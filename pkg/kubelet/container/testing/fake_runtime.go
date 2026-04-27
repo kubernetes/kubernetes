@@ -237,6 +237,27 @@ func (f *FakeRuntime) GetPods(_ context.Context, all bool) ([]*kubecontainer.Pod
 	return pods, f.Err
 }
 
+func (f *FakeRuntime) GetPod(_ context.Context, podUID types.UID) (*kubecontainer.Pod, error) {
+	f.Lock()
+	defer f.Unlock()
+
+	if f.Err != nil {
+		return nil, f.Err
+	}
+
+	for _, fakePod := range f.PodList {
+		if fakePod.Pod.ID == podUID {
+			return fakePod.Pod, nil
+		}
+	}
+	for _, fakePod := range f.AllPodList {
+		if fakePod.Pod.ID == podUID {
+			return fakePod.Pod, nil
+		}
+	}
+	return nil, kubecontainer.ErrPodNotFound
+}
+
 func (f *FakeRuntime) SyncPod(_ context.Context, pod *v1.Pod, _ *kubecontainer.PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff, _ bool) (result kubecontainer.PodSyncResult) {
 	f.Lock()
 	defer f.Unlock()
@@ -303,7 +324,7 @@ func (f *FakeRuntime) GeneratePodStatus(event *runtimeapi.ContainerEventResponse
 	return &status
 }
 
-func (f *FakeRuntime) GetPodStatus(_ context.Context, uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
+func (f *FakeRuntime) GetPodStatus(_ context.Context, pod *kubecontainer.Pod) (*kubecontainer.PodStatus, error) {
 	f.Lock()
 	defer f.Unlock()
 

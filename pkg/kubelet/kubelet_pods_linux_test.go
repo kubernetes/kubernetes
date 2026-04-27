@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/ptr"
@@ -452,6 +453,10 @@ func TestMakeMounts(t *testing.T) {
 		for _, featureEnabled := range tc.imageVolumeFeatureEnabled {
 			name := fmt.Sprintf("features.ImageVolume is %v, %s", featureEnabled, name)
 			t.Run(name, func(t *testing.T) {
+				if !featureEnabled {
+					// Set emulation version to v1.35 (last version before GA) to allow disabling the feature gate
+					featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+				}
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImageVolume, featureEnabled)
 				fhu := hostutil.NewFakeHostUtil(nil)
 				fsp := &subpath.FakeSubpath{}

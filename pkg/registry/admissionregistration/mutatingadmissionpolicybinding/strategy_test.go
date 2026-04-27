@@ -22,6 +22,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/registry/admissionregistration/resolver"
 
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
@@ -124,4 +127,75 @@ func validPolicyBindings() []*admissionregistration.MutatingAdmissionPolicyBindi
 			},
 		},
 	}
+}
+
+func validPolicyBinding() *admissionregistration.MutatingAdmissionPolicyBinding {
+	return validPolicyBindings()[0]
+}
+
+func TestStaticSuffixWarningsAndValidation(t *testing.T) {
+	strategy := NewStrategy(nil, nil, replicaLimitsResolver)
+	ctx := genericapirequest.NewDefaultContext()
+	staticName := "my-binding.static.k8s.io"
+
+	makeConfig := func(name string) *admissionregistration.MutatingAdmissionPolicyBinding {
+		cfg := validPolicyBinding()
+		cfg.Name = name
+		return cfg
+	}
+
+	t.Run("feature gate disabled warns on create", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ManifestBasedAdmissionControlConfig, false)
+		warnings := strategy.WarningsOnCreate(ctx, makeConfig(staticName))
+		if len(warnings) == 0 {
+			t.Error("Expected warning for .static.k8s.io suffix when feature gate is disabled")
+		}
+	})
+
+	t.Run("feature gate disabled warns on update", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ManifestBasedAdmissionControlConfig, false)
+		warnings := strategy.WarningsOnUpdate(ctx, makeConfig(staticName), makeConfig(staticName))
+		if len(warnings) == 0 {
+			t.Error("Expected warning for .static.k8s.io suffix when feature gate is disabled")
+		}
+	})
+
+	t.Run("feature gate disabled no warning for normal name", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ManifestBasedAdmissionControlConfig, false)
+		warnings := strategy.WarningsOnCreate(ctx, makeConfig("normal-binding"))
+		if len(warnings) != 0 {
+			t.Errorf("Expected no warnings for normal name, got: %v", warnings)
+		}
+	})
+
+	t.Run("feature gate enabled rejects static suffix on create", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ManifestBasedAdmissionControlConfig, true)
+		errs := strategy.Validate(ctx, makeConfig(staticName))
+		found := false
+		for _, e := range errs {
+			if e.Field == "metadata.name" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("Expected validation error for .static.k8s.io suffix when feature gate is enabled")
+		}
+	})
+
+	t.Run("feature gate enabled no warning on create", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ManifestBasedAdmissionControlConfig, true)
+		warnings := strategy.WarningsOnCreate(ctx, makeConfig(staticName))
+		if len(warnings) != 0 {
+			t.Errorf("Expected no warnings when feature gate is enabled (validation handles it), got: %v", warnings)
+		}
+	})
+
+	t.Run("feature gate enabled warns on update", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ManifestBasedAdmissionControlConfig, true)
+		warnings := strategy.WarningsOnUpdate(ctx, makeConfig(staticName), makeConfig(staticName))
+		if len(warnings) == 0 {
+			t.Error("Expected warning for .static.k8s.io suffix on update even when feature gate is enabled")
+		}
+	})
 }

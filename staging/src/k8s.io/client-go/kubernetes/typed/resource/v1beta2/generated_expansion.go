@@ -20,6 +20,8 @@ package v1beta2
 
 type DeviceClassExpansion interface{}
 
+type DeviceTaintRuleExpansion interface{}
+
 type ResourceClaimExpansion interface{}
 
 type ResourceClaimTemplateExpansion interface{}

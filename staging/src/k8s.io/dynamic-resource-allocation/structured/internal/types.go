@@ -81,6 +81,7 @@ type Features struct {
 	ConsumableCapacity     bool
 	DeviceBindingAndStatus bool
 	DeviceTaints           bool
+	ListTypeAttributes     bool
 	PartitionableDevices   bool
 	PrioritizedList        bool
 }
@@ -102,6 +103,9 @@ func (f Features) Set() sets.Set[string] {
 	if f.DeviceTaints {
 		enabled.Insert("DRADeviceTaints")
 	}
+	if f.ListTypeAttributes {
+		enabled.Insert("DRAListTypeAttributes")
+	}
 	if f.PartitionableDevices {
 		enabled.Insert("DRAPartitionableDevices")
 	}
@@ -119,6 +123,7 @@ var FeaturesAll = Features{
 	ConsumableCapacity:     true,
 	DeviceBindingAndStatus: true,
 	DeviceTaints:           true,
+	ListTypeAttributes:     true,
 	PartitionableDevices:   true,
 	PrioritizedList:        true,
 }

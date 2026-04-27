@@ -26,6 +26,8 @@ import (
 var (
 	// RandShuffle pseudo-randomizes the order of addresses.
 	RandShuffle = rand.Shuffle
+	// RandFloat64 returns, as a float64, a pseudo-random number in [0.0,1.0).
+	RandFloat64 = rand.Float64
 	// TimeAfterFunc allows mocking the timer for testing connection delay
 	// related functionality.
 	TimeAfterFunc = func(d time.Duration, f func()) func() {

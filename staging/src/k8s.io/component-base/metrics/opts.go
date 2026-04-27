@@ -18,18 +18,13 @@ package metrics
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	yaml "go.yaml.in/yaml/v2"
-	"k8s.io/apimachinery/pkg/util/sets"
+	internalmetrics "k8s.io/component-base/metrics/internal"
 	promext "k8s.io/component-base/metrics/prometheusextension"
-	"k8s.io/klog/v2"
 )
 
 var (
@@ -201,7 +196,7 @@ func (o *HistogramOpts) annotateStabilityLevel() {
 // convenience function to allow easy transformation to the prometheus
 // counterpart. This will do more once we have a proper label abstraction
 func (o *HistogramOpts) toPromHistogramOpts() prometheus.HistogramOpts {
-	return prometheus.HistogramOpts{
+	opts := prometheus.HistogramOpts{
 		Namespace:   o.Namespace,
 		Subsystem:   o.Subsystem,
 		Name:        o.Name,
@@ -209,6 +204,16 @@ func (o *HistogramOpts) toPromHistogramOpts() prometheus.HistogramOpts {
 		ConstLabels: o.ConstLabels,
 		Buckets:     o.Buckets,
 	}
+
+	// When native histograms are enabled, configure exponential bucket options
+	// to expose metrics in both classic and native histogram formats.
+	if internalmetrics.NativeHistogramsEnabled() {
+		nativeOpts := internalmetrics.NativeHistogramConfig()
+		opts.NativeHistogramBucketFactor = nativeOpts.BucketFactor
+		opts.NativeHistogramMaxBucketNumber = nativeOpts.MaxBucketNumber
+	}
+
+	return opts
 }
 
 // TimingHistogramOpts bundles the options for creating a TimingHistogram metric. It is
@@ -324,67 +329,4 @@ func (o *SummaryOpts) toPromSummaryOpts() prometheus.SummaryOpts {
 		AgeBuckets:  o.AgeBuckets,
 		BufCap:      o.BufCap,
 	}
-}
-
-type MetricLabelAllowList struct {
-	labelToAllowList map[string]sets.Set[string]
-}
-
-func (allowList *MetricLabelAllowList) ConstrainToAllowedList(labelNameList, labelValueList []string) {
-	for index, value := range labelValueList {
-		name := labelNameList[index]
-		if allowValues, ok := allowList.labelToAllowList[name]; ok {
-			if !allowValues.Has(value) {
-				labelValueList[index] = "unexpected"
-				cardinalityEnforcementUnexpectedCategorizationsTotal.Inc()
-			}
-		}
-	}
-}
-
-func (allowList *MetricLabelAllowList) ConstrainLabelMap(labels map[string]string) {
-	for name, value := range labels {
-		if allowValues, ok := allowList.labelToAllowList[name]; ok {
-			if !allowValues.Has(value) {
-				labels[name] = "unexpected"
-				cardinalityEnforcementUnexpectedCategorizationsTotal.Inc()
-			}
-		}
-	}
-}
-
-func SetLabelAllowListFromCLI(allowListMapping map[string]string) {
-	allowListLock.Lock()
-	defer allowListLock.Unlock()
-	for metricLabelName, labelValues := range allowListMapping {
-		metricName := strings.Split(metricLabelName, ",")[0]
-		labelName := strings.Split(metricLabelName, ",")[1]
-		valueSet := sets.New[string](strings.Split(labelValues, ",")...)
-
-		allowList, ok := labelValueAllowLists[metricName]
-		if ok {
-			allowList.labelToAllowList[labelName] = valueSet
-		} else {
-			labelToAllowList := make(map[string]sets.Set[string])
-			labelToAllowList[labelName] = valueSet
-			labelValueAllowLists[metricName] = &MetricLabelAllowList{
-				labelToAllowList,
-			}
-		}
-	}
-}
-
-func SetLabelAllowListFromManifest(manifest string) {
-	allowListMapping := make(map[string]string)
-	data, err := os.ReadFile(filepath.Clean(manifest))
-	if err != nil {
-		klog.Errorf("Failed to read allow list manifest: %v", err)
-		return
-	}
-	err = yaml.Unmarshal(data, &allowListMapping)
-	if err != nil {
-		klog.Errorf("Failed to parse allow list manifest: %v", err)
-		return
-	}
-	SetLabelAllowListFromCLI(allowListMapping)
 }

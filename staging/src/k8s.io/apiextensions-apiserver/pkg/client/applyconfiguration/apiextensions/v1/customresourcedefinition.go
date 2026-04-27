@@ -19,8 +19,11 @@ limitations under the License.
 package v1
 
 import (
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	internal "k8s.io/apiextensions-apiserver/pkg/client/applyconfiguration/internal"
 	apismetav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	metav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -48,6 +51,46 @@ func CustomResourceDefinition(name string) *CustomResourceDefinitionApplyConfigu
 	b.WithKind("CustomResourceDefinition")
 	b.WithAPIVersion("apiextensions.k8s.io/v1")
 	return b
+}
+
+// ExtractCustomResourceDefinitionFrom extracts the applied configuration owned by fieldManager from
+// customResourceDefinition for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// customResourceDefinition must be a unmodified CustomResourceDefinition API object that was retrieved from the Kubernetes API.
+// ExtractCustomResourceDefinitionFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractCustomResourceDefinitionFrom(customResourceDefinition *apiextensionsv1.CustomResourceDefinition, fieldManager string, subresource string) (*CustomResourceDefinitionApplyConfiguration, error) {
+	b := &CustomResourceDefinitionApplyConfiguration{}
+	err := managedfields.ExtractInto(customResourceDefinition, internal.Parser().Type("io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinition"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(customResourceDefinition.Name)
+
+	b.WithKind("CustomResourceDefinition")
+	b.WithAPIVersion("apiextensions.k8s.io/v1")
+	return b, nil
+}
+
+// ExtractCustomResourceDefinition extracts the applied configuration owned by fieldManager from
+// customResourceDefinition. If no managedFields are found in customResourceDefinition for fieldManager, a
+// CustomResourceDefinitionApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// customResourceDefinition must be a unmodified CustomResourceDefinition API object that was retrieved from the Kubernetes API.
+// ExtractCustomResourceDefinition provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractCustomResourceDefinition(customResourceDefinition *apiextensionsv1.CustomResourceDefinition, fieldManager string) (*CustomResourceDefinitionApplyConfiguration, error) {
+	return ExtractCustomResourceDefinitionFrom(customResourceDefinition, fieldManager, "")
+}
+
+// ExtractCustomResourceDefinitionStatus extracts the applied configuration owned by fieldManager from
+// customResourceDefinition for the status subresource.
+func ExtractCustomResourceDefinitionStatus(customResourceDefinition *apiextensionsv1.CustomResourceDefinition, fieldManager string) (*CustomResourceDefinitionApplyConfiguration, error) {
+	return ExtractCustomResourceDefinitionFrom(customResourceDefinition, fieldManager, "status")
 }
 
 func (b CustomResourceDefinitionApplyConfiguration) IsApplyConfiguration() {}

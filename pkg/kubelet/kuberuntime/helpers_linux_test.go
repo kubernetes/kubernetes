@@ -267,7 +267,7 @@ func TestSharesToMilliCPU(t *testing.T) {
 			if testMilliCPU < 2 {
 				expectedMilliCPU = 2
 			}
-			milliCPU := sharesToMilliCPU(shares)
+			milliCPU := cm.SharesToMilliCPU(shares)
 			if milliCPU != expectedMilliCPU {
 				t.Errorf("Test sharesToMilliCPU: Input shares %v, expected milliCPU %v, but got %v", shares, expectedMilliCPU, milliCPU)
 			}
@@ -307,7 +307,7 @@ func TestQuotaToMilliCPU(t *testing.T) {
 			expected: int64(1500),
 		}} {
 		t.Run(tc.name, func(t *testing.T) {
-			milliCPU := quotaToMilliCPU(tc.quota, tc.period)
+			milliCPU := cm.QuotaToMilliCPU(tc.quota, tc.period)
 			if milliCPU != tc.expected {
 				t.Errorf("Test %s: Input quota %v and period %v, expected milliCPU %v, but got %v", tc.name, tc.quota, tc.period, tc.expected, milliCPU)
 			}

@@ -114,28 +114,28 @@ func TestTranscodeRawTypes(t *testing.T) {
 			Out: &map[string][]runtime.RawExtension{"hello": {{Raw: []byte(`7`)}}},
 		},
 		{
-			In:  &metav1.FieldsV1{Raw: []byte{0xa0}},
-			Out: &metav1.FieldsV1{Raw: []byte(`{}`)},
+			In:  metav1.NewFieldsV1(string([]byte{0xa0})),
+			Out: metav1.NewFieldsV1(`{}`),
 		},
 		{
 			In:  &metav1.FieldsV1{},
 			Out: &metav1.FieldsV1{},
 		},
 		{
-			In:  metav1.FieldsV1{Raw: []byte{0xa0}},
-			Out: metav1.FieldsV1{Raw: []byte{0xa0}}, // not addressable
+			In:  *metav1.NewFieldsV1(string([]byte{0xa0})),
+			Out: *metav1.NewFieldsV1(string([]byte{0xa0})), // not addressable
 		},
 		{
-			In:  &[...]metav1.FieldsV1{{Raw: []byte{0xa0}}, {Raw: []byte{0xf6}}},
-			Out: &[...]metav1.FieldsV1{{Raw: []byte(`{}`)}, {Raw: []byte(`null`)}},
+			In:  &[...]metav1.FieldsV1{*metav1.NewFieldsV1(string([]byte{0xa0})), *metav1.NewFieldsV1(string([]byte{0xf6}))},
+			Out: &[...]metav1.FieldsV1{*metav1.NewFieldsV1(`{}`), *metav1.NewFieldsV1(`null`)},
 		},
 		{
 			In:  &[0]metav1.FieldsV1{},
 			Out: &[0]metav1.FieldsV1{},
 		},
 		{
-			In:  &[]metav1.FieldsV1{{Raw: []byte{0xa0}}, {Raw: []byte{0xf6}}},
-			Out: &[]metav1.FieldsV1{{Raw: []byte(`{}`)}, {Raw: []byte(`null`)}},
+			In:  &[]metav1.FieldsV1{*metav1.NewFieldsV1(string([]byte{0xa0})), *metav1.NewFieldsV1(string([]byte{0xf6}))},
+			Out: &[]metav1.FieldsV1{*metav1.NewFieldsV1(`{}`), *metav1.NewFieldsV1(`null`)},
 		},
 		{
 			In:  &[]metav1.FieldsV1{},
@@ -146,34 +146,34 @@ func TestTranscodeRawTypes(t *testing.T) {
 			Out: (*metav1.FieldsV1)(nil),
 		},
 		{
-			In:  &struct{ I fmt.Stringer }{I: &metav1.FieldsV1{Raw: []byte{0xa0}}},
-			Out: &struct{ I fmt.Stringer }{I: &metav1.FieldsV1{Raw: []byte(`{}`)}},
+			In:  &struct{ I fmt.Stringer }{I: metav1.NewFieldsV1(string([]byte{0xa0}))},
+			Out: &struct{ I fmt.Stringer }{I: metav1.NewFieldsV1(`{}`)},
 		},
 		{
 			In: &struct {
 				E metav1.FieldsV1
 				I int64
-			}{E: metav1.FieldsV1{Raw: []byte{0xa0}}, I: 7},
+			}{E: *metav1.NewFieldsV1(string([]byte{0xa0})), I: 7},
 			Out: &struct {
 				E metav1.FieldsV1
 				I int64
-			}{E: metav1.FieldsV1{Raw: []byte(`{}`)}, I: 7},
+			}{E: *metav1.NewFieldsV1(`{}`), I: 7},
 		},
 		{
 			In: &struct {
 				metav1.FieldsV1
-			}{FieldsV1: metav1.FieldsV1{Raw: []byte{0xa0}}},
+			}{FieldsV1: *metav1.NewFieldsV1(string([]byte{0xa0}))},
 			Out: &struct {
 				metav1.FieldsV1
-			}{FieldsV1: metav1.FieldsV1{Raw: []byte(`{}`)}},
+			}{FieldsV1: *metav1.NewFieldsV1(`{}`)},
 		},
 		{
-			In:  &map[string]metav1.FieldsV1{"hello": {Raw: []byte{0xa0}}},
-			Out: &map[string]metav1.FieldsV1{"hello": {Raw: []byte{0xa0}}}, // not addressable
+			In:  &map[string]metav1.FieldsV1{"hello": *metav1.NewFieldsV1(string([]byte{0xa0}))},
+			Out: &map[string]metav1.FieldsV1{"hello": *metav1.NewFieldsV1(string([]byte{0xa0}))}, // not addressable
 		},
 		{
-			In:  &map[string][]metav1.FieldsV1{"hello": {{Raw: []byte{0xa0}}}},
-			Out: &map[string][]metav1.FieldsV1{"hello": {{Raw: []byte(`{}`)}}},
+			In:  &map[string][]metav1.FieldsV1{"hello": {*metav1.NewFieldsV1(string([]byte{0xa0}))}},
+			Out: &map[string][]metav1.FieldsV1{"hello": {*metav1.NewFieldsV1(`{}`)}},
 		},
 	} {
 		t.Run(fmt.Sprintf("%#v", tc.In), func(t *testing.T) {

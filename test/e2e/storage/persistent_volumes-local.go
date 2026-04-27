@@ -576,9 +576,9 @@ var _ = utils.SIGDescribe("PersistentVolumes-local", func() {
 					return
 				}
 
-				for i := 0; i < numConcurrentPods; i++ {
+				for range numConcurrentPods {
 					pvcs := []*v1.PersistentVolumeClaim{}
-					for j := 0; j < volsPerPod; j++ {
+					for range volsPerPod {
 						pvc := e2epv.MakePersistentVolumeClaim(makeLocalPVCConfig(config, volType), config.ns)
 						pvc, err := e2epv.CreatePVC(ctx, config.client, config.ns, pvc)
 						framework.ExpectNoError(err)
@@ -776,7 +776,7 @@ func podNodeName(ctx context.Context, config *localTestConfig, pod *v1.Pod) (str
 // setupLocalVolumes sets up directories to use for local PV
 func setupLocalVolumes(ctx context.Context, config *localTestConfig, localVolumeType localVolumeType, node *v1.Node, count int) []*localTestVolume {
 	vols := []*localTestVolume{}
-	for i := 0; i < count; i++ {
+	for range count {
 		ltrType, ok := setupLocalVolumeMap[localVolumeType]
 		if !ok {
 			framework.Failf("Invalid localVolumeType: %v", localVolumeType)
@@ -1081,7 +1081,7 @@ func newLocalClaimWithName(config *localTestConfig, name string) *v1.PersistentV
 func createStatefulSet(ctx context.Context, config *localTestConfig, ssReplicas int32, volumeCount int, anti, parallel bool) *appsv1.StatefulSet {
 	mounts := []v1.VolumeMount{}
 	claims := []v1.PersistentVolumeClaim{}
-	for i := 0; i < volumeCount; i++ {
+	for i := range volumeCount {
 		name := fmt.Sprintf("vol%v", i+1)
 		pvc := newLocalClaimWithName(config, name)
 		mounts = append(mounts, v1.VolumeMount{Name: name, MountPath: "/" + name})

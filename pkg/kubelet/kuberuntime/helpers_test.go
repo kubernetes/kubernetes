@@ -18,7 +18,10 @@ package kuberuntime
 
 import (
 	"context"
+	"fmt"
+	"sort"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -38,10 +41,23 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-type podStatusProviderFunc func(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error)
+type fakePodStatusProvider struct {
+	pod    *kubecontainer.Pod
+	status *kubecontainer.PodStatus
+}
 
-func (f podStatusProviderFunc) GetPodStatus(_ context.Context, uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
-	return f(uid, name, namespace)
+func (f fakePodStatusProvider) GetPod(_ context.Context, uid types.UID) (*kubecontainer.Pod, error) {
+	if uid != f.pod.ID {
+		return nil, fmt.Errorf("unexpected pod UID: got %s, want %s", uid, f.pod.ID)
+	}
+	return f.pod, nil
+}
+
+func (f fakePodStatusProvider) GetPodStatus(_ context.Context, pod *kubecontainer.Pod) (*kubecontainer.PodStatus, error) {
+	if pod != f.pod {
+		return nil, fmt.Errorf("Unexpected pod: %v", pod)
+	}
+	return f.status, nil
 }
 
 func TestIsInitContainerFailed(t *testing.T) {
@@ -585,4 +601,219 @@ func TestConvertResourceConfigToLinuxContainerResources(t *testing.T) {
 	assert.Equal(t, int64(*resCfg.CPUShares), lcr.CpuShares)
 	assert.Equal(t, *resCfg.Memory, lcr.MemoryLimitInBytes)
 	assert.Equal(t, resCfg.Unified, lcr.Unified)
+}
+
+func TestContainerByCreatedThenID(t *testing.T) {
+	now := time.Now()
+
+	tests := []struct {
+		name     string
+		input    []*runtimeapi.Container
+		expected []*runtimeapi.Container
+	}{
+		{
+			name: "different CreatedAt sort by time desc (newest first)",
+			input: []*runtimeapi.Container{
+				{Id: "c1", CreatedAt: now.Add(-30 * time.Minute).Unix()},
+				{Id: "c2", CreatedAt: now.Unix()},
+				{Id: "c3", CreatedAt: now.Add(-10 * time.Minute).Unix()},
+			},
+			expected: []*runtimeapi.Container{
+				{Id: "c2"}, // newest
+				{Id: "c3"},
+				{Id: "c1"}, // oldest
+			},
+		},
+		{
+			name: "same CreatedAt sort by ID asc",
+			input: []*runtimeapi.Container{
+				{Id: "container-zzz", CreatedAt: now.Unix()},
+				{Id: "container-aaa", CreatedAt: now.Unix()},
+				{Id: "container-mmm", CreatedAt: now.Unix()},
+			},
+			expected: []*runtimeapi.Container{
+				{Id: "container-aaa"},
+				{Id: "container-mmm"},
+				{Id: "container-zzz"},
+			},
+		},
+		{
+			name: "mixed: some same time, some different",
+			input: []*runtimeapi.Container{
+				{Id: "c-old-2", CreatedAt: now.Add(-1 * time.Hour).Unix()},
+				{Id: "c-new-1", CreatedAt: now.Unix()},
+				{Id: "c-group-b", CreatedAt: now.Unix()},
+				{Id: "c-group-a", CreatedAt: now.Unix()},
+				{Id: "c-old-1", CreatedAt: now.Add(-1 * time.Hour).Unix()},
+			},
+			expected: []*runtimeapi.Container{
+				{Id: "c-group-a"},
+				{Id: "c-group-b"},
+				{Id: "c-new-1"},
+				{Id: "c-old-1"},
+				{Id: "c-old-2"},
+			},
+		},
+		{
+			name:     "empty slice",
+			input:    []*runtimeapi.Container{},
+			expected: []*runtimeapi.Container{},
+		},
+		{
+			name: "single element",
+			input: []*runtimeapi.Container{
+				{Id: "only-one", CreatedAt: now.Add(-5 * time.Minute).Unix()},
+			},
+			expected: []*runtimeapi.Container{
+				{Id: "only-one"},
+			},
+		},
+		{
+			name: "all CreatedAt same, IDs already sorted should remain stable",
+			input: []*runtimeapi.Container{
+				{Id: "id-001", CreatedAt: now.Unix()},
+				{Id: "id-002", CreatedAt: now.Unix()},
+				{Id: "id-003", CreatedAt: now.Unix()},
+			},
+			expected: []*runtimeapi.Container{
+				{Id: "id-001"},
+				{Id: "id-002"},
+				{Id: "id-003"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			containers := make([]*runtimeapi.Container, len(tt.input))
+			copy(containers, tt.input)
+
+			sort.Sort(containerByCreatedThenID(containers))
+
+			assert.Len(t, containers, len(tt.expected), "length mismatch")
+
+			for i := range tt.expected {
+				assert.Equal(t, tt.expected[i].Id, containers[i].Id, "ID mismatch at index %d", i)
+			}
+		})
+	}
+}
+
+func TestPodSandboxByCreatedThenID(t *testing.T) {
+	now := time.Now()
+
+	tests := []struct {
+		name     string
+		input    []*runtimeapi.PodSandbox
+		expected []string
+	}{
+		{
+			name: "different Attempt higher Attempt first",
+			input: []*runtimeapi.PodSandbox{
+				{
+					Id:        "sandbox-c",
+					CreatedAt: now.UnixNano(),
+					Metadata:  &runtimeapi.PodSandboxMetadata{Attempt: 0},
+				},
+				{
+					Id:        "sandbox-a",
+					CreatedAt: now.UnixNano(),
+					Metadata:  &runtimeapi.PodSandboxMetadata{Attempt: 2},
+				},
+				{
+					Id:        "sandbox-b",
+					CreatedAt: now.UnixNano(),
+					Metadata:  &runtimeapi.PodSandboxMetadata{Attempt: 1},
+				},
+			},
+			expected: []string{"sandbox-a", "sandbox-b", "sandbox-c"},
+		},
+		{
+			name: "same Attempt newer CreatedAt first",
+			input: []*runtimeapi.PodSandbox{
+				{
+					Id:        "old",
+					CreatedAt: now.Add(-10 * time.Minute).UnixNano(),
+					Metadata:  &runtimeapi.PodSandboxMetadata{Attempt: 5},
+				},
+				{
+					Id:        "newest",
+					CreatedAt: now.UnixNano(),
+					Metadata:  &runtimeapi.PodSandboxMetadata{Attempt: 5},
+				},
+				{
+					Id:        "medium",
+					CreatedAt: now.Add(-5 * time.Minute).UnixNano(),
+					Metadata:  &runtimeapi.PodSandboxMetadata{Attempt: 5},
+				},
+			},
+			expected: []string{"newest", "medium", "old"},
+		},
+		{
+			name: "same Attempt and CreatedAt sort by Id ascending",
+			input: []*runtimeapi.PodSandbox{
+				{Id: "zzz-3", CreatedAt: now.UnixNano(), Metadata: &runtimeapi.PodSandboxMetadata{Attempt: 1}},
+				{Id: "aaa-1", CreatedAt: now.UnixNano(), Metadata: &runtimeapi.PodSandboxMetadata{Attempt: 1}},
+				{Id: "mmm-2", CreatedAt: now.UnixNano(), Metadata: &runtimeapi.PodSandboxMetadata{Attempt: 1}},
+			},
+			expected: []string{"aaa-1", "mmm-2", "zzz-3"},
+		},
+		{
+			name: "mixed: Attempt CreatedAt + Id",
+			input: []*runtimeapi.PodSandbox{
+				{Id: "c1", CreatedAt: now.UnixNano(), Metadata: &runtimeapi.PodSandboxMetadata{Attempt: 0}},
+				{Id: "a2", CreatedAt: now.Add(-20 * time.Minute).UnixNano(), Metadata: &runtimeapi.PodSandboxMetadata{Attempt: 2}},
+				{Id: "b3", CreatedAt: now.UnixNano(), Metadata: &runtimeapi.PodSandboxMetadata{Attempt: 1}},
+				{Id: "group-b", CreatedAt: now.UnixNano(), Metadata: &runtimeapi.PodSandboxMetadata{Attempt: 1}},
+				{Id: "group-a", CreatedAt: now.UnixNano(), Metadata: &runtimeapi.PodSandboxMetadata{Attempt: 1}},
+			},
+			expected: []string{
+				"a2",
+				"b3",
+				"group-a",
+				"group-b",
+				"c1",
+			},
+		},
+		{
+			name:     "empty slice",
+			input:    []*runtimeapi.PodSandbox{},
+			expected: []string{},
+		},
+		{
+			name: "single sandbox",
+			input: []*runtimeapi.PodSandbox{
+				{Id: "single", CreatedAt: now.UnixNano(), Metadata: &runtimeapi.PodSandboxMetadata{Attempt: 3}},
+			},
+			expected: []string{"single"},
+		},
+		{
+			name: "Metadata nil fallback only CreatedAt then Id",
+			input: []*runtimeapi.PodSandbox{
+				{Id: "nil-b", CreatedAt: now.UnixNano(), Metadata: nil},
+				{Id: "nil-a", CreatedAt: now.UnixNano(), Metadata: nil},
+				{Id: "with-meta", CreatedAt: now.UnixNano(), Metadata: &runtimeapi.PodSandboxMetadata{Attempt: 0}},
+			},
+			expected: []string{"nil-a", "nil-b", "with-meta"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sandboxes := make([]*runtimeapi.PodSandbox, len(tt.input))
+			copy(sandboxes, tt.input)
+
+			sort.Sort(podSandboxByCreatedThenID(sandboxes))
+
+			assert.Len(t, sandboxes, len(tt.expected), "length mismatch")
+
+			actualIDs := make([]string, len(sandboxes))
+			for i, s := range sandboxes {
+				actualIDs[i] = s.Id
+			}
+
+			assert.Equal(t, tt.expected, actualIDs, "sorting order mismatch")
+		})
+	}
 }

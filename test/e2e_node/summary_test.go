@@ -405,7 +405,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 		})
 
 		ginkgo.It("should report Memory pressure in PSI metrics", func(ctx context.Context) {
-			runtime, _, err := getCRIClient()
+			runtime, _, err := getCRIClient(ctx)
 			framework.ExpectNoError(err)
 			resp, err := runtime.Version(ctx, "")
 			framework.ExpectNoError(err)

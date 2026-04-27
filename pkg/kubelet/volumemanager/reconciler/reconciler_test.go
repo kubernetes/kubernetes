@@ -2017,10 +2017,14 @@ func waitForUnmount(
 	err := retryWithExponentialBackOff(
 		testOperationBackOffDuration,
 		func() (bool, error) {
-			if asw.PodHasMountedVolumes(podName) {
-				return false, nil
+			// GetAllMountedVolumes includes both VolumeMounted and VolumeMountUncertain
+			// states, so this correctly detects unmount for reconstructed (uncertain)
+			// volumes as well as normally mounted volumes.
+			for _, v := range asw.GetAllMountedVolumes() {
+				if v.PodName == podName {
+					return false, nil
+				}
 			}
-
 			return true, nil
 		},
 	)
@@ -2586,6 +2590,21 @@ func TestReconstructedVolumeShouldUnmountSucceedAfterSetupFailed(t *testing.T) {
 
 	// Act first reconcile to trigger mount reconstructed volume
 	reconciler.reconcile(ctx)
+
+	// Wait for the async mount operation to actually complete before proceeding.
+	// The mount runs in a goroutine and creates directories on disk. We must
+	// wait for it to finish so the subsequent unmount is not blocked by a
+	// pending mount operation.
+	err = retryWithExponentialBackOff(
+		testOperationBackOffDuration,
+		func() (bool, error) {
+			return volumetesting.VerifySetUpCallCount(1, fakePlugin) == nil, nil
+		},
+	)
+	if err != nil {
+		t.Fatalf("Timed out waiting for mount operation to complete")
+	}
+
 	waitForUncertainPodMount(t, generatedVolumeName, podName, asw)
 
 	// mock remove pod

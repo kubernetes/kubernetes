@@ -243,12 +243,17 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		}
 	}
 
+	isRestartableInitContainer := w.isInitContainer() &&
+		w.container.RestartPolicy != nil &&
+		*w.container.RestartPolicy == v1.ContainerRestartPolicyAlways
+
 	if w.containerID.String() != c.ContainerID {
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Remove(w.containerID)
 		}
 
 		w.containerID = kubecontainer.ParseContainerID(c.ContainerID)
+
 		if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) {
 			// On kubelet restart, we don't want to immediately set the probe result to Failure,
 			// as this could cause a container that was Ready to become NotReady.
@@ -259,6 +264,18 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 					isRestart = true
 				}
 			}
+
+			// For restartable init containers (sidecars) with a startup probe, seed the
+			// startup result with Success if the container had already started before the
+			// kubelet restarted. This ensures startupManager.Get() returns a valid result,
+			// allowing computeInitContainerActions to detect pod initialization.
+			// See https://github.com/kubernetes/kubernetes/issues/136910
+			if isRestartableInitContainer && w.probeType == startup {
+				if c.Started != nil && *c.Started {
+					w.resultsManager.Set(w.containerID, results.Success, w.pod)
+				}
+			}
+
 			if !isRestart {
 				w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
 			}
@@ -281,9 +298,6 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 		if !w.containerID.IsEmpty() {
 			w.resultsManager.Set(w.containerID, results.Failure, w.pod)
 		}
-
-		isRestartableInitContainer := w.isInitContainer() &&
-			w.container.RestartPolicy != nil && *w.container.RestartPolicy == v1.ContainerRestartPolicyAlways
 
 		// Abort if the container will not be restarted.
 		if utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) {

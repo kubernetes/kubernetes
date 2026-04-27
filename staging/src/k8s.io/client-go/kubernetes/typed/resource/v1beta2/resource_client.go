@@ -29,6 +29,7 @@ import (
 type ResourceV1beta2Interface interface {
 	RESTClient() rest.Interface
 	DeviceClassesGetter
+	DeviceTaintRulesGetter
 	ResourceClaimsGetter
 	ResourceClaimTemplatesGetter
 	ResourceSlicesGetter
@@ -41,6 +42,10 @@ type ResourceV1beta2Client struct {
 
 func (c *ResourceV1beta2Client) DeviceClasses() DeviceClassInterface {
 	return newDeviceClasses(c)
+}
+
+func (c *ResourceV1beta2Client) DeviceTaintRules() DeviceTaintRuleInterface {
+	return newDeviceTaintRules(c)
 }
 
 func (c *ResourceV1beta2Client) ResourceClaims(namespace string) ResourceClaimInterface {

@@ -39,6 +39,14 @@ type Struct struct {
 	// +k8s:unionMember
 	// +k8s:optional
 	M2 *M2 `json:"m2"`
+
+	// +k8s:unionMember
+	// +k8s:optional
+	M3 []string `json:"m3"`
+
+	// +k8s:unionMember
+	// +k8s:optional
+	M4 map[string]string `json:"m4"`
 }
 
 type D string
@@ -46,6 +54,8 @@ type D string
 const (
 	DM1 D = "M1"
 	DM2 D = "M2"
+	DM3 D = "M3"
+	DM4 D = "M4"
 )
 
 type M1 struct{}

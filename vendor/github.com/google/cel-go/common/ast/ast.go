@@ -16,6 +16,8 @@
 package ast
 
 import (
+	"slices"
+
 	"github.com/google/cel-go/common"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
@@ -160,6 +162,26 @@ func MaxID(a *AST) int64 {
 	return visitor.maxID + 1
 }
 
+// IDs returns the set of AST node IDs, including macro calls.
+func (a *AST) IDs() map[int64]bool {
+	visitor := make(idVisitor)
+	PostOrderVisit(a.Expr(), visitor)
+	for _, call := range a.SourceInfo().MacroCalls() {
+		PostOrderVisit(call, visitor)
+	}
+	return visitor
+}
+
+// ClearUnusedIDs removes IDs not used in the AST or macro calls from SourceInfo.
+func (a *AST) ClearUnusedIDs() {
+	ids := a.IDs()
+	for id := range a.SourceInfo().OffsetRanges() {
+		if !ids[id] {
+			a.SourceInfo().ClearOffsetRange(id)
+		}
+	}
+}
+
 // Heights computes the heights of all AST expressions and returns a map from expression id to height.
 func Heights(a *AST) map[int64]int {
 	visitor := make(heightVisitor)
@@ -230,6 +252,23 @@ type SourceInfo struct {
 	baseCol      int32
 	offsetRanges map[int64]OffsetRange
 	macroCalls   map[int64]Expr
+}
+
+// RenumberIDs performs an in-place update of the expression IDs within the SourceInfo.
+func (s *SourceInfo) RenumberIDs(idGen IDGenerator) {
+	if s == nil {
+		return
+	}
+	oldIDs := []int64{}
+	for id := range s.offsetRanges {
+		oldIDs = append(oldIDs, id)
+	}
+	slices.Sort(oldIDs)
+	newRanges := make(map[int64]OffsetRange)
+	for _, id := range oldIDs {
+		newRanges[idGen(id)] = s.offsetRanges[id]
+	}
+	s.offsetRanges = newRanges
 }
 
 // SyntaxVersion returns the syntax version associated with the text expression.
@@ -365,6 +404,12 @@ func (s *SourceInfo) ComputeOffset(line, col int32) int32 {
 		line = s.baseLine + line
 		col = s.baseCol + col
 	}
+	return s.ComputeOffsetAbsolute(line, col)
+}
+
+// ComputeOffsetAbsolute calculates the 0-based character offset from a 1-based line and 0-based column
+// based on the absolute line and column of the SourceInfo.
+func (s *SourceInfo) ComputeOffsetAbsolute(line, col int32) int32 {
 	if line == 1 {
 		return col
 	}
@@ -532,4 +577,14 @@ func (hv heightVisitor) maxEntryHeight(entries ...EntryExpr) int {
 		}
 	}
 	return max
+}
+
+type idVisitor map[int64]bool
+
+func (v idVisitor) VisitExpr(e Expr) {
+	v[e.ID()] = true
+}
+
+func (v idVisitor) VisitEntryExpr(e EntryExpr) {
+	v[e.ID()] = true
 }

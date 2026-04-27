@@ -115,10 +115,6 @@ func masterExec(ctx context.Context, f *framework.Framework, cmd string) {
 
 	host := ips[0] + ":22"
 	result, err := e2essh.SSH(ctx, cmd, host, framework.TestContext.Provider)
-	framework.ExpectNoError(err)
-	e2essh.LogResult(result)
-
-	result, err = e2essh.SSH(ctx, cmd, host, framework.TestContext.Provider)
 	framework.ExpectNoError(err, "failed to SSH to host %s on provider %s and run command: %q", host, framework.TestContext.Provider, cmd)
 	if result.Code != 0 {
 		e2essh.LogResult(result)

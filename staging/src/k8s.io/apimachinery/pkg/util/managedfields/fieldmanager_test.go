@@ -851,9 +851,9 @@ func TestUpdateViaSubresources(t *testing.T) {
 			Operation:  metav1.ManagedFieldsOperationApply,
 			APIVersion: "apps/v1",
 			FieldsType: "FieldsV1",
-			FieldsV1: &metav1.FieldsV1{
-				Raw: []byte(`{"f:metadata":{"f:labels":{"f:another_field":{}}}}`),
-			},
+			FieldsV1: metav1.NewFieldsV1(
+				`{"f:metadata":{"f:labels":{"f:another_field":{}}}}`,
+			),
 		},
 	})
 

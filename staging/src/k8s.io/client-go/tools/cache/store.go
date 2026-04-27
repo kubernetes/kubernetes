@@ -209,6 +209,10 @@ type cache struct {
 	keyFunc KeyFunc
 	// Called with every object put in the cache.
 	transformer TransformFunc
+	// identifier is used to identify the store for metrics.
+	identifier InformerNameAndResource
+	// metrics is the metrics provider for the store.
+	metrics InformerMetricsProvider
 }
 
 var _ Store = &cache{}
@@ -395,22 +399,41 @@ func WithTransformer(transformer TransformFunc) StoreOption {
 	}
 }
 
+func WithStoreMetrics(identifier InformerNameAndResource, metrics InformerMetricsProvider) StoreOption {
+	return func(c *cache) {
+		c.identifier = identifier
+		c.metrics = metrics
+	}
+}
+
 // NewStore returns a Store implemented simply with a map and a lock.
 func NewStore(keyFunc KeyFunc, opts ...StoreOption) Store {
 	c := &cache{
-		cacheStorage: NewThreadSafeStore(Indexers{}, Indices{}),
-		keyFunc:      keyFunc,
+		keyFunc: keyFunc,
 	}
 	for _, opt := range opts {
 		opt(c)
 	}
+	threadSafeOpts := []ThreadSafeStoreOption{}
+	if c.metrics != nil {
+		threadSafeOpts = append(threadSafeOpts, WithThreadSafeStoreMetrics(c.identifier, c.metrics))
+	}
+	c.cacheStorage = NewThreadSafeStore(Indexers{}, Indices{}, threadSafeOpts...)
 	return c
 }
 
 // NewIndexer returns an Indexer implemented simply with a map and a lock.
-func NewIndexer(keyFunc KeyFunc, indexers Indexers) Indexer {
-	return &cache{
-		cacheStorage: NewThreadSafeStore(indexers, Indices{}),
-		keyFunc:      keyFunc,
+func NewIndexer(keyFunc KeyFunc, indexers Indexers, opts ...StoreOption) Indexer {
+	c := &cache{
+		keyFunc: keyFunc,
 	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	threadSafeOpts := []ThreadSafeStoreOption{}
+	if c.metrics != nil {
+		threadSafeOpts = append(threadSafeOpts, WithThreadSafeStoreMetrics(c.identifier, c.metrics))
+	}
+	c.cacheStorage = NewThreadSafeStore(indexers, Indices{}, threadSafeOpts...)
+	return c
 }

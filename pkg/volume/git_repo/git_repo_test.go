@@ -548,7 +548,6 @@ func doTestSetUp(sc scenario, mounter volume.Mounter) []error {
 	var fakeOutputs []fakeexec.FakeAction
 	var fcmd fakeexec.FakeCmd
 	for _, expected := range expecteds {
-		expected := expected
 		if expected.cmd[1] == "clone" {
 			// Calculate the subdirectory clone would create (if any)
 			// git clone -- https://github.com/kubernetes/kubernetes.git target_dir --> target_dir

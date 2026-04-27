@@ -237,7 +237,9 @@ func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internal
 	}
 
 	informer = newFunc(f.client, resyncPeriod)
-	informer.SetTransform(f.transform)
+	if f.transform != nil {
+		informer.SetTransform(f.transform)
+	}
 	f.informers[informerType] = informer
 
 	return informer
@@ -251,7 +253,7 @@ func (f *sharedInformerFactory) InformerFor(obj runtime.Object, newFunc internal
 //	ctx, cancel := context.WithCancel(context.Background())
 //	defer cancel()
 //	factory := NewSharedInformerFactory(client, resyncPeriod)
-//	defer factory.WaitForStop()    // Returns immediately if nothing was started.
+//	defer factory.Shutdown()    // Returns immediately if nothing was started.
 //	genericInformer := factory.ForResource(resource)
 //	typedInformer := factory.SomeAPIGroup().V1().SomeType()
 //	handle, err := typeInformer.Informer().AddEventHandler(...)

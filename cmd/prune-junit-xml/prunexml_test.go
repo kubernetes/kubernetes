@@ -76,16 +76,16 @@ func TestPruneXML(t *testing.T) {
 func TestPruneTESTS(t *testing.T) {
 	sourceXML := `<?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-	<testsuite tests="6" failures="0" time="5.50000" name="k8s.io/kubernetes/cluster/gce/cos" timestamp="">
+	<testsuite tests="6" failures="0" time="5.50000" name="k8s.io/kubernetes/cluster/gce/gci" timestamp="">
 		<properties>
 			<property name="go.version" value="go1.18 linux/amd64"></property>
 		</properties>
-		<testcase classname="k8s.io/kubernetes/cluster/gce/cos" name="TestServerOverride/ETCD-SERVERS_is_not_set_-_default_override" time="0.950000"></testcase>
-		<testcase classname="k8s.io/kubernetes/cluster/gce/cos" name="TestServerOverride/ETCD-SERVERS_and_ETCD_SERVERS_OVERRIDES_are_set" time="0.660000"></testcase>
-		<testcase classname="k8s.io/kubernetes/cluster/gce/cos" name="TestServerOverride" time="1.610000"></testcase>
-		<testcase classname="k8s.io/kubernetes/cluster/gce/cos" name="TestStorageOptions/storage_options_are_supplied" time="0.860000"></testcase>
-		<testcase classname="k8s.io/kubernetes/cluster/gce/cos" name="TestStorageOptions/storage_options_are_not_supplied" time="0.280000"></testcase>
-		<testcase classname="k8s.io/kubernetes/cluster/gce/cos" name="TestStorageOptions" time="1.140000"></testcase>
+		<testcase classname="k8s.io/kubernetes/cluster/gce/gci" name="TestServerOverride/ETCD-SERVERS_is_not_set_-_default_override" time="0.950000"></testcase>
+		<testcase classname="k8s.io/kubernetes/cluster/gce/gci" name="TestServerOverride/ETCD-SERVERS_and_ETCD_SERVERS_OVERRIDES_are_set" time="0.660000"></testcase>
+		<testcase classname="k8s.io/kubernetes/cluster/gce/gci" name="TestServerOverride" time="1.610000"></testcase>
+		<testcase classname="k8s.io/kubernetes/cluster/gce/gci" name="TestStorageOptions/storage_options_are_supplied" time="0.860000"></testcase>
+		<testcase classname="k8s.io/kubernetes/cluster/gce/gci" name="TestStorageOptions/storage_options_are_not_supplied" time="0.280000"></testcase>
+		<testcase classname="k8s.io/kubernetes/cluster/gce/gci" name="TestStorageOptions" time="1.140000"></testcase>
 	</testsuite>
 	<testsuite tests="2" failures="1" time="30.050000" name="k8s.io/kubernetes/test/integration/apimachinery" timestamp="">
 		<properties>
@@ -129,25 +129,34 @@ func TestPruneTESTS(t *testing.T) {
 			<failure message="Failed" type="">sub-test failed</failure>
 		</testcase>
 	</testsuite>
+	<testsuite tests="1" failures="0" time="30.050000" name="k8s.io/client-go/tools/cache" timestamp="">
+                <properties></properties>
+		<testcase classname="k8s.io/client-go/tools/cache" name="foobar" time="30.050000"></testcase>
+	</testsuite>
 </testsuites>`
 
+	// This test uses the real OWNERS files from k/k because those exist.
+	// The downside it that OWNERS changes (not unlikely in the case of cluster/gce)
+	// imply changing this test data.
+	//
+	// Fake packages have no source and thus no OWNERS.
 	outputXML := `<?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-	<testsuite tests="6" failures="0" time="5.50000" name="k8s.io/kubernetes/cluster/gce/cos" timestamp="">
+	<testsuite tests="6" failures="0" time="5.50000" name="[sig-cloud-provider] k8s.io/kubernetes/cluster/gce" timestamp="">
 		<properties>
 			<property name="go.version" value="go1.18 linux/amd64"></property>
 		</properties>
-		<testcase classname="k8s.io/kubernetes/cluster/gce" name="cos" time="5.50000"></testcase>
+		<testcase classname="[sig-cloud-provider] k8s.io/kubernetes/cluster/gce" name="gci" time="5.50000"></testcase>
 	</testsuite>
-	<testsuite tests="2" failures="1" time="30.050000" name="k8s.io/kubernetes/test/integration/apimachinery" timestamp="">
+	<testsuite tests="2" failures="1" time="30.050000" name="[sig-api-machinery] k8s.io/kubernetes/test/integration" timestamp="">
 		<properties>
 			<property name="go.version" value="go1.18 linux/amd64"></property>
 		</properties>
-		<testcase classname="k8s.io/kubernetes/test/integration" name="apimachinery" time="30.050000">
+		<testcase classname="[sig-api-machinery] k8s.io/kubernetes/test/integration" name="apimachinery" time="30.050000">
 			<failure message="Failed" type="">FailureContent</failure>
 		</testcase>
 	</testsuite>
-	<testsuite tests="3" failures="2" time="30.050000" name="k8s.io/kubernetes/test/integration/apimachinery2" timestamp="">
+	<testsuite tests="3" failures="2" time="30.050000" name="k8s.io/kubernetes/test/integration" timestamp="">
 		<properties>
 			<property name="go.version" value="go1.18 linux/amd64"></property>
 		</properties>
@@ -155,7 +164,7 @@ func TestPruneTESTS(t *testing.T) {
 			<failure message="FailedA&#xA;&#xA;FailedB" type="">FailureContentA&#xA;&#xA;FailureContentB</failure>
 		</testcase>
 	</testsuite>
-	<testsuite tests="3" failures="3" time="40.050000" name="k8s.io/kubernetes/test/integration/apimachinery3" timestamp="">
+	<testsuite tests="3" failures="3" time="40.050000" name="k8s.io/kubernetes/test/integration" timestamp="">
 		<properties>
 			<property name="go.version" value="go1.18 linux/amd64"></property>
 		</properties>
@@ -165,9 +174,13 @@ func TestPruneTESTS(t *testing.T) {
 			<system-err>err A&#xA;&#xA;err B</system-err>
 		</testcase>
 	</testsuite>
+	<testsuite tests="1" failures="0" time="30.050000" name="[sig-api-machinery] k8s.io/client-go/tools" timestamp="">
+		<properties></properties>
+		<testcase classname="[sig-api-machinery] k8s.io/client-go/tools" name="cache" time="30.050000"></testcase>
+	</testsuite>
 </testsuites>`
 	suites, _ := fetchXML(strings.NewReader(sourceXML))
-	pruneTESTS(suites)
+	pruneTESTS(suites, newPackageOwners(true))
 	var output bytes.Buffer
 	writer := bufio.NewWriter(&output)
 	_ = streamXML(writer, suites)

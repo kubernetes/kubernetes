@@ -83,7 +83,7 @@ func goJSONActionFromSpecState(state types.SpecState) GoJSONAction {
 type gojsonReport struct {
 	o types.Report
 	// Extra calculated fields
-	goPkg string
+	goPkg   string
 	elapsed float64
 }
 
@@ -109,8 +109,8 @@ type gojsonSpecReport struct {
 	o types.SpecReport
 	// extra calculated fields
 	testName string
-	elapsed float64
-	action GoJSONAction
+	elapsed  float64
+	action   GoJSONAction
 }
 
 func newSpecReport(in types.SpecReport) *gojsonSpecReport {
@@ -141,18 +141,31 @@ func suitePathToPkg(dir string) (string, error) {
 }
 
 func createTestName(spec types.SpecReport) string {
-		name := fmt.Sprintf("[%s]", spec.LeafNodeType)
-		if spec.FullText() != "" {
-			name = name + " " + spec.FullText()
-		}
-		labels := spec.Labels()
-		if len(labels) > 0 {
-			name = name + " [" + strings.Join(labels, ", ") + "]"
-		}
-		semVerConstraints := spec.SemVerConstraints()
-		if len(semVerConstraints) > 0 {
-			name = name + " [" + strings.Join(semVerConstraints, ", ") + "]"
-		}
-		name = strings.TrimSpace(name)
-		return name
+	name := fmt.Sprintf("[%s]", spec.LeafNodeType)
+	if spec.FullText() != "" {
+		name = name + " " + spec.FullText()
+	}
+	labels := spec.Labels()
+	if len(labels) > 0 {
+		name = name + " [" + strings.Join(labels, ", ") + "]"
+	}
+	semVerConstraints := spec.SemVerConstraints()
+	if len(semVerConstraints) > 0 {
+		name = name + " [" + strings.Join(semVerConstraints, ", ") + "]"
+	}
+	componentSemVerConstraints := spec.ComponentSemVerConstraints()
+	if len(componentSemVerConstraints) > 0 {
+		name = name + " [" + formatComponentSemVerConstraintsToString(componentSemVerConstraints) + "]"
+	}
+	name = strings.TrimSpace(name)
+	return name
+}
+
+func formatComponentSemVerConstraintsToString(componentSemVerConstraints map[string][]string) string {
+	var tmpStr string
+	for component, semVerConstraints := range componentSemVerConstraints {
+		tmpStr = tmpStr + fmt.Sprintf("%s: %s, ", component, semVerConstraints)
+	}
+	tmpStr = strings.TrimSuffix(tmpStr, ", ")
+	return tmpStr
 }

@@ -73,18 +73,18 @@ func Test(t *testing.T) {
 		Max10ValidatedTypedefPtrField:   ptr.To(Max10Type(strings.Repeat("x", 11))),
 	}
 	st.Value(testVal).ExpectMatches(field.ErrorMatcher{}.ByType().ByField(), field.ErrorList{
-		field.TooLong(field.NewPath("max0Field"), nil, 0),
-		field.TooLong(field.NewPath("max0PtrField"), nil, 0),
-		field.TooLong(field.NewPath("max10Field"), nil, 10),
-		field.TooLong(field.NewPath("max10PtrField"), nil, 10),
-		field.TooLong(field.NewPath("max0UnvalidatedTypedefField"), nil, 0),
-		field.TooLong(field.NewPath("max0UnvalidatedTypedefPtrField"), nil, 0),
-		field.TooLong(field.NewPath("max10UnvalidatedTypedefField"), nil, 10),
-		field.TooLong(field.NewPath("max10UnvalidatedTypedefPtrField"), nil, 10),
-		field.TooLong(field.NewPath("max0ValidatedTypedefField"), nil, 0),
-		field.TooLong(field.NewPath("max0ValidatedTypedefPtrField"), nil, 0),
-		field.TooLong(field.NewPath("max10ValidatedTypedefField"), nil, 10),
-		field.TooLong(field.NewPath("max10ValidatedTypedefPtrField"), nil, 10),
+		field.TooLongCharacters(field.NewPath("max0Field"), "", 0),
+		field.TooLongCharacters(field.NewPath("max0PtrField"), "", 0),
+		field.TooLongCharacters(field.NewPath("max10Field"), "", 10),
+		field.TooLongCharacters(field.NewPath("max10PtrField"), "", 10),
+		field.TooLongCharacters(field.NewPath("max0UnvalidatedTypedefField"), "", 0),
+		field.TooLongCharacters(field.NewPath("max0UnvalidatedTypedefPtrField"), "", 0),
+		field.TooLongCharacters(field.NewPath("max10UnvalidatedTypedefField"), "", 10),
+		field.TooLongCharacters(field.NewPath("max10UnvalidatedTypedefPtrField"), "", 10),
+		field.TooLongCharacters(field.NewPath("max0ValidatedTypedefField"), "", 0),
+		field.TooLongCharacters(field.NewPath("max0ValidatedTypedefPtrField"), "", 0),
+		field.TooLongCharacters(field.NewPath("max10ValidatedTypedefField"), "", 10),
+		field.TooLongCharacters(field.NewPath("max10ValidatedTypedefPtrField"), "", 10),
 	})
 
 	// Test validation ratcheting

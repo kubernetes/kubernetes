@@ -24,6 +24,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
+	cmqos "k8s.io/kubernetes/pkg/kubelet/cm/qos"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/status"
@@ -74,28 +75,38 @@ func (m *fakeManager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymana
 	return map[string][]topologymanager.TopologyHint{}
 }
 
+func (m *fakeManager) AllocatePod(pod *v1.Pod) error {
+	logger := klog.TODO()
+	logger.Info("AllocatePod", "pod", klog.KObj(pod))
+	return nil
+}
+
 func (m *fakeManager) State() state.Reader {
 	return m.state
 }
 
 func (m *fakeManager) GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet {
 	m.logger.Info("GetExclusiveCPUs", "podUID", podUID, "containerName", containerName)
-	return cpuset.CPUSet{}
+	return cpuset.New()
 }
 
 func (m *fakeManager) GetAllocatableCPUs() cpuset.CPUSet {
 	m.logger.Info("Get Allocatable CPUs")
-	return cpuset.CPUSet{}
+	return cpuset.New()
 }
 
 func (m *fakeManager) GetCPUAffinity(podUID, containerName string) cpuset.CPUSet {
 	m.logger.Info("GetCPUAffinity", "podUID", podUID, "containerName", containerName)
-	return cpuset.CPUSet{}
+	return cpuset.New()
 }
 
 func (m *fakeManager) GetAllCPUs() cpuset.CPUSet {
 	m.logger.Info("GetAllCPUs")
-	return cpuset.CPUSet{}
+	return cpuset.New()
+}
+
+func (m *fakeManager) GetResourceIsolationLevel(pod *v1.Pod, container *v1.Container) cmqos.ResourceIsolationLevel {
+	return cmqos.ResourceIsolationContainer
 }
 
 // NewFakeManager creates empty/fake cpu manager

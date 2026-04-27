@@ -250,7 +250,6 @@ func TestPersistentVolumeClaimHasClass(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			got := PersistentVolumeClaimHasClass(tc.pvc)
 			if got != tc.want {

@@ -39,11 +39,10 @@ import (
 // Test failures are not propagated to the parent context.
 // WithRESTConfig initializes all client-go clients with new clients
 // created for the config. The current test name gets included in the UserAgent.
-func (tc *TC) WithError(err *error) (TContext, func()) {
-	tc = tc.clone()
-	tc.capture = &capture{}
+func (tCtx TContext) WithError(err *error) (TContext, func()) {
+	tCtx.capture = &capture{}
 
-	return tc, func() {
+	return tCtx, func() {
 		// Recover has to be called in the deferred function. When called inside
 		// a function called by a deferred function (like finalize below), it
 		// returns nil.
@@ -54,16 +53,16 @@ func (tc *TC) WithError(err *error) (TContext, func()) {
 			}
 		}
 
-		tc.finalize(err)
+		tCtx.finalize(err)
 	}
 }
 
-func (tc *TC) finalize(err *error) {
-	tc.capture.mutex.Lock()
-	defer tc.capture.mutex.Unlock()
+func (tCtx TContext) finalize(err *error) {
+	tCtx.capture.mutex.Lock()
+	defer tCtx.capture.mutex.Unlock()
 
-	errs := tc.capture.errors
-	if tc.capture.failed && len(errs) == 0 {
+	errs := tCtx.capture.errors
+	if tCtx.capture.failed && len(errs) == 0 {
 		errs = []error{errFailedWithNoExplanation}
 	}
 	if len(errs) == 0 {
@@ -85,9 +84,9 @@ func (e failures) GomegaString() string {
 // buildHeader handles:
 // - "ERROR:<non-empty prefix><optional header><suffix>" -> use both prefix and suffix when we have a header, otherwise just the suffix
 // - "<empty prefix><optional header><suffix>" -> use suffix only if we have a header
-func (tc *TC) buildHeader(prefix, suffix string) string {
-	if tc.perTestHeader != nil {
-		return prefix + tc.perTestHeader() + suffix
+func (tCtx TContext) buildHeader(prefix, suffix string) string {
+	if tCtx.perTestHeader != nil {
+		return prefix + tCtx.perTestHeader() + suffix
 	}
 	if prefix != "" {
 		return suffix
@@ -104,45 +103,45 @@ func indent(msg string, all bool) string {
 	return header + strings.ReplaceAll(msg, "\n", "\n\t")
 }
 
-func (tc *TC) Skip(args ...any) {
-	tc.Helper()
+func (tCtx TContext) Skip(args ...any) {
+	tCtx.Helper()
 	// Enable `go vet printf` by directly calling fmt.Sprintln.
 	msg := strings.TrimSpace(fmt.Sprintln(args...))
-	tc.TB().Skip("SKIP:", tc.buildHeader(" ", " ")+tc.steps+indent(msg, false))
+	tCtx.TB().Skip("SKIP:", tCtx.buildHeader(" ", " ")+tCtx.steps+indent(msg, false))
 }
 
-func (tc *TC) Skipf(format string, args ...any) {
-	tc.Helper()
+func (tCtx TContext) Skipf(format string, args ...any) {
+	tCtx.Helper()
 	// Enable `go vet printf` by directly calling fmt.Sprintf.
 	msg := strings.TrimSpace(fmt.Sprintf(format, args...))
-	tc.TB().Skip("SKIP:", tc.buildHeader(" ", " ")+tc.steps+indent(msg, false))
+	tCtx.TB().Skip("SKIP:", tCtx.buildHeader(" ", " ")+tCtx.steps+indent(msg, false))
 }
 
-func (tc *TC) Log(args ...any) {
-	tc.Helper()
+func (tCtx TContext) Log(args ...any) {
+	tCtx.Helper()
 	// Enable `go vet printf` by directly calling fmt.Sprintln.
 	msg := strings.TrimSpace(fmt.Sprintln(args...))
-	tc.TB().Log(tc.buildHeader("", " ") + tc.steps + indent(msg, false))
+	tCtx.TB().Log(tCtx.buildHeader("", " ") + tCtx.steps + indent(msg, false))
 }
 
-func (tc *TC) Logf(format string, args ...any) {
-	tc.Helper()
+func (tCtx TContext) Logf(format string, args ...any) {
+	tCtx.Helper()
 	// Enable `go vet printf` by directly calling fmt.Sprintf.
 	msg := strings.TrimSpace(fmt.Sprintf(format, args...))
-	tc.TB().Log(tc.buildHeader("", " ") + tc.steps + indent(msg, false))
+	tCtx.TB().Log(tCtx.buildHeader("", " ") + tCtx.steps + indent(msg, false))
 }
 
-func (tc *TC) Error(args ...any) {
-	if tc.capture == nil {
-		tc.Helper()
+func (tCtx TContext) Error(args ...any) {
+	if tCtx.capture == nil {
+		tCtx.Helper()
 		msg := strings.TrimSpace(fmt.Sprintln(args...))
 		// ERROR *before* header to make it stand out as failure.
-		tc.TB().Error("ERROR:" + tc.buildHeader(" ", "\n") + indent(tc.steps+msg, true))
+		tCtx.TB().Error("ERROR:" + tCtx.buildHeader(" ", "\n") + indent(tCtx.steps+msg, true))
 		return
 	}
 
-	tc.capture.mutex.Lock()
-	defer tc.capture.mutex.Unlock()
+	tCtx.capture.mutex.Lock()
+	defer tCtx.capture.mutex.Unlock()
 
 	// Gomega adds a leading newline in https://github.com/onsi/gomega/blob/f804ac6ada8d36164ecae0513295de8affce1245/internal/gomega.go#L37
 	// Let's strip that at start and end because ktesting will make errors
@@ -150,89 +149,89 @@ func (tc *TC) Error(args ...any) {
 	// line breaks. Besides, Sprintln (required for `go vet printf`) also
 	// adds a trailing newline that we don't want.
 	msg := strings.TrimSpace(fmt.Sprintln(args...))
-	tc.capture.errors = append(tc.capture.errors, errors.New(tc.steps+msg))
-	tc.capture.failed = true
+	tCtx.capture.errors = append(tCtx.capture.errors, errors.New(tCtx.steps+msg))
+	tCtx.capture.failed = true
 }
 
-func (tc *TC) Errorf(format string, args ...any) {
-	if tc.capture == nil {
-		tc.Helper()
+func (tCtx TContext) Errorf(format string, args ...any) {
+	if tCtx.capture == nil {
+		tCtx.Helper()
 		// Enable `go vet printf` by directly calling fmt.Sprintln.
 		msg := strings.TrimSpace(fmt.Sprintf(format, args...))
 		// ERROR *before* header to make it stand out as failure.
-		tc.TB().Error("ERROR:" + tc.buildHeader(" ", "\n") + indent(tc.steps+msg, true))
+		tCtx.TB().Error("ERROR:" + tCtx.buildHeader(" ", "\n") + indent(tCtx.steps+msg, true))
 		return
 	}
 
-	tc.capture.mutex.Lock()
-	defer tc.capture.mutex.Unlock()
+	tCtx.capture.mutex.Lock()
+	defer tCtx.capture.mutex.Unlock()
 
 	msg := strings.TrimSpace(fmt.Sprintf(format, args...))
-	tc.capture.errors = append(tc.capture.errors, errors.New(tc.steps+msg))
-	tc.capture.failed = true
+	tCtx.capture.errors = append(tCtx.capture.errors, errors.New(tCtx.steps+msg))
+	tCtx.capture.failed = true
 }
 
-func (tc *TC) Fail() {
-	if tc.capture == nil {
-		tc.TB().Fail()
+func (tCtx TContext) Fail() {
+	if tCtx.capture == nil {
+		tCtx.TB().Fail()
 		return
 	}
 
-	tc.capture.mutex.Lock()
-	defer tc.capture.mutex.Unlock()
+	tCtx.capture.mutex.Lock()
+	defer tCtx.capture.mutex.Unlock()
 
-	tc.capture.failed = true
+	tCtx.capture.failed = true
 }
 
-func (tc *TC) FailNow() {
-	if tc.capture == nil {
-		tc.TB().FailNow()
+func (tCtx TContext) FailNow() {
+	if tCtx.capture == nil {
+		tCtx.TB().FailNow()
 		return
 	}
 
-	tc.capture.mutex.Lock()
-	defer tc.capture.mutex.Unlock()
+	tCtx.capture.mutex.Lock()
+	defer tCtx.capture.mutex.Unlock()
 
-	tc.capture.failed = true
+	tCtx.capture.failed = true
 	panic(failed)
 }
 
-func (tc *TC) Failed() bool {
-	if tc.capture == nil {
-		return tc.TB().Failed()
+func (tCtx TContext) Failed() bool {
+	if tCtx.capture == nil {
+		return tCtx.TB().Failed()
 	}
 
-	tc.capture.mutex.Lock()
-	defer tc.capture.mutex.Unlock()
+	tCtx.capture.mutex.Lock()
+	defer tCtx.capture.mutex.Unlock()
 
-	return tc.capture.failed
+	return tCtx.capture.failed
 }
 
-func (tc *TC) Fatal(args ...any) {
-	if tc.capture == nil {
-		tc.Helper()
+func (tCtx TContext) Fatal(args ...any) {
+	if tCtx.capture == nil {
+		tCtx.Helper()
 		// Enable `go vet printf` by directly calling fmt.Sprintln.
 		msg := strings.TrimSpace(fmt.Sprintln(args...))
 		// FATAL ERROR *before* header to make it stand out as failure.
-		tc.TB().Fatal("FATAL ERROR:" + tc.buildHeader(" ", "\n") + indent(tc.steps+msg, true))
+		tCtx.TB().Fatal("FATAL ERROR:" + tCtx.buildHeader(" ", "\n") + indent(tCtx.steps+msg, true))
 	}
 
-	tc.Error(args...)
-	tc.FailNow()
+	tCtx.Error(args...)
+	tCtx.FailNow()
 }
 
-func (tc *TC) Fatalf(format string, args ...any) {
-	if tc.capture == nil {
-		tc.Helper()
+func (tCtx TContext) Fatalf(format string, args ...any) {
+	if tCtx.capture == nil {
+		tCtx.Helper()
 		// Enable `go vet printf` by directly calling fmt.Sprintf.
 		msg := strings.TrimSpace(fmt.Sprintf(format, args...))
 		// FATAL ERROR *before* header to make it stand out as failure.
-		tc.TB().Fatal("FATAL ERROR:" + tc.buildHeader(" ", "\n") + indent(tc.steps+msg, true))
+		tCtx.TB().Fatal("FATAL ERROR:" + tCtx.buildHeader(" ", "\n") + indent(tCtx.steps+msg, true))
 		return
 	}
 
-	tc.Errorf(format, args...)
-	tc.FailNow()
+	tCtx.Errorf(format, args...)
+	tCtx.FailNow()
 }
 
 // fatalWithError is the internal type that should never get propagated up. The

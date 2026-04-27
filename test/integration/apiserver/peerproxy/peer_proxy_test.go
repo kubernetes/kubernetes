@@ -39,7 +39,6 @@ import (
 	"k8s.io/apiserver/pkg/server"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/cert"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
@@ -53,13 +52,6 @@ import (
 
 func TestPeerProxiedRequest(t *testing.T) {
 	ktesting.SetDefaultVerbosity(1)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer func() {
-		t.Cleanup(cancel) // register context cancellation last so it is cleaned up before servers
-	}()
-
-	// ensure to stop cert reloading after shutdown
-	transport.DialerStopCh = ctx.Done()
 
 	// enable feature flags
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
@@ -116,13 +108,6 @@ func TestPeerProxiedRequest(t *testing.T) {
 
 func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	ktesting.SetDefaultVerbosity(1)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer func() {
-		t.Cleanup(cancel) // register context cancellation last so it is cleaned up before servers
-	}()
-
-	// ensure to stop cert reloading after shutdown
-	transport.DialerStopCh = ctx.Done()
 
 	// enable feature flags
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
@@ -182,7 +167,7 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 
 	var jobsB *v1.JobList
 	// list jobs using ServerB which it should proxy to ServerC and get back valid response
-	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 1*time.Minute, false, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(t.Context(), 1*time.Second, 1*time.Minute, false, func(ctx context.Context) (bool, error) {
 		select {
 		case <-ctx.Done():
 			return false, ctx.Err()

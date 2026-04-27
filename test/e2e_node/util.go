@@ -30,6 +30,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"k8s.io/kubernetes/pkg/util/procfs"
@@ -53,6 +54,7 @@ import (
 	stats "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubelet/pkg/types"
 	"k8s.io/kubernetes/pkg/cluster/ports"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -85,6 +87,7 @@ const (
 	// state files
 	cpuManagerStateFile    = "/var/lib/kubelet/cpu_manager_state"
 	memoryManagerStateFile = "/var/lib/kubelet/memory_manager_state"
+	usernsStateFiles       = "/var/lib/kubelet/pods/*/userns"
 )
 
 var (
@@ -279,12 +282,12 @@ func logKubeletLatencyMetrics(ctx context.Context, metricNames ...string) {
 }
 
 // getCRIClient connects CRI and returns CRI runtime service clients and image service client.
-func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
+func getCRIClient(ctx context.Context) (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
 	// connection timeout for CRI service connection
-	logger := klog.Background()
 	const connectionTimeout = 2 * time.Minute
 	runtimeEndpoint := framework.TestContext.ContainerRuntimeEndpoint
-	r, err := remote.NewRemoteRuntimeService(runtimeEndpoint, connectionTimeout, noop.NewTracerProvider(), &logger)
+	useStreaming := utilfeature.DefaultFeatureGate.Enabled(features.CRIListStreaming)
+	r, err := remote.NewRemoteRuntimeService(ctx, runtimeEndpoint, connectionTimeout, noop.NewTracerProvider(), useStreaming)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -294,7 +297,7 @@ func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService
 		//explicitly specified
 		imageManagerEndpoint = framework.TestContext.ImageServiceEndpoint
 	}
-	i, err := remote.NewRemoteImageService(imageManagerEndpoint, connectionTimeout, noop.NewTracerProvider(), &logger)
+	i, err := remote.NewRemoteImageService(ctx, imageManagerEndpoint, connectionTimeout, noop.NewTracerProvider(), useStreaming)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -488,7 +491,7 @@ func withFeatureGate(feature featuregate.Feature, desired bool) func() {
 // a pristine environment. The only way known so far to do that is to introduce this wait.
 // Worth noting, however, that this makes the test runtime much bigger.
 func waitForAllContainerRemoval(ctx context.Context, podName, podNS string) {
-	rs, _, err := getCRIClient()
+	rs, _, err := getCRIClient(ctx)
 	framework.ExpectNoError(err)
 	gomega.Eventually(ctx, func(ctx context.Context) error {
 		containers, err := rs.ListContainers(ctx, &runtimeapi.ContainerFilter{
@@ -596,6 +599,7 @@ func nodeNameOrIP() string {
 }
 
 func deletePodSyncByName(ctx context.Context, f *framework.Framework, podName string) {
+	ginkgo.GinkgoHelper()
 	gp := int64(0)
 	delOpts := metav1.DeleteOptions{
 		GracePeriodSeconds: &gp,
@@ -610,7 +614,7 @@ func deletePods(ctx context.Context, f *framework.Framework, podNames []string) 
 }
 
 func waitForContainerRemoval(ctx context.Context, containerName, podName, podNS string) {
-	rs, _, err := getCRIClient()
+	rs, _, err := getCRIClient(ctx)
 	framework.ExpectNoError(err)
 	gomega.Eventually(ctx, func(ctx context.Context) bool {
 		containers, err := rs.ListContainers(ctx, &runtimeapi.ContainerFilter{
@@ -625,4 +629,25 @@ func waitForContainerRemoval(ctx context.Context, containerName, podName, podNS 
 		}
 		return len(containers) == 0
 	}, 2*time.Minute, 1*time.Second).Should(gomega.BeTrueBecause("Containers were expected to be removed"))
+}
+
+func deletePodsAsync(ctx context.Context, f *framework.Framework, podMap map[string]*v1.Pod) {
+	ginkgo.GinkgoHelper()
+	var wg sync.WaitGroup
+	for _, pod := range podMap {
+		wg.Add(1)
+		go func(podNS, podName string) {
+			defer ginkgo.GinkgoRecover()
+			defer wg.Done()
+			deletePodSyncAndWait(ctx, f, podNS, podName)
+		}(pod.Namespace, pod.Name)
+	}
+	wg.Wait()
+}
+
+func deletePodSyncAndWait(ctx context.Context, f *framework.Framework, podNS, podName string) {
+	framework.Logf("deleting pod: %s/%s", podNS, podName)
+	deletePodSyncByName(ctx, f, podName)
+	waitForAllContainerRemoval(ctx, podName, podNS)
+	framework.Logf("deleted pod: %s/%s", podNS, podName)
 }

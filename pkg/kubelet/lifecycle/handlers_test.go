@@ -61,20 +61,22 @@ func (f *fakeContainerCommandRunner) RunInContainer(_ context.Context, id kubeco
 }
 
 func stubPodStatusProvider(podIP string) podStatusProvider {
-	return podStatusProviderFunc(func(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
-		return &kubecontainer.PodStatus{
-			ID:        uid,
-			Name:      name,
-			Namespace: namespace,
-			IPs:       []string{podIP},
-		}, nil
-	})
+	return &fakePodStatusProvider{podIP: podIP}
 }
 
-type podStatusProviderFunc func(uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error)
+type fakePodStatusProvider struct {
+	podIP string
+}
 
-func (f podStatusProviderFunc) GetPodStatus(_ context.Context, uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
-	return f(uid, name, namespace)
+func (f *fakePodStatusProvider) GetPod(_ context.Context, uid types.UID) (*kubecontainer.Pod, error) {
+	return &kubecontainer.Pod{ID: uid}, nil
+}
+
+func (f *fakePodStatusProvider) GetPodStatus(_ context.Context, pod *kubecontainer.Pod) (*kubecontainer.PodStatus, error) {
+	return &kubecontainer.PodStatus{
+		ID:  pod.ID,
+		IPs: []string{f.podIP},
+	}, nil
 }
 
 func TestRunHandlerExec(t *testing.T) {
@@ -907,9 +909,9 @@ func TestDeclaredFeaturesAdmitHandler(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			framework, err := ndf.New(tc.registeredFeatures)
-			require.NoError(t, err)
-			handler := NewDeclaredFeaturesAdmitHandler(framework, ndf.NewFeatureSet(tc.nodeDeclaredFeatures...), tc.version)
+			framework := ndf.New(tc.registeredFeatures)
+			fs := framework.MustMapSorted(tc.nodeDeclaredFeatures)
+			handler := NewDeclaredFeaturesAdmitHandler(framework, fs, tc.version)
 			attrs := &PodAdmitAttributes{Pod: pod}
 
 			result := handler.Admit(attrs)

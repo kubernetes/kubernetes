@@ -33,6 +33,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"gopkg.in/go-jose/go-jose.v2"
+
 	"k8s.io/kubernetes/test/utils/oidc/handlers"
 )
 
@@ -254,4 +255,23 @@ func GetSignatureAlgorithm[K JoseKey](key K) jose.SignatureAlgorithm {
 	default:
 		panic("unknown key type") // should be impossible
 	}
+}
+
+// WriteTempFile writes content to a temporary file and returns its path.
+// The file is automatically cleaned up when the test completes.
+func WriteTempFile(t *testing.T, content string) string {
+	t.Helper()
+	file, err := os.CreateTemp("", "oidc-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Remove(file.Name()); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if err := os.WriteFile(file.Name(), []byte(content), 0600); err != nil {
+		t.Fatal(err)
+	}
+	return file.Name()
 }

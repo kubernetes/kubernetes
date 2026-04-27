@@ -191,7 +191,7 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 		configMapNames := createConfigmapsForRace(ctx, f)
 		ginkgo.DeferCleanup(deleteConfigMaps, f, configMapNames)
 		volumes, volumeMounts := makeConfigMapVolumes(configMapNames)
-		for i := 0; i < wrappedVolumeRaceConfigMapIterationCount; i++ {
+		for range wrappedVolumeRaceConfigMapIterationCount {
 			testNoWrappedVolumeRace(ctx, f, volumes, volumeMounts, wrappedVolumeRaceConfigMapPodCount)
 		}
 	})
@@ -204,7 +204,7 @@ var _ = utils.SIGDescribe("EmptyDir wrapper volumes", func() {
 		gitURL, gitRepo, cleanup := createGitServer(ctx, f)
 		defer cleanup()
 		volumes, volumeMounts := makeGitRepoVolumes(gitURL, gitRepo)
-		for i := 0; i < wrappedVolumeRaceGitRepoIterationCount; i++ {
+		for range wrappedVolumeRaceGitRepoIterationCount {
 			testNoWrappedVolumeRace(ctx, f, volumes, volumeMounts, wrappedVolumeRaceGitRepoPodCount)
 		}
 	})
@@ -257,7 +257,7 @@ func createGitServer(ctx context.Context, f *framework.Framework) (gitURL string
 }
 
 func makeGitRepoVolumes(gitURL, gitRepo string) (volumes []v1.Volume, volumeMounts []v1.VolumeMount) {
-	for i := 0; i < wrappedVolumeRaceGitRepoVolumeCount; i++ {
+	for i := range wrappedVolumeRaceGitRepoVolumeCount {
 		volumeName := fmt.Sprintf("racey-git-repo-%d", i)
 		volumes = append(volumes, v1.Volume{
 			Name: volumeName,
@@ -278,7 +278,7 @@ func makeGitRepoVolumes(gitURL, gitRepo string) (volumes []v1.Volume, volumeMoun
 
 func createConfigmapsForRace(ctx context.Context, f *framework.Framework) (configMapNames []string) {
 	ginkgo.By(fmt.Sprintf("Creating %d configmaps", wrappedVolumeRaceConfigMapVolumeCount))
-	for i := 0; i < wrappedVolumeRaceConfigMapVolumeCount; i++ {
+	for i := range wrappedVolumeRaceConfigMapVolumeCount {
 		configMapName := fmt.Sprintf("racey-configmap-%d", i)
 		configMapNames = append(configMapNames, configMapName)
 		configMap := &v1.ConfigMap{

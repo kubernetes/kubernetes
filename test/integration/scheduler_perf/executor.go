@@ -46,7 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	testutils "k8s.io/kubernetes/test/utils"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 )
@@ -62,9 +62,10 @@ type WorkloadExecutor struct {
 	podInformer                  coreinformers.PodInformer
 	throughputErrorMargin        float64
 	testCase                     *testCase
-	workload                     *workload
+	workload                     *Workload
 	topicName                    string
 	nextNodeIndex                int
+	opts                         *schedulerPerfOptions
 }
 
 func (e *WorkloadExecutor) wait() {
@@ -109,6 +110,15 @@ func (e *WorkloadExecutor) runCreateNodesOp(tCtx ktesting.TContext, opIndex int,
 		return err
 	}
 	e.nextNodeIndex += op.Count
+	if e.opts != nil && e.opts.nodeUpdateFn != nil {
+		nodes, err := waitListAllNodes(tCtx, tCtx.Client())
+		if err != nil {
+			return fmt.Errorf("failed to list nodes for nodeUpdateFn: %w", err)
+		}
+		if err := e.opts.nodeUpdateFn(tCtx, e.scheduler, e.workload, nodes); err != nil {
+			return fmt.Errorf("nodeUpdateFn failed: %w", err)
+		}
+	}
 	return nil
 }
 

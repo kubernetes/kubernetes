@@ -24,7 +24,12 @@ import (
 	"github.com/google/go-cmp/cmp"
 	resourceapi "k8s.io/api/resource/v1"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
+	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	apitest "k8s.io/dynamic-resource-allocation/api/internal/test"
+	"sigs.k8s.io/randfill"
 )
 
 func TestConversion(t *testing.T) {
@@ -330,4 +335,50 @@ func TestConversion(t *testing.T) {
 		})
 	}
 
+}
+
+// v1beta1FillFuncs returns custom fill functions needed for v1beta1
+// types where the default random filling would create objects that
+// cannot round-trip due to structural differences between versions.
+func v1beta1FillFuncs(codecs serializer.CodecFactory) []interface{} {
+	return []interface{}{
+		// v1 -> v1beta1 conversion always creates a non-nil Basic,
+		// so we must ensure it is non-nil in the source object too.
+		func(d *resourcev1beta1.Device, c randfill.Continue) {
+			c.FillNoCustom(d)
+			if d.Basic == nil {
+				d.Basic = &resourcev1beta1.BasicDevice{}
+			}
+		},
+	}
+}
+
+// TestConversionRoundTrip verifies that the automatically generated and
+// hand-written conversion code for the DRA API correctly round-trips
+// between v1beta1 and v1. For each non-list type registered in v1beta1,
+// a fuzzed object is converted to v1 and back, and the result must be
+// equal to the original.
+//
+// Note that this only covers conversion code which is called
+// while converting the top-level API types. Types embedded
+// inside those have their own conversion functions, but those
+// are not necessarily called.
+func TestConversionRoundTrip(t *testing.T) {
+	scheme := runtime.NewScheme()
+	if err := resourceapi.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := resourcev1beta1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+
+	filler := apitest.NewFiller(t, scheme, fuzzer.FuzzerFuncs(v1beta1FillFuncs))
+
+	apitest.ConversionRoundTrip(t, scheme, filler,
+		schema.GroupVersion{Group: resourcev1beta1.GroupName, Version: "v1beta1"},
+		schema.GroupVersion{Group: resourceapi.GroupName, Version: "v1"},
+	)
 }

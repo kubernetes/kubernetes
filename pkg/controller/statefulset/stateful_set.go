@@ -18,6 +18,7 @@ package statefulset
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"sync"
@@ -25,11 +26,14 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -44,6 +48,8 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
 	"k8s.io/kubernetes/pkg/controller/statefulset/metrics"
+	consistencyutil "k8s.io/kubernetes/pkg/controller/util/consistency"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
 
@@ -84,7 +90,24 @@ type StatefulSetController struct {
 	// eventBroadcaster is the core of event processing pipeline.
 	eventBroadcaster record.EventBroadcaster
 	clock            clock.PassiveClock
+	// consistencyStore is used to track the state of the controller's operations.
+	consistencyStore consistencyutil.ConsistencyStore
 }
+
+var (
+	statefulSetGroupResource = schema.GroupResource{
+		Group:    "apps",
+		Resource: "statefulsets",
+	}
+	podGroupResource = schema.GroupResource{
+		Group:    "",
+		Resource: "pods",
+	}
+	persistentVolumeClaimGroupResource = schema.GroupResource{
+		Group:    "",
+		Resource: "persistentvolumeclaims",
+	}
+)
 
 // NewStatefulSetController creates a new statefulset controller.
 func NewStatefulSetController(
@@ -104,6 +127,32 @@ func NewStatefulSetController(
 	if err := history.AddControllerRevisionControllerIndexer(revInformer.Informer()); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to add controller revision controller indexer: %w", err))
 	}
+
+	var consistencyStore consistencyutil.ConsistencyStore
+	var podWriteCallback func(pod *v1.Pod, rs *metav1.OwnerReference)
+	if utilfeature.DefaultFeatureGate.Enabled(features.StaleControllerConsistencyStatefulSet) {
+		consistencyStore = consistencyutil.NewConsistencyStore(map[schema.GroupResource]consistencyutil.LastSyncRVGetter{
+			podGroupResource:                   podInformer.Informer().GetStore(),
+			persistentVolumeClaimGroupResource: pvcInformer.Informer().GetStore(),
+			statefulSetGroupResource:           setInformer.Informer().GetStore(),
+		})
+		podWriteCallback = func(pod *v1.Pod, ss *metav1.OwnerReference) {
+			if ss == nil {
+				return
+			}
+			consistencyStore.WroteAt(
+				types.NamespacedName{
+					Namespace: pod.Namespace,
+					Name:      ss.Name,
+				},
+				ss.UID,
+				podGroupResource,
+				pod.ResourceVersion,
+			)
+		}
+	} else {
+		consistencyStore = consistencyutil.NewNoopConsistencyStore()
+	}
 	ssc := &StatefulSetController{
 		kubeClient: kubeClient,
 		control: NewDefaultStatefulSetControl(
@@ -111,8 +160,9 @@ func NewStatefulSetController(
 				kubeClient,
 				podInformer.Lister(),
 				pvcInformer.Lister(),
-				recorder),
-			NewRealStatefulSetStatusUpdater(kubeClient, setInformer.Lister()),
+				recorder,
+				consistencyStore),
+			NewRealStatefulSetStatusUpdater(kubeClient, setInformer.Lister(), consistencyStore),
 			history.NewHistory(kubeClient, revInformer.Lister(), revInformer.Informer().GetIndexer()),
 		),
 		pvcListerSynced: pvcInformer.Informer().HasSynced,
@@ -121,10 +171,11 @@ func NewStatefulSetController(
 			workqueue.DefaultTypedControllerRateLimiter[string](),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "statefulset"},
 		),
-		podControl: controller.RealPodControl{KubeClient: kubeClient, Recorder: recorder},
+		podControl: controller.RealPodControl{KubeClient: kubeClient, Recorder: recorder, OnWrite: podWriteCallback},
 
 		eventBroadcaster: eventBroadcaster,
 		clock:            clock.RealClock{},
+		consistencyStore: consistencyStore,
 	}
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -481,8 +532,25 @@ func (ssc *StatefulSetController) sync(ctx context.Context, key string) error {
 	if err != nil {
 		return err
 	}
+
+	ssNamespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      name,
+	}
+	if err := ssc.consistencyStore.EnsureReady(ssNamespacedName); err != nil {
+		var consistencyErr *consistencyutil.ConsistencyError
+		if errors.As(err, &consistencyErr) {
+			metrics.StatefulSetRequeueSkips.WithLabelValues(
+				consistencyErr.GroupResource.Group,
+				consistencyErr.GroupResource.Resource,
+			).Inc()
+		}
+		return err
+	}
+
 	set, err := ssc.setLister.StatefulSets(namespace).Get(name)
-	if errors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
+		ssc.consistencyStore.Clear(ssNamespacedName, "")
 		logger.Info("StatefulSet has been deleted", "key", key)
 		return nil
 	}

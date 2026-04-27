@@ -22,13 +22,13 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -912,42 +912,28 @@ func testRestartableInitContainers(tCtx ktesting.TContext) {
 	}
 
 	testCases := []struct {
-		name                    string
-		pod                     *v1.Pod
-		enableSidecarContainers bool
-		wantPreFilterStatus     *fwk.Status
-		wantFilterStatus        *fwk.Status
+		name                string
+		pod                 *v1.Pod
+		wantPreFilterStatus *fwk.Status
+		wantFilterStatus    *fwk.Status
 	}{
 		{
-			name: "allow pod without restartable init containers if sidecar containers is disabled",
+			name: "allow pod without restartable init containers",
 			pod:  newPod(),
 		},
 		{
-			name:                "not allow pod with restartable init containers if sidecar containers is disabled",
-			pod:                 newPodWithRestartableInitContainers(nil, nil),
-			wantPreFilterStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "Pod has a restartable init container and the SidecarContainers feature is disabled"),
+			name: "allow pod with restartable init containers",
+			pod:  newPodWithRestartableInitContainers(nil, nil),
 		},
 		{
-			name:                    "allow pod without restartable init containers if sidecar containers is enabled",
-			enableSidecarContainers: true,
-			pod:                     newPod(),
-		},
-		{
-			name:                    "allow pod with restartable init containers if sidecar containers is enabled",
-			enableSidecarContainers: true,
-			pod:                     newPodWithRestartableInitContainers(nil, nil),
-		},
-		{
-			name:                    "allow pod if the total requested resources do not exceed the node's allocatable resources",
-			enableSidecarContainers: true,
+			name: "allow pod if the total requested resources do not exceed the node's allocatable resources",
 			pod: newPodWithRestartableInitContainers(
 				&v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(1, resource.DecimalSI)},
 				&v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(1, resource.DecimalSI)},
 			),
 		},
 		{
-			name:                    "not allow pod if the total requested resources do exceed the node's allocatable resources",
-			enableSidecarContainers: true,
+			name: "not allow pod if the total requested resources do exceed the node's allocatable resources",
 			pod: newPodWithRestartableInitContainers(
 				&v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(1, resource.DecimalSI)},
 				&v1.ResourceList{v1.ResourceCPU: *resource.NewMilliQuantity(2, resource.DecimalSI)},
@@ -962,7 +948,7 @@ func testRestartableInitContainers(tCtx ktesting.TContext) {
 			nodeInfo := framework.NewNodeInfo()
 			nodeInfo.SetNode(&node)
 
-			p, err := NewFit(tCtx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{EnableSidecarContainers: test.enableSidecarContainers})
+			p, err := NewFit(tCtx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{})
 			tCtx.ExpectNoError(err, "create fit plugin")
 			cycleState := framework.NewCycleState()
 			_, preFilterStatus := p.(fwk.PreFilterPlugin).PreFilter(tCtx, cycleState, test.pod, nil)
@@ -1431,7 +1417,6 @@ func TestEventsToRegister(t *testing.T) {
 	tests := []struct {
 		name                            string
 		enableInPlacePodVerticalScaling bool
-		enableSchedulingQueueHint       bool
 		enableDRAExtendedResource       bool
 		expectedClusterEvents           []fwk.ClusterEventWithHint
 	}{
@@ -1439,48 +1424,33 @@ func TestEventsToRegister(t *testing.T) {
 			name:                            "Register events with InPlacePodVerticalScaling feature enabled",
 			enableInPlacePodVerticalScaling: true,
 			expectedClusterEvents: []fwk.ClusterEventWithHint{
-				{Event: fwk.ClusterEvent{Resource: "Pod", ActionType: fwk.UpdatePodScaleDown | fwk.Delete}},
-				{Event: fwk.ClusterEvent{Resource: "Node", ActionType: fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeTaint | fwk.UpdateNodeLabel}},
+				{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}},
+				{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeAllocatable}},
+				{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodScaleDown}},
+				{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodScaleDown}},
 			},
 		},
 		{
-			name:                      "Register events with SchedulingQueueHint feature enabled",
-			enableSchedulingQueueHint: true,
+			name: "Register events with default features",
 			expectedClusterEvents: []fwk.ClusterEventWithHint{
-				{Event: fwk.ClusterEvent{Resource: "Pod", ActionType: fwk.Delete}},
-				{Event: fwk.ClusterEvent{Resource: "Node", ActionType: fwk.Add | fwk.UpdateNodeAllocatable}},
-			},
-		},
-		{
-			name:                            "Register events with InPlacePodVerticalScaling feature disabled",
-			enableInPlacePodVerticalScaling: false,
-			expectedClusterEvents: []fwk.ClusterEventWithHint{
-				{Event: fwk.ClusterEvent{Resource: "Pod", ActionType: fwk.Delete}},
-				{Event: fwk.ClusterEvent{Resource: "Node", ActionType: fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeTaint | fwk.UpdateNodeLabel}},
+				{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}},
+				{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeAllocatable}},
 			},
 		},
 		{
 			name:                      "Register events with DRAExtendedResource feature enabled",
 			enableDRAExtendedResource: true,
 			expectedClusterEvents: []fwk.ClusterEventWithHint{
-				{Event: fwk.ClusterEvent{Resource: "Pod", ActionType: fwk.Delete}},
-				{Event: fwk.ClusterEvent{Resource: "Node", ActionType: fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeTaint | fwk.UpdateNodeLabel}},
+				{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}},
+				{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeAllocatable}},
 				{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.Add | fwk.Update}},
-			},
-		},
-		{
-			name:                      "Register events with DRAExtendedResource feature disabled",
-			enableDRAExtendedResource: false,
-			expectedClusterEvents: []fwk.ClusterEventWithHint{
-				{Event: fwk.ClusterEvent{Resource: "Pod", ActionType: fwk.Delete}},
-				{Event: fwk.ClusterEvent{Resource: "Node", ActionType: fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeTaint | fwk.UpdateNodeLabel}},
 			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fp := &Fit{enableInPlacePodVerticalScaling: test.enableInPlacePodVerticalScaling, enableSchedulingQueueHint: test.enableSchedulingQueueHint, enableDRAExtendedResource: test.enableDRAExtendedResource}
+			fp := &Fit{enableInPlacePodVerticalScaling: test.enableInPlacePodVerticalScaling, enableDRAExtendedResource: test.enableDRAExtendedResource}
 			_, ctx := ktesting.NewTestContext(t)
 			actualClusterEvents, err := fp.EventsToRegister(ctx)
 			if err != nil {
@@ -1496,102 +1466,72 @@ func TestEventsToRegister(t *testing.T) {
 	}
 }
 
-func Test_isSchedulableAfterPodChange(t *testing.T) {
+func Test_isSchedulableAfterAssignedPodDelete(t *testing.T) {
 	testcases := map[string]struct {
-		pod                             *v1.Pod
-		oldObj, newObj                  interface{}
-		enableInPlacePodVerticalScaling bool
-		expectedHint                    fwk.QueueingHint
-		expectedErr                     bool
+		pod          *v1.Pod
+		oldObj       interface{}
+		expectedHint fwk.QueueingHint
+		expectedErr  bool
 	}{
 		"backoff-wrong-old-object": {
-			pod:                             &v1.Pod{},
-			oldObj:                          "not-a-pod",
-			enableInPlacePodVerticalScaling: true,
-			expectedHint:                    fwk.Queue,
-			expectedErr:                     true,
-		},
-		"backoff-wrong-new-object": {
-			pod:                             &v1.Pod{},
-			newObj:                          "not-a-pod",
-			enableInPlacePodVerticalScaling: true,
-			expectedHint:                    fwk.Queue,
-			expectedErr:                     true,
+			pod:          &v1.Pod{},
+			oldObj:       "not-a-pod",
+			expectedHint: fwk.Queue,
+			expectedErr:  true,
 		},
 		"queue-on-other-pod-deleted": {
-			pod:                             st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
-			oldObj:                          st.MakePod().Name("pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("fake").Obj(),
-			enableInPlacePodVerticalScaling: true,
-			expectedHint:                    fwk.Queue,
+			pod:          st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			oldObj:       st.MakePod().Name("pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("fake").Obj(),
+			expectedHint: fwk.Queue,
 		},
 		"skip-queue-on-unscheduled-pod-deleted": {
-			pod:                             &v1.Pod{},
-			oldObj:                          &v1.Pod{},
-			enableInPlacePodVerticalScaling: true,
-			expectedHint:                    fwk.QueueSkip,
+			pod:          &v1.Pod{},
+			oldObj:       &v1.Pod{},
+			expectedHint: fwk.QueueSkip,
 		},
 		"queue-on-nominated-pod-deleted": {
-			pod:                             st.MakePod().Name("pod1").UID("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).UID("uid0").Obj(),
-			oldObj:                          st.MakePod().Name("pod2").UID("pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).NominatedNodeName("fake").UID("uid1").Obj(),
-			enableInPlacePodVerticalScaling: true,
-			expectedHint:                    fwk.Queue,
+			pod:          st.MakePod().Name("pod1").UID("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).UID("uid0").Obj(),
+			oldObj:       st.MakePod().Name("pod2").UID("pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).NominatedNodeName("fake").UID("uid1").Obj(),
+			expectedHint: fwk.Queue,
 		},
-		"skip-queue-on-disable-inplace-pod-vertical-scaling": {
-			pod:    st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
-			oldObj: st.MakePod().Name("pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Node("fake").Obj(),
-			// (Actually, this scale down cannot happen when InPlacePodVerticalScaling is disabled.)
-			newObj:                          st.MakePod().Name("pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("fake").Obj(),
-			enableInPlacePodVerticalScaling: false,
-			expectedHint:                    fwk.QueueSkip,
-		},
-		"skip-queue-on-other-unscheduled-pod": {
-			pod:                             st.MakePod().Name("pod1").UID("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).UID("uid0").Obj(),
-			oldObj:                          st.MakePod().Name("pod2").UID("pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).UID("uid1").Obj(),
-			newObj:                          st.MakePod().Name("pod2").UID("pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).UID("uid1").Obj(),
-			enableInPlacePodVerticalScaling: true,
-			expectedHint:                    fwk.QueueSkip,
-		},
-		"skip-queue-on-other-pod-unrelated-resource-scaled-down": {
-			pod:                             st.MakePod().Name("pod1").UID("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
-			oldObj:                          st.MakePod().Name("pod2").UID("pod2").Req(map[v1.ResourceName]string{v1.ResourceMemory: "2"}).Node("fake").Obj(),
-			newObj:                          st.MakePod().Name("pod2").UID("pod2").Req(map[v1.ResourceName]string{v1.ResourceMemory: "1"}).Node("fake").Obj(),
-			enableInPlacePodVerticalScaling: true,
-			expectedHint:                    fwk.QueueSkip,
-		},
-		"skip-queue-on-other-pod-unrelated-pod-level-resource-scaled-down": {
-			pod:                             st.MakePod().Name("pod1").UID("pod1").PodLevelResourceRequests(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
-			oldObj:                          st.MakePod().Name("pod2").UID("pod2").PodLevelResourceRequests(map[v1.ResourceName]string{v1.ResourceMemory: "2"}).Node("fake").Obj(),
-			newObj:                          st.MakePod().Name("pod2").UID("pod2").PodLevelResourceRequests(map[v1.ResourceName]string{v1.ResourceMemory: "1"}).Node("fake").Obj(),
-			enableInPlacePodVerticalScaling: true,
-			expectedHint:                    fwk.QueueSkip,
-		},
-		"queue-on-other-pod-some-resource-scale-down": {
-			pod:                             st.MakePod().Name("pod1").UID("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
-			oldObj:                          st.MakePod().Name("pod2").UID("pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Node("fake").Obj(),
-			newObj:                          st.MakePod().Name("pod2").UID("pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("fake").Obj(),
-			enableInPlacePodVerticalScaling: true,
-			expectedHint:                    fwk.Queue,
-		},
-		"queue-on-other-pod-some-pod-level-resource-scale-down": {
-			pod:                             st.MakePod().Name("pod1").UID("pod1").PodLevelResourceRequests(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
-			oldObj:                          st.MakePod().Name("pod2").UID("pod2").PodLevelResourceRequests(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Node("fake").Obj(),
-			newObj:                          st.MakePod().Name("pod2").UID("pod2").PodLevelResourceRequests(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("fake").Obj(),
-			enableInPlacePodVerticalScaling: true,
-			expectedHint:                    fwk.Queue,
-		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			actualHint, err := p.(*Fit).isSchedulableAfterAssignedPodDelete(logger, tc.pod, tc.oldObj, nil)
+			if tc.expectedErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tc.expectedHint, actualHint); diff != "" {
+				t.Errorf("unexpected hint (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func Test_isSchedulableAfterTargetPodScaleDown(t *testing.T) {
+	testcases := map[string]struct {
+		pod          *v1.Pod
+		expectedHint fwk.QueueingHint
+	}{
 		"queue-on-target-pod-some-resource-scale-down": {
-			pod:                             st.MakePod().Name("pod1").UID("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
-			oldObj:                          st.MakePod().Name("pod1").UID("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
-			newObj:                          st.MakePod().Name("pod1").UID("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
-			enableInPlacePodVerticalScaling: true,
-			expectedHint:                    fwk.Queue,
+			pod:          st.MakePod().Name("pod1").UID("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			expectedHint: fwk.Queue,
 		},
 		"queue-on-target-pod-some-pod-level-resource-scale-down": {
-			pod:                             st.MakePod().Name("pod1").UID("pod1").PodLevelResourceRequests(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
-			oldObj:                          st.MakePod().Name("pod1").UID("pod1").PodLevelResourceRequests(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj(),
-			newObj:                          st.MakePod().Name("pod1").UID("pod1").PodLevelResourceRequests(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
-			enableInPlacePodVerticalScaling: true,
-			expectedHint:                    fwk.Queue,
+			pod:          st.MakePod().Name("pod1").UID("pod1").PodLevelResourceRequests(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			expectedHint: fwk.Queue,
 		},
 	}
 
@@ -1599,18 +1539,95 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			logger, ctx := ktesting.NewTestContext(t)
 			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{
-				EnableInPlacePodVerticalScaling: tc.enableInPlacePodVerticalScaling,
+				EnableInPlacePodVerticalScaling: true,
 			})
 			if err != nil {
 				t.Fatal(err)
 			}
-			actualHint, err := p.(*Fit).isSchedulableAfterPodEvent(logger, tc.pod, tc.oldObj, tc.newObj)
+			actualHint, err := p.(*Fit).isSchedulableAfterTargetPodScaleDown(logger, tc.pod, nil, nil)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tc.expectedHint, actualHint); diff != "" {
+				t.Errorf("unexpected hint (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func Test_isSchedulableAfterAssignedPodScaleDown(t *testing.T) {
+	testcases := map[string]struct {
+		pod            *v1.Pod
+		oldObj, newObj interface{}
+		expectedHint   fwk.QueueingHint
+		expectedErr    bool
+	}{
+		"backoff-wrong-old-object": {
+			pod:          &v1.Pod{},
+			oldObj:       "not-a-pod",
+			expectedHint: fwk.Queue,
+			expectedErr:  true,
+		},
+		"backoff-wrong-new-object": {
+			pod:          &v1.Pod{},
+			newObj:       "not-a-pod",
+			expectedHint: fwk.Queue,
+			expectedErr:  true,
+		},
+		"skip-queue-on-other-unscheduled-pod": {
+			pod:          st.MakePod().Name("pod1").UID("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).UID("uid0").Obj(),
+			oldObj:       st.MakePod().Name("pod2").UID("pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).UID("uid1").Obj(),
+			newObj:       st.MakePod().Name("pod2").UID("pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).UID("uid1").Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		"skip-queue-on-other-pod-unrelated-resource-scaled-down": {
+			pod:          st.MakePod().Name("pod1").UID("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			oldObj:       st.MakePod().Name("pod2").UID("pod2").Req(map[v1.ResourceName]string{v1.ResourceMemory: "2"}).Node("fake").Obj(),
+			newObj:       st.MakePod().Name("pod2").UID("pod2").Req(map[v1.ResourceName]string{v1.ResourceMemory: "1"}).Node("fake").Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		"skip-queue-on-other-pod-unrelated-pod-level-resource-scaled-down": {
+			pod:          st.MakePod().Name("pod1").UID("pod1").PodLevelResourceRequests(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			oldObj:       st.MakePod().Name("pod2").UID("pod2").PodLevelResourceRequests(map[v1.ResourceName]string{v1.ResourceMemory: "2"}).Node("fake").Obj(),
+			newObj:       st.MakePod().Name("pod2").UID("pod2").PodLevelResourceRequests(map[v1.ResourceName]string{v1.ResourceMemory: "1"}).Node("fake").Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		"queue-on-other-pod-some-resource-scale-down": {
+			pod:          st.MakePod().Name("pod1").UID("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			oldObj:       st.MakePod().Name("pod2").UID("pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Node("fake").Obj(),
+			newObj:       st.MakePod().Name("pod2").UID("pod2").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("fake").Obj(),
+			expectedHint: fwk.Queue,
+		},
+		"queue-on-other-pod-some-pod-level-resource-scale-down": {
+			pod:          st.MakePod().Name("pod1").UID("pod1").PodLevelResourceRequests(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj(),
+			oldObj:       st.MakePod().Name("pod2").UID("pod2").PodLevelResourceRequests(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Node("fake").Obj(),
+			newObj:       st.MakePod().Name("pod2").UID("pod2").PodLevelResourceRequests(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Node("fake").Obj(),
+			expectedHint: fwk.Queue,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{
+				EnableInPlacePodVerticalScaling: true,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			actualHint, err := p.(*Fit).isSchedulableAfterAssignedPodScaleDown(logger, tc.pod, tc.oldObj, tc.newObj)
 			if tc.expectedErr {
-				require.Error(t, err)
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
 				return
 			}
-			require.NoError(t, err)
-			require.Equal(t, tc.expectedHint, actualHint)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tc.expectedHint, actualHint); diff != "" {
+				t.Errorf("unexpected hint (-want, +got):\n%s", diff)
+			}
 		})
 	}
 }
@@ -1734,11 +1751,17 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 			}
 			actualHint, err := p.(*Fit).isSchedulableAfterNodeChange(logger, tc.pod, tc.oldObj, tc.newObj)
 			if tc.expectedErr {
-				require.Error(t, err)
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
 				return
 			}
-			require.NoError(t, err)
-			require.Equal(t, tc.expectedHint, actualHint)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tc.expectedHint, actualHint); diff != "" {
+				t.Errorf("unexpected hint (-want, +got):\n%s", diff)
+			}
 		})
 	}
 }
@@ -1883,11 +1906,17 @@ func Test_isSchedulableAfterDeviceClassChange(t *testing.T) {
 			}
 			actualHint, err := p.(*Fit).isSchedulableAfterDeviceClassEvent(logger, tc.pod, tc.oldObj, tc.newObj)
 			if tc.expectedErr {
-				require.Error(t, err)
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
 				return
 			}
-			require.NoError(t, err)
-			require.Equal(t, tc.expectedHint, actualHint)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tc.expectedHint, actualHint); diff != "" {
+				t.Errorf("unexpected hint (-want, +got):\n%s", diff)
+			}
 		})
 	}
 }
@@ -2173,19 +2202,22 @@ func testHaveAnyRequestedResourcesIncreased(tCtx ktesting.TContext) {
 }
 
 func TestFitSignPod(t *testing.T) {
+	testFitSignPod(ktesting.Init(t))
+}
+func testFitSignPod(tCtx ktesting.TContext) {
 	tests := map[string]struct {
-		name                      string
-		pod                       *v1.Pod
-		enableDRAExtendedResource bool
-		expectedFragments         []fwk.SignFragment
-		expectedStatusCode        fwk.Code
+		name                       string
+		pod                        *v1.Pod
+		disableDRAExtendedResource bool
+		expectedFragments          []fwk.SignFragment
+		expectedStatusCode         fwk.Code
 	}{
 		"pod with CPU and memory requests": {
 			pod: st.MakePod().Req(map[v1.ResourceName]string{
 				v1.ResourceCPU:    "1000m",
 				v1.ResourceMemory: "2000",
 			}).Obj(),
-			enableDRAExtendedResource: false,
+			disableDRAExtendedResource: true,
 			expectedFragments: []fwk.SignFragment{
 				{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(st.MakePod().Req(map[v1.ResourceName]string{
 					v1.ResourceCPU:    "1000m",
@@ -2195,8 +2227,8 @@ func TestFitSignPod(t *testing.T) {
 			expectedStatusCode: fwk.Success,
 		},
 		"best-effort pod with no requests": {
-			pod:                       st.MakePod().Obj(),
-			enableDRAExtendedResource: false,
+			pod:                        st.MakePod().Obj(),
+			disableDRAExtendedResource: true,
 			expectedFragments: []fwk.SignFragment{
 				{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(st.MakePod().Obj(), ResourceRequestsOptions{})},
 			},
@@ -2210,7 +2242,7 @@ func TestFitSignPod(t *testing.T) {
 				v1.ResourceCPU:    "1500m",
 				v1.ResourceMemory: "3000",
 			}).Obj(),
-			enableDRAExtendedResource: false,
+			disableDRAExtendedResource: true,
 			expectedFragments: []fwk.SignFragment{
 				{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(st.MakePod().Container("container1").Req(map[v1.ResourceName]string{
 					v1.ResourceCPU:    "500m",
@@ -2224,38 +2256,450 @@ func TestFitSignPod(t *testing.T) {
 		},
 		"DRA extended resource enabled - returns unschedulable": {
 			pod: st.MakePod().Req(map[v1.ResourceName]string{
-				v1.ResourceCPU:    "1000m",
-				v1.ResourceMemory: "2000",
+				v1.ResourceCPU:                        "1000m",
+				v1.ResourceMemory:                     "2000",
+				v1.ResourceName(extendedResourceName): "1",
 			}).Obj(),
-			enableDRAExtendedResource: true,
-			expectedFragments:         nil,
-			expectedStatusCode:        fwk.Unschedulable,
+			disableDRAExtendedResource: false,
+			expectedFragments:          nil,
+			expectedStatusCode:         fwk.Unschedulable,
+		},
+		"DRA extended resource disabled": {
+			pod: st.MakePod().Req(
+				map[v1.ResourceName]string{
+					v1.ResourceCPU:                        "1000m",
+					v1.ResourceMemory:                     "2000",
+					v1.ResourceName(extendedResourceName): "1",
+				}).Obj(),
+			disableDRAExtendedResource: true,
+			expectedFragments: []fwk.SignFragment{
+				{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(st.MakePod().
+					Container("container1").Req(
+					map[v1.ResourceName]string{
+						v1.ResourceCPU:                        "1000m",
+						v1.ResourceMemory:                     "2000",
+						v1.ResourceName(extendedResourceName): "1",
+					}).Obj(), ResourceRequestsOptions{})},
+			},
+			expectedStatusCode: fwk.Success,
 		},
 	}
 
 	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
+		tCtx.SyncTest(name, func(tCtx ktesting.TContext) {
+			runOpts := []runtime.Option{}
+			var testDRAManager *dynamicresources.DefaultDRAManager
+			if !test.disableDRAExtendedResource {
+				testDRAManager = newTestDRAManager(tCtx, deviceClassWithExtendResourceName)
+				runOpts = append(runOpts, runtime.WithSharedDRAManager(testDRAManager))
+			}
+			fh, _ := runtime.NewFramework(tCtx, nil, nil, runOpts...)
+			defer func() {
+				tCtx.Cancel("test has completed")
+				runtime.WaitForShutdown(fh)
+			}()
 
-			fh, _ := runtime.NewFramework(ctx, nil, nil)
-			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, fh, plfeature.Features{
-				EnableDRAExtendedResource: test.enableDRAExtendedResource,
+			p, err := NewFit(tCtx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, fh, plfeature.Features{
+				EnableDRAExtendedResource: !test.disableDRAExtendedResource,
 			})
 			if err != nil {
-				t.Fatalf("failed to create plugin: %v", err)
+				tCtx.Fatalf("failed to create plugin: %v", err)
 			}
 
 			fit := p.(*Fit)
-			fragments, status := fit.SignPod(ctx, test.pod)
+			fragments, status := fit.SignPod(tCtx, test.pod)
 
 			if status.Code() != test.expectedStatusCode {
-				t.Errorf("unexpected status code, want: %v, got: %v, message: %v", test.expectedStatusCode, status.Code(), status.Message())
+				tCtx.Errorf("unexpected status code, want: %v, got: %v, message: %v", test.expectedStatusCode, status.Code(), status.Message())
 			}
 
 			if test.expectedStatusCode == fwk.Success {
 				if diff := cmp.Diff(test.expectedFragments, fragments); diff != "" {
-					t.Errorf("unexpected fragments, diff (-want,+got):\n%s", diff)
+					tCtx.Errorf("unexpected fragments, diff (-want,+got):\n%s", diff)
 				}
+			}
+		})
+	}
+}
+
+type podAssignment struct {
+	pod      *v1.Pod
+	nodeName string
+}
+
+func (pa *podAssignment) GetPod() *v1.Pod {
+	return pa.pod
+}
+
+func (pa *podAssignment) GetNodeName() string {
+	return pa.nodeName
+}
+
+func TestScorePlacement_Resources(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:                 true,
+		features.TopologyAwareWorkloadScheduling: true,
+	})
+
+	testCases := []struct {
+		name                string
+		nodes               []*v1.Node
+		placementNodeNames  []string
+		podGroupPods        []*v1.Pod
+		podGroupAssignments map[types.UID]string
+		preExistingPods     []*v1.Pod
+		resourceSpec        []config.ResourceSpec
+		expectedScore       int64
+	}{
+		{
+			name: "Computes score based on total requests",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
+				st.MakeNode().Name("node2").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
+			},
+			placementNodeNames: []string{"node1", "node2"},
+			podGroupPods: []*v1.Pod{
+				st.MakePod().UID("foo").Req(cpuAndMemory("1000m", "0")).Obj(),
+				st.MakePod().UID("bar").Req(cpuAndMemory("2000m", "2000")).Obj(),
+			},
+			podGroupAssignments: map[types.UID]string{
+				"foo": "node1",
+				"bar": "node2",
+			},
+			resourceSpec: []config.ResourceSpec{
+				{Name: "cpu", Weight: 1},
+				{Name: "memory", Weight: 1},
+			},
+			// CPU: (1000m + 2000m) / (5000m + 5000m) = 0.3
+			// Memory: (0 + 2000) / (5000 + 5000) = 0.2
+			// Score: MaxScore * (0.3 + 0.2) / 2 = 25
+			expectedScore: 25,
+		},
+		{
+			name: "Computes score using weights",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
+				st.MakeNode().Name("node2").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
+			},
+			placementNodeNames: []string{"node1", "node2"},
+			podGroupPods: []*v1.Pod{
+				st.MakePod().UID("foo").Req(cpuAndMemory("1000m", "0")).Obj(),
+				st.MakePod().UID("bar").Req(cpuAndMemory("2000m", "2000")).Obj(),
+			},
+			podGroupAssignments: map[types.UID]string{
+				"foo": "node1",
+				"bar": "node2",
+			},
+			resourceSpec: []config.ResourceSpec{
+				{Name: "cpu", Weight: 4},
+				{Name: "memory", Weight: 1},
+			},
+			// CPU: (1000m + 2000m) / (5000m + 5000m) = 0.3
+			// Memory: (0 + 2000) / (5000 + 5000) = 0.2
+			// Score: MaxScore * (4 * 0.3 + 0.2) / 5 = 28
+			expectedScore: 28,
+		},
+		{
+			name: "Handles multiple pods per node",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
+				st.MakeNode().Name("node2").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
+			},
+			placementNodeNames: []string{"node1", "node2"},
+			podGroupPods: []*v1.Pod{
+				st.MakePod().UID("foo").Req(cpuAndMemory("1000m", "0")).Obj(),
+				st.MakePod().UID("bar").Req(cpuAndMemory("2000m", "2000")).Obj(),
+			},
+			podGroupAssignments: map[types.UID]string{
+				"foo": "node1",
+				"bar": "node1",
+			},
+			resourceSpec: []config.ResourceSpec{
+				{Name: "cpu", Weight: 4},
+				{Name: "memory", Weight: 1},
+			},
+			// CPU: (1000m + 2000m) / (5000m + 5000m) = 0.3
+			// Memory: (0 + 2000) / (5000 + 5000) = 0.2
+			// Score: MaxScore * (4 * 0.3 + 0.2) / 5 = 28
+			expectedScore: 28,
+		},
+		{
+			name: "Does not include nodes from outside of placement",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
+				st.MakeNode().Name("node2").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
+				st.MakeNode().Name("node3").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
+			},
+			placementNodeNames: []string{"node1", "node2"},
+			podGroupPods: []*v1.Pod{
+				st.MakePod().UID("foo").Req(cpuAndMemory("1000m", "0")).Obj(),
+				st.MakePod().UID("bar").Req(cpuAndMemory("2000m", "2000")).Obj(),
+			},
+			podGroupAssignments: map[types.UID]string{
+				"foo": "node1",
+				"bar": "node2",
+			},
+			resourceSpec: []config.ResourceSpec{
+				{Name: "cpu", Weight: 1},
+				{Name: "memory", Weight: 1},
+			},
+			expectedScore: 25,
+		},
+		{
+			name: "Includes pre-existing pods from outside of pod group",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
+				st.MakeNode().Name("node2").Capacity(cpuAndMemory("5000m", "5000")).Obj(),
+			},
+			placementNodeNames: []string{"node1", "node2"},
+			podGroupPods: []*v1.Pod{
+				st.MakePod().UID("foo").Req(cpuAndMemory("1000m", "0")).Obj(),
+				st.MakePod().UID("bar").Req(cpuAndMemory("2000m", "2000")).Obj(),
+			},
+			podGroupAssignments: map[types.UID]string{
+				"foo": "node1",
+				"bar": "node2",
+			},
+			preExistingPods: []*v1.Pod{
+				st.MakePod().Node("node1").UID("baz").Req(cpuAndMemory("1000m", "0")).Obj(),
+			},
+			resourceSpec: []config.ResourceSpec{
+				{Name: "cpu", Weight: 1},
+				{Name: "memory", Weight: 1},
+			},
+			// CPU: (1000m + 2000m + 1000m) / (5000m + 5000m) = 0.4
+			// Memory: (0 + 2000 + 0) / (5000 + 5000) = 0.2
+			// Score: MaxScore * (0.3 + 0.2) / 2 = 30
+			expectedScore: 30,
+		},
+		{
+			name: "Includes scalar resources if any pod in pod group has nonzero requests",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(cpuAndMemoryAndGpu("5000m", "5000", "5")).Obj(),
+				st.MakeNode().Name("node2").Capacity(cpuAndMemoryAndGpu("5000m", "5000", "5")).Obj(),
+			},
+			placementNodeNames: []string{"node1", "node2"},
+			podGroupPods: []*v1.Pod{
+				st.MakePod().UID("foo").Req(cpuAndMemoryAndGpu("1000m", "0", "0")).Obj(),
+				st.MakePod().UID("bar").Req(cpuAndMemoryAndGpu("1000m", "2000", "1")).Obj(),
+			},
+			podGroupAssignments: map[types.UID]string{
+				"foo": "node1",
+				"bar": "node2",
+			},
+			preExistingPods: []*v1.Pod{
+				st.MakePod().Node("node1").UID("baz").Req(cpuAndMemoryAndGpu("1000m", "0", "0")).Obj(),
+			},
+			resourceSpec: []config.ResourceSpec{
+				{Name: "cpu", Weight: 1},
+				{Name: "memory", Weight: 1},
+				{Name: "nvidia.com/gpu", Weight: 1},
+			},
+			// CPU: (1000m + 1000m + 1000m) / (5000m + 5000m) = 0.3
+			// Memory: (0 + 2000 + 0) / (5000 + 5000) = 0.2
+			// GPU: (0 + 1 + 0) / (5 + 5) = 0.1
+			// Score: MaxScore * (0.3 + 0.2 + 0.1) / 3 = 20
+			expectedScore: 20,
+		},
+		{
+			name: "Does not include scalar resources if all pods in pod group have zero requests",
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(cpuAndMemoryAndGpu("5000m", "5000", "5")).Obj(),
+				st.MakeNode().Name("node2").Capacity(cpuAndMemoryAndGpu("5000m", "5000", "5")).Obj(),
+			},
+			placementNodeNames: []string{"node1", "node2"},
+			podGroupPods: []*v1.Pod{
+				st.MakePod().UID("foo").Req(cpuAndMemoryAndGpu("1000m", "0", "0")).Obj(),
+				st.MakePod().UID("bar").Req(cpuAndMemoryAndGpu("1000m", "2000", "0")).Obj(),
+			},
+			podGroupAssignments: map[types.UID]string{
+				"foo": "node1",
+				"bar": "node2",
+			},
+			preExistingPods: []*v1.Pod{
+				st.MakePod().Node("node1").UID("baz").Req(cpuAndMemoryAndGpu("1000m", "0", "1")).Obj(),
+			},
+			resourceSpec: []config.ResourceSpec{
+				{Name: "cpu", Weight: 1},
+				{Name: "memory", Weight: 1},
+				{Name: "nvidia.com/gpu", Weight: 1},
+			},
+			// CPU: (1000m + 1000m + 1000m) / (5000m + 5000m) = 0.3
+			// Memory: (0 + 2000 + 0) / (5000 + 5000) = 0.2
+			// GPU: not included as it isn't requested by the pods
+			// Score: MaxScore * (0.3 + 0.2) / 2 = 25
+			expectedScore: 25,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			snapshot := cache.NewSnapshot(tc.preExistingPods, tc.nodes)
+			fh, _ := runtime.NewFramework(tCtx, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
+			scoringStrategy := defaultScoringStrategy.DeepCopy()
+			scoringStrategy.Resources = tc.resourceSpec
+			plugin, err := NewFit(tCtx, &config.NodeResourcesFitArgs{
+				ScoringStrategy: scoringStrategy,
+			}, fh, plfeature.Features{EnableTopologyAwareWorkloadScheduling: true})
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			placementNodes := make([]fwk.NodeInfo, 0, len(tc.placementNodeNames))
+			for _, name := range tc.placementNodeNames {
+				nodeInfo, err := snapshot.NodeInfos().Get(name)
+				if err != nil {
+					t.Fatal(err)
+				}
+				placementNodes = append(placementNodes, nodeInfo)
+			}
+			proposedAssignments := make([]fwk.ProposedAssignment, 0, len(tc.podGroupPods))
+			for _, pod := range tc.podGroupPods {
+				if nodeName, ok := tc.podGroupAssignments[pod.UID]; ok {
+					proposedAssignments = append(proposedAssignments, &podAssignment{
+						pod:      pod,
+						nodeName: nodeName,
+					})
+				}
+			}
+			podGroupInfo := &framework.PodGroupInfo{
+				UnscheduledPods: tc.podGroupPods,
+			}
+			podGroupAssignments := &fwk.PodGroupAssignments{
+				Placement: &fwk.Placement{
+					Nodes: placementNodes,
+				},
+				ProposedAssignments: proposedAssignments,
+			}
+
+			score, status := plugin.(*Fit).ScorePlacement(tCtx, framework.NewCycleState(), podGroupInfo, podGroupAssignments)
+
+			if !status.IsSuccess() {
+				t.Fatalf("ScorePlacement failed: %v", status.AsError())
+			}
+			if score != tc.expectedScore {
+				t.Fatalf("Unexpected score, want %v got %v", tc.expectedScore, score)
+			}
+		})
+	}
+}
+
+func TestComputePodResourceRequestWithNodeAllocatableDRA(t *testing.T) {
+	testComputePodResourceRequestWithNodeAllocatableDRA(ktesting.Init(t))
+}
+func testComputePodResourceRequestWithNodeAllocatableDRA(tCtx ktesting.TContext) {
+	tests := []struct {
+		name                              string
+		pod                               *v1.Pod
+		expected                          *preFilterState
+		enableDRANodeAllocatableResources bool
+	}{
+		{
+			name:                              "Pod with DRA claim and EnableDRANodeAllocatableResources enabled",
+			enableDRANodeAllocatableResources: true,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+								Claims: []v1.ResourceClaim{
+									{
+										Name: "node-allocatable-claim",
+									},
+								},
+							},
+						},
+					},
+					ResourceClaims: []v1.PodResourceClaim{
+						{
+							Name:              "node-allocatable-claim",
+							ResourceClaimName: ptr.To("node-allocatable-claim"),
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim",
+							Containers:        []string{"c1"},
+							Resources: map[v1.ResourceName]resource.Quantity{
+								v1.ResourceCPU: resource.MustParse("50m"),
+							},
+						},
+					},
+				},
+			},
+			expected: &preFilterState{
+				Resource: framework.Resource{
+					MilliCPU: 150, // NodeAllocatableResourceClaimStatus + standard request
+					Memory:   1024 * 1024 * 1024,
+				},
+			},
+		},
+		{
+			name:                              "Pod with DRA claim and EnableDRANodeAllocatableResources disabled",
+			enableDRANodeAllocatableResources: false,
+			pod: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name: "c1",
+							Resources: v1.ResourceRequirements{
+								Requests: v1.ResourceList{
+									v1.ResourceCPU:    resource.MustParse("100m"),
+									v1.ResourceMemory: resource.MustParse("1Gi"),
+								},
+								Claims: []v1.ResourceClaim{
+									{
+										Name: "node-allocatable-claim",
+									},
+								},
+							},
+						},
+					},
+					ResourceClaims: []v1.PodResourceClaim{
+						{
+							Name:              "node-allocatable-claim",
+							ResourceClaimName: ptr.To("node-allocatable-claim"),
+						},
+					},
+				},
+				Status: v1.PodStatus{
+					NodeAllocatableResourceClaimStatuses: []v1.NodeAllocatableResourceClaimStatus{
+						{
+							ResourceClaimName: "node-allocatable-claim",
+							Containers:        []string{"c1"},
+							Resources: map[v1.ResourceName]resource.Quantity{
+								v1.ResourceCPU: resource.MustParse("50m"),
+							},
+						},
+					},
+				},
+			},
+			expected: &preFilterState{
+				Resource: framework.Resource{
+					MilliCPU: 100, // only standard request
+					Memory:   1024 * 1024 * 1024,
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		tCtx.Run(tc.name, func(tCtx ktesting.TContext) {
+			opts := ResourceRequestsOptions{
+				EnableDRANodeAllocatableResources: tc.enableDRANodeAllocatableResources,
+			}
+			result := computePodResourceRequest(tc.pod, opts)
+
+			if diff := cmp.Diff(tc.expected.Resource, result.Resource); diff != "" {
+				tCtx.Errorf("computePodResourceRequest() returned diff (-want +got):\n%s", diff)
 			}
 		})
 	}

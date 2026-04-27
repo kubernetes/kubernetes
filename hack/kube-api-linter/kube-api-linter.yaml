@@ -16,7 +16,7 @@ linters:
     - "nonullable" # Ensure fields are not marked as nullable.
     # - "nophase" # Ensure field names do not have the word "phase" in them.
     - "notimestamp" # Ensure fields are not named "timestamp", prefer "time".
-    # - "optionalfields" # Ensure fields marked optional have omitempty and pointers.
+    - "optionalfields" # Ensure fields marked optional have omitempty and pointers.
     - "optionalorrequired" # Every field should be marked as `+optional` xor `+required`.
     # - "requiredfields" # Required fields should only be pointers when required based on the validity of the zero value, they should always have `omitempty`.
     - "ssatags" # Ensure lists have a listType tag.
@@ -51,14 +51,14 @@ lintersConfig:
   #   jsonTagRegex: "^[a-z][a-z0-9]*(?:[A-Z][a-z0-9]*)*$" # The default regex is appropriate for our use case.
   # nomaps:
   #   policy: AllowStringToStringMaps # Determines how the linter should handle maps of basic types. Maps of objects are always disallowed.
-  # optionalFields:
-  #  pointers:
-  #    preference: Always | WhenRequired # Whether to always require pointers, or only when required. Defaults to `Always`.
-  #    policy: SuggestFix | Warn # The policy for pointers in optional fields. Defaults to `SuggestFix`.
-  #  omitempty:
-  #      policy: SuggestFix | Warn | Ignore # The policy for omitempty in optional fields. Defaults to `SuggestFix`.
-  #  omitzero:
-  #      policy: SuggestFix | Warn | Forbid # The policy for omitzero in optional fields. Defaults to `SuggestFix`.
+  optionalFields:
+   pointers:
+     preference: Always # Whether to always require pointers, or only when required. Defaults to `Always`.
+     policy: SuggestFix # The policy for pointers in optional fields. Defaults to `SuggestFix`.
+   omitempty:
+       policy: SuggestFix # The policy for omitempty in optional fields. Defaults to `SuggestFix`.
+   omitzero:
+       policy: Forbid # The policy for omitzero in optional fields. Defaults to `SuggestFix`.
   # optionalOrRequired:
   #   preferredOptionalMarker: optional # The preferred optional marker to use, fixes will suggest to use this marker. Defaults to `optional`.
   #   preferredRequiredMarker: required # The preferred required marker to use, fixes will suggest to use this marker. Defaults to `required`. 

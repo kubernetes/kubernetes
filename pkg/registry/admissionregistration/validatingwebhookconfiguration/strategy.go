@@ -22,7 +22,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration/validation"
@@ -63,11 +65,20 @@ func (validatingWebhookConfigurationStrategy) PrepareForUpdate(ctx context.Conte
 
 // Validate validates a new validatingWebhookConfiguration.
 func (validatingWebhookConfigurationStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
-	return validation.ValidateValidatingWebhookConfiguration(obj.(*admissionregistration.ValidatingWebhookConfiguration))
+	ic := obj.(*admissionregistration.ValidatingWebhookConfiguration)
+	errs := validation.ValidateValidatingWebhookConfiguration(ic)
+	if utilfeature.DefaultFeatureGate.Enabled(features.ManifestBasedAdmissionControlConfig) {
+		errs = append(errs, validation.ValidateStaticSuffix(ic.Name, field.NewPath("metadata", "name"))...)
+	}
+	return errs
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (validatingWebhookConfigurationStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	ic := obj.(*admissionregistration.ValidatingWebhookConfiguration)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ManifestBasedAdmissionControlConfig) {
+		return validation.WarningsForStaticSuffix(ic.Name)
+	}
 	return nil
 }
 
@@ -82,12 +93,16 @@ func (validatingWebhookConfigurationStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (validatingWebhookConfigurationStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidateValidatingWebhookConfigurationUpdate(obj.(*admissionregistration.ValidatingWebhookConfiguration), old.(*admissionregistration.ValidatingWebhookConfiguration))
+	newIC := obj.(*admissionregistration.ValidatingWebhookConfiguration)
+	oldIC := old.(*admissionregistration.ValidatingWebhookConfiguration)
+	errs := validation.ValidateValidatingWebhookConfigurationUpdate(newIC, oldIC)
+	return errs
 }
 
 // WarningsOnUpdate returns warnings for the given update.
 func (validatingWebhookConfigurationStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	newIC := obj.(*admissionregistration.ValidatingWebhookConfiguration)
+	return validation.WarningsForStaticSuffix(newIC.Name)
 }
 
 // AllowUnconditionalUpdate is the default update policy for validatingWebhookConfiguration objects. Status update should

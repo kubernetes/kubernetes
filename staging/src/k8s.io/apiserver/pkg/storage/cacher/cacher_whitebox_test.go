@@ -41,6 +41,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/sharding"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
@@ -2648,7 +2650,7 @@ func TestForgetWatcher(t *testing.T) {
 	}
 	w := newCacheWatcher(
 		0,
-		func(_ string, _ labels.Set, _ fields.Set) bool { return true },
+		func(_ string, _ labels.Set, _ fields.Set, _ runtime.Object) bool { return true },
 		nil,
 		storage.APIObjectVersioner{},
 		testingclock.NewFakeClock(time.Now()).Now().Add(2*time.Minute),
@@ -3355,4 +3357,238 @@ func (f *fakeSnapshotter) Add(rv uint64, indexer store.OrderedLister) {}
 func (f *fakeSnapshotter) RemoveLess(rv uint64)                       {}
 func (f *fakeSnapshotter) Len() int {
 	return 0
+}
+
+// --- Sharding unit tests for filterWithAttrsAndPrefixFunction ---
+
+// selectorIncludingUID builds a shard selector whose range contains the hash of uid.
+func selectorIncludingUID(uid string) sharding.Selector {
+	hash := "0x" + sharding.HashField(uid)
+	return sharding.NewSelector(sharding.ShardRangeRequirement{
+		Key:   "object.metadata.uid",
+		Start: hash,
+		End:   incrementHex(hash),
+	})
+}
+
+// selectorExcludingUID builds a shard selector whose range does NOT contain the hash of uid.
+func selectorExcludingUID(uid string) sharding.Selector {
+	hash := "0x" + sharding.HashField(uid)
+	return sharding.NewSelector(sharding.ShardRangeRequirement{
+		Key:   "object.metadata.uid",
+		Start: "0x0000000000000000",
+		End:   hash,
+	})
+}
+
+func incrementHex(hex string) string {
+	b := []byte(hex)
+	for i := len(b) - 1; i >= 2; i-- {
+		if b[i] < '9' {
+			b[i]++
+			return string(b)
+		} else if b[i] == '9' {
+			b[i] = 'a'
+			return string(b)
+		} else if b[i] < 'f' {
+			b[i]++
+			return string(b)
+		}
+		b[i] = '0'
+	}
+	return "0x10000000000000000"
+}
+
+func makeExamplePod(name, namespace, uid string, podLabels map[string]string) *example.Pod {
+	return &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			UID:       types.UID(uid),
+			Labels:    podLabels,
+		},
+	}
+}
+
+func TestFilterWithAttrsAndPrefixFunction_ShardMatchAndLabels(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, true)
+	uid := "test-uid-1"
+	pod := makeExamplePod("pod1", "default", uid, map[string]string{"app": "web"})
+	gr := schema.GroupResource{Resource: "pods"}
+
+	pred := storage.SelectionPredicate{
+		Label:         labels.SelectorFromSet(labels.Set{"app": "web"}),
+		Field:         fields.Everything(),
+		ShardSelector: selectorIncludingUID(uid),
+		GetAttrs:      storage.DefaultNamespaceScopedAttr,
+	}
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+
+	if !filter("/pods/default/pod1", labels.Set{"app": "web"}, fields.Set{"metadata.name": "pod1", "metadata.namespace": "default"}, pod) {
+		t.Error("expected filter to match: shard matches and labels match")
+	}
+}
+
+func TestFilterWithAttrsAndPrefixFunction_ShardMatchButLabelMismatch(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, true)
+	uid := "test-uid-2"
+	pod := makeExamplePod("pod2", "default", uid, map[string]string{"app": "api"})
+	gr := schema.GroupResource{Resource: "pods"}
+
+	pred := storage.SelectionPredicate{
+		Label:         labels.SelectorFromSet(labels.Set{"app": "web"}),
+		Field:         fields.Everything(),
+		ShardSelector: selectorIncludingUID(uid),
+		GetAttrs:      storage.DefaultNamespaceScopedAttr,
+	}
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+
+	if filter("/pods/default/pod2", labels.Set{"app": "api"}, fields.Set{"metadata.name": "pod2", "metadata.namespace": "default"}, pod) {
+		t.Error("expected filter to reject: shard matches but labels don't")
+	}
+}
+
+func TestFilterWithAttrsAndPrefixFunction_ShardMismatch(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, true)
+	uid := "test-uid-3"
+	pod := makeExamplePod("pod3", "default", uid, map[string]string{"app": "web"})
+	gr := schema.GroupResource{Resource: "pods"}
+
+	pred := storage.SelectionPredicate{
+		Label:         labels.Everything(),
+		Field:         fields.Everything(),
+		ShardSelector: selectorExcludingUID(uid),
+		GetAttrs:      storage.DefaultNamespaceScopedAttr,
+	}
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+
+	if filter("/pods/default/pod3", labels.Set{"app": "web"}, fields.Set{"metadata.name": "pod3", "metadata.namespace": "default"}, pod) {
+		t.Error("expected filter to reject: shard does not match")
+	}
+}
+
+func TestFilterWithAttrsAndPrefixFunction_NilShardSelector(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, true)
+	pod := makeExamplePod("pod4", "default", "uid-4", map[string]string{"app": "web"})
+	gr := schema.GroupResource{Resource: "pods"}
+
+	pred := storage.SelectionPredicate{
+		Label:    labels.SelectorFromSet(labels.Set{"app": "web"}),
+		Field:    fields.Everything(),
+		GetAttrs: storage.DefaultNamespaceScopedAttr,
+	}
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+
+	if !filter("/pods/default/pod4", labels.Set{"app": "web"}, fields.Set{"metadata.name": "pod4", "metadata.namespace": "default"}, pod) {
+		t.Error("expected filter to match: nil ShardSelector should pass everything through")
+	}
+}
+
+func TestFilterWithAttrsAndPrefixFunction_EverythingSelector(t *testing.T) {
+	pod := makeExamplePod("pod5", "default", "uid-5", nil)
+	gr := schema.GroupResource{Resource: "pods"}
+
+	pred := storage.SelectionPredicate{
+		Label:         labels.Everything(),
+		Field:         fields.Everything(),
+		ShardSelector: sharding.Everything(),
+		GetAttrs:      storage.DefaultNamespaceScopedAttr,
+	}
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+
+	if !filter("/pods/default/pod5", labels.Set{}, fields.Set{"metadata.name": "pod5", "metadata.namespace": "default"}, pod) {
+		t.Error("expected filter to match: Everything() selector should pass all objects")
+	}
+}
+
+func TestFilterWithAttrsAndPrefixFunction_WrongPrefix(t *testing.T) {
+	uid := "test-uid-6"
+	pod := makeExamplePod("pod6", "default", uid, nil)
+	gr := schema.GroupResource{Resource: "pods"}
+
+	pred := storage.SelectionPredicate{
+		Label:         labels.Everything(),
+		Field:         fields.Everything(),
+		ShardSelector: selectorIncludingUID(uid),
+		GetAttrs:      storage.DefaultNamespaceScopedAttr,
+	}
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+
+	if filter("/configmaps/default/cm1", nil, nil, pod) {
+		t.Error("expected filter to reject: key prefix doesn't match")
+	}
+}
+
+func TestFilterWithAttrsAndPrefixFunction_ShardErrorDropsEvent(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, true)
+	obj := &runtime.Unknown{}
+	gr := schema.GroupResource{Resource: "pods"}
+
+	pred := storage.SelectionPredicate{
+		Label: labels.Everything(),
+		Field: fields.Everything(),
+		ShardSelector: sharding.NewSelector(sharding.ShardRangeRequirement{
+			Key:   "object.metadata.uid",
+			Start: "0x0000000000000000",
+			End:   "0x10000000000000000",
+		}),
+		GetAttrs: storage.DefaultNamespaceScopedAttr,
+	}
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+
+	if filter("/pods/default/pod-err", nil, nil, obj) {
+		t.Error("expected filter to reject: shard matching should fail on unstructured object")
+	}
+}
+
+func TestFilterWithAttrsAndPrefixFunction_NamespaceSharding(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, true)
+	ns := "my-namespace"
+	pod := makeExamplePod("pod-ns", ns, "some-uid", nil)
+
+	nsHash := "0x" + sharding.HashField(ns)
+	sel := sharding.NewSelector(sharding.ShardRangeRequirement{
+		Key:   "object.metadata.namespace",
+		Start: nsHash,
+		End:   incrementHex(nsHash),
+	})
+
+	gr := schema.GroupResource{Resource: "pods"}
+	pred := storage.SelectionPredicate{
+		Label:         labels.Everything(),
+		Field:         fields.Everything(),
+		ShardSelector: sel,
+		GetAttrs:      storage.DefaultNamespaceScopedAttr,
+	}
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+
+	if !filter("/pods/my-namespace/pod-ns", labels.Set{}, fields.Set{"metadata.name": "pod-ns", "metadata.namespace": ns}, pod) {
+		t.Error("expected filter to match: namespace-based shard selector should match")
+	}
+}
+
+func TestFilterWithAttrsAndPrefixFunction_NamespaceShardingMismatch(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, true)
+	ns := "other-namespace"
+	pod := makeExamplePod("pod-ns2", ns, "some-uid-2", nil)
+
+	targetHash := "0x" + sharding.HashField("my-namespace")
+	sel := sharding.NewSelector(sharding.ShardRangeRequirement{
+		Key:   "object.metadata.namespace",
+		Start: targetHash,
+		End:   incrementHex(targetHash),
+	})
+
+	gr := schema.GroupResource{Resource: "pods"}
+	pred := storage.SelectionPredicate{
+		Label:         labels.Everything(),
+		Field:         fields.Everything(),
+		ShardSelector: sel,
+		GetAttrs:      storage.DefaultNamespaceScopedAttr,
+	}
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+
+	if filter("/pods/other-namespace/pod-ns2", labels.Set{}, fields.Set{"metadata.name": "pod-ns2", "metadata.namespace": ns}, pod) {
+		t.Error("expected filter to reject: namespace hash doesn't fall in shard range")
+	}
 }

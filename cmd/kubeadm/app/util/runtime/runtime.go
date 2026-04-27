@@ -45,7 +45,7 @@ var defaultKnownCRISockets = []string{
 // ContainerRuntime is an interface for working with container runtimes
 type ContainerRuntime interface {
 	Connect() error
-	Close()
+	Close(ctx context.Context)
 	SetImpl(Impl)
 	IsRunning() error
 	ListKubeContainers() ([]string, error)
@@ -83,13 +83,13 @@ func (runtime *CRIRuntime) SetImpl(impl Impl) {
 
 // Connect establishes a connection with the CRI runtime.
 func (runtime *CRIRuntime) Connect() error {
-	runtimeService, err := runtime.impl.NewRemoteRuntimeService(runtime.criSocket, defaultTimeout)
+	runtimeService, err := runtime.impl.NewRemoteRuntimeService(context.Background(), runtime.criSocket, defaultTimeout)
 	if err != nil {
 		return errors.Wrap(err, "failed to create new CRI runtime service")
 	}
 	runtime.runtimeService = runtimeService
 
-	imageService, err := runtime.impl.NewRemoteImageService(runtime.criSocket, defaultTimeout)
+	imageService, err := runtime.impl.NewRemoteImageService(context.Background(), runtime.criSocket, defaultTimeout)
 	if err != nil {
 		return errors.Wrap(err, "failed to create new CRI image service")
 	}
@@ -99,14 +99,14 @@ func (runtime *CRIRuntime) Connect() error {
 }
 
 // Close closes the connections to the runtime and image services.
-func (runtime *CRIRuntime) Close() {
+func (runtime *CRIRuntime) Close(ctx context.Context) {
 	if runtime.runtimeService != nil {
-		if err := runtime.runtimeService.Close(); err != nil {
+		if err := runtime.runtimeService.Close(ctx); err != nil {
 			klog.Warningf("failed to close runtime service: %v", err)
 		}
 	}
 	if runtime.imageService != nil {
-		if err := runtime.imageService.Close(); err != nil {
+		if err := runtime.imageService.Close(ctx); err != nil {
 			klog.Warningf("failed to close image service: %v", err)
 		}
 	}
@@ -157,7 +157,7 @@ func (runtime *CRIRuntime) RemoveContainers(containers []string) error {
 	errs := []error{}
 	for _, container := range containers {
 		var lastErr error
-		for i := 0; i < constants.RemoveContainerRetry; i++ {
+		for range constants.RemoveContainerRetry {
 			klog.V(5).Infof("Attempting to remove container %v", container)
 
 			ctx, cancel := defaultContext()
@@ -189,7 +189,7 @@ func (runtime *CRIRuntime) RemoveContainers(containers []string) error {
 
 // PullImage pulls the image
 func (runtime *CRIRuntime) PullImage(image string) (err error) {
-	for i := 0; i < constants.PullImageRetry; i++ {
+	for range constants.PullImageRetry {
 		if _, err = runtime.impl.PullImage(context.Background(), runtime.imageService, &runtimeapi.ImageSpec{Image: image}, nil, nil); err == nil {
 			return nil
 		}
@@ -235,7 +235,7 @@ func pullImagesInParallelImpl(images []string, ifNotPresent bool,
 		}()
 	}
 
-	for i := 0; i < len(images); i++ {
+	for range images {
 		if err := <-errChan; err != nil {
 			errs = append(errs, err)
 		}

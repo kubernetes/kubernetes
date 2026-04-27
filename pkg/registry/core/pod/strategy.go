@@ -384,9 +384,7 @@ func dropNonResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
 	metav1.ResetObjectMetaForStatus(&newPod.ObjectMeta, &oldPod.ObjectMeta)
 
 	newPod.Spec.Containers = containers
-	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
-		newPod.Spec.InitContainers = initContainers
-	}
+	newPod.Spec.InitContainers = initContainers
 
 	return newPod
 }
@@ -735,7 +733,7 @@ func AttachLocation(
 	connInfo client.ConnectionInfoGetter,
 	name string,
 	opts *api.PodAttachOptions,
-) (*url.URL, http.RoundTripper, error) {
+) (*url.URL, *client.ConnectionInfo, error) {
 	return streamLocation(ctx, getter, connInfo, name, opts, opts.Container, "attach")
 }
 
@@ -747,7 +745,7 @@ func ExecLocation(
 	connInfo client.ConnectionInfoGetter,
 	name string,
 	opts *api.PodExecOptions,
-) (*url.URL, http.RoundTripper, error) {
+) (*url.URL, *client.ConnectionInfo, error) {
 	return streamLocation(ctx, getter, connInfo, name, opts, opts.Container, "exec")
 }
 
@@ -759,7 +757,7 @@ func streamLocation(
 	opts runtime.Object,
 	container,
 	path string,
-) (*url.URL, http.RoundTripper, error) {
+) (*url.URL, *client.ConnectionInfo, error) {
 	pod, err := getPod(ctx, getter, name)
 	if err != nil {
 		return nil, nil, err
@@ -791,7 +789,7 @@ func streamLocation(
 		Path:     fmt.Sprintf("/%s/%s/%s/%s", path, pod.Namespace, pod.Name, container),
 		RawQuery: params.Encode(),
 	}
-	return loc, nodeInfo.Transport, nil
+	return loc, nodeInfo, nil
 }
 
 // PortForwardLocation returns the port-forward URL for a pod.
@@ -801,7 +799,7 @@ func PortForwardLocation(
 	connInfo client.ConnectionInfoGetter,
 	name string,
 	opts *api.PodPortForwardOptions,
-) (*url.URL, http.RoundTripper, error) {
+) (*url.URL, *client.ConnectionInfo, error) {
 	pod, err := getPod(ctx, getter, name)
 	if err != nil {
 		return nil, nil, err
@@ -826,7 +824,7 @@ func PortForwardLocation(
 		Path:     fmt.Sprintf("/portForward/%s/%s", pod.Namespace, pod.Name),
 		RawQuery: params.Encode(),
 	}
-	return loc, nodeInfo.Transport, nil
+	return loc, nodeInfo, nil
 }
 
 // validateContainer validate container is valid for pod, return valid container

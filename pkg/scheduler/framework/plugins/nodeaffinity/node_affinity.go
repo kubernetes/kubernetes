@@ -37,10 +37,9 @@ import (
 
 // NodeAffinity is a plugin that checks if a pod node selector matches the node label.
 type NodeAffinity struct {
-	handle                    fwk.Handle
-	addedNodeSelector         *nodeaffinity.NodeSelector
-	addedPrefSchedTerms       *nodeaffinity.PreferredSchedulingTerms
-	enableSchedulingQueueHint bool
+	handle              fwk.Handle
+	addedNodeSelector   *nodeaffinity.NodeSelector
+	addedPrefSchedTerms *nodeaffinity.PreferredSchedulingTerms
 }
 
 var _ fwk.PreFilterPlugin = &NodeAffinity{}
@@ -99,18 +98,8 @@ func (s *preFilterState) Clone() fwk.StateData {
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *NodeAffinity) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
-	// A note about UpdateNodeTaint event:
-	// Ideally, it's supposed to register only Add | UpdateNodeLabel because UpdateNodeTaint will never change the result from this plugin.
-	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
-	// See: https://github.com/kubernetes/kubernetes/issues/109437
-	nodeActionType := fwk.Add | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint
-	if pl.enableSchedulingQueueHint {
-		// preCheck is not used when QHint is enabled, and hence we can use UpdateNodeLabel instead of Update.
-		nodeActionType = fwk.Add | fwk.UpdateNodeLabel
-	}
-
 	return []fwk.ClusterEventWithHint{
-		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeLabel}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
 	}, nil
 }
 
@@ -313,8 +302,7 @@ func New(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Fea
 		return nil, err
 	}
 	pl := &NodeAffinity{
-		handle:                    h,
-		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,
+		handle: h,
 	}
 	if args.AddedAffinity != nil {
 		if ns := args.AddedAffinity.RequiredDuringSchedulingIgnoredDuringExecution; ns != nil {

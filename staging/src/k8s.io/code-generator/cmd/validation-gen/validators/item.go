@@ -18,7 +18,6 @@ package validators
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -231,13 +230,13 @@ func parseTypedValue(value string, argType codetags.ArgType) (any, codetags.Valu
 	case codetags.ArgTypeString:
 		return value, codetags.ValueTypeString, nil
 	case codetags.ArgTypeInt:
-		intVal, err := strconv.Atoi(value)
+		intVal, err := util.ParseInt(value)
 		if err != nil {
 			return nil, "", fmt.Errorf("invalid integer: %w", err)
 		}
 		return intVal, codetags.ValueTypeInt, nil
 	case codetags.ArgTypeBool:
-		boolVal, err := strconv.ParseBool(value)
+		boolVal, err := util.ParseBool(value)
 		if err != nil {
 			return nil, "", fmt.Errorf("invalid boolean: %w", err)
 		}
@@ -251,7 +250,7 @@ func (itv itemTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            itv.TagName(),
 		StabilityLevel: TagStabilityLevelStable,
-		Scopes:         itv.ValidScopes().UnsortedList(),
+		Scopes:         sets.List(itv.ValidScopes()),
 		Description: "Declares a validation for an item of a slice declared as a +k8s:listType=map. " +
 			"The item to match is declared by providing field-value pair arguments. All key fields must be specified.",
 		Usage: "+k8s:item(stringKey: \"value\", intKey: 42, boolKey: true)=<validation-tag>",

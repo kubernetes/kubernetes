@@ -24,12 +24,12 @@ import (
 	"reflect"
 	"sync"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/gomega"
-	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	resourcealphaapi "k8s.io/api/resource/v1alpha3"
+	resourcebeta "k8s.io/api/resource/v1beta2"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -45,7 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	"k8s.io/kubernetes/pkg/scheduler/util/assumecache"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -82,7 +82,7 @@ func (op *createResourceClaimsOp) isValid(allowParameterization bool) error {
 func (op *createResourceClaimsOp) collectsMetrics() bool {
 	return false
 }
-func (op *createResourceClaimsOp) patchParams(w *workload) (realOp, error) {
+func (op *createResourceClaimsOp) patchParams(w *Workload) (realOp, error) {
 	if op.CountParam != "" {
 		var err error
 		op.Count, err = w.Params.get(op.CountParam[1:])
@@ -159,7 +159,7 @@ func (op *createResourceDriverOp) isValid(allowParameterization bool) error {
 func (op *createResourceDriverOp) collectsMetrics() bool {
 	return false
 }
-func (op *createResourceDriverOp) patchParams(w *workload) (realOp, error) {
+func (op *createResourceDriverOp) patchParams(w *Workload) (realOp, error) {
 	if op.MaxClaimsPerNodeParam != "" {
 		var err error
 		op.MaxClaimsPerNode, err = w.Params.get(op.MaxClaimsPerNodeParam[1:])
@@ -267,7 +267,7 @@ func (op *allocResourceClaimsOp) isValid(allowParameterization bool) error {
 func (op *allocResourceClaimsOp) collectsMetrics() bool {
 	return false
 }
-func (op *allocResourceClaimsOp) patchParams(w *workload) (realOp, error) {
+func (op *allocResourceClaimsOp) patchParams(w *Workload) (realOp, error) {
 	return op, op.isValid(false)
 }
 
@@ -291,7 +291,7 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 		KubeClient:               tCtx.Client(),
 	}
 	if resourceSliceTrackerOpts.EnableDeviceTaintRules {
-		resourceSliceTrackerOpts.TaintInformer = informerFactory.Resource().V1alpha3().DeviceTaintRules()
+		resourceSliceTrackerOpts.TaintInformer = informerFactory.Resource().V1beta2().DeviceTaintRules()
 		resourceSliceTrackerOpts.ClassInformer = informerFactory.Resource().V1().DeviceClasses()
 	}
 	resourceSliceTracker, err := resourceslicetracker.StartTracker(tCtx, resourceSliceTrackerOpts)
@@ -303,19 +303,30 @@ func (op *allocResourceClaimsOp) run(tCtx ktesting.TContext) {
 		tCtx.Cancel("allocResourceClaimsOp.run is shutting down")
 		informerFactory.Shutdown()
 	}()
-	syncedInformers := informerFactory.WaitForCacheSync(tCtx.Done())
-	expectSyncedInformers := map[reflect.Type]bool{
-		reflect.TypeOf(&resourceapi.DeviceClass{}):   true,
-		reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
-		reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
-		reflect.TypeOf(&v1.Node{}):                   true,
+	syncResult := informerFactory.WaitForCacheSyncWithContext(tCtx)
+	expectSyncResult := cache.SyncResult{
+		Synced: map[reflect.Type]bool{
+			reflect.TypeFor[*resourceapi.DeviceClass]():   true,
+			reflect.TypeFor[*resourceapi.ResourceClaim](): true,
+			reflect.TypeFor[*resourceapi.ResourceSlice](): true,
+			reflect.TypeFor[*v1.Node]():                   true,
+		},
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaints) {
-		expectSyncedInformers[reflect.TypeOf(&resourcealphaapi.DeviceTaintRule{})] = true
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
+		expectSyncResult.Synced[reflect.TypeFor[*resourcebeta.DeviceTaintRule]()] = true
+	}
+	if diff := cmp.Diff(expectSyncResult, syncResult,
+		cmp.Transformer("TypeOf", func(t reflect.Type) string {
+			return t.String()
+		}),
+	); diff != "" {
+		tCtx.Fatalf("unexpected informer sync result (- expected, + actual):\n%s", diff)
 	}
 
-	require.Equal(tCtx, expectSyncedInformers, syncedInformers, "synced informers")
-	celCache := cel.NewCache(10, cel.Features{EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity)})
+	celCache := cel.NewCache(10, cel.Features{
+		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		EnableListTypeAttributes: utilfeature.DefaultFeatureGate.Enabled(features.DRAListTypeAttributes),
+	})
 
 	// Also wait for the assume cache to catch up.
 	// Without this we cannot reliably store the result of

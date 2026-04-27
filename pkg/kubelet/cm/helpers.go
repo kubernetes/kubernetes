@@ -25,6 +25,7 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 )
@@ -32,7 +33,7 @@ import (
 // for typecheck across platforms
 var _ func(int64, int64) int64 = MilliCPUToQuota
 var _ func(int64) uint64 = MilliCPUToShares
-var _ func(*v1.Pod, bool, uint64, bool) *ResourceConfig = ResourceConfigForPod
+var _ func(*v1.Pod, bool, uint64, bool, kubeletconfig.MemoryReservationPolicy) *ResourceConfig = ResourceConfigForPod
 var _ func() (*CgroupSubsystems, error) = GetCgroupSubsystems
 var _ func(string) ([]int, error) = getCgroupProcs
 var _ func(types.UID) string = GetPodCgroupNameSuffix

@@ -199,6 +199,8 @@ type validateFunc func(
 	runtimeCELCostBudget int64,
 	authz authorizer.Authorizer) validating.ValidateResult
 
+func (f validateFunc) CompileError() error { return nil }
+
 type fakeCompiler struct {
 	ValidateFuncs map[types.NamespacedName]validating.Validator
 

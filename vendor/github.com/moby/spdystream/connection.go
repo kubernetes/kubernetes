@@ -224,7 +224,13 @@ type Connection struct {
 // NewConnection creates a new spdy connection from an existing
 // network connection.
 func NewConnection(conn net.Conn, server bool) (*Connection, error) {
-	framer, framerErr := spdy.NewFramer(conn, conn)
+	return NewConnectionWithOptions(conn, server)
+}
+
+// NewConnectionWithOptions creates a new spdy connection and applies frame
+// parsing limits via options.
+func NewConnectionWithOptions(conn net.Conn, server bool, opts ...spdy.FramerOption) (*Connection, error) {
+	framer, framerErr := spdy.NewFramerWithOptions(conn, conn, opts...)
 	if framerErr != nil {
 		return nil, framerErr
 	}
@@ -349,6 +355,9 @@ Loop:
 				debugMessage("frame read error: %s", err)
 			} else {
 				debugMessage("(%p) EOF received", s)
+			}
+			if spdyErr, ok := err.(*spdy.Error); ok && spdyErr.Err == spdy.InvalidControlFrame {
+				_ = s.conn.Close()
 			}
 			break
 		}

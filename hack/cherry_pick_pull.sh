@@ -134,6 +134,7 @@ trap return_to_kansas EXIT
 
 SUBJECTS=()
 RELEASE_NOTES=()
+KIND_LABELS=()
 function make-a-pr() {
   local rel
   rel="$(basename "${BRANCH}")"
@@ -142,12 +143,25 @@ function make-a-pr() {
 
   local numandtitle
   numandtitle=$(printf '%s\n' "${SUBJECTS[@]}")
+
+  local kind_commands=""
+  if [[ ${#KIND_LABELS[@]} -gt 0 ]]; then
+    while IFS= read -r label; do
+      if [[ -n "${label}" ]]; then
+        kind_commands+="/kind ${label#kind/}"$'\n'
+      fi
+    done < <(printf '%s\n' "${KIND_LABELS[@]}" | sort -u)
+  fi
+
   prtext=$(cat <<EOF
 Cherry pick of ${PULLSUBJ} on ${rel}.
 
 ${numandtitle}
 
 For details on the cherry pick process, see the [cherry pick requests](https://git.k8s.io/community/contributors/devel/sig-release/cherry-picks.md) page.
+
+#### What type of PR is this?
+${kind_commands}
 
 \`\`\`release-note
 $(printf '%s\n' "${RELEASE_NOTES[@]}")
@@ -202,6 +216,13 @@ for pull in "${PULLS[@]}"; do
   # set the release note
   release_note=$(gh pr view "$pull" --json body --jq '.["body"]' | awk '/```release-note/{f=1;next} /```/{f=0} f')
   RELEASE_NOTES+=("${release_note}")
+
+  # collect kind/* labels from the original PR
+  while IFS= read -r label; do
+    if [[ -n "${label}" ]]; then
+      KIND_LABELS+=("${label}")
+    fi
+  done < <(gh pr view "$pull" --json labels --jq '.labels[].name | select(startswith("kind/"))')
 
   # remove the patch file from /tmp
   rm -f "/tmp/${pull}.patch"

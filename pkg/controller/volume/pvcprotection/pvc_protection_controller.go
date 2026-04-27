@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -34,8 +35,9 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-helpers/storage/ephemeral"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/controller/util/protectionutil"
 	"k8s.io/kubernetes/pkg/controller/volume/common"
-	"k8s.io/kubernetes/pkg/controller/volume/protectionutil"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/slice"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -114,6 +116,10 @@ type Controller struct {
 	queue              workqueue.TypedRateLimitingInterface[string]
 	pvcProcessingStore *pvcProcessingStore
 }
+
+var unusedSinceNowFunc = metav1.Now
+
+type podUsageCheckFunc func(logger klog.Logger, pod *v1.Pod, pvc *v1.PersistentVolumeClaim) bool
 
 // NewPVCProtectionController returns a new instance of PVCProtectionController.
 func NewPVCProtectionController(logger klog.Logger, pvcInformer coreinformers.PersistentVolumeClaimInformer, podInformer coreinformers.PodInformer, cl clientset.Interface) (*Controller, error) {
@@ -254,10 +260,20 @@ func (c *Controller) processPVC(ctx context.Context, pvcNamespace, pvcName strin
 		return err
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.PersistentVolumeClaimUnusedSinceTime) && pvc.DeletionTimestamp == nil {
+		isUsed, err := c.isBeingUsedWith(ctx, pvc, lazyLivePodList, c.podUsesPVCForUnusedSince)
+		if err != nil {
+			return err
+		}
+		if err := c.updateUnusedCondition(ctx, pvc, isUsed); err != nil {
+			return err
+		}
+	}
+
 	if protectionutil.IsDeletionCandidate(pvc, volumeutil.PVCProtectionFinalizer) {
 		// PVC should be deleted. Check if it's used and remove finalizer if
 		// it's not.
-		isUsed, err := c.isBeingUsed(ctx, pvc, lazyLivePodList)
+		isUsed, err := c.isBeingUsedWith(ctx, pvc, lazyLivePodList, c.podUsesPVCForDeletion)
 		if err != nil {
 			return err
 		}
@@ -303,12 +319,63 @@ func (c *Controller) removeFinalizer(ctx context.Context, pvc *v1.PersistentVolu
 	return nil
 }
 
-func (c *Controller) isBeingUsed(ctx context.Context, pvc *v1.PersistentVolumeClaim, lazyLivePodList *LazyLivePodList) (bool, error) {
+func (c *Controller) updateUnusedCondition(ctx context.Context, pvc *v1.PersistentVolumeClaim, isUsed bool) error {
+	existingCondition := findCondition(pvc.Status.Conditions, v1.PersistentVolumeClaimUnused)
+
+	switch {
+	case isUsed && (existingCondition == nil || existingCondition.Status == v1.ConditionTrue):
+		// PVC was unused but is now in use -> set Unused=False
+		return c.setUnusedCondition(ctx, pvc, v1.ConditionFalse, "PodUsingPVC", "A pod is currently referencing this PVC")
+	case !isUsed && (existingCondition == nil || existingCondition.Status != v1.ConditionTrue):
+		// PVC is not in use and condition doesn't reflect that -> set Unused=True
+		return c.setUnusedCondition(ctx, pvc, v1.ConditionTrue, "NoPodsUsingPVC", "No pods are currently referencing this PVC")
+	default:
+		return nil
+	}
+}
+
+func (c *Controller) setUnusedCondition(ctx context.Context, pvc *v1.PersistentVolumeClaim, status v1.ConditionStatus, reason, message string) error {
+	claimClone := pvc.DeepCopy()
+	now := unusedSinceNowFunc()
+	newCondition := v1.PersistentVolumeClaimCondition{
+		Type:               v1.PersistentVolumeClaimUnused,
+		Status:             status,
+		LastTransitionTime: now,
+		Reason:             reason,
+		Message:            message,
+	}
+
+	if existing := findCondition(claimClone.Status.Conditions, v1.PersistentVolumeClaimUnused); existing != nil {
+		*existing = newCondition
+	} else {
+		claimClone.Status.Conditions = append(claimClone.Status.Conditions, newCondition)
+	}
+
+	_, err := c.client.CoreV1().PersistentVolumeClaims(claimClone.Namespace).UpdateStatus(ctx, claimClone, metav1.UpdateOptions{})
+	logger := klog.FromContext(ctx)
+	if err != nil {
+		logger.Error(err, "Error updating Unused condition in PVC status", "PVC", klog.KObj(pvc))
+		return err
+	}
+	logger.V(3).Info("Updated Unused condition in PVC status", "PVC", klog.KObj(pvc), "status", status)
+	return nil
+}
+
+func findCondition(conditions []v1.PersistentVolumeClaimCondition, condType v1.PersistentVolumeClaimConditionType) *v1.PersistentVolumeClaimCondition {
+	for i := range conditions {
+		if conditions[i].Type == condType {
+			return &conditions[i]
+		}
+	}
+	return nil
+}
+
+func (c *Controller) isBeingUsedWith(ctx context.Context, pvc *v1.PersistentVolumeClaim, lazyLivePodList *LazyLivePodList, podUsage podUsageCheckFunc) (bool, error) {
 	// Look for a Pod using pvc in the Informer's cache. If one is found the
 	// correct decision to keep pvc is taken without doing an expensive live
 	// list.
 	logger := klog.FromContext(ctx)
-	if inUse, err := c.askInformer(logger, pvc); err != nil {
+	if inUse, err := c.askInformer(logger, pvc, podUsage); err != nil {
 		// No need to return because a live list will follow.
 		logger.Error(err, "")
 	} else if inUse {
@@ -323,10 +390,10 @@ func (c *Controller) isBeingUsed(ctx context.Context, pvc *v1.PersistentVolumeCl
 	// Use a "lazy" live pod list: lazyLivePodList caches the first successful live pod list response,
 	// so for a large number of PVC deletions in a short duration, subsequent requests can use the cached pod list
 	// instead of issuing a lot of API requests. The cache is refreshed for each run of processNextWorkItem().
-	return c.askAPIServer(ctx, pvc, lazyLivePodList)
+	return c.askAPIServer(ctx, pvc, lazyLivePodList, podUsage)
 }
 
-func (c *Controller) askInformer(logger klog.Logger, pvc *v1.PersistentVolumeClaim) (bool, error) {
+func (c *Controller) askInformer(logger klog.Logger, pvc *v1.PersistentVolumeClaim, podUsage podUsageCheckFunc) (bool, error) {
 	logger.V(4).Info("Looking for Pods using PVC in the Informer's cache", "PVC", klog.KObj(pvc))
 
 	// The indexer is used to find pods which might use the PVC.
@@ -343,7 +410,7 @@ func (c *Controller) askInformer(logger klog.Logger, pvc *v1.PersistentVolumeCla
 		// We still need to look at each volume: that's redundant for volume.PersistentVolumeClaim,
 		// but for volume.Ephemeral we need to be sure that this particular PVC is the one
 		// created for the ephemeral volume.
-		if c.podUsesPVC(logger, pod, pvc) {
+		if podUsage(logger, pod, pvc) {
 			return true, nil
 		}
 	}
@@ -352,7 +419,7 @@ func (c *Controller) askInformer(logger klog.Logger, pvc *v1.PersistentVolumeCla
 	return false, nil
 }
 
-func (c *Controller) askAPIServer(ctx context.Context, pvc *v1.PersistentVolumeClaim, lazyLivePodList *LazyLivePodList) (bool, error) {
+func (c *Controller) askAPIServer(ctx context.Context, pvc *v1.PersistentVolumeClaim, lazyLivePodList *LazyLivePodList, podUsage podUsageCheckFunc) (bool, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Looking for Pods using PVC", "PVC", klog.KObj(pvc))
 	if lazyLivePodList.getCache() == nil {
@@ -370,7 +437,7 @@ func (c *Controller) askAPIServer(ctx context.Context, pvc *v1.PersistentVolumeC
 	}
 
 	for _, pod := range lazyLivePodList.getCache() {
-		if c.podUsesPVC(logger, &pod, pvc) {
+		if podUsage(logger, &pod, pvc) {
 			return true, nil
 		}
 	}
@@ -379,7 +446,7 @@ func (c *Controller) askAPIServer(ctx context.Context, pvc *v1.PersistentVolumeC
 	return false, nil
 }
 
-func (c *Controller) podUsesPVC(logger klog.Logger, pod *v1.Pod, pvc *v1.PersistentVolumeClaim) bool {
+func (c *Controller) podUsesPVCForDeletion(logger klog.Logger, pod *v1.Pod, pvc *v1.PersistentVolumeClaim) bool {
 	// Check whether pvc is used by pod only if pod is scheduled, because
 	// kubelet sees pods after they have been scheduled and it won't allow
 	// starting a pod referencing a PVC with a non-nil deletionTimestamp.
@@ -390,6 +457,21 @@ func (c *Controller) podUsesPVC(logger klog.Logger, pod *v1.Pod, pvc *v1.Persist
 				logger.V(2).Info("Pod uses PVC", "pod", klog.KObj(pod), "PVC", klog.KObj(pvc))
 				return true
 			}
+		}
+	}
+	return false
+}
+
+func (c *Controller) podUsesPVCForUnusedSince(logger klog.Logger, pod *v1.Pod, pvc *v1.PersistentVolumeClaim) bool {
+	if volumeutil.IsPodTerminated(pod, pod.Status) {
+		return false
+	}
+
+	for _, volume := range pod.Spec.Volumes {
+		if volume.PersistentVolumeClaim != nil && volume.PersistentVolumeClaim.ClaimName == pvc.Name ||
+			volume.Ephemeral != nil && ephemeral.VolumeClaimName(pod, &volume) == pvc.Name && ephemeral.VolumeIsForPod(pod, pvc) == nil {
+			logger.V(4).Info("Pod references PVC for unused tracking", "pod", klog.KObj(pod), "PVC", klog.KObj(pvc))
+			return true
 		}
 	}
 	return false
@@ -439,6 +521,10 @@ func (c *Controller) pvcAddedUpdated(logger klog.Logger, obj interface{}) {
 	}
 	logger.V(4).Info("Got event on PVC", "pvc", klog.KObj(pvc))
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.PersistentVolumeClaimUnusedSinceTime) && findCondition(pvc.Status.Conditions, v1.PersistentVolumeClaimUnused) == nil {
+		c.queue.Add(key)
+	}
+
 	if protectionutil.NeedToAddFinalizer(pvc, volumeutil.PVCProtectionFinalizer) || protectionutil.IsDeletionCandidate(pvc, volumeutil.PVCProtectionFinalizer) {
 		c.queue.Add(key)
 	}
@@ -482,7 +568,8 @@ func (*Controller) parsePod(obj interface{}) *v1.Pod {
 
 func (c *Controller) enqueuePVCs(logger klog.Logger, pod *v1.Pod, deleted bool) {
 	// Filter out pods that can't help us to remove a finalizer on PVC
-	if !deleted && !volumeutil.IsPodTerminated(pod, pod.Status) && pod.Spec.NodeName != "" {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.PersistentVolumeClaimUnusedSinceTime) &&
+		!deleted && !volumeutil.IsPodTerminated(pod, pod.Status) && pod.Spec.NodeName != "" {
 		return
 	}
 

@@ -36,26 +36,28 @@ import (
 	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
-type podsByID []*kubecontainer.Pod
+type containerByCreatedThenID []*runtimeapi.Container
 
-func (b podsByID) Len() int           { return len(b) }
-func (b podsByID) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
-func (b podsByID) Less(i, j int) bool { return b[i].ID < b[j].ID }
-
-type containersByID []*kubecontainer.Container
-
-func (b containersByID) Len() int           { return len(b) }
-func (b containersByID) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
-func (b containersByID) Less(i, j int) bool { return b[i].ID.ID < b[j].ID.ID }
+func (b containerByCreatedThenID) Len() int      { return len(b) }
+func (b containerByCreatedThenID) Swap(i, j int) { b[i], b[j] = b[j], b[i] }
+func (b containerByCreatedThenID) Less(i, j int) bool {
+	if b[i].CreatedAt != b[j].CreatedAt {
+		return b[i].CreatedAt > (b[j].CreatedAt)
+	}
+	return b[i].Id < b[j].Id
+}
 
 // Newest first.
-type podSandboxByCreated []*runtimeapi.PodSandbox
+type podSandboxByCreatedThenID []*runtimeapi.PodSandbox
 
-func (p podSandboxByCreated) Len() int      { return len(p) }
-func (p podSandboxByCreated) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
-func (p podSandboxByCreated) Less(i, j int) bool {
-	if p[i].Metadata == nil || p[j].Metadata == nil {
-		return p[i].CreatedAt > p[j].CreatedAt
+func (p podSandboxByCreatedThenID) Len() int      { return len(p) }
+func (p podSandboxByCreatedThenID) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
+func (p podSandboxByCreatedThenID) Less(i, j int) bool {
+	if p[i].Metadata == nil || p[j].Metadata == nil || (p[i].Metadata.Attempt == p[j].Metadata.Attempt) {
+		if p[i].CreatedAt != p[j].CreatedAt {
+			return p[i].CreatedAt > p[j].CreatedAt
+		}
+		return p[i].Id < p[j].Id
 	}
 	return p[i].Metadata.Attempt > p[j].Metadata.Attempt
 }
@@ -119,6 +121,8 @@ func (m *kubeGenericRuntimeManager) toKubeContainer(ctx context.Context, c *runt
 		Image:               c.Image.Image,
 		Hash:                annotatedInfo.Hash,
 		State:               toKubeContainerState(c.State),
+		PodSandboxID:        c.PodSandboxId,
+		CreatedAt:           c.CreatedAt,
 	}, nil
 }
 
@@ -132,8 +136,10 @@ func (m *kubeGenericRuntimeManager) sandboxToKubeContainer(s *runtimeapi.PodSand
 	}
 
 	return &kubecontainer.Container{
-		ID:    kubecontainer.ContainerID{Type: m.runtimeName, ID: s.Id},
-		State: kubecontainer.SandboxToContainerState(s.State),
+		ID:           kubecontainer.ContainerID{Type: m.runtimeName, ID: s.Id},
+		State:        kubecontainer.SandboxToContainerState(s.State),
+		PodSandboxID: s.Id,
+		CreatedAt:    s.CreatedAt,
 	}, nil
 }
 
@@ -255,7 +261,8 @@ func toKubeRuntimeStatus(status *runtimeapi.RuntimeStatus, handlers []*runtimeap
 	var retFeatures *kubecontainer.RuntimeFeatures
 	if features != nil {
 		retFeatures = &kubecontainer.RuntimeFeatures{
-			SupplementalGroupsPolicy: features.SupplementalGroupsPolicy,
+			SupplementalGroupsPolicy:  features.SupplementalGroupsPolicy,
+			UserNamespacesHostNetwork: features.UserNamespacesHostNetwork,
 		}
 	}
 	return &kubecontainer.RuntimeStatus{Conditions: conditions, Handlers: retHandlers, Features: retFeatures}

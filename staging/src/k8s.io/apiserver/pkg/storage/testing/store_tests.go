@@ -33,6 +33,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.etcd.io/etcd/client/v3/kubernetes"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -205,7 +206,6 @@ func RunTestGet(ctx context.Context, t *testing.T, store storage.Interface) {
 	}}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			// For some asynchronous implementations of storage interface (in particular watchcache),
 			// certain requests may impact result of further requests. As an example, if we first
@@ -2262,7 +2262,6 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			// For some asynchronous implementations of storage interface (in particular watchcache),
 			// certain requests may impact result of further requests. As an example, if we first
@@ -2688,7 +2687,6 @@ func RunTestGetListNonRecursive(ctx context.Context, t *testing.T, increaseRV In
 	}}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			// For some asynchronous implementations of storage interface (in particular watchcache),
 			// certain requests may impact result of further requests. As an example, if we first
@@ -2816,10 +2814,8 @@ func RunTestGetListRecursivePrefix(ctx context.Context, t *testing.T, store stor
 	}
 
 	for _, listType := range listTypes {
-		listType := listType
 		t.Run(listType.name, func(t *testing.T) {
 			for _, tt := range tests {
-				tt := tt
 				t.Run(tt.name, func(t *testing.T) {
 					out := &example.PodList{}
 					storageOpts := storage.ListOptions{
@@ -3717,7 +3713,7 @@ func RunTestGuaranteedUpdateWithSuggestionAndConflict(ctx context.Context, t *te
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if updatedPod2.Generation != 3 {
-		t.Errorf("unexpected pod generation: %q", updatedPod2.Generation)
+		t.Errorf("unexpected pod generation: %d", updatedPod2.Generation)
 	}
 
 	// Third, update using a current version as the suggestion.

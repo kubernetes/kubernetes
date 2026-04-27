@@ -21,6 +21,8 @@ import (
 	"strings"
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/metrics"
@@ -44,40 +46,40 @@ func TestRealFIFO_Metrics(t *testing.T) {
 		{
 			name: "Add increases metric",
 			actions: []func(f *cache.RealFIFO){
-				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("foo", 1)) },
+				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("foo", "1")) },
 			},
 			expectedQueuedItems: 1,
 		},
 		{
 			name: "multiple Adds increase metric",
 			actions: []func(f *cache.RealFIFO){
-				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("foo", 1)) },
-				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("bar", 2)) },
-				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("baz", 3)) },
+				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("foo", "1")) },
+				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("bar", "2")) },
+				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("baz", "3")) },
 			},
 			expectedQueuedItems: 3,
 		},
 		{
 			name: "Update increases metric",
 			actions: []func(f *cache.RealFIFO){
-				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("foo", 1)) },
-				func(f *cache.RealFIFO) { _ = f.Update(mkFifoObj("foo", 2)) },
+				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("foo", "1")) },
+				func(f *cache.RealFIFO) { _ = f.Update(mkFifoObj("foo", "2")) },
 			},
 			expectedQueuedItems: 2,
 		},
 		{
 			name: "Delete increases metric",
 			actions: []func(f *cache.RealFIFO){
-				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("foo", 1)) },
-				func(f *cache.RealFIFO) { _ = f.Delete(mkFifoObj("foo", 2)) },
+				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("foo", "1")) },
+				func(f *cache.RealFIFO) { _ = f.Delete(mkFifoObj("foo", "2")) },
 			},
 			expectedQueuedItems: 2,
 		},
 		{
 			name: "Pop decreases metric and records latency",
 			actions: []func(f *cache.RealFIFO){
-				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("foo", 1)) },
-				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("bar", 2)) },
+				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("foo", "1")) },
+				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("bar", "2")) },
 				func(f *cache.RealFIFO) {
 					_, _ = f.Pop(func(obj interface{}, isInInitialList bool) error { return nil })
 				},
@@ -88,9 +90,9 @@ func TestRealFIFO_Metrics(t *testing.T) {
 		{
 			name: "PopBatch decreases metric and records latency",
 			actions: []func(f *cache.RealFIFO){
-				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("foo", 1)) },
-				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("bar", 2)) },
-				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("baz", 3)) },
+				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("foo", "1")) },
+				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("bar", "2")) },
+				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("baz", "3")) },
 				func(f *cache.RealFIFO) {
 					_ = f.PopBatch(
 						func(deltas []cache.Delta, isInInitialList bool) error { return nil },
@@ -104,12 +106,12 @@ func TestRealFIFO_Metrics(t *testing.T) {
 		{
 			name: "Replace sets metric to new count",
 			actions: []func(f *cache.RealFIFO){
-				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("old", 1)) },
+				func(f *cache.RealFIFO) { _ = f.Add(mkFifoObj("old", "1")) },
 				func(f *cache.RealFIFO) {
 					_ = f.Replace([]interface{}{
-						mkFifoObj("foo", 1),
-						mkFifoObj("bar", 2),
-					}, "0")
+						mkFifoObj("foo", "1"),
+						mkFifoObj("bar", "2"),
+					}, "50")
 				},
 			},
 			// 1 (Add) + 1 (Delete for "old") + 2 (Replace items) = 4
@@ -119,7 +121,7 @@ func TestRealFIFO_Metrics(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			metricsProvider := newTestFIFOMetricsProvider()
+			metricsProvider := newTestInformerMetricsProvider()
 			informerName, err := cache.NewInformerName("test-fifo")
 			if err != nil {
 				t.Fatalf("NewInformerName() unexpected error: %v", err)
@@ -128,8 +130,12 @@ func TestRealFIFO_Metrics(t *testing.T) {
 			id := informerName.WithResource(podsGVR)
 
 			f := cache.NewRealFIFOWithOptions(cache.RealFIFOOptions{
-				KeyFunction:     testFifoObjectKeyFunc,
-				KnownObjects:    emptyKnownObjects(),
+				KeyFunction: cache.DeletionHandlingMetaNamespaceKeyFunc,
+				KnownObjects: cache.NewIndexer(
+					cache.DeletionHandlingMetaNamespaceKeyFunc,
+					cache.Indexers{},
+					cache.WithStoreMetrics(id, metricsProvider),
+				),
 				Identifier:      id,
 				MetricsProvider: metricsProvider,
 			})
@@ -148,20 +154,24 @@ func TestRealFIFO_Metrics(t *testing.T) {
 }
 
 func TestRealFIFO_MetricsNotPublishedForUnnamedFIFO(t *testing.T) {
-	metricsProvider := newTestFIFOMetricsProvider()
+	metricsProvider := newTestInformerMetricsProvider()
 
 	// No InformerName configured - should not publish metrics
 	var id cache.InformerNameAndResource
 	f := cache.NewRealFIFOWithOptions(cache.RealFIFOOptions{
-		KeyFunction:     testFifoObjectKeyFunc,
-		KnownObjects:    emptyKnownObjects(),
+		KeyFunction: cache.DeletionHandlingMetaNamespaceKeyFunc,
+		KnownObjects: cache.NewIndexer(
+			cache.DeletionHandlingMetaNamespaceKeyFunc,
+			cache.Indexers{},
+			cache.WithStoreMetrics(id, metricsProvider),
+		),
 		Identifier:      id,
 		MetricsProvider: metricsProvider,
 	})
 
 	// Perform operations
-	_ = f.Add(mkFifoObj("foo", 1))
-	_ = f.Add(mkFifoObj("bar", 2))
+	_ = f.Add(mkFifoObj("foo", "1"))
+	_ = f.Add(mkFifoObj("bar", "2"))
 
 	// No metrics should be created because there's no identifier configured
 	want := ""
@@ -171,7 +181,7 @@ func TestRealFIFO_MetricsNotPublishedForUnnamedFIFO(t *testing.T) {
 }
 
 func TestRealFIFO_MetricsNotPublishedForDuplicateGVR(t *testing.T) {
-	metricsProvider := newTestFIFOMetricsProvider()
+	metricsProvider := newTestInformerMetricsProvider()
 
 	// Create InformerName
 	informerName, err := cache.NewInformerName("duplicate-test")
@@ -185,8 +195,12 @@ func TestRealFIFO_MetricsNotPublishedForDuplicateGVR(t *testing.T) {
 		t.Fatal("Expected first identifier to be reserved")
 	}
 	f1 := cache.NewRealFIFOWithOptions(cache.RealFIFOOptions{
-		KeyFunction:     testFifoObjectKeyFunc,
-		KnownObjects:    emptyKnownObjects(),
+		KeyFunction: cache.DeletionHandlingMetaNamespaceKeyFunc,
+		KnownObjects: cache.NewIndexer(
+			cache.DeletionHandlingMetaNamespaceKeyFunc,
+			cache.Indexers{},
+			cache.WithStoreMetrics(id1, metricsProvider),
+		),
 		Identifier:      id1,
 		MetricsProvider: metricsProvider,
 	})
@@ -197,22 +211,26 @@ func TestRealFIFO_MetricsNotPublishedForDuplicateGVR(t *testing.T) {
 		t.Fatal("Expected second identifier with same GVR to not be reserved")
 	}
 	f2 := cache.NewRealFIFOWithOptions(cache.RealFIFOOptions{
-		KeyFunction:     testFifoObjectKeyFunc,
-		KnownObjects:    emptyKnownObjects(),
+		KeyFunction: cache.DeletionHandlingMetaNamespaceKeyFunc,
+		KnownObjects: cache.NewIndexer(
+			cache.DeletionHandlingMetaNamespaceKeyFunc,
+			cache.Indexers{},
+			cache.WithStoreMetrics(id2, metricsProvider),
+		),
 		Identifier:      id2,
 		MetricsProvider: metricsProvider,
 	})
 
 	// Add items to both FIFOs
-	_ = f1.Add(mkFifoObj("foo", 1))
-	_ = f2.Add(mkFifoObj("bar", 2))
+	_ = f1.Add(mkFifoObj("foo", "1"))
+	_ = f2.Add(mkFifoObj("bar", "2"))
 
 	// Only f1's metric should be published, f2 uses noopMetric
 	verifyQueuedItems(t, metricsProvider, "duplicate-test", podsGVR, 1)
 }
 
 func TestRealFIFO_MetricsTrackedIndependentlyForDifferentFIFOs(t *testing.T) {
-	metricsProvider := newTestFIFOMetricsProvider()
+	metricsProvider := newTestInformerMetricsProvider()
 
 	// Create two InformerNames with different names - both should be unique
 	informerName1, err := cache.NewInformerName("fifo-1")
@@ -223,8 +241,12 @@ func TestRealFIFO_MetricsTrackedIndependentlyForDifferentFIFOs(t *testing.T) {
 
 	id1 := informerName1.WithResource(podsGVR)
 	f1 := cache.NewRealFIFOWithOptions(cache.RealFIFOOptions{
-		KeyFunction:     testFifoObjectKeyFunc,
-		KnownObjects:    emptyKnownObjects(),
+		KeyFunction: cache.DeletionHandlingMetaNamespaceKeyFunc,
+		KnownObjects: cache.NewIndexer(
+			cache.DeletionHandlingMetaNamespaceKeyFunc,
+			cache.Indexers{},
+			cache.WithStoreMetrics(id1, metricsProvider),
+		),
 		Identifier:      id1,
 		MetricsProvider: metricsProvider,
 	})
@@ -237,18 +259,22 @@ func TestRealFIFO_MetricsTrackedIndependentlyForDifferentFIFOs(t *testing.T) {
 
 	id2 := informerName2.WithResource(podsGVR)
 	f2 := cache.NewRealFIFOWithOptions(cache.RealFIFOOptions{
-		KeyFunction:     testFifoObjectKeyFunc,
-		KnownObjects:    emptyKnownObjects(),
+		KeyFunction: cache.DeletionHandlingMetaNamespaceKeyFunc,
+		KnownObjects: cache.NewIndexer(
+			cache.DeletionHandlingMetaNamespaceKeyFunc,
+			cache.Indexers{},
+			cache.WithStoreMetrics(id2, metricsProvider),
+		),
 		Identifier:      id2,
 		MetricsProvider: metricsProvider,
 	})
 
 	// Add items to f1
-	_ = f1.Add(mkFifoObj("foo", 1))
-	_ = f1.Add(mkFifoObj("bar", 2))
+	_ = f1.Add(mkFifoObj("foo", "1"))
+	_ = f1.Add(mkFifoObj("bar", "2"))
 
 	// Add items to f2
-	_ = f2.Add(mkFifoObj("baz", 3))
+	_ = f2.Add(mkFifoObj("baz", "3"))
 
 	// Verify metrics are tracked independently
 	wantInformerQueuedItemsMetric := `# HELP informer_queued_items [ALPHA] Number of items currently queued in the FIFO.
@@ -284,73 +310,145 @@ informer_processing_latency_seconds_count{group="",name="fifo-2",resource="pods"
 	}
 }
 
-type testFifoObject struct {
-	name string
-	val  interface{}
-}
-
-func testFifoObjectKeyFunc(obj interface{}) (string, error) {
-	return obj.(testFifoObject).name, nil
-}
-
-func mkFifoObj(name string, val interface{}) testFifoObject {
-	return testFifoObject{name: name, val: val}
-}
-
-type literalListerGetter func() []testFifoObject
-
-func (l literalListerGetter) List() []interface{} {
-	if l == nil {
-		return nil
-	}
-	result := []interface{}{}
-	for _, item := range l() {
-		result = append(result, item)
-	}
-	return result
-}
-
-func (l literalListerGetter) ListKeys() []string {
-	if l == nil {
-		return nil
-	}
-	result := []string{}
-	for _, item := range l() {
-		result = append(result, item.name)
-	}
-	return result
-}
-
-func (l literalListerGetter) Get(key string) (interface{}, bool, error) {
-	for _, item := range l() {
-		if item.name == key {
-			return item, true, nil
-		}
-	}
-	return nil, false, nil
-}
-
-func (l literalListerGetter) GetByKey(key string) (interface{}, bool, error) {
-	return l.Get(key)
-}
-
-func emptyKnownObjects() cache.KeyListerGetter {
-	return literalListerGetter(
-		func() []testFifoObject {
-			return []testFifoObject{}
+func TestStore_MetricsTrackedForResourceVersions(t *testing.T) {
+	tests := []struct {
+		name           string
+		actions        []func(f cache.Store)
+		expectedMetric int64
+	}{
+		{
+			name:           "empty store has zero metric",
+			actions:        []func(f cache.Store){},
+			expectedMetric: 0,
 		},
+		{
+			name: "Add sets metric",
+			actions: []func(f cache.Store){
+				func(f cache.Store) { _ = f.Add(mkFifoObj("foo", "1")) },
+			},
+			expectedMetric: 1,
+		},
+		{
+			name: "multiple Adds increase metric",
+			actions: []func(f cache.Store){
+				func(f cache.Store) { _ = f.Add(mkFifoObj("bar", "2")) },
+				func(f cache.Store) { _ = f.Add(mkFifoObj("baz", "3")) },
+			},
+			expectedMetric: 3,
+		},
+		{
+			name: "Update increases metric",
+			actions: []func(f cache.Store){
+				func(f cache.Store) { _ = f.Add(mkFifoObj("foo", "1")) },
+				func(f cache.Store) { _ = f.Update(mkFifoObj("foo", "2")) },
+			},
+			expectedMetric: 2,
+		},
+		{
+			name: "Delete sets metric",
+			actions: []func(f cache.Store){
+				func(f cache.Store) { _ = f.Add(mkFifoObj("foo", "1")) },
+				func(f cache.Store) { _ = f.Delete(mkFifoObj("foo", "2")) },
+			},
+			expectedMetric: 2,
+		},
+		{
+			name: "Replace sets metric to new count and updates store resource version metric",
+			actions: []func(f cache.Store){
+				func(f cache.Store) { _ = f.Add(mkFifoObj("old", "1")) },
+				func(f cache.Store) {
+					_ = f.Replace([]interface{}{
+						mkFifoObj("foo", "10"),
+						mkFifoObj("bar", "20"),
+					}, "50")
+				},
+			},
+			expectedMetric: 50,
+		},
+		{
+			name: "Metrics are truncated to last 15 digits",
+			actions: []func(f cache.Store){
+				func(f cache.Store) { _ = f.Add(mkFifoObj("old", "1")) },
+				func(f cache.Store) {
+					_ = f.Replace([]interface{}{
+						mkFifoObj("foo", "10"),
+						mkFifoObj("bar", "20"),
+					}, "123456789012345678901234567890")
+				},
+			},
+			expectedMetric: 678901234567890,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			metricsProvider := newTestInformerMetricsProvider()
+			informerName, err := cache.NewInformerName("test-fifo")
+			if err != nil {
+				t.Fatalf("NewInformerName() unexpected error: %v", err)
+			}
+			defer informerName.Release()
+			id := informerName.WithResource(podsGVR)
+			store := cache.NewIndexer(
+				cache.DeletionHandlingMetaNamespaceKeyFunc,
+				cache.Indexers{},
+				cache.WithStoreMetrics(id, metricsProvider),
+			)
+
+			for _, action := range tt.actions {
+				action(store)
+			}
+
+			verifyStoreResourceVersion(t, metricsProvider, "test-fifo", podsGVR, tt.expectedMetric)
+		})
+	}
+}
+
+func BenchmarkStoreWithMetrics(b *testing.B) {
+	metricsProvider := newTestInformerMetricsProvider()
+	informerName, err := cache.NewInformerName("test-fifo")
+	if err != nil {
+		b.Fatalf("NewInformerName() unexpected error: %v", err)
+	}
+	defer informerName.Release()
+	id := informerName.WithResource(podsGVR)
+	store := cache.NewIndexer(
+		cache.DeletionHandlingMetaNamespaceKeyFunc,
+		cache.Indexers{},
+		cache.WithStoreMetrics(id, metricsProvider),
 	)
+
+	objectCount := 5000
+	objects := make([]*v1.Pod, 0, 5000)
+	for i := range objectCount {
+		objects = append(objects, mkFifoObj(fmt.Sprintf("object-number-%d", i), fmt.Sprintf("%d", i)))
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = store.Update(objects[i%objectCount])
+	}
 }
 
-// testFIFOMetricsProvider is a test implementation of cache.FIFOMetricsProvider
+func mkFifoObj(name string, resourceVersion string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            name,
+			ResourceVersion: resourceVersion,
+		},
+	}
+}
+
+// testInformerMetricsProvider is a test implementation of cache.InformerMetricsProvider
 // that uses real component-base metrics registered with a custom registry.
-type testFIFOMetricsProvider struct {
-	registry  metrics.KubeRegistry
-	gauge     *metrics.GaugeVec
-	histogram *metrics.HistogramVec
+type testInformerMetricsProvider struct {
+	registry             metrics.KubeRegistry
+	gauge                *metrics.GaugeVec
+	histogram            *metrics.HistogramVec
+	storeResourceVersion *metrics.GaugeVec
 }
 
-func newTestFIFOMetricsProvider() *testFIFOMetricsProvider {
+func newTestInformerMetricsProvider() *testInformerMetricsProvider {
 	registry := metrics.NewKubeRegistry()
 	gauge := metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
@@ -371,24 +469,39 @@ func newTestFIFOMetricsProvider() *testFIFOMetricsProvider {
 		},
 		[]string{"name", "group", "version", "resource"},
 	)
+	storeResourceVersion := metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      "informer",
+			Name:           "store_resource_version",
+			Help:           "The 15 least significant digits of the resource version of the store.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"name", "group", "version", "resource"},
+	)
 	registry.MustRegister(gauge)
 	registry.MustRegister(histogram)
-	return &testFIFOMetricsProvider{
-		registry:  registry,
-		gauge:     gauge,
-		histogram: histogram,
+	registry.MustRegister(storeResourceVersion)
+	return &testInformerMetricsProvider{
+		registry:             registry,
+		gauge:                gauge,
+		histogram:            histogram,
+		storeResourceVersion: storeResourceVersion,
 	}
 }
 
-func (p *testFIFOMetricsProvider) NewQueuedItemMetric(id cache.InformerNameAndResource) cache.GaugeMetric {
+func (p *testInformerMetricsProvider) NewQueuedItemMetric(id cache.InformerNameAndResource) cache.GaugeMetric {
 	return p.gauge.WithLabelValues(id.Name(), id.GroupVersionResource().Group, id.GroupVersionResource().Version, id.GroupVersionResource().Resource)
 }
 
-func (p *testFIFOMetricsProvider) NewProcessingLatencyMetric(id cache.InformerNameAndResource) cache.HistogramMetric {
+func (p *testInformerMetricsProvider) NewProcessingLatencyMetric(id cache.InformerNameAndResource) cache.HistogramMetric {
 	return p.histogram.WithLabelValues(id.Name(), id.GroupVersionResource().Group, id.GroupVersionResource().Version, id.GroupVersionResource().Resource)
 }
 
-func verifyQueuedItems(t *testing.T, metricsProvider *testFIFOMetricsProvider, informerName string, gvr schema.GroupVersionResource, expected int) {
+func (p *testInformerMetricsProvider) NewStoreResourceVersionMetric(id cache.InformerNameAndResource) cache.GaugeMetric {
+	return p.storeResourceVersion.WithLabelValues(id.Name(), id.GroupVersionResource().Group, id.GroupVersionResource().Version, id.GroupVersionResource().Resource)
+}
+
+func verifyQueuedItems(t *testing.T, metricsProvider *testInformerMetricsProvider, informerName string, gvr schema.GroupVersionResource, expected int) {
 	t.Helper()
 	want := fmt.Sprintf(`# HELP informer_queued_items [ALPHA] Number of items currently queued in the FIFO.
 # TYPE informer_queued_items gauge
@@ -402,7 +515,7 @@ informer_queued_items{group="%s",name="%s",resource="%s",version="%s"} %d
 // verifyLatencyObservations checks the histogram observation count using a custom gatherer
 // that strips timing-dependent values (bucket counts and sum) from the comparison, so that
 // we only verify the number of observations without being affected by the duration values.
-func verifyLatencyObservations(t *testing.T, metricsProvider *testFIFOMetricsProvider, informerName string, gvr schema.GroupVersionResource, expected uint64) {
+func verifyLatencyObservations(t *testing.T, metricsProvider *testInformerMetricsProvider, informerName string, gvr schema.GroupVersionResource, expected uint64) {
 	t.Helper()
 	if expected == 0 {
 		return
@@ -417,7 +530,18 @@ informer_processing_latency_seconds_count{group="%s",name="%s",resource="%s",ver
 	}
 }
 
-func (p *testFIFOMetricsProvider) gatherWithoutDurations() testutil.GathererFunc {
+func verifyStoreResourceVersion(t *testing.T, metricsProvider *testInformerMetricsProvider, informerName string, gvr schema.GroupVersionResource, expected int64) {
+	t.Helper()
+	want := fmt.Sprintf(`# HELP informer_store_resource_version [ALPHA] The 15 least significant digits of the resource version of the store.
+# TYPE informer_store_resource_version gauge
+informer_store_resource_version{group="%s",name="%s",resource="%s",version="%s"} %d
+`, gvr.Group, informerName, gvr.Resource, gvr.Version, expected)
+	if err := testutil.GatherAndCompare(metricsProvider.registry, strings.NewReader(want), "informer_store_resource_version"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func (p *testInformerMetricsProvider) gatherWithoutDurations() testutil.GathererFunc {
 	return func() ([]*testutil.MetricFamily, error) {
 		got, err := p.registry.Gather()
 		for _, mf := range got {

@@ -1,3 +1,7 @@
+## 1.39.1
+
+Update all dependencies.  This auto-updated the required version of Go to 1.24, consistent with the fact that Go 1.23 has been out of support for almost six months.
+
 ## 1.39.0
 
 ### Features

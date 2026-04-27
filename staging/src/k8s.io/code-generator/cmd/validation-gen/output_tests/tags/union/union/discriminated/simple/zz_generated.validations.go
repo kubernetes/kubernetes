@@ -25,6 +25,7 @@ import (
 	context "context"
 	fmt "fmt"
 
+	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -48,7 +49,7 @@ func RegisterValidations(scheme *testscheme.Scheme) error {
 	return nil
 }
 
-var unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_union_union_discriminated_simple_Struct_ = validate.NewDiscriminatedUnionMembership("d", validate.NewDiscriminatedUnionMember("m1", "M1"), validate.NewDiscriminatedUnionMember("m2", "M2"))
+var unionMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_union_union_discriminated_simple_Struct_ = validate.NewDiscriminatedUnionMembership("d", validate.NewDiscriminatedUnionMember("m1", "M1"), validate.NewDiscriminatedUnionMember("m2", "M2"), validate.NewDiscriminatedUnionMember("m3", "M3"), validate.NewDiscriminatedUnionMember("m4", "M4"))
 
 // Validate_Struct validates an instance of Struct according
 // to declarative validation rules in the API schema.
@@ -68,6 +69,16 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			return false
 		}
 		return obj.M2 != nil
+	}, func(obj *Struct) bool {
+		if obj == nil {
+			return false
+		}
+		return len(obj.M3) != 0
+	}, func(obj *Struct) bool {
+		if obj == nil {
+			return false
+		}
+		return len(obj.M4) != 0
 	})...)
 
 	// field Struct.TypeMeta has no validation
@@ -108,6 +119,42 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			}
 			return
 		}(fldPath.Child("m2"), obj.M2, safe.Field(oldObj, func(oldObj *Struct) *M2 { return oldObj.M2 }), oldObj != nil)...)
+
+	// field Struct.M3
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("m3"), obj.M3, safe.Field(oldObj, func(oldObj *Struct) []string { return oldObj.M3 }), oldObj != nil)...)
+
+	// field Struct.M4
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj map[string]string, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}(fldPath.Child("m4"), obj.M4, safe.Field(oldObj, func(oldObj *Struct) map[string]string { return oldObj.M4 }), oldObj != nil)...)
 
 	return errs
 }

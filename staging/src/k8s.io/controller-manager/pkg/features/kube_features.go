@@ -40,6 +40,11 @@ const (
 	// kep:  http://kep.k8s.io/2699
 	// Enable webhook in cloud controller manager
 	CloudControllerManagerWebhook featuregate.Feature = "CloudControllerManagerWebhook"
+
+	// owner: @jefftree, @tchap
+	//
+	// Make kube-controller-manager release leader election lock on exit.
+	ControllerManagerReleaseLeaderElectionLockOnExit featuregate.Feature = "ControllerManagerReleaseLeaderElectionLockOnExit"
 )
 
 func SetupCurrentKubernetesSpecificFeatureGates(featuregates featuregate.MutableVersionedFeatureGate) error {
@@ -54,5 +59,8 @@ var versionedCloudPublicFeatureGates = map[featuregate.Feature]featuregate.Versi
 	},
 	CloudControllerManagerWebhook: {
 		{Version: version.MustParse("1.27"), Default: false, PreRelease: featuregate.Alpha},
+	},
+	ControllerManagerReleaseLeaderElectionLockOnExit: {
+		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 	},
 }

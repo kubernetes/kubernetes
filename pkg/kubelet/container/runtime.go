@@ -19,6 +19,7 @@ package container
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -89,6 +90,9 @@ type Runtime interface {
 	// specifies whether the runtime returns all containers including those already
 	// exited and dead containers (used for garbage collection).
 	GetPods(ctx context.Context, all bool) ([]*Pod, error)
+	// GetPod fetches the current sandboxes & containers for a pod.
+	// Returns ErrPodNotFound when no sandboxes are found for the requested pod.
+	GetPod(ctx context.Context, podUID types.UID) (*Pod, error)
 	// GarbageCollect removes dead containers using the specified container gc policy
 	// If allSourcesReady is not true, it means that kubelet doesn't have the
 	// complete list of pods from all available sources (e.g., apiserver, http,
@@ -109,7 +113,7 @@ type Runtime interface {
 	KillPod(ctx context.Context, pod *v1.Pod, runningPod Pod, gracePeriodOverride *int64) error
 	// GetPodStatus retrieves the status of the pod, including the
 	// information of all containers in the pod that are visible in Runtime.
-	GetPodStatus(ctx context.Context, uid types.UID, name, namespace string) (*PodStatus, error)
+	GetPodStatus(ctx context.Context, pod *Pod) (*PodStatus, error)
 	// TODO(vmarmol): Unify pod and containerID args.
 	// GetContainerLogs returns logs of a specific container. By
 	// default, it returns a snapshot of the container log. Set 'follow' to true to
@@ -148,6 +152,11 @@ type Runtime interface {
 	// UpdateActuatedPodLevelResources updates pod-level resources in actuatedState
 	UpdateActuatedPodLevelResources(actuatedPod *v1.Pod) error
 }
+
+var (
+	// ErrPodNotFound is returned by GetPod when no sandboxes are found for the requested pod.
+	ErrPodNotFound = errors.New("pod sandboxes not found")
+)
 
 // StreamingRuntime is the interface implemented by runtimes that handle the serving of the
 // streaming calls (exec/attach/port-forward) themselves. In this case, Kubelet should redirect to
@@ -209,8 +218,11 @@ type Pod struct {
 	// List of sandboxes associated with this pod. The sandboxes are converted
 	// to Container temporarily to avoid substantial changes to other
 	// components. This is only populated by kuberuntime.
+	// Sandboxes are sorted by creation time, newest -> oldest.
 	// TODO: use the runtimeApi.PodSandbox type directly.
 	Sandboxes []*Container
+	// Timestamp is the time that this Pod object was read from the runtime.
+	Timestamp time.Time
 }
 
 // PodPair contains both runtime#Pod and api#Pod
@@ -318,6 +330,10 @@ type Container struct {
 	Hash uint64
 	// State is the state of the container.
 	State State
+	// ID of the sandbox to which this container belongs.
+	PodSandboxID string
+	// Creation time of the container in nanoseconds.
+	CreatedAt int64
 }
 
 // PodStatus represents the status of the pod and its containers.
@@ -652,7 +668,8 @@ func (c *RuntimeCondition) String() string {
 
 // RuntimeFeatures contains the set of features implemented by the runtime
 type RuntimeFeatures struct {
-	SupplementalGroupsPolicy bool
+	SupplementalGroupsPolicy  bool
+	UserNamespacesHostNetwork bool
 }
 
 // String formats the runtime condition into a human readable string.
@@ -660,7 +677,7 @@ func (f *RuntimeFeatures) String() string {
 	if f == nil {
 		return "nil"
 	}
-	return fmt.Sprintf("SupplementalGroupsPolicy: %v", f.SupplementalGroupsPolicy)
+	return fmt.Sprintf("SupplementalGroupsPolicy: %v UserNamespacesHostNetwork: %v", f.SupplementalGroupsPolicy, f.UserNamespacesHostNetwork)
 }
 
 // Pods represents the list of pods

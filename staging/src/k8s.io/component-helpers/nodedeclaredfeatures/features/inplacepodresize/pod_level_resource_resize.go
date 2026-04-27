@@ -17,14 +17,13 @@ limitations under the License.
 package inplacepodresize
 
 import (
-	"reflect"
-
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/component-helpers/nodedeclaredfeatures"
+	"k8s.io/component-helpers/nodedeclaredfeatures/types"
 )
 
 // Ensure the feature struct implements the unified Feature interface.
-var _ nodedeclaredfeatures.Feature = &podLevelResourcesResizeFeature{}
+var _ types.Feature = &podLevelResourcesResizeFeature{}
 
 // IPPRPodLevelResourcesFeatureGate is the feature gate for IPPRPodLevelResourcesVerticalScaling.
 const IPPRPodLevelResourcesFeatureGate = "InPlacePodLevelResourcesVerticalScaling"
@@ -38,20 +37,26 @@ func (f *podLevelResourcesResizeFeature) Name() string {
 	return IPPRPodLevelResourcesFeatureGate
 }
 
-func (f *podLevelResourcesResizeFeature) Discover(cfg *nodedeclaredfeatures.NodeConfiguration) bool {
+func (f *podLevelResourcesResizeFeature) Discover(cfg *types.NodeConfiguration) bool {
 	return cfg.FeatureGates.Enabled(IPPRPodLevelResourcesFeatureGate)
 }
 
-func (f *podLevelResourcesResizeFeature) InferForScheduling(podInfo *nodedeclaredfeatures.PodInfo) bool {
+func (f *podLevelResourcesResizeFeature) Requirements() *types.FeatureRequirements {
+	return &types.FeatureRequirements{
+		EnabledFeatureGates: []string{IPPRPodLevelResourcesFeatureGate},
+	}
+}
+
+func (f *podLevelResourcesResizeFeature) InferForScheduling(podInfo *types.PodInfo) bool {
 	// This feature is only relevant for pod updates.
 	return false
 }
 
-func (f *podLevelResourcesResizeFeature) InferForUpdate(oldPodInfo, newPodInfo *nodedeclaredfeatures.PodInfo) bool {
+func (f *podLevelResourcesResizeFeature) InferForUpdate(oldPodInfo, newPodInfo *types.PodInfo) bool {
 	if oldPodInfo.Spec.Resources == nil && newPodInfo.Spec.Resources == nil {
 		return false
 	}
-	return !reflect.DeepEqual(oldPodInfo.Spec.Resources, newPodInfo.Spec.Resources)
+	return !apiequality.Semantic.DeepEqual(oldPodInfo.Spec.Resources, newPodInfo.Spec.Resources)
 }
 
 func (f *podLevelResourcesResizeFeature) MaxVersion() *version.Version {

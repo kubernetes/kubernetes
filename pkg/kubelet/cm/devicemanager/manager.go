@@ -1122,6 +1122,12 @@ func (m *ManagerImpl) GetAllocatableDevices() ResourceDeviceInstances {
 	return resp
 }
 
+// AllocatePod is called to trigger the allocation of resources to a pod.
+func (m *ManagerImpl) AllocatePod(pod *v1.Pod) error {
+	// Device Manager does not support pod level resource allocation.
+	return nil
+}
+
 // GetDevices returns the devices used by the specified container
 func (m *ManagerImpl) GetDevices(podUID, containerName string) ResourceDeviceInstances {
 	return m.podDevices.getContainerDevices(podUID, containerName)

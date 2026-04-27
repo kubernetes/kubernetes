@@ -17,13 +17,18 @@ limitations under the License.
 package state
 
 import (
+	"encoding/json"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
+	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	testutil "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state/testing"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -34,12 +39,13 @@ const testingCheckpoint = "cpumanager_checkpoint_test"
 
 func TestCheckpointStateRestore(t *testing.T) {
 	testCases := []struct {
-		description       string
-		checkpointContent string
-		policyName        string
-		initialContainers containermap.ContainerMap
-		expectedError     string
-		expectedState     *stateMemory
+		description                     string
+		checkpointContent               string
+		policyName                      string
+		initialContainers               containermap.ContainerMap
+		expectedError                   string
+		expectedState                   *stateMemory
+		podLevelResourceManagersEnabled bool
 	}{
 		{
 			"Restore non-existing checkpoint",
@@ -48,6 +54,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 			containermap.ContainerMap{},
 			"",
 			&stateMemory{},
+			false,
 		},
 		{
 			"Restore default cpu set",
@@ -63,6 +70,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 			&stateMemory{
 				defaultCPUSet: cpuset.New(4, 5, 6),
 			},
+			false,
 		},
 		{
 			"Restore valid checkpoint",
@@ -89,6 +97,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 				},
 				defaultCPUSet: cpuset.New(1, 2, 3),
 			},
+			false,
 		},
 		{
 			"Restore checkpoint with invalid checksum",
@@ -102,6 +111,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 			containermap.ContainerMap{},
 			"checkpoint is corrupted",
 			&stateMemory{},
+			false,
 		},
 		{
 			"Restore checkpoint with invalid JSON",
@@ -110,6 +120,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 			containermap.ContainerMap{},
 			"unexpected end of JSON input",
 			&stateMemory{},
+			false,
 		},
 		{
 			"Restore checkpoint with invalid policy name",
@@ -123,6 +134,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 			containermap.ContainerMap{},
 			`configured policy "none" differs from state checkpoint policy "other"`,
 			&stateMemory{},
+			false,
 		},
 		{
 			"Restore checkpoint with unparsable default cpu set",
@@ -136,6 +148,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 			containermap.ContainerMap{},
 			`could not parse default cpu set "1.3": strconv.Atoi: parsing "1.3": invalid syntax`,
 			&stateMemory{},
+			false,
 		},
 		{
 			"Restore checkpoint with unparsable assignment entry",
@@ -154,6 +167,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 			containermap.ContainerMap{},
 			`could not parse cpuset "asd" for container "container2" in pod "pod": strconv.Atoi: parsing "asd": invalid syntax`,
 			&stateMemory{},
+			false,
 		},
 		{
 			"Restore checkpoint from checkpoint with v1 checksum",
@@ -168,6 +182,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 			&stateMemory{
 				defaultCPUSet: cpuset.New(1, 2, 3),
 			},
+			false,
 		},
 		{
 			"Restore checkpoint with migration",
@@ -197,6 +212,189 @@ func TestCheckpointStateRestore(t *testing.T) {
 				},
 				defaultCPUSet: cpuset.New(1, 2, 3),
 			},
+			false,
+		},
+		{
+			"Restore checkpoint from v1 (migration) with PodLevelResourceManagers enabled",
+			`{
+				"policyName": "none",
+				"defaultCPUSet": "1-3",
+				"entries": {
+					"containerID1": "4-6",
+					"containerID2": "1-3"
+				},
+				"checksum": 3680390589
+			}`,
+			"none",
+			func() containermap.ContainerMap {
+				cm := containermap.NewContainerMap()
+				cm.Add("pod", "container1", "containerID1")
+				cm.Add("pod", "container2", "containerID2")
+				return cm
+			}(),
+			"",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod": map[string]cpuset.CPUSet{
+						"container1": cpuset.New(4, 5, 6),
+						"container2": cpuset.New(1, 2, 3),
+					},
+				},
+				defaultCPUSet: cpuset.New(1, 2, 3),
+			},
+			true,
+		},
+		{
+			"Restore checkpoint from v2 (migration) with PodLevelResourceManagers enabled",
+			`{
+				"policyName": "none",
+				"defaultCPUSet": "1-3",
+				"entries": {
+					"pod": {
+						"container1": "4-6",
+						"container2": "1-3"
+					}
+				},
+				"checksum": 3610638499
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod": map[string]cpuset.CPUSet{
+						"container1": cpuset.New(4, 5, 6),
+						"container2": cpuset.New(1, 2, 3),
+					},
+				},
+				defaultCPUSet: cpuset.New(1, 2, 3),
+			},
+			true,
+		},
+		{
+			"Restore checkpoint from v2 (migration) with PodLevelResourceManagers disabled",
+			`{
+				"policyName": "none",
+				"defaultCPUSet": "1-3",
+				"entries": {
+					"pod": {
+						"container1": "4-6",
+						"container2": "1-3"
+					}
+				},
+				"checksum": 3610638499
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod": map[string]cpuset.CPUSet{
+						"container1": cpuset.New(4, 5, 6),
+						"container2": cpuset.New(1, 2, 3),
+					},
+				},
+				defaultCPUSet: cpuset.New(1, 2, 3),
+			},
+			false,
+		},
+		{
+			"Restore valid v3 checkpoint with PodLevelResourceManagers enabled",
+			`{
+				"policyName": "none",
+				"defaultCPUSet": "1-3",
+				"entries": {
+					"pod": {
+						"container1": "4-6",
+						"container2": "1-3"
+					}
+				},
+				"podEntries": {
+					"pod": {
+						"cpuSet": "4-6"
+					}
+				},
+				"checksum": 2649431787
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod": map[string]cpuset.CPUSet{
+						"container1": cpuset.New(4, 5, 6),
+						"container2": cpuset.New(1, 2, 3),
+					},
+				},
+				podAssignments: PodCPUAssignments{
+					"pod": PodEntry{
+						CPUSet: cpuset.New(4, 5, 6),
+					},
+				},
+				defaultCPUSet: cpuset.New(1, 2, 3),
+			},
+			true,
+		},
+		{
+			"Restore valid v3 checkpoint with PodLevelResourceManagers disabled",
+			`{
+				"policyName": "none",
+				"defaultCPUSet": "1-3",
+				"entries": {
+					"pod": {
+						"container1": "4-6",
+						"container2": "1-3"
+					}
+				},
+				"podEntries": {
+					"pod": {
+						"cpuSet": "4-6"
+					}
+				},
+				"checksum": 2649431787
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"could not restore state from checkpoint",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod": map[string]cpuset.CPUSet{
+						"container1": cpuset.New(4, 5, 6),
+						"container2": cpuset.New(1, 2, 3),
+					},
+				},
+				podAssignments: PodCPUAssignments{
+					"pod": PodEntry{
+						CPUSet: cpuset.New(4, 5, 6),
+					},
+				},
+				defaultCPUSet: cpuset.New(1, 2, 3),
+			},
+			false,
+		},
+		{
+			"Restore non-existing checkpoint with PodLevelResourceManagers enabled",
+			"",
+			"none",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{},
+			true,
+		},
+		{
+			"Restore corrupt checkpoint with PodLevelResourceManagers enabled",
+			`{
+				"policyName": "none",
+				"defaultCPUSet": "1-3",
+				"entries": {},
+				"podEntries": {},
+				"checksum": 12345
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"checkpoint is corrupted",
+			&stateMemory{},
+			true,
 		},
 	}
 
@@ -210,6 +408,11 @@ func TestCheckpointStateRestore(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
+			if tc.podLevelResourceManagersEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, true)
+			}
+
 			// ensure there is no previous checkpoint
 			cpm.RemoveCheckpoint(testingCheckpoint)
 
@@ -434,5 +637,55 @@ func AssertStateEqual(t *testing.T, sf State, sm State) {
 	cpuassignmentSm := sm.GetCPUAssignments()
 	if !reflect.DeepEqual(cpuassignmentSf, cpuassignmentSm) {
 		t.Errorf("State CPU assignments mismatch. Have %s, want %s", cpuassignmentSf, cpuassignmentSm)
+	}
+}
+
+func TestCPUManagerCheckpointV2_MarshalCheckpoint_ForwardCompatibility(t *testing.T) {
+	// 1. Create a V2 checkpoint using the struct defined in the current codebase (1.36+)
+	currentCheckpoint := &CPUManagerCheckpointV2{
+		PolicyName:    "none",
+		DefaultCPUSet: "1-3",
+		Entries:       make(map[string]map[string]string),
+	}
+
+	// Marshal it using the logic that forces the "CPUManagerCheckpoint" name
+	data, err := currentCheckpoint.MarshalCheckpoint()
+	if err != nil {
+		t.Fatalf("Failed to marshal checkpoint: %v", err)
+	}
+
+	// 2. Unmarshal the raw JSON to extract the checksum that was actually written to the file
+	var result map[string]interface{}
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("Failed to unmarshal JSON: %v", err)
+	}
+
+	actualChecksumFloat, ok := result["checksum"].(float64)
+	if !ok {
+		t.Fatalf("Checksum field missing or invalid type")
+	}
+	writtenChecksum := checksum.Checksum(uint64(actualChecksumFloat))
+
+	// 3. Reconstruct how versions 1.35 and earlier would calculate the checksum
+	// by defining a struct with the exact legacy name and fields.
+	type CPUManagerCheckpoint struct {
+		PolicyName    string                       `json:"policyName"`
+		DefaultCPUSet string                       `json:"defaultCpuSet"`
+		Entries       map[string]map[string]string `json:"entries,omitempty"`
+		Checksum      checksum.Checksum            `json:"checksum"`
+	}
+
+	legacyCheckpoint := &CPUManagerCheckpoint{
+		PolicyName:    currentCheckpoint.PolicyName,
+		DefaultCPUSet: currentCheckpoint.DefaultCPUSet,
+		Entries:       currentCheckpoint.Entries,
+	}
+
+	expectedLegacyChecksum := checksum.New(legacyCheckpoint)
+
+	// 4. Assert that the checksum written by our 1.36+ code matches
+	// what a 1.35 Kubelet would expect to see.
+	if writtenChecksum != expectedLegacyChecksum {
+		t.Errorf("Written Checksum %d does not match legacy calculation %d. Forward compatibility broken.", writtenChecksum, expectedLegacyChecksum)
 	}
 }

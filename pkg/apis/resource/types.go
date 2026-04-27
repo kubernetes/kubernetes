@@ -17,6 +17,7 @@ limitations under the License.
 package resource
 
 import (
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,6 +36,11 @@ const (
 	// special ResourceClaim. Its single valid value is "true".
 	// This is used only inside the scheduler.
 	ExtendedResourceClaimAnnotation = "resource.kubernetes.io/extended-resource-claim"
+	// PodResourceClaimAnnotation is the annotation set on template-generated
+	// ResourceClaims by the ResourceClaim controller. Its value is the
+	// spec.resourceClaims[].name of the Pod or PodGroup for which the claim was
+	// generated. The Pod and its PodGroup are guaranteed to use the same name.
+	PodResourceClaimAnnotation = "resource.kubernetes.io/pod-claim-name"
 	// Resource device class prefix is for generating implicit extended resource
 	// name for a device class when its ExtendedResourceName field is not
 	// specified. The generated name is this prefix + the device class name.
@@ -249,7 +255,14 @@ type ResourcePool struct {
 
 const ResourceSliceMaxSharedCapacity = 128
 const ResourceSliceMaxDevices = 128
-const ResourceSliceMaxDevicesWithTaintsOrConsumesCounters = 64
+
+// ResourceSliceMaxDevicesWithAdvancedFeatures defines the maximum number of devices in a ResourceSlice
+// if any of those devices uses advanced features:
+// - device taints (DRADeviceTaints feature gate)
+// - consuming counters (DRAPartitionableDevices feature gate)
+// - list attributes (DRAListTypeAttributes feature gate)
+const ResourceSliceMaxDevicesWithAdvancedFeatures = 64
+
 const PoolNameMaxLength = validation.DNS1123SubdomainMaxLength // Same as for a single node name.
 const BindingConditionsMaxSize = 4
 const BindingFailureConditionsMaxSize = 4
@@ -348,7 +361,7 @@ type Device struct {
 	// any device in a ResourceSlice, then the maximum number of
 	// allowed devices per ResourceSlice is 64 instead of 128.
 	//
-	// This is an alpha field and requires enabling the DRADeviceTaints
+	// This is a beta field and requires enabling the DRADeviceTaints
 	// feature gate.
 	//
 	// +optional
@@ -361,7 +374,7 @@ type Device struct {
 	// If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector
 	// to match the node where the allocation was made.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
 	// feature gates.
 	//
 	// +optional
@@ -377,7 +390,7 @@ type Device struct {
 	// All entries are condition types, which means
 	// they must be labels.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
 	// feature gates.
 	//
 	// +optional
@@ -393,7 +406,7 @@ type Device struct {
 	// All entries are condition types, which means
 	// they must be labels.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
 	// feature gates.
 	//
 	// +optional
@@ -409,6 +422,59 @@ type Device struct {
 	// +optional
 	// +featureGate=DRAConsumableCapacity
 	AllowMultipleAllocations *bool
+
+	// NodeAllocatableResourceMappings defines the mapping of node resources
+	// that are managed by the DRA driver exposing this device. This includes resources currently
+	// reported in v1.Node `status.allocatable` that are not extended resources
+	// (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources).
+	// Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
+	// In addition to standard requests made through the Pod `spec`, these resources
+	// can also be requested through claims and allocated by the DRA driver.
+	// For example, a CPU DRA driver might allocate exclusive CPUs or auxiliary node memory
+	// dependencies of an accelerator device.
+	// The keys of this map are the node-allocatable resource names (e.g., "cpu", "memory").
+	// Extended resource names are not permitted as keys.
+	// +optional
+	// +featureGate=DRANodeAllocatableResources
+	NodeAllocatableResourceMappings map[v1.ResourceName]NodeAllocatableResourceMapping
+}
+
+// NodeAllocatableResourceMapping defines the translation of the requested DRA device/capacity
+// units to the corresponding quantity of the node-allocatable resource.
+type NodeAllocatableResourceMapping struct {
+	// CapacityKey references a capacity name defined as a key in the
+	// `spec.devices[*].capacity` map. When this field is set, the value associated with
+	// this key in the `status.allocation.devices.results[*].consumedCapacity` map
+	// (for a specific claim allocation) determines the base quantity for
+	// the node allocatable resource. If `allocationMultiplier` is also set, it is
+	// multiplied with the base quantity.
+	// For example, if `spec.devices[*].capacity` has an entry "dra.example.com/memory": "128Gi",
+	// and this field is set to "dra.example.com/memory", then for a claim allocation
+	// that consumes { "dra.example.com/memory": "4Gi" } the base quantity for the
+	// node allocatable resource mapping will be "4Gi", and `allocationMultiplier` should
+	// be omitted or set to "1".
+	// +optional
+	CapacityKey *QualifiedName
+
+	// AllocationMultiplier is used as a multiplier for the allocated device count or the allocated capacity in the claim.
+	// It defaults to 1 if not specified. How the field is used also depends on whether `capacityKey` is set.
+	// 1.  If `capacityKey` is NOT set: `allocationMultiplier` multiplies the device count allocated to the claim.
+	// 	   a. A DRA driver representing each CPU core as a device would have
+	//        {ResourceName: "cpu", allocationMultiplier: "2"} in its
+	//        `nodeAllocatableResourceMappings`. If 4 devices are allocated to the claim,
+	// 		  4 * 2 CPUs would be considered as allocated and subtracted from the node's capacity.
+	//     b. A GPU device that needs additional node memory per GPU allocation would
+	//        have {ResourceName: "memory", allocationMultiplier: "2Gi"}.  Each allocated
+	// 		  GPU device instance of this type will account for 2Gi of memory.
+	//
+	// 2.  If `capacityKey` IS set: `allocationMultiplier` is multiplied by the amount of that capacity consumed.
+	// 	   The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `allocationMultiplier`.
+	//     For example, if a Device's capacity "dra.example.com/cores" is consumed,
+	//     and each "core" provides 2 "cpu"s, the mapping would be:
+	//     {ResourceName: "cpu", capacityKey: "dra.example.com/cores", allocationMultiplier: "2"}.
+	//     If a claim consumes 8 "dra.example.com/cores", the CPU footprint is 8 * 2 = 16.
+	// +optional
+	AllocationMultiplier *resource.Quantity
 }
 
 // DeviceCounterConsumption defines a set of counters that
@@ -548,6 +614,10 @@ type CapacityRequestPolicyRange struct {
 // Limit for the sum of the number of entries in both attributes and capacity.
 const ResourceSliceMaxAttributesAndCapacitiesPerDevice = 32
 
+// Limit per device for the total number of string, version, bool or int values
+// in list and non-list attributes.
+const ResourceSliceMaxAttributeValuesPerDevice = 48
+
 // QualifiedName is the name of a device attribute or capacity.
 //
 // Attributes and capacities are defined either by the owner of the specific
@@ -605,6 +675,46 @@ type DeviceAttribute struct {
 	// +optional
 	// +oneOf=ValueType
 	VersionValue *string
+
+	// IntValues is a non-empty list of numbers.
+	//
+	// This is an alpha field and requires enabling the DRAListTypeAttributes feature gate.
+	//
+	// +optional
+	// +listType=atomic
+	// +k8s:alpha(since:"1.36")=+oneOf=ValueType
+	// +featureGate=DRAListTypeAttributes
+	IntValues []int64
+
+	// BoolValues is a non-empty list of true/false values.
+	//
+	// +optional
+	// +listType=atomic
+	// +k8s:alpha(since:"1.36")=+oneOf=ValueType
+	// +featureGate=DRAListTypeAttributes
+	BoolValues []bool
+
+	// StringValues is a non-empty list of strings.
+	// Each string must not be longer than 64 characters.
+	//
+	// This is an alpha field and requires enabling the DRAListTypeAttributes feature gate.
+	//
+	// +optional
+	// +listType=atomic
+	// +k8s:alpha(since:"1.36")=+oneOf=ValueType
+	// +featureGate=DRAListTypeAttributes
+	StringValues []string
+
+	// VersionValues is a non-empty list of semantic versions according to semver.org spec 2.0.0.
+	// Each version string must not be longer than 64 characters.
+	//
+	// This is an alpha field and requires enabling the DRAListTypeAttributes feature gate.
+	//
+	// +optional
+	// +listType=atomic
+	// +k8s:alpha(since:"1.36")=+oneOf=ValueType
+	// +featureGate=DRAListTypeAttributes
+	VersionValues []string
 }
 
 // DeviceAttributeMaxValueLength is the maximum length of a string or version attribute value.
@@ -652,8 +762,12 @@ type DeviceTaint struct {
 	// which will enable adding new enums within a single release without
 	// ratcheting.
 
-	// TimeAdded represents the time at which the taint was added.
+	// TimeAdded represents the time at which the taint was added or
+	// (only in a DeviceTaintRule) the effect was modified.
 	// Added automatically during create or update if not set.
+	// In addition, in a DeviceTaintRule a value provided during
+	// an update gets replaced with the current time if the provided
+	// value is the same as the old one and the new effect is different.
 	//
 	// +optional
 	TimeAdded *metav1.Time
@@ -888,8 +1002,7 @@ type ExactDeviceRequest struct {
 	// all ordinary claims to the device with respect to access modes and
 	// any resource allocations.
 	//
-	// This is an alpha field and requires enabling the DRAAdminAccess
-	// feature gate. Admin access is disabled if this field is unset or
+	// Admin access is disabled if this field is unset or
 	// set to false, otherwise it is enabled.
 	//
 	// +optional
@@ -911,7 +1024,7 @@ type ExactDeviceRequest struct {
 	//
 	// The maximum number of tolerations is 16.
 	//
-	// This is an alpha field and requires enabling the DRADeviceTaints
+	// This is a beta field and requires enabling the DRADeviceTaints
 	// feature gate.
 	//
 	// +optional
@@ -1022,7 +1135,7 @@ type DeviceSubRequest struct {
 	//
 	// The maximum number of tolerations is 16.
 	//
-	// This is an alpha field and requires enabling the DRADeviceTaints
+	// This is a beta field and requires enabling the DRADeviceTaints
 	// feature gate.
 	//
 	// +optional
@@ -1151,6 +1264,14 @@ type CELDeviceSelector struct {
 	//
 	//     cel.bind(dra, device.attributes["dra.example.com"], dra.someBool && dra.anotherBool)
 	//
+	// When the DRAListTypeAttributes feature gate is enabled,
+	// the includes() helper is available and it can work for both scalar
+	// and list-type attributes. It was introduced to support smooth migration
+	// from scalar attributes to list-type attributes while keeping
+	// CEL expressions simple. For example:
+	//
+	//     device.attributes["dra.example.com"].models.includes("some-model")
+	//
 	// The length of the expression must be smaller or equal to 10 Ki. The
 	// cost of evaluating it is also limited based on the estimated number
 	// of logical steps.
@@ -1214,6 +1335,11 @@ type DeviceConstraint struct {
 	// its specification, but if one device doesn't, then it also will not be
 	// chosen.
 	//
+	// When the DRAListTypeAttributes feature gate is enabled, comparison uses
+	// set semantics(i.e., element order and duplicates are ignored): list-valued attributes
+	// match when the intersection across all devices is non-empty.
+	// Scalar values are treated as singleton sets for backward compatibility.
+	//
 	// Must include the domain qualifier.
 	//
 	// +optional
@@ -1232,6 +1358,11 @@ type DeviceConstraint struct {
 
 	// DistinctAttribute requires that all devices in question have this
 	// attribute and that its type and value are unique across those devices.
+	//
+	// When the DRAListTypeAttributes feature gate is enabled, comparison uses
+	// set semantics (i.e., element order and duplicates are ignored):
+	// list-valued attributes must be pairwise disjoint across devices.
+	// Scalar values are treated as singleton sets for backward compatibility.
 	//
 	// This acts as the inverse of MatchAttribute.
 	//
@@ -1456,7 +1587,7 @@ type AllocationResult struct {
 	// AllocationTimestamp stores the time when the resources were allocated.
 	// This field is not guaranteed to be set, in which case that time is unknown.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
 	// feature gate.
 	//
 	// +optional
@@ -1531,8 +1662,7 @@ type DeviceRequestAllocationResult struct {
 	// administrative access. See the corresponding request field
 	// for a definition of mode.
 	//
-	// This is an alpha field and requires enabling the DRAAdminAccess
-	// feature gate. Admin access is disabled if this field is unset or
+	// Admin access is disabled if this field is unset or
 	// set to false, otherwise it is enabled.
 	//
 	// +optional
@@ -1544,7 +1674,7 @@ type DeviceRequestAllocationResult struct {
 	//
 	// The maximum number of tolerations is 16.
 	//
-	// This is an alpha field and requires enabling the DRADeviceTaints
+	// This is a beta field and requires enabling the DRADeviceTaints
 	// feature gate.
 	//
 	// +optional
@@ -1555,7 +1685,7 @@ type DeviceRequestAllocationResult struct {
 	// BindingConditions contains a copy of the BindingConditions
 	// from the corresponding ResourceSlice at the time of allocation.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
 	// feature gates.
 	//
 	// +optional
@@ -1566,7 +1696,7 @@ type DeviceRequestAllocationResult struct {
 	// BindingFailureConditions contains a copy of the BindingFailureConditions
 	// from the corresponding ResourceSlice at the time of allocation.
 	//
-	// This is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
+	// This is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus
 	// feature gates.
 	//
 	// +optional
@@ -1998,4 +2128,136 @@ type DeviceTaintRuleList struct {
 
 	// Items is the list of DeviceTaintRules.
 	Items []DeviceTaintRule
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ResourcePoolStatusRequest triggers a one-time calculation of resource pool status
+// based on the provided filters. Once status is set, the request is considered complete and will not be reprocessed.
+// Users should delete and recreate requests to get updated information.
+type ResourcePoolStatusRequest struct {
+	metav1.TypeMeta
+	// Standard object metadata
+	// +required
+	metav1.ObjectMeta
+
+	// Spec defines the filters for which pools to include in the status.
+	// +required
+	Spec ResourcePoolStatusRequestSpec
+
+	// Status is populated by the controller with the calculated pool status.
+	// +optional
+	Status *ResourcePoolStatusRequestStatus
+}
+
+// ResourcePoolStatusRequestSpec defines the filters for the pool status request.
+type ResourcePoolStatusRequestSpec struct {
+	// Driver specifies the DRA driver name to filter pools.
+	// Only pools from ResourceSlices with this driver will be included.
+	// This field is required to bound the scope of the request.
+	Driver string
+
+	// PoolName optionally filters to a specific pool name.
+	// If not specified, all pools from the specified driver are included.
+	// When specified, must be a valid resource pool name (DNS subdomains separated by "/").
+	// +optional
+	PoolName *string
+
+	// Limit optionally specifies the maximum number of pools to return in the status.
+	// If more pools match the filter criteria, the response will be truncated.
+	//
+	// Default: 100
+	// Maximum: 1000
+	//
+	// +optional
+	Limit *int32
+}
+
+// ResourcePoolStatusRequestLimitDefault is the default value for spec.limit.
+const ResourcePoolStatusRequestLimitDefault int32 = 100
+
+// ResourcePoolStatusRequestLimitMax is the maximum allowed value for spec.limit.
+const ResourcePoolStatusRequestLimitMax int32 = 1000
+
+// ResourcePoolStatusRequestStatus contains the calculated pool status information.
+type ResourcePoolStatusRequestStatus struct {
+	// PoolCount is the total number of pools that matched the filter criteria,
+	// regardless of truncation.
+	// +optional
+	PoolCount *int32
+
+	// Pools contains the first `spec.limit` matching pools, sorted by driver
+	// then pool name. If len(pools) < poolCount, the list was truncated.
+	// +optional
+	Pools []PoolStatus
+
+	// Conditions provide information about the state of the request.
+	// A condition with type=Complete or type=Failed will always be set
+	// when the status is populated.
+	// +optional
+	Conditions []metav1.Condition
+}
+
+// PoolStatus contains status information for a single resource pool.
+type PoolStatus struct {
+	// Driver is the DRA driver name for this pool.
+	Driver string
+
+	// PoolName is the name of the pool.
+	PoolName string
+
+	// Generation is the pool generation observed across all ResourceSlices
+	// in this pool.
+	Generation int64
+
+	// ResourceSliceCount is the number of ResourceSlices that make up this pool.
+	// +optional
+	ResourceSliceCount *int32
+
+	// TotalDevices is the total number of devices in the pool across all slices.
+	// +optional
+	TotalDevices *int32
+
+	// AllocatedDevices is the number of devices currently allocated to claims.
+	// +optional
+	AllocatedDevices *int32
+
+	// AvailableDevices is the number of devices available for allocation.
+	// This equals TotalDevices - AllocatedDevices - UnavailableDevices.
+	// +optional
+	AvailableDevices *int32
+
+	// UnavailableDevices is the number of devices that are not available
+	// due to taints or other conditions, but are not allocated.
+	// +optional
+	UnavailableDevices *int32
+
+	// NodeName is the node this pool is associated with.
+	// When omitted, the pool is not associated with a specific node.
+	// +optional
+	NodeName *string
+
+	// ValidationError is set when the pool's data could not be fully validated.
+	// When set, device count fields and ResourceSliceCount may be unset.
+	// +optional
+	ValidationError *string
+}
+
+// ResourcePoolStatusRequestConditionComplete is the condition type for completed requests.
+const ResourcePoolStatusRequestConditionComplete = "Complete"
+
+// ResourcePoolStatusRequestConditionFailed is the condition type for failed requests.
+const ResourcePoolStatusRequestConditionFailed = "Failed"
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ResourcePoolStatusRequestList is a collection of ResourcePoolStatusRequests.
+type ResourcePoolStatusRequestList struct {
+	metav1.TypeMeta
+	// Standard list metadata
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of ResourcePoolStatusRequests.
+	Items []ResourcePoolStatusRequest
 }

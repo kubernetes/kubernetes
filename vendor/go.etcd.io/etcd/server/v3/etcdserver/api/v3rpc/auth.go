@@ -185,3 +185,19 @@ func (aa *AuthAdmin) isPermitted(ctx context.Context) error {
 
 	return aa.ag.AuthStore().IsAdminPermitted(authInfo)
 }
+
+func (aa *AuthAdmin) requireAuthInfo(ctx context.Context) error {
+	if !aa.ag.AuthStore().IsAuthEnabled() {
+		return nil
+	}
+
+	authInfo, err := aa.ag.AuthInfoFromCtx(ctx)
+	if err != nil {
+		return err
+	}
+
+	if authInfo == nil {
+		return auth.ErrUserEmpty
+	}
+	return nil
+}

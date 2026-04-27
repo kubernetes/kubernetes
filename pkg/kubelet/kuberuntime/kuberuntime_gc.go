@@ -147,7 +147,7 @@ func (cgc *containerGC) removeOldestN(ctx context.Context, containers []containe
 				continue
 			}
 		}
-		if err := cgc.manager.removeContainer(ctx, containers[i].id); err != nil {
+		if err := cgc.manager.removeContainer(ctx, containers[i].id, false); err != nil {
 			logger.Error(err, "Failed to remove container", "containerID", containers[i].id)
 		}
 	}
@@ -190,7 +190,7 @@ func (cgc *containerGC) removeSandbox(ctx context.Context, sandboxID string) {
 // evictableContainers gets all containers that are evictable. Evictable containers are: not running
 // and created more than MinAge ago.
 func (cgc *containerGC) evictableContainers(ctx context.Context, minAge time.Duration) (containersByEvictUnit, error) {
-	containers, err := cgc.manager.getKubeletContainers(ctx, true)
+	containers, err := cgc.manager.getContainers(ctx, listOptions{})
 	if err != nil {
 		return containersByEvictUnit{}, err
 	}
@@ -279,12 +279,12 @@ func (cgc *containerGC) evictContainers(ctx context.Context, gcPolicy kubecontai
 //  3. belong to a non-existent (i.e., already removed) pod, or is not the
 //     most recently created sandbox for the pod.
 func (cgc *containerGC) evictSandboxes(ctx context.Context, evictNonDeletedPods bool) error {
-	containers, err := cgc.manager.getKubeletContainers(ctx, true)
+	containers, err := cgc.manager.getContainers(ctx, listOptions{})
 	if err != nil {
 		return err
 	}
 
-	sandboxes, err := cgc.manager.getKubeletSandboxes(ctx, true)
+	sandboxes, err := cgc.manager.getSandboxes(ctx, listOptions{})
 	if err != nil {
 		return err
 	}

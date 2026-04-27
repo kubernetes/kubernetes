@@ -185,7 +185,7 @@ func (lttv listTypeTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            lttv.TagName(),
 		StabilityLevel: TagStabilityLevelStable,
-		Scopes:         lttv.ValidScopes().UnsortedList(),
+		Scopes:         sets.List(lttv.ValidScopes()),
 		Description:    "Declares a list field's semantic type and ownership behavior. atomic: single ownership, set: shared ownership with uniqueness, map: shared ownership with key-based uniqueness.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<type>",
@@ -253,7 +253,7 @@ func (lmktv listMapKeyTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            lmktv.TagName(),
 		StabilityLevel: TagStabilityLevelStable,
-		Scopes:         lmktv.ValidScopes().UnsortedList(),
+		Scopes:         sets.List(lmktv.ValidScopes()),
 		Description:    "Declares a named sub-field of a list's value-type to be part of the list-map key.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<field-json-name>",
@@ -324,7 +324,7 @@ func (utv uniqueTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            utv.TagName(),
 		StabilityLevel: TagStabilityLevelBeta,
-		Scopes:         utv.ValidScopes().UnsortedList(),
+		Scopes:         sets.List(utv.ValidScopes()),
 		Description:    "Declares that a list field's elements are unique. This tag can be used with listType=atomic to add uniqueness constraints, or independently to specify uniqueness semantics.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<type>",
@@ -374,7 +374,7 @@ func (cutv customUniqueTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            cutv.TagName(),
 		StabilityLevel: TagStabilityLevelBeta,
-		Scopes:         cutv.ValidScopes().UnsortedList(),
+		Scopes:         sets.List(cutv.ValidScopes()),
 		Description:    "Indicates that uniqueness validation for this list is implemented via custom, handwritten validation. This disables generation of uniqueness validation for this list.",
 		Payloads:       nil,
 	}

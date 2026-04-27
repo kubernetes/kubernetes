@@ -228,7 +228,7 @@ func (evtv eachValTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            evtv.TagName(),
 		StabilityLevel: TagStabilityLevelAlpha,
-		Scopes:         evtv.ValidScopes().UnsortedList(),
+		Scopes:         sets.List(evtv.ValidScopes()),
 		Description:    "Declares a validation for each value in a map or list.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<validation-tag>",
@@ -310,7 +310,7 @@ func ForEachKey(_ *field.Path, t *types.Type, fn FunctionGen) (Validations, erro
 func (ektv eachKeyTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            ektv.TagName(),
-		Scopes:         ektv.ValidScopes().UnsortedList(),
+		Scopes:         sets.List(ektv.ValidScopes()),
 		StabilityLevel: TagStabilityLevelBeta,
 		Description:    "Declares a validation for each value in a map or list.",
 		Payloads: []TagPayloadDoc{{

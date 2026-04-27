@@ -66,6 +66,12 @@ func PodGroupWaitingOnPreemption(profile string, duration float64) {
 	observePodGroupScheduleAttemptAndLatency(WaitingOnPreemptionResult, profile, duration)
 }
 
+// PodGroupScheduleError records a pod group scheduling attempt that had an error, and the
+// duration since `start`.
+func PodGroupScheduleError(profile string, duration float64) {
+	observePodGroupScheduleAttemptAndLatency(ErrorResult, profile, duration)
+}
+
 func observePodGroupScheduleAttemptAndLatency(result, profile string, duration float64) {
 	podGroupSchedulingLatency.WithLabelValues(result, profile).Observe(duration)
 	podGroupScheduleAttempts.WithLabelValues(result, profile).Inc()

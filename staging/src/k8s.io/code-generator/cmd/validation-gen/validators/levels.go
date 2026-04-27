@@ -99,7 +99,7 @@ func (ltv *levelTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            ltv.TagName(),
 		StabilityLevel: TagStabilityLevelBeta,
-		Scopes:         ltv.ValidScopes().UnsortedList(),
+		Scopes:         sets.List(ltv.ValidScopes()),
 		Description:    fmt.Sprintf("Marks the given payload validation as a %s validation of the handwritten validation code. An optional Kubernetes version can be specified.", ltv.level),
 		Args: []TagArgDoc{{
 			Description: "The Kubernetes version (e.g. `1.34`) at which this validation was added.",

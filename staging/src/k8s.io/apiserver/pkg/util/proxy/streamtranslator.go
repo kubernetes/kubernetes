@@ -26,11 +26,12 @@ import (
 	"github.com/mxk/go-flowrate/flowrate"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	constants "k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apiserver/pkg/util/proxy/metrics"
 	"k8s.io/client-go/tools/remotecommand"
+	clientspdy "k8s.io/client-go/transport/spdy"
 	"k8s.io/client-go/util/exec"
+	"k8s.io/streaming/pkg/httpstream/spdy"
 )
 
 // StreamTranslatorHandler is a handler which translates WebSocket stream data
@@ -77,7 +78,12 @@ func (h *StreamTranslatorHandler) ServeHTTP(w http.ResponseWriter, req *http.Req
 		websocketStreams.writeStatus(apierrors.NewInternalError(err)) //nolint:errcheck
 		return
 	}
-	spdyExecutor, err := remotecommand.NewSPDYExecutorRejectRedirects(spdyRoundTripper, spdyRoundTripper, "POST", h.Location)
+	spdyExecutor, err := remotecommand.NewSPDYExecutorRejectRedirects(
+		spdyRoundTripper,
+		clientspdy.NewUpgraderForStreaming(spdyRoundTripper),
+		"POST",
+		h.Location,
+	)
 	if err != nil {
 		metrics.IncStreamTranslatorRequest(req.Context(), strconv.Itoa(http.StatusInternalServerError))
 		websocketStreams.writeStatus(apierrors.NewInternalError(err)) //nolint:errcheck

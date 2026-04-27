@@ -152,12 +152,27 @@ func (m *ManagerImpl) getAvailableDevices(resource string) sets.Set[string] {
 }
 
 func (m *ManagerImpl) generateDeviceTopologyHints(resource string, available sets.Set[string], reusable sets.Set[string], request int) []topologymanager.TopologyHint {
-	// Initialize minAffinitySize to include all NUMA Nodes
-	minAffinitySize := len(m.numaNodes)
+	// Narrow the bitmask iteration to NUMA nodes that actually host
+	// devices for this resource.  On platforms where the OS exposes many
+	// NUMA nodes that carry no devices (e.g. NVIDIA GB200 with 36 NUMA
+	// nodes, most hosting only GPU HBM), iterating all machine NUMA
+	// nodes would enumerate O(2^n) subsets.  Restricting to device-
+	// bearing nodes reduces n to the number of nodes that matter.
+	// Because device-less nodes never contribute to devicesInMask,
+	// excluding them does not change minAffinitySize or Preferred
+	// flag computation.
+	numaNodes := m.deviceNUMANodes(resource)
+	if len(numaNodes) == 0 {
+		numaNodes = m.numaNodes
+	}
+
+	// Initialize minAffinitySize to the number of NUMA nodes under
+	// consideration; it will be narrowed as satisfying masks are found.
+	minAffinitySize := len(numaNodes)
 
 	// Iterate through all combinations of NUMA Nodes and build hints from them.
 	hints := []topologymanager.TopologyHint{}
-	bitmask.IterateBitMasks(m.numaNodes, func(mask bitmask.BitMask) {
+	bitmask.IterateBitMasks(numaNodes, func(mask bitmask.BitMask) {
 		// First, update minAffinitySize for the current request size.
 		devicesInMask := 0
 		for _, device := range m.allDevices[resource] {
@@ -216,6 +231,28 @@ func (m *ManagerImpl) generateDeviceTopologyHints(resource string, available set
 	}
 
 	return hints
+}
+
+// deviceNUMANodes returns the sorted list of NUMA node IDs that host at least
+// one device for the given resource.  The returned set is guaranteed to be a
+// subset of m.numaNodes: any NUMA IDs reported by device plugins that are not
+// known to cadvisor are logged and dropped.
+// The caller must hold m.mutex.
+func (m *ManagerImpl) deviceNUMANodes(resource string) []int {
+	nodesWithDevices := sets.New[int]()
+	for _, device := range m.allDevices[resource] {
+		nodesWithDevices.Insert(m.getNUMANodeIds(device.Topology)...)
+	}
+
+	knownNodes := sets.New[int](m.numaNodes...)
+	unknown := nodesWithDevices.Difference(knownNodes)
+	if unknown.Len() > 0 {
+		klog.TODO().Info("Ignoring NUMA node IDs reported by device plugin that are unknown to cadvisor",
+			"resource", resource, "unknownNodes", sets.List(unknown), "knownNodes", m.numaNodes)
+		nodesWithDevices = nodesWithDevices.Intersection(knownNodes)
+	}
+
+	return sets.List(nodesWithDevices)
 }
 
 func (m *ManagerImpl) getNUMANodeIds(topology *pluginapi.TopologyInfo) []int {

@@ -31,17 +31,22 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	flagzv1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
-	"k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
-	"k8s.io/client-go/tools/cache"
-
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	apiserverfeat "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
+	flagzv1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
+	flagzv1beta1 "k8s.io/apiserver/pkg/server/flagz/api/v1beta1"
+	flagztesting "k8s.io/apiserver/pkg/server/flagz/testing"
 	"k8s.io/apiserver/pkg/server/options"
+	statuszv1alpha1 "k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
+	statuszv1beta1 "k8s.io/apiserver/pkg/server/statusz/api/v1beta1"
+	statusztesting "k8s.io/apiserver/pkg/server/statusz/testing"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/cache"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudctrlmgrtesting "k8s.io/cloud-provider/app/testing"
+	cloudproviderconfigv1alpha1 "k8s.io/cloud-provider/config/v1alpha1"
 	"k8s.io/cloud-provider/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -49,6 +54,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/klog/v2/ktesting"
+	kubecontrollermanagerconfigv1alpha1 "k8s.io/kube-controller-manager/config/v1alpha1"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	kubectrlmgrtesting "k8s.io/kubernetes/cmd/kube-controller-manager/app/testing"
 	kubeschedulertesting "k8s.io/kubernetes/cmd/kube-scheduler/app/testing"
@@ -357,8 +363,8 @@ users:
 		t.Fatal(err)
 	}
 
-	statuszWantBodyStr := "kube-controller-manager statusz\nWarning: This endpoint is not meant to be machine parseable"
-	statuszWantBodyJSON := &v1alpha1.Statusz{
+	statuszWantBodyText := "kube-controller-manager statusz\nWarning: This endpoint is not meant to be machine parseable"
+	statuszWantBodyAlpha1 := &statuszv1alpha1.Statusz{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Statusz",
 			APIVersion: "config.k8s.io/v1alpha1",
@@ -368,9 +374,19 @@ users:
 		},
 		Paths: []string{"/configz", "/flagz", "/healthz", "/metrics"},
 	}
+	statuszWantBodyBeta1 := &statuszv1beta1.Statusz{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Statusz",
+			APIVersion: "config.k8s.io/v1beta1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kube-controller-manager",
+		},
+		Paths: []string{"/configz", "/flagz", "/healthz", "/metrics"},
+	}
 
-	flagzWantBodyStr := "kube-controller-manager flagz\nWarning: This endpoint is not meant to be machine parseable"
-	flagzWantBodyJSON := &flagzv1alpha1.Flagz{
+	flagzWantBodyText := "kube-controller-manager flagz\nWarning: This endpoint is not meant to be machine parseable"
+	flagzWantBodyStructuredAlpha := &flagzv1alpha1.Flagz{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Flagz",
 			APIVersion: "config.k8s.io/v1alpha1",
@@ -379,31 +395,41 @@ users:
 			Name: "kube-controller-manager",
 		},
 	}
+	flagzWantBodyStructuredBeta := &flagzv1beta1.Flagz{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Flagz",
+			APIVersion: "config.k8s.io/v1beta1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "kube-controller-manager",
+		},
+	}
 
 	statuszTestCases := []struct {
-		name         string
-		acceptHeader string
-		wantStatus   int
-		wantBodySub  string            // for text/plain
-		wantJSON     *v1alpha1.Statusz // for structured json
+		name                  string
+		acceptHeader          string
+		wantStatus            int
+		wantBodyText          string
+		wantBodyStructured    interface{}
+		wantDeprecationHeader bool
 	}{
 		{
 			name:         "text plain response",
 			acceptHeader: "text/plain",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  statuszWantBodyStr,
+			wantBodyText: statuszWantBodyText,
 		},
 		{
-			name:         "structured json response",
-			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io;as=Statusz",
-			wantStatus:   http.StatusOK,
-			wantJSON:     statuszWantBodyJSON,
+			name:               "structured json response",
+			acceptHeader:       "application/json;v=v1beta1;g=config.k8s.io;as=Statusz",
+			wantStatus:         http.StatusOK,
+			wantBodyStructured: statuszWantBodyBeta1,
 		},
 		{
 			name:         "no accept header (defaults to text)",
 			acceptHeader: "",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  statuszWantBodyStr,
+			wantBodyText: statuszWantBodyText,
 		},
 		{
 			name:         "invalid accept header",
@@ -417,47 +443,74 @@ users:
 		},
 		{
 			name:         "application/json with missing as",
-			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io",
+			acceptHeader: "application/json;v=v1beta1;g=config.k8s.io",
 			wantStatus:   http.StatusNotAcceptable,
 		},
 		{
 			name:         "wildcard accept header",
 			acceptHeader: "*/*",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  statuszWantBodyStr,
+			wantBodyText: statuszWantBodyText,
 		},
 		{
 			name:         "bad json header fall back wildcard",
 			acceptHeader: "application/json;v=foo;g=config.k8s.io;as=Statusz,*/*",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  statuszWantBodyStr,
+			wantBodyText: statuszWantBodyText,
+		},
+		{
+			name:               "structured yaml response",
+			acceptHeader:       "application/yaml;v=v1beta1;g=config.k8s.io;as=Statusz",
+			wantStatus:         http.StatusOK,
+			wantBodyStructured: statuszWantBodyBeta1,
+		},
+		{
+			name:               "structured cbor response",
+			acceptHeader:       "application/cbor;v=v1beta1;g=config.k8s.io;as=Statusz",
+			wantStatus:         http.StatusOK,
+			wantBodyStructured: statuszWantBodyBeta1,
+		},
+		{
+			name:                  "alpha specified before beta, should show warning",
+			acceptHeader:          "application/json;g=config.k8s.io;v=v1alpha1;as=Statusz,application/json;g=config.k8s.io;v=v1beta1;as=Statusz",
+			wantStatus:            http.StatusOK,
+			wantBodyStructured:    statuszWantBodyAlpha1,
+			wantDeprecationHeader: true,
+		},
+		{
+			name:                  "beta specified before alpha, no warning",
+			acceptHeader:          "application/json;g=config.k8s.io;v=v1beta1;as=Statusz,application/json;g=config.k8s.io;v=v1alpha1;as=Statusz",
+			wantStatus:            http.StatusOK,
+			wantBodyStructured:    statuszWantBodyBeta1,
+			wantDeprecationHeader: false,
 		},
 	}
 
 	flagzTestCases := []struct {
-		name         string
-		acceptHeader string
-		wantStatus   int
-		wantBodySub  string               // for text/plain
-		wantJSON     *flagzv1alpha1.Flagz // for structured json
+		name                  string
+		acceptHeader          string
+		wantStatus            int
+		wantBodyText          string      // for text/plain
+		wantBodyStructured    interface{} // for structured json
+		wantDeprecationHeader bool
 	}{
 		{
 			name:         "text plain response",
 			acceptHeader: "text/plain",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  flagzWantBodyStr,
+			wantBodyText: flagzWantBodyText,
 		},
 		{
-			name:         "structured json response",
-			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io;as=Flagz",
-			wantStatus:   http.StatusOK,
-			wantJSON:     flagzWantBodyJSON,
+			name:               "structured json response",
+			acceptHeader:       "application/json;v=v1beta1;g=config.k8s.io;as=Flagz",
+			wantStatus:         http.StatusOK,
+			wantBodyStructured: flagzWantBodyStructuredBeta,
 		},
 		{
 			name:         "no accept header (defaults to text)",
 			acceptHeader: "",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  flagzWantBodyStr,
+			wantBodyText: flagzWantBodyText,
 		},
 		{
 			name:         "invalid accept header",
@@ -471,31 +524,58 @@ users:
 		},
 		{
 			name:         "application/json with missing as",
-			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io",
+			acceptHeader: "application/json;v=v1beta1;g=config.k8s.io",
 			wantStatus:   http.StatusNotAcceptable,
 		},
 		{
 			name:         "wildcard accept header",
 			acceptHeader: "*/*",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  flagzWantBodyStr,
+			wantBodyText: flagzWantBodyText,
 		},
 		{
 			name:         "bad json header fall back wildcard",
 			acceptHeader: "application/json;v=foo;g=config.k8s.io;as=Flagz,*/*",
 			wantStatus:   http.StatusOK,
-			wantBodySub:  flagzWantBodyStr,
+			wantBodyText: flagzWantBodyText,
+		},
+		{
+			name:               "structured cbor response",
+			acceptHeader:       "application/cbor;v=v1beta1;g=config.k8s.io;as=Flagz",
+			wantStatus:         http.StatusOK,
+			wantBodyStructured: flagzWantBodyStructuredBeta,
+		},
+		{
+			name:               "structured yaml response",
+			acceptHeader:       "application/yaml;v=v1beta1;g=config.k8s.io;as=Flagz",
+			wantStatus:         http.StatusOK,
+			wantBodyStructured: flagzWantBodyStructuredBeta,
+		},
+		{
+			name:                  "alpha specified before beta, should show warning",
+			acceptHeader:          "application/json;v=v1alpha1;g=config.k8s.io;as=Flagz,application/json;v=v1beta1;g=config.k8s.io;as=Flagz",
+			wantStatus:            http.StatusOK,
+			wantBodyStructured:    flagzWantBodyStructuredAlpha,
+			wantDeprecationHeader: true,
+		},
+		{
+			name:                  "beta specified before alpha, no warning",
+			acceptHeader:          "application/json;v=v1beta1;g=config.k8s.io;as=Flagz,application/json;v=v1alpha1;g=config.k8s.io;as=Flagz",
+			wantStatus:            http.StatusOK,
+			wantBodyStructured:    flagzWantBodyStructuredBeta,
+			wantDeprecationHeader: false,
 		},
 	}
 
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentStatusz, true)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, zpagesfeatures.ComponentFlagz, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, apiserverfeat.CBORServingAndStorage, true)
 	_, ctx := ktesting.NewTestContext(t)
 	flags := []string{
 		"--authentication-skip-lookup",
 		"--authentication-kubeconfig", apiserverConfig.Name(),
 		"--authorization-kubeconfig", apiserverConfig.Name(),
-		"--authorization-always-allow-paths", "/statusz,/flagz",
+		"--authorization-always-allow-paths", "/statusz,/flagz,/configz",
 		"--kubeconfig", apiserverConfig.Name(),
 		"--leader-elect=false",
 	}
@@ -515,6 +595,7 @@ users:
 	}
 	statuszURL := fmt.Sprintf("https://127.0.0.1:%s/statusz", port)
 	flagzURL := fmt.Sprintf("https://127.0.0.1:%s/flagz", port)
+	configzURL := fmt.Sprintf("https://127.0.0.1:%s/configz", port)
 
 	// read self-signed server cert disk
 	pool := x509.NewCertPool()
@@ -559,26 +640,14 @@ users:
 			}
 
 			if tc.wantStatus == http.StatusOK {
-				if tc.wantBodySub != "" {
-					if !strings.Contains(string(body), tc.wantBodySub) {
-						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodySub, string(body))
+				if tc.wantBodyText != "" {
+					if !strings.Contains(string(body), tc.wantBodyText) {
+						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodyText, string(body))
 					}
 				}
-				if tc.wantJSON != nil {
-					var got v1alpha1.Statusz
-					if err := json.Unmarshal(body, &got); err != nil {
-						t.Fatalf("error unmarshalling JSON: %v", err)
-					}
-					// Only check static fields, since others are dynamic
-					if got.TypeMeta != tc.wantJSON.TypeMeta {
-						t.Errorf("TypeMeta mismatch: want %+v, got %+v", tc.wantJSON.TypeMeta, got.TypeMeta)
-					}
-					if got.ObjectMeta.Name != tc.wantJSON.ObjectMeta.Name {
-						t.Errorf("ObjectMeta.Name mismatch: want %q, got %q", tc.wantJSON.ObjectMeta.Name, got.ObjectMeta.Name)
-					}
-					if diff := cmp.Diff(tc.wantJSON.Paths, got.Paths); diff != "" {
-						t.Errorf("Paths mismatch (-want,+got):\n%s", diff)
-					}
+				if tc.wantBodyStructured != nil {
+					warnings := append([]string{}, r.Header.Values("Warning")...)
+					statusztesting.VerifyStructuredResponse(t, tc.acceptHeader, body, warnings, tc.wantBodyStructured, tc.wantDeprecationHeader)
 				}
 			}
 		})
@@ -612,27 +681,67 @@ users:
 			}
 
 			if tc.wantStatus == http.StatusOK {
-				if tc.wantBodySub != "" {
-					if !strings.Contains(string(body), tc.wantBodySub) {
-						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodySub, string(body))
+				if tc.wantBodyText != "" {
+					if !strings.Contains(string(body), tc.wantBodyText) {
+						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodyText, string(body))
 					}
 				}
-				if tc.wantJSON != nil {
-					var got flagzv1alpha1.Flagz
-					if err := json.Unmarshal(body, &got); err != nil {
-						t.Fatalf("error unmarshalling JSON: %v", err)
-					}
-					// Only check static fields, since others are dynamic
-					if got.TypeMeta != tc.wantJSON.TypeMeta {
-						t.Errorf("TypeMeta mismatch: want %+v, got %+v", tc.wantJSON.TypeMeta, got.TypeMeta)
-					}
-					if got.ObjectMeta.Name != tc.wantJSON.ObjectMeta.Name {
-						t.Errorf("ObjectMeta.Name mismatch: want %q, got %q", tc.wantJSON.ObjectMeta.Name, got.ObjectMeta.Name)
-					}
+				if tc.wantBodyStructured != nil {
+					warnings := append([]string{}, r.Header.Values("Warning")...)
+					flagztesting.VerifyStructuredResponse(t, tc.acceptHeader, body, warnings, tc.wantBodyStructured, tc.wantDeprecationHeader)
 				}
 			}
 		})
 	}
+
+	t.Run("configz", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodGet, configzURL, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		req.Header.Add("Authorization", fmt.Sprintf("Token %s", token))
+		r, err := client.Do(req)
+		if err != nil {
+			t.Fatalf("failed to GET /configz: %v", err)
+		}
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("failed to read response body: %v", err)
+		}
+		defer func() {
+			_ = r.Body.Close()
+		}()
+
+		if r.StatusCode != http.StatusOK {
+			t.Fatalf("want status %d, got %d", http.StatusOK, r.StatusCode)
+		}
+
+		var configz map[string]unstructured.Unstructured
+		if err := json.Unmarshal(body, &configz); err != nil {
+			t.Fatalf("failed to unmarshal configz: %v", err)
+		}
+		cfg, ok := configz["kubecontrollermanager.config.k8s.io"]
+		if !ok {
+			t.Fatalf("configz missing 'kubecontrollermanager.config.k8s.io' key")
+		}
+		if cfg.GetAPIVersion() != "kubecontrollermanager.config.k8s.io/v1alpha1" {
+			t.Errorf("unexpected APIVersion: %s", cfg.GetAPIVersion())
+		}
+		if cfg.GetKind() != "KubeControllerManagerConfiguration" {
+			t.Errorf("unexpected Kind: %s", cfg.GetKind())
+		}
+
+		// confirm that they expose public config type
+		var kcmConfig kubecontrollermanagerconfigv1alpha1.KubeControllerManagerConfiguration
+		err = json.Unmarshal(body, &struct {
+			ComponentConfig *kubecontrollermanagerconfigv1alpha1.KubeControllerManagerConfiguration `json:"kubecontrollermanager.config.k8s.io"`
+		}{ComponentConfig: &kcmConfig})
+		if err != nil {
+			t.Errorf("failed to deserialize into public config type: %v", err)
+		}
+	})
 }
 
 func TestKubeControllerManagerInformerMetrics(t *testing.T) {
@@ -781,4 +890,150 @@ users:
 	if !foundKCM {
 		t.Errorf("expected to find informer_queued_items metric with name=\"kube-controller-manager\" label")
 	}
+}
+
+func TestCloudControllerManagerServingZPages(t *testing.T) {
+	if !cloudprovider.IsCloudProvider("fake") {
+		cloudprovider.RegisterCloudProvider("fake", fakeCloudProviderFactory)
+	}
+	// authenticate to apiserver via bearer token
+	token := "flwqkenfjasasdfmwerasd" // Fake token for testing.
+	tokenFile, err := os.CreateTemp("", "kubeconfig")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = fmt.Fprintf(tokenFile, "\n%s,system:cloud-controller-manager,system:cloud-controller-manager,\"\"\n", token); err != nil {
+		t.Fatal(err)
+	}
+	if err = tokenFile.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// start apiserver
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{
+		"--token-auth-file", tokenFile.Name(),
+		"--authorization-mode", "RBAC",
+	}, framework.SharedEtcd())
+	defer server.TearDownFn()
+
+	// create kubeconfig for the apiserver
+	apiserverConfig, err := os.CreateTemp("", "kubeconfig")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = fmt.Fprintf(apiserverConfig, `
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    server: %s
+    certificate-authority: %s
+  name: integration
+contexts:
+- context:
+    cluster: integration
+    user: cloud-controller-manager
+  name: default-context
+current-context: default-context
+users:
+- name: cloud-controller-manager
+  user:
+    token: %s
+`, server.ClientConfig.Host, server.ServerOpts.SecureServing.ServerCert.CertKey.CertFile, token); err != nil {
+		t.Fatal(err)
+	}
+	if err = apiserverConfig.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	_, ctx := ktesting.NewTestContext(t)
+	flags := []string{
+		"--authentication-skip-lookup",
+		"--authentication-kubeconfig", apiserverConfig.Name(),
+		"--authorization-kubeconfig", apiserverConfig.Name(),
+		"--authorization-always-allow-paths", "/statusz,/flagz,/configz",
+		"--kubeconfig", apiserverConfig.Name(),
+		"--leader-elect=false",
+		"--cloud-provider=fake",
+		"--webhook-secure-port=0",
+	}
+	secureOptions, secureInfo, tearDownFn, err := cloudControllerManagerTester{}.StartTestServer(t, ctx, flags)
+	if tearDownFn != nil {
+		defer tearDownFn()
+	}
+	if err != nil {
+		t.Fatalf("StartTestServer() error = %v", err)
+	}
+	if secureInfo == nil {
+		t.Fatalf("SecureServing not enabled")
+	}
+	_, port, err := net.SplitHostPort(secureInfo.Listener.Addr().String())
+	if err != nil {
+		t.Fatalf("could not get host and port from %s : %v", secureInfo.Listener.Addr().String(), err)
+	}
+	configzURL := fmt.Sprintf("https://127.0.0.1:%s/configz", port)
+
+	// read self-signed server cert disk
+	pool := x509.NewCertPool()
+	serverCertPath := path.Join(secureOptions.ServerCert.CertDirectory, secureOptions.ServerCert.PairName+".crt")
+	serverCert, err := os.ReadFile(serverCertPath)
+	if err != nil {
+		t.Fatalf("Failed to read component server cert %q: %v", serverCertPath, err)
+	}
+	pool.AppendCertsFromPEM(serverCert)
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			RootCAs: pool,
+		},
+	}
+	client := &http.Client{Transport: tr}
+
+	t.Run("configz", func(t *testing.T) {
+		req, err := http.NewRequest(http.MethodGet, configzURL, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		req.Header.Add("Authorization", fmt.Sprintf("Token %s", token))
+		r, err := client.Do(req)
+		if err != nil {
+			t.Fatalf("failed to GET /configz: %v", err)
+		}
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("failed to read response body: %v", err)
+		}
+		defer func() {
+			_ = r.Body.Close()
+		}()
+
+		if r.StatusCode != http.StatusOK {
+			t.Fatalf("want status %d, got %d", http.StatusOK, r.StatusCode)
+		}
+
+		var configz map[string]unstructured.Unstructured
+		if err := json.Unmarshal(body, &configz); err != nil {
+			t.Fatalf("failed to unmarshal configz: %v", err)
+		}
+		cfg, ok := configz["cloudcontrollermanager.config.k8s.io"]
+		if !ok {
+			t.Fatalf("configz missing 'cloudcontrollermanager.config.k8s.io' key")
+		}
+		if cfg.GetAPIVersion() != "cloudcontrollermanager.config.k8s.io/v1alpha1" {
+			t.Errorf("unexpected APIVersion: %s", cfg.GetAPIVersion())
+		}
+		if cfg.GetKind() != "CloudControllerManagerConfiguration" {
+			t.Errorf("unexpected Kind: %s", cfg.GetKind())
+		}
+
+		// confirm that they expose public config type
+		var ccmConfig cloudproviderconfigv1alpha1.CloudControllerManagerConfiguration
+		err = json.Unmarshal(body, &struct {
+			ComponentConfig *cloudproviderconfigv1alpha1.CloudControllerManagerConfiguration `json:"cloudcontrollermanager.config.k8s.io"`
+		}{ComponentConfig: &ccmConfig})
+		if err != nil {
+			t.Errorf("failed to deserialize into public config type: %v", err)
+		}
+	})
 }

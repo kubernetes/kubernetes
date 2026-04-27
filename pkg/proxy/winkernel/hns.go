@@ -31,7 +31,10 @@ import (
 
 type HostNetworkService interface {
 	getNetworkByName(name string) (*hnsNetworkInfo, error)
-	getAllEndpointsByNetwork(networkName string) (map[string]*endpointInfo, error)
+	// Returns a map of endpoints keyed by both endpoint ID and IP address for all endpoints on the specified network, and a map of remote endpoints with duplicate IPs to be deleted.
+	getAllEndpointsByNetwork(networkName string) (map[string]*endpointInfo, map[string]bool, error)
+	// deleteAllRemoteEndpointsWithDupIP deletes all remote endpoints with duplicate IPs that were found in getAllEndpointsByNetwork. This is needed to clean up stale remote endpoints that can be left behind due to a Windows bug.
+	deleteAllRemoteEndpointsWithDupIP(remoteEPsWithDupIP map[string]bool)
 	getEndpointByID(id string) (*endpointInfo, error)
 	getEndpointByIpAddress(ip string, networkName string) (*endpointInfo, error)
 	getEndpointByName(id string) (*endpointInfo, error)
@@ -114,17 +117,20 @@ func (hns hns) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 	}, nil
 }
 
-func (hns hns) getAllEndpointsByNetwork(networkName string) (map[string]*(endpointInfo), error) {
+func (hns hns) getAllEndpointsByNetwork(networkName string) (map[string]*(endpointInfo), map[string]bool, error) {
 	hcnnetwork, err := hns.hcn.GetNetworkByName(networkName)
 	if err != nil {
 		klog.ErrorS(err, "failed to get HNS network by name", "name", networkName)
-		return nil, err
+		return nil, nil, err
 	}
 	endpoints, err := hns.hcn.ListEndpointsOfNetwork(hcnnetwork.Id)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list endpoints: %w", err)
+		return nil, nil, fmt.Errorf("failed to list endpoints: %w", err)
 	}
+
 	endpointInfos := make(map[string]*(endpointInfo))
+	remoteEPsWithDupIP := make(map[string]bool)
+
 	for _, ep := range endpoints {
 
 		if len(ep.IpConfigurations) == 0 {
@@ -142,14 +148,22 @@ func (hns hns) getAllEndpointsByNetwork(networkName string) (map[string]*(endpoi
 				break
 			}
 
-			isLocal := uint32(ep.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0
+			curEpIsLocal := uint32(ep.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0
 
-			if existingEp, ok := endpointInfos[ipConfig.IpAddress]; ok && isLocal {
-				// If the endpoint is already part of the queried endpoints map and is local,
-				// then we should not add it again to the map
-				// This is to avoid overwriting the remote endpoint info with a local endpoint.
-				klog.V(3).InfoS("Endpoint already exists in queried endpoints map; skipping.", "newLocalEndpoint", ep, "ipConfig", ipConfig, "existingEndpoint", existingEp)
-				continue
+			if existingEp, ok := endpointInfos[ipConfig.IpAddress]; ok {
+				if curEpIsLocal && !existingEp.isLocal {
+					// Local found, stale remote in map → delete remote from HNS, overwrite
+					remoteEPsWithDupIP[existingEp.hnsID] = true
+					delete(endpointInfos, existingEp.hnsID)
+					delete(endpointInfos, existingEp.ip)
+					// fall through to add local
+				} else if !curEpIsLocal && existingEp.isLocal {
+					// Local already in map, remote arriving → delete remote from HNS, skip
+					remoteEPsWithDupIP[ep.Id] = true
+					continue
+				} else {
+					continue // same type, keep existing
+				}
 			}
 
 			// Add to map with key endpoint ID or IP address
@@ -157,7 +171,7 @@ func (hns hns) getAllEndpointsByNetwork(networkName string) (map[string]*(endpoi
 			// TODO: Store by IP only and remove any lookups by endpoint ID.
 			epInfo := &endpointInfo{
 				ip:         ipConfig.IpAddress,
-				isLocal:    isLocal,
+				isLocal:    curEpIsLocal,
 				macAddress: ep.MacAddress,
 				hnsID:      ep.Id,
 				hns:        hns,
@@ -172,7 +186,17 @@ func (hns hns) getAllEndpointsByNetwork(networkName string) (map[string]*(endpoi
 	}
 	klog.V(3).InfoS("Queried endpoints from network", "network", networkName, "count", len(endpointInfos))
 	klog.V(5).InfoS("Queried endpoints details", "network", networkName, "endpointInfos", endpointInfos)
-	return endpointInfos, nil
+	return endpointInfos, remoteEPsWithDupIP, nil
+}
+
+func (hns hns) deleteAllRemoteEndpointsWithDupIP(remoteEPsWithDupIP map[string]bool) {
+	for hnsID := range remoteEPsWithDupIP {
+		klog.V(3).InfoS("Deleting stale remote endpoint with duplicate IP", "hnsID", hnsID)
+		err := hns.deleteEndpoint(hnsID)
+		if err != nil {
+			klog.ErrorS(err, "Failed to delete stale remote endpoint with duplicate IP", "hnsID", hnsID)
+		}
+	}
 }
 
 func (hns hns) getEndpointByID(id string) (*endpointInfo, error) {

@@ -1102,7 +1102,9 @@ func (q *completerWorkqueue) Add(item string) {
 }
 
 func (q *completerWorkqueue) AddAfter(item string, duration time.Duration) {
-	q.Add(item)
+	// Normally apiservices are continuously re-synced and never leave the
+	// queue. Make this a no-op in the unit test so that isComplete()
+	// reflects whether all explicitly dirtied items have been processed.
 }
 
 func (q *completerWorkqueue) AddRateLimited(item string) {

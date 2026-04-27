@@ -365,6 +365,10 @@ func unmarshalInt(tok json.Token, bitSize int) (protoreflect.Value, bool) {
 		if err != nil {
 			return protoreflect.Value{}, false
 		}
+		// Ensure there is no non-number content in this string.
+		if next, err := dec.Read(); err != nil || next.Kind() != json.EOF {
+			return protoreflect.Value{}, false
+		}
 		return getInt(tok, bitSize)
 	}
 	return protoreflect.Value{}, false
@@ -395,6 +399,10 @@ func unmarshalUint(tok json.Token, bitSize int) (protoreflect.Value, bool) {
 		dec := json.NewDecoder([]byte(s))
 		tok, err := dec.Read()
 		if err != nil {
+			return protoreflect.Value{}, false
+		}
+		// Ensure there is no non-number content in this string.
+		if next, err := dec.Read(); err != nil || next.Kind() != json.EOF {
 			return protoreflect.Value{}, false
 		}
 		return getUint(tok, bitSize)
@@ -445,6 +453,10 @@ func unmarshalFloat(tok json.Token, bitSize int) (protoreflect.Value, bool) {
 		dec := json.NewDecoder([]byte(s))
 		tok, err := dec.Read()
 		if err != nil {
+			return protoreflect.Value{}, false
+		}
+		// Ensure there is no non-number content in this string.
+		if next, err := dec.Read(); err != nil || next.Kind() != json.EOF {
 			return protoreflect.Value{}, false
 		}
 		return getFloat(tok, bitSize)

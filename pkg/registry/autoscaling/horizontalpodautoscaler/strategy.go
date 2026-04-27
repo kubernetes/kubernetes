@@ -19,6 +19,7 @@ package horizontalpodautoscaler
 import (
 	"context"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -69,6 +70,11 @@ func (autoscalerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 	// create cannot set status
 	newHPA.Status = autoscaling.HorizontalPodAutoscalerStatus{}
 
+	// Feature gated in case someone is setting the generation themselves, they can opt out of this for 1 release
+	if utilfeature.DefaultFeatureGate.Enabled(features.HPAGeneration) {
+		newHPA.Generation = 1
+	}
+
 	dropDisabledFields(newHPA, nil)
 }
 
@@ -106,6 +112,12 @@ func (autoscalerStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 	newHPA.Status = oldHPA.Status
 
 	dropDisabledFields(newHPA, oldHPA)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.HPAGeneration) {
+		if !apiequality.Semantic.DeepEqual(newHPA.Spec, oldHPA.Spec) {
+			newHPA.Generation = oldHPA.Generation + 1
+		}
+	}
 }
 
 // ValidateUpdate is the default update validation for an end user.

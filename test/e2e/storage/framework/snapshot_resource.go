@@ -125,7 +125,7 @@ func CreateSnapshotResource(ctx context.Context, sDriver SnapshottableTestDriver
 		framework.ExpectNoError(err)
 
 		ginkgo.By("checking the Snapshot has been deleted")
-		err = utils.WaitForNamespacedGVRDeletion(ctx, dc, utils.SnapshotGVR, r.Vs.GetName(), r.Vs.GetNamespace(), framework.Poll, timeouts.SnapshotDelete)
+		err = utils.WaitForNamespacedGVRDeletion(ctx, dc, utils.SnapshotGVR, r.Vs.GetNamespace(), r.Vs.GetName(), framework.Poll, timeouts.SnapshotDelete)
 		framework.ExpectNoError(err)
 
 		err = dc.Resource(utils.SnapshotContentGVR).Delete(ctx, r.Vscontent.GetName(), metav1.DeleteOptions{})
@@ -212,7 +212,7 @@ func (sr *SnapshotResource) CleanupResource(ctx context.Context, timeouts *frame
 				}
 				framework.ExpectNoError(err)
 
-				err = utils.WaitForNamespacedGVRDeletion(ctx, dc, utils.SnapshotGVR, sr.Vs.GetName(), sr.Vs.GetNamespace(), framework.Poll, timeouts.SnapshotDelete)
+				err = utils.WaitForNamespacedGVRDeletion(ctx, dc, utils.SnapshotGVR, sr.Vs.GetNamespace(), sr.Vs.GetName(), framework.Poll, timeouts.SnapshotDelete)
 				framework.ExpectNoError(err)
 			default:
 				cleanupErrs = append(cleanupErrs, err)

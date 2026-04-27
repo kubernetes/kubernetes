@@ -21,6 +21,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
@@ -47,6 +49,7 @@ type UndoOptions struct {
 	LabelSelector    string
 	EnforceNamespace bool
 	RESTClientGetter genericclioptions.RESTClientGetter
+	CmdBaseName      string
 
 	resource.FilenameOptions
 	genericiooptions.IOStreams
@@ -65,6 +68,10 @@ var (
 
 		# Roll back to the previous deployment with dry-run
 		kubectl rollout undo --dry-run=server deployment/abc`)
+
+	warningRollbackApplyManagedResource = "Warning: resource %[1]s was previously managed with '%[3]s apply'. " +
+		"Rolling back will not update the %[2]s annotation, which may cause unexpected behavior on future '%[3]s apply' operations. " +
+		"Consider using '%[3]s apply' with your previous configuration file instead.\n"
 )
 
 // NewRolloutUndoOptions returns an initialized UndoOptions instance
@@ -77,8 +84,9 @@ func NewRolloutUndoOptions(streams genericiooptions.IOStreams) *UndoOptions {
 }
 
 // NewCmdRolloutUndo returns a Command instance for the 'rollout undo' sub command
-func NewCmdRolloutUndo(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdRolloutUndo(parent string, f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	o := NewRolloutUndoOptions(streams)
+	o.CmdBaseName = parent
 
 	validArgs := []string{"deployment", "daemonset", "statefulset"}
 
@@ -157,6 +165,17 @@ func (o *UndoOptions) RunUndo() error {
 		if err != nil {
 			return err
 		}
+
+		metadata, err := meta.Accessor(info.Object)
+		if err != nil {
+			return err
+		}
+
+		annotationMap := metadata.GetAnnotations()
+		if _, ok := annotationMap[corev1.LastAppliedConfigAnnotation]; ok {
+			fmt.Fprintf(o.ErrOut, warningRollbackApplyManagedResource, info.ObjectName(), corev1.LastAppliedConfigAnnotation, o.CmdBaseName) //nolint:errcheck
+		}
+
 		rollbacker, err := polymorphichelpers.RollbackerFn(o.RESTClientGetter, info.ResourceMapping())
 		if err != nil {
 			return err

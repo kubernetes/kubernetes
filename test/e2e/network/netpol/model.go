@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -44,17 +45,28 @@ type Model struct {
 // The number of containers per pod is the number of ports x the number of protocols.
 // The *total* number of containers is namespaces x pods x ports x protocols.
 func NewModel(namespaceNames []string, podNames []string, ports []int32, protocols []v1.Protocol) *Model {
+	podNamesByNamespace := make(map[string]sets.Set[string], len(namespaceNames))
+	for _, ns := range namespaceNames {
+		podNamesByNamespace[ns] = sets.New(podNames...)
+	}
+	return newModelWithPerNamespacePodNames(namespaceNames, podNamesByNamespace, ports, protocols)
+}
+
+// newModelWithPerNamespacePodNames instantiates a model where each namespace can define a different pod set.
+func newModelWithPerNamespacePodNames(namespaceNames []string, podNamesByNamespace map[string]sets.Set[string], ports []int32, protocols []v1.Protocol) *Model {
 	model := &Model{
-		PodNames:  podNames,
 		Ports:     ports,
 		Protocols: protocols,
 	}
+	allPodNames := sets.New[string]()
 
 	// build the entire "model" for the overall test, which means, building
 	// namespaces, pods, containers for each protocol.
 	for _, ns := range namespaceNames {
 		var pods []*Pod
+		podNames := sets.List(podNamesByNamespace[ns])
 		for _, podName := range podNames {
+			allPodNames.Insert(podName)
 			pods = append(pods, &Pod{
 				Name:      podName,
 				Ports:     ports,
@@ -66,6 +78,7 @@ func NewModel(namespaceNames []string, podNames []string, ports []int32, protoco
 			Pods: pods,
 		})
 	}
+	model.PodNames = sets.List(allPodNames)
 	return model
 }
 

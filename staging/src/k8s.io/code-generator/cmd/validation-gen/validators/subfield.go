@@ -136,7 +136,7 @@ func (stv subfieldTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            stv.TagName(),
 		StabilityLevel: TagStabilityLevelStable,
-		Scopes:         stv.ValidScopes().UnsortedList(),
+		Scopes:         sets.List(stv.ValidScopes()),
 		Description:    "Declares a validation for a subfield of a struct.",
 		Args: []TagArgDoc{{
 			Description: "<field-json-name>",

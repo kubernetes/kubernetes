@@ -123,9 +123,18 @@ func (pl *BalancedAllocation) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.S
 		EnablePodLevelResources:   pl.enablePodLevelResources,
 		EnableDRAExtendedResource: pl.enableDRAExtendedResource,
 	}
-
 	if pl.enableDRAExtendedResource {
-		return nil, fwk.NewStatus(fwk.Unschedulable, "signature disabled when dra extended resources enabled")
+		podRequest := computePodResourceRequest(pod, opts)
+		for rName, rQuant := range podRequest.ScalarResources {
+			// Skip in case request quantity is zero
+			if rQuant == 0 {
+				continue
+			}
+
+			if shouldDelegateResourceToDRA(rName, nil, pl.draManager, opts) {
+				return nil, fwk.NewStatus(fwk.Unschedulable, "signature disabled when dra extended resources are used in the cluster")
+			}
+		}
 	}
 
 	return []fwk.SignFragment{
@@ -187,6 +196,7 @@ func NewBalancedAllocation(_ context.Context, baArgs runtime.Object, h fwk.Handl
 			useRequested:                    true,
 			resources:                       args.Resources,
 			enableInPlacePodLevelResourcesVerticalScaling: fts.EnableInPlacePodLevelResourcesVerticalScaling,
+			draManager: h.SharedDRAManager(),
 		},
 	}, nil
 }

@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
@@ -106,7 +107,14 @@ func (s *ProxyServer) platformCheckSupported(ctx context.Context) (ipv4Supported
 
 	// Check if the OS has IPv6 enabled, by verifying if the IPv6 interfaces are available
 	_, errIPv6 := os.Stat("/proc/net/if_inet6")
-	if errIPv6 != nil {
+	if errIPv6 == nil {
+		// Also check that IPv6 hasn't been disabled
+		content, err := os.ReadFile("/proc/sys/net/ipv6/conf/all/disable_ipv6")
+		if err == nil && strings.TrimSpace(string(content)) == "1" {
+			logger.Info("Kernel support disabled for family", "ipFamily", v1.IPv6Protocol)
+			ipv6Supported = false
+		}
+	} else {
 		logger.Info("No kernel support for family", "ipFamily", v1.IPv6Protocol)
 		ipv6Supported = false
 	}

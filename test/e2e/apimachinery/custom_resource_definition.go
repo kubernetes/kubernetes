@@ -97,7 +97,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 
 			// Create CRD and wait for the resource to be recognized and available.
 			crds := make([]*v1.CustomResourceDefinition, testListSize)
-			for i := 0; i < testListSize; i++ {
+			for i := range testListSize {
 				crd := fixtures.NewRandomNameV1CustomResourceDefinition(v1.ClusterScoped)
 				crd.Labels = map[string]string{"e2e-list-test-uuid": testUUID}
 				crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)

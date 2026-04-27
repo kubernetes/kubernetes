@@ -17,23 +17,33 @@ limitations under the License.
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/xml"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"path"
 	"regexp"
 	"strings"
 
 	"k8s.io/kubernetes/cmd/prune-junit-xml/logparse"
 	"k8s.io/kubernetes/third_party/forked/gotestsum/junitxml"
+	"sigs.k8s.io/yaml"
 )
 
 func main() {
 	maxTextSize := flag.Int("max-text-size", 1, "maximum size of attribute or text (in MB)")
 	pruneTests := flag.Bool("prune-tests", true,
 		"prune's xml files to display only top level tests and failed sub-tests")
+	addOwners := flag.Bool("add-owners", true,
+		"when pruning tests, also look for OWNERs files of the packages and prefix the names with [sig-...] if found")
 	flag.Parse()
+
+	pkgs := newPackageOwners(*addOwners)
+
 	for _, path := range flag.Args() {
 		fmt.Printf("processing junit xml file : %s\n", path)
 		xmlReader, err := os.Open(path)
@@ -48,7 +58,7 @@ func main() {
 
 		pruneXML(suites, *maxTextSize*1e6) // convert MB into bytes (roughly!)
 		if *pruneTests {
-			pruneTESTS(suites)
+			pruneTESTS(suites, pkgs)
 		}
 
 		xmlWriter, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
@@ -121,7 +131,7 @@ func pruneStringIfNeeded(str *string, maxBytes int, msg string, args ...any) {
 
 // This function condenses the junit xml to have package name as top level identifier
 // and nesting under that.
-func pruneTESTS(suites *junitxml.JUnitTestSuites) {
+func pruneTESTS(suites *junitxml.JUnitTestSuites, pkgs *packageOwners) {
 	var updatedTestsuites []junitxml.JUnitTestSuite
 
 	for _, suite := range suites.Suites {
@@ -130,10 +140,23 @@ func pruneTESTS(suites *junitxml.JUnitTestSuites) {
 		var updatedTestcaseFailure junitxml.JUnitFailure
 		failflag := false
 		name := suite.Name
+
+		// Inject the owning SIG prefix, if possible.
+		// This has to be done while we still have what
+		// is likely to be the full package name.
+		name = pkgs.addOwner(name)
+
 		regex := regexp.MustCompile(`^(.*?)/([^/]+)/?$`)
 		match := regex.FindStringSubmatch(name)
-		updatedTestcase.Classname = match[1]
-		updatedTestcase.Name = match[2]
+		baseName := match[1]
+		leafName := match[2]
+
+		// testgrid uses suite.Name.
+		// Spyglass/Prow use testcase.Classname.
+		// Therefore we need to update both.
+		suite.Name = baseName
+		updatedTestcase.Classname = baseName
+		updatedTestcase.Name = leafName
 		updatedTestcase.Time = suite.Time
 		updatedSystemOut := ""
 		updatedSystemErr := ""
@@ -207,4 +230,80 @@ func streamXML(writer io.Writer, in *junitxml.JUnitTestSuites) error {
 		return err
 	}
 	return encoder.Flush()
+}
+
+type packageOwners struct {
+	// pkgs maps from import path to directory.
+	pkgs map[string]string
+}
+
+func newPackageOwners(enabled bool) *packageOwners {
+	if !enabled {
+		return nil
+	}
+
+	return &packageOwners{
+		pkgs: make(map[string]string),
+	}
+}
+
+// addOwner takes a package name (= import path, like k8s.io/client-go),
+// tries to look up the source code of the package, and then
+// walks up until it finds an OWNERS file with some sig label.
+// The first sig label found this way is used.
+//
+// If successful, that SIG gets added to the name.
+// If not, the name remains unchanged.
+func (p *packageOwners) addOwner(name string) string {
+	if p == nil {
+		return name
+	}
+
+	dir := p.pkgs[name]
+	if dir == "" {
+		// Look up via `go list`. To invoke it less often,
+		// we also ask for sub-packages and cache the results.
+		// We don't care about errors.
+		//
+		// This is roughly what golang.org/x/tools/go/packages does,
+		// which we can't use here because it would add a new
+		// dependency to k/k.
+		cmd := exec.Command("go", "list", "-f", "{{.ImportPath}}:{{.Dir}}", name+"/...")
+		out, _ := cmd.Output()
+		scanner := bufio.NewScanner(bytes.NewReader(out))
+		for scanner.Scan() {
+			line := scanner.Text()
+			parts := strings.SplitN(line, ":", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			p.pkgs[parts[0]] = parts[1]
+		}
+		dir = p.pkgs[name]
+	}
+
+	// Walk up starting from an absolute path until we cannot go up further.
+	for ; dir != "" && dir != "." && dir != "/"; dir = path.Dir(dir) {
+		data, err := os.ReadFile(path.Join(dir, "OWNERS"))
+		if err != nil {
+			continue
+		}
+		var owners owners
+		if err := yaml.Unmarshal(data, &owners); err != nil {
+			continue
+		}
+		for _, label := range owners.Labels {
+			if strings.HasPrefix(label, "sig/") {
+				// Bingo!
+				return fmt.Sprintf("[sig-%s] %s", label[4:], name)
+			}
+		}
+	}
+
+	return name
+}
+
+// owners contains only fields from https://go.k8s.io/owners that we care about.
+type owners struct {
+	Labels []string `json:"labels"`
 }

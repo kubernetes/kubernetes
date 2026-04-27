@@ -662,13 +662,6 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			framework.Logf("Starting the kubelet")
 			restartKubelet(ctx)
 
-			// wait until the kubelet health check will succeed
-			gomega.Eventually(ctx, func() bool {
-				ok := kubeletHealthCheck(kubeletHealthCheckURL)
-				framework.Logf("kubelet health check at %q value=%v", kubeletHealthCheckURL, ok)
-				return ok
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
-
 			framework.Logf("wait for the pod %v to disappear", pod.Name)
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				err := checkMirrorPodDisappear(ctx, f.ClientSet, pod.Name, pod.Namespace)
@@ -957,7 +950,7 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 			restartKubelet := mustStopKubelet(ctx, f)
 
 			ginkgo.By("stopping all the local containers - using CRI")
-			rs, _, err := getCRIClient()
+			rs, _, err := getCRIClient(ctx)
 			framework.ExpectNoError(err)
 			sandboxes, err := rs.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{})
 			framework.ExpectNoError(err)

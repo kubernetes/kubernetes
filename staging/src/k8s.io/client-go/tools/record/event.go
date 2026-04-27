@@ -408,7 +408,10 @@ func (e *eventBroadcasterImpl) StartEventWatcher(eventHandler func(*v1.Event)) w
 			case <-e.cancelationCtx.Done():
 				watcher.Stop()
 				return
-			case watchEvent := <-watcher.ResultChan():
+			case watchEvent, ok := <-watcher.ResultChan():
+				if !ok {
+					return
+				}
 				event, ok := watchEvent.Object.(*v1.Event)
 				if !ok {
 					// This is all local, so there's no reason this should

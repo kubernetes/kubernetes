@@ -18,6 +18,7 @@ package pods
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -27,6 +28,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -1503,8 +1505,9 @@ func TestRelaxedDNSSearchValidation(t *testing.T) {
 
 func TestNodeDeclaredFeatureAdmission(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.NodeDeclaredFeatures:      true,
-		features.InPlacePodVerticalScaling: true,
+		features.NodeDeclaredFeatures:                    true,
+		features.PodLevelResources:                       true,
+		features.InPlacePodLevelResourcesVerticalScaling: true,
 	})
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
@@ -1519,30 +1522,20 @@ func TestNodeDeclaredFeatureAdmission(t *testing.T) {
 		},
 		Spec: v1.PodSpec{
 			NodeName: nodeName,
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")},
+				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")},
+			},
 			Containers: []v1.Container{
 				{
 					Name:  "test-container",
 					Image: "fakeimage",
-					Resources: v1.ResourceRequirements{
-						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")},
-						Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1"), v1.ResourceMemory: resource.MustParse("1Gi")},
-					},
 				},
 			},
 			RestartPolicy: v1.RestartPolicyAlways,
 		},
 		Status: v1.PodStatus{
 			Phase: v1.PodRunning,
-			ContainerStatuses: []v1.ContainerStatus{
-				{
-					Name:  "test-container",
-					Ready: true,
-					AllocatedResources: v1.ResourceList{
-						v1.ResourceCPU:    resource.MustParse("1"),
-						v1.ResourceMemory: resource.MustParse("1Gi"),
-					},
-				},
-			},
 		},
 	}
 
@@ -1558,19 +1551,19 @@ func TestNodeDeclaredFeatureAdmission(t *testing.T) {
 			nodeDeclaredFeatures: []string{"SomeOtherFeature"},
 			nodeVersion:          "1.35.0",
 			podUpdateFn: func(pod *v1.Pod) {
-				pod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("2")
-				pod.Spec.Containers[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
+				pod.Spec.Resources.Requests[v1.ResourceCPU] = resource.MustParse("2")
+				pod.Spec.Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
 			},
-			expectError: "pod update requires features GuaranteedQoSPodCPUResize which are not available on node",
+			expectError: "pod update requires features InPlacePodLevelResourcesVerticalScaling which are not available on node",
 		},
 
 		{
 			name:                 "admission succeeds when required feature is declared on node",
-			nodeDeclaredFeatures: []string{ipprfeature.GuaranteedQoSPodCPUResize},
+			nodeDeclaredFeatures: []string{ipprfeature.PodLevelResourcesResizeFeature.Name()},
 			nodeVersion:          "1.35.0",
 			podUpdateFn: func(pod *v1.Pod) {
-				pod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse("2")
-				pod.Spec.Containers[0].Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
+				pod.Spec.Resources.Requests[v1.ResourceCPU] = resource.MustParse("2")
+				pod.Spec.Resources.Limits[v1.ResourceCPU] = resource.MustParse("2")
 			},
 			expectError: "",
 		},
@@ -1596,6 +1589,14 @@ func TestNodeDeclaredFeatureAdmission(t *testing.T) {
 				Status: v1.NodeStatus{
 					NodeInfo:         v1.NodeSystemInfo{KubeletVersion: tc.nodeVersion},
 					DeclaredFeatures: tc.nodeDeclaredFeatures,
+					Allocatable: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("12"),
+						v1.ResourceMemory: resource.MustParse("8Gi"),
+					},
+					Capacity: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("12"),
+						v1.ResourceMemory: resource.MustParse("8Gi"),
+					},
 				},
 			}
 			_, err := client.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{})
@@ -1634,6 +1635,128 @@ func TestNodeDeclaredFeatureAdmission(t *testing.T) {
 					t.Errorf("Expected error containing %q, but got no error", tc.expectError)
 				} else if !strings.Contains(err.Error(), tc.expectError) {
 					t.Errorf("Expected error containing %q, but got: %v", tc.expectError, err)
+				}
+			}
+		})
+	}
+}
+
+func TestPodResizeValidation(t *testing.T) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
+	defer server.TearDownFn()
+	client := clientset.NewForConfigOrDie(server.ClientConfig)
+	ns := framework.CreateNamespaceOrDie(client, "pod-resize-validation", t)
+	defer framework.DeleteNamespaceOrDie(client, ns, t)
+
+	ctx := context.Background()
+
+	createNode := func(name string, os string, cpu string, mem string) {
+		node := &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: name,
+				Labels: map[string]string{
+					v1.LabelOSStable: os,
+				},
+			},
+			Status: v1.NodeStatus{
+				Allocatable: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse(cpu),
+					v1.ResourceMemory: resource.MustParse(mem),
+				},
+			},
+		}
+		if _, err := client.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create node %s: %v", name, err)
+		}
+	}
+
+	createNode("linux-node-small", "linux", "2", "2Gi")
+	createNode("windows-node", "windows", "8", "16Gi")
+
+	testPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "test-pod-",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "c1",
+					Image: "pause",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("500m"),
+							v1.ResourceMemory: resource.MustParse("512Mi"),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name            string
+		targetNode      string
+		resizeCPU       string
+		expectError     string
+		expectCauseType string
+	}{
+		{
+			name:       "valid resize on linux node",
+			targetNode: "linux-node-small",
+			resizeCPU:  "1",
+		},
+		{
+			name:            "fail resize exceeding node allocatable",
+			targetNode:      "linux-node-small",
+			resizeCPU:       "4", // Node only has 2
+			expectError:     "node didn't have enough allocatable resources: cpu",
+			expectCauseType: "NodeCapacity",
+		},
+		{
+			name:            "fail resize on non-linux node",
+			targetNode:      "windows-node",
+			resizeCPU:       "1",
+			expectError:     "pod resize is only supported on linux nodes",
+			expectCauseType: "UnsupportedPlatform",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			p := testPod.DeepCopy()
+			p.Spec.NodeName = tc.targetNode
+			pod, err := client.CoreV1().Pods(ns.Name).Create(ctx, p, metav1.CreateOptions{})
+			if err != nil {
+				t.Fatalf("Error creating pod: %v", err)
+			}
+			defer func() {
+				err := client.CoreV1().Pods(ns.Name).Delete(ctx, pod.ObjectMeta.Name, metav1.DeleteOptions{})
+				if err != nil {
+					t.Logf("Failed to delete pod %s: %v", testPod.Name, err)
+				}
+			}()
+
+			pod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = resource.MustParse(tc.resizeCPU)
+			_, err = client.CoreV1().Pods(ns.Name).UpdateResize(ctx, pod.Name, pod, metav1.UpdateOptions{})
+
+			if tc.expectError == "" {
+				if err != nil {
+					t.Errorf("Expected success, got error: %v", err)
+				}
+			} else if err == nil {
+				t.Error("Expected error but got success")
+			} else if !strings.Contains(err.Error(), tc.expectError) {
+				t.Errorf("Expected error containing %q, got: %v", tc.expectError, err)
+			} else {
+				var statusErr *apierrors.StatusError
+				if !errors.As(err, &statusErr) {
+					t.Errorf("Expected a StatusError, got: %v", err)
+				}
+				if len(statusErr.ErrStatus.Details.Causes) == 0 {
+					t.Errorf("Expected error causes, but got none")
+				}
+				if tc.expectCauseType != string(statusErr.ErrStatus.Details.Causes[0].Type) {
+					t.Errorf("Expected cause type %q, got: %v", tc.expectCauseType, statusErr.ErrStatus.Details.Causes[0].Type)
 				}
 			}
 		})

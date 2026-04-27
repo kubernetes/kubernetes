@@ -28,11 +28,11 @@ import (
 func TestPodSyncResult(t *testing.T) {
 	okResults := []*SyncResult{
 		NewSyncResult(StartContainer, "container_0"),
-		NewSyncResult(SetupNetwork, "pod"),
+		NewSyncResult(CreatePodSandbox, "pod"),
 	}
 	errResults := []*SyncResult{
 		NewSyncResult(KillContainer, "container_1"),
-		NewSyncResult(TeardownNetwork, "pod"),
+		NewSyncResult(KillPodSandbox, "pod"),
 	}
 	errResults[0].Fail(errors.New("error_0"), "message_0")
 	errResults[1].Fail(errors.New("error_1"), "message_1")

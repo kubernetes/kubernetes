@@ -31,15 +31,14 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/httpstream"
 	remotecommandconsts "k8s.io/apimachinery/pkg/util/remotecommand"
 	restclient "k8s.io/client-go/rest"
 	remoteclient "k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/transport/spdy"
-	"k8s.io/kubelet/pkg/cri/streaming/remotecommand"
+	"k8s.io/cri-streaming/pkg/streaming/remotecommand"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/streaming/pkg/httpstream"
 )
 
 type fakeExecutor struct {
@@ -56,22 +55,22 @@ type fakeExecutor struct {
 	exec          bool
 }
 
-func (ex *fakeExecutor) ExecInContainer(_ context.Context, name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remoteclient.TerminalSize, timeout time.Duration) error {
+func (ex *fakeExecutor) ExecInContainer(_ context.Context, name string, uid string, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
 	return ex.run(name, uid, container, cmd, in, out, err, tty)
 }
 
-func (ex *fakeExecutor) AttachContainer(_ context.Context, name string, uid types.UID, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remoteclient.TerminalSize) error {
+func (ex *fakeExecutor) AttachContainer(_ context.Context, name string, uid string, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
 	return ex.run(name, uid, container, nil, in, out, err, tty)
 }
 
-func (ex *fakeExecutor) run(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error {
+func (ex *fakeExecutor) run(name string, uid string, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error {
 	ex.command = cmd
 	ex.tty = tty
 
 	if e, a := "pod", name; e != a {
 		ex.t.Errorf("%s: pod: expected %q, got %q", ex.testName, e, a)
 	}
-	if e, a := "uid", uid; e != string(a) {
+	if e, a := "uid", uid; e != a {
 		ex.t.Errorf("%s: uid: expected %q, got %q", ex.testName, e, a)
 	}
 	if ex.exec {
@@ -339,7 +338,7 @@ func TestDial(t *testing.T) {
 			Body:       io.NopCloser(&bytes.Buffer{}),
 		},
 	}
-	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: upgrader}, "POST", &url.URL{Host: "something.com", Scheme: "https"})
+	dialer := spdy.NewDialerForStreaming(spdy.NewUpgraderForStreaming(upgrader), &http.Client{Transport: upgrader}, "POST", &url.URL{Host: "something.com", Scheme: "https"})
 	conn, protocol, err := dialer.Dial("protocol1")
 	if err != nil {
 		t.Fatal(err)

@@ -51,10 +51,11 @@ const (
 	initialRetryDelay = 30 * time.Second
 	retryDelay        = 3 * time.Minute
 
-	TriggerReasonPodResized  = "pod_resized"
-	TriggerReasonPodUpdated  = "pod_updated"
-	TriggerReasonPodsAdded   = "pods_added"
-	TriggerReasonPodsRemoved = "pods_removed"
+	TriggerReasonPodResized    = "pod_resized"
+	TriggerReasonPodUpdated    = "pod_updated"
+	TriggerReasonPodsAdded     = "pods_added"
+	TriggerReasonPodsRemoved   = "pods_removed"
+	TriggerReasonPodTerminated = "pod_terminated"
 
 	triggerReasonPeriodic = "periodic_retry"
 )
@@ -496,16 +497,12 @@ func allocationFromPod(pod *v1.Pod) state.PodResourceInfo {
 		podAlloc.PodLevelResources = pod.Spec.Resources.DeepCopy()
 	}
 	podAlloc.ContainerResources = make(map[string]v1.ResourceRequirements)
-	for _, container := range pod.Spec.Containers {
+	for container, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+		if !IsResizableContainer(container, containerType) {
+			continue
+		}
 		alloc := *container.Resources.DeepCopy()
 		podAlloc.ContainerResources[container.Name] = alloc
-	}
-
-	for _, container := range pod.Spec.InitContainers {
-		if podutil.IsRestartableInitContainer(&container) {
-			alloc := *container.Resources.DeepCopy()
-			podAlloc.ContainerResources[container.Name] = alloc
-		}
 	}
 
 	return podAlloc
@@ -586,7 +583,7 @@ func (m *manager) handlePodResourcesResize(logger klog.Logger, pod *v1.Pod) (boo
 		m.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
 
 		msg := events.PodResizeStartedMsg(logger, pod, pod.Generation)
-		m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeNormal, events.ResizeStarted, msg)
+		m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeNormal, events.ResizeStarted, "%s", msg)
 		return true, nil
 	}
 
@@ -597,7 +594,7 @@ func (m *manager) handlePodResourcesResize(logger klog.Logger, pod *v1.Pod) (boo
 				eventType = events.ResizeInfeasible
 			}
 			msg := events.PodResizePendingMsg(logger, pod, reason, message, pod.Generation)
-			m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, eventType, msg)
+			m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, eventType, "%s", msg)
 		}
 	}
 
@@ -642,7 +639,7 @@ func (m *manager) getAllocatedPods(activePods []*v1.Pod) []*v1.Pod {
 func IsResizableContainer(container *v1.Container, containerType podutil.ContainerType) bool {
 	switch containerType {
 	case podutil.InitContainers:
-		return podutil.IsRestartableInitContainer(container)
+		return utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingInitContainers) || podutil.IsRestartableInitContainer(container)
 	case podutil.Containers:
 		return true
 	default:

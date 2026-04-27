@@ -54,7 +54,7 @@ var (
 )
 
 // NewCmdRollout returns a Command instance for 'rollout' sub command
-func NewCmdRollout(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
+func NewCmdRollout(parent string, f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "rollout SUBCOMMAND",
 		DisableFlagsInUseLine: true,
@@ -67,7 +67,7 @@ func NewCmdRollout(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra
 	cmd.AddCommand(NewCmdRolloutHistory(f, streams))
 	cmd.AddCommand(NewCmdRolloutPause(f, streams))
 	cmd.AddCommand(NewCmdRolloutResume(f, streams))
-	cmd.AddCommand(NewCmdRolloutUndo(f, streams))
+	cmd.AddCommand(NewCmdRolloutUndo(parent, f, streams))
 	cmd.AddCommand(NewCmdRolloutStatus(f, streams))
 	cmd.AddCommand(NewCmdRolloutRestart(f, streams))
 

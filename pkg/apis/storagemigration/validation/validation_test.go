@@ -296,18 +296,6 @@ func TestValidateStorageVersionMigrationStatusUpdate(t *testing.T) {
 			errorSubstring: "Both success and failed conditions cannot be true at the same time",
 		},
 		{
-			name:           "invalid: both succeeded and running are true",
-			newSVM:         newTestSVM("123", succeededCond, runningCond),
-			oldSVM:         newTestSVM("123", runningCond),
-			errorSubstring: "Running condition cannot be true when success condition is true",
-		},
-		{
-			name:           "invalid: both failed and running are true",
-			newSVM:         newTestSVM("123", failedCond, runningCond),
-			oldSVM:         newTestSVM("123", runningCond),
-			errorSubstring: "Running condition cannot be true when failed condition is true",
-		},
-		{
 			name:           "invalid: succeeded changed from true to false",
 			newSVM:         newTestSVM("123", succeededFalseCond),
 			oldSVM:         newTestSVM("123", succeededCond),

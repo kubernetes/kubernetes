@@ -231,8 +231,10 @@ func TestNodeSyncResync(t *testing.T) {
 	fake := &fakeAPIs{
 		nodeRet:       nodeWithCIDRRange,
 		resyncTimeout: time.Millisecond,
-		reportChan:    make(chan struct{}),
-		logger:        logger,
+		// Allow one extra resync notification to land while the test is
+		// closing the loop down.
+		reportChan: make(chan struct{}, 1),
+		logger:     logger,
 	}
 	cidr, _ := cidrset.NewCIDRSet(clusterCIDRRange, 24)
 	sync := New(fake, fake, fake, SyncFromCluster, "node1", cidr)

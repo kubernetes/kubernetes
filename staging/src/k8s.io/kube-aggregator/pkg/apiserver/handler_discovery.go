@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints"
 	discoveryendpoint "k8s.io/apiserver/pkg/endpoints/discovery/aggregated"
@@ -52,6 +51,12 @@ var APIRegistrationGroupVersion metav1.GroupVersion = metav1.GroupVersion{Group:
 // Maximum is 20000. Set to higher than that so apiregistration always is listed
 // first (mirrors v1 discovery behavior)
 var APIRegistrationGroupPriority int = 20001
+
+// discoveryRefreshInterval is the interval at which the discovery manager
+// re-fetches discovery documents from aggregated API servers to detect changes.
+// This also caps the exponential backoff for failed fetches, so retries never
+// wait longer than the normal refresh period.
+const discoveryRefreshInterval = 1 * time.Minute
 
 // Aggregated discovery content-type GVK.
 var v2Beta1GVK = schema.GroupVersionKind{
@@ -199,7 +204,7 @@ func NewDiscoveryManager(
 		apiServices:            make(map[string]groupVersionInfo),
 		cachedResults:          make(map[serviceKey]cachedResult),
 		dirtyAPIServiceQueue: workqueue.NewTypedRateLimitingQueueWithConfig(
-			workqueue.DefaultTypedControllerRateLimiter[string](),
+			workqueue.NewTypedItemExponentialFailureRateLimiter[string](500*time.Millisecond, discoveryRefreshInterval),
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "discovery-manager"},
 		),
 		codecs: codecs,
@@ -432,7 +437,10 @@ func (dm *discoveryManager) syncAPIService(apiServiceName string) error {
 
 	dm.mergedDiscoveryHandler.AddGroupVersion(gv.Group, entry)
 	dm.mergedDiscoveryHandler.SetGroupVersionPriority(metav1.GroupVersion(gv), info.groupPriority, info.versionPriority)
-	return nil
+	// Return the error so the worker retries with backoff. The stale entry
+	// is already added above, so discovery reflects the current state while
+	// we wait for the service to become reachable.
+	return err
 }
 
 func (dm *discoveryManager) getAPIServiceKeys() []string {
@@ -496,26 +504,17 @@ func (dm *discoveryManager) Run(stopCh <-chan struct{}, discoverySyncedCh chan<-
 						dm.dirtyAPIServiceQueue.AddRateLimited(next)
 					} else {
 						dm.dirtyAPIServiceQueue.Forget(next)
+						// Re-enqueue after the refresh interval to pick up changes
+						// in the aggregated server's discovery document.
+						dm.markDirty(next)
+						dm.dirtyAPIServiceQueue.AddAfter(next, discoveryRefreshInterval)
 					}
 				}()
 			}
 		}()
 	}
 
-	wait.PollUntil(1*time.Minute, func() (done bool, err error) {
-		dm.servicesLock.Lock()
-		defer dm.servicesLock.Unlock()
-
-		now := time.Now()
-
-		// Mark all non-local APIServices as dirty
-		for key, info := range dm.apiServices {
-			info.lastMarkedDirty = now
-			dm.apiServices[key] = info
-			dm.dirtyAPIServiceQueue.Add(key)
-		}
-		return false, nil
-	}, stopCh)
+	<-stopCh
 }
 
 // Takes a snapshot of all currently used services by known APIServices and
@@ -602,6 +601,15 @@ func (dm *discoveryManager) getInfoForAPIService(name string) (groupVersionInfo,
 
 	result, ok := dm.apiServices[name]
 	return result, ok
+}
+
+func (dm *discoveryManager) markDirty(name string) {
+	dm.servicesLock.Lock()
+	defer dm.servicesLock.Unlock()
+	if info, exists := dm.apiServices[name]; exists {
+		info.lastMarkedDirty = time.Now()
+		dm.apiServices[name] = info
+	}
 }
 
 func (dm *discoveryManager) setInfoForAPIService(name string, result *groupVersionInfo) (oldValueIfExisted *groupVersionInfo) {

@@ -36,12 +36,14 @@ func NewMaxResourceSlices() map[string]*resourceapi.ResourceSlice {
 		"basic":                             newBasicResourceSlice(resourceapi.ResourceSliceMaxDevices),
 		"with-taints-and-consumes-counters": newResourceSliceWithTaintsAndConsumesCounters(),
 		"with-shared-counters":              newSharedCountersResourceSlice(),
+		"with-list-values":                  newResourceSliceWithListValues(),
+		"with-taints-and-consumes-counters-and-list-values": newResourceSliceWithTaintsAndConsumesCountersAndListValues(),
 	}
 	return slices
 }
 
 func newResourceSliceWithTaintsAndConsumesCounters() *resourceapi.ResourceSlice {
-	slice := newBasicResourceSlice(resourceapi.ResourceSliceMaxDevicesWithTaintsOrConsumesCounters)
+	slice := newBasicResourceSlice(resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures)
 	for i := range slice.Spec.Devices {
 		for range resourceapi.DeviceTaintsMaxLength {
 			slice.Spec.Devices[i].Taints = append(slice.Spec.Devices[i].Taints,
@@ -119,6 +121,36 @@ func newSharedCountersResourceSlice() *resourceapi.ResourceSlice {
 	}
 	slice.Spec.SharedCounters = counterSets
 	return slice
+}
+
+func newResourceSliceWithListValues() *resourceapi.ResourceSlice {
+	slice := newBasicResourceSlice(resourceapi.ResourceSliceMaxDevicesWithAdvancedFeatures)
+	addListValues(slice)
+	return slice
+}
+
+func newResourceSliceWithTaintsAndConsumesCountersAndListValues() *resourceapi.ResourceSlice {
+	slice := newResourceSliceWithTaintsAndConsumesCounters()
+	addListValues(slice)
+	return slice
+}
+
+func addListValues(slice *resourceapi.ResourceSlice) {
+	for i, device := range slice.Spec.Devices {
+		// Make each attribute a list of strings (adds some encoding overhead).
+		// The first list gets as many additional strings as allowed by the overall value limit.
+		numAdditionalValues := resourceapi.ResourceSliceMaxAttributeValuesPerDevice - resourceapi.ResourceSliceMaxAttributesAndCapacitiesPerDevice
+		for k, v := range device.Attributes {
+			v.StringValues = []string{*v.StringValue}
+			v.StringValue = nil
+			for range numAdditionalValues {
+				v.StringValues = append(v.StringValues, v.StringValues[0])
+			}
+			numAdditionalValues = 0
+			device.Attributes[k] = v
+		}
+		slice.Spec.Devices[i] = device
+	}
 }
 
 func commonResourceSlice() *resourceapi.ResourceSlice {

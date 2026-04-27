@@ -283,6 +283,11 @@ func (le *LeaderElector) renew(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	wait.UntilWithContext(ctx, func(ctx context.Context) {
 		err := wait.PollUntilContextTimeout(ctx, le.config.RetryPeriod, le.config.RenewDeadline, true, func(ctx context.Context) (done bool, err error) {
+			// PollUntilContextTimeout invokes condition even when the context is canceled when immediate=true.
+			// Short-circuit this to prevent unnecessary processing and error log messages.
+			if err := ctx.Err(); err != nil {
+				return false, err
+			}
 			if !le.config.Coordinated {
 				return le.tryAcquireOrRenew(ctx), nil
 			} else {
@@ -446,7 +451,7 @@ func (le *LeaderElector) tryAcquireOrRenew(ctx context.Context) bool {
 			le.setObservedRecord(&leaderElectionRecord)
 			return true
 		}
-		logger.Error(err, "Failed to update lease optimistically, falling back to slow path", "lock", le.config.Lock.Describe())
+		logger.V(2).Info("Failed to update lease optimistically, falling back to slow path", "lock", le.config.Lock.Describe(), "err", err)
 	}
 
 	// 2. obtain or create the ElectionRecord

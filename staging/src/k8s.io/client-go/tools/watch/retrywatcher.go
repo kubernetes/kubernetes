@@ -166,6 +166,13 @@ func (rw *RetryWatcher) doReceive(ctx context.Context) (bool, time.Duration) {
 			return true, 0
 		}
 
+		// Resource expired or 410 Gone errors (e.g. resource version too old)
+		// are expected and recoverable, so log at a lower verbosity instead of ERROR.
+		if apierrors.IsResourceExpired(err) || apierrors.IsGone(err) {
+			klog.FromContext(ctx).V(4).Info(msg, "err", err)
+			return false, 0
+		}
+
 		klog.FromContext(ctx).Error(err, msg)
 		// Retry
 		return false, 0

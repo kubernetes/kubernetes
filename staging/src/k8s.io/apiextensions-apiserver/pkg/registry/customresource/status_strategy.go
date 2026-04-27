@@ -56,6 +56,7 @@ func (a statusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set
 			// we might need a mechanism that is the inverse of resetFields where
 			// you specify only the fields to be kept rather than the fields to be wiped
 			// that way you could wipe everything but the status in this case.
+			fieldpath.MakePathOrDie("metadata"),
 			fieldpath.MakePathOrDie("spec"),
 		),
 	}

@@ -64,7 +64,7 @@ func CreateServiceSpec(serviceName, externalName string, isHeadless bool, select
 func UpdateService(ctx context.Context, c clientset.Interface, namespace, serviceName string, update func(*v1.Service)) (*v1.Service, error) {
 	var service *v1.Service
 	var err error
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		service, err = c.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{})
 		if err != nil {
 			return service, err

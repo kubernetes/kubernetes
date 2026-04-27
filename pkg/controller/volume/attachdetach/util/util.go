@@ -178,7 +178,7 @@ func getPVSpecFromCache(name string, pvcReadOnly bool, expectedClaimUID types.UI
 
 // DetermineVolumeAction returns true if volume and pod needs to be added to dswp
 // and it returns false if volume and pod needs to be removed from dswp
-func DetermineVolumeAction(pod *v1.Pod, desiredStateOfWorld cache.DesiredStateOfWorld, defaultAction bool) bool {
+func DetermineVolumeAction(pod *v1.Pod, defaultAction bool) bool {
 	if pod == nil || len(pod.Spec.Volumes) <= 0 {
 		return defaultAction
 	}

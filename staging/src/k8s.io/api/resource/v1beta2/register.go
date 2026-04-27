@@ -46,6 +46,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&DeviceClass{},
 		&DeviceClassList{},
+		&DeviceTaintRule{},
+		&DeviceTaintRuleList{},
 		&ResourceClaim{},
 		&ResourceClaimList{},
 		&ResourceClaimTemplate{},

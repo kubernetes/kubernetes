@@ -1074,7 +1074,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			deviceNames := make([]string, numPods)
 
 			ginkgo.By(fmt.Sprintf("Creating %d pods concurrently to stress test connection management", numPods))
-			for i := 0; i < numPods; i++ {
+			for i := range numPods {
 				className := fmt.Sprintf("concurrent-class-%d", i)
 				claimNames[i] = fmt.Sprintf("concurrent-claim-%d", i)
 				podName := fmt.Sprintf("concurrent-pod-%d", i)
@@ -1097,7 +1097,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 				"NodePrepareResources should be called at least once per pod")
 
 			ginkgo.By("Sending health updates for all devices concurrently")
-			for i := 0; i < numPods; i++ {
+			for i := range numPods {
 				kubeletPlugin.HealthControlChan <- testdriver.DeviceHealthUpdate{
 					PoolName:   poolNames[i],
 					DeviceName: deviceNames[i],
@@ -1106,7 +1106,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			}
 
 			ginkgo.By("Verifying all health updates are correctly reflected")
-			for i := 0; i < numPods; i++ {
+			for i := range numPods {
 				pod := pods[i]
 				poolName := poolNames[i]
 				deviceName := deviceNames[i]
@@ -1119,7 +1119,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			}
 
 			ginkgo.By("Changing health status for all devices to verify continued operation")
-			for i := 0; i < numPods; i++ {
+			for i := range numPods {
 				kubeletPlugin.HealthControlChan <- testdriver.DeviceHealthUpdate{
 					PoolName:   poolNames[i],
 					DeviceName: deviceNames[i],
@@ -1128,7 +1128,7 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), feature.Dynami
 			}
 
 			ginkgo.By("Verifying all health changes are correctly reflected")
-			for i := 0; i < numPods; i++ {
+			for i := range numPods {
 				pod := pods[i]
 				poolName := poolNames[i]
 				deviceName := deviceNames[i]

@@ -63,25 +63,29 @@ var ExtensionPoints = []string{
 	Unreserve,
 	Permit,
 	Sign,
+	PlacementGenerate,
 }
 
 const (
-	PreFilter                   = "PreFilter"
-	Filter                      = "Filter"
-	PreFilterExtensionAddPod    = "PreFilterExtensionAddPod"
-	PreFilterExtensionRemovePod = "PreFilterExtensionRemovePod"
-	PostFilter                  = "PostFilter"
-	PreScore                    = "PreScore"
-	Score                       = "Score"
-	ScoreExtensionNormalize     = "ScoreExtensionNormalize"
-	PreBind                     = "PreBind"
-	PreBindPreFlight            = "PreBindPreFlight"
-	Bind                        = "Bind"
-	PostBind                    = "PostBind"
-	Reserve                     = "Reserve"
-	Unreserve                   = "Unreserve"
-	Permit                      = "Permit"
-	Sign                        = "Sign"
+	PreFilter                        = "PreFilter"
+	Filter                           = "Filter"
+	PreFilterExtensionAddPod         = "PreFilterExtensionAddPod"
+	PreFilterExtensionRemovePod      = "PreFilterExtensionRemovePod"
+	PostFilter                       = "PostFilter"
+	PreScore                         = "PreScore"
+	Score                            = "Score"
+	ScoreExtensionNormalize          = "ScoreExtensionNormalize"
+	PreBind                          = "PreBind"
+	PreBindPreFlight                 = "PreBindPreFlight"
+	Bind                             = "Bind"
+	PostBind                         = "PostBind"
+	Reserve                          = "Reserve"
+	Unreserve                        = "Unreserve"
+	Permit                           = "Permit"
+	Sign                             = "Sign"
+	PlacementGenerate                = "PlacementGenerate"
+	PlacementScore                   = "PlacementScore"
+	PlacementScoreExtensionNormalize = "PlacementScoreExtensionNormalize"
 )
 
 const (
@@ -113,6 +117,14 @@ const (
 	BatchFlushPodNotBatchable = "pod_not_batchable"
 )
 
+// DRADeviceBindingConditions status labels
+const (
+	BindingConditionsStatusSuccess = "success"
+	BindingConditionsStatusFailed  = "failure"
+	BindingConditionsStatusTimeout = "timeout"
+	BindingConditionsStatusError   = "error"
+)
+
 // All the histogram based metrics have 1ms as size for the smallest bucket.
 var (
 	scheduleAttempts             *metrics.CounterVec
@@ -140,7 +152,6 @@ var (
 	unschedulableReasons  *metrics.GaugeVec
 	PluginEvaluationTotal *metrics.CounterVec
 
-	// The below two are only available when the QHint feature gate is enabled.
 	queueingHintExecutionDuration *metrics.HistogramVec
 	SchedulerQueueIncomingPods    *metrics.CounterVec
 
@@ -159,6 +170,9 @@ var (
 	podGroupScheduleAttempts           *metrics.CounterVec
 	podGroupSchedulingLatency          *metrics.HistogramVec
 	PodGroupSchedulingAlgorithmLatency *metrics.Histogram
+	// The below are only available when the DRADeviceBindingConditions feature gate is enabled.
+	DRABindingConditionsAllocationsTotal *metrics.CounterVec
+	DRABindingConditionsPreBindDuration  *metrics.HistogramVec
 
 	// metricsList is a list of all metrics that should be registered always, regardless of any feature gate's value.
 	metricsList []metrics.Registerable
@@ -174,9 +188,6 @@ func Register() {
 		RegisterMetrics(metricsList...)
 		volumebindingmetrics.RegisterVolumeSchedulingMetrics()
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
-			RegisterMetrics(queueingHintExecutionDuration, InFlightEvents)
-		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerAsyncPreemption) {
 			RegisterMetrics(PreemptionGoroutinesDuration, PreemptionGoroutinesExecutionTotal)
 		}
@@ -195,6 +206,12 @@ func Register() {
 				podGroupScheduleAttempts,
 				podGroupSchedulingLatency,
 				PodGroupSchedulingAlgorithmLatency,
+			)
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceBindingConditions) {
+			RegisterMetrics(
+				DRABindingConditionsAllocationsTotal,
+				DRABindingConditionsPreBindDuration,
 			)
 		}
 	})
@@ -271,7 +288,7 @@ func InitMetrics() {
 			Subsystem:      SchedulerSubsystem,
 			Name:           "goroutines",
 			Help:           "Number of running goroutines split by the work they do such as binding.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		}, []string{"operation"})
 	BatchAttemptStats = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -339,7 +356,6 @@ func InitMetrics() {
 		},
 		[]string{"plugin", "extension_point", "status"})
 
-	// This is only available when the QHint feature gate is enabled.
 	queueingHintExecutionDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem: SchedulerSubsystem,
@@ -366,7 +382,7 @@ func InitMetrics() {
 			Name:           "permit_wait_duration_seconds",
 			Help:           "Duration of waiting on permit.",
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"result"})
 
@@ -383,7 +399,7 @@ func InitMetrics() {
 			Subsystem:      SchedulerSubsystem,
 			Name:           "unschedulable_pods",
 			Help:           "The number of unschedulable pods broken down by plugin name. A pod will increment the gauge for all plugins that caused it to not schedule and so this metric have meaning only when broken down by plugin.",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		}, []string{"plugin", "profile"})
 
 	PluginEvaluationTotal = metrics.NewCounterVec(
@@ -391,7 +407,7 @@ func InitMetrics() {
 			Subsystem:      SchedulerSubsystem,
 			Name:           "plugin_evaluation_total",
 			Help:           "Number of attempts to schedule pods by each plugin and the extension point (available only in PreFilter, Filter, PreScore, and Score).",
-			StabilityLevel: metrics.ALPHA,
+			StabilityLevel: metrics.BETA,
 		}, []string{"plugin", "extension_point", "profile"})
 
 	PreemptionGoroutinesDuration = metrics.NewHistogramVec(
@@ -450,6 +466,27 @@ func InitMetrics() {
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"status"})
+
+	DRABindingConditionsAllocationsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "dra_bindingconditions_allocations_total",
+			Help:           "Number of allocations using devices with BindingConditions, counted per driver per scheduling attempt",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"profile", "driver", "status"},
+	)
+
+	DRABindingConditionsPreBindDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "dra_bindingconditions_wait_duration_seconds",
+			Help:           "Time in seconds spent waiting for BindingConditions to be satisfied during PreBind.",
+			Buckets:        metrics.ExponentialBuckets(0.1, 2, 14),
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"profile", "driver", "status"},
+	)
 
 	GetNodeHintDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
@@ -521,6 +558,8 @@ func InitMetrics() {
 		BatchCacheFlushed,
 		GetNodeHintDuration,
 		StoreScheduleResultsDuration,
+		queueingHintExecutionDuration,
+		InFlightEvents,
 	}
 }
 

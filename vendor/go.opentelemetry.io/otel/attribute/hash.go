@@ -27,6 +27,7 @@ const (
 	int64SliceID   uint64 = 3762322556277578591 // "_[]int64" (little endian)
 	float64SliceID uint64 = 7308324551835016539 // "[]double" (little endian)
 	stringSliceID  uint64 = 7453010373645655387 // "[]string" (little endian)
+	emptyID        uint64 = 7305809155345288421 // "__empty_" (little endian)
 )
 
 // hashKVs returns a new xxHash64 hash of kvs.
@@ -80,7 +81,8 @@ func hashKV(h xxhash.Hash, kv KeyValue) xxhash.Hash {
 		for i := 0; i < rv.Len(); i++ {
 			h = h.String(rv.Index(i).String())
 		}
-	case INVALID:
+	case EMPTY:
+		h = h.Uint64(emptyID)
 	default:
 		// Logging is an alternative, but using the internal logger here
 		// causes an import cycle so it is not done.

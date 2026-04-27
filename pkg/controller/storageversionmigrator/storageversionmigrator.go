@@ -262,18 +262,7 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		return fmt.Errorf("GC cache is not up to date, requeuing to attempt again. gcListResourceVersion: %s, listResourceVersion: %s", gcListResourceVersion, listResourceVersion)
 	}
 
-	toBeProcessedSVM, err = svmc.kubeClient.StoragemigrationV1beta1().
-		StorageVersionMigrations().
-		UpdateStatus(
-			ctx,
-			setStatusConditions(toBeProcessedSVM, svmv1beta1.MigrationRunning, migrationRunningStatusReason, ""),
-			metav1.UpdateOptions{},
-		)
-	if err != nil {
-		return err
-	}
-
-	err, failedMigration := svmc.runMigration(ctx, logger, *gvr, resourceMonitor, toBeProcessedSVM, listResourceVersion)
+	err, failedMigration := svmc.runMigration(ctx, *gvr, resourceMonitor, toBeProcessedSVM, listResourceVersion)
 	if err != nil {
 		return err
 	}
@@ -296,11 +285,12 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 	return nil
 }
 
-func (svmc *SVMController) runMigration(ctx context.Context, logger klog.Logger, gvr schema.GroupVersionResource, resourceMonitor *garbagecollector.Monitor, toBeProcessedSVM *svmv1beta1.StorageVersionMigration, listResourceVersion string) (err error, failed bool) {
+func (svmc *SVMController) runMigration(ctx context.Context, gvr schema.GroupVersionResource, resourceMonitor *garbagecollector.Monitor, toBeProcessedSVM *svmv1beta1.StorageVersionMigration, listResourceVersion string) (err error, failed bool) {
 	gvk, err := svmc.restMapper.KindFor(gvr)
 	if err != nil {
 		return svmc.failMigration(ctx, toBeProcessedSVM, err), true
 	}
+	logger := klog.FromContext(ctx)
 	for _, obj := range resourceMonitor.Store.List() {
 		accessor, err := meta.Accessor(obj)
 		if err != nil {

@@ -468,14 +468,14 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	s.installReadyz()
 
 	componentName := "apiserver"
-	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
-		statusz.Install(s.Handler.NonGoRestfulMux, componentName, statusz.NewRegistry(s.EffectiveVersion, statusz.WithListedPaths(s.ListedPaths())))
-	}
-
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
 		if s.Flagz != nil {
 			flagz.Install(s.Handler.NonGoRestfulMux, componentName, s.Flagz)
 		}
+	}
+	// statusz is installed last so that it can list all the paths that have been registered
+	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentStatusz) {
+		statusz.Install(s.Handler.NonGoRestfulMux, componentName, statusz.NewRegistry(s.EffectiveVersion, statusz.WithListedPaths(s.ListedPaths())))
 	}
 
 	return preparedGenericAPIServer{s}

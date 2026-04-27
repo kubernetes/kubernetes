@@ -51,4 +51,12 @@ func Test(t *testing.T) {
 	st.Value(&Struct{}).OldValue(&Struct{}).ExpectValid()
 	st.Value(&Struct{M1: &M1{}, M2: &M2{}}).OldValue(&Struct{M1: &M1{}, M2: &M2{}}).ExpectValid()
 	st.Value(&Struct{M3: "a string", M2: &M2{}}).OldValue(&Struct{M3: "different string", M2: &M2{}}).ExpectValid()
+
+	// Test update with nil old value (simulates new map entry added during update).
+	// Empty union is still valid for zeroOrOneOf, even with nil old value.
+	st.Value(&Struct{}).OldValue((*Struct)(nil)).ExpectValid()
+	// Multiple members set should still be caught even with nil old value.
+	st.Value(&Struct{M1: &M1{}, M2: &M2{}}).OldValue((*Struct)(nil)).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
+		field.Invalid(nil, nil, "must specify at most one of").WithOrigin("zeroOrOneOf"),
+	})
 }

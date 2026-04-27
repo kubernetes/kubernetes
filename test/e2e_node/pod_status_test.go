@@ -18,6 +18,7 @@ package e2enode
 
 import (
 	"context"
+
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
@@ -81,7 +82,7 @@ var _ = SIGDescribe(framework.WithSerial(), "Pods status phase", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Getting the current pod sandbox ID")
-		rs, _, err := getCRIClient()
+		rs, _, err := getCRIClient(ctx)
 		framework.ExpectNoError(err)
 		sandboxes, err := rs.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{
 			LabelSelector: podLabels,
@@ -105,9 +106,6 @@ var _ = SIGDescribe(framework.WithSerial(), "Pods status phase", func() {
 
 		ginkgo.By("Starting the kubelet")
 		startKubelet(ctx)
-		gomega.Eventually(ctx, func() bool {
-			return kubeletHealthCheck(kubeletHealthCheckURL)
-		}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("kubelet should be started"))
 
 		ginkgo.By("Waiting for the regular init container to be started after the node reboot")
 		err = e2epod.WaitForPodInitContainerStarted(ctx, f.ClientSet, pod.Namespace, pod.Name, 0, f.Timeouts.PodStart)

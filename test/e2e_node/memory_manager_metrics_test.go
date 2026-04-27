@@ -79,8 +79,21 @@ var _ = SIGDescribe("Memory Manager Metrics", framework.WithSerial(), feature.Me
 				updateKubeletConfig(ctx, f, oldCfg, true)
 			})
 
-			count := printAllPodsOnNode(ctx, f.ClientSet, framework.TestContext.NodeName)
-			gomega.Expect(count).To(gomega.BeZero(), "unexpected pods on %q, please check output above", framework.TestContext.NodeName)
+			// Wait for pods from previous serial tests to finish terminating.
+			// Framework namespace deletion is async, and the kubelet restart
+			// above can delay in-flight pod cleanup. Poll instead of asserting
+			// immediately so we don't flake on test ordering.
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				count, err := printAllPodsOnNode(ctx, f.ClientSet, framework.TestContext.NodeName)
+				if err != nil {
+					return err
+				}
+				if count != 0 {
+					return fmt.Errorf("unexpected pods on %q: %d still present", framework.TestContext.NodeName, count)
+				}
+				return nil
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(
+				gomega.Succeed(), "unexpected pods on %q, please check output above", framework.TestContext.NodeName)
 		})
 
 		ginkgo.It("should report zero pinning counters after a fresh restart", func(ctx context.Context) {
@@ -160,7 +173,8 @@ var _ = SIGDescribe("Memory Manager Metrics", framework.WithSerial(), feature.Me
 				}),
 			)
 
-			printAllPodsOnNode(ctx, f.ClientSet, framework.TestContext.NodeName)
+			_, err := printAllPodsOnNode(ctx, f.ClientSet, framework.TestContext.NodeName)
+			framework.ExpectNoError(err)
 
 			// we updated the kubelet config in BeforeEach, so we can assume we start fresh.
 			// being [Serial], we can also assume noone else but us is running pods.
@@ -213,7 +227,7 @@ func validateMetrics(values e2emetrics.KubeletMetrics, totalKey, errorKey string
 
 // printAllPodsOnNode outputs status of all kubelet pods into log.
 // Note considering the e2e_node environment we will always have exactly 1 node, but still.
-func printAllPodsOnNode(ctx context.Context, c clientset.Interface, nodeName string) int {
+func printAllPodsOnNode(ctx context.Context, c clientset.Interface, nodeName string) (int, error) {
 	nodeSelector := fields.Set{
 		"spec.nodeName": nodeName,
 	}.AsSelector().String()
@@ -223,7 +237,7 @@ func printAllPodsOnNode(ctx context.Context, c clientset.Interface, nodeName str
 	})
 	if err != nil {
 		framework.Logf("Unable to retrieve pods for node %v: %v", nodeName, err)
-		return 0
+		return 0, err
 	}
 	count := 0
 	framework.Logf("begin listing pods: %d found", len(podList.Items))
@@ -237,5 +251,5 @@ func printAllPodsOnNode(ctx context.Context, c clientset.Interface, nodeName str
 		count++
 	}
 	framework.Logf("end listing pods: %d found", len(podList.Items))
-	return count
+	return count, nil
 }

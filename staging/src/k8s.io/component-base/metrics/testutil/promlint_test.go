@@ -19,6 +19,8 @@ package testutil
 import (
 	"strings"
 	"testing"
+
+	"github.com/prometheus/client_golang/prometheus/testutil/promlint"
 )
 
 func TestLinter(t *testing.T) {
@@ -98,6 +100,71 @@ func TestMergeProblems(t *testing.T) {
 			got := mergeProblems(tc.problems)
 			if tc.expected != got {
 				t.Errorf("expected: %s, but got: %s", tc.expected, got)
+			}
+		})
+	}
+}
+
+func TestCheckUnusedExceptions(t *testing.T) {
+	// Save original exceptionMetrics
+	origExceptions := exceptionMetrics
+	defer func() { exceptionMetrics = origExceptions }()
+
+	// Set a controlled list for testing
+	exceptionMetrics = []string{"test_metric_1", "test_metric_2"}
+
+	var tests = []struct {
+		name        string
+		problems    []promlint.Problem
+		expectError bool
+		errorStr    string
+	}{
+		{
+			name: "all exceptions used",
+			problems: []promlint.Problem{
+				{Metric: "test_metric_1", Text: "some error"},
+				{Metric: "test_metric_2", Text: "some error"},
+			},
+			expectError: false,
+		},
+		{
+			name: "one exception unused",
+			problems: []promlint.Problem{
+				{Metric: "test_metric_1", Text: "some error"},
+			},
+			expectError: true,
+			errorStr:    "metrics in exception list but have no violations: test_metric_2",
+		},
+		{
+			name:        "all exceptions unused",
+			problems:    []promlint.Problem{},
+			expectError: true,
+			errorStr:    "metrics in exception list but have no violations: test_metric_1, test_metric_2",
+		},
+		{
+			name: "problems not in exception list are ignored in this check",
+			problems: []promlint.Problem{
+				{Metric: "test_metric_1", Text: "some error"},
+				{Metric: "test_metric_2", Text: "some error"},
+				{Metric: "some_other_metric", Text: "some error"},
+			},
+			expectError: false,
+		},
+	}
+
+	for _, test := range tests {
+		tc := test
+		t.Run(tc.name, func(t *testing.T) {
+			err := CheckUnusedExceptions(tc.problems)
+			if tc.expectError {
+				if err == nil {
+					t.Fatalf("expected error but got nil")
+				}
+				if err.Error() != tc.errorStr {
+					t.Fatalf("expected error: %s, but got: %s", tc.errorStr, err.Error())
+				}
+			} else if err != nil {
+				t.Fatalf("unexpected error: %v", err)
 			}
 		})
 	}

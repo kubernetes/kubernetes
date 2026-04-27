@@ -26,9 +26,8 @@ import (
 
 // listener allows for testing of ServiceHealthServer and ProxyHealthServer.
 type listener interface {
-	// Listen is very much like netutils.MultiListen, except the second arg (network) is
-	// fixed to be "tcp".
-	Listen(ctx context.Context, addrs ...string) (net.Listener, error)
+	// Listen creates a netutils.MultiListen for the given network and addresses.
+	Listen(ctx context.Context, network string, addrs ...string) (net.Listener, error)
 }
 
 // httpServerFactory allows for testing of ServiceHealthServer and ProxyHealthServer.
@@ -48,8 +47,8 @@ type httpServer interface {
 // Implement listener in terms of net.Listen.
 type stdNetListener struct{}
 
-func (stdNetListener) Listen(ctx context.Context, addrs ...string) (net.Listener, error) {
-	return netutils.MultiListen(ctx, "tcp", addrs...)
+func (stdNetListener) Listen(ctx context.Context, network string, addrs ...string) (net.Listener, error) {
+	return netutils.MultiListen(ctx, network, addrs...)
 }
 
 var _ listener = stdNetListener{}

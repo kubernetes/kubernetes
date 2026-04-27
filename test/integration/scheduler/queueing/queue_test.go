@@ -19,6 +19,7 @@ package queueing
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -618,5 +619,15 @@ func TestPopFromBackoffQWhenActiveQEmpty(t *testing.T) {
 	err = wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, ns, pod.Name))
 	if err != nil {
 		t.Fatalf("Expected pod to be scheduled: %v", err)
+	}
+}
+
+// TestCoreResourceEnqueue verify Pods failed by in-tree default plugins can be
+// moved properly upon their registered events.
+func TestCoreResourceEnqueue(t *testing.T) {
+	for _, tt := range CoreResourceEnqueueTestCases {
+		t.Run(strings.Join(append(tt.EnablePlugins, tt.Name), "/"), func(t *testing.T) {
+			RunTestCoreResourceEnqueue(t, tt)
+		})
 	}
 }

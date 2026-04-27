@@ -502,7 +502,6 @@ func BenchmarkGCMRead(b *testing.B) {
 		name := fmt.Sprintf("%vKeyLength/%vValueLength/%vExpectStale", t.keyLength, t.valueLength, t.expectStale)
 		b.Run(name, func(b *testing.B) {
 			for _, n := range gcmBenchmarks {
-				n := n
 				if t.keyLength == 16 && n.name == "gcm-extended-nonce" {
 					continue // gcm-extended-nonce requires 32 byte keys
 				}
@@ -528,7 +527,6 @@ func BenchmarkGCMWrite(b *testing.B) {
 		name := fmt.Sprintf("%vKeyLength/%vValueLength", t.keyLength, t.valueLength)
 		b.Run(name, func(b *testing.B) {
 			for _, n := range gcmBenchmarks {
-				n := n
 				if t.keyLength == 16 && n.name == "gcm-extended-nonce" {
 					continue // gcm-extended-nonce requires 32 byte keys
 				}

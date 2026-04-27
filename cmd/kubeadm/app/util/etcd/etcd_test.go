@@ -28,6 +28,7 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
@@ -819,6 +820,147 @@ func TestGetMemberStatus(t *testing.T) {
 			}
 			if (err != nil) != tt.wantError {
 				t.Errorf("getMemberStatus() error = %v, wantError %v", err, tt.wantError)
+			}
+		})
+	}
+}
+
+type fakeEtcdClientWithStatusResponse struct {
+	fakeEtcdClient
+	statusResponses     map[string]*clientv3.StatusResponse
+	statusRequestErrors map[string]error
+}
+
+// Status gets the status of the endpoint.
+func (f *fakeEtcdClientWithStatusResponse) Status(_ context.Context, ep string) (*clientv3.StatusResponse, error) {
+	if f.statusRequestErrors != nil {
+		if _, ok := f.statusRequestErrors[ep]; ok {
+			return nil, f.statusRequestErrors[ep]
+		}
+	}
+	return f.statusResponses[ep], nil
+}
+
+func TestEvaluateClusterStatus(t *testing.T) {
+	testCases := []struct {
+		name               string
+		Endpoints          []string
+		newEtcdClient      func(endpoints []string) (etcdClient, error)
+		wantClusterHealthy bool
+		wantMemberErrors   bool
+	}{
+		{
+			name:      "all the three members are healthy",
+			Endpoints: []string{"https://192.168.10.100:2379", "https://192.168.10.200:2379", "https://192.168.10.300:2379"},
+			newEtcdClient: func(endpoints []string) (etcdClient, error) {
+				f := &fakeEtcdClientWithStatusResponse{
+					statusResponses: map[string]*clientv3.StatusResponse{
+						"https://192.168.10.100:2379": {},
+						"https://192.168.10.200:2379": {},
+						"https://192.168.10.300:2379": {},
+					},
+				}
+				return f, nil
+			},
+			wantClusterHealthy: true,
+			wantMemberErrors:   false,
+		},
+		{
+			name:      "one out of three members has errors",
+			Endpoints: []string{"https://192.168.10.100:2379", "https://192.168.10.200:2379", "https://192.168.10.300:2379"},
+			newEtcdClient: func(endpoints []string) (etcdClient, error) {
+				f := &fakeEtcdClientWithStatusResponse{
+					statusResponses: map[string]*clientv3.StatusResponse{
+						"https://192.168.10.100:2379": {},
+						"https://192.168.10.200:2379": {Errors: []string{"etcdserver: mvcc: database space exceeded"}},
+						"https://192.168.10.300:2379": {},
+					},
+				}
+				return f, nil
+			},
+			wantClusterHealthy: true,
+			wantMemberErrors:   true,
+		},
+		{
+			name:      "one out of three members is unreachable",
+			Endpoints: []string{"https://192.168.10.100:2379", "https://192.168.10.200:2379", "https://192.168.10.300:2379"},
+			newEtcdClient: func(endpoints []string) (etcdClient, error) {
+				f := &fakeEtcdClientWithStatusResponse{
+					statusResponses: map[string]*clientv3.StatusResponse{
+						"https://192.168.10.100:2379": {},
+						"https://192.168.10.200:2379": {},
+						"https://192.168.10.300:2379": {},
+					},
+					statusRequestErrors: map[string]error{
+						"https://192.168.10.200:2379": errors.New("context deadline exceeded"),
+					},
+				}
+				return f, nil
+			},
+			wantClusterHealthy: true,
+			wantMemberErrors:   true,
+		},
+		{
+			name:      "two out of three members has errors",
+			Endpoints: []string{"https://192.168.10.100:2379", "https://192.168.10.200:2379", "https://192.168.10.300:2379"},
+			newEtcdClient: func(endpoints []string) (etcdClient, error) {
+				f := &fakeEtcdClientWithStatusResponse{
+					statusResponses: map[string]*clientv3.StatusResponse{
+						"https://192.168.10.100:2379": {},
+						"https://192.168.10.200:2379": {Errors: []string{"etcdserver: mvcc: database space exceeded"}},
+						"https://192.168.10.300:2379": {Errors: []string{"etcdserver: mvcc: data corrupted"}},
+					},
+				}
+				return f, nil
+			},
+			wantClusterHealthy: false,
+			wantMemberErrors:   true,
+		},
+		{
+			name:      "two out of three members are unreachable",
+			Endpoints: []string{"https://192.168.10.100:2379", "https://192.168.10.200:2379", "https://192.168.10.300:2379"},
+			newEtcdClient: func(endpoints []string) (etcdClient, error) {
+				f := &fakeEtcdClientWithStatusResponse{
+					statusResponses: map[string]*clientv3.StatusResponse{
+						"https://192.168.10.100:2379": {},
+						"https://192.168.10.200:2379": {},
+						"https://192.168.10.300:2379": {},
+					},
+					statusRequestErrors: map[string]error{
+						"https://192.168.10.200:2379": errors.New("context deadline exceeded"),
+						"https://192.168.10.300:2379": errors.New("context deadline exceeded"),
+					},
+				}
+				return f, nil
+			},
+			wantClusterHealthy: false,
+			wantMemberErrors:   true,
+		},
+	}
+
+	// Temporarily reduce the etcd API call timeout from 2 minutes to 1 second.
+	oldActiveTimeout := kubeadmapi.GetActiveTimeouts()
+	newActiveTimeout := oldActiveTimeout.DeepCopy()
+	newActiveTimeout.EtcdAPICall = &metav1.Duration{Duration: 1 * time.Second}
+	kubeadmapi.SetActiveTimeouts(newActiveTimeout)
+	defer func() {
+		kubeadmapi.SetActiveTimeouts(oldActiveTimeout)
+	}()
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &Client{
+				Endpoints:     tc.Endpoints,
+				newEtcdClient: tc.newEtcdClient,
+			}
+			_, gotClusterHealthy, err := c.getClusterStatus()
+
+			if gotClusterHealthy != tc.wantClusterHealthy {
+				t.Errorf("gotClusterHealthy = %t, want = %t", gotClusterHealthy, tc.wantClusterHealthy)
+			}
+
+			if tc.wantMemberErrors != (err != nil) {
+				t.Errorf("gotMemberErrors = %v, wantMemberErrors = %t", err, tc.wantMemberErrors)
 			}
 		})
 	}

@@ -1147,6 +1147,58 @@ func TestFileBasedImagePullManager_RecordImagePulled(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:     "record with familiar image name - only the last segment",
+			image:    "testing@sha256:f24acc752be18b93b0504c86312bbaf482c9efb0c45e925bbccb0a591cebd7af",
+			imageRef: "testimageref-familiarlast",
+			creds: &kubeletconfiginternal.ImagePullCredentials{
+				KubernetesServiceAccounts: []kubeletconfiginternal.ImagePullServiceAccount{
+					{UID: "test-sa-uid", Namespace: "default", Name: "test-sa"},
+				},
+			},
+			existingPulling:      []string{"sha256-7ffc99ef20589dc844b202c4cba501d1aaf06d1481935aa1e160029afd639847"},
+			expectPulled:         []string{"sha256-f2ba1256df29972c4fe11d8af7d302e37631c6077a2ed29d8bee55ee77cf26ad"},
+			pullsInFlight:        1,
+			expectPullingRemoved: "sha256-7ffc99ef20589dc844b202c4cba501d1aaf06d1481935aa1e160029afd639847",
+			checkedPullFile:      "sha256-f2ba1256df29972c4fe11d8af7d302e37631c6077a2ed29d8bee55ee77cf26ad",
+			expectUpdated:        true,
+			expectedPullRecord: kubeletconfiginternal.ImagePulledRecord{
+				ImageRef: "testimageref-familiarlast",
+				CredentialMapping: map[string]kubeletconfiginternal.ImagePullCredentials{
+					"testing": {
+						KubernetesServiceAccounts: []kubeletconfiginternal.ImagePullServiceAccount{
+							{UID: "test-sa-uid", Namespace: "default", Name: "test-sa"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:     "record with familiar image name - org and name",
+			image:    "secretorg/myimage:customtag",
+			imageRef: "testimageref-familiarwithorg",
+			creds: &kubeletconfiginternal.ImagePullCredentials{
+				KubernetesServiceAccounts: []kubeletconfiginternal.ImagePullServiceAccount{
+					{UID: "test-sa-uid", Namespace: "default", Name: "test-sa"},
+				},
+			},
+			existingPulling:      []string{"sha256-5f3ca9e4d82e32203c2fafb410dfae9c8047bc6ebe57d642fe264d479e152955"},
+			expectPulled:         []string{"sha256-ff66306c3a398c6e6b64d8f7acdd1aebc37fce76add3849f9d3f59274434234a"},
+			pullsInFlight:        1,
+			expectPullingRemoved: "sha256-5f3ca9e4d82e32203c2fafb410dfae9c8047bc6ebe57d642fe264d479e152955",
+			checkedPullFile:      "sha256-ff66306c3a398c6e6b64d8f7acdd1aebc37fce76add3849f9d3f59274434234a",
+			expectUpdated:        true,
+			expectedPullRecord: kubeletconfiginternal.ImagePulledRecord{
+				ImageRef: "testimageref-familiarwithorg",
+				CredentialMapping: map[string]kubeletconfiginternal.ImagePullCredentials{
+					"secretorg/myimage": {
+						KubernetesServiceAccounts: []kubeletconfiginternal.ImagePullServiceAccount{
+							{UID: "test-sa-uid", Namespace: "default", Name: "test-sa"},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {

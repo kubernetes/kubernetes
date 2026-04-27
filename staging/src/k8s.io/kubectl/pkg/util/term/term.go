@@ -17,6 +17,7 @@ limitations under the License.
 package term
 
 import (
+	"errors"
 	"io"
 	"os"
 
@@ -112,4 +113,28 @@ func (t TTY) Safe(fn SafeFunc) error {
 
 		term.RestoreTerminal(inFd, state)
 	}).Run(fn)
+}
+
+type detachableReader struct {
+	escapeProxy io.Reader
+}
+
+func NewDetachableReader(r io.Reader, detachKeys string) (io.Reader, error) {
+	detachKeyBytes, err := term.ToBytes(detachKeys)
+	if err != nil {
+		return nil, err
+	}
+	return &detachableReader{
+		escapeProxy: term.NewEscapeProxy(r, detachKeyBytes),
+	}, nil
+}
+
+func (r *detachableReader) Read(p []byte) (n int, err error) {
+	n, err = r.escapeProxy.Read(p)
+	if errors.Is(err, term.EscapeError{}) {
+		// EscapeError is expected when the user types the detach key sequence, so we should not treat it as an error.
+		// Instead, we return io.EOF so that the attach session will end gracefully.
+		err = io.EOF
+	}
+	return n, err
 }

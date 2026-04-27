@@ -79,7 +79,7 @@ func (b Bytes) ConvertToNative(typeDesc reflect.Type) (any, error) {
 		case byteWrapperType:
 			// Convert the bytes to a wrapperspb.BytesValue.
 			return wrapperspb.Bytes([]byte(b)), nil
-		case jsonValueType:
+		case JSONValueType:
 			// CEL follows the proto3 to JSON conversion by encoding bytes to a string via base64.
 			// The encoding below matches the golang 'encoding/json' behavior during marshaling,
 			// which uses base64.StdEncoding.

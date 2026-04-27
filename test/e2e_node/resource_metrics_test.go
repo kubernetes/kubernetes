@@ -22,6 +22,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -31,8 +32,6 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	admissionapi "k8s.io/pod-security-admission/api"
-
-	"github.com/prometheus/common/model"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -237,26 +236,26 @@ func nodeID(element interface{}) string {
 }
 
 func podID(element interface{}) string {
-	el := element.(*model.Sample)
+	el := element.(*testutil.Sample)
 	return fmt.Sprintf("%s::%s", el.Metric["namespace"], el.Metric["pod"])
 }
 
 func containerID(element interface{}) string {
-	el := element.(*model.Sample)
+	el := element.(*testutil.Sample)
 	return fmt.Sprintf("%s::%s::%s", el.Metric["namespace"], el.Metric["pod"], el.Metric["container"])
 }
 
 func makeCustomPairID(pri, sec string) func(interface{}) string {
 	return func(element interface{}) string {
-		el := element.(*model.Sample)
-		return fmt.Sprintf("%s::%s", el.Metric[model.LabelName(pri)], el.Metric[model.LabelName(sec)])
+		el := element.(*testutil.Sample)
+		return fmt.Sprintf("%s::%s", el.Metric[testutil.LabelName(pri)], el.Metric[testutil.LabelName(sec)])
 	}
 }
 
 func makeCustomLabelID(label string) func(interface{}) string {
 	return func(element interface{}) string {
-		el := element.(*model.Sample)
-		return string(el.Metric[model.LabelName(label)])
+		el := element.(*testutil.Sample)
+		return string(el.Metric[testutil.LabelName(label)])
 	}
 }
 
@@ -265,7 +264,7 @@ func boundedSample(lower, upper interface{}) types.GomegaMatcher {
 		// We already check Metric when matching the Id
 		"Metric": gstruct.Ignore(),
 		"Value":  gomega.And(gomega.BeNumerically(">=", lower), gomega.BeNumerically("<=", upper)),
-		"Timestamp": gomega.WithTransform(func(t model.Time) time.Time {
+		"Timestamp": gomega.WithTransform(func(t testutil.Time) time.Time {
 			if t.Unix() <= 0 {
 				return time.Now()
 			}

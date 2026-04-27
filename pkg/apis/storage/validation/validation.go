@@ -210,7 +210,7 @@ func validateVolumeError(e *storage.VolumeError, fldPath *field.Path) field.Erro
 		return allErrs
 	}
 	if len(e.Message) > maxVolumeErrorMessageSize {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), "" /*unused*/, maxAttachedVolumeMetadataSize))
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), "" /*unused*/, maxVolumeErrorMessageSize))
 	}
 
 	if e.ErrorCode != nil {
@@ -420,6 +420,7 @@ func validateCSIDriverSpec(
 	allErrs = append(allErrs, validateSELinuxMount(spec.SELinuxMount, fldPath.Child("seLinuxMount"))...)
 	allErrs = append(allErrs, validateNodeAllocatableUpdatePeriodSeconds(spec.NodeAllocatableUpdatePeriodSeconds, fldPath.Child("nodeAllocatableUpdatePeriodSeconds"))...)
 	allErrs = append(allErrs, validateServiceAccountTokenInSecrets(spec.ServiceAccountTokenInSecrets, spec.TokenRequests, fldPath.Child("serviceAccountTokenInSecrets"))...)
+	allErrs = append(allErrs, validatePreventPodSchedulingIfMissing(spec.PreventPodSchedulingIfMissing, fldPath.Child("preventPodSchedulingIfMissing"))...)
 	return allErrs
 }
 
@@ -541,6 +542,16 @@ func validateServiceAccountTokenInSecrets(serviceAccountTokenInSecrets *bool, to
 	allErrs := field.ErrorList{}
 	if serviceAccountTokenInSecrets != nil && len(tokenRequests) == 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath, serviceAccountTokenInSecrets, "serviceAccountTokenInSecrets is set but no tokenRequests are specified"))
+	}
+
+	return allErrs
+}
+
+// validatePreventPodSchedulingIfMissing validates that preventPodSchedulingIfMissing is not set when the VolumeLimitScaling feature gate is disabled.
+func validatePreventPodSchedulingIfMissing(preventPodSchedulingIfMissing *bool, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if preventPodSchedulingIfMissing == nil && utilfeature.DefaultFeatureGate.Enabled(features.VolumeLimitScaling) {
+		allErrs = append(allErrs, field.Required(fldPath, ""))
 	}
 
 	return allErrs

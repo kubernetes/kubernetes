@@ -19,6 +19,7 @@ package cri
 import (
 	"context"
 	"os"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,23 +31,20 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/cri-client/pkg/util"
-	"k8s.io/klog/v2"
 )
 
-func createRemoteImageServiceWithTracerProvider(endpoint string, tp oteltrace.TracerProvider, t *testing.T) internalapi.ImageManagerService {
-	logger := klog.Background()
-	runtimeService, err := NewRemoteImageService(endpoint, defaultConnectionTimeout, tp, &logger)
+func createRemoteImageServiceWithTracerProvider(ctx context.Context, endpoint string, tp oteltrace.TracerProvider, t *testing.T) internalapi.ImageManagerService {
+	imageService, err := NewRemoteImageService(ctx, endpoint, defaultConnectionTimeout, tp, false)
 	require.NoError(t, err)
 
-	return runtimeService
+	return imageService
 }
 
-func createRemoteImageServiceWithoutTracerProvider(endpoint string, t *testing.T) internalapi.ImageManagerService {
-	logger := klog.Background()
-	runtimeService, err := NewRemoteImageService(endpoint, defaultConnectionTimeout, noop.NewTracerProvider(), &logger)
+func createRemoteImageServiceWithoutTracerProvider(ctx context.Context, endpoint string, t *testing.T) internalapi.ImageManagerService {
+	imageService, err := NewRemoteImageService(ctx, endpoint, defaultConnectionTimeout, noop.NewTracerProvider(), false)
 	require.NoError(t, err)
 
-	return runtimeService
+	return imageService
 }
 
 func TestImageServiceSpansWithTP(t *testing.T) {
@@ -65,7 +63,7 @@ func TestImageServiceSpansWithTP(t *testing.T) {
 		sdktrace.WithBatcher(exp),
 	)
 	ctx := context.Background()
-	imgSvc := createRemoteImageServiceWithTracerProvider(endpoint, tp, t)
+	imgSvc := createRemoteImageServiceWithTracerProvider(ctx, endpoint, tp, t)
 	imgRef, err := imgSvc.PullImage(ctx, &runtimeapi.ImageSpec{Image: "busybox"}, nil, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, "busybox", imgRef)
@@ -91,7 +89,7 @@ func TestImageServiceSpansWithoutTP(t *testing.T) {
 		sdktrace.WithBatcher(exp),
 	)
 	ctx := context.Background()
-	imgSvc := createRemoteImageServiceWithoutTracerProvider(endpoint, t)
+	imgSvc := createRemoteImageServiceWithoutTracerProvider(ctx, endpoint, t)
 	imgRef, err := imgSvc.PullImage(ctx, &runtimeapi.ImageSpec{Image: "busybox"}, nil, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, "busybox", imgRef)
@@ -99,4 +97,29 @@ func TestImageServiceSpansWithoutTP(t *testing.T) {
 	err = tp.ForceFlush(ctx)
 	require.NoError(t, err)
 	assert.Empty(t, exp.GetSpans())
+}
+
+func TestNewRemoteImageServiceUnixSocketEndpoint(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix socket regression test is not applicable on windows")
+	}
+
+	fakeRuntime, endpoint := createAndStartFakeRemoteRuntime(t)
+	defer func() {
+		fakeRuntime.Stop()
+		// clear endpoint file
+		if addr, _, err := util.GetAddressAndDialer(endpoint); err == nil {
+			if _, err := os.Stat(addr); err == nil {
+				if err := os.Remove(addr); err != nil {
+					t.Errorf("remove %q: %v", addr, err)
+				}
+			}
+		}
+	}()
+
+	ctx := context.Background()
+	imgSvc := createRemoteImageServiceWithoutTracerProvider(ctx, endpoint, t)
+	info, err := imgSvc.ImageFsInfo(ctx)
+	require.NoError(t, err)
+	assert.NotNil(t, info)
 }

@@ -118,7 +118,7 @@ func (udtv unionDiscriminatorTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            udtv.TagName(),
 		StabilityLevel: TagStabilityLevelBeta,
-		Scopes:         udtv.ValidScopes().UnsortedList(),
+		Scopes:         sets.List(udtv.ValidScopes()),
 		Description:    "Indicates that this field is the discriminator for a union.",
 		Args: []TagArgDoc{{
 			Name:        "union",
@@ -157,7 +157,7 @@ func (umtv unionMemberTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            umtv.TagName(),
 		StabilityLevel: TagStabilityLevelStable,
-		Scopes:         umtv.ValidScopes().UnsortedList(),
+		Scopes:         sets.List(umtv.ValidScopes()),
 		Description:    "Indicates that this field is a member of a union.",
 		Args: []TagArgDoc{{
 			Name:        "union",
@@ -328,8 +328,10 @@ func createMemberExtractor(ptrType *types.Type, member *types.Member) FunctionLi
 	}
 	nt := util.NativeType(member.Type)
 	switch nt.Kind {
-	case types.Pointer, types.Map, types.Slice:
+	case types.Pointer:
 		extractor.Body = fmt.Sprintf("if obj == nil {return false}; return obj.%s != nil", member.Name)
+	case types.Map, types.Slice:
+		extractor.Body = fmt.Sprintf("if obj == nil {return false}; return len(obj.%s) != 0", member.Name)
 	case types.Builtin:
 		extractor.Body = fmt.Sprintf("if obj == nil {return false}; var z %s; return obj.%s != z", member.Type, member.Name)
 	default:

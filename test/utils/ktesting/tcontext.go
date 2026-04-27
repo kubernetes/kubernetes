@@ -26,17 +26,11 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/onsi/gomega"
 
-	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/client-go/dynamic"
-	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/restmapper"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
-	"k8s.io/kubernetes/test/utils/format"
+	"k8s.io/kubernetes/test/utils/ktesting/format"
 	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 	"k8s.io/kubernetes/test/utils/ktesting/internal"
 )
@@ -117,8 +111,24 @@ type ContextTB interface {
 // Ginkgo create a fresh context for cleanup code.
 //
 // Can be called more than once per test to get different contexts with
-// independent cancellation. The default behavior describe above can be
+// independent cancellation. The default behavior described above can be
 // modified via optional functional options defined in [initoption].
+//
+// Can be called inside a synctest bubble. Signal handling (cleaning up on
+// SIGINT, progress reporting on SIGUSR1) then does not get initialized because
+// code running inside a bubble should not depend on outside input. Progress
+// reporting still works when some parent test already initialized it.
+// Therefore the recommended pattern is to initialize ktesting first, then
+// create the synctest bubble:
+//
+//	func TestSomething(t *testing.T) { ktesting.Init(t).SyncTest("", testSomething) }
+//	func testSomething(tCtx ktesting.TContext) { ... }
+//
+// This pattern also has the advantage that the test code cannot accidentally
+// use the testing.T instance directly. The same works for normal tests:
+//
+//	func TestSomething(t *testing.T) { testSomething(ktesting.Init(t)) }
+//	func testSomething(tCtx ktesting.TContext) { ... }
 func Init(tb TB, opts ...InitOption) TContext {
 	tb.Helper()
 
@@ -130,13 +140,31 @@ func Init(tb TB, opts ...InitOption) TContext {
 	}
 
 	// We don't need a Deadline implementation, testing.B doesn't have it.
-	// But if we have one, we'll use it to set a timeout shortly before
-	// the deadline. This needs to come before we wrap tb.
-	deadlineTB, deadlineOK := tb.(interface {
+	// But if we have one, we use it to determine the deadline and
+	// set a timeout shortly before it.
+	//
+	// This also allows us to detect a synctest bubble.
+	isSyncTest := false
+	var deadline *time.Time
+	if deadlineTB, deadlineOK := tb.(interface {
 		Deadline() (time.Time, bool)
-	})
+	}); deadlineOK {
+		func() {
+			defer func() {
+				// Calling testing.T.Deadline panics inside a synctest bubble.
+				// There's no API to detect that in advance, so here we react
+				// by catching the panic.
+				if r := recover(); r != nil {
+					isSyncTest = true
+				}
+			}()
+			if d, ok := deadlineTB.Deadline(); ok {
+				deadline = &d
+			}
+		}()
+	}
 
-	ctx := defaultProgressReporter.init(tb)
+	ctx := defaultProgressReporter.init(tb, isSyncTest)
 	var header func() string
 	if c.PerTestOutput {
 		logger := newLogger(tb, c.BufferLogs)
@@ -145,16 +173,15 @@ func Init(tb TB, opts ...InitOption) TContext {
 	}
 
 	var cancelTimeout func(cause string)
-	if deadlineOK {
-		if deadline, ok := deadlineTB.Deadline(); ok {
-			timeLeft := time.Until(deadline)
-			timeLeft -= CleanupGracePeriod
-			ctx, cancelTimeout = withTimeout(ctx, tb, timeLeft, fmt.Sprintf("test suite deadline (%s) is close, need to clean up before the %s cleanup grace period", deadline.Truncate(time.Second), CleanupGracePeriod))
-		}
+	if deadline != nil {
+		timeLeft := time.Until(*deadline)
+		timeLeft -= CleanupGracePeriod
+		ctx, cancelTimeout = withTimeout(ctx, tb, timeLeft, fmt.Sprintf("test suite deadline (%s) is close, need to clean up before the %s cleanup grace period", deadline.Truncate(time.Second), CleanupGracePeriod))
 	}
 
 	// Construct new TContext with context and settings as determined above.
 	tCtx := InitCtx(ctx, tb)
+	tCtx.isSyncTest = isSyncTest
 	if cancelTimeout != nil {
 		tCtx.cancel = cancelTimeout
 	} else {
@@ -216,11 +243,10 @@ type InitOption = initoption.InitOption
 // Functional options are part of the API, but currently
 // there are none which have an effect.
 func InitCtx(ctx context.Context, tb TB, _ ...InitOption) TContext {
-	tc := TC{
+	return TContext{
 		Context:   ctx,
 		testingTB: testingTB{TB: tb},
 	}
-	return &tc
 }
 
 // withTB constructs a new TContext with a different TB instance.
@@ -239,23 +265,21 @@ func InitCtx(ctx context.Context, tb TB, _ ...InitOption) TContext {
 //	   })
 //
 // withTB sets up cancellation for the sub-test and uses per-test output.
-func (tc *TC) withTB(tb TB) TContext {
-	tc = tc.clone()
-	tc.testingTB.TB = tb
-	if tc.perTestHeader != nil {
+func (tCtx TContext) withTB(tb TB) TContext {
+	tCtx.testingTB.TB = tb
+	if tCtx.perTestHeader != nil {
 		logger := newLogger(tb, false /* don't buffer logs in sub-test */)
-		tc.Context = klog.NewContext(tc.Context, logger)
+		tCtx.Context = klog.NewContext(tCtx.Context, logger)
 	}
-	tc = tc.WithCancel()
-	return tc
+	return tCtx.WithCancel()
 }
 
 // run implements the different Run and SyncTest methods. It's not an exported
 // method because tCtx.Run is more discoverable (same usage as
 // with normal Go).
-func run(tc *TC, name string, syncTest bool, cb func(tc *TC)) bool {
-	tc.Helper()
-	switch tb := tc.TB().(type) {
+func run(tCtx TContext, name string, syncTest bool, cb func(tCtx TContext)) bool {
+	tCtx.Helper()
+	switch tb := tCtx.TB().(type) {
 	case *testing.T:
 		if syncTest {
 			f := func(t *testing.T) {
@@ -265,10 +289,9 @@ func run(tc *TC, name string, syncTest bool, cb func(tc *TC)) bool {
 				//
 				// Sync tests shouldn't need the overall suite timeout,
 				// so this seems okay.
-				tc = tc.clone()
-				tc.isSyncTest = true
-				tc = tc.WithoutCancel().withTB(t)
-				cb(tc)
+				tCtx.isSyncTest = true
+				tCtx = tCtx.WithoutCancel().withTB(t)
+				cb(tCtx)
 			}
 			if name != "" {
 				return tb.Run(name, func(t *testing.T) { synctest.Test(t, f) })
@@ -277,12 +300,12 @@ func run(tc *TC, name string, syncTest bool, cb func(tc *TC)) bool {
 			return true
 		}
 		return tb.Run(name, func(t *testing.T) {
-			cb(tc.withTB(t))
+			cb(tCtx.withTB(t))
 		})
 	case *testing.B:
 		if !syncTest {
 			return tb.Run(name, func(b *testing.B) {
-				cb(tc.withTB(b))
+				cb(tCtx.withTB(b))
 			})
 		}
 	}
@@ -291,7 +314,7 @@ func run(tc *TC, name string, syncTest bool, cb func(tc *TC)) bool {
 	if syncTest {
 		what = "SyncTest"
 	}
-	tc.Fatalf("%s not implemented, underlying %T does not support it", what, tc.TB())
+	tCtx.Fatalf("%s not implemented, underlying %T does not support it", what, tCtx.TB())
 
 	return false
 }
@@ -304,30 +327,34 @@ func run(tc *TC, name string, syncTest bool, cb func(tc *TC)) bool {
 //	   tCtx := ktesting.WithContext(tCtx, ctx)
 //	   ...
 //
-// This is important because the Context in the callback could have
-// a different deadline than in the parent TContext.
-func (tc *TC) WithContext(ctx context.Context) TContext {
-	tc = tc.clone()
-	logger := tc.Logger()
-	tc.Context = ctx
-	if _, err := logr.FromContext(ctx); err != nil {
-		// Keep using the logger from the parent context.
-		tc = tc.WithLogger(logger)
-	}
-	return tc
+// Cancellation and deadline are determined by the new context.
+// Values are looked up first in the new context, then the old one.
+// In other words, values set previous via WithValue are still
+// available.
+func (tCtx TContext) WithContext(ctx context.Context) TContext {
+	tCtx.Context = &chainContext{Context: ctx, previousCtx: tCtx.Context}
+	return tCtx
 }
 
 // WithValue wraps [context.WithValue] such that the result is again a TContext.
-func (tc *TC) WithValue(key, val any) TContext {
-	ctx := context.WithValue(tc, key, val)
-	return tc.WithContext(ctx)
+func (tCtx TContext) WithValue(key, val any) TContext {
+	ctx := context.WithValue(tCtx, key, val)
+	return tCtx.WithContext(ctx)
 }
 
-// TContext is the recommended type for storing a [TC] instance.
-// The type alias is necessary because TContext used to be an interface.
-type TContext = *TC
+type chainContext struct {
+	context.Context
+	previousCtx context.Context
+}
 
-// TC implements [context.Context], [testing.TB] and some additional
+func (ctx *chainContext) Value(key any) any {
+	if val := ctx.Context.Value(key); val != nil {
+		return val
+	}
+	return ctx.previousCtx.Value(key)
+}
+
+// TContext implements [context.Context], [testing.TB] and some additional
 // methods. [TContext] is the public pointer type for referencing a TC.
 // Variables are usually called tCtx. To ensure that test code does not
 // use `t` directly unintentionally, it is recommended to use two functions:
@@ -355,7 +382,7 @@ type TContext = *TC
 // Progress reporting is more informative when doing polling with
 // [gomega.Eventually] and [gomega.Consistently]. Without that, it
 // can only report which tests are active.
-type TC struct {
+type TContext struct {
 	// Context makes the methods of the underlying context
 	// available. It must not be modified.
 	context.Context
@@ -375,15 +402,8 @@ type TC struct {
 	// It's empty if there are no steps.
 	steps string
 
-	// for SyncTest
+	// for IsSyncTest
 	isSyncTest bool
-
-	// for WithClient
-	restConfig    *rest.Config
-	restMapper    *restmapper.DeferredDiscoveryRESTMapper
-	client        clientset.Interface
-	dynamic       dynamic.Interface
-	apiextensions apiextensions.Interface
 
 	// for WithNamespace
 	namespace string
@@ -402,12 +422,6 @@ type capture struct {
 	failed bool
 }
 
-// tc makes a shallow copy.
-func (tc *TC) clone() *TC {
-	clone := *tc
-	return &clone
-}
-
 // testingTB is needed to avoid a name conflict
 // between field and method in tContext.
 type testingTB struct {
@@ -417,8 +431,6 @@ type testingTB struct {
 	TB
 }
 
-var _ TContext = &TC{}
-
 // Parallel signals that this test is to be run in parallel with (and
 // only with) other parallel tests. In other words, it needs to be
 // called in each test which is meant to run in parallel.
@@ -427,11 +439,11 @@ var _ TContext = &TC{}
 //
 // When a unit test is run multiple times due to use of -test.count or -test.cpu,
 // multiple instances of a single test never run in parallel with each other.
-func (tc *TC) Parallel() {
-	if tb, ok := tc.TB().(interface{ Parallel() }); ok {
+func (tCtx TContext) Parallel() {
+	if tb, ok := tCtx.TB().(interface{ Parallel() }); ok {
 		tb.Parallel()
 	} else {
-		tc.Fatalf("Parallel not implemented, underlying %T does not support it", tc.TB())
+		tCtx.Fatalf("Parallel not implemented, underlying %T does not support it", tCtx.TB())
 	}
 }
 
@@ -442,9 +454,9 @@ func (tc *TC) Parallel() {
 // The cause, if non-empty, is turned into an error which is equivalent
 // to context.Canceled. context.Cause will return that error for the
 // context.
-func (tc *TC) Cancel(cause string) {
-	if tc.cancel != nil {
-		tc.cancel(cause)
+func (tCtx TContext) Cancel(cause string) {
+	if tCtx.cancel != nil {
+		tCtx.cancel(cause)
 	}
 }
 
@@ -464,24 +476,24 @@ func (tc *TC) Cancel(cause string) {
 //
 // The logger and clients are the same as in the TContext that CleanupCtx
 // is invoked on.
-func (tc *TC) CleanupCtx(cb func(TContext)) {
-	tc.Helper()
+func (tCtx TContext) CleanupCtx(cb func(TContext)) {
+	tCtx.Helper()
 
-	if tb, ok := tc.TB().(ContextTB); ok {
+	if tb, ok := tCtx.TB().(ContextTB); ok {
 		// Use context from base TB (most likely Ginkgo).
 		tb.CleanupCtx(func(ctx context.Context) {
-			tCtx := tc.WithContext(ctx)
+			tCtx := tCtx.WithContext(ctx)
 			cb(tCtx)
 		})
 		return
 	}
 
-	tc.Cleanup(func() {
+	tCtx.Cleanup(func() {
 		// Use new context. This is the code path for "go test". The
 		// context then has *no* deadline. In the code path above for
 		// Ginkgo, Ginkgo is more sophisticated and also applies
 		// timeouts to cleanup calls which accept a context.
-		childCtx := tc.WithContext(context.WithoutCancel(tc))
+		childCtx := tCtx.WithContext(context.WithoutCancel(tCtx))
 		cb(childCtx)
 	})
 }
@@ -491,8 +503,8 @@ func (tc *TC) CleanupCtx(cb func(TContext)) {
 //
 // Only supported in Go unit tests or benchmarks. It fails the current
 // test when called elsewhere.
-func (tc *TC) Run(name string, cb func(tCtx TContext)) bool {
-	return run(tc, name, false, cb)
+func (tCtx TContext) Run(name string, cb func(tCtx TContext)) bool {
+	return run(tCtx, name, false, cb)
 }
 
 // SyncTest uses [synctest.Test] to execute the callback inside a bubble.
@@ -500,8 +512,11 @@ func (tc *TC) Run(name string, cb func(tCtx TContext)) bool {
 // the bubble directly in the current test context.
 //
 // Only works in Go unit tests.
-func (tc *TC) SyncTest(name string, cb func(tCtx TContext)) bool {
-	return run(tc, name, true, cb)
+//
+// Cleaning up on SIGINT is not available because code running inside a bubble
+// should not depend on outside input.
+func (tCtx TContext) SyncTest(name string, cb func(tCtx TContext)) bool {
+	return run(tCtx, name, true, cb)
 }
 
 // IsSyncTest returns true if the context was created by SyncTest.
@@ -513,8 +528,8 @@ func (tc *TC) SyncTest(name string, cb func(tCtx TContext)) bool {
 //     Eventually and Consistently both call Wait and then check
 //     the condition.
 //   - Outside, polling or some synchronization mechanism has to be used.
-func (tc *TC) IsSyncTest() bool {
-	return tc.isSyncTest
+func (tCtx TContext) IsSyncTest() bool {
+	return tCtx.isSyncTest
 }
 
 // Wait calls [synctest.Wait] and thus ensures that all background
@@ -522,7 +537,7 @@ func (tc *TC) IsSyncTest() bool {
 //
 // Only works inside a bubble started by SyncTest (can be checked with
 // IsSyncTest), panics elsewhere.
-func (tc *TC) Wait() {
+func (tCtx TContext) Wait() {
 	synctest.Wait()
 }
 
@@ -542,7 +557,7 @@ func (tc *TC) Wait() {
 //	        ...
 //	    }
 //	}
-func (tc *TC) TB() TB { return tc.testingTB.TB }
+func (tCtx TContext) TB() TB { return tCtx.testingTB.TB }
 
 // Logger returns a logger for the current test. This is a shortcut
 // for calling klog.FromContext.
@@ -554,22 +569,9 @@ func (tc *TC) TB() TB { return tc.testingTB.TB }
 //
 // To skip intermediate helper functions during stack unwinding,
 // TB.Helper can be called in those functions.
-func (tc *TC) Logger() klog.Logger {
-	return klog.FromContext(tc.Context)
+func (tCtx TContext) Logger() klog.Logger {
+	return klog.FromContext(tCtx.Context)
 }
-
-// RESTConfig returns a copy of the config for a rest client with the UserAgent
-// set to include the current test name or nil if not available. Several typed
-// clients using this config are available through [Client], [Dynamic],
-// [APIExtensions].
-func (tc *TC) RESTConfig() *rest.Config {
-	return rest.CopyConfig(tc.restConfig)
-}
-
-func (tc *TC) RESTMapper() *restmapper.DeferredDiscoveryRESTMapper { return tc.restMapper }
-func (tc *TC) Client() clientset.Interface                         { return tc.client }
-func (tc *TC) Dynamic() dynamic.Interface                          { return tc.dynamic }
-func (tc *TC) APIExtensions() apiextensions.Interface              { return tc.apiextensions }
 
 // Expect wraps [gomega.Expect] such that a failure will be reported via
 // [TContext.Fatal]. As with [gomega.Expect], additional values
@@ -579,27 +581,26 @@ func (tc *TC) APIExtensions() apiextensions.Interface              { return tc.a
 //
 //	myAmazingThing := func(int, error) { ...}
 //	tCtx.Expect(myAmazingThing()).Should(gomega.Equal(1))
-func (tc *TC) Expect(actual interface{}, extra ...interface{}) gomega.Assertion {
-	return gomegaAssertion(tc, true, actual, extra...)
+func (tCtx TContext) Expect(actual interface{}, extra ...interface{}) gomega.Assertion {
+	return gomegaAssertion(tCtx, true, actual, extra...)
 }
 
 // Require is an alias for Expect.
-func (tc *TC) Require(actual interface{}, extra ...interface{}) gomega.Assertion {
-	return gomegaAssertion(tc, true, actual, extra...)
+func (tCtx TContext) Require(actual interface{}, extra ...interface{}) gomega.Assertion {
+	return gomegaAssertion(tCtx, true, actual, extra...)
 }
 
 // Assert also wraps [gomega.Expect], but in contrast to Expect = Require,
 // it reports a failure through [TContext.Error]. This makes it possible
 // to test several different assertions.
-func (tc *TC) Assert(actual interface{}, extra ...interface{}) gomega.Assertion {
-	return gomegaAssertion(tc, false, actual, extra...)
+func (tCtx TContext) Assert(actual interface{}, extra ...interface{}) gomega.Assertion {
+	return gomegaAssertion(tCtx, false, actual, extra...)
 }
 
 // WithNamespace creates a new context with a Kubernetes namespace name for retrieval through [Namespace].
-func (tc *TC) WithNamespace(namespace string) TContext {
-	tc = tc.clone()
-	tc.namespace = namespace
-	return tc
+func (tCtx TContext) WithNamespace(namespace string) TContext {
+	tCtx.namespace = namespace
+	return tCtx
 }
 
 // Namespace returns the Kubernetes namespace name that was set previously
@@ -608,6 +609,6 @@ func (tc *TC) WithNamespace(namespace string) TContext {
 // This namespace is the one to be used by tests which need to create namespace-scoped
 // objects. The name is guaranteed to be unique for the test context, so tests running
 // in parallel need to be set up so that each test has its own namespace.
-func (tc *TC) Namespace() string {
-	return tc.namespace
+func (tCtx TContext) Namespace() string {
+	return tCtx.namespace
 }

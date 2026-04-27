@@ -94,7 +94,7 @@ func TestDefaultBinder(t *testing.T) {
 					t.Fatal(err)
 				}
 				if asyncAPICallsEnabled {
-					cache := internalcache.New(ctx, apiDispatcher)
+					cache := internalcache.New(ctx, apiDispatcher, false)
 					fh.SetAPICacher(apicache.New(nil, cache))
 				}
 

@@ -18,7 +18,6 @@ package validators
 
 import (
 	"fmt"
-	"strconv"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/code-generator/cmd/validation-gen/util"
@@ -75,7 +74,7 @@ func (v neqTagValidator) GetValidations(context Context, tag codetags.Tag) (Vali
 		if tag.ValueType != codetags.ValueTypeBool {
 			return Validations{}, fmt.Errorf("type mismatch: field is a bool, but payload is of type %s", tag.ValueType)
 		}
-		disallowedValue, err = strconv.ParseBool(tag.Value)
+		disallowedValue, err = util.ParseBool(tag.Value)
 		if err != nil {
 			return Validations{}, fmt.Errorf("invalid bool value for payload: %w", err)
 		}
@@ -83,7 +82,7 @@ func (v neqTagValidator) GetValidations(context Context, tag codetags.Tag) (Vali
 		if tag.ValueType != codetags.ValueTypeInt {
 			return Validations{}, fmt.Errorf("type mismatch: field is an integer, but payload is of type %s", tag.ValueType)
 		}
-		disallowedValue, err = strconv.Atoi(tag.Value)
+		disallowedValue, err = util.ParseInt(tag.Value)
 		if err != nil {
 			return Validations{}, fmt.Errorf("invalid integer value for payload: %w", err)
 		}
@@ -99,7 +98,7 @@ func (v neqTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:              v.TagName(),
 		StabilityLevel:   TagStabilityLevelAlpha,
-		Scopes:           v.ValidScopes().UnsortedList(),
+		Scopes:           sets.List(v.ValidScopes()),
 		Description:      "Verifies the field's value is not equal to a specific disallowed value. Supports string, integer, and boolean types.",
 		PayloadsRequired: true,
 		PayloadsType:     codetags.ValueTypeRaw,

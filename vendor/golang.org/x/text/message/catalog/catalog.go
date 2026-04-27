@@ -333,7 +333,7 @@ func String(name string) Message {
 //
 // The name passed to a Var must be unique within message sequence.
 func Var(name string, msg ...Message) Message {
-	return &catmsg.Var{Name: name, Message: firstInSequence(msg)}
+	return &catmsg.Var{Name: name, Message: catmsg.FirstOf(msg)}
 }
 
 // Context returns a Context for formatting messages.

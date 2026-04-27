@@ -130,11 +130,11 @@ func mapBindMountDevice(devicePath string, mapPath string, linkName string) erro
 		// Check if device file
 		// TODO: Need to check if this device file is actually the expected bind mount
 		if file.Mode()&os.ModeDevice == os.ModeDevice {
-			klog.Warningf("Warning: Map skipped because bind mount already exists on the path: %v", linkPath)
+			klog.Warningf("Map skipped because bind mount already exists on the path: %v", linkPath)
 			return nil
 		}
 
-		klog.Warningf("Warning: file %s already exists but is not mounted, skip creating file", linkPath)
+		klog.Warningf("File %s already exists but is not mounted, skip creating file", linkPath)
 	}
 
 	// Bind mount file
@@ -177,7 +177,7 @@ func unmapBindMountDevice(v VolumePathHandler, mapPath string, linkName string) 
 	if isMountExist, checkErr := v.IsDeviceBindMountExist(linkPath); checkErr != nil {
 		return checkErr
 	} else if !isMountExist {
-		klog.Warningf("Warning: Unmap skipped because bind mount does not exist on the path: %v", linkPath)
+		klog.Warningf("Unmap skipped because bind mount does not exist on the path: %v", linkPath)
 
 		// Check if linkPath still exists
 		if _, err := os.Stat(linkPath); err != nil {
@@ -214,7 +214,7 @@ func unmapSymlinkDevice(v VolumePathHandler, mapPath string, linkName string) er
 	if islinkExist, checkErr := v.IsSymlinkExist(linkPath); checkErr != nil {
 		return checkErr
 	} else if !islinkExist {
-		klog.Warningf("Warning: Unmap skipped because symlink does not exist on the path: %v", linkPath)
+		klog.Warningf("Unmap skipped because symlink does not exist on the path: %v", linkPath)
 		return nil
 	}
 	return os.Remove(linkPath)

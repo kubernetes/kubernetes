@@ -187,6 +187,16 @@ func (m *CSIDriverSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.PreventPodSchedulingIfMissing != nil {
+		i--
+		if *m.PreventPodSchedulingIfMissing {
+			dAtA[i] = 1
+		} else {
+			dAtA[i] = 0
+		}
+		i--
+		dAtA[i] = 0x58
+	}
 	if m.ServiceAccountTokenInSecrets != nil {
 		i--
 		if *m.ServiceAccountTokenInSecrets {
@@ -1304,6 +1314,9 @@ func (m *CSIDriverSpec) Size() (n int) {
 	if m.ServiceAccountTokenInSecrets != nil {
 		n += 2
 	}
+	if m.PreventPodSchedulingIfMissing != nil {
+		n += 2
+	}
 	return n
 }
 
@@ -1701,6 +1714,7 @@ func (this *CSIDriverSpec) String() string {
 		`SELinuxMount:` + valueToStringGenerated(this.SELinuxMount) + `,`,
 		`NodeAllocatableUpdatePeriodSeconds:` + valueToStringGenerated(this.NodeAllocatableUpdatePeriodSeconds) + `,`,
 		`ServiceAccountTokenInSecrets:` + valueToStringGenerated(this.ServiceAccountTokenInSecrets) + `,`,
+		`PreventPodSchedulingIfMissing:` + valueToStringGenerated(this.PreventPodSchedulingIfMissing) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -2498,6 +2512,27 @@ func (m *CSIDriverSpec) Unmarshal(dAtA []byte) error {
 			}
 			b := bool(v != 0)
 			m.ServiceAccountTokenInSecrets = &b
+		case 11:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PreventPodSchedulingIfMissing", wireType)
+			}
+			var v int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			b := bool(v != 0)
+			m.PreventPodSchedulingIfMissing = &b
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

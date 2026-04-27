@@ -25,17 +25,21 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/util/httpstream"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
 	"k8s.io/apimachinery/pkg/util/remotecommand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
+	utilexec "k8s.io/client-go/util/exec"
+	"k8s.io/streaming/pkg/httpstream"
 )
 
 func TestFallbackClient_WebSocketPrimarySucceeds(t *testing.T) {
@@ -232,6 +236,74 @@ func TestFallbackClient_PrimaryAndSecondaryFail(t *testing.T) {
 		// Ensure secondary executor returned an error.
 		require.Error(t, err)
 	}
+}
+
+func TestFallbackClient_SPDYSecondaryNonZeroExitCode(t *testing.T) {
+	const expectedExitCode = 23
+	const expectedStdout = "stdout-before-exit"
+
+	// Create fake SPDY server that writes stdout followed by a v4 status error.
+	spdyServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		ctx, err := createHTTPStreams(w, req, &StreamOptions{
+			Stdin:  strings.NewReader("input"),
+			Stdout: &bytes.Buffer{},
+		})
+		if err != nil {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		defer ctx.conn.Close()
+
+		if _, err := io.WriteString(ctx.stdoutStream, expectedStdout); err != nil {
+			t.Fatalf("error writing stdout stream: %v", err)
+		}
+
+		statusErr := &apierrors.StatusError{ErrStatus: metav1.Status{
+			Status: metav1.StatusFailure,
+			Reason: remotecommand.NonZeroExitCodeReason,
+			Details: &metav1.StatusDetails{
+				Causes: []metav1.StatusCause{
+					{
+						Type:    remotecommand.ExitCodeCauseType,
+						Message: "23",
+					},
+				},
+			},
+			Message: "command terminated with non-zero exit code: 23",
+		}}
+		if err := ctx.writeStatus(statusErr); err != nil {
+			t.Fatalf("error writing status stream: %v", err)
+		}
+	}))
+	defer spdyServer.Close()
+
+	spdyLocation, err := url.Parse(spdyServer.URL)
+	require.NoError(t, err)
+	// Primary websocket executor points at a SPDY-only endpoint and should fail.
+	websocketExecutor, err := NewWebSocketExecutor(&rest.Config{Host: spdyLocation.Host}, "GET", spdyServer.URL+"?stdin=true&stdout=true")
+	require.NoError(t, err)
+	spdyExecutor, err := NewSPDYExecutor(&rest.Config{Host: spdyLocation.Host}, "POST", spdyLocation)
+	require.NoError(t, err)
+
+	var sawPrimaryError atomic.Bool
+	exec, err := NewFallbackExecutor(websocketExecutor, spdyExecutor, func(err error) bool {
+		sawPrimaryError.Store(true)
+		return true
+	})
+	require.NoError(t, err)
+
+	var stdout bytes.Buffer
+	err = exec.StreamWithContext(context.Background(), StreamOptions{
+		Stdin:  strings.NewReader("input"),
+		Stdout: &stdout,
+	})
+	require.Error(t, err)
+	require.True(t, sawPrimaryError.Load(), "expected primary websocket path to fail and trigger fallback")
+
+	var exitErr utilexec.ExitError
+	require.ErrorAs(t, err, &exitErr, "expected ExitError from secondary SPDY path, got: %T: %v", err, err)
+	require.Equal(t, expectedExitCode, exitErr.ExitStatus())
+	require.Equal(t, expectedStdout, stdout.String())
 }
 
 // localhostCert was generated from crypto/tls/generate_cert.go with the following command:

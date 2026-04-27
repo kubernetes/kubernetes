@@ -38,7 +38,7 @@ import (
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
-var _ = common.SIGDescribe("Pod IPs", func() {
+var _ = common.SIGDescribe("Pod IPs", framework.WithNodeConformance(), func() {
 	f := framework.NewDefaultFramework("pod-ips")
 	f.NamespacePodSecurityLevel = admissionapi.LevelRestricted
 	testFinalizer := "example.com/test-finalizer"

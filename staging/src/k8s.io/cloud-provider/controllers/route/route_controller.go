@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"golang.org/x/time/rate"
+
 	"k8s.io/klog/v2"
 	netutils "k8s.io/utils/net"
 
@@ -440,7 +441,7 @@ func (rc *RouteController) reconcile(ctx context.Context, nodes []*v1.Node, rout
 									Name:       string(nodeName),
 									UID:        node.UID,
 									Namespace:  "",
-								}, v1.EventTypeWarning, "FailedToCreateRoute", msg)
+								}, v1.EventTypeWarning, "FailedToCreateRoute", "%s", msg)
 							klog.V(4).Info(msg)
 							return err
 						}

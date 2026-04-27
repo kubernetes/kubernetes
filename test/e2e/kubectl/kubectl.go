@@ -239,7 +239,7 @@ func readTestFileOrDie(file string) []byte {
 func runKubectlRetryOrDie(ns string, args ...string) string {
 	var err error
 	var output string
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		output, err = e2ekubectl.RunKubectl(ns, args...)
 		if err == nil || (!strings.Contains(err.Error(), genericregistry.OptimisticLockErrorMsg) && !strings.Contains(err.Error(), "Operation cannot be fulfilled")) {
 			break
@@ -446,7 +446,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 			ginkgo.By("executing a very long command in the container")
 			veryLongData := make([]rune, 20000)
-			for i := 0; i < len(veryLongData); i++ {
+			for i := range veryLongData {
 				veryLongData[i] = 'a'
 			}
 			execOutput = e2ekubectl.RunKubectlOrDie(ns, "exec", podRunningTimeoutArg, simplePodName, "--", "echo", string(veryLongData))
@@ -1485,8 +1485,11 @@ metadata:
 			checkOutput(output, requiredStrings)
 
 			// Node
-			// It should be OK to list unschedulable Nodes here.
-			nodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+			// Filter out unschedulable nodes to avoid picking up ephemeral fake nodes
+			// created by other parallel tests (e.g. test/e2e/node/node_lifecycle.go).
+			nodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{
+				FieldSelector: "spec.unschedulable=false",
+			})
 			framework.ExpectNoError(err)
 			node := nodes.Items[0]
 			output = e2ekubectl.RunKubectlOrDie(ns, "describe", "node", node.Name)

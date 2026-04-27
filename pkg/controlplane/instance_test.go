@@ -31,8 +31,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	autoscalingrest "k8s.io/kubernetes/pkg/registry/autoscaling/rest"
-	resourcerest "k8s.io/kubernetes/pkg/registry/resource/rest"
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 
 	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
@@ -50,6 +49,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
+	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/server/resourceconfig"
@@ -72,6 +72,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	appsrest "k8s.io/kubernetes/pkg/registry/apps/rest"
+	autoscalingrest "k8s.io/kubernetes/pkg/registry/autoscaling/rest"
 	batchrest "k8s.io/kubernetes/pkg/registry/batch/rest"
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
@@ -80,6 +81,7 @@ import (
 	noderest "k8s.io/kubernetes/pkg/registry/node/rest"
 	policyrest "k8s.io/kubernetes/pkg/registry/policy/rest"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
+	resourcerest "k8s.io/kubernetes/pkg/registry/resource/rest"
 	schedulingrest "k8s.io/kubernetes/pkg/registry/scheduling/rest"
 	storagerest "k8s.io/kubernetes/pkg/registry/storage/rest"
 )
@@ -568,6 +570,95 @@ func TestGenericStorageProviders(t *testing.T) {
 	if g != len(generic) {
 		t.Errorf("Unexpected, generic APIs found: %#v", generic[g:])
 	}
+}
+
+// TestGetResetFieldsHasAllVersions verifies that every storage implementing
+// ResetFieldsStrategy or ResetFieldsFilterStrategy returns entries for all
+// served API versions of that resource.
+func TestGetResetFieldsHasAllVersions(t *testing.T) {
+	_, config, _ := setUp(t)
+
+	client, err := kubernetes.NewForConfig(config.ControlPlane.Generic.LoopbackClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	providers, err := config.Complete().StorageProviders(client)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Enable all versions (including alpha and beta) to test comprehensively.
+	allVersionsConfig := DefaultAPIResourceConfigSource()
+	allVersionsConfig.EnableVersions(betaAPIGroupVersionsDisabledByDefault...)
+	allVersionsConfig.EnableVersions(alphaAPIGroupVersionsDisabledByDefault...)
+
+	for _, provider := range providers {
+		groupName := provider.GroupName()
+		apiGroupInfo, err := provider.NewRESTStorage(allVersionsConfig, config.ControlPlane.Generic.RESTOptionsGetter)
+		if err != nil {
+			t.Errorf("error creating REST storage for %s: %v", groupName, err)
+			continue
+		}
+
+		allServedVersionsByResource := map[string][]string{}
+		for v, resourcesInVersion := range apiGroupInfo.VersionedResourcesStorageMap {
+			for resource := range resourcesInVersion {
+				var apiVersion string
+				if len(groupName) == 0 {
+					apiVersion = v
+				} else {
+					apiVersion = groupName + "/" + v
+				}
+				allServedVersionsByResource[resource] = append(allServedVersionsByResource[resource], apiVersion)
+			}
+		}
+
+		// Check every storage that implements GetResetFields or GetResetFieldsFilter.
+		for v, resourcesInVersion := range apiGroupInfo.VersionedResourcesStorageMap {
+			for resource, storage := range resourcesInVersion {
+				servedVersions := allServedVersionsByResource[resource]
+				if len(servedVersions) <= 1 {
+					continue // only one version, nothing to check
+				}
+				if rfs, ok := storage.(rest.ResetFieldsStrategy); ok {
+					resetFields := rfs.GetResetFields()
+					if resetFields == nil {
+						continue // no reset fields, nothing to check
+					}
+					for _, sv := range servedVersions {
+						if _, exists := resetFields[fieldpath.APIVersion(sv)]; !exists {
+							t.Errorf("%s: GetResetFields() is missing version %q, has %v; all served versions: %v",
+								gvr(groupName, v, resource), sv, resetFields, servedVersions)
+						}
+					}
+				}
+
+				if rfs, ok := storage.(rest.ResetFieldsFilterStrategy); ok {
+					resetFieldsFilter := rfs.GetResetFieldsFilter()
+					if resetFieldsFilter == nil {
+						continue
+					}
+					for _, sv := range servedVersions {
+						if _, exists := resetFieldsFilter[fieldpath.APIVersion(sv)]; !exists {
+							t.Errorf("%s: GetResetFieldsFilter() is missing version %q, has %v; all served versions: %v",
+								gvr(groupName, v, resource), sv, resetFieldsFilter, servedVersions)
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+func gvr(g string, v string, r string) string {
+	var gvr string
+	if len(g) == 0 {
+		gvr = fmt.Sprintf("%s/%s", v, r)
+	} else {
+		gvr = fmt.Sprintf("%s/%s/%s", g, v, r)
+	}
+	return gvr
 }
 
 // noStorageVersionHash lists resources that legitimately with empty storage

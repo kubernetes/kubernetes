@@ -18,11 +18,12 @@ package set
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
-	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
+	apiresource "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -31,8 +32,8 @@ import (
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	generateversioned "k8s.io/kubectl/pkg/generate/versioned"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -211,10 +212,17 @@ func (o *SetResourcesOptions) Validate() error {
 		return fmt.Errorf("you must specify an update to requests or limits (in the form of --requests/--limits)")
 	}
 
-	o.ResourceRequirements, err = generateversioned.HandleResourceRequirementsV1(map[string]string{"limits": o.Limits, "requests": o.Requests})
+	o.ResourceRequirements = v1.ResourceRequirements{}
+	limits, err := parseResourceList(o.Limits)
 	if err != nil {
 		return err
 	}
+	o.ResourceRequirements.Limits = limits
+	requests, err := parseResourceList(o.Requests)
+	if err != nil {
+		return err
+	}
+	o.ResourceRequirements.Requests = requests
 
 	return nil
 }
@@ -299,4 +307,25 @@ func (o *SetResourcesOptions) Run() error {
 		}
 	}
 	return utilerrors.NewAggregate(allErrs)
+}
+
+func parseResourceList(spec string) (v1.ResourceList, error) {
+	if spec == "" {
+		return nil, nil
+	}
+
+	result := v1.ResourceList{}
+	for resourceStatement := range strings.SplitSeq(spec, ",") {
+		parts := strings.Split(resourceStatement, "=")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid argument syntax %v, expected <resource>=<value>", resourceStatement)
+		}
+		resourceName := v1.ResourceName(parts[0])
+		resourceQuantity, err := apiresource.ParseQuantity(parts[1])
+		if err != nil {
+			return nil, err
+		}
+		result[resourceName] = resourceQuantity
+	}
+	return result, nil
 }

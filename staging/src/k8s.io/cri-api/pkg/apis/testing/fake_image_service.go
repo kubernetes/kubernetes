@@ -256,7 +256,7 @@ type pulledImage struct {
 }
 
 // Close will shutdown the internal gRPC client connection.
-func (r *FakeImageService) Close() error {
+func (r *FakeImageService) Close(_ context.Context) error {
 	r.Lock()
 	defer r.Unlock()
 

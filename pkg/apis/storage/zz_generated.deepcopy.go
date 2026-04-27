@@ -142,6 +142,11 @@ func (in *CSIDriverSpec) DeepCopyInto(out *CSIDriverSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.PreventPodSchedulingIfMissing != nil {
+		in, out := &in.PreventPodSchedulingIfMissing, &out.PreventPodSchedulingIfMissing
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

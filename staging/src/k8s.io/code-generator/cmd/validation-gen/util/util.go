@@ -17,6 +17,10 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
+	"math"
+	"strconv"
+
 	"k8s.io/gengo/v2/parser/tags"
 	"k8s.io/gengo/v2/types"
 )
@@ -113,4 +117,112 @@ func IsDirectComparable(t *types.Type) bool {
 		return IsDirectComparable(t.Underlying)
 	}
 	return false
+}
+
+// ParseInt strictly parses an int from a string input,
+// ensuring that when converted back to a string, the resulting
+// int and the input string have the exact same representation.
+// This prevents scenarios where an input like "0100" parses
+// as 100 and would be re-stringed as "100".
+func ParseInt(val string) (int, error) {
+	intVal, err := strconv.Atoi(val)
+	if err != nil {
+		return 0, fmt.Errorf("parsing %q as int: %w", val, err)
+	}
+
+	strVal := strconv.Itoa(intVal)
+	if strVal != val {
+		return 0, fmt.Errorf("%q is not a valid int value", val)
+	}
+
+	return intVal, nil
+}
+
+// ParseSignedInt strictly parses a signed integer from a string input and
+// validates that the result fits within the specified bit size. The bitSize
+// parameter should be 8, 16, 32, or 64, corresponding to the target Go type.
+// Values outside the representable range for the target type are rejected at
+// parse time with a descriptive error.
+func ParseSignedInt(val string, bitSize int) (int64, error) {
+	intVal, err := strconv.ParseInt(val, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("parsing %q as int: %w", val, err)
+	}
+
+	// Verify canonical form: reject leading zeros, unary plus, etc.
+	strVal := strconv.FormatInt(intVal, 10)
+	if strVal != val {
+		return 0, fmt.Errorf("%q is not a valid int value", val)
+	}
+
+	// Validate the parsed value fits in the target type's range.
+	var minVal, maxVal int64
+	switch bitSize {
+	case 8:
+		minVal, maxVal = math.MinInt8, math.MaxInt8
+	case 16:
+		minVal, maxVal = math.MinInt16, math.MaxInt16
+	case 32:
+		minVal, maxVal = math.MinInt32, math.MaxInt32
+	case 64:
+		minVal, maxVal = math.MinInt64, math.MaxInt64
+	default:
+		return 0, fmt.Errorf("unsupported bitSize %d; must be 8, 16, 32, or 64", bitSize)
+	}
+	if intVal < minVal || intVal > maxVal {
+		return 0, fmt.Errorf("value %d does not fit in int%d (range [%d, %d])", intVal, bitSize, minVal, maxVal)
+	}
+
+	return intVal, nil
+}
+
+// ParseUnsignedInt strictly parses an unsigned integer from a string input and
+// validates that the result fits within the specified bit size. The bitSize
+// parameter should be 8, 16, 32, or 64, corresponding to the target Go type.
+func ParseUnsignedInt(val string, bitSize int) (uint64, error) {
+	uintVal, err := strconv.ParseUint(val, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("parsing %q as uint: %w", val, err)
+	}
+
+	// Verify canonical form: reject leading zeros, unary plus, etc.
+	strVal := strconv.FormatUint(uintVal, 10)
+	if strVal != val {
+		return 0, fmt.Errorf("%q is not a valid uint value", val)
+	}
+
+	// Validate the parsed value fits in the target type's range.
+	var maxVal uint64
+	switch bitSize {
+	case 8:
+		maxVal = math.MaxUint8
+	case 16:
+		maxVal = math.MaxUint16
+	case 32:
+		maxVal = math.MaxUint32
+	case 64:
+		maxVal = math.MaxUint64
+	default:
+		return 0, fmt.Errorf("unsupported bitSize %d; must be 8, 16, 32, or 64", bitSize)
+	}
+	if uintVal > maxVal {
+		return 0, fmt.Errorf("value %d does not fit in uint%d (range [0, %d])", uintVal, bitSize, maxVal)
+	}
+
+	return uintVal, nil
+}
+
+// ParseBool strictly parses a bool from a string input,
+// ensuring that when converted back to a string, the resulting
+// bool and the input string have the exact same representation.
+// This prevents scenarios where an input like "TRUE" parses
+// as true and would be re-stringed as "true".
+func ParseBool(val string) (bool, error) {
+	switch val {
+	case "true":
+		return true, nil
+	case "false":
+		return false, nil
+	}
+	return false, fmt.Errorf("%q is not a valid bool value", val)
 }

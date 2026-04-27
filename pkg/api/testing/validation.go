@@ -223,6 +223,13 @@ type validationOption struct {
 	// to the versioned object fails.
 	IgnoreObjectConversionErrors bool
 
+	// MinEmulationVersion is the minimum emulation version that can be used in the
+	// "hand written validation" sub-test. When the test has already enabled a feature
+	// gate introduced after 1.35 (e.g. in 1.36+), setting the emulation version to
+	// 1.35 would fail because the feature gate did not exist at that version.
+	// If set to a version greater than 1.35, the sub-test is skipped.
+	MinEmulationVersion *version.Version
+
 	// Fuzzer is the fuzzer to use for generating test objects.
 	Fuzzer *randfill.Filler
 }
@@ -248,6 +255,16 @@ func WithIgnoreObjectConversionErrors() ValidationTestConfig {
 func WithFuzzer(fuzzer *randfill.Filler) ValidationTestConfig {
 	return func(o *validationOption) {
 		o.Fuzzer = fuzzer
+	}
+}
+
+// WithMinEmulationVersion sets the minimum emulation version that can be used in the
+// "hand written validation" sub-test. Use this when the test has already enabled a
+// feature gate that was introduced after 1.35, which would cause the emulation version
+// downgrade to 1.35 to fail.
+func WithMinEmulationVersion(v *version.Version) ValidationTestConfig {
+	return func(o *validationOption) {
+		o.MinEmulationVersion = v
 	}
 }
 
@@ -366,12 +383,17 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 	})
 	// 3. Legacy Hand Written Validation
 	// TODO: Remove this test case in 1.39 when emulation for 1.35 is no longer needed.
+	emulationVersion := version.MustParse("1.35")
+	skipHandWritten := opt.MinEmulationVersion != nil && opt.MinEmulationVersion.GreaterThan(emulationVersion)
 	t.Run("hand written validation", func(t *testing.T) {
+		if skipHandWritten {
+			t.Skipf("skipping: minimum emulation version %s is greater than %s", opt.MinEmulationVersion, emulationVersion)
+		}
 		// Even when DeclarativeValidation gate is disabled, if the object's strategy has explicit
 		// declarative enforcement enabled, Standard declarative validations still run and are enforced.
 		// Emulating 1.35 ensures the DeclarativeValidationBeta gate is also effectively disabled (evaluated as false)
 		// because the feature gate was not introduced until 1.36.
-		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, emulationVersion)
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 			features.DeclarativeValidation: false,
 		})
@@ -428,13 +450,15 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 		equivalenceMatcher = equivalenceMatcher.ByField()
 	}
 
-	// The imperative validation may produce duplicate errors, which is not supported by the ErrorMatcher.
-	// TODO: remove this once ErrorMatcher has been extended to handle this form of deduplication.
-	imperativeErrs = deDuplicateErrors(imperativeErrs, equivalenceMatcher)
+	if !skipHandWritten {
+		// The imperative validation may produce duplicate errors, which is not supported by the ErrorMatcher.
+		// TODO: remove this once ErrorMatcher has been extended to handle this form of deduplication.
+		imperativeErrs = deDuplicateErrors(imperativeErrs, equivalenceMatcher)
 
-	// Verify equivalence across all scenarios
-	equivalenceMatcher.Test(t, imperativeErrs, declarativeBetaEnabledErrs)
-	equivalenceMatcher.Test(t, imperativeErrs, declarativeBetaDisabledErrs)
+		// Verify equivalence across all scenarios
+		equivalenceMatcher.Test(t, imperativeErrs, declarativeBetaEnabledErrs)
+		equivalenceMatcher.Test(t, imperativeErrs, declarativeBetaDisabledErrs)
+	}
 }
 
 // deDuplicateErrors removes duplicate errors from an ErrorList based on the provided matcher.

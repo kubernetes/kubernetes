@@ -126,10 +126,6 @@ featureGates:
 			framework.ExpectNoError(os.WriteFile(filepath.Join(configDir, "20-kubelet.conf"), contents, 0755))
 			ginkgo.By("Restarting the kubelet")
 			restartKubelet(ctx)
-			// wait until the kubelet health check will succeed
-			gomega.Eventually(ctx, func() bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
 
 			mergedConfig, err := getCurrentKubeletConfig(ctx)
 			framework.ExpectNoError(err)

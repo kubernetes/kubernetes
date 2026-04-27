@@ -59,7 +59,7 @@ LIMITED_SWAP=${LIMITED_SWAP:-""}
 
 # required for cni installation
 CNI_CONFIG_DIR=${CNI_CONFIG_DIR:-/etc/cni/net.d}
-CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.9.0"}
+CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.9.1"}
 # The arch of the CNI binary, if not set, will be fetched based on the value of `uname -m`
 CNI_TARGETARCH=${CNI_TARGETARCH:-""}
 CNI_PLUGINS_URL="https://github.com/containernetworking/plugins/releases/download"
@@ -333,7 +333,21 @@ REUSE_CERTS=${REUSE_CERTS:-false}
 
 # Ensure CERT_DIR is created for auto-generated crt/key and kubeconfig
 mkdir -p "${CERT_DIR}" &>/dev/null || sudo mkdir -p "${CERT_DIR}"
-CONTROLPLANE_SUDO=$(test -w "${CERT_DIR}" || echo "sudo -E")
+
+# CONTROLPLANE_SUDO is used for control plane components. If the CERT_DIR is not writable,
+# "sudo -E" is used to gain the necessary write privileges.
+# Can be set to something else or explicitly to empty to override the default.
+CONTROLPLANE_SUDO=${CONTROLPLANE_SUDO-$(test -w "${CERT_DIR}" || echo "sudo -E")}
+
+# KUBELET_SUDO is used for starting the kubelet.
+# Can be set to something else or explicitly to empty to override the default.
+KUBELET_SUDO=${KUBELET_SUDO-sudo -E}
+
+# PROXY_SUDO is used for starting kube-proxy.
+# Can be set to something else or explicitly to empty to override the default.
+PROXY_SUDO=${PROXY_SUDO-sudo -E}
+
+# Note that "sudo" is still used in various other places and must work.
 
 if (( KUBE_VERBOSE <= 4 )); then
   set +x
@@ -1035,7 +1049,8 @@ EOF
     } >>"${TMP_DIR}"/kubelet.yaml
 
     # shellcheck disable=SC2024
-    run kubelet "${KUBELET_LOG}" sudo -E "${GO_OUT}/kubelet" "${all_kubelet_flags[@]}" \
+    # shellcheck disable=SC2086 # Word-splitting of KUBELET_SUDO is intentional.
+    run kubelet "${KUBELET_LOG}" ${KUBELET_SUDO} "${GO_OUT}/kubelet" "${all_kubelet_flags[@]}" \
       --config="${TMP_DIR}"/kubelet.yaml &
     KUBELET_PID=$!
 
@@ -1082,7 +1097,8 @@ EOF
     # Probably not necessary...
     #
     # shellcheck disable=SC2024
-    run kube-proxy "${PROXY_LOG}" sudo "${GO_OUT}/kube-proxy" \
+    # shellcheck disable=SC2086 # Word-splitting of KUBELET_SUDO is intentional.
+    run kube-proxy "${PROXY_LOG}" ${PROXY_SUDO} "${GO_OUT}/kube-proxy" \
       --v="${LOG_LEVEL}" \
       --config="${TMP_DIR}"/kube-proxy.yaml \
       --healthz-port="${PROXY_HEALTHZ_PORT}" \

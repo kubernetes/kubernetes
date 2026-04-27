@@ -60,7 +60,7 @@ func (itv immutableTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            itv.TagName(),
 		StabilityLevel: TagStabilityLevelBeta,
-		Scopes:         itv.ValidScopes().UnsortedList(),
+		Scopes:         sets.List(itv.ValidScopes()),
 		Description:    "Indicates that a field may not be updated.",
 	}
 }

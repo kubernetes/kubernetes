@@ -33,7 +33,7 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	testutils "k8s.io/kubernetes/test/utils"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -213,7 +213,7 @@ func TestRunOp(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, tCtx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 			client := fake.NewSimpleClientset()
 			tCtx = tCtx.WithClients(nil, nil, client, nil, nil)
 
@@ -618,7 +618,7 @@ func TestMetricThreshold(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, tCtx := ktesting.NewTestContext(t)
+			tCtx := ktesting.Init(t)
 			var capturedErr error
 			capturingCtx, finalize := tCtx.WithError(&capturedErr)
 			defer finalize()
@@ -629,7 +629,7 @@ func TestMetricThreshold(t *testing.T) {
 				return []testDataCollector{&mockDataCollector{dataItems: tc.dataItems}}
 			}
 
-			workload := &workload{
+			workload := &Workload{
 				Name: "some/workload",
 				Threshold: thresholds{
 					valuesByTopic: map[string]float64{"example": tc.thresholdValue},

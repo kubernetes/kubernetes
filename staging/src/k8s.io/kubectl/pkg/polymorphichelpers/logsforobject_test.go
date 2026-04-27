@@ -384,6 +384,12 @@ func TestLogsForObject(t *testing.T) {
 				FieldPath:  fmt.Sprintf("spec.containers{%s}", testPodWithOneContainers().Spec.Containers[0].Name),
 			}},
 		},
+		{
+			name:        "pod logs: invalid container name",
+			obj:         testPodWithTwoContainers(),
+			opts:        &corev1.PodLogOptions{Container: "nonexistent"},
+			expectedErr: "container nonexistent is not valid for pod foo-two-containers out of: foo-2-c1, foo-2-c2",
+		},
 	}
 
 	for _, test := range tests {

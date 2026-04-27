@@ -22,7 +22,7 @@ limitations under the License.
 //
 // +k8s:validation-gen-nolint
 //
-//nolint:unused,govet // govet disables structtag check, which checks for use of tags on private fields
+//nolint:unused,govet,staticcheck // govet disables structtag check, which checks for use of tags on private fields; staticcheck calls out SA5008: unexported struct field cannot have non-ignored `json:"private"`
 package publicprivate
 
 import "k8s.io/code-generator/cmd/validation-gen/testscheme"

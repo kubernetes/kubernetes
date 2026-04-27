@@ -196,6 +196,8 @@ func dropDisabledFields(newSlice, oldSlice *resource.ResourceSlice) {
 	dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice)
 	dropDisabledDRADeviceBindingConditionsFields(newSlice, oldSlice)
 	dropDisabledDRAConsumableCapacityFields(newSlice, oldSlice)
+	dropDisabledDRANodeAllocatableResourcesFields(newSlice, oldSlice)
+	dropDisableDRAListTypeAttributesFields(newSlice, oldSlice)
 }
 
 func dropDisabledDRADeviceTaintsFields(newSlice, oldSlice *resource.ResourceSlice) {
@@ -323,4 +325,71 @@ func dropDisabledDRAConsumableCapacityFields(newSlice, oldSlice *resource.Resour
 			}
 		}
 	}
+}
+
+func dropDisabledDRANodeAllocatableResourcesFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) || draNodeAllocatableResourcesFeatureInUse(oldSlice) {
+		return
+	}
+
+	for i := range newSlice.Spec.Devices {
+		newSlice.Spec.Devices[i].NodeAllocatableResourceMappings = nil
+	}
+}
+
+func draNodeAllocatableResourcesFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+
+	for _, device := range slice.Spec.Devices {
+		if len(device.NodeAllocatableResourceMappings) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func dropDisableDRAListTypeAttributesFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAListTypeAttributes) ||
+		draListTypeAttributesFeatureInUse(oldSlice) {
+		return
+	}
+
+	for i := range newSlice.Spec.Devices {
+		for k, deviceAttribute := range newSlice.Spec.Devices[i].Attributes {
+			if deviceAttribute.BoolValues != nil {
+				deviceAttribute.BoolValues = nil
+				newSlice.Spec.Devices[i].Attributes[k] = deviceAttribute
+			}
+			if deviceAttribute.IntValues != nil {
+				deviceAttribute.IntValues = nil
+				newSlice.Spec.Devices[i].Attributes[k] = deviceAttribute
+			}
+			if deviceAttribute.StringValues != nil {
+				deviceAttribute.StringValues = nil
+				newSlice.Spec.Devices[i].Attributes[k] = deviceAttribute
+			}
+			if deviceAttribute.VersionValues != nil {
+				deviceAttribute.VersionValues = nil
+				newSlice.Spec.Devices[i].Attributes[k] = deviceAttribute
+			}
+		}
+	}
+}
+
+func draListTypeAttributesFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+
+	for _, device := range slice.Spec.Devices {
+		for _, deviceAttribute := range device.Attributes {
+			if deviceAttribute.BoolValues != nil || deviceAttribute.IntValues != nil || deviceAttribute.StringValues != nil || deviceAttribute.VersionValues != nil {
+				return true
+			}
+		}
+	}
+
+	return false
 }

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,18 +30,26 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/endpoints/responsewriter"
 	"k8s.io/apiserver/pkg/features"
-	v1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
+	"k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
+	"k8s.io/apiserver/pkg/server/flagz/api/v1beta1"
 	"k8s.io/apiserver/pkg/server/flagz/negotiate"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
-const (
-	DefaultFlagzPath = "/flagz"
-	Kind             = "Flagz"
-	GroupName        = "config.k8s.io"
-	Version          = "v1alpha1"
+var (
+	v1alpha1FlagzKind         = v1alpha1.SchemeGroupVersion.WithKind("Flagz")
+	v1beta1FlagzKind          = v1beta1.SchemeGroupVersion.WithKind("Flagz")
+	recognizedStructuredKinds = map[schema.GroupVersionKind]bool{
+		v1alpha1FlagzKind: true,
+		v1beta1FlagzKind:  true,
+	}
 )
+
+const DefaultFlagzPath = "/flagz"
 
 // flagzCodecFactory wraps a CodecFactory to filter out unsupported media types (like protobuf)
 // from the supported media types list, so error messages only show actually supported types.
@@ -57,7 +66,7 @@ type mux interface {
 func Install(m mux, componentName string, flagReader Reader, opts ...Option) {
 	reg := &registry{
 		reader:                flagReader,
-		deprecatedVersionsMap: map[string]bool{},
+		deprecatedVersionsMap: map[string]bool{"v1alpha1": true},
 	}
 	for _, opt := range opts {
 		opt(reg)
@@ -65,11 +74,15 @@ func Install(m mux, componentName string, flagReader Reader, opts ...Option) {
 
 	scheme := runtime.NewScheme()
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
+	utilruntime.Must(v1beta1.AddToScheme(scheme))
 	filteredCodecFactory, err := newFlagzCodecFactory(scheme, componentName, reg.reader)
 	if err != nil {
 		utilruntime.HandleError(err)
 	}
-	m.Handle(DefaultFlagzPath, handleFlagz(componentName, reg, filteredCodecFactory, negotiate.FlagzEndpointRestrictions{}))
+	restrictions := negotiate.FlagzEndpointRestrictions{
+		RecognizedStructuredKinds: recognizedStructuredKinds,
+	}
+	m.Handle(DefaultFlagzPath, handleFlagz(componentName, reg, filteredCodecFactory, restrictions))
 }
 
 // newFlagzCodecFactory creates a codec factory with the standard serializers for flagz,
@@ -128,10 +141,34 @@ func (f *flagzCodecFactory) SupportedMediaTypes() []runtime.SerializerInfo {
 
 func handleFlagz(componentName string, reg *registry, serializer runtime.NegotiatedSerializer, restrictions negotiate.FlagzEndpointRestrictions) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		obj := flagz(componentName, reg.reader)
+		requestReceivedTimestamp, ok := request.ReceivedTimestampFrom(r.Context())
+		if !ok {
+			requestReceivedTimestamp = time.Now()
+		}
+		delegate := &metrics.ResponseWriterDelegator{ResponseWriter: w}
+		w = responsewriter.WrapForHTTP1Or2(delegate)
+
+		// Use MonitorRequest instead of InstrumentHandlerFunc because the group,
+		// version, and deprecated status depend on per-request content negotiation.
+		// For text/plain requests, group and version remain empty. For structured
+		// responses (JSON/YAML/CBOR), they are set to the negotiated API group and
+		// version (e.g., config.k8s.io/v1alpha1).
+		var group, version string
+		var deprecated bool
+		defer func() {
+			metrics.MonitorRequest(r, "GET", group, version,
+				"flagz",       // resource
+				"",            // subresource
+				"",            // scope
+				componentName, // component
+				deprecated,
+				"", // removedRelease
+				delegate.Status(), delegate.ContentLength(), time.Since(requestReceivedTimestamp))
+		}()
+
 		acceptHeader := r.Header.Get("Accept")
 		if strings.TrimSpace(acceptHeader) == "" {
-			writePlainTextResponse(obj, serializer, w, reg)
+			writePlainTextResponse(v1beta1Flagz(componentName, reg.reader), serializer, w, reg)
 			return
 		}
 
@@ -148,7 +185,6 @@ func handleFlagz(componentName string, reg *registry, serializer runtime.Negotia
 			return
 		}
 
-		var targetGV schema.GroupVersion
 		switch serializerInfo.MediaType {
 		case "application/json", "application/yaml", "application/cbor":
 			if mediaType.Convert == nil {
@@ -163,13 +199,15 @@ func handleFlagz(componentName string, reg *registry, serializer runtime.Negotia
 				)
 				return
 			}
-			targetGV = mediaType.Convert.GroupVersion()
-			if reg.deprecatedVersions()[targetGV.Version] {
+			group = mediaType.Convert.Group
+			version = mediaType.Convert.Version
+			deprecated = reg.deprecatedVersions()[version]
+			if deprecated {
 				w.Header().Set("Warning", `299 - "This version of the flagz endpoint is deprecated. Please use a newer version."`)
 			}
-			writeStructuredResponse(obj, serializer, targetGV, restrictions, w, r)
+			handleStructuredResponse(w, r, componentName, reg, serializer, restrictions, mediaType)
 		case "text/plain":
-			writePlainTextResponse(obj, serializer, w, reg)
+			writePlainTextResponse(v1beta1Flagz(componentName, reg.reader), serializer, w, reg)
 		default:
 			err := fmt.Errorf("unsupported media type: %s/%s", serializerInfo.MediaType, serializerInfo.MediaTypeSubType)
 			utilruntime.HandleError(err)
@@ -234,12 +272,45 @@ func writeStructuredResponse(obj runtime.Object, serializer runtime.NegotiatedSe
 	)
 }
 
-func flagz(componentName string, flagReader Reader) *v1alpha1.Flagz {
+func handleStructuredResponse(w http.ResponseWriter, r *http.Request, componentName string, reg *registry, serializer runtime.NegotiatedSerializer, restrictions negotiate.FlagzEndpointRestrictions, mediaType negotiation.MediaTypeOptions) {
+	switch *mediaType.Convert {
+	case v1alpha1FlagzKind:
+		writeStructuredResponse(v1alpha1Flagz(componentName, reg.reader), serializer, v1alpha1FlagzKind.GroupVersion(), restrictions, w, r)
+	case v1beta1FlagzKind:
+		writeStructuredResponse(v1beta1Flagz(componentName, reg.reader), serializer, v1beta1FlagzKind.GroupVersion(), restrictions, w, r)
+	default:
+		err := fmt.Errorf("unsupported media type: %s", mediaType.Convert.String())
+		utilruntime.HandleError(err)
+		responsewriters.ErrorNegotiated(
+			err,
+			serializer,
+			schema.GroupVersion{},
+			w,
+			r,
+		)
+	}
+}
+
+func v1alpha1Flagz(componentName string, flagReader Reader) *v1alpha1.Flagz {
 	flags := flagReader.GetFlagz()
 	return &v1alpha1.Flagz{
 		TypeMeta: metav1.TypeMeta{
-			Kind:       Kind,
-			APIVersion: fmt.Sprintf("%s/%s", GroupName, Version),
+			Kind:       v1alpha1FlagzKind.Kind,
+			APIVersion: v1alpha1FlagzKind.GroupVersion().String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: componentName,
+		},
+		Flags: flags,
+	}
+}
+
+func v1beta1Flagz(componentName string, flagReader Reader) *v1beta1.Flagz {
+	flags := flagReader.GetFlagz()
+	return &v1beta1.Flagz{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       v1beta1FlagzKind.Kind,
+			APIVersion: v1beta1FlagzKind.GroupVersion().String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: componentName,

@@ -2003,3 +2003,674 @@ type testHostMacProvider struct {
 func (r *testHostMacProvider) GetHostMac(nodeIP net.IP) string {
 	return r.macAddress
 }
+
+// TestRemoteAndLocalEndpointsSameIP demonstrates a reference counting issue
+// when two services share an endpoint with the same IP address, where one
+// service treats it as local (NodeName matches proxy hostname) and the other
+// treats it as remote (NodeName doesn't match). The remote proxy endpoint
+// resolves to the local HNS endpoint, causing its refCount to never be
+// incremented via the shared endPointsRefCount map.
+func TestRemoteAndLocalEndpointsSameIP(t *testing.T) {
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_L2BRIDGE, false)
+	if proxier == nil {
+		t.Error("Failed to create proxier")
+	}
+
+	sharedEPIP := epIpAddressLocal1 // "192.168.4.4" — same IP for both services
+
+	svcIP1 := "10.20.30.41"
+	svcPort1 := 80
+	svcPortName1 := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	svcIP2 := "10.20.30.42"
+	svcPort2 := 80
+	svcPortName2 := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc2"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	makeServiceMap(proxier,
+		// svc1 uses the endpoint as LOCAL
+		makeTestService(svcPortName1.Namespace, svcPortName1.Name, func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeClusterIP
+			svc.Spec.ClusterIP = svcIP1
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName1.Port,
+				Port:     int32(svcPort1),
+				Protocol: v1.ProtocolTCP,
+			}}
+		}),
+		// svc2 uses the endpoint as REMOTE
+		makeTestService(svcPortName2.Namespace, svcPortName2.Name, func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeClusterIP
+			svc.Spec.ClusterIP = svcIP2
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName2.Port,
+				Port:     int32(svcPort2),
+				Protocol: v1.ProtocolTCP,
+			}}
+		}),
+	)
+
+	populateEndpointSlices(proxier,
+		// svc1's endpoint: local (NodeName = "testhost" matches proxy hostname)
+		makeTestEndpointSlice(svcPortName1.Namespace, svcPortName1.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{sharedEPIP},
+				NodeName:  ptr.To(testNodeName),
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName1.Port),
+				Port:     ptr.To(int32(svcPort1)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+		// svc2's endpoint: remote (NodeName = "testhost2" doesn't match proxy hostname)
+		makeTestEndpointSlice(svcPortName2.Namespace, svcPortName2.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{sharedEPIP},
+				NodeName:  ptr.To("testhost2"),
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName2.Port),
+				Port:     ptr.To(int32(svcPort2)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+	)
+
+	// Pre-populate the local HNS endpoint at sharedEPIP (as CNI would create it)
+	hcnMock := (proxier.hcn).(*fakehcn.HcnMock)
+	hcnMock.PopulateQueriedEndpoints(endpointLocal1, networkId, sharedEPIP, macAddressLocal1, prefixLen)
+
+	proxier.setInitialized(true)
+	proxier.syncProxyRules()
+
+	// Find each service's endpoint
+	var localEp, remoteEp *endpointInfo
+	for _, ep := range proxier.endpointsMap[svcPortName1] {
+		if epI, ok := ep.(*endpointInfo); ok && epI.ip == sharedEPIP {
+			localEp = epI
+		}
+	}
+	for _, ep := range proxier.endpointsMap[svcPortName2] {
+		if epI, ok := ep.(*endpointInfo); ok && epI.ip == sharedEPIP {
+			remoteEp = epI
+		}
+	}
+
+	assert.NotNil(t, localEp, "Expected to find local endpoint for svc1")
+	assert.NotNil(t, remoteEp, "Expected to find remote endpoint for svc2")
+
+	// Both should resolve to the same local HNS endpoint
+	assert.Equal(t, endpointLocal1, localEp.hnsID,
+		"Local ep should have the pre-populated HNS endpoint ID")
+	assert.Equal(t, endpointLocal1, remoteEp.hnsID,
+		"Remote ep should resolve to the same local HNS endpoint ID")
+
+	// Verify the endpoint locality as seen by the proxy layer
+	assert.True(t, localEp.IsLocal(), "svc1's endpoint should be local")
+	assert.False(t, remoteEp.IsLocal(), "svc2's endpoint should be remote")
+
+	// The remote ep's refCount was never incremented via endPointsRefCount
+	// because the resolved HNS endpoint is local (newHnsEndpoint.IsLocal()=true),
+	// so the code took the hnsLocalEndpoints branch instead of incrementing the
+	// shared refCount. The remote ep retains its private refCount (value 0).
+	assert.NotNil(t, remoteEp.refCount, "Remote ep refCount pointer should not be nil")
+	assert.Equal(t, uint16(0), *remoteEp.refCount,
+		"Remote ep refCount should be 0 — it was never incremented because "+
+			"the HNS endpoint is local, exposing a refCount tracking gap")
+
+	// The shared endPointsRefCount map should not have an entry for this
+	// HNS endpoint (or if it does from some other path, it should be 0),
+	// because refCounts are only tracked for remote HNS endpoints.
+	if refCountPtr, exists := proxier.endPointsRefCount[endpointLocal1]; exists {
+		assert.Equal(t, uint16(0), *refCountPtr,
+			"Shared refCount for the local HNS endpoint should be 0")
+	}
+	// If the entry doesn't exist at all, that also confirms the issue:
+	// the remote proxy endpoint has no shared refCount tracking.
+}
+
+// TestRemoteEndpointDeleteDoesNotAffectLocalEndpointWithSameIP verifies that
+// when a remote endpoint is deleted (due to endpoint map changes), a local
+// endpoint with the same IP address is not incorrectly deleted.
+//
+// Flow:
+//  1. Create a local endpoint (IP-A) and a remote endpoint (IP-B).
+//  2. Two services (svc1, svc2) both use IP-A and IP-B. Remote endpoint refCount = 2.
+//  3. Add a third service (svc3) with a local endpoint at IP-B (same IP as the remote).
+//     Remote refCount stays 2; local endpoint refCount is 0 (locals are not ref-counted).
+//  4. Remove endpoints for svc1 and svc2. The remote endpoint at IP-B should be
+//     cleaned up (refCount drops to 0), but the local endpoint at IP-B for svc3
+//     must survive.
+func TestRemoteEndpointDeleteDoesNotAffectLocalEndpointWithSameIP(t *testing.T) {
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_L2BRIDGE, false)
+	if proxier == nil {
+		t.Fatal("Failed to create proxier")
+	}
+
+	localIP := epIpAddressLocal1  // "192.168.4.4"
+	remoteIP := epIpAddressRemote // "192.168.2.3"
+
+	svcIP1 := "10.20.30.41"
+	svcPort1 := 80
+	svcNodePort1 := 3001
+	svcPortName1 := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	svcIP2 := "10.20.30.42"
+	svcPort2 := 80
+	svcNodePort2 := 3002
+	svcPortName2 := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc2"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	svcIP3 := "10.20.30.43"
+	svcPort3 := 80
+	svcPortName3 := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc3"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	// Step 1+2: Create two services (svc1, svc2) each with a local endpoint (IP-A)
+	// and a remote endpoint (IP-B).
+	makeServiceMap(proxier,
+		makeTestService(svcPortName1.Namespace, svcPortName1.Name, func(svc *v1.Service) {
+			svc.Spec.Type = "NodePort"
+			svc.Spec.ClusterIP = svcIP1
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName1.Port,
+				Port:     int32(svcPort1),
+				Protocol: v1.ProtocolTCP,
+				NodePort: int32(svcNodePort1),
+			}}
+		}),
+		makeTestService(svcPortName2.Namespace, svcPortName2.Name, func(svc *v1.Service) {
+			svc.Spec.Type = "NodePort"
+			svc.Spec.ClusterIP = svcIP2
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName2.Port,
+				Port:     int32(svcPort2),
+				Protocol: v1.ProtocolTCP,
+				NodePort: int32(svcNodePort2),
+			}}
+		}),
+	)
+
+	populateEndpointSlices(proxier,
+		makeTestEndpointSlice(svcPortName1.Namespace, svcPortName1.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{
+				{
+					Addresses: []string{localIP},
+					NodeName:  ptr.To(testNodeName),
+				},
+				{
+					Addresses: []string{remoteIP},
+				},
+			}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName1.Port),
+				Port:     ptr.To(int32(svcPort1)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+		makeTestEndpointSlice(svcPortName2.Namespace, svcPortName2.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{
+				{
+					Addresses: []string{localIP},
+					NodeName:  ptr.To(testNodeName),
+				},
+				{
+					Addresses: []string{remoteIP},
+				},
+			}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName2.Port),
+				Port:     ptr.To(int32(svcPort2)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+	)
+
+	// Pre-populate the local HNS endpoint (as CNI would create it).
+	hcnMock := (proxier.hcn).(*fakehcn.HcnMock)
+	hcnMock.PopulateQueriedEndpoints(endpointLocal1, networkId, localIP, macAddressLocal1, prefixLen)
+
+	proxier.setInitialized(true)
+	proxier.syncProxyRules()
+
+	// Find the remote endpoint for svc1 and assert refCount == 2.
+	var remoteEpInfo *endpointInfo
+	var remoteEpHnsID string
+	for _, ep := range proxier.endpointsMap[svcPortName1] {
+		epI, ok := ep.(*endpointInfo)
+		if ok && epI.ip == remoteIP {
+			remoteEpInfo = epI
+			remoteEpHnsID = epI.hnsID
+		}
+	}
+	assert.NotNil(t, remoteEpInfo, "Expected to find remote endpoint for svc1")
+	assert.NotEmpty(t, remoteEpHnsID, "Remote endpoint should have an HNS ID")
+	assert.Equal(t, uint16(2), *remoteEpInfo.refCount,
+		"Remote endpoint refCount should be 2 after two services reference it")
+	assert.Equal(t, *proxier.endPointsRefCount[remoteEpHnsID], *remoteEpInfo.refCount,
+		"Global and endpoint refCounts should match")
+
+	// Step 3: Add svc3 with a local endpoint at IP-B (same IP as the remote endpoint).
+	proxier.setInitialized(false)
+
+	proxier.OnServiceAdd(
+		makeTestService(svcPortName3.Namespace, svcPortName3.Name, func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeClusterIP
+			svc.Spec.ClusterIP = svcIP3
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName3.Port,
+				Port:     int32(svcPort3),
+				Protocol: v1.ProtocolTCP,
+			}}
+		}))
+	proxier.mu.Lock()
+	proxier.servicesSynced = true
+	proxier.mu.Unlock()
+
+	proxier.OnEndpointSliceAdd(
+		makeTestEndpointSlice(svcPortName3.Namespace, svcPortName3.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{{
+				Addresses: []string{remoteIP},
+				NodeName:  ptr.To(testNodeName), // Local because NodeName matches
+			}}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName3.Port),
+				Port:     ptr.To(int32(svcPort3)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}))
+	proxier.mu.Lock()
+	proxier.endpointSlicesSynced = true
+	proxier.mu.Unlock()
+
+	// Pre-populate the new local HNS endpoint at IP-B.
+	hcnMock.PopulateQueriedEndpoints(endpointLocal2, networkId, remoteIP, macAddressLocal2, prefixLen)
+
+	proxier.setInitialized(true)
+	proxier.syncProxyRules()
+
+	// The remote endpoint refCount should still be 2 (svc1 and svc2 still reference it).
+	remoteEpInfo = nil
+	for _, ep := range proxier.endpointsMap[svcPortName1] {
+		epI, ok := ep.(*endpointInfo)
+		if ok && epI.ip == remoteIP {
+			remoteEpInfo = epI
+		}
+	}
+	assert.NotNil(t, remoteEpInfo, "Expected remote endpoint still present for svc1")
+	assert.Equal(t, uint16(2), *remoteEpInfo.refCount,
+		"Remote endpoint refCount should still be 2 after adding local endpoint with same IP")
+
+	// Find svc3's local endpoint at IP-B. Its refCount should be 0
+	// (local endpoints are not ref-counted).
+	var localEpAtRemoteIP *endpointInfo
+	for _, ep := range proxier.endpointsMap[svcPortName3] {
+		epI, ok := ep.(*endpointInfo)
+		if ok && epI.ip == remoteIP {
+			localEpAtRemoteIP = epI
+		}
+	}
+	assert.NotNil(t, localEpAtRemoteIP, "Expected to find local endpoint for svc3 at IP-B")
+	assert.True(t, localEpAtRemoteIP.IsLocal(), "svc3's endpoint should be local")
+	assert.NotNil(t, localEpAtRemoteIP.refCount, "Local endpoint refCount pointer should not be nil")
+	assert.Equal(t, uint16(0), *localEpAtRemoteIP.refCount,
+		"Local endpoint refCount should be 0 (locals are not ref-counted)")
+
+	// Step 4: Remove endpoint slices for svc1 and svc2 (IPs A and B disappear).
+	// This should cause the remote endpoint at IP-B to be cleaned up,
+	// but the local endpoint at IP-B (used by svc3) must NOT be deleted.
+	proxier.setInitialized(false)
+
+	deleteEndpointSlices(proxier,
+		makeTestEndpointSlice(svcPortName1.Namespace, svcPortName1.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{
+				{
+					Addresses: []string{localIP},
+					NodeName:  ptr.To(testNodeName),
+				},
+				{
+					Addresses: []string{remoteIP},
+				},
+			}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName1.Port),
+				Port:     ptr.To(int32(svcPort1)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+		makeTestEndpointSlice(svcPortName2.Namespace, svcPortName2.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{
+				{
+					Addresses: []string{localIP},
+					NodeName:  ptr.To(testNodeName),
+				},
+				{
+					Addresses: []string{remoteIP},
+				},
+			}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName2.Port),
+				Port:     ptr.To(int32(svcPort2)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+	)
+
+	proxier.setInitialized(true)
+	proxier.syncProxyRules()
+
+	// svc1 and svc2 should have no endpoints now.
+	assert.Empty(t, proxier.endpointsMap[svcPortName1],
+		"svc1 should have no endpoints after deletion")
+	assert.Empty(t, proxier.endpointsMap[svcPortName2],
+		"svc2 should have no endpoints after deletion")
+
+	// svc3's local endpoint at IP-B should still be present and functional.
+	var svc3Ep *endpointInfo
+	for _, ep := range proxier.endpointsMap[svcPortName3] {
+		epI, ok := ep.(*endpointInfo)
+		if ok && epI.ip == remoteIP {
+			svc3Ep = epI
+		}
+	}
+	assert.NotNil(t, svc3Ep, "svc3's local endpoint at IP-B should still exist")
+	assert.True(t, svc3Ep.IsLocal(), "svc3's endpoint should still be local")
+	assert.NotEmpty(t, svc3Ep.hnsID, "svc3's local endpoint should still have a valid HNS ID")
+
+	// Verify the local HNS endpoint was NOT deleted from HNS.
+	_, err := hcnMock.GetEndpointByID(svc3Ep.hnsID)
+	assert.NoError(t, err, "Local HNS endpoint at IP-B should still exist in HNS (not deleted)")
+}
+
+// TestEndpointTransitionWithLBFailures verifies endpoint reference counting
+// when an endpoint set transitions from [A,B,C,D] to [A,B] while load
+// balancer delete and create operations both fail.
+//
+// Flow:
+//  1. Create a local endpoint (A) and 3 remote endpoints (B, C, D).
+//  2. Two services (svc1, svc2) each reference all 4 endpoints.
+//     Assert remote endpoint refCounts B=2, C=2, D=2.
+//  3. Transition endpoints from [A,B,C,D] to [A,B] while LB delete is
+//     injected to fail. LB create then also fails because the old LB
+//     (same VIP:port) was never removed.
+//  4. Assert that C and D refCounts drop from 2 to 0. B gets a new HNS
+//     endpoint with refCount=2. A remains local with refCount=0.
+func TestEndpointTransitionWithLBFailures(t *testing.T) {
+	proxier := NewFakeProxier(t, testNodeName, netutils.ParseIPSloppy("10.0.0.1"), NETWORK_TYPE_L2BRIDGE, false)
+	if proxier == nil {
+		t.Fatal("Failed to create proxier")
+	}
+
+	localIP := epIpAddressLocal1   // "192.168.4.4"
+	remoteIPB := epIpAddressRemote // "192.168.2.3"
+	remoteIPC := "192.168.2.4"
+	remoteIPD := "192.168.2.5"
+
+	svcIP1 := "10.20.30.41"
+	svcPort1 := 80
+	svcNodePort1 := 3001
+	svcPortName1 := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	svcIP2 := "10.20.30.42"
+	svcPort2 := 80
+	svcNodePort2 := 3002
+	svcPortName2 := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc2"),
+		Port:           "p80",
+		Protocol:       v1.ProtocolTCP,
+	}
+
+	// Step 1+2: Create two services with a local endpoint (A) and
+	// three remote endpoints (B, C, D).
+	makeServiceMap(proxier,
+		makeTestService(svcPortName1.Namespace, svcPortName1.Name, func(svc *v1.Service) {
+			svc.Spec.Type = "NodePort"
+			svc.Spec.ClusterIP = svcIP1
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName1.Port,
+				Port:     int32(svcPort1),
+				Protocol: v1.ProtocolTCP,
+				NodePort: int32(svcNodePort1),
+			}}
+		}),
+		makeTestService(svcPortName2.Namespace, svcPortName2.Name, func(svc *v1.Service) {
+			svc.Spec.Type = "NodePort"
+			svc.Spec.ClusterIP = svcIP2
+			svc.Spec.Ports = []v1.ServicePort{{
+				Name:     svcPortName2.Port,
+				Port:     int32(svcPort2),
+				Protocol: v1.ProtocolTCP,
+				NodePort: int32(svcNodePort2),
+			}}
+		}),
+	)
+
+	populateEndpointSlices(proxier,
+		makeTestEndpointSlice(svcPortName1.Namespace, svcPortName1.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{
+				{Addresses: []string{localIP}, NodeName: ptr.To(testNodeName)},
+				{Addresses: []string{remoteIPB}},
+				{Addresses: []string{remoteIPC}},
+				{Addresses: []string{remoteIPD}},
+			}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName1.Port),
+				Port:     ptr.To(int32(svcPort1)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+		makeTestEndpointSlice(svcPortName2.Namespace, svcPortName2.Name, 1, func(eps *discovery.EndpointSlice) {
+			eps.AddressType = discovery.AddressTypeIPv4
+			eps.Endpoints = []discovery.Endpoint{
+				{Addresses: []string{localIP}, NodeName: ptr.To(testNodeName)},
+				{Addresses: []string{remoteIPB}},
+				{Addresses: []string{remoteIPC}},
+				{Addresses: []string{remoteIPD}},
+			}
+			eps.Ports = []discovery.EndpointPort{{
+				Name:     ptr.To(svcPortName2.Port),
+				Port:     ptr.To(int32(svcPort2)),
+				Protocol: ptr.To(v1.ProtocolTCP),
+			}}
+		}),
+	)
+
+	// Pre-populate the local HNS endpoint (as CNI would create it).
+	hcnMock := (proxier.hcn).(*fakehcn.HcnMock)
+	hcnMock.PopulateQueriedEndpoints(endpointLocal1, networkId, localIP, macAddressLocal1, prefixLen)
+
+	proxier.setInitialized(true)
+	proxier.syncProxyRules()
+
+	// Collect the HNS IDs for B, C, D after the first sync.
+	// For L2Bridge without overlay, remote endpoints are created sequentially:
+	// B → EPID-1, C → EPID-2, D → EPID-3
+	findRemoteEp := func(svcPortName proxy.ServicePortName, ip string) *endpointInfo {
+		for _, ep := range proxier.endpointsMap[svcPortName] {
+			if epI, ok := ep.(*endpointInfo); ok && epI.ip == ip {
+				return epI
+			}
+		}
+		return nil
+	}
+
+	epB := findRemoteEp(svcPortName1, remoteIPB)
+	epC := findRemoteEp(svcPortName1, remoteIPC)
+	epD := findRemoteEp(svcPortName1, remoteIPD)
+	epA := findRemoteEp(svcPortName1, localIP)
+
+	assert.NotNil(t, epB, "Expected to find remote endpoint B")
+	assert.NotNil(t, epC, "Expected to find remote endpoint C")
+	assert.NotNil(t, epD, "Expected to find remote endpoint D")
+	assert.NotNil(t, epA, "Expected to find local endpoint A")
+
+	hnsIDB := epB.hnsID
+	hnsIDC := epC.hnsID
+	hnsIDD := epD.hnsID
+
+	// Assert all remote endpoint refCounts are 2 (shared by svc1 and svc2).
+	assert.Equal(t, uint16(2), *proxier.endPointsRefCount[hnsIDB],
+		"B refCount should be 2")
+	assert.Equal(t, uint16(2), *proxier.endPointsRefCount[hnsIDC],
+		"C refCount should be 2")
+	assert.Equal(t, uint16(2), *proxier.endPointsRefCount[hnsIDD],
+		"D refCount should be 2")
+
+	// Record the old LB IDs for both services.
+	svc1Info := proxier.svcPortMap[svcPortName1].(*serviceInfo)
+	svc2Info := proxier.svcPortMap[svcPortName2].(*serviceInfo)
+	oldLBID1 := svc1Info.hnsID
+	oldLBID2 := svc2Info.hnsID
+	assert.NotEmpty(t, oldLBID1, "svc1 should have a ClusterIP LB after first sync")
+	assert.NotEmpty(t, oldLBID2, "svc2 should have a ClusterIP LB after first sync")
+
+	// Step 3: Inject LB delete failure and transition endpoints from
+	// [A,B,C,D] to [A,B].
+	hcnMock.ShouldFailDeleteLoadBalancer = true
+	proxier.setInitialized(false)
+
+	// Build the old and new endpoint slices for the update.
+	oldSlice1 := makeTestEndpointSlice(svcPortName1.Namespace, svcPortName1.Name, 1, func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv4
+		eps.Endpoints = []discovery.Endpoint{
+			{Addresses: []string{localIP}, NodeName: ptr.To(testNodeName)},
+			{Addresses: []string{remoteIPB}},
+			{Addresses: []string{remoteIPC}},
+			{Addresses: []string{remoteIPD}},
+		}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     ptr.To(svcPortName1.Port),
+			Port:     ptr.To(int32(svcPort1)),
+			Protocol: ptr.To(v1.ProtocolTCP),
+		}}
+	})
+	newSlice1 := makeTestEndpointSlice(svcPortName1.Namespace, svcPortName1.Name, 1, func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv4
+		eps.Endpoints = []discovery.Endpoint{
+			{Addresses: []string{localIP}, NodeName: ptr.To(testNodeName)},
+			{Addresses: []string{remoteIPB}},
+		}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     ptr.To(svcPortName1.Port),
+			Port:     ptr.To(int32(svcPort1)),
+			Protocol: ptr.To(v1.ProtocolTCP),
+		}}
+	})
+	oldSlice2 := makeTestEndpointSlice(svcPortName2.Namespace, svcPortName2.Name, 1, func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv4
+		eps.Endpoints = []discovery.Endpoint{
+			{Addresses: []string{localIP}, NodeName: ptr.To(testNodeName)},
+			{Addresses: []string{remoteIPB}},
+			{Addresses: []string{remoteIPC}},
+			{Addresses: []string{remoteIPD}},
+		}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     ptr.To(svcPortName2.Port),
+			Port:     ptr.To(int32(svcPort2)),
+			Protocol: ptr.To(v1.ProtocolTCP),
+		}}
+	})
+	newSlice2 := makeTestEndpointSlice(svcPortName2.Namespace, svcPortName2.Name, 1, func(eps *discovery.EndpointSlice) {
+		eps.AddressType = discovery.AddressTypeIPv4
+		eps.Endpoints = []discovery.Endpoint{
+			{Addresses: []string{localIP}, NodeName: ptr.To(testNodeName)},
+			{Addresses: []string{remoteIPB}},
+		}
+		eps.Ports = []discovery.EndpointPort{{
+			Name:     ptr.To(svcPortName2.Port),
+			Port:     ptr.To(int32(svcPort2)),
+			Protocol: ptr.To(v1.ProtocolTCP),
+		}}
+	})
+
+	proxier.OnEndpointSliceUpdate(oldSlice1, newSlice1)
+	proxier.OnEndpointSliceUpdate(oldSlice2, newSlice2)
+
+	proxier.mu.Lock()
+	proxier.endpointSlicesSynced = true
+	proxier.mu.Unlock()
+
+	proxier.setInitialized(true)
+	proxier.syncProxyRules()
+
+	// Step 4: Assert the results.
+	//
+	// LB delete was injected to fail, so the old LBs are still in HNS.
+	// LB create naturally fails because the old LBs (same VIP:port) were
+	// never removed, causing a "port already exists" conflict.
+	svc1Info = proxier.svcPortMap[svcPortName1].(*serviceInfo)
+	svc2Info = proxier.svcPortMap[svcPortName2].(*serviceInfo)
+
+	// svcInfo.hnsID should still hold the old stale LB ID (delete failed, create skipped).
+	assert.Empty(t, svc1Info.hnsID, "svc1 LB ID should be empty because create failed due to existing LB")
+	assert.Empty(t, svc2Info.hnsID, "svc2 LB ID should be empty because create failed due to existing LB")
+
+	// The old LBs should still exist in HNS because deletion failed.
+	lb1, err1 := hcnMock.GetLoadBalancerByID(oldLBID1)
+	assert.NoError(t, err1, "Old LB for svc1 should still exist in HNS (delete failed)")
+	assert.NotNil(t, lb1)
+	lb2, err2 := hcnMock.GetLoadBalancerByID(oldLBID2)
+	assert.NoError(t, err2, "Old LB for svc2 should still exist in HNS (delete failed)")
+	assert.NotNil(t, lb2)
+
+	// C and D refCounts should have dropped from 2 to 0.
+	// The endpointsMapChange callback calls cleanupAllPolicies with the
+	// OLD endpoint set (since the map hasn't been updated yet at callback time).
+	// This decrements C and D's refCounts twice (once per service), reaching 0.
+	// They stay in terminatedEndpoints (not in the new map) and get deleted by
+	// cleanupTerminatedEndpoints.
+	assert.Equal(t, uint16(2), *proxier.endPointsRefCount[hnsIDB],
+		"B refCount should be 2")
+	assert.Equal(t, uint16(0), *proxier.endPointsRefCount[hnsIDC],
+		"C refCount should be 0 after transition")
+	assert.Equal(t, uint16(0), *proxier.endPointsRefCount[hnsIDD],
+		"D refCount should be 0 after transition")
+
+	// C and D HNS endpoints should have been deleted by cleanupTerminatedEndpoints.
+	_, errC := hcnMock.GetEndpointByID(hnsIDC)
+	assert.Error(t, errC, "C HNS endpoint should have been deleted")
+	_, errD := hcnMock.GetEndpointByID(hnsIDD)
+	assert.Error(t, errD, "D HNS endpoint should have been deleted")
+
+	epBNew := findRemoteEp(svcPortName1, remoteIPB)
+	assert.NotNil(t, epBNew, "B endpoint should exist for svc1")
+	assert.Equal(t, hnsIDB, epBNew.hnsID,
+		"B should keep the same HNS ID (reused, not recreated)")
+	assert.Equal(t, uint16(2), *proxier.endPointsRefCount[hnsIDB],
+		"B refCount should be 2 after reuse by both services")
+
+	// A is local — its private refCount should be 0 (locals are not ref-counted).
+	epANew := findRemoteEp(svcPortName1, localIP)
+	assert.NotNil(t, epANew, "Local endpoint A should still exist")
+	assert.True(t, epANew.IsLocal(), "A should be local")
+}

@@ -337,7 +337,7 @@ func TestRunExposeService(t *testing.T) {
 			input: &corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
 			},
-			flags: map[string]string{"selector": "svc=frompod", "port": "90", "labels": "svc=frompod", "generator": "service/v2"},
+			flags: map[string]string{"selector": "svc=frompod", "port": "90", "labels": "svc=frompod"},
 			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "a-name-that-is-toooo-big-for-a-service-because-it-can-only-handle-63-characters"[:63], Namespace: "", Labels: map[string]string{"svc": "frompod"}},
 				Spec: corev1.ServiceSpec{
@@ -379,7 +379,7 @@ func TestRunExposeService(t *testing.T) {
 					},
 				},
 			},
-			flags: map[string]string{"selector": "svc=fromfoo", "generator": "service/v2", "name": "fromfoo", "dry-run": "client"},
+			flags: map[string]string{"selector": "svc=fromfoo", "name": "fromfoo", "dry-run": "client"},
 			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "fromfoo", Namespace: "", Labels: map[string]string{"svc": "multiport"}},
 				Spec: corev1.ServiceSpec{
@@ -438,7 +438,7 @@ func TestRunExposeService(t *testing.T) {
 					},
 				},
 			},
-			flags: map[string]string{"selector": "svc=fromfoo", "generator": "service/v2", "name": "fromfoo", "dry-run": "client"},
+			flags: map[string]string{"selector": "svc=fromfoo", "name": "fromfoo", "dry-run": "client"},
 			output: &corev1.Service{
 				ObjectMeta: metav1.ObjectMeta{Name: "fromfoo", Namespace: "", Labels: map[string]string{"svc": "multiport"}},
 				Spec: corev1.ServiceSpec{

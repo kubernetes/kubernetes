@@ -12,7 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# If we ever move agnhost away from alpine, we may need changes to
+# test/e2e/network/dns.go, which assumes that agnhost's `dig` binary
+# is linked against musl libc.
 ARG BASEIMAGE=alpine
+
 ARG GOLANG_VERSION
 
 FROM golang:$GOLANG_VERSION AS preparer

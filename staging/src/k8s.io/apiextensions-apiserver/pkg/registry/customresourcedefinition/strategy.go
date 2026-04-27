@@ -252,11 +252,17 @@ func (statusStrategy) NamespaceScoped() bool {
 func (statusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
 		"apiextensions.k8s.io/v1": fieldpath.NewSet(
-			fieldpath.MakePathOrDie("metadata"),
+			// Disabled to match PrepareForUpdate, which do not wipe metadata
+			// https://github.com/kubernetes/kubernetes/issues/137681
+			// fieldpath.MakePathOrDie("metadata"),
+
 			fieldpath.MakePathOrDie("spec"),
 		),
 		"apiextensions.k8s.io/v1beta1": fieldpath.NewSet(
-			fieldpath.MakePathOrDie("metadata"),
+			// Disabled to match PrepareForUpdate, which do not wipe metadata
+			// https://github.com/kubernetes/kubernetes/issues/137681
+			// fieldpath.MakePathOrDie("metadata"),
+
 			fieldpath.MakePathOrDie("spec"),
 		),
 	}
@@ -320,7 +326,7 @@ func CustomResourceDefinitionToSelectableFields(obj *apiextensions.CustomResourc
 // dropDisabledFields drops disabled fields that are not used if their associated feature gates
 // are not enabled.
 func dropDisabledFields(newCRD *apiextensions.CustomResourceDefinition, oldCRD *apiextensions.CustomResourceDefinition) {
-	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) && (oldCRD == nil || (oldCRD != nil && !specHasOptionalOldSelf(&oldCRD.Spec))) {
+	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDValidationRatcheting) && (oldCRD == nil || !specHasOptionalOldSelf(&oldCRD.Spec)) {
 		if newCRD.Spec.Validation != nil {
 			dropOptionalOldSelfField(newCRD.Spec.Validation.OpenAPIV3Schema)
 		}
@@ -331,7 +337,7 @@ func dropDisabledFields(newCRD *apiextensions.CustomResourceDefinition, oldCRD *
 			}
 		}
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceFieldSelectors) && (oldCRD == nil || (oldCRD != nil && !specHasSelectableFields(&oldCRD.Spec))) {
+	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceFieldSelectors) && (oldCRD == nil || !specHasSelectableFields(&oldCRD.Spec)) {
 		dropSelectableFields(&newCRD.Spec)
 	}
 	if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CRDObservedGenerationTracking) && (oldCRD == nil || !observedGenerationTrackingInUse(&oldCRD.Status)) {

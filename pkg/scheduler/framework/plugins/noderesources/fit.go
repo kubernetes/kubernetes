@@ -47,6 +47,7 @@ var _ fwk.EnqueueExtensions = &Fit{}
 var _ fwk.PreScorePlugin = &Fit{}
 var _ fwk.ScorePlugin = &Fit{}
 var _ fwk.SignPlugin = &Fit{}
+var _ fwk.PlacementScorePlugin = &Fit{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -62,27 +63,27 @@ const (
 
 // nodeResourceStrategyTypeMap maps strategy to scorer implementation
 var nodeResourceStrategyTypeMap = map[config.ScoringStrategyType]scorer{
-	config.LeastAllocated: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
-		resources := args.ScoringStrategy.Resources
+	config.LeastAllocated: func(strategy *config.ScoringStrategy) *resourceAllocationScorer {
+		resources := strategy.Resources
 		return &resourceAllocationScorer{
 			Name:      string(config.LeastAllocated),
 			scorer:    leastResourceScorer(resources),
 			resources: resources,
 		}
 	},
-	config.MostAllocated: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
-		resources := args.ScoringStrategy.Resources
+	config.MostAllocated: func(strategy *config.ScoringStrategy) *resourceAllocationScorer {
+		resources := strategy.Resources
 		return &resourceAllocationScorer{
 			Name:      string(config.MostAllocated),
 			scorer:    mostResourceScorer(resources),
 			resources: resources,
 		}
 	},
-	config.RequestedToCapacityRatio: func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer {
-		resources := args.ScoringStrategy.Resources
+	config.RequestedToCapacityRatio: func(strategy *config.ScoringStrategy) *resourceAllocationScorer {
+		resources := strategy.Resources
 		return &resourceAllocationScorer{
 			Name:      string(config.RequestedToCapacityRatio),
-			scorer:    requestedToCapacityRatioScorer(resources, args.ScoringStrategy.RequestedToCapacityRatio.Shape),
+			scorer:    requestedToCapacityRatioScorer(resources, strategy.RequestedToCapacityRatio.Shape),
 			resources: resources,
 		}
 	},
@@ -93,13 +94,12 @@ type Fit struct {
 	ignoredResources                              sets.Set[string]
 	ignoredResourceGroups                         sets.Set[string]
 	enableInPlacePodVerticalScaling               bool
-	enableSidecarContainers                       bool
-	enableSchedulingQueueHint                     bool
 	enablePodLevelResources                       bool
 	enableDRAExtendedResource                     bool
 	enableInPlacePodLevelResourcesVerticalScaling bool
 	handle                                        fwk.Handle
 	*resourceAllocationScorer
+	placementScorer *resourceAllocationScorer
 }
 
 // ScoreExtensions of the Score plugin.
@@ -177,11 +177,32 @@ func (pl *Fit) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragment, *f
 		EnableDRAExtendedResource: pl.enableDRAExtendedResource,
 	}
 	if pl.enableDRAExtendedResource {
-		return nil, fwk.NewStatus(fwk.Unschedulable, "signature disabled when dra extended resources enabled")
+		podRequest := computePodResourceRequest(pod, opts)
+		for rName, rQuant := range podRequest.ScalarResources {
+			// Skip in case request quantity is zero
+			if rQuant == 0 {
+				continue
+			}
+			if shouldDelegateResourceToDRA(rName, nil, pl.draManager, opts) {
+				return nil, fwk.NewStatus(fwk.Unschedulable, "signature disabled when dra extended resources are used in the cluster")
+			}
+		}
 	}
+
 	return []fwk.SignFragment{
 		{Key: fwk.ResourcesSignerName, Value: computePodResourceRequest(pod, opts)},
 	}, nil
+}
+
+func getScorer(strategy *config.ScoringStrategy) (*resourceAllocationScorer, error) {
+	if strategy == nil {
+		return nil, fmt.Errorf("scoring strategy not specified")
+	}
+	scorerFactory, exists := nodeResourceStrategyTypeMap[strategy.Type]
+	if !exists {
+		return nil, fmt.Errorf("scoring strategy %s is not supported", strategy.Type)
+	}
+	return scorerFactory(strategy), nil
 }
 
 // NewFit initializes a new plugin and returns it.
@@ -194,44 +215,52 @@ func NewFit(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.
 		return nil, err
 	}
 
-	if args.ScoringStrategy == nil {
-		return nil, fmt.Errorf("scoring strategy not specified")
+	scorer, err := getScorer(args.ScoringStrategy)
+	if err != nil {
+		return nil, err
 	}
-
-	strategy := args.ScoringStrategy.Type
-	scorePlugin, exists := nodeResourceStrategyTypeMap[strategy]
-	if !exists {
-		return nil, fmt.Errorf("scoring strategy %s is not supported", strategy)
-	}
-
-	scorer := scorePlugin(args)
 	if fts.EnableDRAExtendedResource {
 		scorer.enableDRAExtendedResource = true
 		scorer.draManager = h.SharedDRAManager()
 		scorer.draFeatures = dynamicresources.AllocatorFeatures(fts)
 		// Create a CEL cache for device class selector compilation
 		// This cache improves performance by avoiding recompilation of the same CEL expressions
-		scorer.DRACaches.celCache = cel.NewCache(10, cel.Features{EnableConsumableCapacity: fts.EnableDRAConsumableCapacity})
+		scorer.DRACaches.celCache = cel.NewCache(10, cel.Features{
+			EnableConsumableCapacity: fts.EnableDRAConsumableCapacity,
+			EnableListTypeAttributes: fts.EnableDRAListTypeAttributes,
+		})
 	}
 
-	return &Fit{
+	pl := &Fit{
 		ignoredResources:                              sets.New(args.IgnoredResources...),
 		ignoredResourceGroups:                         sets.New(args.IgnoredResourceGroups...),
 		enableInPlacePodVerticalScaling:               fts.EnableInPlacePodVerticalScaling,
-		enableSidecarContainers:                       fts.EnableSidecarContainers,
-		enableSchedulingQueueHint:                     fts.EnableSchedulingQueueHint,
 		handle:                                        h,
 		enablePodLevelResources:                       fts.EnablePodLevelResources,
 		enableDRAExtendedResource:                     fts.EnableDRAExtendedResource,
 		enableInPlacePodLevelResourcesVerticalScaling: fts.EnableInPlacePodLevelResourcesVerticalScaling,
 		resourceAllocationScorer:                      scorer,
-	}, nil
+	}
+
+	if fts.EnableTopologyAwareWorkloadScheduling {
+		placementScorer, err := getScorer(&config.ScoringStrategy{
+			Type:      config.MostAllocated,
+			Resources: args.ScoringStrategy.Resources,
+		})
+		if err != nil {
+			return nil, err
+		}
+		pl.placementScorer = placementScorer
+	}
+
+	return pl, nil
 }
 
 // ResourceRequestsOptions contains feature gate flags for resource request computation.
 type ResourceRequestsOptions struct {
-	EnablePodLevelResources   bool
-	EnableDRAExtendedResource bool
+	EnablePodLevelResources           bool
+	EnableDRAExtendedResource         bool
+	EnableDRANodeAllocatableResources bool
 }
 
 // shouldDelegateResourceToDRA checks if the given resource should be delegated to the DRA plugin.
@@ -243,8 +272,10 @@ func shouldDelegateResourceToDRA(rName v1.ResourceName, nodeInfo fwk.NodeInfo, d
 		return false
 	}
 
-	if allocatable := nodeInfo.GetAllocatable().GetScalarResources()[rName]; allocatable > 0 {
-		return false
+	if nodeInfo != nil {
+		if allocatable := nodeInfo.GetAllocatable().GetScalarResources()[rName]; allocatable > 0 {
+			return false
+		}
 	}
 
 	if draManager == nil {
@@ -287,7 +318,8 @@ func computePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) *preFi
 	// pod hasn't scheduled yet so we don't need to worry about InPlacePodVerticalScalingEnabled
 	reqs := resource.PodRequests(pod, resource.PodResourcesOptions{
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !opts.EnablePodLevelResources,
+		SkipPodLevelResources:                    !opts.EnablePodLevelResources,
+		UseDRANodeAllocatableResourceClaimStatus: opts.EnableDRANodeAllocatableResources,
 	})
 	result := &preFilterState{}
 	result.SetMaxResource(reqs)
@@ -296,14 +328,6 @@ func computePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) *preFi
 
 // PreFilter invoked at the prefilter extension point.
 func (f *Fit) PreFilter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
-	if !f.enableSidecarContainers && hasRestartableInitContainer(pod) {
-		// Scheduler will calculate resources usage for a Pod containing
-		// restartable init containers that will be equal or more than kubelet will
-		// require to run the Pod. So there will be no overbooking. However, to
-		// avoid the inconsistency in resource calculation between the scheduler
-		// and the older (before v1.28) kubelet, make the Pod unschedulable.
-		return nil, fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "Pod has a restartable init container and the SidecarContainers feature is disabled")
-	}
 	result := computePodResourceRequest(pod, ResourceRequestsOptions{EnablePodLevelResources: f.enablePodLevelResources})
 
 	cycleState.Write(preFilterStateKey, result)
@@ -332,61 +356,58 @@ func getPreFilterState(cycleState fwk.CycleState) (*preFilterState, error) {
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (f *Fit) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
-	podActionType := fwk.Delete
-	if f.enableInPlacePodVerticalScaling {
-		// If InPlacePodVerticalScaling (KEP 1287) is enabled, then UpdatePodScaleDown event should be registered
-		// for this plugin since a Pod update may free up resources that make other Pods schedulable.
-		podActionType |= fwk.UpdatePodScaleDown
-	}
-
-	// A note about UpdateNodeTaint/UpdateNodeLabel event:
-	// Ideally, it's supposed to register only Add | UpdateNodeAllocatable because the only resource update could change the node resource fit plugin's result.
-	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
-	// See: https://github.com/kubernetes/kubernetes/issues/109437
-	nodeActionType := fwk.Add | fwk.UpdateNodeAllocatable | fwk.UpdateNodeTaint | fwk.UpdateNodeLabel
-	if f.enableSchedulingQueueHint {
-		// preCheck is not used when QHint is enabled, and hence Update event isn't necessary.
-		nodeActionType = fwk.Add | fwk.UpdateNodeAllocatable
-	}
-
 	events := []fwk.ClusterEventWithHint{
-		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: podActionType}, QueueingHintFn: f.isSchedulableAfterPodEvent},
-		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}, QueueingHintFn: f.isSchedulableAfterNodeChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}, QueueingHintFn: f.isSchedulableAfterAssignedPodDelete},
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeAllocatable}, QueueingHintFn: f.isSchedulableAfterNodeChange},
 	}
 	if f.enableDRAExtendedResource {
 		events = append(events,
 			// A pod might be waiting for an exteneded resurce from a class to get created or modified.
 			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: f.isSchedulableAfterDeviceClassEvent})
 	}
+	if f.enableInPlacePodVerticalScaling {
+		// If InPlacePodVerticalScaling (KEP 1287) is enabled, then UpdatePodScaleDown event should be registered
+		// for this plugin since a Pod update may free up resources that make other Pods schedulable.
+		events = append(events,
+			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodScaleDown}, QueueingHintFn: f.isSchedulableAfterAssignedPodScaleDown},
+			fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodScaleDown}, QueueingHintFn: f.isSchedulableAfterTargetPodScaleDown})
+	}
 	return events, nil
 }
 
-// isSchedulableAfterPodEvent is invoked whenever a pod deleted or scaled down. It checks whether
-// that change made a previously unschedulable pod schedulable.
-func (f *Fit) isSchedulableAfterPodEvent(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+// isSchedulableAfterAssignedPodDelete is invoked whenever a scheduled pod
+// is deleted and checks whether that change could make a previously unschedulable pod schedulable.
+func (f *Fit) isSchedulableAfterAssignedPodDelete(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	deletedPod, _, err := schedutil.As[*v1.Pod](oldObj, newObj)
+	if err != nil {
+		return fwk.Queue, err
+	}
+
+	if deletedPod.Spec.NodeName == "" && deletedPod.Status.NominatedNodeName == "" {
+		logger.V(5).Info("the deleted pod was unscheduled and it wouldn't make the unscheduled pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
+		return fwk.QueueSkip, nil
+	}
+
+	// any deletion event to a scheduled pod could make the unscheduled pod schedulable.
+	logger.V(5).Info("another scheduled pod was deleted, and it may make the unscheduled pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(deletedPod))
+	return fwk.Queue, nil
+}
+
+// isSchedulableAfterTargetPodScaleDown is invoked when the target pod is scaled down, making itself schedulable.
+func (f *Fit) isSchedulableAfterTargetPodScaleDown(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	logger.V(5).Info("the target pod got scaled down and it may be schedulable now", "pod", klog.KObj(pod))
+	return fwk.Queue, nil
+}
+
+// isSchedulableAfterAssignedPodScaleDown is invoked when a scheduled pod got scaled down, and checks
+// whether that change could make a previously unschedulable pod schedulable.
+func (f *Fit) isSchedulableAfterAssignedPodScaleDown(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	originalPod, modifiedPod, err := schedutil.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
 		return fwk.Queue, err
 	}
 
-	if modifiedPod == nil {
-		if originalPod.Spec.NodeName == "" && originalPod.Status.NominatedNodeName == "" {
-			logger.V(5).Info("the deleted pod was unscheduled and it wouldn't make the unscheduled pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(originalPod))
-			return fwk.QueueSkip, nil
-		}
-
-		// any deletion event to a scheduled pod could make the unscheduled pod schedulable.
-		logger.V(5).Info("another scheduled pod was deleted, and it may make the unscheduled pod schedulable", "pod", klog.KObj(pod), "deletedPod", klog.KObj(originalPod))
-		return fwk.Queue, nil
-	}
-
-	if !f.enableInPlacePodVerticalScaling {
-		// If InPlacePodVerticalScaling (KEP 1287) is disabled, the pod scale down event cannot free up any resources.
-		logger.V(5).Info("another pod was modified, but InPlacePodVerticalScaling is disabled, so it doesn't make the unscheduled pod schedulable", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
-		return fwk.QueueSkip, nil
-	}
-
-	if !f.isSchedulableAfterPodScaleDown(pod, originalPod, modifiedPod) {
+	if !f.haveEnoughRelevantResourcesDecreased(pod, originalPod, modifiedPod) {
 		if loggerV := logger.V(10); loggerV.Enabled() {
 			// Log more information.
 			loggerV.Info("pod got scaled down, but the modification isn't related to the resource requests of the target pod", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod), "diff", diff.Diff(originalPod, modifiedPod))
@@ -396,19 +417,12 @@ func (f *Fit) isSchedulableAfterPodEvent(logger klog.Logger, pod *v1.Pod, oldObj
 		return fwk.QueueSkip, nil
 	}
 
-	logger.V(5).Info("another scheduled pod or the target pod itself got scaled down, and it may make the unscheduled pod schedulable", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
+	logger.V(5).Info("another scheduled pod got scaled down, and it may make the unscheduled pod schedulable", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
 	return fwk.Queue, nil
 }
 
-// isSchedulableAfterPodScaleDown checks whether the scale down event may make the target pod schedulable. Specifically:
-// - Returns true when the update event is for the target pod itself.
-// - Returns true when the update event shows a scheduled pod's resource request that the target pod also requests got reduced.
-func (f *Fit) isSchedulableAfterPodScaleDown(targetPod, originalPod, modifiedPod *v1.Pod) bool {
-	if modifiedPod.UID == targetPod.UID {
-		// If the scaling down event is for targetPod, it would make targetPod schedulable.
-		return true
-	}
-
+// haveAnyEnoughRelevantResourcesDecreased checks whether a scheduled pod's resource request that the target pod also requests got reduced.
+func (f *Fit) haveEnoughRelevantResourcesDecreased(targetPod *v1.Pod, originalPod, modifiedPod *v1.Pod) bool {
 	if modifiedPod.Spec.NodeName == "" {
 		// If the update event is for a unscheduled Pod,
 		// it wouldn't make targetPod schedulable.
@@ -611,15 +625,6 @@ func (f *Fit) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod
 	return nil
 }
 
-func hasRestartableInitContainer(pod *v1.Pod) bool {
-	for _, c := range pod.Spec.InitContainers {
-		if c.RestartPolicy != nil && *c.RestartPolicy == v1.ContainerRestartPolicyAlways {
-			return true
-		}
-	}
-	return false
-}
-
 // InsufficientResource describes what kind of resource limit is hit and caused the pod to not fit the node.
 type InsufficientResource struct {
 	ResourceName v1.ResourceName
@@ -747,4 +752,14 @@ func (f *Fit) Score(ctx context.Context, state fwk.CycleState, pod *v1.Pod, node
 	}
 
 	return f.score(ctx, pod, nodeInfo, s.podRequests, s.draPreScoreState)
+}
+
+// PlacementScoreExtensions is not used by this plugin.
+func (f *Fit) PlacementScoreExtensions() fwk.PlacementScoreExtensions {
+	return nil
+}
+
+// ScorePlacement scores capacity ratio on all nodes in the placement including all assigned pod group pods' resource requests.
+func (f *Fit) ScorePlacement(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
+	return f.placementScorer.scorePlacement(ctx, podGroup, placement)
 }

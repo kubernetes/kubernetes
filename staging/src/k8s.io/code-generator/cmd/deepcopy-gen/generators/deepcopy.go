@@ -128,16 +128,6 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	boundingDirs := []string{}
-	if args.BoundingDirs == nil {
-		args.BoundingDirs = context.Inputs
-	}
-	for i := range args.BoundingDirs {
-		// Strip any trailing slashes - they are not exactly "correct" but
-		// this is friendlier.
-		boundingDirs = append(boundingDirs, strings.TrimRight(args.BoundingDirs[i], "/"))
-	}
-
 	targets := []generator.Target{}
 
 	for _, i := range context.Inputs {
@@ -197,7 +187,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 					},
 					GeneratorsFunc: func(c *generator.Context) (generators []generator.Generator) {
 						return []generator.Generator{
-							NewGenDeepCopy(args.OutputFile, pkg.Path, boundingDirs, (ptagValue == tagValuePackage), ptagRegister),
+							NewGenDeepCopy(args.OutputFile, pkg.Path, (ptagValue == tagValuePackage), ptagRegister),
 						}
 					},
 				})
@@ -210,20 +200,18 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 type genDeepCopy struct {
 	generator.GoGenerator
 	targetPackage string
-	boundingDirs  []string
 	allTypes      bool
 	registerTypes bool
 	imports       namer.ImportTracker
 	typesForInit  []*types.Type
 }
 
-func NewGenDeepCopy(outputFilename, targetPackage string, boundingDirs []string, allTypes, registerTypes bool) generator.Generator {
+func NewGenDeepCopy(outputFilename, targetPackage string, allTypes, registerTypes bool) generator.Generator {
 	return &genDeepCopy{
 		GoGenerator: generator.GoGenerator{
 			OutputFilename: outputFilename,
 		},
 		targetPackage: targetPackage,
-		boundingDirs:  boundingDirs,
 		allTypes:      allTypes,
 		registerTypes: registerTypes,
 		imports:       generator.NewImportTrackerForPackage(targetPackage),

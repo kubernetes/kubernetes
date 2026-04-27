@@ -116,7 +116,7 @@ func newCPUBurnPods(numPods int, image imageutils.Config, cpuLimit string, memor
 	cpuLimitQuantity, err := resource.ParseQuantity(cpuLimit)
 	framework.ExpectNoError(err)
 
-	for i := 0; i < numPods; i++ {
+	for range numPods {
 
 		podName := "cpulimittest-" + string(uuid.NewUUID())
 		pod := v1.Pod{

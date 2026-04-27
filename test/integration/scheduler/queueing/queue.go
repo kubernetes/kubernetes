@@ -24,7 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,7 +35,6 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
-	ndffeatures "k8s.io/component-helpers/nodedeclaredfeatures/features"
 	ndftesting "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 	"k8s.io/component-helpers/storage/volume"
 	configv1 "k8s.io/kube-scheduler/config/v1"
@@ -86,6 +85,8 @@ type CoreResourceEnqueueTestCase struct {
 	InitialDeviceClasses []*resourceapi.DeviceClass
 	// InitialWorkloads is the list of Workloads to be created at first.
 	InitialWorkloads []*schedulingapi.Workload
+	// InitialPodGroups is the list of PodGroups to be created at first.
+	InitialPodGroups []*schedulingapi.PodGroup
 	// Pods are the list of Pods to be created.
 	// All of them are expected to be unschedulable at first.
 	Pods []*v1.Pod
@@ -103,9 +104,6 @@ type CoreResourceEnqueueTestCase struct {
 	TriggerFn func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error)
 	// WantRequeuedPods is the map of Pods that are expected to be requeued after triggerFn.
 	WantRequeuedPods sets.Set[string]
-	// EnableSchedulingQueueHint indicates which feature gate value(s) the test case should run with.
-	// By default, it's {true, false}
-	EnableSchedulingQueueHint sets.Set[bool]
 	// EnablePlugins is a list of plugins to enable.
 	// PrioritySort and DefaultPreemption are enabled by default because they are required by the framework.
 	// If empty, all plugins are enabled.
@@ -120,17 +118,7 @@ type CoreResourceEnqueueTestCase struct {
 	EnableGangScheduling bool
 }
 
-var (
-	// These resources are unexported from the framework intentionally
-	// because they're only used internally for the metric labels/logging.
-	// We need to declare them here to use them in the test
-	// because this test is using the metric labels.
-	assignedPod      fwk.EventResource = "AssignedPod"
-	unschedulablePod fwk.EventResource = "UnschedulablePod"
-)
-
 // We define all the test cases here in the one place,
-// and those will be run either in ./former or ./queueinghint tests, depending on EnableSchedulingQueueHint.
 // We needed to do this because running all these test cases resulted in the timeout.
 var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 	{
@@ -153,8 +141,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod2"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod2"),
 	},
 	{
 		Name:          "Pod rejected by the PodAffinity plugin is requeued when a new Node is created and turned to ready",
@@ -230,8 +217,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeLabel}: 1}, nil
 		},
-		WantRequeuedPods:          sets.Set[string]{},
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.Set[string]{},
 	},
 	{
 		Name:          "Pod rejected by the NodeAffinity plugin is requeued when a Node is added",
@@ -269,7 +255,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, st.MakePod().Name("pod1").Container("image").Toleration("taint-key").Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update the pod: %w", err)
 			}
-			return map[fwk.ClusterEvent]uint64{{Resource: unschedulablePod, ActionType: fwk.UpdatePodToleration}: 1}, nil
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdatePodToleration}: 1}, nil
 		},
 		WantRequeuedPods: sets.New("pod1"),
 	},
@@ -291,8 +277,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeTaint}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod1"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
 		Name:          "Pod rejected by the TaintToleration plugin is requeued when a Node that has the correspoding taint is added",
@@ -327,7 +312,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).UpdateResize(testCtx.Ctx, "pod1", st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to resize the pod: %w", err)
 			}
-			return map[fwk.ClusterEvent]uint64{{Resource: unschedulablePod, ActionType: fwk.UpdatePodScaleDown}: 1}, nil
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdatePodScaleDown}: 1}, nil
 		},
 		WantRequeuedPods: sets.New("pod1"),
 	},
@@ -411,7 +396,6 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
 		},
 		WantRequeuedPods:          sets.Set[string]{},
-		EnableSchedulingQueueHint: sets.New(true),
 		EnableDRAExtendedResource: false,
 	},
 	{
@@ -432,7 +416,6 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
 		},
 		WantRequeuedPods:          sets.Set[string]{},
-		EnableSchedulingQueueHint: sets.New(true),
 		EnableDRAExtendedResource: true,
 	},
 	{
@@ -453,7 +436,6 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
 		},
 		WantRequeuedPods:          sets.Set[string]{},
-		EnableSchedulingQueueHint: sets.New(true),
 		EnableDRAExtendedResource: false,
 	},
 	{
@@ -486,7 +468,6 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
 		},
 		WantRequeuedPods:          sets.New("pod1"),
-		EnableSchedulingQueueHint: sets.New(true),
 		EnableDRAExtendedResource: true,
 	},
 	{
@@ -509,7 +490,6 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.DeviceClass, ActionType: fwk.Add}: 1}, nil
 		},
 		WantRequeuedPods:          sets.New("pod1"),
-		EnableSchedulingQueueHint: sets.New(true),
 		EnableDRAExtendedResource: true,
 	},
 	{
@@ -533,7 +513,6 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.DeviceClass, ActionType: fwk.Update}: 1}, nil
 		},
 		WantRequeuedPods:          sets.New("pod1"),
-		EnableSchedulingQueueHint: sets.New(true),
 		EnableDRAExtendedResource: true,
 	},
 	{
@@ -554,8 +533,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
 		},
-		WantRequeuedPods:          sets.Set[string]{},
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.Set[string]{},
 	},
 	{
 		Name:          "Pod rejected by the NodeResourcesFit plugin is requeued when a Node is updated with increase in the requested resources",
@@ -575,8 +553,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod1"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
 		Name:          "Pod rejected by the NodeResourcesFit plugin is requeued when a Node is updated with increase in the allowed pods number",
@@ -600,8 +577,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod2"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod2"),
 	},
 	{
 		Name:          "Updating pod label doesn't retry scheduling if the Pod was rejected by TaintToleration",
@@ -615,12 +591,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, st.MakePod().Name("pod1").Label("key", "val").Container("image").Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update the pod: %w", err)
 			}
-			return map[fwk.ClusterEvent]uint64{{Resource: unschedulablePod, ActionType: fwk.UpdatePodLabel}: 1}, nil
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.UnscheduledPod, ActionType: fwk.UpdatePodLabel}: 1}, nil
 		},
 		WantRequeuedPods: sets.Set[string]{},
-		// This behaviour is only true when enabling QHint
-		// because QHint of TaintToleration would decide to ignore a Pod update.
-		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
 		// The test case makes sure that PreFilter plugins returning PreFilterResult are also inserted into pInfo.UnschedulablePlugins
@@ -637,26 +610,18 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Label("unscheduled", "plugins").Name("pod1").NodeAffinityIn("metadata.name", []string{"fake-node"}, st.NodeSelectorTypeMatchFields).Req(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
 		},
 		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
-			// Because of preCheck, we cannot determine which unschedulable plugins are registered for pod1.
-			// So, not the ideal way as the integration test though,
-			// here we check the unschedulable plugins by directly using the SchedulingQueue function for now.
-			// We can change here to assess unschedPlugin by triggering cluster events like other test cases
-			// after QHint is graduated and preCheck is removed.
-			pInfo, ok := testCtx.Scheduler.SchedulingQueue.GetPod("pod1", testCtx.NS.Name)
-			if !ok || pInfo == nil {
-				return nil, fmt.Errorf("pod1 is not found in the scheduling queue")
+			// We will trigger UpdateNodeAllocatable and UpdateNodeLabel events which work for
+			// the NodeResourcesFit and NodeAffinity plugins respectively.
+			if _, err := testCtx.ClientSet.CoreV1().Nodes().UpdateStatus(testCtx.Ctx, st.MakeNode().Name("fake-node").Label("metadata.name", "fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(), metav1.UpdateOptions{}); err != nil {
+				return nil, fmt.Errorf("failed to update fake-node: %w", err)
 			}
 
-			if pInfo.Pod.Name != "pod1" {
-				return nil, fmt.Errorf("unexpected pod info: %#v", pInfo)
-			}
-
-			if pInfo.UnschedulablePlugins.Difference(sets.New(names.NodeAffinity, names.NodeResourcesFit)).Len() != 0 {
-				return nil, fmt.Errorf("unexpected unschedulable plugin(s) is registered in pod1: %v", pInfo.UnschedulablePlugins.UnsortedList())
-			}
-
-			return nil, nil
+			return map[fwk.ClusterEvent]uint64{
+				{Resource: fwk.Node, ActionType: fwk.UpdateNodeAllocatable}: 1,
+				{Resource: fwk.Node, ActionType: fwk.UpdateNodeLabel}:       1,
+			}, nil
 		},
+		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
 		Name:          "Pod rejected by the InterPodAffinity plugin is requeued when deleting the existed pod's label that matches the podAntiAffinity",
@@ -676,10 +641,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, st.MakePod().Name("pod1").Label("anti2", "anti2").Container("image").Node("fake-node").Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update pod1: %w", err)
 			}
-			return map[fwk.ClusterEvent]uint64{{Resource: assignedPod, ActionType: fwk.UpdatePodLabel}: 1}, nil
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodLabel}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod2"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod2"),
 	},
 	{
 		Name:          "Pod rejected by the InterPodAffinity plugin is requeued when deleting the existing pod that matches the target podAntiAffinity",
@@ -700,10 +664,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			if err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
 				return nil, fmt.Errorf("failed to delete pod1: %w", err)
 			}
-			return map[fwk.ClusterEvent]uint64{{Resource: assignedPod, ActionType: fwk.Delete}: 1}, nil
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.AssignedPod, ActionType: fwk.Delete}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod3"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod3"),
 	},
 	{
 		Name:          "Pod rejected by the InterPodAffinity plugin is requeued when deleting the existing pod with podAntiAffinity that matches the target pod",
@@ -724,10 +687,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			if err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Delete(testCtx.Ctx, "pod1", metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
 				return nil, fmt.Errorf("failed to delete pod1: %w", err)
 			}
-			return map[fwk.ClusterEvent]uint64{{Resource: assignedPod, ActionType: fwk.Delete}: 1}, nil
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.AssignedPod, ActionType: fwk.Delete}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod3"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod3"),
 	},
 	{
 		Name:          "Pod rejected by the PodAffinity plugin is requeued when updating the existed pod's label to make it match the pod's podAffinity",
@@ -747,10 +709,9 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, st.MakePod().Name("pod1").Label("aaa", "bbb").Container("image").Node("fake-node").Obj(), metav1.UpdateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to update pod1: %w", err)
 			}
-			return map[fwk.ClusterEvent]uint64{{Resource: assignedPod, ActionType: fwk.UpdatePodLabel}: 1}, nil
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.AssignedPod, ActionType: fwk.UpdatePodLabel}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod2"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod2"),
 	},
 
 	{
@@ -770,8 +731,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.Add}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod1"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
 		Name:          "Pod rejected by the InterPodAffinity plugin is requeued when updating the node with the topologyKey label of the pod affinity",
@@ -798,8 +758,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeLabel}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod2", "pod4"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod2", "pod4"),
 	},
 	{
 		Name:          "Pod rejected by the InterPodAffinity plugin is requeued when updating the node with the topologyKey label of the pod anti affinity",
@@ -822,8 +781,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeLabel}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod2", "pod3"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod2", "pod3"),
 	},
 	{
 		Name:          "Pod rejected by the InterPodAffinity plugin is requeued when creating the node with the topologyKey label of the pod anti affinity",
@@ -844,8 +802,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.Add}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod2", "pod3"),
-		EnableSchedulingQueueHint: sets.New(true, false),
+		WantRequeuedPods: sets.New("pod2", "pod3"),
 	},
 	{
 		Name:          "Pod rejected with hostport by the NodePorts plugin is requeued when pod with common hostport is deleted",
@@ -868,8 +825,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{framework.EventAssignedPodDelete: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod3"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod3"),
 	},
 	{
 		Name:          "Pod rejected with hostport by the NodePorts plugin is requeued when new node is created",
@@ -890,8 +846,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.Add}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod2"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod2"),
 	},
 	{
 		Name:          "Pod rejected by the NodeUnschedulable plugin is requeued when the node is turned to ready",
@@ -944,9 +899,6 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.Add}: 1}, nil
 		},
 		WantRequeuedPods: sets.Set[string]{},
-		// This test case is valid only when QHint is enabled
-		// because QHint filters out a node creation made in triggerFn.
-		EnableSchedulingQueueHint: sets.New(true),
 	},
 	{
 		Name:          "Pods with PodTopologySpread should be requeued when a Pod with matching label is scheduled",
@@ -971,8 +923,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 
 			return map[fwk.ClusterEvent]uint64{framework.EventAssignedPodAdd: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod3"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod3"),
 	},
 	{
 		Name:          "Pods with PodTopologySpread should be requeued when a scheduled Pod label is updated to match the selector",
@@ -996,8 +947,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{framework.EventAssignedPodUpdate: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod3"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod3"),
 	},
 	{
 		Name:          "Pods with PodTopologySpread should be requeued when a scheduled Pod with matching label is deleted",
@@ -1020,8 +970,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{framework.EventAssignedPodDelete: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod3"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod3"),
 	},
 	{
 		Name:          "Pods with PodTopologySpread should be requeued when a Node with topology label is created",
@@ -1048,8 +997,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.Add}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod3"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod3"),
 	},
 	{
 		Name:          "Pods with PodTopologySpread should be requeued when a Node is updated to have the topology label",
@@ -1085,11 +1033,10 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeLabel}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod5", "pod6", "pod9"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod5", "pod6", "pod9"),
 	},
 	{
-		Name:          "Pods with PodTopologySpread should be requeued when a Node with a topology label is deleted (QHint: enabled)",
+		Name:          "Pods with PodTopologySpread should be requeued when a Node with a topology label is deleted",
 		EnablePlugins: []string{names.PodTopologySpread},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Label("node", "fake-node").Obj(),
@@ -1112,35 +1059,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.Delete}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod4"),
-		EnableSchedulingQueueHint: sets.New(true),
-	},
-	{
-		Name:          "Pods with PodTopologySpread should be requeued when a Node with a topology label is deleted (QHint: disabled)",
-		EnablePlugins: []string{names.PodTopologySpread},
-		InitialNodes: []*v1.Node{
-			st.MakeNode().Name("fake-node1").Label("node", "fake-node").Obj(),
-			st.MakeNode().Name("fake-node2").Label("zone", "fake-node").Obj(),
-		},
-		InitialPods: []*v1.Pod{
-			st.MakePod().Name("pod1").Label("key1", "val").SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), nil, nil, nil, nil).Container("image").Node("fake-node1").Obj(),
-			st.MakePod().Name("pod2").Label("key1", "val").SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), nil, nil, nil, nil).Container("image").Node("fake-node2").Obj(),
-		},
-		Pods: []*v1.Pod{
-			// - Pod3 and Pod4 will be rejected by the PodTopologySpread plugin.
-			st.MakePod().Name("pod3").Label("key1", "val").SpreadConstraint(1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), ptr.To(int32(3)), nil, nil, nil).Container("image").Obj(),
-			st.MakePod().Name("pod4").Label("key1", "val").SpreadConstraint(1, "zone", v1.DoNotSchedule, st.MakeLabelSelector().Exists("key1").Obj(), ptr.To(int32(3)), nil, nil, nil).Container("image").Obj(),
-		},
-		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
-			// Trigger an NodeTaint delete event.
-			// It should requeue both pod3 and pod4 only because PodTopologySpread subscribes to Node/delete events.
-			if err := testCtx.ClientSet.CoreV1().Nodes().Delete(testCtx.Ctx, "fake-node2", metav1.DeleteOptions{}); err != nil {
-				return nil, fmt.Errorf("failed to update node: %w", err)
-			}
-			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.Delete}: 1}, nil
-		},
-		WantRequeuedPods:          sets.New("pod3", "pod4"),
-		EnableSchedulingQueueHint: sets.New(false),
+		WantRequeuedPods: sets.New("pod4"),
 	},
 	{
 		Name:          "Pods with PodTopologySpread should be requeued when a NodeTaint of a Node with a topology label has been updated",
@@ -1216,8 +1135,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PersistentVolume, ActionType: fwk.Add}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod2"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod2"),
 	},
 	{
 		Name:          "Pod rejected with node by the VolumeZone plugin is requeued when the PV is updated",
@@ -1272,8 +1190,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PersistentVolume, ActionType: fwk.Update}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod2"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod2"),
 	},
 	{
 		Name:          "Pod rejected with node by the VolumeZone plugin is requeued when the PVC bound to the pod is added",
@@ -1324,8 +1241,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.Add}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod2"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod2"),
 	},
 	{
 		Name:          "Pod rejected with node by the VolumeZone plugin is requeued when the PVC bound to the pod is updated",
@@ -1382,8 +1298,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.Update}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod2"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod2"),
 	},
 	{
 		Name:          "Pod rejected with node by the VolumeZone plugin is requeued when the Storage class is added",
@@ -1431,8 +1346,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.StorageClass, ActionType: fwk.Add}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod2"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod2"),
 	},
 	{
 		Name:          "Pod rejected with node by the VolumeZone plugin is not requeued when the PV is updated but the topology is same",
@@ -1488,8 +1402,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PersistentVolume, ActionType: fwk.Update}: 1}, nil
 		},
-		WantRequeuedPods:          sets.Set[string]{},
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.Set[string]{},
 	},
 	{
 		Name:          "Pod rejected by the VolumeRestriction plugin is requeued when the PVC bound to the pod is added",
@@ -1520,8 +1433,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.Add}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod1"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
 		Name:          "Pod rejected by the VolumeRestriction plugin is requeued when the pod is deleted",
@@ -1557,8 +1469,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{framework.EventAssignedPodDelete: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod2"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod2"),
 	},
 	{
 		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the Node is created",
@@ -1594,8 +1505,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.Add}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod1"),
-		EnableSchedulingQueueHint: sets.New(true, false),
+		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
 		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the Node is updated",
@@ -1635,8 +1545,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.UpdateNodeLabel}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod1"),
-		EnableSchedulingQueueHint: sets.New(true, false),
+		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
 		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the PV is created",
@@ -1679,8 +1588,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PersistentVolume, ActionType: fwk.Add}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod1"),
-		EnableSchedulingQueueHint: sets.New(true, false),
+		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
 		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the PV is updated",
@@ -1719,8 +1627,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PersistentVolume, ActionType: fwk.Update}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod1"),
-		EnableSchedulingQueueHint: sets.New(true, false),
+		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
 		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the PVC is created",
@@ -1764,8 +1671,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.Add}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod1"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
 		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the PVC is updated",
@@ -1807,8 +1713,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.Update}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod1"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
 		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the StorageClass is created",
@@ -1843,8 +1748,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.StorageClass, ActionType: fwk.Add}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod1"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
 		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the StorageClass's AllowedTopologies is updated",
@@ -1900,8 +1804,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.StorageClass, ActionType: fwk.Update}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod1"),
-		EnableSchedulingQueueHint: sets.New(true, false),
+		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
 		Name:          "Pod rejected with node by the VolumeBinding plugin is not requeued when the StorageClass is updated but the AllowedTopologies is same",
@@ -1959,8 +1862,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.StorageClass, ActionType: fwk.Update}: 1}, nil
 		},
-		WantRequeuedPods:          sets.Set[string]{},
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.Set[string]{},
 	},
 	{
 		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the CSINode is created",
@@ -1991,8 +1893,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.CSINode, ActionType: fwk.Add}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod1"),
-		EnableSchedulingQueueHint: sets.New(true, false),
+		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
 		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the CSINode's MigratedPluginsAnnotation is updated",
@@ -2032,8 +1933,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.CSINode, ActionType: fwk.Update}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod1"),
-		EnableSchedulingQueueHint: sets.New(true, false),
+		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
 		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the CSIDriver's StorageCapacity gets disabled",
@@ -2080,8 +1980,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.CSIDriver, ActionType: fwk.Update}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod1"),
-		EnableSchedulingQueueHint: sets.New(true, false),
+		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
 		Name:          "Pod rejected with node by the VolumeBinding plugin is not requeued when the CSIDriver is updated but the storage capacity is originally enabled",
@@ -2128,8 +2027,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.CSIDriver, ActionType: fwk.Update}: 1}, nil
 		},
-		WantRequeuedPods:          sets.Set[string]{},
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.Set[string]{},
 	},
 	{
 		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the CSIStorageCapacity is created",
@@ -2167,8 +2065,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.CSIStorageCapacity, ActionType: fwk.Add}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod1"),
-		EnableSchedulingQueueHint: sets.New(true, false),
+		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
 		Name:          "Pod rejected with node by the VolumeBinding plugin is requeued when the CSIStorageCapacity is increased",
@@ -2215,8 +2112,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.CSIStorageCapacity, ActionType: fwk.Update}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod1"),
-		EnableSchedulingQueueHint: sets.New(true, false),
+		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
 		Name:          "Pod rejected with node by the VolumeBinding plugin is not requeued when the CSIStorageCapacity is updated but the volumelimit is not increased",
@@ -2261,8 +2157,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.CSIStorageCapacity, ActionType: fwk.Update}: 1}, nil
 		},
-		WantRequeuedPods:          sets.Set[string]{},
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.Set[string]{},
 	},
 	{
 		Name:          "Pod rejected the CSI NodeVolumeLimits plugin is requeued when the CSINode is added",
@@ -2301,8 +2196,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.CSINode, ActionType: fwk.Add}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod1"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
 		Name:          "Pod rejected with PVC by the CSI NodeVolumeLimits plugin is requeued when the pod having related PVC is deleted",
@@ -2410,8 +2304,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.Add}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod2"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod2"),
 	},
 	{
 		Name:         "Pod with PVC rejected the CSI NodeVolumeLimits plugin is requeued when the VolumeAttachment is deleted",
@@ -2456,8 +2349,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.VolumeAttachment, ActionType: fwk.Delete}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod1"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
 		Name: "Pod with Inline Migratable volume (AWSEBSDriver and GCEPDDriver) rejected the CSI NodeVolumeLimits plugin is requeued (only AWSEBSDriver) when the VolumeAttachment is deleted",
@@ -2542,13 +2434,11 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			}
 			return map[fwk.ClusterEvent]uint64{{Resource: fwk.VolumeAttachment, ActionType: fwk.Delete}: 1}, nil
 		},
-		WantRequeuedPods:          sets.New("pod1"),
-		EnableSchedulingQueueHint: sets.New(true),
+		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
 		Name:                       "pod becomes schedulable after node update with required feature",
 		EnableNodeDeclaredFeatures: true,
-		EnableSchedulingQueueHint:  sets.New(true),
 		EnablePlugins:              []string{names.NodeDeclaredFeatures},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("node-1").Obj(),
@@ -2573,7 +2463,6 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 	{
 		Name:                       "pod remains unschedulable after node update that does not update declared features",
 		EnableNodeDeclaredFeatures: true,
-		EnableSchedulingQueueHint:  sets.New(true),
 		EnablePlugins:              []string{names.NodeDeclaredFeatures},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("node-1").Obj(),
@@ -2601,7 +2490,6 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 	{
 		Name:                       "pod becomes schedulable after pod update that removes feature requirement",
 		EnableNodeDeclaredFeatures: true,
-		EnableSchedulingQueueHint:  sets.New(true),
 		EnablePlugins:              []string{names.NodeDeclaredFeatures},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("node-1").Obj(),
@@ -2620,14 +2508,13 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, updatedPod, metav1.UpdateOptions{}); err != nil {
 				return nil, err
 			}
-			return map[fwk.ClusterEvent]uint64{{Resource: unschedulablePod, ActionType: fwk.Update}: 1}, nil
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.UnscheduledPod, ActionType: fwk.Update}: 1}, nil
 		},
 		WantRequeuedPods: sets.New("pod1"),
 	},
 	{
 		Name:                       "pod remains unschedulable after pod update that does not remove feature requirement",
 		EnableNodeDeclaredFeatures: true,
-		EnableSchedulingQueueHint:  sets.New(true),
 		EnablePlugins:              []string{names.NodeDeclaredFeatures},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("node-1").Obj(),
@@ -2646,25 +2533,28 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Update(testCtx.Ctx, updatedPod, metav1.UpdateOptions{}); err != nil {
 				return nil, err
 			}
-			return map[fwk.ClusterEvent]uint64{{Resource: unschedulablePod, ActionType: fwk.Update}: 1}, nil
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.UnscheduledPod, ActionType: fwk.Update}: 1}, nil
 		},
 		WantRequeuedPods: sets.Set[string]{},
 	},
 	{
-		Name:          "Pod rejected by the GangScheduling plugin is requeued when a new pod with matching workload reference is created",
+		Name:          "Pod rejected by the GangScheduling plugin is requeued when a new pod with matching scheduling group is created",
 		EnablePlugins: []string{names.GangScheduling},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Obj(),
 		},
 		InitialWorkloads: []*schedulingapi.Workload{
-			st.MakeWorkload().Name("w1").PodGroup(st.MakePodGroup().Name("pg1").MinCount(2).Obj()).Obj(),
+			st.MakeWorkload().Name("w").PodGroupTemplate(st.MakePodGroupTemplate().Name("t").MinCount(2).Obj()).Obj(),
+		},
+		InitialPodGroups: []*schedulingapi.PodGroup{
+			st.MakePodGroup().Name("pg1").MinCount(2).TemplateRef("t", "w").Obj(),
 		},
 		Pods: []*v1.Pod{
-			st.MakePod().Name("pod1").Container("image").WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj(),
-			st.MakePod().Name("pod2").Container("image").WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg2"}).Obj(),
+			st.MakePod().Name("pod1").Container("image").PodGroupName("pg1").Obj(),
+			st.MakePod().Name("pod2").Container("image").PodGroupName("pg2").Obj(),
 		},
 		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
-			pod := st.MakePod().Name("pod3").Container("image").WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj()
+			pod := st.MakePod().Name("pod3").Container("image").PodGroupName("pg1").Obj()
 			if _, err := testCtx.ClientSet.CoreV1().Pods(testCtx.NS.Name).Create(testCtx.Ctx, pod, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create Pod %q: %w", pod.Name, err)
 			}
@@ -2672,29 +2562,30 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		},
 		ExpectedInitialRejectingPhase: rejectingPhasePreEnqueue,
 		WantRequeuedPods:              sets.New("pod1", "pod3"),
-		EnableSchedulingQueueHint:     sets.New(true),
 		EnableGangScheduling:          true,
 	},
 	{
-		Name:          "Pod rejected by the GangScheduling plugin is requeued when a matching workload is created",
+		Name:          "Pod rejected by the GangScheduling plugin is requeued when a matching pod group is created",
 		EnablePlugins: []string{names.GangScheduling},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Obj(),
 		},
+		InitialWorkloads: []*schedulingapi.Workload{
+			st.MakeWorkload().Name("w").PodGroupTemplate(st.MakePodGroupTemplate().Name("t").MinCount(1).Obj()).Obj(),
+		},
 		Pods: []*v1.Pod{
-			st.MakePod().Name("pod1").Container("image").WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg1"}).Obj(),
-			st.MakePod().Name("pod2").Container("image").WorkloadRef(&v1.WorkloadReference{Name: "w1", PodGroup: "pg2"}).Obj(),
+			st.MakePod().Name("pod1").Container("image").PodGroupName("pg1").Obj(),
+			st.MakePod().Name("pod2").Container("image").PodGroupName("pg2").Obj(),
 		},
 		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
-			workload := st.MakeWorkload().Name("w1").PodGroup(st.MakePodGroup().Name("pg1").MinCount(1).Obj()).Obj()
-			if _, err := testCtx.ClientSet.SchedulingV1alpha1().Workloads(testCtx.NS.Name).Create(testCtx.Ctx, workload, metav1.CreateOptions{}); err != nil {
-				return nil, fmt.Errorf("failed to create Workload %q: %w", workload.Name, err)
+			pg := st.MakePodGroup().Name("pg1").MinCount(1).TemplateRef("t", "w").Obj()
+			if _, err := testCtx.ClientSet.SchedulingV1alpha2().PodGroups(testCtx.NS.Name).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+				return nil, fmt.Errorf("failed to create PodGroup %q: %w", pg.Name, err)
 			}
-			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Workload, ActionType: fwk.Add}: 1}, nil
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.PodGroup, ActionType: fwk.Add}: 1}, nil
 		},
 		ExpectedInitialRejectingPhase: rejectingPhasePreEnqueue,
 		WantRequeuedPods:              sets.New("pod1"),
-		EnableSchedulingQueueHint:     sets.New(true),
 		EnableGangScheduling:          true,
 	},
 }
@@ -2718,11 +2609,8 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 		})
 		mockFeature.SetMaxVersion(nil)
 
-		originalAllFeatures := ndffeatures.AllFeatures
-		ndffeatures.AllFeatures = []ndf.Feature{mockFeature}
-		defer func() {
-			ndffeatures.AllFeatures = originalAllFeatures
-		}()
+		ndfFramework := ndf.New([]ndf.Feature{mockFeature})
+		ndftesting.SetFrameworkDuringTest(t, *ndfFramework)
 	}
 	if tt.EnableGangScheduling {
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
@@ -2830,10 +2718,17 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 		}
 	}
 
-	for _, wl := range tt.InitialWorkloads {
-		wl.Namespace = ns
-		if _, err := cs.SchedulingV1alpha1().Workloads(ns).Create(testCtx.Ctx, wl, metav1.CreateOptions{}); err != nil {
-			t.Fatalf("Failed to create a Workload %q: %v", wl.Name, err)
+	for _, w := range tt.InitialWorkloads {
+		w.Namespace = ns
+		if _, err := cs.SchedulingV1alpha2().Workloads(ns).Create(testCtx.Ctx, w, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create a Workload %q: %v", w.Name, err)
+		}
+	}
+
+	for _, pg := range tt.InitialPodGroups {
+		pg.Namespace = ns
+		if _, err := cs.SchedulingV1alpha2().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create a PodGroup %q: %v", pg.Name, err)
 		}
 	}
 

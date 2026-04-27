@@ -22,7 +22,9 @@ import (
 
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/configuration"
+	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/manifest/source"
 )
 
 const (
@@ -48,6 +50,22 @@ type Plugin struct {
 }
 
 var _ admission.ValidationInterface = &Plugin{}
+var _ initializer.WantsManifestLoaders = &Plugin{}
+
+// SetManifestLoaders provides the manifest load functions for scheme-based defaulting and validation.
+func (a *Plugin) SetManifestLoaders(loaders *initializer.ManifestLoaders) {
+	if loaders == nil || loaders.LoadValidatingWebhookManifests == nil {
+		return
+	}
+	loadFunc := loaders.LoadValidatingWebhookManifests
+	a.Webhook.SetStaticSourceFactory(func(manifestsDir string) (generic.ReloadableSource, error) {
+		src := source.NewValidatingSource(manifestsDir, a.Webhook.GetAPIServerID(), source.ValidatingWebhookLoadFunc(loadFunc))
+		if err := src.LoadInitial(); err != nil {
+			return nil, err
+		}
+		return src, nil
+	})
+}
 
 // NewValidatingAdmissionWebhook returns a generic admission webhook plugin.
 func NewValidatingAdmissionWebhook(configFile io.Reader) (*Plugin, error) {

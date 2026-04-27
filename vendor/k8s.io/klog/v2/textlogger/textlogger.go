@@ -92,17 +92,23 @@ func (l *tlogger) Error(err error, msg string, kvList ...interface{}) {
 }
 
 func (l *tlogger) print(err error, s severity.Severity, msg string, kvList []interface{}) {
-	// Determine caller.
-	// +1 for this frame, +1 for Info/Error.
-	skip := l.callDepth + 2
-	file, line := l.config.co.unwind(skip)
-	if file == "" {
-		file = "???"
-		line = 1
-	} else if slash := strings.LastIndex(file, "/"); slash >= 0 {
-		file = file[slash+1:]
+	var file string
+	var line int
+	var now time.Time
+	if l.config.co.withHeader {
+		// Determine caller.
+		// +1 for this frame, +1 for Info/Error.
+		skip := l.callDepth + 2
+		file, line = l.config.co.unwind(skip)
+		if file == "" {
+			file = "???"
+			line = 1
+		} else if slash := strings.LastIndex(file, "/"); slash >= 0 {
+			file = file[slash+1:]
+		}
+		now = time.Now()
 	}
-	l.printWithInfos(file, line, time.Now(), err, s, msg, kvList)
+	l.printWithInfos(file, line, now, err, s, msg, kvList)
 }
 
 func runtimeBacktrace(skip int) (string, int) {
@@ -114,24 +120,31 @@ func runtimeBacktrace(skip int) (string, int) {
 }
 
 func (l *tlogger) printWithInfos(file string, line int, now time.Time, err error, s severity.Severity, msg string, kvList []interface{}) {
+	// The message is always quoted, even if it contains line breaks.
+	// If developers want multi-line output, they should use a small, fixed
+	// message and put the multi-line output into a value.
+	qMsg := make([]byte, 0, 1024)
+	qMsg = strconv.AppendQuote(qMsg, msg)
+
 	// Only create a new buffer if we don't have one cached.
 	b := buffer.GetBuffer()
 	defer buffer.PutBuffer(b)
 
-	// Format header.
-	if l.config.co.fixedTime != nil {
-		now = *l.config.co.fixedTime
+	if l.config.co.withHeader {
+		// Format header.
+		if l.config.co.fixedTime != nil {
+			now = *l.config.co.fixedTime
+		}
+		b.FormatHeader(s, file, line, now)
 	}
-	b.FormatHeader(s, file, line, now)
 
-	// The message is always quoted, even if it contains line breaks.
-	// If developers want multi-line output, they should use a small, fixed
-	// message and put the multi-line output into a value.
-	b.WriteString(strconv.Quote(msg))
+	b.Write(qMsg)
+
+	var errKV []interface{}
 	if err != nil {
-		serialize.KVFormat(&b.Buffer, "err", err)
+		errKV = []interface{}{"err", err}
 	}
-	serialize.MergeAndFormatKVs(&b.Buffer, l.values, kvList)
+	serialize.FormatKVs(&b.Buffer, errKV, l.values, kvList)
 	if b.Len() == 0 || b.Bytes()[b.Len()-1] != '\n' {
 		b.WriteByte('\n')
 	}

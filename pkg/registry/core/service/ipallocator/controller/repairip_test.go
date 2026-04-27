@@ -24,6 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -771,5 +772,85 @@ func expectEvents(t *testing.T, actual <-chan string, expected []string) {
 		default:
 			return // No more events, as expected.
 		}
+	}
+}
+
+func TestRepairIPAddress_runOnce(t *testing.T) {
+	tests := []struct {
+		name          string
+		conflictCount int
+		errorType     func(string) error
+		expectedRuns  int
+		expectedErr   bool
+	}{
+		{
+			name:          "Retry on Conflict",
+			conflictCount: 2,
+			errorType: func(name string) error {
+				return apierrors.NewConflict(networkingv1.Resource("ipaddresses"), name, fmt.Errorf("conflict"))
+			},
+			expectedRuns: 3,
+			expectedErr:  false,
+		},
+		{
+			name:          "Retry on Forbidden",
+			conflictCount: 2,
+			errorType: func(name string) error {
+				return apierrors.NewForbidden(networkingv1.Resource("ipaddresses"), name, fmt.Errorf("forbidden"))
+			},
+			expectedRuns: 3,
+			expectedErr:  false,
+		},
+		{
+			name:          "No Retry on InternalError",
+			conflictCount: 1, // It will fail once and stop
+			errorType: func(name string) error {
+				return apierrors.NewInternalError(fmt.Errorf("internal error"))
+			},
+			expectedRuns: 1,
+			expectedErr:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, r := newFakeRepair(testTimeNow)
+			// Add a service that needs repair (missing IPAddress)
+			svc := newService("test-svc", []string{"10.0.1.1"})
+			err := r.serviceStore.Add(svc)
+			if err != nil {
+				t.Fatalf("Unexpected error adding service: %v", err)
+			}
+			r.servicesSynced = func() bool { return true }
+			r.ipAddressSynced = func() bool { return true }
+			r.serviceCIDRSynced = func() bool { return true }
+
+			// Add a default ServiceCIDR
+			cidr := newServiceCIDR("kubernetes", serviceCIDRv4, serviceCIDRv6)
+			err = r.serviceCIDRStore.Add(cidr)
+			if err != nil {
+				t.Fatalf("Unexpected error adding ServiceCIDR: %v", err)
+			}
+
+			// Track how many times create is called
+			createCalls := 0
+			client.PrependReactor("create", "ipaddresses", func(action k8stesting.Action) (bool, runtime.Object, error) {
+				createCalls++
+				if createCalls <= tt.conflictCount {
+					return true, nil, tt.errorType("10.0.1.1")
+				}
+				// Pass through to the default reactor (which creates the object)
+				return false, nil, nil
+			})
+
+			err = r.runOnce()
+			if (err != nil) != tt.expectedErr {
+				t.Errorf("runOnce() error = %v, expectedErr %v", err, tt.expectedErr)
+			}
+
+			if createCalls != tt.expectedRuns {
+				t.Errorf("Expected %d create calls, got %d", tt.expectedRuns, createCalls)
+			}
+		})
 	}
 }

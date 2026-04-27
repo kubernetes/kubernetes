@@ -281,7 +281,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 			pvcConditions := l.resource.Pvc.Status.Conditions
-			gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
+			ExpectNoResizeConditions(pvcConditions)
 			err = VerifyRecoveryRelatedFields(l.resource.Pvc)
 			framework.ExpectNoError(err, "while verifying recovery related fields")
 		})
@@ -339,7 +339,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 			pvcConditions := l.resource.Pvc.Status.Conditions
-			gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
+			ExpectNoResizeConditions(pvcConditions)
 
 			err = VerifyRecoveryRelatedFields(l.resource.Pvc)
 			framework.ExpectNoError(err, "while verifying recovery related fields")
@@ -419,7 +419,7 @@ func (v *volumeExpandTestSuite) DefineTests(driver storageframework.TestDriver, 
 			framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 			pvcConditions := l.resource.Pvc.Status.Conditions
-			gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
+			ExpectNoResizeConditions(pvcConditions)
 
 			err = VerifyRecoveryRelatedFields(l.resource.Pvc)
 			framework.ExpectNoError(err, "while verifying recovery related fields")
@@ -557,15 +557,18 @@ func WaitForPendingFSResizeCondition(ctx context.Context, pvc *v1.PersistentVolu
 		}
 
 		inProgressConditions := updatedPVC.Status.Conditions
-		// if there are no PVC conditions that means no node expansion is necessary
-		if len(inProgressConditions) == 0 {
-			return true, nil
-		}
+		hasResizeCondition := false
 		for _, condition := range inProgressConditions {
-			conditionType := condition.Type
-			if conditionType == v1.PersistentVolumeClaimFileSystemResizePending {
+			if condition.Type == v1.PersistentVolumeClaimFileSystemResizePending {
 				return true, nil
 			}
+			if isResizeConditionType(condition.Type) {
+				hasResizeCondition = true
+			}
+		}
+		// if there are no resize-related PVC conditions that means no node expansion is necessary
+		if !hasResizeCondition {
+			return true, nil
 		}
 		return false, nil
 	})
@@ -599,6 +602,20 @@ func WaitForFSResize(ctx context.Context, pvc *v1.PersistentVolumeClaim, c clien
 		return nil, fmt.Errorf("error waiting for pvc %q filesystem resize to finish: %v", pvc.Name, waitErr)
 	}
 	return updatedPVC, nil
+}
+
+func isResizeConditionType(t v1.PersistentVolumeClaimConditionType) bool {
+	return t == v1.PersistentVolumeClaimFileSystemResizePending ||
+		t == v1.PersistentVolumeClaimResizing ||
+		t == v1.PersistentVolumeClaimControllerResizeError ||
+		t == v1.PersistentVolumeClaimNodeResizeError
+}
+
+// ExpectNoResizeConditions verifies that only non-resize PVC conditions remain.
+func ExpectNoResizeConditions(pvcConditions []v1.PersistentVolumeClaimCondition) {
+	for _, condition := range pvcConditions {
+		gomega.ExpectWithOffset(1, isResizeConditionType(condition.Type)).To(gomega.BeFalseBecause("pvc should not have resize-related condition %q", condition.Type))
+	}
 }
 
 func verifyOfflineAllocatedResources(pvc *v1.PersistentVolumeClaim, allocatedSize resource.Quantity) error {

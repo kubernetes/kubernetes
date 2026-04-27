@@ -54,7 +54,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	clientgotransport "k8s.io/client-go/transport"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	basecompatibility "k8s.io/component-base/compatibility"
@@ -156,7 +155,11 @@ func NewDefaultTestServerOptions() *TestServerInstanceOptions {
 func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
 	// Some callers may have initialize ktesting already.
 	tCtx, ok := t.(ktesting.TContext)
-	if !ok {
+	if ok {
+		// tCtx.Cancel below must not cancel whatever else might be using
+		// this existing TContext.
+		tCtx = tCtx.WithCancel()
+	} else {
 		tCtx = ktesting.Init(t)
 	}
 
@@ -352,6 +355,12 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	if err := fs.Parse(customFlags); err != nil {
 		return result, err
 	}
+
+	// disable endpoint reconciliation when using a loopback "external" address
+	// unless the user has explicitly overridden the reconciler or advertise address
+	if !fs.Changed("advertise-address") && !fs.Changed("endpoint-reconciler-type") {
+		s.EndpointReconcilerType = "none"
+	}
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
 		s.Flagz = flagz.NamedFlagSetsReader{FlagSets: namedFlagSets}
 	}
@@ -395,12 +404,6 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 
 	if instanceOptions.EnableCertAuth {
 		if featureGate.Enabled(genericfeatures.UnknownVersionInteroperabilityProxy) {
-			// TODO: set up a general clean up for testserver
-			if clientgotransport.DialerStopCh == wait.NeverStop {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
-				t.Cleanup(cancel)
-				clientgotransport.DialerStopCh = ctx.Done()
-			}
 			s.PeerCAFile = filepath.Join(s.SecureServing.ServerCert.CertDirectory, s.SecureServing.ServerCert.PairName+".crt")
 		}
 	}

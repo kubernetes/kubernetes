@@ -33,8 +33,9 @@ var (
 )
 
 type HcnMock struct {
-	supportedFeatures hcn.SupportedFeatures
-	network           *hcn.HostComputeNetwork
+	supportedFeatures            hcn.SupportedFeatures
+	network                      *hcn.HostComputeNetwork
+	ShouldFailDeleteLoadBalancer bool
 }
 
 func (hcnObj HcnMock) generateEndpointGuid() (endpointId string, endpointName string) {
@@ -215,6 +216,9 @@ func (hcnObj HcnMock) UpdateLoadBalancer(loadBalancer *hcn.HostComputeLoadBalanc
 func (hcnObj HcnMock) DeleteLoadBalancer(loadBalancer *hcn.HostComputeLoadBalancer) error {
 	if _, ok := loadbalancerMap[loadBalancer.Id]; !ok {
 		return hcn.LoadBalancerNotFoundError{LoadBalancerId: loadBalancer.Id}
+	}
+	if hcnObj.ShouldFailDeleteLoadBalancer {
+		return fmt.Errorf("injected DeleteLoadBalancer failure for %s", loadBalancer.Id)
 	}
 	delete(loadbalancerMap, loadBalancer.Id)
 	return nil

@@ -246,8 +246,6 @@ func TestRealFIFOW_ReplaceMakesDeletionsForObjectsOnlyInQueue(t *testing.T) {
 		},
 	}
 	for _, tt := range table {
-		tt := tt
-
 		t.Run(tt.name, func(t *testing.T) {
 			// Test with a RealFIFO with a backing KnownObjects
 			fWithKnownObjects := NewRealFIFO(
@@ -1394,8 +1392,6 @@ func TestRealFIFO_ReplaceAtomic(t *testing.T) {
 		},
 	}
 	for _, tt := range table {
-		tt := tt
-
 		t.Run(tt.name, func(t *testing.T) {
 			// Test with a RealFIFO with a backing KnownObjects
 			f := NewRealFIFO(

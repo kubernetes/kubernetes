@@ -243,10 +243,10 @@ func TestPolicyCallsMetric(t *testing.T) {
 				PolicyType: api.PluginPolicyAllowlist,
 				Allowlist: []api.AllowlistEntry{
 					{
-						Name: "foobar",
+						Command: "foobar",
 					},
 					{
-						Name: "testdata/test-plugin.sh",
+						Command: "testdata/test-plugin.sh",
 					},
 				},
 			},
@@ -256,8 +256,8 @@ func TestPolicyCallsMetric(t *testing.T) {
 			policy: api.PluginPolicy{
 				PolicyType: api.PluginPolicyAllowlist,
 				Allowlist: []api.AllowlistEntry{
-					{Name: "foobar"},
-					{Name: "baz"},
+					{Command: "foobar"},
+					{Command: "baz"},
 				},
 			},
 		},

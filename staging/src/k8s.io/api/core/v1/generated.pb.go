@@ -244,6 +244,8 @@ func (m *NodeAddress) Reset() { *m = NodeAddress{} }
 
 func (m *NodeAffinity) Reset() { *m = NodeAffinity{} }
 
+func (m *NodeAllocatableResourceClaimStatus) Reset() { *m = NodeAllocatableResourceClaimStatus{} }
+
 func (m *NodeCondition) Reset() { *m = NodeCondition{} }
 
 func (m *NodeConfigSource) Reset() { *m = NodeConfigSource{} }
@@ -347,6 +349,8 @@ func (m *PodResourceClaim) Reset() { *m = PodResourceClaim{} }
 func (m *PodResourceClaimStatus) Reset() { *m = PodResourceClaimStatus{} }
 
 func (m *PodSchedulingGate) Reset() { *m = PodSchedulingGate{} }
+
+func (m *PodSchedulingGroup) Reset() { *m = PodSchedulingGroup{} }
 
 func (m *PodSecurityContext) Reset() { *m = PodSecurityContext{} }
 
@@ -513,8 +517,6 @@ func (m *VsphereVirtualDiskVolumeSource) Reset() { *m = VsphereVirtualDiskVolume
 func (m *WeightedPodAffinityTerm) Reset() { *m = WeightedPodAffinityTerm{} }
 
 func (m *WindowsSecurityContextOptions) Reset() { *m = WindowsSecurityContextOptions{} }
-
-func (m *WorkloadReference) Reset() { *m = WorkloadReference{} }
 
 func (m *AWSElasticBlockStoreVolumeSource) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
@@ -6323,6 +6325,72 @@ func (m *NodeAffinity) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *NodeAllocatableResourceClaimStatus) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *NodeAllocatableResourceClaimStatus) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *NodeAllocatableResourceClaimStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Resources) > 0 {
+		keysForResources := make([]string, 0, len(m.Resources))
+		for k := range m.Resources {
+			keysForResources = append(keysForResources, string(k))
+		}
+		sort.Strings(keysForResources)
+		for iNdEx := len(keysForResources) - 1; iNdEx >= 0; iNdEx-- {
+			v := m.Resources[ResourceName(keysForResources[iNdEx])]
+			baseI := i
+			{
+				size, err := (&v).MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+			i -= len(keysForResources[iNdEx])
+			copy(dAtA[i:], keysForResources[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(keysForResources[iNdEx])))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarintGenerated(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0x1a
+		}
+	}
+	if len(m.Containers) > 0 {
+		for iNdEx := len(m.Containers) - 1; iNdEx >= 0; iNdEx-- {
+			i -= len(m.Containers[iNdEx])
+			copy(dAtA[i:], m.Containers[iNdEx])
+			i = encodeVarintGenerated(dAtA, i, uint64(len(m.Containers[iNdEx])))
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	i -= len(m.ResourceClaimName)
+	copy(dAtA[i:], m.ResourceClaimName)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.ResourceClaimName)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
 func (m *NodeCondition) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -9478,6 +9546,36 @@ func (m *PodSchedulingGate) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *PodSchedulingGroup) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *PodSchedulingGroup) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *PodSchedulingGroup) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.PodGroupName != nil {
+		i -= len(*m.PodGroupName)
+		copy(dAtA[i:], *m.PodGroupName)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.PodGroupName)))
+		i--
+		dAtA[i] = 0xa
+	}
+	return len(dAtA) - i, nil
+}
+
 func (m *PodSecurityContext) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -9671,9 +9769,9 @@ func (m *PodSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.WorkloadRef != nil {
+	if m.SchedulingGroup != nil {
 		{
-			size, err := m.WorkloadRef.MarshalToSizedBuffer(dAtA[:i])
+			size, err := m.SchedulingGroup.MarshalToSizedBuffer(dAtA[:i])
 			if err != nil {
 				return 0, err
 			}
@@ -9683,7 +9781,7 @@ func (m *PodSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 		i--
 		dAtA[i] = 0x2
 		i--
-		dAtA[i] = 0xd2
+		dAtA[i] = 0xda
 	}
 	if m.HostnameOverride != nil {
 		i -= len(*m.HostnameOverride)
@@ -10182,6 +10280,22 @@ func (m *PodStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.NodeAllocatableResourceClaimStatuses) > 0 {
+		for iNdEx := len(m.NodeAllocatableResourceClaimStatuses) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.NodeAllocatableResourceClaimStatuses[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x1
+			i--
+			dAtA[i] = 0xaa
+		}
+	}
 	if m.Resources != nil {
 		{
 			size, err := m.Resources.MarshalToSizedBuffer(dAtA[:i])
@@ -11564,6 +11678,13 @@ func (m *ResourceHealth) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.Message != nil {
+		i -= len(*m.Message)
+		copy(dAtA[i:], *m.Message)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.Message)))
+		i--
+		dAtA[i] = 0x32
+	}
 	i -= len(m.Health)
 	copy(dAtA[i:], m.Health)
 	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Health)))
@@ -14181,16 +14302,18 @@ func (m *VolumeMountStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	{
-		size, err := m.VolumeStatus.MarshalToSizedBuffer(dAtA[:i])
-		if err != nil {
-			return 0, err
+	if m.VolumeStatus != nil {
+		{
+			size, err := m.VolumeStatus.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
 		}
-		i -= size
-		i = encodeVarintGenerated(dAtA, i, uint64(size))
+		i--
+		dAtA[i] = 0x2a
 	}
-	i--
-	dAtA[i] = 0x2a
 	if m.RecursiveReadOnly != nil {
 		i -= len(*m.RecursiveReadOnly)
 		copy(dAtA[i:], *m.RecursiveReadOnly)
@@ -15008,44 +15131,6 @@ func (m *WindowsSecurityContextOptions) MarshalToSizedBuffer(dAtA []byte) (int, 
 		i--
 		dAtA[i] = 0xa
 	}
-	return len(dAtA) - i, nil
-}
-
-func (m *WorkloadReference) Marshal() (dAtA []byte, err error) {
-	size := m.Size()
-	dAtA = make([]byte, size)
-	n, err := m.MarshalToSizedBuffer(dAtA[:size])
-	if err != nil {
-		return nil, err
-	}
-	return dAtA[:n], nil
-}
-
-func (m *WorkloadReference) MarshalTo(dAtA []byte) (int, error) {
-	size := m.Size()
-	return m.MarshalToSizedBuffer(dAtA[:size])
-}
-
-func (m *WorkloadReference) MarshalToSizedBuffer(dAtA []byte) (int, error) {
-	i := len(dAtA)
-	_ = i
-	var l int
-	_ = l
-	i -= len(m.PodGroupReplicaKey)
-	copy(dAtA[i:], m.PodGroupReplicaKey)
-	i = encodeVarintGenerated(dAtA, i, uint64(len(m.PodGroupReplicaKey)))
-	i--
-	dAtA[i] = 0x1a
-	i -= len(m.PodGroup)
-	copy(dAtA[i:], m.PodGroup)
-	i = encodeVarintGenerated(dAtA, i, uint64(len(m.PodGroup)))
-	i--
-	dAtA[i] = 0x12
-	i -= len(m.Name)
-	copy(dAtA[i:], m.Name)
-	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
-	i--
-	dAtA[i] = 0xa
 	return len(dAtA) - i, nil
 }
 
@@ -17211,6 +17296,32 @@ func (m *NodeAffinity) Size() (n int) {
 	return n
 }
 
+func (m *NodeAllocatableResourceClaimStatus) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.ResourceClaimName)
+	n += 1 + l + sovGenerated(uint64(l))
+	if len(m.Containers) > 0 {
+		for _, s := range m.Containers {
+			l = len(s)
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	if len(m.Resources) > 0 {
+		for k, v := range m.Resources {
+			_ = k
+			_ = v
+			l = v.Size()
+			mapEntrySize := 1 + len(k) + sovGenerated(uint64(len(k))) + 1 + l + sovGenerated(uint64(l))
+			n += mapEntrySize + 1 + sovGenerated(uint64(mapEntrySize))
+		}
+	}
+	return n
+}
+
 func (m *NodeCondition) Size() (n int) {
 	if m == nil {
 		return 0
@@ -18384,6 +18495,19 @@ func (m *PodSchedulingGate) Size() (n int) {
 	return n
 }
 
+func (m *PodSchedulingGroup) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.PodGroupName != nil {
+		l = len(*m.PodGroupName)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
 func (m *PodSecurityContext) Size() (n int) {
 	if m == nil {
 		return 0
@@ -18623,8 +18747,8 @@ func (m *PodSpec) Size() (n int) {
 		l = len(*m.HostnameOverride)
 		n += 2 + l + sovGenerated(uint64(l))
 	}
-	if m.WorkloadRef != nil {
-		l = m.WorkloadRef.Size()
+	if m.SchedulingGroup != nil {
+		l = m.SchedulingGroup.Size()
 		n += 2 + l + sovGenerated(uint64(l))
 	}
 	return n
@@ -18715,6 +18839,12 @@ func (m *PodStatus) Size() (n int) {
 	if m.Resources != nil {
 		l = m.Resources.Size()
 		n += 2 + l + sovGenerated(uint64(l))
+	}
+	if len(m.NodeAllocatableResourceClaimStatuses) > 0 {
+		for _, e := range m.NodeAllocatableResourceClaimStatuses {
+			l = e.Size()
+			n += 2 + l + sovGenerated(uint64(l))
+		}
 	}
 	return n
 }
@@ -19140,6 +19270,10 @@ func (m *ResourceHealth) Size() (n int) {
 	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.Health)
 	n += 1 + l + sovGenerated(uint64(l))
+	if m.Message != nil {
+		l = len(*m.Message)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -20129,8 +20263,10 @@ func (m *VolumeMountStatus) Size() (n int) {
 		l = len(*m.RecursiveReadOnly)
 		n += 1 + l + sovGenerated(uint64(l))
 	}
-	l = m.VolumeStatus.Size()
-	n += 1 + l + sovGenerated(uint64(l))
+	if m.VolumeStatus != nil {
+		l = m.VolumeStatus.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -20399,21 +20535,6 @@ func (m *WindowsSecurityContextOptions) Size() (n int) {
 	if m.HostProcess != nil {
 		n += 2
 	}
-	return n
-}
-
-func (m *WorkloadReference) Size() (n int) {
-	if m == nil {
-		return 0
-	}
-	var l int
-	_ = l
-	l = len(m.Name)
-	n += 1 + l + sovGenerated(uint64(l))
-	l = len(m.PodGroup)
-	n += 1 + l + sovGenerated(uint64(l))
-	l = len(m.PodGroupReplicaKey)
-	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -22064,6 +22185,28 @@ func (this *NodeAffinity) String() string {
 	}, "")
 	return s
 }
+func (this *NodeAllocatableResourceClaimStatus) String() string {
+	if this == nil {
+		return "nil"
+	}
+	keysForResources := make([]string, 0, len(this.Resources))
+	for k := range this.Resources {
+		keysForResources = append(keysForResources, string(k))
+	}
+	sort.Strings(keysForResources)
+	mapStringForResources := "map[ResourceName]resource.Quantity{"
+	for _, k := range keysForResources {
+		mapStringForResources += fmt.Sprintf("%v: %v,", k, this.Resources[ResourceName(k)])
+	}
+	mapStringForResources += "}"
+	s := strings.Join([]string{`&NodeAllocatableResourceClaimStatus{`,
+		`ResourceClaimName:` + fmt.Sprintf("%v", this.ResourceClaimName) + `,`,
+		`Containers:` + fmt.Sprintf("%v", this.Containers) + `,`,
+		`Resources:` + mapStringForResources + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *NodeCondition) String() string {
 	if this == nil {
 		return "nil"
@@ -22913,6 +23056,16 @@ func (this *PodSchedulingGate) String() string {
 	}, "")
 	return s
 }
+func (this *PodSchedulingGroup) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PodSchedulingGroup{`,
+		`PodGroupName:` + valueToStringGenerated(this.PodGroupName) + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *PodSecurityContext) String() string {
 	if this == nil {
 		return "nil"
@@ -23071,7 +23224,7 @@ func (this *PodSpec) String() string {
 		`ResourceClaims:` + repeatedStringForResourceClaims + `,`,
 		`Resources:` + strings.Replace(this.Resources.String(), "ResourceRequirements", "ResourceRequirements", 1) + `,`,
 		`HostnameOverride:` + valueToStringGenerated(this.HostnameOverride) + `,`,
-		`WorkloadRef:` + strings.Replace(this.WorkloadRef.String(), "WorkloadReference", "WorkloadReference", 1) + `,`,
+		`SchedulingGroup:` + strings.Replace(this.SchedulingGroup.String(), "PodSchedulingGroup", "PodSchedulingGroup", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -23115,6 +23268,11 @@ func (this *PodStatus) String() string {
 		repeatedStringForHostIPs += strings.Replace(strings.Replace(f.String(), "HostIP", "HostIP", 1), `&`, ``, 1) + ","
 	}
 	repeatedStringForHostIPs += "}"
+	repeatedStringForNodeAllocatableResourceClaimStatuses := "[]NodeAllocatableResourceClaimStatus{"
+	for _, f := range this.NodeAllocatableResourceClaimStatuses {
+		repeatedStringForNodeAllocatableResourceClaimStatuses += strings.Replace(strings.Replace(f.String(), "NodeAllocatableResourceClaimStatus", "NodeAllocatableResourceClaimStatus", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForNodeAllocatableResourceClaimStatuses += "}"
 	keysForAllocatedResources := make([]string, 0, len(this.AllocatedResources))
 	for k := range this.AllocatedResources {
 		keysForAllocatedResources = append(keysForAllocatedResources, string(k))
@@ -23146,6 +23304,7 @@ func (this *PodStatus) String() string {
 		`ExtendedResourceClaimStatus:` + strings.Replace(this.ExtendedResourceClaimStatus.String(), "PodExtendedResourceClaimStatus", "PodExtendedResourceClaimStatus", 1) + `,`,
 		`AllocatedResources:` + mapStringForAllocatedResources + `,`,
 		`Resources:` + strings.Replace(this.Resources.String(), "ResourceRequirements", "ResourceRequirements", 1) + `,`,
+		`NodeAllocatableResourceClaimStatuses:` + repeatedStringForNodeAllocatableResourceClaimStatuses + `,`,
 		`}`,
 	}, "")
 	return s
@@ -23478,6 +23637,7 @@ func (this *ResourceHealth) String() string {
 	s := strings.Join([]string{`&ResourceHealth{`,
 		`ResourceID:` + fmt.Sprintf("%v", this.ResourceID) + `,`,
 		`Health:` + fmt.Sprintf("%v", this.Health) + `,`,
+		`Message:` + valueToStringGenerated(this.Message) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -24231,7 +24391,7 @@ func (this *VolumeMountStatus) String() string {
 		`MountPath:` + fmt.Sprintf("%v", this.MountPath) + `,`,
 		`ReadOnly:` + fmt.Sprintf("%v", this.ReadOnly) + `,`,
 		`RecursiveReadOnly:` + valueToStringGenerated(this.RecursiveReadOnly) + `,`,
-		`VolumeStatus:` + strings.Replace(strings.Replace(this.VolumeStatus.String(), "VolumeStatus", "VolumeStatus", 1), `&`, ``, 1) + `,`,
+		`VolumeStatus:` + strings.Replace(this.VolumeStatus.String(), "VolumeStatus", "VolumeStatus", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -24374,18 +24534,6 @@ func (this *WindowsSecurityContextOptions) String() string {
 		`GMSACredentialSpec:` + valueToStringGenerated(this.GMSACredentialSpec) + `,`,
 		`RunAsUserName:` + valueToStringGenerated(this.RunAsUserName) + `,`,
 		`HostProcess:` + valueToStringGenerated(this.HostProcess) + `,`,
-		`}`,
-	}, "")
-	return s
-}
-func (this *WorkloadReference) String() string {
-	if this == nil {
-		return "nil"
-	}
-	s := strings.Join([]string{`&WorkloadReference{`,
-		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
-		`PodGroup:` + fmt.Sprintf("%v", this.PodGroup) + `,`,
-		`PodGroupReplicaKey:` + fmt.Sprintf("%v", this.PodGroupReplicaKey) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -42948,6 +43096,249 @@ func (m *NodeAffinity) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *NodeAllocatableResourceClaimStatus) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: NodeAllocatableResourceClaimStatus: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: NodeAllocatableResourceClaimStatus: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ResourceClaimName", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ResourceClaimName = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Containers", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Containers = append(m.Containers, string(dAtA[iNdEx:postIndex]))
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Resources", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Resources == nil {
+				m.Resources = make(map[ResourceName]resource.Quantity)
+			}
+			var mapkey ResourceName
+			mapvalue := &resource.Quantity{}
+			for iNdEx < postIndex {
+				entryPreIndex := iNdEx
+				var wire uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowGenerated
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					wire |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				fieldNum := int32(wire >> 3)
+				if fieldNum == 1 {
+					var stringLenmapkey uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapkey |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapkey := int(stringLenmapkey)
+					if intStringLenmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postStringIndexmapkey := iNdEx + intStringLenmapkey
+					if postStringIndexmapkey < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postStringIndexmapkey > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapkey = ResourceName(dAtA[iNdEx:postStringIndexmapkey])
+					iNdEx = postStringIndexmapkey
+				} else if fieldNum == 2 {
+					var mapmsglen int
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowGenerated
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						mapmsglen |= int(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					if mapmsglen < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					postmsgIndex := iNdEx + mapmsglen
+					if postmsgIndex < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if postmsgIndex > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapvalue = &resource.Quantity{}
+					if err := mapvalue.Unmarshal(dAtA[iNdEx:postmsgIndex]); err != nil {
+						return err
+					}
+					iNdEx = postmsgIndex
+				} else {
+					iNdEx = entryPreIndex
+					skippy, err := skipGenerated(dAtA[iNdEx:])
+					if err != nil {
+						return err
+					}
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
+						return ErrInvalidLengthGenerated
+					}
+					if (iNdEx + skippy) > postIndex {
+						return io.ErrUnexpectedEOF
+					}
+					iNdEx += skippy
+				}
+			}
+			m.Resources[ResourceName(mapkey)] = *mapvalue
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *NodeCondition) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -52986,6 +53377,89 @@ func (m *PodSchedulingGate) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *PodSchedulingGroup) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PodSchedulingGroup: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PodSchedulingGroup: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PodGroupName", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(dAtA[iNdEx:postIndex])
+			m.PodGroupName = &s
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *PodSecurityContext) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -55007,9 +55481,9 @@ func (m *PodSpec) Unmarshal(dAtA []byte) error {
 			s := string(dAtA[iNdEx:postIndex])
 			m.HostnameOverride = &s
 			iNdEx = postIndex
-		case 42:
+		case 43:
 			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field WorkloadRef", wireType)
+				return fmt.Errorf("proto: wrong wireType = %d for field SchedulingGroup", wireType)
 			}
 			var msglen int
 			for shift := uint(0); ; shift += 7 {
@@ -55036,10 +55510,10 @@ func (m *PodSpec) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			if m.WorkloadRef == nil {
-				m.WorkloadRef = &WorkloadReference{}
+			if m.SchedulingGroup == nil {
+				m.SchedulingGroup = &PodSchedulingGroup{}
 			}
-			if err := m.WorkloadRef.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+			if err := m.SchedulingGroup.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -55840,6 +56314,40 @@ func (m *PodStatus) Unmarshal(dAtA []byte) error {
 				m.Resources = &ResourceRequirements{}
 			}
 			if err := m.Resources.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 21:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field NodeAllocatableResourceClaimStatuses", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.NodeAllocatableResourceClaimStatuses = append(m.NodeAllocatableResourceClaimStatuses, NodeAllocatableResourceClaimStatus{})
+			if err := m.NodeAllocatableResourceClaimStatuses[len(m.NodeAllocatableResourceClaimStatuses)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -59694,6 +60202,39 @@ func (m *ResourceHealth) Unmarshal(dAtA []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Health = ResourceHealthStatus(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Message", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(dAtA[iNdEx:postIndex])
+			m.Message = &s
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
@@ -68358,6 +68899,9 @@ func (m *VolumeMountStatus) Unmarshal(dAtA []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
+			if m.VolumeStatus == nil {
+				m.VolumeStatus = &VolumeStatus{}
+			}
 			if err := m.VolumeStatus.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
@@ -70688,152 +71232,6 @@ func (m *WindowsSecurityContextOptions) Unmarshal(dAtA []byte) error {
 			}
 			b := bool(v != 0)
 			m.HostProcess = &b
-		default:
-			iNdEx = preIndex
-			skippy, err := skipGenerated(dAtA[iNdEx:])
-			if err != nil {
-				return err
-			}
-			if (skippy < 0) || (iNdEx+skippy) < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if (iNdEx + skippy) > l {
-				return io.ErrUnexpectedEOF
-			}
-			iNdEx += skippy
-		}
-	}
-
-	if iNdEx > l {
-		return io.ErrUnexpectedEOF
-	}
-	return nil
-}
-func (m *WorkloadReference) Unmarshal(dAtA []byte) error {
-	l := len(dAtA)
-	iNdEx := 0
-	for iNdEx < l {
-		preIndex := iNdEx
-		var wire uint64
-		for shift := uint(0); ; shift += 7 {
-			if shift >= 64 {
-				return ErrIntOverflowGenerated
-			}
-			if iNdEx >= l {
-				return io.ErrUnexpectedEOF
-			}
-			b := dAtA[iNdEx]
-			iNdEx++
-			wire |= uint64(b&0x7F) << shift
-			if b < 0x80 {
-				break
-			}
-		}
-		fieldNum := int32(wire >> 3)
-		wireType := int(wire & 0x7)
-		if wireType == 4 {
-			return fmt.Errorf("proto: WorkloadReference: wiretype end group for non-group")
-		}
-		if fieldNum <= 0 {
-			return fmt.Errorf("proto: WorkloadReference: illegal tag %d (wire type %d)", fieldNum, wire)
-		}
-		switch fieldNum {
-		case 1:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.Name = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 2:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field PodGroup", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.PodGroup = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
-		case 3:
-			if wireType != 2 {
-				return fmt.Errorf("proto: wrong wireType = %d for field PodGroupReplicaKey", wireType)
-			}
-			var stringLen uint64
-			for shift := uint(0); ; shift += 7 {
-				if shift >= 64 {
-					return ErrIntOverflowGenerated
-				}
-				if iNdEx >= l {
-					return io.ErrUnexpectedEOF
-				}
-				b := dAtA[iNdEx]
-				iNdEx++
-				stringLen |= uint64(b&0x7F) << shift
-				if b < 0x80 {
-					break
-				}
-			}
-			intStringLen := int(stringLen)
-			if intStringLen < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			postIndex := iNdEx + intStringLen
-			if postIndex < 0 {
-				return ErrInvalidLengthGenerated
-			}
-			if postIndex > l {
-				return io.ErrUnexpectedEOF
-			}
-			m.PodGroupReplicaKey = string(dAtA[iNdEx:postIndex])
-			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

@@ -17,14 +17,22 @@ limitations under the License.
 package discovery
 
 import (
+	"crypto/x509"
+	"crypto/x509/pkix"
+	_ "embed"
+	"math/big"
 	"testing"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 )
+
+//go:embed testdata/ca.crt
+var testCACert []byte
 
 func TestFor(t *testing.T) {
 	tests := []struct {
@@ -87,5 +95,85 @@ func TestFor(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+func TestGetCACertFromKubeconfig(t *testing.T) {
+	tests := []struct {
+		name          string
+		config        *clientcmdapi.Config
+		expectedError bool
+	}{
+		{
+			name:          "empty kubeconfig",
+			config:        &clientcmdapi.Config{},
+			expectedError: true,
+		},
+		{
+			name: "kubeconfig with invalid cert",
+			config: &clientcmdapi.Config{
+				CurrentContext: "cluster",
+				Contexts: map[string]*clientcmdapi.Context{
+					"cluster": {
+						Cluster: "cluster",
+					},
+				},
+				Clusters: map[string]*clientcmdapi.Cluster{
+					"cluster": {
+						CertificateAuthorityData: []byte("foo"),
+					},
+				},
+			},
+			expectedError: true,
+		},
+		{
+			name: "kubeconfig with CA cert",
+			config: &clientcmdapi.Config{
+				CurrentContext: "cluster",
+				Contexts: map[string]*clientcmdapi.Context{
+					"cluster": {
+						Cluster: "cluster",
+					},
+				},
+				Clusters: map[string]*clientcmdapi.Cluster{
+					"cluster": {
+						CertificateAuthorityData: testCACert,
+					},
+				},
+			},
+			expectedError: false,
+		},
+	}
+	for _, rt := range tests {
+		t.Run(rt.name, func(t *testing.T) {
+			_, err := getCACertFromKubeconfig(rt.config)
+			if (err != nil) != rt.expectedError {
+				t.Errorf("Expected error: %v, got: %v, error: %v", rt.expectedError, err != nil, err)
+			}
+		})
+	}
+}
+
+func TestFormatCACertInfo(t *testing.T) {
+	certInfo := formatCACertInfo(&x509.Certificate{
+		Subject:            pkix.Name{CommonName: "test-subject"},
+		Issuer:             pkix.Name{CommonName: "test-issuer"},
+		SerialNumber:       big.NewInt(12345),
+		NotBefore:          time.Date(2020, time.January, 1, 0, 0, 0, 0, time.UTC),
+		NotAfter:           time.Date(2030, time.January, 1, 0, 0, 0, 0, time.UTC),
+		SignatureAlgorithm: x509.SHA256WithRSA,
+		PublicKeyAlgorithm: x509.RSA,
+	})
+	expected := "CA Certificate:\n" +
+		"\tSubject: CN=test-subject\n" +
+		"\tIssuer: CN=test-issuer\n" +
+		"\tSerialNumber: 12345\n" +
+		"\tNotBefore: 2020-01-01 00:00:00 +0000 UTC\n" +
+		"\tNotAfter: 2030-01-01 00:00:00 +0000 UTC\n" +
+		"\tSignatureAlgorithm: SHA256-RSA\n" +
+		"\tPublicKeyAlgorithm: RSA\n" +
+		"\tHash: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+	if certInfo != expected {
+		t.Errorf("expected:\n%s\ngot:\n%s\n", expected, certInfo)
 	}
 }
