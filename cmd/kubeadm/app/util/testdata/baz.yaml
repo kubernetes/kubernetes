@@ -1,0 +1,4 @@
+apiVersion: baz.k8s.io/v1
+kind: Baz
+baz:
+	foo: bar

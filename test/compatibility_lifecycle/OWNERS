@@ -1,0 +1,18 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+approvers:
+  - feature-approvers
+  - sig-api-machinery-api-approvers
+  - jpbetz
+  - siyuanfoundation
+  - aaron-prindle # For migration of unversioned feature gates to versioned
+  - jefftree # For migration of unversioned feature gates to versioned
+reviewers:
+  - feature-approvers
+  - sig-api-machinery-api-reviewers
+  - jpbetz
+  - siyuanfoundation
+  - aaron-prindle # For migration of unversioned feature gates to versioned
+  - jefftree # For migration of unversioned feature gates to versioned
+labels:
+  - sig/api-machinery

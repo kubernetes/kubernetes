@@ -1,0 +1,35 @@
+{
+  "apiVersion": "v1",
+  "groupVersion": "internal.apiserver.k8s.io/v1alpha1",
+  "kind": "APIResourceList",
+  "resources": [
+    {
+      "kind": "StorageVersion",
+      "name": "storageversions",
+      "namespaced": false,
+      "singularName": "storageversion",
+      "storageVersionHash": "c8YZt5U0nPk=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "StorageVersion",
+      "name": "storageversions/status",
+      "namespaced": false,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    }
+  ]
+}

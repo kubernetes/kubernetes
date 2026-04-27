@@ -1,0 +1,4 @@
+*.out
+*.cov
+.idea
+.env

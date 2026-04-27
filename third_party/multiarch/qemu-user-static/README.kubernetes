@@ -1,0 +1,2 @@
+qemu-binfmt-confg.sh comes from https://github.com/qemu/qemu/blob/7c81570d932268a9626457a662f1c5046ebc455e/scripts/qemu-binfmt-conf.sh
+register.sh comes from https://github.com/multiarch/qemu-user-static/blob/9898439ca975c9c4c0db2bdc4b3707d382559d09/containers/latest/register.sh

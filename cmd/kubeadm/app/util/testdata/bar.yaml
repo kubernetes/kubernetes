@@ -1,0 +1,3 @@
+apiVersion: bar.k8s.io/v2
+barField: bar
+kind: Bar

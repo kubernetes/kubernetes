@@ -1,0 +1,25 @@
+{
+  "apiVersion":"apps/v1",
+  "kind":"ControllerRevision",
+  "metadata":{
+    "creationTimestamp":"2025-10-31T18:19:02Z",
+    "labels":{
+      "app":"foo",
+      "controller.kubernetes.io/hash":"c77f6d978"
+    },
+    "name":"test-c77f6d978",
+    "namespace":"default",
+    "ownerReferences":[{
+      "apiVersion":"apps/v1",
+      "blockOwnerDeletion":true,
+      "controller":true,
+      "kind":"StatefulSet",
+      "name":"test",
+      "uid":"ec335e25-1045-4216-8634-50cfbe05f3d6"
+    }],
+    "resourceVersion":"2209",
+    "uid":"af6e1945-ed14-4d1a-b420-813aa683a0fd"
+  },
+  "data":{"spec":{"template":{"$patch":"replace","metadata":{"annotations":{"test":"value"},"creationTimestamp":null,"labels":{"app":"foo"}},"spec":{"containers":[{"image":"test","imagePullPolicy":"Always","name":"test","resources":{},"terminationMessagePath":"/dev/termination-log","terminationMessagePolicy":"File"}],"dnsPolicy":"ClusterFirst","restartPolicy":"Always","schedulerName":"default-scheduler","securityContext":{},"terminationGracePeriodSeconds":30}}}},
+  "revision":1
+}

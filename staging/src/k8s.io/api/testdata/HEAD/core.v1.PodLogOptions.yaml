@@ -1,0 +1,12 @@
+apiVersion: v1
+container: containerValue
+follow: true
+insecureSkipTLSVerifyBackend: true
+kind: PodLogOptions
+limitBytes: 8
+previous: true
+sinceSeconds: 4
+sinceTime: "2005-01-01T01:01:01Z"
+stream: streamValue
+tailLines: 7
+timestamps: true
