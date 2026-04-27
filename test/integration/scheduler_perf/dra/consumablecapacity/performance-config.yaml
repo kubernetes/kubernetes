@@ -76,12 +76,13 @@
       steadyState: false
       duration: 0s # unused
       maxClaimsPerNode: 2
-  - name: 2000pods_100nodes
+  - name: 400pods_100nodes
+    labels: [performance]
     params:
       nodesWithDRA: 100
       nodesWithoutDRA: 0
-      resourceSlices: 2000
-      measurePods: 2000
+      resourceSlices: 100
+      measurePods: 400
       steadyState: true
       duration: 10s
-      maxClaimsPerNode: 20
+      maxClaimsPerNode: 4

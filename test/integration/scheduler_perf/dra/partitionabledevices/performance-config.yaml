@@ -69,6 +69,7 @@
       steadyState: false
       duration: 0s # unused
   - name: 2000pods_100nodes
+    labels: [performance]
     params:
       nodesWithDRA: 100
       nodesWithoutDRA: 0

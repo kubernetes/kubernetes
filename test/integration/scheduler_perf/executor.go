@@ -711,6 +711,12 @@ func createPodsSteadily(tCtx ktesting.TContext, namespace string, podInformer co
 		return fmt.Errorf("register event handler: %w", err)
 	}
 	defer func() {
+		tCtx.Log("Waiting for remaining pods to get scheduled. This is necessary to get clean metrics after the run.")
+		for existingPods > runningPods {
+			<-scheduledPods
+		}
+		tCtx.Log("Done waiting for remaining pods to get scheduled.")
+
 		tCtx.ExpectNoError(podInformer.Informer().RemoveEventHandler(handle), "remove event handler")
 	}()
 
