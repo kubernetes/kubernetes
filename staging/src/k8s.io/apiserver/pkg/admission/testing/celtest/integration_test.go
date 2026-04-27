@@ -261,8 +261,8 @@ webhooks:
 		if err != nil {
 			t.Fatalf("ParseAdmissionPolicy() error: %v", err)
 		}
-		if len(policy.Validations) != 2 {
-			t.Fatalf("got %d validations, want 2", len(policy.Validations))
+		if len(policy.MatchConditions) != 2 {
+			t.Fatalf("got %d matchConditions, want 2", len(policy.MatchConditions))
 		}
 
 		input := &AdmissionInput{
@@ -281,12 +281,20 @@ webhooks:
 			},
 		}
 
-		result, err := e.EvalAdmission(policy, input)
+		result, err := e.EvalMatchConditions(policy, input)
 		if err != nil {
-			t.Fatalf("EvalAdmission() error: %v", err)
+			t.Fatalf("EvalMatchConditions() error: %v", err)
 		}
-		if !result.Allowed {
-			t.Errorf("all matchConditions should pass: %s", result.FormatViolations())
+		if len(result.Conditions) != 2 {
+			t.Fatalf("got %d conditions, want 2", len(result.Conditions))
+		}
+		for index, condition := range result.Conditions {
+			if condition.Error != nil {
+				t.Fatalf("condition[%d] error: %v", index, condition.Error)
+			}
+			if condition.Value != true {
+				t.Errorf("condition[%d] value = %v, want true", index, condition.Value)
+			}
 		}
 	})
 
@@ -311,7 +319,7 @@ webhooks:
 			t.Fatalf("ParseAdmissionPolicy() error: %v", err)
 		}
 
-		// Should fail (skip) for kube-system
+		// The matchCondition expression evaluates to false for kube-system.
 		input := &AdmissionInput{
 			Object: map[string]interface{}{
 				"apiVersion": "v1",
@@ -322,12 +330,18 @@ webhooks:
 				},
 			},
 		}
-		result, err := e.EvalAdmission(policy, input)
+		result, err := e.EvalMatchConditions(policy, input)
 		if err != nil {
-			t.Fatalf("EvalAdmission() error: %v", err)
+			t.Fatalf("EvalMatchConditions() error: %v", err)
 		}
-		if result.Allowed {
-			t.Error("expected matchCondition to fail for kube-system namespace")
+		if len(result.Conditions) != 1 {
+			t.Fatalf("got %d conditions, want 1", len(result.Conditions))
+		}
+		if result.Conditions[0].Error != nil {
+			t.Fatalf("condition error: %v", result.Conditions[0].Error)
+		}
+		if result.Conditions[0].Value != false {
+			t.Errorf("condition value = %v, want false", result.Conditions[0].Value)
 		}
 	})
 }

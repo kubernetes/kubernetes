@@ -36,8 +36,10 @@ type policyMeta struct {
 // policyFile represents the flat variables/validations format that is not
 // a real Kubernetes resource.
 type policyFile struct {
-	Variables   []admissionregistrationv1.Variable   `json:"variables"`
-	Validations []admissionregistrationv1.Validation `json:"validations"`
+	Variables        []admissionregistrationv1.Variable        `json:"variables"`
+	Validations      []admissionregistrationv1.Validation      `json:"validations"`
+	MatchConditions  []admissionregistrationv1.MatchCondition  `json:"matchConditions"`
+	AuditAnnotations []admissionregistrationv1.AuditAnnotation `json:"auditAnnotations"`
 }
 
 // admissionInputFile represents a YAML file containing the runtime inputs for
@@ -93,8 +95,14 @@ func parseFlatPolicy(data []byte) (*AdmissionPolicy, error) {
 	if err := appendValidations(policy, "validations", flat.Validations); err != nil {
 		return nil, err
 	}
-	if len(policy.Variables) == 0 && len(policy.Validations) == 0 {
-		return nil, fmt.Errorf("policy file does not contain variables or validations")
+	if err := appendMatchConditions(policy, "matchConditions", flat.MatchConditions); err != nil {
+		return nil, err
+	}
+	if err := appendAuditAnnotations(policy, "auditAnnotations", flat.AuditAnnotations); err != nil {
+		return nil, err
+	}
+	if len(policy.Variables) == 0 && len(policy.Validations) == 0 && len(policy.MatchConditions) == 0 && len(policy.AuditAnnotations) == 0 {
+		return nil, fmt.Errorf("policy file does not contain CEL expressions")
 	}
 	return policy, nil
 }
@@ -112,11 +120,17 @@ func parseValidatingAdmissionPolicy(data []byte) (*AdmissionPolicy, error) {
 	if err := appendVariables(policy, vap.Spec.Variables); err != nil {
 		return nil, err
 	}
+	if err := appendMatchConditions(policy, "spec.matchConditions", vap.Spec.MatchConditions); err != nil {
+		return nil, err
+	}
 	if err := appendValidations(policy, "spec.validations", vap.Spec.Validations); err != nil {
 		return nil, err
 	}
-	if len(policy.Variables) == 0 && len(policy.Validations) == 0 {
-		return nil, fmt.Errorf("ValidatingAdmissionPolicy does not contain variables or validations")
+	if err := appendAuditAnnotations(policy, "spec.auditAnnotations", vap.Spec.AuditAnnotations); err != nil {
+		return nil, err
+	}
+	if len(policy.Variables) == 0 && len(policy.Validations) == 0 && len(policy.MatchConditions) == 0 && len(policy.AuditAnnotations) == 0 {
+		return nil, fmt.Errorf("ValidatingAdmissionPolicy does not contain CEL expressions")
 	}
 	return policy, nil
 }
@@ -134,17 +148,20 @@ func parseMutatingAdmissionPolicy(data []byte) (*AdmissionPolicy, error) {
 	if err := appendVariables(policy, map_.Spec.Variables); err != nil {
 		return nil, err
 	}
+	if err := appendMatchConditions(policy, "spec.matchConditions", map_.Spec.MatchConditions); err != nil {
+		return nil, err
+	}
 	if err := appendMutations(policy, "spec.mutations", map_.Spec.Mutations); err != nil {
 		return nil, err
 	}
-	if len(policy.Variables) == 0 && len(policy.Mutations) == 0 {
-		return nil, fmt.Errorf("MutatingAdmissionPolicy does not contain variables or mutations")
+	if len(policy.Variables) == 0 && len(policy.Mutations) == 0 && len(policy.MatchConditions) == 0 {
+		return nil, fmt.Errorf("MutatingAdmissionPolicy does not contain CEL expressions")
 	}
 	return policy, nil
 }
 
 // parseValidatingWebhookConfiguration parses a ValidatingWebhookConfiguration
-// YAML document, extracting matchConditions expressions as validations.
+// YAML document, extracting matchConditions expressions.
 func parseValidatingWebhookConfiguration(data []byte) (*AdmissionPolicy, error) {
 	var config admissionregistrationv1.ValidatingWebhookConfiguration
 	if err := sigsyaml.Unmarshal(data, &config); err != nil {
@@ -155,24 +172,18 @@ func parseValidatingWebhookConfiguration(data []byte) (*AdmissionPolicy, error) 
 	policy.hasParams = false
 	policy.hasParamsSet = true
 	for webhookIndex, webhook := range config.Webhooks {
-		for conditionIndex, condition := range webhook.MatchConditions {
-			if condition.Expression == "" {
-				return nil, fmt.Errorf("webhooks[%d].matchConditions[%d] missing expression", webhookIndex, conditionIndex)
-			}
-			policy.Validations = append(policy.Validations, Validation{
-				Path:       fmt.Sprintf("webhooks[%d].matchConditions[%d]", webhookIndex, conditionIndex),
-				Expression: condition.Expression,
-			})
+		if err := appendMatchConditions(policy, fmt.Sprintf("webhooks[%d].matchConditions", webhookIndex), webhook.MatchConditions); err != nil {
+			return nil, err
 		}
 	}
-	if len(policy.Validations) == 0 {
+	if len(policy.MatchConditions) == 0 {
 		return nil, fmt.Errorf("webhook configuration does not contain matchConditions")
 	}
 	return policy, nil
 }
 
 // parseMutatingWebhookConfiguration parses a MutatingWebhookConfiguration
-// YAML document, extracting matchConditions expressions as validations.
+// YAML document, extracting matchConditions expressions.
 func parseMutatingWebhookConfiguration(data []byte) (*AdmissionPolicy, error) {
 	var config admissionregistrationv1.MutatingWebhookConfiguration
 	if err := sigsyaml.Unmarshal(data, &config); err != nil {
@@ -183,17 +194,11 @@ func parseMutatingWebhookConfiguration(data []byte) (*AdmissionPolicy, error) {
 	policy.hasParams = false
 	policy.hasParamsSet = true
 	for webhookIndex, webhook := range config.Webhooks {
-		for conditionIndex, condition := range webhook.MatchConditions {
-			if condition.Expression == "" {
-				return nil, fmt.Errorf("webhooks[%d].matchConditions[%d] missing expression", webhookIndex, conditionIndex)
-			}
-			policy.Validations = append(policy.Validations, Validation{
-				Path:       fmt.Sprintf("webhooks[%d].matchConditions[%d]", webhookIndex, conditionIndex),
-				Expression: condition.Expression,
-			})
+		if err := appendMatchConditions(policy, fmt.Sprintf("webhooks[%d].matchConditions", webhookIndex), webhook.MatchConditions); err != nil {
+			return nil, err
 		}
 	}
-	if len(policy.Validations) == 0 {
+	if len(policy.MatchConditions) == 0 {
 		return nil, fmt.Errorf("webhook configuration does not contain matchConditions")
 	}
 	return policy, nil
@@ -225,6 +230,37 @@ func appendValidations(policy *AdmissionPolicy, prefix string, validations []adm
 			Expression:        validation.Expression,
 			Message:           validation.Message,
 			MessageExpression: validation.MessageExpression,
+		})
+	}
+	return nil
+}
+
+func appendMatchConditions(policy *AdmissionPolicy, prefix string, conditions []admissionregistrationv1.MatchCondition) error {
+	for index, condition := range conditions {
+		if condition.Expression == "" {
+			return fmt.Errorf("match condition %s[%d] missing expression", prefix, index)
+		}
+		policy.MatchConditions = append(policy.MatchConditions, MatchCondition{
+			Path:       fmt.Sprintf("%s[%d]", prefix, index),
+			Name:       condition.Name,
+			Expression: condition.Expression,
+		})
+	}
+	return nil
+}
+
+func appendAuditAnnotations(policy *AdmissionPolicy, prefix string, annotations []admissionregistrationv1.AuditAnnotation) error {
+	for index, annotation := range annotations {
+		if annotation.Key == "" {
+			return fmt.Errorf("audit annotation %s[%d] missing key", prefix, index)
+		}
+		if annotation.ValueExpression == "" {
+			return fmt.Errorf("audit annotation %s[%d] missing valueExpression", prefix, index)
+		}
+		policy.AuditAnnotations = append(policy.AuditAnnotations, AuditAnnotation{
+			Path:            fmt.Sprintf("%s[%d]", prefix, index),
+			Key:             annotation.Key,
+			ValueExpression: annotation.ValueExpression,
 		})
 	}
 	return nil

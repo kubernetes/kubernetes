@@ -28,6 +28,8 @@ import (
 	"fmt"
 	"strings"
 
+	celtypes "github.com/google/cel-go/common/types"
+	"google.golang.org/protobuf/types/known/structpb"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -117,6 +119,33 @@ type ValidationSelector struct {
 	Part string
 }
 
+// MatchCondition is a CEL expression that decides whether a policy or webhook
+// should run for a request.
+type MatchCondition struct {
+	Path       string
+	Name       string
+	Expression string
+}
+
+// MatchConditionSelector identifies a single match condition for EvalMatchCondition.
+type MatchConditionSelector struct {
+	Path string
+	Name string
+}
+
+// AuditAnnotation is a CEL expression that produces a validating admission
+// policy audit annotation value.
+type AuditAnnotation struct {
+	Path            string
+	Key             string
+	ValueExpression string
+}
+
+// AuditAnnotationSelector identifies a single audit annotation for EvalAuditAnnotation.
+type AuditAnnotationSelector struct {
+	Path string
+}
+
 // AdmissionPolicy holds parsed variables, validations, and mutations from a policy YAML.
 //
 // When constructed manually (not via ParseAdmissionPolicy), the params variable
@@ -124,9 +153,11 @@ type ValidationSelector struct {
 // SetHasParams(true) to explicitly enable it, matching the behavior of
 // ParseAdmissionPolicy which sets it based on the presence of spec.paramKind.
 type AdmissionPolicy struct {
-	Variables   []Variable
-	Validations []Validation
-	Mutations   []Mutation
+	Variables        []Variable
+	Validations      []Validation
+	Mutations        []Mutation
+	MatchConditions  []MatchCondition
+	AuditAnnotations []AuditAnnotation
 
 	hasParams    bool
 	hasParamsSet bool
@@ -197,6 +228,36 @@ type Violation struct {
 	MessageError error
 }
 
+// MatchResult is the outcome of evaluating all matchConditions in a policy.
+type MatchResult struct {
+	Conditions []MatchConditionResult
+	Cost       int64
+}
+
+// MatchConditionResult is the outcome of evaluating one matchCondition.
+type MatchConditionResult struct {
+	Path       string
+	Name       string
+	Expression string
+	Value      interface{}
+	Error      error
+}
+
+// AuditResult is the outcome of evaluating all audit annotation expressions.
+type AuditResult struct {
+	Annotations []AuditAnnotationResult
+	Cost        int64
+}
+
+// AuditAnnotationResult is the outcome of evaluating one audit annotation expression.
+type AuditAnnotationResult struct {
+	Path            string
+	Key             string
+	ValueExpression string
+	Value           interface{}
+	Error           error
+}
+
 // NewEvaluator creates an Evaluator with the given options. By default it uses
 // the current compatibility version with authorizer and patch types enabled.
 func NewEvaluator(opts ...Option) (*Evaluator, error) {
@@ -209,6 +270,29 @@ func NewEvaluator(opts ...Option) (*Evaluator, error) {
 	}
 	e.baseEnvSet = environment.MustBaseEnvSet(e.version)
 	return e, nil
+}
+
+type policyEvaluationState struct {
+	compiler *admissioncel.CompositedCompiler
+	decls    admissioncel.OptionalVariableDeclarations
+	inputs   *evaluationInputs
+}
+
+func (e *Evaluator) preparePolicyEvaluation(policy *AdmissionPolicy, input *AdmissionInput) (*policyEvaluationState, error) {
+	compiler, decls, err := e.newCompiler(policy)
+	if err != nil {
+		return nil, err
+	}
+	if err := e.compileVariableList(compiler, decls, policy.Variables, "variable"); err != nil {
+		return nil, err
+	}
+
+	evalInputs, err := buildEvaluationInputs(input)
+	if err != nil {
+		return nil, err
+	}
+
+	return &policyEvaluationState{compiler: compiler, decls: decls, inputs: evalInputs}, nil
 }
 
 // CompileCheck validates that a CEL expression compiles against the admission
@@ -240,35 +324,27 @@ func (e *Evaluator) EvalExpression(expr string, input *AdmissionInput) (interfac
 // EvalAdmission evaluates all validations in the policy against the input and
 // returns an AdmissionResult indicating whether the request would be allowed.
 func (e *Evaluator) EvalAdmission(policy *AdmissionPolicy, input *AdmissionInput) (*AdmissionResult, error) {
-	compiler, decls, err := e.newCompiler(policy)
-	if err != nil {
-		return nil, err
-	}
-	if err := e.compileVariableList(compiler, decls, policy.Variables, "variable"); err != nil {
-		return nil, err
-	}
-
-	evalInputs, err := buildEvaluationInputs(input)
-	if err != nil {
-		return nil, err
-	}
-
-	accessors := make([]admissioncel.ExpressionAccessor, 0, len(policy.Validations))
-	for _, validation := range policy.Validations {
-		accessors = append(accessors, boolExpressionAccessor(validation.Expression))
-	}
-	conditionEvaluator := compiler.CompileCondition(accessors, decls, e.compileMode())
-	if err := compilationErrors(conditionEvaluator.CompilationErrors()); err != nil {
-		return nil, err
-	}
-
-	budget := e.runtimeCELCostBudget()
-	results, remaining, err := conditionEvaluator.ForInput(context.Background(), evalInputs.versionedAttr, evalInputs.request, evalInputs.optionalVars, evalInputs.namespace, budget)
+	state, err := e.preparePolicyEvaluation(policy, input)
 	if err != nil {
 		return nil, err
 	}
 
 	result := &AdmissionResult{Allowed: true}
+	accessors := make([]admissioncel.ExpressionAccessor, 0, len(policy.Validations))
+	for _, validation := range policy.Validations {
+		accessors = append(accessors, boolExpressionAccessor(validation.Expression))
+	}
+	conditionEvaluator := state.compiler.CompileCondition(accessors, state.decls, e.compileMode())
+	if err := compilationErrors(conditionEvaluator.CompilationErrors()); err != nil {
+		return nil, err
+	}
+
+	budget := e.runtimeCELCostBudget()
+	results, remaining, err := conditionEvaluator.ForInput(context.Background(), state.inputs.versionedAttr, state.inputs.request, state.inputs.optionalVars, state.inputs.namespace, budget)
+	if err != nil {
+		return nil, err
+	}
+
 	for index, validation := range policy.Validations {
 		evaluation := results[index]
 		if evaluation.Error != nil {
@@ -294,7 +370,7 @@ func (e *Evaluator) EvalAdmission(policy *AdmissionPolicy, input *AdmissionInput
 		message := validation.Message
 		var messageErr error
 		if validation.MessageExpression != "" {
-			messageValue, nextRemaining, err := e.evaluateMutatingWithInputs(compiler, decls, stringExpressionAccessor(validation.MessageExpression), evalInputs, remaining)
+			messageValue, nextRemaining, err := e.evaluateMutatingWithInputs(state.compiler, state.decls, stringExpressionAccessor(validation.MessageExpression), state.inputs, remaining)
 			if nextRemaining >= 0 {
 				remaining = nextRemaining
 			}
@@ -307,7 +383,7 @@ func (e *Evaluator) EvalAdmission(policy *AdmissionPolicy, input *AdmissionInput
 		result.Violations = append(result.Violations, Violation{Expression: validation.Expression, Message: message, MessageError: messageErr})
 	}
 
-	result.Cost = budgetCost(budget, remaining)
+	result.Cost += budgetCost(budget, remaining)
 	return result, nil
 }
 
@@ -316,35 +392,31 @@ func (e *Evaluator) EvalAdmission(policy *AdmissionPolicy, input *AdmissionInput
 // Compilation errors cause an immediate error return (symmetric with EvalAdmission).
 // Runtime evaluation errors are recorded per-patch in PatchResult.Error.
 func (e *Evaluator) EvalMutation(policy *AdmissionPolicy, input *AdmissionInput) (*MutationResult, error) {
-	compiler, decls, err := e.newCompiler(policy)
+	state, err := e.preparePolicyEvaluation(policy, input)
 	if err != nil {
-		return nil, err
-	}
-	if err := e.compileVariableList(compiler, decls, policy.Variables, "variable"); err != nil {
 		return nil, err
 	}
 
 	// Pre-compile all mutations and fail fast on compilation errors.
 	compiled := make([]admissioncel.MutatingEvaluator, 0, len(policy.Mutations))
 	for _, mutation := range policy.Mutations {
-		evaluator := compiler.CompileMutatingEvaluator(anyExpressionAccessor(mutation.Expression), decls, e.compileMode())
+		evaluator := state.compiler.CompileMutatingEvaluator(anyExpressionAccessor(mutation.Expression), state.decls, e.compileMode())
 		if err := compilationErrors(evaluator.CompilationErrors()); err != nil {
 			return nil, fmt.Errorf("mutation %q: %w", mutation.Path, err)
 		}
 		compiled = append(compiled, evaluator)
 	}
 
-	evalInputs, err := buildEvaluationInputs(input)
-	if err != nil {
-		return nil, err
-	}
-
 	budget := e.runtimeCELCostBudget()
 	result := &MutationResult{}
 	for i, mutation := range policy.Mutations {
-		ctx := compiler.CreateContext(context.Background())
-		evalResult, remaining, err := compiled[i].ForInput(ctx, evalInputs.versionedAttr, evalInputs.request, evalInputs.optionalVars, evalInputs.namespace, budget)
-		budget = remaining
+		callContext := state.compiler.CreateContext(context.Background())
+		evalResult, remaining, err := compiled[i].ForInput(callContext, state.inputs.versionedAttr, state.inputs.request, state.inputs.optionalVars, state.inputs.namespace, budget)
+		if remaining >= 0 {
+			budget = remaining
+		} else {
+			budget = 0
+		}
 
 		patch := PatchResult{
 			Path:      mutation.Path,
@@ -352,6 +424,11 @@ func (e *Evaluator) EvalMutation(policy *AdmissionPolicy, input *AdmissionInput)
 		}
 		if err != nil {
 			patch.Error = err
+			result.Patches = append(result.Patches, patch)
+			if remaining < 0 {
+				break
+			}
+			continue
 		} else if evalResult.Error != nil {
 			patch.Error = evalResult.Error
 		} else {
@@ -360,7 +437,7 @@ func (e *Evaluator) EvalMutation(policy *AdmissionPolicy, input *AdmissionInput)
 		result.Patches = append(result.Patches, patch)
 	}
 
-	result.Cost = budgetCost(e.runtimeCELCostBudget(), budget)
+	result.Cost += budgetCost(e.runtimeCELCostBudget(), budget)
 	return result, nil
 }
 
@@ -371,15 +448,7 @@ func (e *Evaluator) EvalMutationByPath(policy *AdmissionPolicy, selector Mutatio
 		return nil, fmt.Errorf("mutation selector path is required")
 	}
 
-	compiler, decls, err := e.newCompiler(policy)
-	if err != nil {
-		return nil, err
-	}
-	if err := e.compileVariableList(compiler, decls, policy.Variables, "variable"); err != nil {
-		return nil, err
-	}
-
-	evalInputs, err := buildEvaluationInputs(input)
+	state, err := e.preparePolicyEvaluation(policy, input)
 	if err != nil {
 		return nil, err
 	}
@@ -388,7 +457,7 @@ func (e *Evaluator) EvalMutationByPath(policy *AdmissionPolicy, selector Mutatio
 		if mutation.Path != selector.Path {
 			continue
 		}
-		return e.evaluateMutating(compiler, decls, anyExpressionAccessor(mutation.Expression), evalInputs)
+		return e.evaluateMutating(state.compiler, state.decls, anyExpressionAccessor(mutation.Expression), state.inputs)
 	}
 
 	return nil, fmt.Errorf("mutation %q not found in policy", selector.Path)
@@ -437,15 +506,7 @@ func (e *Evaluator) EvalValidation(policy *AdmissionPolicy, selector ValidationS
 		part = "expression"
 	}
 
-	compiler, decls, err := e.newCompiler(policy)
-	if err != nil {
-		return nil, err
-	}
-	if err := e.compileVariableList(compiler, decls, policy.Variables, "variable"); err != nil {
-		return nil, err
-	}
-
-	evalInputs, err := buildEvaluationInputs(input)
+	state, err := e.preparePolicyEvaluation(policy, input)
 	if err != nil {
 		return nil, err
 	}
@@ -456,18 +517,182 @@ func (e *Evaluator) EvalValidation(policy *AdmissionPolicy, selector ValidationS
 		}
 		switch part {
 		case "expression":
-			return e.evaluateMutating(compiler, decls, boolExpressionAccessor(validation.Expression), evalInputs)
+			return e.evaluateMutating(state.compiler, state.decls, boolExpressionAccessor(validation.Expression), state.inputs)
 		case "messageExpression":
 			if validation.MessageExpression == "" {
 				return validation.Message, nil
 			}
-			return e.evaluateMutating(compiler, decls, stringExpressionAccessor(validation.MessageExpression), evalInputs)
+			return e.evaluateMutating(state.compiler, state.decls, stringExpressionAccessor(validation.MessageExpression), state.inputs)
 		default:
 			return nil, fmt.Errorf("unsupported validation part %q", part)
 		}
 	}
 
 	return nil, fmt.Errorf("validation %q not found in policy", selector.Path)
+}
+
+// EvalMatchConditions evaluates all matchConditions in the policy against the input.
+func (e *Evaluator) EvalMatchConditions(policy *AdmissionPolicy, input *AdmissionInput) (*MatchResult, error) {
+	state, err := e.preparePolicyEvaluation(policy, input)
+	if err != nil {
+		return nil, err
+	}
+	return e.evalMatchConditionsWithInputs(state.compiler, state.decls, policy, state.inputs)
+}
+
+// EvalMatchCondition evaluates a single matchCondition selected by path or name.
+func (e *Evaluator) EvalMatchCondition(policy *AdmissionPolicy, selector MatchConditionSelector, input *AdmissionInput) (interface{}, error) {
+	if selector.Path == "" && selector.Name == "" {
+		return nil, fmt.Errorf("match condition selector path or name is required")
+	}
+
+	state, err := e.preparePolicyEvaluation(policy, input)
+	if err != nil {
+		return nil, err
+	}
+
+	var matched *MatchCondition
+	for index := range policy.MatchConditions {
+		condition := &policy.MatchConditions[index]
+		if selector.Path != "" && condition.Path != selector.Path {
+			continue
+		}
+		if selector.Name != "" && condition.Name != selector.Name {
+			continue
+		}
+		if matched != nil {
+			return nil, fmt.Errorf("multiple match conditions matched selector path %q name %q", selector.Path, selector.Name)
+		}
+		matched = condition
+	}
+	if matched == nil {
+		return nil, fmt.Errorf("match condition matching selector path %q name %q not found in policy", selector.Path, selector.Name)
+	}
+
+	return e.evaluateMutating(state.compiler, state.decls, boolExpressionAccessor(matched.Expression), state.inputs)
+}
+
+// EvalAuditAnnotations evaluates all audit annotation expressions in the policy.
+func (e *Evaluator) EvalAuditAnnotations(policy *AdmissionPolicy, input *AdmissionInput) (*AuditResult, error) {
+	state, err := e.preparePolicyEvaluation(policy, input)
+	if err != nil {
+		return nil, err
+	}
+	return e.evalAuditAnnotationsWithInputs(state.compiler, state.decls, policy, state.inputs)
+}
+
+// EvalAuditAnnotation evaluates a single audit annotation selected by path.
+func (e *Evaluator) EvalAuditAnnotation(policy *AdmissionPolicy, selector AuditAnnotationSelector, input *AdmissionInput) (interface{}, error) {
+	if selector.Path == "" {
+		return nil, fmt.Errorf("audit annotation selector path is required")
+	}
+
+	state, err := e.preparePolicyEvaluation(policy, input)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, annotation := range policy.AuditAnnotations {
+		if annotation.Path != selector.Path {
+			continue
+		}
+		return e.evaluateMutating(state.compiler, state.decls, stringOrNullExpressionAccessor(annotation.ValueExpression), state.inputs)
+	}
+
+	return nil, fmt.Errorf("audit annotation %q not found in policy", selector.Path)
+}
+
+func (e *Evaluator) evalMatchConditionsWithInputs(compiler *admissioncel.CompositedCompiler, decls admissioncel.OptionalVariableDeclarations, policy *AdmissionPolicy, evalInputs *evaluationInputs) (*MatchResult, error) {
+	result := &MatchResult{}
+	if policy == nil || len(policy.MatchConditions) == 0 {
+		return result, nil
+	}
+
+	accessors := make([]admissioncel.ExpressionAccessor, 0, len(policy.MatchConditions))
+	for _, condition := range policy.MatchConditions {
+		accessors = append(accessors, boolExpressionAccessor(condition.Expression))
+	}
+	conditionEvaluator := compiler.CompileCondition(accessors, decls, e.compileMode())
+	if err := compilationErrors(conditionEvaluator.CompilationErrors()); err != nil {
+		return nil, err
+	}
+
+	budget := e.runtimeMatchCELCostBudget()
+	evaluations, remaining, err := conditionEvaluator.ForInput(context.Background(), evalInputs.versionedAttr, evalInputs.request, evalInputs.optionalVars, evalInputs.namespace, budget)
+	result.Cost = budgetCost(budget, remaining)
+	if err != nil {
+		return nil, err
+	}
+
+	for index, condition := range policy.MatchConditions {
+		evaluation := evaluations[index]
+		conditionResult := MatchConditionResult{Path: condition.Path, Name: condition.Name, Expression: condition.Expression}
+		if evaluation.Error != nil {
+			conditionResult.Error = evaluation.Error
+			result.Conditions = append(result.Conditions, conditionResult)
+			continue
+		}
+
+		value, ok := evaluationValue(evaluation).(bool)
+		if !ok {
+			conditionResult.Error = fmt.Errorf("matchCondition must return bool, got %T", evaluationValue(evaluation))
+			result.Conditions = append(result.Conditions, conditionResult)
+			continue
+		}
+		conditionResult.Value = value
+		result.Conditions = append(result.Conditions, conditionResult)
+	}
+	return result, nil
+}
+
+func (e *Evaluator) evalAuditAnnotationsWithInputs(compiler *admissioncel.CompositedCompiler, decls admissioncel.OptionalVariableDeclarations, policy *AdmissionPolicy, evalInputs *evaluationInputs) (*AuditResult, error) {
+	result := &AuditResult{}
+	if policy == nil || len(policy.AuditAnnotations) == 0 {
+		return result, nil
+	}
+
+	accessors := make([]admissioncel.ExpressionAccessor, 0, len(policy.AuditAnnotations))
+	for _, annotation := range policy.AuditAnnotations {
+		accessors = append(accessors, stringOrNullExpressionAccessor(annotation.ValueExpression))
+	}
+	conditionEvaluator := compiler.CompileCondition(accessors, decls, e.compileMode())
+	if err := compilationErrors(conditionEvaluator.CompilationErrors()); err != nil {
+		return nil, err
+	}
+
+	budget := e.runtimeCELCostBudget()
+	optionalVars := admissioncel.OptionalVariableBindings{VersionedParams: evalInputs.optionalVars.VersionedParams}
+	evaluations, remaining, err := conditionEvaluator.ForInput(context.Background(), evalInputs.versionedAttr, evalInputs.request, optionalVars, evalInputs.namespace, budget)
+	result.Cost = budgetCost(budget, remaining)
+	if err != nil {
+		return nil, err
+	}
+
+	for index, annotation := range policy.AuditAnnotations {
+		evaluation := evaluations[index]
+		annotationResult := AuditAnnotationResult{Path: annotation.Path, Key: annotation.Key, ValueExpression: annotation.ValueExpression}
+		if evaluation.Error != nil {
+			annotationResult.Error = evaluation.Error
+			result.Annotations = append(result.Annotations, annotationResult)
+			continue
+		}
+
+		value := evaluationValue(evaluation)
+		switch typed := value.(type) {
+		case string:
+			annotationResult.Value = strings.TrimSpace(typed)
+		case nil:
+			annotationResult.Value = nil
+		case celtypes.Null:
+			annotationResult.Value = nil
+		case structpb.NullValue:
+			annotationResult.Value = nil
+		default:
+			annotationResult.Error = fmt.Errorf("valueExpression %q resulted in unsupported return type: %T", annotation.ValueExpression, value)
+		}
+		result.Annotations = append(result.Annotations, annotationResult)
+	}
+	return result, nil
 }
 
 func (e *Evaluator) newCompiler(policy *AdmissionPolicy) (*admissioncel.CompositedCompiler, admissioncel.OptionalVariableDeclarations, error) {
@@ -534,6 +759,13 @@ func (e *Evaluator) runtimeCELCostBudget() int64 {
 		return e.costLimit
 	}
 	return celconfig.RuntimeCELCostBudget
+}
+
+func (e *Evaluator) runtimeMatchCELCostBudget() int64 {
+	if e.costLimit > 0 {
+		return e.costLimit
+	}
+	return celconfig.RuntimeCELCostBudgetMatchConditions
 }
 
 func compilationErrors(errs []error) error {

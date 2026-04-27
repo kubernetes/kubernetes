@@ -467,6 +467,400 @@ func TestEvalValidation(t *testing.T) {
 	})
 }
 
+func TestEvalMatchConditions(t *testing.T) {
+	e, err := NewEvaluator()
+	if err != nil {
+		t.Fatalf("NewEvaluator() error: %v", err)
+	}
+
+	input := &AdmissionInput{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata": map[string]interface{}{
+				"name":      "test-pod",
+				"namespace": "default",
+			},
+		},
+		Params: map[string]interface{}{
+			"data": map[string]interface{}{"enabled": "true"},
+		},
+	}
+
+	t.Run("all match", func(t *testing.T) {
+		policy := &AdmissionPolicy{
+			MatchConditions: []MatchCondition{
+				{Path: "spec.matchConditions[0]", Name: "params-enabled", Expression: "params.data.enabled == 'true'"},
+				{Path: "spec.matchConditions[1]", Name: "not-system", Expression: "object.metadata.namespace != 'kube-system'"},
+			},
+		}
+		policy.SetHasParams(true)
+
+		result, err := e.EvalMatchConditions(policy, input)
+		if err != nil {
+			t.Fatalf("EvalMatchConditions() error: %v", err)
+		}
+		if len(result.Conditions) != 2 {
+			t.Fatalf("got %d conditions, want 2", len(result.Conditions))
+		}
+		for index, condition := range result.Conditions {
+			if condition.Error != nil {
+				t.Fatalf("condition[%d] error: %v", index, condition.Error)
+			}
+			if condition.Value != true {
+				t.Fatalf("condition[%d] value = %v, want true", index, condition.Value)
+			}
+		}
+	})
+
+	t.Run("false condition", func(t *testing.T) {
+		policy := &AdmissionPolicy{
+			MatchConditions: []MatchCondition{
+				{Path: "spec.matchConditions[0]", Name: "system-only", Expression: "object.metadata.namespace == 'kube-system'"},
+			},
+		}
+
+		result, err := e.EvalMatchConditions(policy, input)
+		if err != nil {
+			t.Fatalf("EvalMatchConditions() error: %v", err)
+		}
+		if len(result.Conditions) != 1 {
+			t.Fatalf("got %d conditions, want 1", len(result.Conditions))
+		}
+		if result.Conditions[0].Error != nil {
+			t.Fatalf("condition error: %v", result.Conditions[0].Error)
+		}
+		if result.Conditions[0].Value != false {
+			t.Fatalf("condition value = %v, want false", result.Conditions[0].Value)
+		}
+	})
+
+	t.Run("runtime error is reported per condition", func(t *testing.T) {
+		policy := &AdmissionPolicy{
+			MatchConditions: []MatchCondition{
+				{Path: "spec.matchConditions[0]", Name: "bad", Expression: "1 / 0 == 0"},
+			},
+		}
+
+		result, err := e.EvalMatchConditions(policy, input)
+		if err != nil {
+			t.Fatalf("EvalMatchConditions() error: %v", err)
+		}
+		if len(result.Conditions) != 1 || result.Conditions[0].Error == nil {
+			t.Fatalf("expected per-condition error, got %#v", result.Conditions)
+		}
+	})
+
+	t.Run("compile error", func(t *testing.T) {
+		policy := &AdmissionPolicy{
+			MatchConditions: []MatchCondition{
+				{Path: "spec.matchConditions[0]", Name: "bad", Expression: "object.metadata.name =="},
+			},
+		}
+
+		if _, err := e.EvalMatchConditions(policy, input); err == nil {
+			t.Fatal("expected compile error")
+		}
+	})
+
+	t.Run("single condition selector by name", func(t *testing.T) {
+		policy := &AdmissionPolicy{
+			MatchConditions: []MatchCondition{
+				{Path: "spec.matchConditions[0]", Name: "params-enabled", Expression: "params.data.enabled == 'true'"},
+			},
+		}
+		policy.SetHasParams(true)
+
+		value, err := e.EvalMatchCondition(policy, MatchConditionSelector{Name: "params-enabled"}, input)
+		if err != nil {
+			t.Fatalf("EvalMatchCondition() error: %v", err)
+		}
+		if value != true {
+			t.Errorf("EvalMatchCondition() = %v, want true", value)
+		}
+	})
+
+	t.Run("duplicate names require path", func(t *testing.T) {
+		policy := &AdmissionPolicy{
+			MatchConditions: []MatchCondition{
+				{Path: "webhooks[0].matchConditions[0]", Name: "same-name", Expression: "false"},
+				{Path: "webhooks[1].matchConditions[0]", Name: "same-name", Expression: "true"},
+			},
+		}
+
+		if _, err := e.EvalMatchCondition(policy, MatchConditionSelector{Name: "same-name"}, input); err == nil {
+			t.Fatal("expected ambiguous selector error")
+		}
+
+		value, err := e.EvalMatchCondition(policy, MatchConditionSelector{Path: "webhooks[1].matchConditions[0]"}, input)
+		if err != nil {
+			t.Fatalf("EvalMatchCondition() error: %v", err)
+		}
+		if value != true {
+			t.Errorf("EvalMatchCondition() = %v, want true", value)
+		}
+	})
+}
+
+func TestEvalAdmission_EvaluatesValidationsIndependentlyOfMatchConditions(t *testing.T) {
+	e, err := NewEvaluator()
+	if err != nil {
+		t.Fatalf("NewEvaluator() error: %v", err)
+	}
+
+	policy := &AdmissionPolicy{
+		MatchConditions: []MatchCondition{{Path: "spec.matchConditions[0]", Name: "not-system", Expression: "false"}},
+		Validations:     []Validation{{Path: "spec.validations[0]", Expression: "false", Message: "validation still evaluated"}},
+	}
+
+	input := &AdmissionInput{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata": map[string]interface{}{
+				"name":      "test-pod",
+				"namespace": "kube-system",
+			},
+		},
+	}
+
+	result, err := e.EvalAdmission(policy, input)
+	if err != nil {
+		t.Fatalf("EvalAdmission() error: %v", err)
+	}
+	if result.Allowed {
+		t.Fatal("expected validation to be evaluated and deny")
+	}
+	if len(result.Violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(result.Violations))
+	}
+}
+
+func TestEvalMutation_EvaluatesMutationsIndependentlyOfMatchConditions(t *testing.T) {
+	e, err := NewEvaluator()
+	if err != nil {
+		t.Fatalf("NewEvaluator() error: %v", err)
+	}
+
+	policy := &AdmissionPolicy{
+		MatchConditions: []MatchCondition{{Path: "spec.matchConditions[0]", Name: "not-system", Expression: "false"}},
+		Mutations: []Mutation{{
+			Path:       "spec.mutations[0]",
+			PatchType:  "ApplyConfiguration",
+			Expression: "Object{metadata: Object.metadata{labels: {'mutated': 'true'}}}",
+		}},
+	}
+
+	input := &AdmissionInput{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata": map[string]interface{}{
+				"name":      "test-pod",
+				"namespace": "kube-system",
+			},
+		},
+	}
+
+	result, err := e.EvalMutation(policy, input)
+	if err != nil {
+		t.Fatalf("EvalMutation() error: %v", err)
+	}
+	if len(result.Patches) != 1 {
+		t.Fatalf("got %d patches, want 1", len(result.Patches))
+	}
+}
+
+func TestParseAndEvalVAPMatchConditionsAndAuditAnnotations(t *testing.T) {
+	e, err := NewEvaluator()
+	if err != nil {
+		t.Fatalf("NewEvaluator() error: %v", err)
+	}
+
+	policyYAML := `{"apiVersion":"admissionregistration.k8s.io/v1","kind":"ValidatingAdmissionPolicy","spec":{"paramKind":{"apiVersion":"v1","kind":"ConfigMap"},"matchConditions":[{"name":"enabled","expression":"params.data.enabled == 'true'"}],"validations":[{"expression":"true"}],"auditAnnotations":[{"key":"pod-name","valueExpression":"string(object.metadata.name)"}]}}`
+	policy, err := ParseAdmissionPolicy(policyYAML)
+	if err != nil {
+		t.Fatalf("ParseAdmissionPolicy() error: %v", err)
+	}
+
+	input := &AdmissionInput{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata":   map[string]interface{}{"name": "test-pod"},
+		},
+		Params: map[string]interface{}{
+			"data": map[string]interface{}{"enabled": "true"},
+		},
+	}
+
+	result, err := e.EvalAdmission(policy, input)
+	if err != nil {
+		t.Fatalf("EvalAdmission() error: %v", err)
+	}
+	if !result.Allowed {
+		t.Fatalf("expected admission validations to allow: %s", result.FormatViolations())
+	}
+
+	matchResult, err := e.EvalMatchConditions(policy, input)
+	if err != nil {
+		t.Fatalf("EvalMatchConditions() error: %v", err)
+	}
+	if len(matchResult.Conditions) != 1 || matchResult.Conditions[0].Value != true {
+		t.Fatalf("unexpected matchConditions: %#v", matchResult.Conditions)
+	}
+
+	auditResult, err := e.EvalAuditAnnotations(policy, input)
+	if err != nil {
+		t.Fatalf("EvalAuditAnnotations() error: %v", err)
+	}
+	if len(auditResult.Annotations) != 1 || auditResult.Annotations[0].Value != "test-pod" {
+		t.Fatalf("unexpected audit annotations: %#v", auditResult.Annotations)
+	}
+}
+
+func TestParseAndEvalMAPMatchConditions(t *testing.T) {
+	e, err := NewEvaluator()
+	if err != nil {
+		t.Fatalf("NewEvaluator() error: %v", err)
+	}
+
+	policyYAML := `{"apiVersion":"admissionregistration.k8s.io/v1","kind":"MutatingAdmissionPolicy","spec":{"matchConditions":[{"name":"only-pods","expression":"object.kind == 'Pod'"}],"mutations":[{"patchType":"ApplyConfiguration","applyConfiguration":{"expression":"Object{metadata: Object.metadata{labels: {'mutated': 'true'}}}"}}]}}`
+	policy, err := ParseAdmissionPolicy(policyYAML)
+	if err != nil {
+		t.Fatalf("ParseAdmissionPolicy() error: %v", err)
+	}
+
+	t.Run("false match condition still allows direct mutation evaluation", func(t *testing.T) {
+		input := &AdmissionInput{
+			Object: map[string]interface{}{
+				"apiVersion": "v1",
+				"kind":       "ConfigMap",
+				"metadata":   map[string]interface{}{"name": "not-a-pod"},
+			},
+		}
+		matchResult, err := e.EvalMatchConditions(policy, input)
+		if err != nil {
+			t.Fatalf("EvalMatchConditions() error: %v", err)
+		}
+		if len(matchResult.Conditions) != 1 || matchResult.Conditions[0].Value != false {
+			t.Fatalf("unexpected matchConditions: %#v", matchResult.Conditions)
+		}
+
+		result, err := e.EvalMutation(policy, input)
+		if err != nil {
+			t.Fatalf("EvalMutation() error: %v", err)
+		}
+		if len(result.Patches) != 1 {
+			t.Fatalf("got %d patches, want 1", len(result.Patches))
+		}
+	})
+
+	t.Run("true match condition", func(t *testing.T) {
+		input := &AdmissionInput{
+			Object: map[string]interface{}{
+				"apiVersion": "v1",
+				"kind":       "Pod",
+				"metadata":   map[string]interface{}{"name": "pod"},
+			},
+		}
+		matchResult, err := e.EvalMatchConditions(policy, input)
+		if err != nil {
+			t.Fatalf("EvalMatchConditions() error: %v", err)
+		}
+		if len(matchResult.Conditions) != 1 || matchResult.Conditions[0].Value != true {
+			t.Fatalf("unexpected matchConditions: %#v", matchResult.Conditions)
+		}
+
+		result, err := e.EvalMutation(policy, input)
+		if err != nil {
+			t.Fatalf("EvalMutation() error: %v", err)
+		}
+		if len(result.Patches) != 1 {
+			t.Fatalf("got %d patches, want 1", len(result.Patches))
+		}
+	})
+}
+
+func TestEvalAuditAnnotations(t *testing.T) {
+	e, err := NewEvaluator()
+	if err != nil {
+		t.Fatalf("NewEvaluator() error: %v", err)
+	}
+
+	policy := &AdmissionPolicy{
+		AuditAnnotations: []AuditAnnotation{
+			{Path: "spec.auditAnnotations[0]", Key: "pod-name", ValueExpression: "string(object.metadata.name)"},
+			{Path: "spec.auditAnnotations[1]", Key: "empty", ValueExpression: "''"},
+			{Path: "spec.auditAnnotations[2]", Key: "null", ValueExpression: "null"},
+		},
+	}
+	input := &AdmissionInput{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata":   map[string]interface{}{"name": "audit-pod"},
+		},
+	}
+
+	result, err := e.EvalAuditAnnotations(policy, input)
+	if err != nil {
+		t.Fatalf("EvalAuditAnnotations() error: %v", err)
+	}
+	if len(result.Annotations) != 3 {
+		t.Fatalf("got %d annotations, want 3", len(result.Annotations))
+	}
+	if result.Annotations[0].Value != "audit-pod" {
+		t.Errorf("annotation[0] = %#v, want audit-pod", result.Annotations[0])
+	}
+	if result.Annotations[1].Value != "" {
+		t.Errorf("annotation[1] value = %v, want empty string", result.Annotations[1].Value)
+	}
+	if result.Annotations[2].Value != nil {
+		t.Errorf("annotation[2] value = %v, want nil", result.Annotations[2].Value)
+	}
+
+	value, err := e.EvalAuditAnnotation(policy, AuditAnnotationSelector{Path: "spec.auditAnnotations[0]"}, input)
+	if err != nil {
+		t.Fatalf("EvalAuditAnnotation() error: %v", err)
+	}
+	if value != "audit-pod" {
+		t.Errorf("EvalAuditAnnotation() = %v, want audit-pod", value)
+	}
+}
+
+func TestEvalAuditAnnotations_CompileError(t *testing.T) {
+	e, err := NewEvaluator()
+	if err != nil {
+		t.Fatalf("NewEvaluator() error: %v", err)
+	}
+
+	input := &AdmissionInput{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata":   map[string]interface{}{"name": "test-pod"},
+		},
+	}
+
+	policy := &AdmissionPolicy{
+		Validations:      []Validation{{Path: "spec.validations[0]", Expression: "true"}},
+		AuditAnnotations: []AuditAnnotation{{Path: "spec.auditAnnotations[0]", Key: "bad", ValueExpression: "1"}},
+	}
+
+	if _, err := e.EvalAuditAnnotations(policy, input); err == nil {
+		t.Fatal("expected audit annotation compile error")
+	}
+
+	result, err := e.EvalAdmission(policy, input)
+	if err != nil {
+		t.Fatalf("EvalAdmission() error: %v", err)
+	}
+	if !result.Allowed {
+		t.Fatalf("EvalAdmission should only evaluate validations, got violations: %s", result.FormatViolations())
+	}
+}
+
 func TestEvalAdmission_RequestFields(t *testing.T) {
 	e, err := NewEvaluator()
 	if err != nil {
@@ -529,16 +923,31 @@ func TestParseAdmissionPolicy_VAP(t *testing.T) {
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy
 spec:
+  matchConditions:
+    - name: skip-system-namespaces
+      expression: "request.namespace != 'kube-system'"
   validations:
     - expression: "object.spec.replicas <= 5"
       message: "too many replicas"
+  auditAnnotations:
+    - key: replicas
+      valueExpression: "string(object.spec.replicas)"
 `
 	policy, err := ParseAdmissionPolicy(yaml)
 	if err != nil {
 		t.Fatalf("ParseAdmissionPolicy() error: %v", err)
 	}
+	if len(policy.MatchConditions) != 1 {
+		t.Fatalf("got %d matchConditions, want 1", len(policy.MatchConditions))
+	}
+	if policy.MatchConditions[0].Path != "spec.matchConditions[0]" {
+		t.Errorf("matchCondition[0] path = %q, want spec.matchConditions[0]", policy.MatchConditions[0].Path)
+	}
 	if len(policy.Validations) != 1 {
 		t.Errorf("got %d validations, want 1", len(policy.Validations))
+	}
+	if len(policy.AuditAnnotations) != 1 {
+		t.Errorf("got %d auditAnnotations, want 1", len(policy.AuditAnnotations))
 	}
 	if policy.hasParams {
 		t.Error("hasParams should be false when paramKind is not set")
@@ -702,27 +1111,16 @@ func TestPreambleVariables(t *testing.T) {
 }
 
 func TestParseAdmissionPolicy_MAP(t *testing.T) {
-	yaml := `
-apiVersion: admissionregistration.k8s.io/v1
-kind: MutatingAdmissionPolicy
-spec:
-  variables:
-    - name: replicas
-      expression: "object.spec.replicas"
-  mutations:
-    - patchType: ApplyConfiguration
-      applyConfiguration:
-        expression: "Object{spec: Object.spec{replicas: 3}}"
-    - patchType: JSONPatch
-      jsonPatch:
-        expression: '[JSONPatch{op: "replace", path: "/spec/replicas", value: 3}]'
-`
+	yaml := `{"apiVersion":"admissionregistration.k8s.io/v1","kind":"MutatingAdmissionPolicy","spec":{"matchConditions":[{"name":"only-pods","expression":"request.resource.resource == 'pods'"}],"variables":[{"name":"replicas","expression":"object.spec.replicas"}],"mutations":[{"patchType":"ApplyConfiguration","applyConfiguration":{"expression":"Object{spec: Object.spec{replicas: 3}}"}},{"patchType":"JSONPatch","jsonPatch":{"expression":"[JSONPatch{op: \"replace\", path: \"/spec/replicas\", value: 3}]"}}]}}`
 	policy, err := ParseAdmissionPolicy(yaml)
 	if err != nil {
 		t.Fatalf("ParseAdmissionPolicy() error: %v", err)
 	}
 	if len(policy.Variables) != 1 {
 		t.Errorf("got %d variables, want 1", len(policy.Variables))
+	}
+	if len(policy.MatchConditions) != 1 {
+		t.Errorf("got %d matchConditions, want 1", len(policy.MatchConditions))
 	}
 	if len(policy.Mutations) != 2 {
 		t.Fatalf("got %d mutations, want 2", len(policy.Mutations))
@@ -967,6 +1365,49 @@ func TestEvalMutation_MultiplePatches(t *testing.T) {
 		if metadata["name"] != wantNames[i] {
 			t.Errorf("patch[%d] metadata.name = %v, want %q", i, metadata["name"], wantNames[i])
 		}
+	}
+}
+
+func TestEvalMutation_CostLimitStopsFurtherMutations(t *testing.T) {
+	e, err := NewEvaluator(WithCostLimit(1))
+	if err != nil {
+		t.Fatalf("NewEvaluator() error: %v", err)
+	}
+
+	policy := &AdmissionPolicy{
+		Mutations: []Mutation{
+			{
+				Path:       "spec.mutations[0]",
+				PatchType:  "ApplyConfiguration",
+				Expression: "Object{metadata: Object.metadata{name: object.metadata.name + object.metadata.name}}",
+			},
+			{
+				Path:       "spec.mutations[1]",
+				PatchType:  "ApplyConfiguration",
+				Expression: "Object{metadata: Object.metadata{name: \"second\"}}",
+			},
+		},
+	}
+	input := &AdmissionInput{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata":   map[string]interface{}{"name": "test-pod"},
+		},
+	}
+
+	result, err := e.EvalMutation(policy, input)
+	if err != nil {
+		t.Fatalf("EvalMutation() error: %v", err)
+	}
+	if len(result.Patches) != 1 {
+		t.Fatalf("got %d patches, want 1", len(result.Patches))
+	}
+	if result.Patches[0].Error == nil {
+		t.Fatal("expected first patch to fail after exceeding the cost budget")
+	}
+	if result.Cost < 0 || result.Cost > 1 {
+		t.Fatalf("Cost = %d, want between 0 and the configured limit", result.Cost)
 	}
 }
 
@@ -1478,11 +1919,11 @@ webhooks:
 	if err != nil {
 		t.Fatalf("ParseAdmissionPolicy() error: %v", err)
 	}
-	if len(policy.Validations) != 2 {
-		t.Fatalf("got %d validations, want 2", len(policy.Validations))
+	if len(policy.MatchConditions) != 2 {
+		t.Fatalf("got %d matchConditions, want 2", len(policy.MatchConditions))
 	}
-	if policy.Validations[0].Path != "webhooks[0].matchConditions[0]" {
-		t.Errorf("validation[0] path = %q, want %q", policy.Validations[0].Path, "webhooks[0].matchConditions[0]")
+	if policy.MatchConditions[0].Path != "webhooks[0].matchConditions[0]" {
+		t.Errorf("matchCondition[0] path = %q, want %q", policy.MatchConditions[0].Path, "webhooks[0].matchConditions[0]")
 	}
 	if policy.hasParams {
 		t.Error("hasParams should be false for webhook configurations")
@@ -1503,11 +1944,11 @@ webhooks:
 	if err != nil {
 		t.Fatalf("ParseAdmissionPolicy() error: %v", err)
 	}
-	if len(policy.Validations) != 1 {
-		t.Fatalf("got %d validations, want 1", len(policy.Validations))
+	if len(policy.MatchConditions) != 1 {
+		t.Fatalf("got %d matchConditions, want 1", len(policy.MatchConditions))
 	}
-	if policy.Validations[0].Expression != "request.resource.resource == 'pods'" {
-		t.Errorf("unexpected expression: %q", policy.Validations[0].Expression)
+	if policy.MatchConditions[0].Expression != "request.resource.resource == 'pods'" {
+		t.Errorf("unexpected expression: %q", policy.MatchConditions[0].Expression)
 	}
 }
 

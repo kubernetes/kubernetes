@@ -68,6 +68,10 @@ func stringExpressionAccessor(expression string) expressionAccessor {
 	return expressionAccessor{expression: expression, returnTypes: []*cel.Type{cel.StringType}}
 }
 
+func stringOrNullExpressionAccessor(expression string) expressionAccessor {
+	return expressionAccessor{expression: expression, returnTypes: []*cel.Type{cel.StringType, cel.NullType}}
+}
+
 // evaluationInputs holds the converted runtime values needed by ForInput.
 type evaluationInputs struct {
 	versionedAttr *admission.VersionedAttributes
