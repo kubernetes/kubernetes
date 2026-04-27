@@ -1269,7 +1269,9 @@ func SetObjectDefaults_ResourceQuotaList(in *corev1.ResourceQuotaList) {
 }
 
 func SetObjectDefaults_Secret(in *corev1.Secret) {
-	SetDefaults_Secret(in)
+	if in.Type == "" {
+		in.Type = "Opaque"
+	}
 }
 
 func SetObjectDefaults_SecretList(in *corev1.SecretList) {

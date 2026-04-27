@@ -5856,6 +5856,7 @@ message Secret {
   // +optional
   // +k8s:optional
   // +k8s:alpha(since: "1.36")=+k8s:immutable
+  // +default="Opaque"
   optional string type = 3;
 }
 

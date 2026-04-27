@@ -7807,6 +7807,7 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: type
       type:
         scalar: string
+      default: Opaque
 - name: io.k8s.api.core.v1.SecretEnvSource
   map:
     fields:
