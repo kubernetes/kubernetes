@@ -197,7 +197,8 @@ func (kvh *kubeletVolumeHost) NewWrapperMounter(
 		spec.Volume.Name = wrapperVolumeName
 	}
 
-	return kvh.kubelet.newVolumeMounterFromPlugins(&spec, pod)
+	logger := klog.FromContext(context.TODO())
+	return kvh.kubelet.newVolumeMounterFromPlugins(logger, &spec, pod)
 }
 
 func (kvh *kubeletVolumeHost) NewWrapperUnmounter(volName string, spec volume.Spec, podUID types.UID) (volume.Unmounter, error) {
