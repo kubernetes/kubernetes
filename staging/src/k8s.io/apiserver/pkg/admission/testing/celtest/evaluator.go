@@ -40,12 +40,12 @@ import (
 // Evaluator compiles and evaluates CEL expressions using the same environment
 // the API server configures for admission policies and webhook matchConditions.
 type Evaluator struct {
-	baseEnvSet         *environment.EnvSet
-	version            *version.Version
-	preambleVars       []Variable
-	costLimit          int64
-	patchTypesEnabled  bool
-	authorizerEnabled  bool
+	baseEnvSet        *environment.EnvSet
+	version           *version.Version
+	preambleVars      []Variable
+	costLimit         int64
+	patchTypesEnabled bool
+	authorizerEnabled bool
 }
 
 // Option configures an Evaluator.
@@ -570,6 +570,21 @@ func ParseAdmissionPolicy(yamlContent string) (*AdmissionPolicy, error) {
 // ensuring the path points to a trusted file — do not pass unsanitised user input.
 func ParseAdmissionPolicyFile(path string) (*AdmissionPolicy, error) {
 	return parseAdmissionPolicyFile(path)
+}
+
+// ParseAdmissionInput parses a YAML string into an AdmissionInput. The YAML may
+// include object, oldObject, params, request, namespace, and namespaceObject
+// fields. Params are passed to CEL as the top-level params object exactly as
+// provided.
+func ParseAdmissionInput(yamlContent string) (*AdmissionInput, error) {
+	return parseAdmissionInput([]byte(yamlContent))
+}
+
+// ParseAdmissionInputFile reads and parses a YAML file into an AdmissionInput.
+// The path is cleaned but not otherwise restricted. Callers are responsible for
+// ensuring the path points to a trusted file - do not pass unsanitised user input.
+func ParseAdmissionInputFile(path string) (*AdmissionInput, error) {
+	return parseAdmissionInputFile(path)
 }
 
 // FormatViolations returns a comma-separated summary of all violation messages and errors.

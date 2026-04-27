@@ -20,7 +20,9 @@ import (
 	"fmt"
 	"os"
 
+	admissionv1 "k8s.io/api/admission/v1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	corev1 "k8s.io/api/core/v1"
 	sigsyaml "sigs.k8s.io/yaml"
 )
 
@@ -36,6 +38,17 @@ type policyMeta struct {
 type policyFile struct {
 	Variables   []admissionregistrationv1.Variable   `json:"variables"`
 	Validations []admissionregistrationv1.Validation `json:"validations"`
+}
+
+// admissionInputFile represents a YAML file containing the runtime inputs for
+// admission CEL evaluation.
+type admissionInputFile struct {
+	Object          map[string]interface{}        `json:"object,omitempty"`
+	OldObject       map[string]interface{}        `json:"oldObject,omitempty"`
+	Params          map[string]interface{}        `json:"params,omitempty"`
+	Request         *admissionv1.AdmissionRequest `json:"request,omitempty"`
+	Namespace       *corev1.Namespace             `json:"namespace,omitempty"`
+	NamespaceObject *corev1.Namespace             `json:"namespaceObject,omitempty"`
 }
 
 // parseAdmissionPolicy dispatches YAML parsing based on the document's Kind field.
@@ -224,6 +237,34 @@ func parseAdmissionPolicyFile(path string) (*AdmissionPolicy, error) {
 		return nil, fmt.Errorf("reading policy file %s: %w", path, err)
 	}
 	return parseAdmissionPolicy(data)
+}
+
+func parseAdmissionInput(data []byte) (*AdmissionInput, error) {
+	var file admissionInputFile
+	if err := sigsyaml.Unmarshal(data, &file); err != nil {
+		return nil, fmt.Errorf("parsing admission input YAML: %w", err)
+	}
+
+	namespace := file.Namespace
+	if namespace == nil {
+		namespace = file.NamespaceObject
+	}
+
+	return &AdmissionInput{
+		Object:    file.Object,
+		OldObject: file.OldObject,
+		Params:    file.Params,
+		Request:   file.Request,
+		Namespace: namespace,
+	}, nil
+}
+
+func parseAdmissionInputFile(path string) (*AdmissionInput, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("reading admission input file %s: %w", path, err)
+	}
+	return parseAdmissionInput(data)
 }
 
 func appendMutations(policy *AdmissionPolicy, prefix string, mutations []admissionregistrationv1.Mutation) error {

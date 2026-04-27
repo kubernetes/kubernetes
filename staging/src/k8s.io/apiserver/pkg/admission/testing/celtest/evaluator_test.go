@@ -1103,6 +1103,131 @@ func TestWithVersion(t *testing.T) {
 	}
 }
 
+func TestParseAdmissionInput(t *testing.T) {
+	yaml := `
+object:
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    name: test-pod
+    namespace: default
+params:
+  apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: policy-config
+  data:
+    allowed: "true"
+request:
+  operation: CREATE
+  kind:
+    version: v1
+    kind: Pod
+  resource:
+    version: v1
+    resource: pods
+namespaceObject:
+  apiVersion: v1
+  kind: Namespace
+  metadata:
+    name: default
+`
+	input, err := ParseAdmissionInput(yaml)
+	if err != nil {
+		t.Fatalf("ParseAdmissionInput() error: %v", err)
+	}
+	if input.Object["kind"] != "Pod" {
+		t.Errorf("object.kind = %v, want Pod", input.Object["kind"])
+	}
+	if input.Params["kind"] != "ConfigMap" {
+		t.Errorf("params.kind = %v, want ConfigMap", input.Params["kind"])
+	}
+	if input.Request == nil || input.Request.Operation != admissionv1.Create {
+		t.Fatalf("request.operation = %v, want CREATE", input.Request)
+	}
+	if input.Namespace == nil || input.Namespace.Name != "default" {
+		t.Fatalf("namespace.name = %v, want default", input.Namespace)
+	}
+
+	e, err := NewEvaluator()
+	if err != nil {
+		t.Fatalf("NewEvaluator() error: %v", err)
+	}
+	policy := &AdmissionPolicy{
+		Validations: []Validation{{Path: "validations[0]", Expression: "params.data.allowed == 'true'"}},
+	}
+	policy.SetHasParams(true)
+	result, err := e.EvalAdmission(policy, input)
+	if err != nil {
+		t.Fatalf("EvalAdmission() error: %v", err)
+	}
+	if !result.Allowed {
+		t.Errorf("expected Allowed=true, got violations: %s", result.FormatViolations())
+	}
+}
+
+func TestParseAdmissionInput_PreambleCanUnwrapParamsResource(t *testing.T) {
+	yaml := `
+object:
+  apiVersion: v1
+  kind: Pod
+  metadata:
+    name: labeled-pod
+    labels:
+      team: platform
+params:
+  apiVersion: policy.example.com/v1alpha1
+  kind: LabelPolicyParams
+  metadata:
+    name: required-labels
+  spec:
+    parameters:
+      labels:
+      - key: team
+request:
+  operation: CREATE
+  kind:
+    version: v1
+    kind: Pod
+  resource:
+    version: v1
+    resource: pods
+`
+	input, err := ParseAdmissionInput(yaml)
+	if err != nil {
+		t.Fatalf("ParseAdmissionInput() error: %v", err)
+	}
+
+	e, err := NewEvaluator(WithPreambleVariables(
+		Variable{
+			Name:       "params",
+			Expression: `!has(params.spec) ? null : !has(params.spec.parameters) ? null : params.spec.parameters`,
+		},
+	))
+	if err != nil {
+		t.Fatalf("NewEvaluator() error: %v", err)
+	}
+
+	policy := &AdmissionPolicy{
+		Validations: []Validation{
+			{
+				Path:       "validations[0]",
+				Expression: `variables.params.labels.all(entry, has(object.metadata.labels) && entry.key in object.metadata.labels)`,
+				Message:    "missing required label",
+			},
+		},
+	}
+	policy.SetHasParams(true)
+
+	result, err := e.EvalAdmission(policy, input)
+	if err != nil {
+		t.Fatalf("EvalAdmission() error: %v", err)
+	}
+	if !result.Allowed {
+		t.Errorf("expected Allowed=true, got violations: %s", result.FormatViolations())
+	}
+}
+
 func TestSetHasParams(t *testing.T) {
 	e, err := NewEvaluator()
 	if err != nil {
@@ -1466,8 +1591,8 @@ webhooks:
 
 func TestDefaultResourceForGVK(t *testing.T) {
 	tests := []struct {
-		kind     string
-		wantRes  string
+		kind    string
+		wantRes string
 	}{
 		{kind: "Pod", wantRes: "pods"},
 		{kind: "Service", wantRes: "services"},

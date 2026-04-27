@@ -24,9 +24,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// preambleVars returns the preamble variables that Gatekeeper injects
-// before policy-specific variables. These make object, params, and isUpdate
-// available through the variables namespace.
+// preambleVars returns example preamble variables that a policy framework may
+// inject before policy-specific variables.
 func preambleVars() []Variable {
 	return []Variable{
 		{Name: "anyObject", Expression: "object"},
@@ -334,7 +333,7 @@ webhooks:
 }
 
 // TestIntegration_FlatPolicy tests the flat variables/validations format used
-// by downstream projects like gatekeeper-library.
+// by projects that store policy expressions without a resource wrapper.
 func TestIntegration_FlatPolicy(t *testing.T) {
 	e, err := NewEvaluator()
 	if err != nil {
@@ -396,8 +395,8 @@ validations:
 	})
 }
 
-// TestIntegration_PreambleVariables tests using WithPreambleVariables and
-// then evaluating a real privileged-containers policy.
+// TestIntegration_PreambleVariables tests using WithPreambleVariables and then
+// evaluating a policy that references those variables.
 func TestIntegration_PreambleVariables(t *testing.T) {
 	e, err := NewEvaluator(
 		WithPreambleVariables(preambleVars()...),
@@ -406,7 +405,6 @@ func TestIntegration_PreambleVariables(t *testing.T) {
 		t.Fatalf("NewEvaluator() error: %v", err)
 	}
 
-	// Policy adapted from gatekeeper-library/src/pod-security-policy/privileged-containers/src.cel
 	policy := &AdmissionPolicy{
 		Variables: []Variable{
 			{Name: "containers", Expression: `has(variables.anyObject.spec.containers) ? variables.anyObject.spec.containers : []`},
