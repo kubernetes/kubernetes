@@ -2606,6 +2606,28 @@ func (kl *Kubelet) rejectPod(ctx context.Context, pod *v1.Pod, reason, message s
 		Message:  "Pod was rejected: " + message})
 }
 
+// podWasPreviouslyRunning checks whether the pod had containers running before
+// the kubelet restarted. This is used to give previously-running pods admission
+// priority over new pods that were never started on this node.
+//
+// It checks the pod cache (CRI state) for Running or Exited containers, which
+// covers kubelet restarts and node reboots. As a fallback, it checks the pod's
+// API status phase.
+func (kl *Kubelet) podWasPreviouslyRunning(pod *v1.Pod) bool {
+	// Check the CRI state via the pod cache.
+	podStatus, err := kl.podCache.Get(pod.UID)
+	if err == nil {
+		for _, cs := range podStatus.ContainerStatuses {
+			if cs.State == kubecontainer.ContainerStateRunning || cs.State == kubecontainer.ContainerStateExited {
+				return true
+			}
+		}
+	}
+	// Fallback: if the API server still reports the pod as Running, the pod
+	// was previously running even though the CRI has no record of it.
+	return pod.Status.Phase == v1.PodRunning
+}
+
 func recordAdmissionRejection(reason string) {
 	// It is possible that the "reason" label can have high cardinality.
 	// To avoid this metric from exploding, we create an allowlist of known
@@ -2843,7 +2865,7 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 	start := kl.clock.Now()
 	logger := klog.FromContext(ctx)
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodStartingOrderByPriority) {
-		sort.Sort(sliceutils.PodsByPriority(pods))
+		sliceutils.SortPodsByPriorityAndPreviouslyRunningStatus(pods, kl.podWasPreviouslyRunning)
 	} else {
 		sort.Sort(sliceutils.PodsByCreationTime(pods))
 	}
