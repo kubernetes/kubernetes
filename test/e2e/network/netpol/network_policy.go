@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -34,6 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -1479,6 +1482,116 @@ var _ = common.SIGDescribe("Netpol", feature.SCTPConnectivity, "[LinuxOnly]", fu
 
 			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolSCTP, Reachability: reachability})
 		})
+
+		// --- North-South (NodePort) ---
+
+		// This test verifies that a 'default-deny-ingress' NetworkPolicy blocks not only
+		// East-West (pod-to-pod) traffic but also North-South traffic arriving via a NodePort
+		// service. It is the missing coverage described in:
+		// https://github.com/kubernetes/kubernetes/issues/114369
+		//
+		// The probe uses y/a (outside the denied namespace) as the sender so that TCP return
+		// traffic back to the probe pod is not also dropped by the same policy, giving a clean
+		// signal of whether x/a's ingress policy is enforced for external traffic.
+		f.It("should block north-south traffic to pods isolated by a 'default-deny-ingress' policy via NodePort",
+			feature.NetworkPolicy, func(ctx context.Context) {
+
+				protocols := []v1.Protocol{protocolTCP}
+				ports := []int32{80}
+
+				// x/a is the policy target; y/a is the probe pod (lives outside nsX so
+				// the deny policy does not drop its own return traffic on the way back).
+				k8s = initializeResources(ctx, f, protocols, ports, "x/a", "y/a")
+				nsX, nsY, _ := getK8sNamespaces(k8s)
+
+				// Resolve the node address family once, before touching any resources.
+				family := v1.IPv4Protocol
+				if framework.TestContext.ClusterIsIPv6() {
+					family = v1.IPv6Protocol
+				}
+
+				nodes, err := e2enode.GetBoundedReadySchedulableNodes(ctx, k8s.clientSet, 1)
+				framework.ExpectNoError(err, "listing schedulable nodes")
+				if len(nodes.Items) == 0 {
+					e2eskipper.Skipf("no schedulable nodes available")
+				}
+				nodeIPs := e2enode.GetAddressesByTypeAndFamily(&nodes.Items[0], v1.NodeInternalIP, family)
+				if len(nodeIPs) == 0 {
+					e2eskipper.Skipf("node %s has no internal IP for address family %s", nodes.Items[0].Name, family)
+				}
+				nodeIP := nodeIPs[0]
+
+				// Create a NodePort service selecting pod x/a.
+				//
+				// externalTrafficPolicy: Cluster (not Local) is intentional: Cluster SNAT's
+				// the packet at the node and forwards it to any healthy endpoint regardless
+				// of placement. Local would silently drop the packet if x/a is not on the
+				// receiving node, producing a false-positive (the test would pass for the
+				// wrong reason). Cluster guarantees traffic always reaches x/a so that any
+				// block is definitively caused by the NetworkPolicy.
+				svc, err := k8s.clientSet.CoreV1().Services(nsX).Create(ctx, &v1.Service{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "north-south-np-test",
+						Namespace: nsX,
+					},
+					Spec: v1.ServiceSpec{
+						Type:                  v1.ServiceTypeNodePort,
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyCluster,
+						Selector:              map[string]string{"pod": "a"},
+						Ports: []v1.ServicePort{
+							{
+								Name:       "http",
+								Port:       80,
+								Protocol:   v1.ProtocolTCP,
+								TargetPort: intstr.FromInt32(80),
+							},
+						},
+					},
+				}, metav1.CreateOptions{})
+				framework.ExpectNoError(err, "creating NodePort service in %s", nsX)
+				nodePort := strconv.Itoa(int(svc.Spec.Ports[0].NodePort))
+
+				// Wait for x/a to appear as a ready endpoint before applying the policy.
+				// Applying the policy first risks a race where the endpoint controller's
+				// health probes arrive after the deny rule is in place and mark x/a
+				// unready — which would again produce a false positive.
+				framework.ExpectNoError(
+					e2eendpointslice.WaitForEndpointPods(ctx, k8s.clientSet, nsX, svc.Name, "a"),
+					"waiting for NodePort service %s/%s to have an endpoint for pod 'a'", nsX, svc.Name,
+				)
+
+				// Apply deny-all-ingress to every pod in nsX.
+				policy := GenNetworkPolicyWithNameAndPodSelector(
+					"deny-ingress", metav1.LabelSelector{}, SetSpecIngressRules(),
+				)
+				CreatePolicy(ctx, k8s, policy, nsX)
+
+				// ── East-West validation ────────────────────────────────────────────
+				// Sanity-check that pod-to-pod traffic into nsX is blocked as expected.
+				reachability := NewReachability(k8s.AllPodStrings(), true)
+				reachability.ExpectPeer(&Peer{}, &Peer{Namespace: nsX}, false)
+				ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
+
+				// ── North-South validation ──────────────────────────────────────────
+				// Exec into y/a and attempt a TCP connection to the NodePort. y/a lives
+				// outside nsX so its ingress (the TCP SYN-ACK path back from x/a) is not
+				// affected by the policy — any failure here is due to x/a's own policy.
+				addr := net.JoinHostPort(nodeIP, nodePort)
+				ginkgo.By(fmt.Sprintf("probing NodePort %s from pod %s/a — expecting block", addr, nsY))
+
+				cmd := []string{
+					"/agnhost", "connect", addr,
+					"--timeout=5s", "--protocol=tcp",
+				}
+				_, _, connErr := k8s.executeRemoteCommand(nsY, "a", cmd)
+				if connErr == nil {
+					framework.Failf(
+						"north-south traffic reached pod x/a via NodePort %s; NetworkPolicy should have blocked it",
+						addr,
+					)
+				}
+				framework.Logf("north-south traffic correctly blocked (err: %v)", connErr)
+			})
 	})
 })
 
