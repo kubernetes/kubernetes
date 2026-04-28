@@ -435,7 +435,7 @@ func (s *store) conditionalDelete(
 		}
 		if !txnResp.Succeeded {
 			klog.V(4).Infof("deletion of %s failed because of a conflict, going to retry", key)
-			origState, err = s.getState(ctx, txnResp.KV, key, v, false, expectTransformOrDecodeError)
+			origState, err = s.getState(ctx, txnResp.KV, txnResp.Revision, key, v, false, expectTransformOrDecodeError)
 			if err != nil {
 				return err
 			}
@@ -601,7 +601,7 @@ func (s *store) GuaranteedUpdate(
 		span.AddEvent("Transaction committed")
 		if !txnResp.Succeeded {
 			klog.V(4).Infof("GuaranteedUpdate of %s failed because of a conflict, going to retry", preparedKey)
-			origState, err = s.getState(ctx, txnResp.KV, preparedKey, v, ignoreNotFound, false)
+			origState, err = s.getState(ctx, txnResp.KV, txnResp.Revision, preparedKey, v, ignoreNotFound, false)
 			if err != nil {
 				return err
 			}
@@ -993,7 +993,7 @@ func (s *store) getCurrentState(ctx context.Context, key string, v reflect.Value
 		if err != nil {
 			return nil, err
 		}
-		return s.getState(ctx, getResp.KV, key, v, ignoreNotFound, expectTransformOrDecodeError)
+		return s.getState(ctx, getResp.KV, getResp.Revision, key, v, ignoreNotFound, expectTransformOrDecodeError)
 	}
 }
 
@@ -1001,7 +1001,7 @@ func (s *store) getCurrentState(ctx context.Context, key string, v reflect.Value
 // expectTransformOrDecodeError is true and neither transformation nor decode fails, returns an
 // InvalidObj error; if either fails, the returned error and the 'obj' field of the returned
 // objState will both be nil.
-func (s *store) getState(ctx context.Context, kv *mvccpb.KeyValue, key string, v reflect.Value, ignoreNotFound bool, expectTransformOrDecodeError bool) (*objState, error) {
+func (s *store) getState(ctx context.Context, kv *mvccpb.KeyValue, rev int64, key string, v reflect.Value, ignoreNotFound bool, expectTransformOrDecodeError bool) (*objState, error) {
 	state := &objState{
 		meta: &storage.ResponseMeta{},
 	}
@@ -1014,7 +1014,7 @@ func (s *store) getState(ctx context.Context, kv *mvccpb.KeyValue, key string, v
 
 	if kv == nil {
 		if !ignoreNotFound {
-			return nil, storage.NewKeyNotFoundError(key, 0)
+			return nil, storage.NewKeyNotFoundError(key, rev)
 		}
 		if err := runtime.SetZeroValue(state.obj); err != nil {
 			return nil, err
