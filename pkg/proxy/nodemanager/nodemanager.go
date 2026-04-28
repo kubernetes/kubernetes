@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package proxy
+package nodemanager
 
 import (
 	"context"
@@ -57,12 +57,12 @@ type NodeManager struct {
 	node *v1.Node
 }
 
-// NewNodeManager initializes node informer that selects for the given node, waits for cache sync
+// New initializes node informer that selects for the given node, waits for cache sync
 // and returns NodeManager after waiting some amount of time for the node object to exist
 // and have NodeIPs (and PodCIDRs if watchPodCIDRs is true). Note: for backward compatibility,
-// NewNodeManager doesn't return any error if it failed to retrieve NodeIPs and watchPodCIDRs
+// it doesn't return any error if it failed to retrieve NodeIPs and watchPodCIDRs
 // is false.
-func NewNodeManager(ctx context.Context, client clientset.Interface,
+func New(ctx context.Context, client clientset.Interface,
 	nodeName string, config *kubeproxyconfig.KubeProxyConfiguration,
 ) (*NodeManager, error) {
 	resyncInterval := config.ConfigSyncPeriod.Duration
@@ -70,7 +70,7 @@ func NewNodeManager(ctx context.Context, client clientset.Interface,
 	return newNodeManager(ctx, client, resyncInterval, nodeName, watchPodCIDRs, os.Exit, time.Second, 30*time.Second, 5*time.Minute)
 }
 
-// newNodeManager implements NewNodeManager with configurable exit function, poll interval and timeouts.
+// newNodeManager implements New with configurable exit function, poll interval and timeouts.
 func newNodeManager(ctx context.Context, client clientset.Interface, resyncInterval time.Duration,
 	nodeName string, watchPodCIDRs bool, exitFunc func(int),
 	pollInterval, nodeIPsTimeout, podCIDRsTimeout time.Duration,
@@ -156,13 +156,13 @@ func getNodeInfo(nodeLister corelisters.NodeLister, nodeName string) (*v1.Node, 
 	return node, nodeIPs, node.Spec.PodCIDRs
 }
 
-// NodeIPs returns the NodeIPs polled in NewNodeManager(). (This may be empty if
-// NewNodeManager timed out without getting any IPs.)
+// NodeIPs returns the node's IPs. (This may be empty if New() timed out without
+// getting any IPs.)
 func (n *NodeManager) NodeIPs() []net.IP {
 	return n.nodeIPs
 }
 
-// PodCIDRs returns the PodCIDRs polled in NewNodeManager().
+// PodCIDRs returns the node's PodCIDRs.
 func (n *NodeManager) PodCIDRs() []string {
 	return n.podCIDRs
 }
