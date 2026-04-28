@@ -56,7 +56,7 @@ func verifyRunAsNonRoot(ctx context.Context, pod *v1.Pod, container *v1.Containe
 			return fmt.Errorf(
 				"container has runAsNonRoot and image has an invalid user id (%d). (Must be 1-(%d)): %s (pod: %q, container: %s)",
 				*uid,
-				int64(math.MaxUint32),
+				math.MaxInt32,
 				strings.Join(errs, "; "),
 				format.Pod(pod),
 				container.Name,

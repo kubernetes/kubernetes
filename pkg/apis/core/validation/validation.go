@@ -9635,7 +9635,7 @@ func validateLinuxContainerUser(linuxContainerUser *core.LinuxContainerUser, fld
 	if linuxContainerUser == nil {
 		return allErrors
 	}
-	for _, msg := range validation.IsValidUserID(linuxContainerUser.UID) {
+	for _, msg := range isValidLinuxContainerUserID(linuxContainerUser.UID) {
 		allErrors = append(allErrors, field.Invalid(fldPath.Child("uid"), linuxContainerUser.UID, msg))
 	}
 
@@ -9648,6 +9648,18 @@ func validateLinuxContainerUser(linuxContainerUser *core.LinuxContainerUser, fld
 		}
 	}
 	return allErrors
+}
+
+const (
+	minLinuxContainerUserID int64 = 0
+	maxLinuxContainerUserID int64 = math.MaxUint32
+)
+
+func isValidLinuxContainerUserID(uid int64) []string {
+	if minLinuxContainerUserID <= uid && uid <= maxLinuxContainerUserID {
+		return nil
+	}
+	return []string{fmt.Sprintf(`must be between %d and %d, inclusive`, minLinuxContainerUserID, maxLinuxContainerUserID)}
 }
 
 func validateImageVolumeSource(imageVolume *core.ImageVolumeSource, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {

@@ -52,9 +52,9 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 
 	rootUser := int64(0)
 	anyUser := int64(1000)
-	invalidUser := int64(math.MaxUint32) + 1
+	invalidUser := int64(2147483648)
 	negativeUser := int64(-1000)
-	maxUint32User := int64(math.MaxUint32)
+	maxInt32User := int64(math.MaxInt32)
 	runAsNonRootTrue := true
 	runAsNonRootFalse := false
 	for _, test := range []struct {
@@ -160,11 +160,11 @@ func TestVerifyRunAsNonRoot(t *testing.T) {
 			fail: true,
 		},
 		{
-			desc: "Pass if image's user is math.MaxUint32 and RunAsNonRoot is true",
+			desc: "Pass if image's user is math.MaxInt32 and RunAsNonRoot is true",
 			sc: &v1.SecurityContext{
 				RunAsNonRoot: &runAsNonRootTrue,
 			},
-			uid:  &maxUint32User,
+			uid:  &maxInt32User,
 			fail: false,
 		},
 	} {

@@ -10391,7 +10391,7 @@ func TestValidatePodSpec(t *testing.T) {
 	activeDeadlineSecondsMax := int64(math.MaxInt32)
 
 	minUserID := int64(0)
-	maxUserID := int64(math.MaxUint32)
+	maxUserID := int64(2147483647)
 	minGroupID := int64(0)
 	maxGroupID := int64(2147483647)
 	goodfsGroupChangePolicy := core.FSGroupChangeAlways
@@ -10425,7 +10425,7 @@ func TestValidatePodSpec(t *testing.T) {
 				FSGroup:            &minGroupID,
 			}),
 		),
-		"populate RunAsUser with max UID and SupplementalGroups FSGroup with max GID": podtest.MakePod("",
+		"populate RunAsUser SupplementalGroups FSGroup with maxID 2147483647": podtest.MakePod("",
 			podtest.SetSecurityContext(&core.PodSecurityContext{
 				SupplementalGroups: []int64{maxGroupID},
 				RunAsUser:          &maxUserID,
@@ -10567,7 +10567,7 @@ func TestValidatePodSpec(t *testing.T) {
 	activeDeadlineSecondsTooLarge := int64(math.MaxInt32 + 1)
 
 	minUserID = int64(-1)
-	maxUserID = int64(math.MaxUint32) + 1
+	maxUserID = int64(2147483648)
 	minGroupID = int64(-1)
 	maxGroupID = int64(2147483648)
 
@@ -10624,7 +10624,7 @@ func TestValidatePodSpec(t *testing.T) {
 				SupplementalGroups: []int64{minGroupID, 1234},
 			}),
 		)},
-		"bad runAsUser larger than math.MaxUint32": {pod: *podtest.MakePod("",
+		"bad runAsUser large than math.MaxInt32": {pod: *podtest.MakePod("",
 			podtest.SetSecurityContext(&core.PodSecurityContext{
 				RunAsUser: &maxUserID,
 			}),
@@ -14726,6 +14726,9 @@ func TestValidatePodUpdate(t *testing.T) {
 }
 
 func TestValidatePodStatusUpdate(t *testing.T) {
+	linuxContainerUserMaxUID := int64(math.MaxUint32)
+	linuxContainerUserInvalidUID := linuxContainerUserMaxUID + 1
+
 	tests := []struct {
 		test                                        string
 		new                                         core.Pod
@@ -15907,7 +15910,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 					podtest.SetContainerStatuses(core.ContainerStatus{
 						User: &core.ContainerUser{
 							Linux: &core.LinuxContainerUser{
-								UID:                int64(math.MaxInt32) + 1,
+								UID:                linuxContainerUserMaxUID,
 								GID:                0,
 								SupplementalGroups: []int64{0, 100},
 							},
@@ -15918,6 +15921,24 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 		),
 		old:  *podtest.MakePod("foo"),
 		test: "containerUser with valid ids in containerStatuses",
+	}, {
+		new: *podtest.MakePod("foo",
+			podtest.SetStatus(
+				podtest.MakePodStatus(
+					podtest.SetContainerStatuses(core.ContainerStatus{
+						User: &core.ContainerUser{
+							Linux: &core.LinuxContainerUser{
+								UID: linuxContainerUserInvalidUID,
+								GID: 0,
+							},
+						},
+					}),
+				),
+			),
+		),
+		old:  *podtest.MakePod("foo"),
+		err:  `status.containerStatuses[0].user.linux.uid: Invalid value: 4294967296: must be between 0 and 4294967295, inclusive`,
+		test: "containerUser with uid above linux range in containerStatuses",
 	}, {
 		new: *podtest.MakePod("foo",
 			podtest.SetStatus(
@@ -15986,7 +16007,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 					podtest.SetInitContainerStatuses(core.ContainerStatus{
 						User: &core.ContainerUser{
 							Linux: &core.LinuxContainerUser{
-								UID:                0,
+								UID:                linuxContainerUserMaxUID,
 								GID:                0,
 								SupplementalGroups: []int64{0, 100},
 							},
@@ -16065,7 +16086,7 @@ func TestValidatePodStatusUpdate(t *testing.T) {
 					podtest.SetEphemeralContainerStatuses(core.ContainerStatus{
 						User: &core.ContainerUser{
 							Linux: &core.LinuxContainerUser{
-								UID:                0,
+								UID:                linuxContainerUserMaxUID,
 								GID:                0,
 								SupplementalGroups: []int64{0, 100},
 							},

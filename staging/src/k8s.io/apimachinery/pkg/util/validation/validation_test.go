@@ -189,22 +189,17 @@ func TestIsValidGroupID(t *testing.T) {
 }
 
 func TestIsValidUserID(t *testing.T) {
-	goodValues := createUserIDs(0, 1, 1000, 65535, 2147483647, 2147483648, 4294967295)
+	goodValues := createUserIDs(0, 1, 1000, 65535, 2147483647)
 	for _, val := range goodValues {
 		if msgs := IsValidUserID(val); len(msgs) != 0 {
 			t.Errorf("expected true for '%d': %v", val, msgs)
 		}
 	}
 
-	badValues := createUserIDs(-1, -1003, 4294967296)
+	badValues := createUserIDs(-1, -1003, 2147483648, 4147483647)
 	for _, val := range badValues {
-		msgs := IsValidUserID(val)
-		if len(msgs) == 0 {
+		if msgs := IsValidUserID(val); len(msgs) == 0 {
 			t.Errorf("expected false for '%d'", val)
-			continue
-		}
-		if msgs[0] != "must be between 0 and 4294967295, inclusive" {
-			t.Errorf("expected user ID range error for '%d', got: %v", val, msgs)
 		}
 	}
 }

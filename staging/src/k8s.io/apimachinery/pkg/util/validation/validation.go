@@ -283,14 +283,13 @@ func IsInRange(value int, min int, max int) []string {
 	return []string{InclusiveRangeError(min, max)}
 }
 
-// Linux UIDs are unsigned 32-bit values. GIDs remain limited by the
-// range historically accepted by Kubernetes.
+// Now in libcontainer UID/GID limits is 0 ~ 1<<31 - 1
 // TODO: once we have a type for UID/GID we should make these that type.
 const (
-	minUserID  int64 = 0
-	maxUserID  int64 = math.MaxUint32
-	minGroupID       = 0
-	maxGroupID       = math.MaxInt32
+	minUserID  = 0
+	maxUserID  = math.MaxInt32
+	minGroupID = 0
+	maxGroupID = math.MaxInt32
 )
 
 // IsValidGroupID tests that the argument is a valid Unix GID.
@@ -306,7 +305,7 @@ func IsValidUserID(uid int64) []string {
 	if minUserID <= uid && uid <= maxUserID {
 		return nil
 	}
-	return []string{inclusiveRangeError(minUserID, maxUserID)}
+	return []string{InclusiveRangeError(minUserID, maxUserID)}
 }
 
 var portNameCharsetRegex = regexp.MustCompile("^[-a-z0-9]+$")
@@ -452,10 +451,6 @@ func EmptyError() string {
 // InclusiveRangeError returns a string explanation of a numeric "must be
 // between" validation failure.
 func InclusiveRangeError(lo, hi int) string {
-	return inclusiveRangeError(int64(lo), int64(hi))
-}
-
-func inclusiveRangeError(lo, hi int64) string {
 	return fmt.Sprintf(`must be between %d and %d, inclusive`, lo, hi)
 }
 
