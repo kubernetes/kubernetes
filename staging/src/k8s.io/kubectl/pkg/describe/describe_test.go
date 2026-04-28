@@ -5286,7 +5286,7 @@ func TestDescribeEvents(t *testing.T) {
 	}
 
 	describerFor := func(name string, clientset *fake.Clientset) (ResourceDescriber, bool) {
-		m := map[string]ResourceDescriber{
+		objectTypeToDescriber := map[string]ResourceDescriber{
 			"ConfigMap":               &ConfigMapDescriber{clientset},
 			"DaemonSet":               &DaemonSetDescriber{clientset},
 			"Deployment":              &DeploymentDescriber{clientset},
@@ -5303,7 +5303,7 @@ func TestDescribeEvents(t *testing.T) {
 			"Service":                 &ServiceDescriber{clientset},
 			"StorageClass":            &StorageClassDescriber{clientset},
 		}
-		describer, ok := m[name]
+		describer, ok := objectTypeToDescriber[name]
 		return describer, ok
 	}
 
