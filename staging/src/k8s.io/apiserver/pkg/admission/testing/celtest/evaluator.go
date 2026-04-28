@@ -31,9 +31,11 @@ import (
 	celtypes "github.com/google/cel-go/common/types"
 	"google.golang.org/protobuf/types/known/structpb"
 	admissionv1 "k8s.io/api/admission/v1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	admissioncel "k8s.io/apiserver/pkg/admission/plugin/cel"
+	mutatingpatch "k8s.io/apiserver/pkg/admission/plugin/policy/mutating/patch"
 	celconfig "k8s.io/apiserver/pkg/apis/cel"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/cel/environment"
@@ -283,7 +285,7 @@ func (e *Evaluator) preparePolicyEvaluation(policy *AdmissionPolicy, input *Admi
 	if err != nil {
 		return nil, err
 	}
-	if err := e.compileVariableList(compiler, decls, policy.Variables, "variable"); err != nil {
+	if err := e.compileVariableList(compiler, decls, policy.Variables, "variable", e.evaluationMode()); err != nil {
 		return nil, err
 	}
 
@@ -298,11 +300,11 @@ func (e *Evaluator) preparePolicyEvaluation(policy *AdmissionPolicy, input *Admi
 // CompileCheck validates that a CEL expression compiles against the admission
 // environment without evaluating it.
 func (e *Evaluator) CompileCheck(expr string) error {
-	compiler, decls, err := e.newCompiler(nil)
+	compiler, decls, err := e.newCompilerWithMode(nil, e.compileCheckMode())
 	if err != nil {
 		return err
 	}
-	evaluator := compiler.CompileMutatingEvaluator(anyExpressionAccessor(expr), decls, e.compileMode())
+	evaluator := compiler.CompileMutatingEvaluator(anyExpressionAccessor(expr), decls, e.compileCheckMode())
 	return compilationErrors(evaluator.CompilationErrors())
 }
 
@@ -334,7 +336,7 @@ func (e *Evaluator) EvalAdmission(policy *AdmissionPolicy, input *AdmissionInput
 	for _, validation := range policy.Validations {
 		accessors = append(accessors, boolExpressionAccessor(validation.Expression))
 	}
-	conditionEvaluator := state.compiler.CompileCondition(accessors, state.decls, e.compileMode())
+	conditionEvaluator := state.compiler.CompileCondition(accessors, state.decls, e.evaluationMode())
 	if err := compilationErrors(conditionEvaluator.CompilationErrors()); err != nil {
 		return nil, err
 	}
@@ -370,7 +372,9 @@ func (e *Evaluator) EvalAdmission(policy *AdmissionPolicy, input *AdmissionInput
 		message := validation.Message
 		var messageErr error
 		if validation.MessageExpression != "" {
-			messageValue, nextRemaining, err := e.evaluateMutatingWithInputs(state.compiler, state.decls, stringExpressionAccessor(validation.MessageExpression), state.inputs, remaining)
+			messageDecls := messageExpressionDeclarations(state.decls)
+			messageOptionalVars := messageExpressionOptionalBindings(state.inputs)
+			messageValue, nextRemaining, err := e.evaluateMutatingWithBindings(state.compiler, messageDecls, stringExpressionAccessor(validation.MessageExpression), state.inputs, messageOptionalVars, remaining)
 			if nextRemaining >= 0 {
 				remaining = nextRemaining
 			}
@@ -400,7 +404,11 @@ func (e *Evaluator) EvalMutation(policy *AdmissionPolicy, input *AdmissionInput)
 	// Pre-compile all mutations and fail fast on compilation errors.
 	compiled := make([]admissioncel.MutatingEvaluator, 0, len(policy.Mutations))
 	for _, mutation := range policy.Mutations {
-		evaluator := state.compiler.CompileMutatingEvaluator(anyExpressionAccessor(mutation.Expression), state.decls, e.compileMode())
+		accessor, err := mutationExpressionAccessor(mutation)
+		if err != nil {
+			return nil, err
+		}
+		evaluator := state.compiler.CompileMutatingEvaluator(accessor, state.decls, e.evaluationMode())
 		if err := compilationErrors(evaluator.CompilationErrors()); err != nil {
 			return nil, fmt.Errorf("mutation %q: %w", mutation.Path, err)
 		}
@@ -457,7 +465,11 @@ func (e *Evaluator) EvalMutationByPath(policy *AdmissionPolicy, selector Mutatio
 		if mutation.Path != selector.Path {
 			continue
 		}
-		return e.evaluateMutating(state.compiler, state.decls, anyExpressionAccessor(mutation.Expression), state.inputs)
+		accessor, err := mutationExpressionAccessor(mutation)
+		if err != nil {
+			return nil, err
+		}
+		return e.evaluateMutating(state.compiler, state.decls, accessor, state.inputs)
 	}
 
 	return nil, fmt.Errorf("mutation %q not found in policy", selector.Path)
@@ -473,7 +485,7 @@ func (e *Evaluator) EvalVariable(policy *AdmissionPolicy, variableName string, i
 
 	found := false
 	for _, variable := range policy.Variables {
-		result := compiler.CompileAndStoreVariable(namedAnyExpressionAccessor(variable.Name, variable.Expression), decls, e.compileMode())
+		result := compiler.CompileAndStoreVariable(namedAnyExpressionAccessor(variable.Name, variable.Expression), decls, e.evaluationMode())
 		if result.Error != nil {
 			return nil, fmt.Errorf("variable %q: %w", variable.Name, result.Error)
 		}
@@ -522,7 +534,8 @@ func (e *Evaluator) EvalValidation(policy *AdmissionPolicy, selector ValidationS
 			if validation.MessageExpression == "" {
 				return validation.Message, nil
 			}
-			return e.evaluateMutating(state.compiler, state.decls, stringExpressionAccessor(validation.MessageExpression), state.inputs)
+			value, _, err := e.evaluateMutatingWithBindings(state.compiler, messageExpressionDeclarations(state.decls), stringExpressionAccessor(validation.MessageExpression), state.inputs, messageExpressionOptionalBindings(state.inputs), e.runtimeCELCostBudget())
+			return value, err
 		default:
 			return nil, fmt.Errorf("unsupported validation part %q", part)
 		}
@@ -612,7 +625,7 @@ func (e *Evaluator) evalMatchConditionsWithInputs(compiler *admissioncel.Composi
 	for _, condition := range policy.MatchConditions {
 		accessors = append(accessors, boolExpressionAccessor(condition.Expression))
 	}
-	conditionEvaluator := compiler.CompileCondition(accessors, decls, e.compileMode())
+	conditionEvaluator := compiler.CompileCondition(accessors, decls, e.evaluationMode())
 	if err := compilationErrors(conditionEvaluator.CompilationErrors()); err != nil {
 		return nil, err
 	}
@@ -655,7 +668,7 @@ func (e *Evaluator) evalAuditAnnotationsWithInputs(compiler *admissioncel.Compos
 	for _, annotation := range policy.AuditAnnotations {
 		accessors = append(accessors, stringOrNullExpressionAccessor(annotation.ValueExpression))
 	}
-	conditionEvaluator := compiler.CompileCondition(accessors, decls, e.compileMode())
+	conditionEvaluator := compiler.CompileCondition(accessors, decls, e.evaluationMode())
 	if err := compilationErrors(conditionEvaluator.CompilationErrors()); err != nil {
 		return nil, err
 	}
@@ -696,20 +709,24 @@ func (e *Evaluator) evalAuditAnnotationsWithInputs(compiler *admissioncel.Compos
 }
 
 func (e *Evaluator) newCompiler(policy *AdmissionPolicy) (*admissioncel.CompositedCompiler, admissioncel.OptionalVariableDeclarations, error) {
+	return e.newCompilerWithMode(policy, e.evaluationMode())
+}
+
+func (e *Evaluator) newCompilerWithMode(policy *AdmissionPolicy, envType environment.Type) (*admissioncel.CompositedCompiler, admissioncel.OptionalVariableDeclarations, error) {
 	decls := e.optionalDeclarations(policy)
 	compiler, err := admissioncel.NewCompositedCompiler(e.baseEnvSet)
 	if err != nil {
 		return nil, decls, fmt.Errorf("creating composited compiler: %w", err)
 	}
-	if err := e.compileVariableList(compiler, decls, e.preambleVars, "preamble variable"); err != nil {
+	if err := e.compileVariableList(compiler, decls, e.preambleVars, "preamble variable", envType); err != nil {
 		return nil, decls, err
 	}
 	return compiler, decls, nil
 }
 
-func (e *Evaluator) compileVariableList(compiler *admissioncel.CompositedCompiler, decls admissioncel.OptionalVariableDeclarations, variables []Variable, label string) error {
+func (e *Evaluator) compileVariableList(compiler *admissioncel.CompositedCompiler, decls admissioncel.OptionalVariableDeclarations, variables []Variable, label string, envType environment.Type) error {
 	for _, variable := range variables {
-		result := compiler.CompileAndStoreVariable(namedAnyExpressionAccessor(variable.Name, variable.Expression), decls, e.compileMode())
+		result := compiler.CompileAndStoreVariable(namedAnyExpressionAccessor(variable.Name, variable.Expression), decls, envType)
 		if result.Error != nil {
 			return fmt.Errorf("%s %q: %w", label, variable.Name, result.Error)
 		}
@@ -717,18 +734,22 @@ func (e *Evaluator) compileVariableList(compiler *admissioncel.CompositedCompile
 	return nil
 }
 
-func (e *Evaluator) evaluateMutating(compiler *admissioncel.CompositedCompiler, decls admissioncel.OptionalVariableDeclarations, accessor expressionAccessor, evalInputs *evaluationInputs) (interface{}, error) {
+func (e *Evaluator) evaluateMutating(compiler *admissioncel.CompositedCompiler, decls admissioncel.OptionalVariableDeclarations, accessor admissioncel.ExpressionAccessor, evalInputs *evaluationInputs) (interface{}, error) {
 	value, _, err := e.evaluateMutatingWithInputs(compiler, decls, accessor, evalInputs, e.runtimeCELCostBudget())
 	return value, err
 }
 
-func (e *Evaluator) evaluateMutatingWithInputs(compiler *admissioncel.CompositedCompiler, decls admissioncel.OptionalVariableDeclarations, accessor expressionAccessor, evalInputs *evaluationInputs, budget int64) (interface{}, int64, error) {
-	evaluator := compiler.CompileMutatingEvaluator(accessor, decls, e.compileMode())
+func (e *Evaluator) evaluateMutatingWithInputs(compiler *admissioncel.CompositedCompiler, decls admissioncel.OptionalVariableDeclarations, accessor admissioncel.ExpressionAccessor, evalInputs *evaluationInputs, budget int64) (interface{}, int64, error) {
+	return e.evaluateMutatingWithBindings(compiler, decls, accessor, evalInputs, evalInputs.optionalVars, budget)
+}
+
+func (e *Evaluator) evaluateMutatingWithBindings(compiler *admissioncel.CompositedCompiler, decls admissioncel.OptionalVariableDeclarations, accessor admissioncel.ExpressionAccessor, evalInputs *evaluationInputs, optionalVars admissioncel.OptionalVariableBindings, budget int64) (interface{}, int64, error) {
+	evaluator := compiler.CompileMutatingEvaluator(accessor, decls, e.evaluationMode())
 	if err := compilationErrors(evaluator.CompilationErrors()); err != nil {
 		return nil, budget, err
 	}
 	ctx := compiler.CreateContext(context.Background())
-	result, remaining, err := evaluator.ForInput(ctx, evalInputs.versionedAttr, evalInputs.request, evalInputs.optionalVars, evalInputs.namespace, budget)
+	result, remaining, err := evaluator.ForInput(ctx, evalInputs.versionedAttr, evalInputs.request, optionalVars, evalInputs.namespace, budget)
 	if err != nil {
 		return nil, remaining, err
 	}
@@ -736,6 +757,26 @@ func (e *Evaluator) evaluateMutatingWithInputs(compiler *admissioncel.Composited
 		return nil, remaining, result.Error
 	}
 	return evaluationValue(result), remaining, nil
+}
+
+func mutationExpressionAccessor(mutation Mutation) (admissioncel.ExpressionAccessor, error) {
+	switch mutation.PatchType {
+	case string(admissionregistrationv1.PatchTypeApplyConfiguration):
+		return &mutatingpatch.ApplyConfigurationCondition{Expression: mutation.Expression}, nil
+	case string(admissionregistrationv1.PatchTypeJSONPatch):
+		return &mutatingpatch.JSONPatchCondition{Expression: mutation.Expression}, nil
+	default:
+		return nil, fmt.Errorf("mutation %q unsupported patchType %q", mutation.Path, mutation.PatchType)
+	}
+}
+
+func messageExpressionDeclarations(decls admissioncel.OptionalVariableDeclarations) admissioncel.OptionalVariableDeclarations {
+	decls.HasAuthorizer = false
+	return decls
+}
+
+func messageExpressionOptionalBindings(evalInputs *evaluationInputs) admissioncel.OptionalVariableBindings {
+	return admissioncel.OptionalVariableBindings{VersionedParams: evalInputs.optionalVars.VersionedParams}
 }
 
 func (e *Evaluator) optionalDeclarations(policy *AdmissionPolicy) admissioncel.OptionalVariableDeclarations {
@@ -750,8 +791,12 @@ func (e *Evaluator) optionalDeclarations(policy *AdmissionPolicy) admissioncel.O
 	}
 }
 
-func (e *Evaluator) compileMode() environment.Type {
+func (e *Evaluator) compileCheckMode() environment.Type {
 	return environment.NewExpressions
+}
+
+func (e *Evaluator) evaluationMode() environment.Type {
+	return environment.StoredExpressions
 }
 
 func (e *Evaluator) runtimeCELCostBudget() int64 {

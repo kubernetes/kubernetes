@@ -302,6 +302,50 @@ func TestEvalAdmission_MessageExpressionError(t *testing.T) {
 	}
 }
 
+func TestEvalAdmission_MessageExpressionDoesNotDeclareAuthorizer(t *testing.T) {
+	e, err := NewEvaluator()
+	if err != nil {
+		t.Fatalf("NewEvaluator() error: %v", err)
+	}
+
+	policy := &AdmissionPolicy{
+		Validations: []Validation{
+			{
+				Path:              "validations[0]",
+				Expression:        "false",
+				Message:           "static fallback",
+				MessageExpression: "authorizer.requestResource.check('get').allowed() ? 'allowed' : 'denied'",
+			},
+		},
+	}
+	input := &AdmissionInput{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata":   map[string]interface{}{"name": "test"},
+		},
+	}
+
+	result, err := e.EvalAdmission(policy, input)
+	if err != nil {
+		t.Fatalf("EvalAdmission() error: %v", err)
+	}
+	if len(result.Violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(result.Violations))
+	}
+	if result.Violations[0].MessageError == nil {
+		t.Fatal("expected MessageError when messageExpression references authorizer")
+	}
+	if result.Violations[0].Message != "static fallback" {
+		t.Errorf("violation message = %q, want fallback", result.Violations[0].Message)
+	}
+
+	_, err = e.EvalValidation(policy, ValidationSelector{Path: "validations[0]", Part: "messageExpression"}, input)
+	if err == nil {
+		t.Fatal("expected EvalValidation messageExpression to reject authorizer")
+	}
+}
+
 func TestEvalAdmission_Variables(t *testing.T) {
 	e, err := NewEvaluator()
 	if err != nil {
@@ -1311,6 +1355,79 @@ func TestEvalMutation_JSONPatch(t *testing.T) {
 	}
 }
 
+func TestEvalMutation_RejectsInvalidPatchReturnTypes(t *testing.T) {
+	e, err := NewEvaluator()
+	if err != nil {
+		t.Fatalf("NewEvaluator() error: %v", err)
+	}
+
+	input := &AdmissionInput{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata":   map[string]interface{}{"name": "test"},
+		},
+	}
+	tests := []struct {
+		name      string
+		patchType string
+		expr      string
+	}{
+		{name: "apply configuration must return Object", patchType: "ApplyConfiguration", expr: "true"},
+		{name: "json patch must return list of JSONPatch", patchType: "JSONPatch", expr: "Object{}"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			policy := &AdmissionPolicy{
+				Mutations: []Mutation{
+					{
+						Path:       "spec.mutations[0]",
+						PatchType:  tt.patchType,
+						Expression: tt.expr,
+					},
+				},
+			}
+			_, err := e.EvalMutation(policy, input)
+			if err == nil {
+				t.Fatal("expected EvalMutation() to reject invalid patch return type")
+			}
+			if !strings.Contains(err.Error(), "spec.mutations[0]") {
+				t.Errorf("error should reference mutation path, got: %v", err)
+			}
+		})
+	}
+}
+
+func TestEvalMutation_WithoutPatchTypesRejectsPatchExpressions(t *testing.T) {
+	e, err := NewEvaluator(WithoutPatchTypes())
+	if err != nil {
+		t.Fatalf("NewEvaluator() error: %v", err)
+	}
+
+	policy := &AdmissionPolicy{
+		Mutations: []Mutation{
+			{
+				Path:       "spec.mutations[0]",
+				PatchType:  "ApplyConfiguration",
+				Expression: "Object{}",
+			},
+		},
+	}
+	input := &AdmissionInput{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata":   map[string]interface{}{"name": "test"},
+		},
+	}
+
+	_, err = e.EvalMutation(policy, input)
+	if err == nil {
+		t.Fatal("expected EvalMutation() to reject patch expressions when patch types are disabled")
+	}
+}
+
 func TestEvalMutation_MultiplePatches(t *testing.T) {
 	e, err := NewEvaluator()
 	if err != nil {
@@ -1531,6 +1648,19 @@ func TestWithVersion(t *testing.T) {
 	err = eOld.CompileCheck("sets.contains([1, 2, 3], [1])")
 	if err == nil {
 		t.Error("expected compilation error for sets library at version 1.28")
+	}
+
+	policy := &AdmissionPolicy{
+		Validations: []Validation{
+			{Path: "validations[0]", Expression: "sets.contains([1, 2, 3], [1])"},
+		},
+	}
+	result, err := eOld.EvalAdmission(policy, &AdmissionInput{})
+	if err != nil {
+		t.Fatalf("EvalAdmission should use stored expression compatibility, got error: %v", err)
+	}
+	if !result.Allowed {
+		t.Fatalf("EvalAdmission with stored expression compatibility should allow, got: %s", result.FormatViolations())
 	}
 
 	// Version 1.29+ should have sets library.
