@@ -141,19 +141,14 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = iptables.NewDualStackProxier(
 				ctx,
+				config,
 				ipts,
 				utilsysctl.New(),
-				config.SyncPeriod.Duration,
-				config.MinSyncPeriod.Duration,
-				config.Linux.MasqueradeAll,
-				*config.IPTables.LocalhostNodePorts,
-				int(*config.IPTables.MasqueradeBit),
 				localDetectors,
 				s.NodeName,
 				s.NodeIPs,
 				s.Recorder,
 				s.HealthzServer,
-				config.NodePortAddresses,
 				initOnly,
 			)
 		} else {
@@ -162,20 +157,15 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = iptables.NewProxier(
 				ctx,
+				config,
 				s.PrimaryIPFamily,
 				ipts[s.PrimaryIPFamily],
 				utilsysctl.New(),
-				config.SyncPeriod.Duration,
-				config.MinSyncPeriod.Duration,
-				config.Linux.MasqueradeAll,
-				*config.IPTables.LocalhostNodePorts,
-				int(*config.IPTables.MasqueradeBit),
 				localDetectors[s.PrimaryIPFamily],
 				s.NodeName,
 				s.NodeIPs[s.PrimaryIPFamily],
 				s.Recorder,
 				s.HealthzServer,
-				config.NodePortAddresses,
 				initOnly,
 			)
 		}
@@ -198,52 +188,32 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig
 		if dualStack {
 			proxier, err = ipvs.NewDualStackProxier(
 				ctx,
+				config,
 				ipts,
 				ipvsInterface,
 				ipsetInterface,
 				utilsysctl.New(),
-				config.SyncPeriod.Duration,
-				config.MinSyncPeriod.Duration,
-				config.IPVS.ExcludeCIDRs,
-				config.IPVS.StrictARP,
-				config.IPVS.TCPTimeout.Duration,
-				config.IPVS.TCPFinTimeout.Duration,
-				config.IPVS.UDPTimeout.Duration,
-				config.Linux.MasqueradeAll,
-				int(*config.IPTables.MasqueradeBit),
 				localDetectors,
 				s.NodeName,
 				s.NodeIPs,
 				s.Recorder,
 				s.HealthzServer,
-				config.IPVS.Scheduler,
-				config.NodePortAddresses,
 				initOnly,
 			)
 		} else {
 			proxier, err = ipvs.NewProxier(
 				ctx,
+				config,
 				s.PrimaryIPFamily,
 				ipts[s.PrimaryIPFamily],
 				ipvsInterface,
 				ipsetInterface,
 				utilsysctl.New(),
-				config.SyncPeriod.Duration,
-				config.MinSyncPeriod.Duration,
-				config.IPVS.ExcludeCIDRs,
-				config.IPVS.StrictARP,
-				config.IPVS.TCPTimeout.Duration,
-				config.IPVS.TCPFinTimeout.Duration,
-				config.IPVS.UDPTimeout.Duration,
-				config.Linux.MasqueradeAll,
-				int(*config.IPTables.MasqueradeBit),
 				localDetectors[s.PrimaryIPFamily],
 				s.NodeName,
 				s.NodeIPs[s.PrimaryIPFamily],
 				s.Recorder,
 				s.HealthzServer,
-				config.IPVS.Scheduler,
-				config.NodePortAddresses,
 				initOnly,
 			)
 		}
@@ -257,16 +227,12 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = nftables.NewDualStackProxier(
 				ctx,
-				config.SyncPeriod.Duration,
-				config.MinSyncPeriod.Duration,
-				config.Linux.MasqueradeAll,
-				int(*config.NFTables.MasqueradeBit),
+				config,
 				localDetectors,
 				s.NodeName,
 				s.NodeIPs,
 				s.Recorder,
 				s.HealthzServer,
-				config.NodePortAddresses,
 				initOnly,
 			)
 		} else {
@@ -274,17 +240,13 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig
 			// TODO this has side effects that should only happen when Run() is invoked.
 			proxier, err = nftables.NewProxier(
 				ctx,
+				config,
 				s.PrimaryIPFamily,
-				config.SyncPeriod.Duration,
-				config.MinSyncPeriod.Duration,
-				config.Linux.MasqueradeAll,
-				int(*config.NFTables.MasqueradeBit),
 				localDetectors[s.PrimaryIPFamily],
 				s.NodeName,
 				s.NodeIPs[s.PrimaryIPFamily],
 				s.Recorder,
 				s.HealthzServer,
-				config.NodePortAddresses,
 				initOnly,
 			)
 		}

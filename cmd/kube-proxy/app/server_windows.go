@@ -90,26 +90,20 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig
 
 	if dualStackMode {
 		proxier, err = winkernel.NewDualStackProxier(
-			config.SyncPeriod.Duration,
-			config.MinSyncPeriod.Duration,
+			config,
 			s.NodeName,
 			s.NodeIPs,
 			s.Recorder,
 			s.HealthzServer,
-			config.HealthzBindAddress,
-			config.Winkernel,
 		)
 	} else {
 		proxier, err = winkernel.NewProxier(
+			config,
 			s.PrimaryIPFamily,
-			config.SyncPeriod.Duration,
-			config.MinSyncPeriod.Duration,
 			s.NodeName,
 			s.NodeIPs[s.PrimaryIPFamily],
 			s.Recorder,
 			s.HealthzServer,
-			config.HealthzBindAddress,
-			config.Winkernel,
 		)
 	}
 	if err != nil {
