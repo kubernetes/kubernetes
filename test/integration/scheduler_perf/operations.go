@@ -299,6 +299,10 @@ type createPodsOp struct {
 	Count int
 	// Template parameter for Count.
 	CountParam string
+	// Template parameter for multiplying CountParam. It is used when total number of pods
+	// is defined by number of pods per podgroup for multiple podgroups.
+	// Optional.
+	CountMultiplierParam string
 	// If false, Count pods get created rapidly. This can be used to
 	// measure how quickly the scheduler can fill up a cluster.
 	//
@@ -351,6 +355,9 @@ func (cpo *createPodsOp) isValid(allowParameterization bool) error {
 	if !isValidCount(allowParameterization, cpo.Count, cpo.CountParam) {
 		return fmt.Errorf("invalid Count=%d / CountParam=%q", cpo.Count, cpo.CountParam)
 	}
+	if cpo.CountMultiplierParam != "" && !isValidParameterizable(cpo.CountMultiplierParam) {
+		return fmt.Errorf("invalid CountMultiplierParam=%q", cpo.CountMultiplierParam)
+	}
 	if cpo.CollectMetrics && cpo.SkipWaitToCompletion {
 		// While it's technically possible to achieve this, the additional
 		// complexity is not worth it, especially given that we don't have any
@@ -377,6 +384,13 @@ func (cpo createPodsOp) patchParams(w *Workload) (realOp, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+	if cpo.CountMultiplierParam != "" {
+		multiplier, err := w.Params.get(cpo.CountMultiplierParam[1:])
+		if err != nil {
+			return nil, err
+		}
+		cpo.Count *= multiplier
 	}
 	if cpo.DurationParam != "" {
 		durationStr, err := getParam[string](w.Params, cpo.DurationParam[1:])
@@ -600,6 +614,40 @@ func (so sleepOp) patchParams(w *Workload) (realOp, error) {
 		}
 	}
 	return &so, nil
+}
+
+// waitForPodGroups defines an op that waits for a specific number of PodGroup objects to be visible in the scheduler's cache.
+type waitForPodGroups struct {
+	// Must be waitForPodGroupsOpcode.
+	Opcode operationCode
+	// Namespace the objects should be in.
+	Namespace string
+	// Count determines how many objects to wait for.
+	Count int
+	// CountParam is the name of the parameter that determines the count.
+	CountParam string
+}
+
+func (w *waitForPodGroups) isValid(allowParameterization bool) error {
+	if !isValidCount(allowParameterization, w.Count, w.CountParam) {
+		return fmt.Errorf("invalid Count=%d / CountParam=%q", w.Count, w.CountParam)
+	}
+	return nil
+}
+
+func (w *waitForPodGroups) collectsMetrics() bool {
+	return false
+}
+
+func (w waitForPodGroups) patchParams(workload *Workload) (realOp, error) {
+	if w.CountParam != "" {
+		var err error
+		w.Count, err = workload.Params.get(w.CountParam[1:])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &w, (&w).isValid(false)
 }
 
 // startCollectingMetricsOp defines an op that starts metrics collectors.
