@@ -76,6 +76,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	proxymetrics "k8s.io/kubernetes/pkg/proxy/metrics"
+	"k8s.io/kubernetes/pkg/proxy/nodemanager"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/oom"
 	netutils "k8s.io/utils/net"
@@ -174,7 +175,7 @@ type ProxyServer struct {
 	flagz           flagz.Reader
 
 	podCIDRs    []string // only used for LocalModeNodeCIDR
-	NodeManager *proxy.NodeManager
+	NodeManager *nodemanager.NodeManager
 
 	Proxier proxy.Provider
 }
@@ -217,7 +218,7 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 	}
 
 	// NodeManager makes an informer that selects for the node where this kube-proxy is running
-	s.NodeManager, err = proxy.NewNodeManager(ctx, s.Client, s.NodeName, s.Config)
+	s.NodeManager, err = nodemanager.New(ctx, s.Client, s.NodeName, s.Config)
 	if err != nil {
 		return nil, err
 	}
