@@ -34,7 +34,6 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
@@ -118,52 +117,28 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletDir strin
 		_, _ = fmt.Fprintf(out, "[dryrun] Would back up kubelet config file to %s\n", dest)
 	}
 
-	if features.Enabled(cfg.FeatureGates, features.NodeLocalCRISocket) {
-		// If instance-config.yaml exist on disk, we don't need to create it.
-		_, err := os.Stat(filepath.Join(kubeletDir, kubeadmconstants.KubeletInstanceConfigurationFileName))
-		// After the NodeLocalCRISocket feature gate is removed, os.IsNotExist(err) should also be removed.
-		// If there is no instance configuration, it indicates that the configuration on the node has been corrupted,
-		// and an error needs to be reported.
-		if os.IsNotExist(err) {
-			var containerRuntimeEndpoint string
-			var kubeletFlags []kubeadmapi.Arg
-			dynamicFlags, err := kubeletphase.ReadKubeletDynamicEnvFile(filepath.Join(kubeletDir, kubeadmconstants.KubeletEnvFileName))
-			if err == nil {
-				args := kubeadmutil.ArgumentsFromCommand(dynamicFlags)
-				for _, arg := range args {
-					if arg.Name == "container-runtime-endpoint" {
-						containerRuntimeEndpoint = arg.Value
-						continue
-					}
-					kubeletFlags = append(kubeletFlags, arg)
-				}
-				if len(containerRuntimeEndpoint) != 0 {
-					if err := kubeletphase.WriteKubeletArgsToFile(kubeletFlags, nil, kubeletDir); err != nil {
-						return err
-					}
-				}
-			} else if dryRun {
-				_, _ = fmt.Fprintf(out, "[dryrun] would read the flag --container-runtime-endpoint value from %q, which is missing. "+
-					"Using default socket %q instead", kubeadmconstants.KubeletEnvFileName, kubeadmconstants.DefaultCRISocket)
-				containerRuntimeEndpoint = kubeadmconstants.DefaultCRISocket
-			} else {
-				return errors.Wrap(err, "error reading kubeadm flags file")
-			}
+	instanceConfigPath := filepath.Join(kubeletDir, kubeadmconstants.KubeletInstanceConfigurationFileName)
+	_, err = os.Stat(instanceConfigPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return errors.Wrapf(err, "stat error for the kubelet instance configuration file %s", instanceConfigPath)
+		}
 
-			kubeletConfig := &kubeletconfig.KubeletConfiguration{
-				ContainerRuntimeEndpoint: containerRuntimeEndpoint,
-			}
+		klog.Warningf("The kubelet instance configuration file %s was not found. "+
+			"Creating a new one with defaults. Please verify its contents!", instanceConfigPath)
 
-			if err := kubeletphase.WriteInstanceConfigToDisk(kubeletConfig, kubeletDir); err != nil {
-				return errors.Wrap(err, "error writing kubelet instance configuration")
-			}
+		kubeletConfig := &kubeletconfig.KubeletConfiguration{
+			ContainerRuntimeEndpoint: cfg.NodeRegistration.CRISocket,
+		}
+		if err := kubeletphase.WriteInstanceConfigToDisk(kubeletConfig, kubeletDir); err != nil {
+			return errors.Wrap(err, "error writing kubelet instance configuration")
+		}
+	}
 
-			if dryRun { // Print what contents would be written
-				err = dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletInstanceConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, out)
-				if err != nil {
-					return errors.Wrap(err, "error printing kubelet instance configuration file on dryrun")
-				}
-			}
+	if dryRun { // Print the instance-config.yaml.
+		err = dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletInstanceConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, out)
+		if err != nil {
+			return errors.Wrap(err, "error printing kubelet instance configuration file on dryrun")
 		}
 	}
 
@@ -172,7 +147,7 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletDir strin
 		return errors.Wrap(err, "error writing kubelet configuration to file")
 	}
 
-	if dryRun { // Print what contents would be written
+	if dryRun { // Print the config.yaml with patches applied.
 		err := dryrunutil.PrintDryRunFile(kubeadmconstants.KubeletConfigurationFileName, kubeletDir, kubeadmconstants.KubeletRunDirectory, out)
 		if err != nil {
 			return errors.Wrap(err, "error printing kubelet configuration file on dryrun")
