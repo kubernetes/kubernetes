@@ -21,6 +21,8 @@ import (
 	"testing"
 
 	"k8s.io/code-generator/cmd/validation-gen/validators"
+	"k8s.io/gengo/v2/codetags"
+	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/types"
 )
 
@@ -475,4 +477,77 @@ func TestSortIntoCohorts(t *testing.T) {
 			t.Errorf("expected %v, got %v", tc.expected, out)
 		}
 	}
+}
+
+func TestDiscoverType_Recursive(t *testing.T) {
+	mockExtractor := &mockValidationExtractor{}
+
+	td := NewTypeDiscoverer(mockExtractor, map[string]string{
+		"k8s.io/api/mock/package": "k8s.io/api/mock/package",
+	})
+
+	c := &generator.Context{
+		Universe: types.Universe{},
+	}
+	if err := td.Init(c); err != nil {
+		t.Fatalf("Init failed: %v", err)
+	}
+
+	cases := []struct {
+		name          string
+		fieldTypeFunc func(node *types.Type) *types.Type
+	}{
+		{
+			name:          "Slice",
+			fieldTypeFunc: sliceOf,
+		},
+		{
+			name:          "Map",
+			fieldTypeFunc: mapOf,
+		},
+		{
+			name:          "Pointer",
+			fieldTypeFunc: ptrTo,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			nodeType := &types.Type{
+				Name: types.Name{Package: "k8s.io/api/mock/package", Name: "Node"},
+				Kind: types.Struct,
+			}
+			fieldType := tc.fieldTypeFunc(nodeType)
+			nodeType.Members = []types.Member{{
+				Name:         "RecursiveField",
+				Type:         fieldType,
+				CommentLines: []string{"+k8s:validation-gen=true"},
+			}}
+
+			hubType := &types.Type{
+				Name: types.Name{Package: "k8s.io/api/mock/package", Name: "Hub"},
+				Kind: types.Struct,
+			}
+			hubType.Members = []types.Member{{
+				Name: "RootField",
+				Type: fieldType,
+			}}
+
+			if err := td.DiscoverType(hubType); err != nil {
+				t.Fatalf("DiscoverType failed: %v", err)
+			}
+		})
+	}
+}
+
+type mockValidationExtractor struct {
+	validators.ValidationExtractor
+}
+
+func (m *mockValidationExtractor) ExtractTags(context validators.Context, comments []string) ([]codetags.Tag, error) {
+	return nil, nil
+}
+
+func (m *mockValidationExtractor) ExtractValidations(context validators.Context, tag ...codetags.Tag) (validators.Validations, error) {
+	return validators.Validations{}, nil
 }

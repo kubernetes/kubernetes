@@ -34,6 +34,8 @@ metadata:
   uid: uidValue
 spec:
   disruptionMode: disruptionModeValue
+  parentRef:
+    compositePodGroupName: compositePodGroupNameValue
   podGroupTemplateRef:
     workload:
       podGroupTemplateName: podGroupTemplateNameValue

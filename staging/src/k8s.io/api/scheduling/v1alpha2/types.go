@@ -58,6 +58,9 @@ type WorkloadList struct {
 // WorkloadMaxPodGroupTemplates is the maximum number of pod group templates per Workload.
 const WorkloadMaxPodGroupTemplates = 8
 
+// WorkloadMaxCompositePodGroupTemplates is the maximum number of composite pod group templates per Workload.
+const WorkloadMaxCompositePodGroupTemplates = 8
+
 // WorkloadSpec defines the desired state of a Workload.
 type WorkloadSpec struct {
 	// ControllerRef is an optional reference to the controlling object, such as a
@@ -70,18 +73,36 @@ type WorkloadSpec struct {
 	// +k8s:immutable
 	ControllerRef *TypedLocalObjectReference `json:"controllerRef,omitempty" protobuf:"bytes,1,opt,name=controllerRef"`
 
-	// PodGroupTemplates is the list of templates that make up the Workload.
+	// PodGroupTemplates is the list of PodGroup templates that make up the Workload.
 	// The maximum number of templates is 8. This field is immutable.
 	//
-	// +required
+	// +optional
 	// +listType=map
 	// +listMapKey=name
-	// +k8s:required
+	// +k8s:ifDisabled("CompositePodGroup")=+k8s:required
+	// +k8s:ifEnabled("CompositePodGroup")=+k8s:optional
+	// +k8s:ifEnabled("CompositePodGroup")=+k8s:unionMember
 	// +k8s:listType=map
 	// +k8s:listMapKey=name
 	// +k8s:maxItems=8
 	// +k8s:immutable
 	PodGroupTemplates []PodGroupTemplate `json:"podGroupTemplates" protobuf:"bytes,2,rep,name=podGroupTemplates"`
+
+	// CompositePodGroupTemplates is the list of CompositePodGroup templates that make up the Workload.
+	// The maximum number of templates is 8. This field is immutable.
+	//
+	// +featureGate=CompositePodGroup
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +k8s:ifDisabled("CompositePodGroup")=+k8s:forbidden
+	// +k8s:ifEnabled("CompositePodGroup")=+k8s:optional
+	// +k8s:ifEnabled("CompositePodGroup")=+k8s:unionMember
+	// +k8s:ifEnabled("CompositePodGroup")=+k8s:listType=map
+	// +k8s:ifEnabled("CompositePodGroup")=+k8s:listMapKey=name
+	// +k8s:ifEnabled("CompositePodGroup")=+k8s:maxItems=8
+	// +k8s:ifEnabled("CompositePodGroup")=+k8s:immutable
+	CompositePodGroupTemplates []CompositePodGroupTemplate `json:"compositePodGroupTemplates" protobuf:"bytes,3,rep,name=compositePodGroupTemplates"`
 }
 
 // TypedLocalObjectReference allows to reference typed object inside the same namespace.
@@ -458,6 +479,18 @@ type PodGroupSpec struct {
 	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:maximum=1000000000 # HighestUserDefinablePriority
 	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:minimum=-2147483648
 	Priority *int32 `json:"priority,omitempty" protobuf:"varint,7,opt,name=priority"`
+
+	// ParentRef references the parent composite pod group of this pod group.
+	// If it's nil, then this pod group is a root of a workload's hierarchy.
+	// This field is used only when the CompositePodGroup feature gate is enabled.
+	// This field is immutable.
+	//
+	// +featureGate=CompositePodGroup
+	// +optional
+	// +k8s:ifDisabled("CompositePodGroup")=+k8s:forbidden
+	// +k8s:ifEnabled("CompositePodGroup")=+k8s:optional
+	// +k8s:ifEnabled("CompositePodGroup")=+k8s:immutable
+	ParentRef *ParentReference `json:"parentRef,omitempty" protobuf:"bytes,8,opt,name=parentRef"`
 }
 
 // PodGroupStatus represents information about the status of a pod group.
@@ -598,4 +631,208 @@ type TopologyConstraint struct {
 	// +k8s:required
 	// +k8s:format=k8s-label-key
 	Key string `json:"key" protobuf:"bytes,1,opt,name=key"`
+}
+
+// ParentReference references the parent object of a PodGroup or a CompositePodGroup in the same namespace.
+// In all cases, the parent object is a CompositePodGroup.
+type ParentReference struct {
+	// CompositePodGroupName specifies the name of the parent CompositePodGroup.
+	//
+	// +required
+	// +k8s:required
+	// +k8s:format=k8s-long-name
+	CompositePodGroupName string `json:"compositePodGroupName" protobuf:"bytes,1,opt,name=compositePodGroupName"`
+}
+
+// CompositePodGroupTemplate represents a template for a CompositePodGroup with a scheduling policy.
+type CompositePodGroupTemplate struct {
+	// Name is a unique identifier for the CompositePodGroupTemplate within the Workload.
+	// It must be a DNS label. This field is immutable.
+	//
+	// +required
+	// +k8s:required
+	// +k8s:format=k8s-short-name
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+
+	// SchedulingPolicy defines the scheduling policy for this CompositePodGroupTemplate.
+	//
+	// +required
+	SchedulingPolicy CompositePodGroupSchedulingPolicy `json:"schedulingPolicy" protobuf:"bytes,2,opt,name=schedulingPolicy"`
+
+	// CompositePodGroupTemplates is the list of CompositePodGroup templates that make up the Workload.
+	// The maximum number of templates is 8. This field is immutable.
+	//
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +k8s:optional
+	// +k8s:listType=map
+	// +k8s:listMapKey=name
+	// +k8s:maxItems=8
+	// +k8s:unionMember
+	// +k8s:immutable
+	CompositePodGroupTemplates []CompositePodGroupTemplate `json:"compositePodGroupTemplates" protobuf:"bytes,3,rep,name=compositePodGroupTemplates"`
+
+	// PodGroupTemplates is the list of PodGroup templates that make up the Workload.
+	// The maximum number of templates is 8. This field is immutable.
+	//
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +k8s:optional
+	// +k8s:listType=map
+	// +k8s:listMapKey=name
+	// +k8s:maxItems=8
+	// +k8s:unionMember
+	// +k8s:immutable
+	PodGroupTemplates []PodGroupTemplate `json:"podGroupTemplates" protobuf:"bytes,4,rep,name=podGroupTemplates"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:supportsSubresource="/status"
+
+// CompositePodGroup represents a runtime instance of pod groups grouped together.
+// CompositePodGroups are created by workload controllers (Job, LWS, JobSet, etc...) from
+// Workload.compositePodGroupTemplates.
+// CompositePodGroup API enablement is toggled by the CompositePodGroup feature gate.
+type CompositePodGroup struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	//
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Spec defines the desired state of the CompositePodGroup.
+	//
+	// +required
+	Spec CompositePodGroupSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
+
+	// Status represents the current observed state of the CompositePodGroup.
+	//
+	// +optional
+	Status CompositePodGroupStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// CompositePodGroupList contains a list of CompositePodGroup resources.
+type CompositePodGroupList struct {
+	metav1.TypeMeta `json:",inline"`
+
+	// Standard list metadata.
+	//
+	// +optional
+	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// Items is the list of CompositePodGroups.
+	Items []CompositePodGroup `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+type CompositePodGroupSpec struct {
+	// ParentRef references the parent composite pod group of this composite pod group.
+	// If it's nil, then this composite pod group is a root of a workload's hierarchy.
+	// This field is immutable.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:immutable
+	ParentRef *ParentReference `json:"parentRef,omitempty" protobuf:"bytes,1,opt,name=parentRef"`
+
+	// CompositePodGroupTemplateRef references an optional CompositePodGroup template within
+	// other object (e.g. Workload) that was used to create the CompositePodGroup.
+	// This field is immutable.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:immutable
+	CompositePodGroupTemplateRef *CompositePodGroupTemplateReference `json:"compositePodGroupTemplateReference" protobuf:"bytes,2,opt,name=compositePodGroupTemplateReference"`
+
+	// SchedulingPolicy defines the scheduling policy for this instance of the CompositePodGroup.
+	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+	// This field is immutable.
+	//
+	// +required
+	// +k8s:immutable
+	SchedulingPolicy CompositePodGroupSchedulingPolicy `json:"schedulingPolicy" protobuf:"bytes,3,opt,name=schedulingPolicy"`
+}
+
+// CompositePodGroupSchedulingPolicy defines the scheduling configuration for a CompositePodGroup.
+// Exactly one policy must be set.
+// +union
+type CompositePodGroupSchedulingPolicy struct {
+	// Basic specifies that the groups of this composite group should be scheduled independently.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:unionMember
+	Basic *BasicGroupSchedulingPolicy `json:"basic,omitempty" protobuf:"bytes,1,opt,name=basic"`
+
+	// Gang specifies that the groups of this composite group should be scheduled using
+	// all-or-nothing semantics.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:unionMember
+	Gang *GangGroupSchedulingPolicy `json:"gang,omitempty" protobuf:"bytes,2,opt,name=gang"`
+}
+
+// BasicGroupSchedulingPolicy indicates that the groups belonging to the composite group
+// should be scheduled independently.
+type BasicGroupSchedulingPolicy struct {
+}
+
+// GangGroupSchedulingPolicy indicates that the groups belonging to the composite group
+// should be scheduled using all-or-nothing semantics.
+type GangGroupSchedulingPolicy struct {
+	// MinGroupCount is the minimum number of groups of the composite group that must
+	// be available to start scheduling the composite group.
+	//
+	// +optional
+	// +k8s:optional
+	MinGroupCount *int32 `json:"minGroupCount,omitempty" protobuf:"varint,1,opt,name=minGroupCount"`
+}
+
+// CompositePodGroupTemplateReference references a CompositePodGroup template defined in some object (e.g. Workload).
+// Exactly one reference must be set.
+// +union
+type CompositePodGroupTemplateReference struct {
+	// Workload references the CompositePodGroupTemplate within the Workload object that was used to create
+	// the CompositePodGroup.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:unionMember
+	Workload *WorkloadCompositePodGroupTemplateReference `json:"workload" protobuf:"bytes,1,opt,name=workload"`
+}
+
+// WorkloadCompositePodGroupTemplateReference references the CompositePodGroupTemplate within the Workload object.
+type WorkloadCompositePodGroupTemplateReference struct {
+	// WorkloadName defines the name of the Workload object.
+	//
+	// +required
+	// +k8s:required
+	// +k8s:format=k8s-long-name
+	WorkloadName string `json:"workloadName" protobuf:"bytes,1,opt,name=workloadName"`
+
+	// CompositePodGroupTemplateName defines the CompositePodGroupTemplate name within the Workload object.
+	//
+	// +required
+	// +k8s:required
+	// +k8s:format=k8s-short-name
+	CompositePodGroupTemplateName string `json:"compositePodGroupTemplateName" protobuf:"bytes,2,opt,name=compositePodGroupTemplateName"`
+}
+
+// CompositePodGroupStatus represents information about the status of a composite pod group.
+type CompositePodGroupStatus struct {
+	// Conditions represent the latest observations of the CompositePodGroup's state.
+	//
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }

@@ -75,6 +75,11 @@ type PodGroupSpecApplyConfiguration struct {
 	// This field is available only when the WorkloadAwarePreemption feature gate
 	// is enabled.
 	Priority *int32 `json:"priority,omitempty"`
+	// ParentRef references the parent composite pod group of this pod group.
+	// If it's nil, then this pod group is a root of a workload's hierarchy.
+	// This field is used only when the CompositePodGroup feature gate is enabled.
+	// This field is immutable.
+	ParentRef *ParentReferenceApplyConfiguration `json:"parentRef,omitempty"`
 }
 
 // PodGroupSpecApplyConfiguration constructs a declarative configuration of the PodGroupSpec type for use with
@@ -141,5 +146,13 @@ func (b *PodGroupSpecApplyConfiguration) WithPriorityClassName(value string) *Po
 // If called multiple times, the Priority field is set to the value of the last call.
 func (b *PodGroupSpecApplyConfiguration) WithPriority(value int32) *PodGroupSpecApplyConfiguration {
 	b.Priority = &value
+	return b
+}
+
+// WithParentRef sets the ParentRef field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ParentRef field is set to the value of the last call.
+func (b *PodGroupSpecApplyConfiguration) WithParentRef(value *ParentReferenceApplyConfiguration) *PodGroupSpecApplyConfiguration {
+	b.ParentRef = value
 	return b
 }
