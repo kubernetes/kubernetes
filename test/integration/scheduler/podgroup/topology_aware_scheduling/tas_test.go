@@ -27,11 +27,9 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
-
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
 	testutils "k8s.io/kubernetes/test/integration/util"
-
-	podgroup "k8s.io/kubernetes/test/integration/scheduler/podgroup"
 )
 
 func makeGangPodGroup(podGroupName, topologyKey string, minCount int32) *schedulingapi.PodGroup {
@@ -51,30 +49,33 @@ func makePod(podName, podGroupName string) *v1.Pod {
 		PodGroupName(podGroupName).Priority(100).ZeroTerminationGracePeriod().Obj()
 }
 
+// makeAssignedPod creates a pre-existing pod assigned to a node in the cluster
 func makeAssignedPod(podName, nodeName, consumedCPU string) *v1.Pod {
 	return st.MakePod().Name(podName).Node(nodeName).Req(map[v1.ResourceName]string{v1.ResourceCPU: consumedCPU}).Container("image").Priority(100).ZeroTerminationGracePeriod().Obj()
 }
 
+// makeLargePod creates a pod that consumes all resources of a single node
 func makeLargePod(podName, podGroupName string) *v1.Pod {
 	return st.MakePod().Name(podName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Container("image").
 		PodGroupName(podGroupName).Priority(100).Obj()
 }
 
+// makeUnfittablePod creates a pod that requests more resources than available on a single node
 func makeUnfittablePod(podName, podGroupName string) *v1.Pod {
 	return st.MakePod().Name(podName).Req(map[v1.ResourceName]string{v1.ResourceCPU: "3"}).Container("image").
 		PodGroupName(podGroupName).Priority(100).Obj()
 }
 
 type scenario struct {
-	Name  string
-	steps []podgroup.Step
+	name  string
+	steps []stepsframework.Step
 }
 
 func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 	tests := []scenario{
 		{
-			Name: "gang schedules on a single rack, when only one feasible rack is available",
-			steps: []podgroup.Step{
+			name: "gang schedules on a single rack, when only one feasible rack is available",
+			steps: []stepsframework.Step{
 				{
 					Name: "Create nodes in multiple zones and racks. Racks 1 and 2 can fit 3 pods",
 					CreateNodes: []*v1.Node{
@@ -114,7 +115,7 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 				},
 				{
 					Name: "Verify all pods scheduled on rack1",
-					VerifyAssignments: &podgroup.VerifyAssignments{
+					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p1", "p2", "p3"},
 						Nodes: sets.New("node1-rack1", "node2-rack1", "node3-rack1"),
 					},
@@ -122,8 +123,8 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 			},
 		},
 		{
-			Name: "gang remains pending when no feasible resources are found",
-			steps: []podgroup.Step{
+			name: "gang remains pending when no feasible resources are found",
+			steps: []stepsframework.Step{
 				{
 					Name: "Create nodes in multiple zones and racks",
 					CreateNodes: []*v1.Node{
@@ -156,8 +157,8 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 			},
 		},
 		{
-			Name: "gang remains pending when resources are consumed by existing pods",
-			steps: []podgroup.Step{
+			name: "gang remains pending when resources are consumed by existing pods",
+			steps: []stepsframework.Step{
 				{
 					Name: "Create nodes in a rack",
 					CreateNodes: []*v1.Node{
@@ -204,8 +205,8 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 			},
 		},
 		{
-			Name: "gang schedules on a single rack, choosing placement with the highest score in default placement scoring algorithm",
-			steps: []podgroup.Step{
+			name: "gang schedules on a single rack, choosing placement with the highest score in default placement scoring algorithm",
+			steps: []stepsframework.Step{
 				{
 					Name: "Create nodes in multiple zones and racks",
 					CreateNodes: []*v1.Node{
@@ -241,7 +242,7 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 					// Scoring results: PodGroupPodsCount will score the same for rack1 and rack2,
 					// and NodeResourcesFit with default strategy MostAllocated will score higher on rack1.
 					Name: "Verify all pods scheduled on rack1",
-					VerifyAssignments: &podgroup.VerifyAssignments{
+					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p1", "p2", "p3"},
 						Nodes: sets.New("node1-rack1", "node2-rack1"),
 					},
@@ -249,8 +250,8 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 			},
 		},
 		{
-			Name: "gang schedules on a single rack, choosing placement with highest allocation percentage (default placement scoring algorithm) with pre-existing pods in cluster",
-			steps: []podgroup.Step{
+			name: "gang schedules on a single rack, choosing placement with highest allocation percentage (default placement scoring algorithm) with pre-existing pods in cluster",
+			steps: []stepsframework.Step{
 				{
 					Name: "Create nodes in multiple zones and racks",
 					CreateNodes: []*v1.Node{
@@ -301,7 +302,7 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 				// - rack4: unfeasible
 				{
 					Name: "Verify all pods scheduled on rack2",
-					VerifyAssignments: &podgroup.VerifyAssignments{
+					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p1", "p2", "p3"},
 						Nodes: sets.New("node3-rack2", "node4-rack2", "node5-rack2"),
 					},
@@ -309,8 +310,8 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 			},
 		},
 		{
-			Name: "two gangs schedule consecutively, each on a separate rack",
-			steps: []podgroup.Step{
+			name: "two gangs schedule consecutively, each on a separate rack",
+			steps: []stepsframework.Step{
 				{
 					Name: "Create nodes in multiple racks",
 					CreateNodes: []*v1.Node{
@@ -362,14 +363,14 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 				},
 				{
 					Name: "Verify all pods in pg1 scheduled on rack1 (the only one fitting them)",
-					VerifyAssignments: &podgroup.VerifyAssignments{
+					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p1", "p2", "p3"},
 						Nodes: sets.New("node1-rack1", "node2-rack1", "node3-rack1"),
 					},
 				},
 				{
 					Name: "Verify all pods in pg2 scheduled on rack2 (the only one fitting them after pg1 is scheduled)",
-					VerifyAssignments: &podgroup.VerifyAssignments{
+					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p4", "p5"},
 						Nodes: sets.New("node4-rack2", "node5-rack2"),
 					},
@@ -377,8 +378,8 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 			},
 		},
 		{
-			Name: "two gangs schedule consecutively, both on the same rack",
-			steps: []podgroup.Step{
+			name: "two gangs schedule consecutively, both on the same rack",
+			steps: []stepsframework.Step{
 				{
 					Name: "Create nodes in multiple racks",
 					CreateNodes: []*v1.Node{
@@ -425,7 +426,7 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 				},
 				{
 					Name: "Verify all pods in pg1 scheduled on rack1 (the only one fitting them)",
-					VerifyAssignments: &podgroup.VerifyAssignments{
+					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p1", "p2"},
 						Nodes: sets.New("node1-rack1", "node2-rack1", "node3-rack1"),
 					},
@@ -436,7 +437,7 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 				},
 				{
 					Name: "Verify all pods in pg2 scheduled also on rack1 (the only one fitting them)",
-					VerifyAssignments: &podgroup.VerifyAssignments{
+					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p3", "p4", "p5"},
 						Nodes: sets.New("node1-rack1", "node2-rack1", "node3-rack1"),
 					},
@@ -444,8 +445,8 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 			},
 		},
 		{
-			Name: "two gangs schedule consecutively, different topology keys",
-			steps: []podgroup.Step{
+			name: "two gangs schedule consecutively, different topology keys",
+			steps: []stepsframework.Step{
 				{
 					Name: "Create nodes in multiple zones and racks",
 					CreateNodes: []*v1.Node{
@@ -499,14 +500,14 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 				},
 				{
 					Name: "Verify all pods in pg1 scheduled on rack3 (the only one fitting them)",
-					VerifyAssignments: &podgroup.VerifyAssignments{
+					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p1", "p2", "p3"},
 						Nodes: sets.New("node4-zone2", "node5-zone2", "node6-zone2"),
 					},
 				},
 				{
 					Name: "Verify all pods in pg2 scheduled in zone1 (the only one fitting them)",
-					VerifyAssignments: &podgroup.VerifyAssignments{
+					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p4", "p5", "p6"},
 						Nodes: sets.New("node1-rack1", "node2-rack1", "node3-rack2"),
 					},
@@ -514,8 +515,8 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 			},
 		},
 		{
-			Name: "two gangs schedule consecutively, only one fits in the cluster",
-			steps: []podgroup.Step{
+			name: "two gangs schedule consecutively, only one fits in the cluster",
+			steps: []stepsframework.Step{
 				{
 					Name: "Create nodes in one rack",
 					CreateNodes: []*v1.Node{
@@ -560,7 +561,7 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 				},
 				{
 					Name: "Verify all pods in pg1 scheduled on rack1",
-					VerifyAssignments: &podgroup.VerifyAssignments{
+					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p1", "p2", "p3"},
 						Nodes: sets.New("node1-rack1", "node2-rack1"),
 					},
@@ -572,8 +573,8 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 			},
 		},
 		{
-			Name: "gang with minCount < pod count schedules on a single rack",
-			steps: []podgroup.Step{
+			name: "gang with minCount < pod count schedules on a single rack",
+			steps: []stepsframework.Step{
 				{
 					Name: "Create nodes in two racks, each rack can fit 3 pods",
 					CreateNodes: []*v1.Node{
@@ -605,7 +606,7 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 				},
 				{
 					Name: "Verify all pods scheduled on a single rack",
-					VerifyAssignedInOneDomain: &podgroup.VerifyAssignedInOneDomain{
+					VerifyAssignedInOneDomain: &stepsframework.VerifyAssignedInOneDomain{
 						Pods:        []string{"p1", "p2", "p3"},
 						TopologyKey: "rack",
 					},
@@ -614,8 +615,8 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 		},
 		{
 			// TODO: Add a test scenario where minCount < pod count and when entering the scheduling cycle, scheduler sees more than minCount pods in queue.
-			Name: "gang with minCount < pod count schedules on a single rack, choosing smaller rack",
-			steps: []podgroup.Step{
+			name: "gang with minCount < pod count schedules on a single rack, choosing smaller rack",
+			steps: []stepsframework.Step{
 				{
 					Name: "Create nodes in multiple racks, one can fit 4 pods, second can fit 6 pods, last is too small",
 					CreateNodes: []*v1.Node{
@@ -662,7 +663,7 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 					// Scoring details:
 					// At the time of scoring pg1 contained 3 pods. Racks 1 and 2 both fit all 3 pods, and were scored equally by PodGroupPodsCount.
 					// NodeResourcesFit with the default mostAllocated strategy scored rack2 higher than rack1.
-					VerifyAssignments: &podgroup.VerifyAssignments{
+					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p1", "p2", "p3", "p4"},
 						Nodes: sets.New("node4-rack2", "node5-rack2"),
 					},
@@ -680,8 +681,8 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 			},
 		},
 		{
-			Name: "gang does not schedule on a single rack when preemption could free up enough resources",
-			steps: []podgroup.Step{
+			name: "gang does not schedule on a single rack when preemption could free up enough resources",
+			steps: []stepsframework.Step{
 				{
 					Name: "Create single rack that can hold pod group pods",
 					CreateNodes: []*v1.Node{
@@ -720,7 +721,7 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.Name, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			runTestScenario(t, tt, true /* gangSchedulingEnabled */)
 		})
 	}
@@ -729,8 +730,8 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 	tests := []scenario{
 		{
-			Name: "basic podgroup schedules on the only rack in the cluster",
-			steps: []podgroup.Step{
+			name: "basic podgroup schedules on the only rack in the cluster",
+			steps: []stepsframework.Step{
 				{
 					Name: "Create nodes in only one rack",
 					CreateNodes: []*v1.Node{
@@ -760,7 +761,7 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				},
 				{
 					Name: "Verify all pods scheduled on rack1",
-					VerifyAssignments: &podgroup.VerifyAssignments{
+					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p1", "p2", "p3"},
 						Nodes: sets.New("node1-rack1", "node2-rack1"),
 					},
@@ -768,8 +769,8 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 			},
 		},
 		{
-			Name: "basic podgroup schedules all pods on a single rack, when there are multiple racks fitting in the cluster",
-			steps: []podgroup.Step{
+			name: "basic podgroup schedules all pods on a single rack, when there are multiple racks fitting in the cluster",
+			steps: []stepsframework.Step{
 				{
 					Name: "Create nodes in multiple racks and zones, each rack enough to fit 3 pods",
 					CreateNodes: []*v1.Node{
@@ -803,7 +804,7 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				},
 				{
 					Name: "Verify all pods scheduled the same rack",
-					VerifyAssignedInOneDomain: &podgroup.VerifyAssignedInOneDomain{
+					VerifyAssignedInOneDomain: &stepsframework.VerifyAssignedInOneDomain{
 						Pods:        []string{"p1", "p2", "p3"},
 						TopologyKey: "rack",
 					},
@@ -811,8 +812,8 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 			},
 		},
 		{
-			Name: "basic podgroup cannot fit on a single rack, no pods get scheduled on a different rack",
-			steps: []podgroup.Step{
+			name: "basic podgroup cannot fit on a single rack, no pods get scheduled on a different rack",
+			steps: []stepsframework.Step{
 				{
 					Name: "Create nodes in 2 racks, each rack enough to fit 2 pods",
 					CreateNodes: []*v1.Node{
@@ -846,7 +847,7 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				},
 				{
 					Name: "Verify both pods scheduled on the same rack",
-					VerifyAssignedInOneDomain: &podgroup.VerifyAssignedInOneDomain{
+					VerifyAssignedInOneDomain: &stepsframework.VerifyAssignedInOneDomain{
 						Pods:        []string{"p1", "p2"},
 						TopologyKey: "rack",
 					},
@@ -854,8 +855,8 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 			},
 		},
 		{
-			Name: "basic podgroup does not schedule at all when no pods fit",
-			steps: []podgroup.Step{
+			name: "basic podgroup does not schedule at all when no pods fit",
+			steps: []stepsframework.Step{
 				{
 					Name: "Create nodes in 2 racks",
 					CreateNodes: []*v1.Node{
@@ -885,8 +886,8 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 			},
 		},
 		{
-			Name: "basic podgroup schedules only some pods when others don't fit on any node",
-			steps: []podgroup.Step{
+			name: "basic podgroup schedules only some pods when others don't fit on any node",
+			steps: []stepsframework.Step{
 				{
 					Name: "Create nodes in 2 racks, each rack enough to fit 2 regular pods",
 					CreateNodes: []*v1.Node{
@@ -920,8 +921,8 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 			},
 		},
 		{
-			Name: "basic podgroup schedules on a single rack, choosing placement with highest allocation percentage (default placement scoring algorithm)",
-			steps: []podgroup.Step{
+			name: "basic podgroup schedules on a single rack, choosing placement with highest allocation percentage (default placement scoring algorithm)",
+			steps: []stepsframework.Step{
 				{
 					Name: "Create nodes in multiple zones and racks",
 					CreateNodes: []*v1.Node{
@@ -960,7 +961,7 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				// - rack2: 1/6 = 0.17
 				{
 					Name: "Verify all pods scheduled on rack1",
-					VerifyAssignments: &podgroup.VerifyAssignments{
+					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p1", "p2", "p3"},
 						Nodes: sets.New("node1-rack1", "node2-rack1"),
 					},
@@ -968,8 +969,8 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 			},
 		},
 		{
-			Name: "basic podgroup schedules on a single rack, choosing placement with highest allocation percentage with pre-existing pods",
-			steps: []podgroup.Step{
+			name: "basic podgroup schedules on a single rack, choosing placement with highest allocation percentage with pre-existing pods",
+			steps: []stepsframework.Step{
 				{
 					Name: "Create nodes in multiple zones and racks",
 					CreateNodes: []*v1.Node{
@@ -1022,7 +1023,7 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				// - rack3: 1/8 = 0.125
 				{
 					Name: "Verify all pods scheduled on rack2",
-					VerifyAssignments: &podgroup.VerifyAssignments{
+					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p1", "p2", "p3"},
 						Nodes: sets.New("node4-rack2", "node5-rack2", "node6-rack2"),
 					},
@@ -1030,8 +1031,8 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 			},
 		},
 		{
-			Name: "basic podgroup schedules on a single rack, choosing best scoring placement that will not fit all podgroup",
-			steps: []podgroup.Step{
+			name: "basic podgroup schedules on a single rack, choosing best scoring placement that will not fit all podgroup",
+			steps: []stepsframework.Step{
 				{
 					Name: "Create nodes in multiple racks",
 					CreateNodes: []*v1.Node{
@@ -1088,7 +1089,7 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				},
 				{
 					Name: "Verify pod scheduled on rack2",
-					VerifyAssignments: &podgroup.VerifyAssignments{
+					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p1", "p2"},
 						Nodes: sets.New("node5-rack2"),
 					},
@@ -1100,8 +1101,8 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 			},
 		},
 		{
-			Name: "two basic podgroups schedule consecutively, each on a single rack",
-			steps: []podgroup.Step{
+			name: "two basic podgroups schedule consecutively, each on a single rack",
+			steps: []stepsframework.Step{
 				{
 					Name: "Create nodes in multiple racks",
 					CreateNodes: []*v1.Node{
@@ -1153,7 +1154,7 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				// - rack2: 1/2 = 0.5
 				{
 					Name: "Verify all pods in pg1 scheduled on rack2 (which scored most allocation)",
-					VerifyAssignments: &podgroup.VerifyAssignments{
+					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p1", "p2"},
 						Nodes: sets.New("node4-rack2"),
 					},
@@ -1164,7 +1165,7 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				},
 				{
 					Name: "Verify all pods in pg2 scheduled on rack1 (because rack2 is full)",
-					VerifyAssignments: &podgroup.VerifyAssignments{
+					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p3", "p4"},
 						Nodes: sets.New("node1-rack1", "node2-rack1", "node3-rack1"),
 					},
@@ -1172,8 +1173,8 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 			},
 		},
 		{
-			Name: "two basic podgroups schedule consecutively on the only rack",
-			steps: []podgroup.Step{
+			name: "two basic podgroups schedule consecutively on the only rack",
+			steps: []stepsframework.Step{
 				{
 					Name: "Create nodes in one rack",
 					CreateNodes: []*v1.Node{
@@ -1220,8 +1221,8 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 			},
 		},
 		{
-			Name: "two basic podgroups schedule consecutively, different topology keys",
-			steps: []podgroup.Step{
+			name: "two basic podgroups schedule consecutively, different topology keys",
+			steps: []stepsframework.Step{
 				{
 					Name: "Create nodes in multiple zones and racks",
 					CreateNodes: []*v1.Node{
@@ -1269,14 +1270,14 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				},
 				{
 					Name: "Verify all pods in pg1 scheduled on rack1 (the smallest rack, scoring highest allocation fraction)",
-					VerifyAssignments: &podgroup.VerifyAssignments{
+					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p1", "p2"},
 						Nodes: sets.New("node1-rack1"),
 					},
 				},
 				{
 					Name: "Verify all pods in pg2 scheduled in zone2 (because zone1 is full)",
-					VerifyAssignments: &podgroup.VerifyAssignments{
+					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p3", "p4", "p5"},
 						Nodes: sets.New("node2-zone2", "node3-zone2", "node4-zone2", "node5-zone2"),
 					},
@@ -1284,8 +1285,8 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 			},
 		},
 		{
-			Name: "two basic podgroups schedule consecutively, one does not fit in the assigned rack",
-			steps: []podgroup.Step{
+			name: "two basic podgroups schedule consecutively, one does not fit in the assigned rack",
+			steps: []stepsframework.Step{
 				{
 					Name: "Create nodes in multiple racks",
 					CreateNodes: []*v1.Node{
@@ -1338,7 +1339,7 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				// - rack2: 1/2 = 0.5
 				{
 					Name: "Verify all pods in pg1 scheduled on rack2 (which scored higher allocation)",
-					VerifyAssignments: &podgroup.VerifyAssignments{
+					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p1", "p2"},
 						Nodes: sets.New("node3-rack2"),
 					},
@@ -1365,7 +1366,7 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				},
 				{
 					Name: "Verify pods in pg2 scheduled on rack1 (because rack2 is full)",
-					VerifyAssignments: &podgroup.VerifyAssignments{
+					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p4", "p5", "p6"},
 						Nodes: sets.New("node1-rack1", "node2-rack1"),
 					},
@@ -1373,8 +1374,8 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 			},
 		},
 		{
-			Name: "basic podgroup continues to schedule pods when more resources become available",
-			steps: []podgroup.Step{
+			name: "basic podgroup continues to schedule pods when more resources become available",
+			steps: []stepsframework.Step{
 				{
 					Name: "Create nodes in 2 racks, each rack enough to fit 2 pods",
 					CreateNodes: []*v1.Node{
@@ -1421,7 +1422,7 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				},
 				{
 					Name: "Verify that p1 got scheduled on rack1, which scored higher in mostAllocated strategy",
-					VerifyAssignments: &podgroup.VerifyAssignments{
+					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p1"},
 						Nodes: sets.New("node1-rack1"),
 					},
@@ -1440,7 +1441,7 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				},
 				{
 					Name: "Verify that both are on the same rack",
-					VerifyAssignments: &podgroup.VerifyAssignments{
+					VerifyAssignments: &stepsframework.VerifyAssignments{
 						Pods:  []string{"p1", "p2"},
 						Nodes: sets.New("node1-rack1"),
 					},
@@ -1451,7 +1452,7 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 
 	for _, gangSchedulingEnabled := range []bool{true, false} {
 		for _, tt := range tests {
-			t.Run(fmt.Sprintf("%s (GangScheduling enabled: %v)", tt.Name, gangSchedulingEnabled), func(t *testing.T) {
+			t.Run(fmt.Sprintf("%s (GangScheduling enabled: %v)", tt.name, gangSchedulingEnabled), func(t *testing.T) {
 				runTestScenario(t, tt, gangSchedulingEnabled)
 			})
 		}
@@ -1474,8 +1475,12 @@ func runTestScenario(t *testing.T, tt scenario, gangSchedulingEnabled bool) {
 		PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(1).Obj()).
 		Obj()
 
-	workloadStep := []podgroup.Step{{CreateWorkloads: []*schedulingapi.Workload{workload}}}
-	if err := podgroup.RunSteps(testCtx, append(workloadStep, tt.steps...), ns); err != nil {
+	workloadStep := []stepsframework.Step{
+		{
+			Name:            "Creating workload",
+			CreateWorkloads: []*schedulingapi.Workload{workload},
+		}}
+	if err := stepsframework.RunSteps(testCtx, ns, append(workloadStep, tt.steps...)); err != nil {
 		t.Fatal(err)
 	}
 }

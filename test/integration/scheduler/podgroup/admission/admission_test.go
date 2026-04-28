@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	"k8s.io/kubernetes/test/integration/scheduler/podgroup"
+	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
 	testutils "k8s.io/kubernetes/test/integration/util"
 )
 
@@ -47,42 +47,48 @@ func TestPodGroupAdmission(t *testing.T) {
 
 	tests := []struct {
 		name  string
-		steps []podgroup.Step
+		steps []stepsframework.Step
 	}{
 		{
 			name: "PodGroup referencing non-existent Workload is rejected",
-			steps: []podgroup.Step{
+			steps: []stepsframework.Step{
 				{
+					Name:                         "Creating podgroup referencing non-existent workload expecting failure",
 					CreatePodGroupForbiddenError: st.MakePodGroup().Name("pg1").TemplateRef("worker", "non-existent-workload").MinCount(3).Obj(),
 				},
 			},
 		},
 		{
 			name: "PodGroup referencing non-existent template is rejected",
-			steps: []podgroup.Step{
+			steps: []stepsframework.Step{
 				{
+					Name:            "Creating workload",
 					CreateWorkloads: []*schedulingapi.Workload{defaultWorkload},
 				},
 				{
+					Name:                         "Creating podgroup referencing non-existent template expecting failure",
 					CreatePodGroupForbiddenError: st.MakePodGroup().Name("pg1").TemplateRef("non-existent-template", "test-workload").MinCount(3).Obj(),
 				},
 			},
 		},
 		{
 			name: "PodGroup referencing valid Workload and template is accepted",
-			steps: []podgroup.Step{
+			steps: []stepsframework.Step{
 				{
+					Name:            "Creating workload",
 					CreateWorkloads: []*schedulingapi.Workload{defaultWorkload},
 				},
 				{
+					Name:           "Creating podgroup referencing valid workload and template",
 					CreatePodGroup: st.MakePodGroup().Name("pg1").TemplateRef("worker", "test-workload").MinCount(3).Obj(),
 				},
 			},
 		},
 		{
 			name: "PodGroup without templateRef is accepted",
-			steps: []podgroup.Step{
+			steps: []stepsframework.Step{
 				{
+					Name: "Creating podgroup without templateRef",
 					CreatePodGroup: &schedulingapi.PodGroup{
 						ObjectMeta: metav1.ObjectMeta{Name: "pg1"},
 						Spec: schedulingapi.PodGroupSpec{
@@ -96,14 +102,17 @@ func TestPodGroupAdmission(t *testing.T) {
 		},
 		{
 			name: "PodGroup referencing terminating Workload is rejected",
-			steps: []podgroup.Step{
+			steps: []stepsframework.Step{
 				{
+					Name:            "Creating workload",
 					CreateWorkloads: []*schedulingapi.Workload{terminatingWorkload},
 				},
 				{
+					Name:            "Deleting workload",
 					DeleteWorkloads: []*schedulingapi.Workload{terminatingWorkload},
 				},
 				{
+					Name:                         "Creating podgroup referencing terminating workload expecting failure",
 					CreatePodGroupForbiddenError: st.MakePodGroup().Name("pg1").TemplateRef("worker", "test-workload").MinCount(3).Obj(),
 				},
 			},
@@ -117,7 +126,7 @@ func TestPodGroupAdmission(t *testing.T) {
 				scheduler.WithPodInitialBackoffSeconds(0))
 			ns := testCtx.NS.Name
 
-			if err := podgroup.RunSteps(testCtx, tt.steps, ns); err != nil {
+			if err := stepsframework.RunSteps(testCtx, ns, tt.steps); err != nil {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 		})

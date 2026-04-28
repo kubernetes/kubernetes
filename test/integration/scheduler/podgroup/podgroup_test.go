@@ -37,6 +37,7 @@ import (
 
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
 	testutils "k8s.io/kubernetes/test/integration/util"
 	"k8s.io/utils/ptr"
 )
@@ -111,11 +112,11 @@ func TestPodGroupScheduling(t *testing.T) {
 		name                          string
 		enableWorkloadAwarePreemption bool
 		requiresTAS                   bool
-		steps                         []Step
+		steps                         []stepsframework.Step
 	}{
 		{
 			name: "gang schedules when pod group and resources are available",
-			steps: []Step{
+			steps: []stepsframework.Step{
 				{
 					Name:           "Create the PodGroup object",
 					CreatePodGroup: gangPodGroup,
@@ -134,7 +135,7 @@ func TestPodGroupScheduling(t *testing.T) {
 				},
 				{
 					Name: "Verify PodGroup condition is set to Scheduled",
-					WaitForPodGroupCondition: &PodGroupConditionCheck{
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
 						PodGroupName:    "pg1",
 						ConditionStatus: metav1.ConditionTrue,
 						Reason:          "Scheduled",
@@ -144,7 +145,7 @@ func TestPodGroupScheduling(t *testing.T) {
 		},
 		{
 			name: "gang waits for quorum to start, then schedules",
-			steps: []Step{
+			steps: []stepsframework.Step{
 				{
 					Name:           "Create the PodGroup object",
 					CreatePodGroup: gangPodGroup,
@@ -173,7 +174,7 @@ func TestPodGroupScheduling(t *testing.T) {
 		},
 		{
 			name: "gang waits for pod group, then for resources, then schedules",
-			steps: []Step{
+			steps: []stepsframework.Step{
 				{
 					Name:       "Create the resource-blocking pod",
 					CreatePods: []*v1.Pod{blockerPod},
@@ -204,7 +205,7 @@ func TestPodGroupScheduling(t *testing.T) {
 				},
 				{
 					Name: "Verify PodGroup condition is set to Unschedulable",
-					WaitForPodGroupCondition: &PodGroupConditionCheck{
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
 						PodGroupName:    "pg1",
 						ConditionStatus: metav1.ConditionFalse,
 						Reason:          schedulingapi.PodGroupReasonUnschedulable,
@@ -220,7 +221,7 @@ func TestPodGroupScheduling(t *testing.T) {
 				},
 				{
 					Name: "Verify PodGroup condition transitions to Scheduled",
-					WaitForPodGroupCondition: &PodGroupConditionCheck{
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
 						PodGroupName:    "pg1",
 						ConditionStatus: metav1.ConditionTrue,
 						Reason:          "Scheduled",
@@ -230,7 +231,7 @@ func TestPodGroupScheduling(t *testing.T) {
 		},
 		{
 			name: "minCount is scheduled, but one pod from a gang remain unschedulable until the blocked resources are released",
-			steps: []Step{
+			steps: []stepsframework.Step{
 				{
 					Name:       "Create the resource-blocking pod",
 					CreatePods: []*v1.Pod{smallBlockerPod},
@@ -253,7 +254,7 @@ func TestPodGroupScheduling(t *testing.T) {
 				},
 				{
 					Name: "Verify minCount pods is scheduled successfully and one becomes unschedulable (resource-blocking pod is blocking the space)",
-					WaitForAnyPodsScheduled: &WaitForAnyPodsScheduled{
+					WaitForAnyPodsScheduled: &stepsframework.WaitForAnyPodsScheduled{
 						Pods:             []*v1.Pod{p1, p2, p3, p4},
 						NumScheduled:     3,
 						NumUnschedulable: 1,
@@ -271,7 +272,7 @@ func TestPodGroupScheduling(t *testing.T) {
 		},
 		{
 			name: "two gangs competing for the same resources shouldn't deadlock, reversed order",
-			steps: []Step{
+			steps: []stepsframework.Step{
 				{
 					Name:           "Create the PodGroup object",
 					CreatePodGroup: gangPodGroup,
@@ -304,7 +305,7 @@ func TestPodGroupScheduling(t *testing.T) {
 		},
 		{
 			name: "two gangs competing for the same resources shouldn't deadlock",
-			steps: []Step{
+			steps: []stepsframework.Step{
 				{
 					Name:           "Create the PodGroup object",
 					CreatePodGroup: gangPodGroup,
@@ -337,7 +338,7 @@ func TestPodGroupScheduling(t *testing.T) {
 		},
 		{
 			name: "gang schedules with preemption",
-			steps: []Step{
+			steps: []stepsframework.Step{
 				{
 					Name:       "Create a low priority pod taking all resources",
 					CreatePods: []*v1.Pod{lowPriorityBlockerPod},
@@ -364,7 +365,7 @@ func TestPodGroupScheduling(t *testing.T) {
 				},
 				{
 					Name: "Verify PodGroup condition is set to Scheduled after preemption completes",
-					WaitForPodGroupCondition: &PodGroupConditionCheck{
+					WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
 						PodGroupName:    "pg1",
 						ConditionStatus: metav1.ConditionTrue,
 						Reason:          "Scheduled",
@@ -378,7 +379,7 @@ func TestPodGroupScheduling(t *testing.T) {
 		},
 		{
 			name: "basic group schedules when pod group and resources are available, without gang enforcement",
-			steps: []Step{
+			steps: []stepsframework.Step{
 				{
 					Name:           "Create the PodGroup object",
 					CreatePodGroup: basicPodGroup,
@@ -407,7 +408,7 @@ func TestPodGroupScheduling(t *testing.T) {
 		},
 		{
 			name: "basic group waits for pod group, part of it waits for resources, then schedules",
-			steps: []Step{
+			steps: []stepsframework.Step{
 				{
 					Name:       "Create the resource-blocking pod",
 					CreatePods: []*v1.Pod{blockerPod},
@@ -434,7 +435,7 @@ func TestPodGroupScheduling(t *testing.T) {
 				},
 				{
 					Name: "Verify two pods are scheduled successfully and one becomes unschedulable (resource-blocking pod is blocking the space)",
-					WaitForAnyPodsScheduled: &WaitForAnyPodsScheduled{
+					WaitForAnyPodsScheduled: &stepsframework.WaitForAnyPodsScheduled{
 						Pods:             []*v1.Pod{p1, p2, p3},
 						NumScheduled:     2,
 						NumUnschedulable: 1,
@@ -452,7 +453,7 @@ func TestPodGroupScheduling(t *testing.T) {
 		},
 		{
 			name: "basic group schedules with preemption",
-			steps: []Step{
+			steps: []stepsframework.Step{
 				{
 					Name:       "Create a low priority pod taking all resources",
 					CreatePods: []*v1.Pod{lowPriorityBlockerPod},
@@ -485,7 +486,7 @@ func TestPodGroupScheduling(t *testing.T) {
 		},
 		{
 			name: "basic group schedules with workload-aware preemption",
-			steps: []Step{
+			steps: []stepsframework.Step{
 				{
 					Name:       "Create a low priority pod taking all resources",
 					CreatePods: []*v1.Pod{lowPriorityBlockerPod},
@@ -519,7 +520,7 @@ func TestPodGroupScheduling(t *testing.T) {
 		{
 			name:                          "gang schedules with workload-aware preemption",
 			enableWorkloadAwarePreemption: true,
-			steps: []Step{
+			steps: []stepsframework.Step{
 				{
 					Name:       "Create low priority pods that take up all node resources",
 					CreatePods: []*v1.Pod{lowP1, lowP2, lowP3, lowP4},
@@ -553,7 +554,7 @@ func TestPodGroupScheduling(t *testing.T) {
 		{
 			name:                          "gang schedules with partial workload-aware preemption",
 			enableWorkloadAwarePreemption: true,
-			steps: []Step{
+			steps: []stepsframework.Step{
 				{
 					Name:       "Create very low and low priority pods that take up all node resources",
 					CreatePods: []*v1.Pod{veryLowP1, veryLowP2, lowP1, lowP2},
@@ -587,7 +588,7 @@ func TestPodGroupScheduling(t *testing.T) {
 		{
 			name:        "tas gang with constraint does not use pod by pod preemption",
 			requiresTAS: true,
-			steps: []Step{
+			steps: []stepsframework.Step{
 				{
 					Name:       "Create very low and low priority pods that take up all node resources",
 					CreatePods: []*v1.Pod{veryLowP1, veryLowP2, lowP1, lowP2},
@@ -618,7 +619,7 @@ func TestPodGroupScheduling(t *testing.T) {
 			name:                          "tas gang with constraint does not use workload preemption",
 			enableWorkloadAwarePreemption: true,
 			requiresTAS:                   true,
-			steps: []Step{
+			steps: []stepsframework.Step{
 				{
 					Name:       "Create very low and low priority pods that take up all node resources",
 					CreatePods: []*v1.Pod{veryLowP1, veryLowP2, lowP1, lowP2},
@@ -668,7 +669,7 @@ func TestPodGroupScheduling(t *testing.T) {
 
 				ns := testCtx.NS.Name
 
-				commonSteps := []Step{
+				commonSteps := []stepsframework.Step{
 					{
 						Name:        "Create Nodes",
 						CreateNodes: []*v1.Node{node},
@@ -679,7 +680,7 @@ func TestPodGroupScheduling(t *testing.T) {
 					},
 				}
 
-				if err := RunSteps(testCtx, append(commonSteps, tt.steps...), ns); err != nil {
+				if err := stepsframework.RunSteps(testCtx, ns, append(commonSteps, tt.steps...)); err != nil {
 					t.Fatal(err)
 				}
 			})
@@ -720,7 +721,7 @@ func TestWorkloadAwarePreemptionInvocation(t *testing.T) {
 		scheduler.WithPodInitialBackoffSeconds(0))
 	ns := testCtx.NS.Name
 
-	steps := []Step{
+	steps := []stepsframework.Step{
 		{
 			Name:        "Create node",
 			CreateNodes: []*v1.Node{node},
@@ -751,7 +752,7 @@ func TestWorkloadAwarePreemptionInvocation(t *testing.T) {
 		},
 	}
 
-	if err := RunSteps(testCtx, steps, ns); err != nil {
+	if err := stepsframework.RunSteps(testCtx, ns, steps); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -784,7 +785,7 @@ func TestPostFilterInvocationCount(t *testing.T) {
 		st.MakePod().Namespace("default").Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(100).Obj(),
 	}
 
-	mockPlugin := &MockPostFilterPlugin{}
+	mockPlugin := &stepsframework.MockPostFilterPlugin{}
 	registry := frameworkruntime.Registry{
 		"MockPostFilter": func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 			return mockPlugin, nil
@@ -813,7 +814,7 @@ func TestPostFilterInvocationCount(t *testing.T) {
 	)
 	ns := testCtx.NS.Name
 
-	steps := []Step{
+	steps := []stepsframework.Step{
 		{
 			Name:        "Create node",
 			CreateNodes: []*v1.Node{node},
@@ -842,14 +843,14 @@ func TestPostFilterInvocationCount(t *testing.T) {
 			// It should be called for each pod from pod group in pod group cycle
 			// but should not be called in WAP.
 			Name: "Verify MockPostFilter was called 3 times",
-			VerifyMockPostFilterPluginCalled: &VerifyMockPostFilterPluginCalled{
+			VerifyMockPostFilterPluginCalled: &stepsframework.VerifyMockPostFilterPluginCalled{
 				Called: 3,
 				Mock:   mockPlugin,
 			},
 		},
 	}
 
-	if err := RunSteps(testCtx, steps, ns); err != nil {
+	if err := stepsframework.RunSteps(testCtx, ns, steps); err != nil {
 		t.Fatal(err)
 	}
 }
