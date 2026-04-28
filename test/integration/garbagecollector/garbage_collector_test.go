@@ -47,10 +47,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/klog/v2"
-	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/integration/kubeapiservertesting"
 	"k8s.io/kubernetes/testutils/ktesting"
 	"k8s.io/utils/ptr"
 )

@@ -43,9 +43,9 @@ import (
 	clienttypedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/integration/kubeapiservertesting"
 	"k8s.io/kubernetes/testutils/ktesting"
 )
 

@@ -33,8 +33,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
-	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	apiservertesting "k8s.io/kubernetes/test/integration/kubeapiservertesting"
 )
 
 // TestApplyCRDNoSchema tests that CRDs and CRs can both be applied to with a PATCH request with the apply content type

@@ -45,8 +45,8 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeletportforward "k8s.io/cri-streaming/pkg/streaming/portforward"
 	"k8s.io/kubectl/pkg/cmd/portforward"
-	kastesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	kastesting "k8s.io/kubernetes/test/integration/kubeapiservertesting"
 
 	"k8s.io/kubernetes/test/integration/framework"
 )

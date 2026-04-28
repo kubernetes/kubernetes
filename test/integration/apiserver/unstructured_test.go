@@ -30,8 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	appsv1applyconfigurations "k8s.io/client-go/applyconfigurations/apps/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/integration/kubeapiservertesting"
 )
 
 // TestRequestObjectConvertibleToUnstructured tests that write requests fail if the request object

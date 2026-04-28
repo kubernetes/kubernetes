@@ -32,8 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
-	apitesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	apitesting "k8s.io/kubernetes/test/integration/kubeapiservertesting"
 )
 
 func makeGVR(group, version, resource string) schema.GroupVersionResource {

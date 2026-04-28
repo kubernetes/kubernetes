@@ -42,8 +42,8 @@ import (
 	"k8s.io/client-go/util/cert"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
-	kastesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
+	kastesting "k8s.io/kubernetes/test/integration/kubeapiservertesting"
 
 	"k8s.io/kubernetes/test/integration/framework"
 	testutil "k8s.io/kubernetes/testutils"

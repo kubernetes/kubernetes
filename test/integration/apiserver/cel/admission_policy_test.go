@@ -34,12 +34,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	admissionregistrationv1apis "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
 	admissionregistrationv1beta1apis "k8s.io/kubernetes/pkg/apis/admissionregistration/v1beta1"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
+	apiservertesting "k8s.io/kubernetes/test/integration/kubeapiservertesting"
 	"k8s.io/kubernetes/testutils/ktesting"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

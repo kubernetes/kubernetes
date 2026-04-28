@@ -34,8 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
-	kubeapiserverapptesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	kubeapiserverapptesting "k8s.io/kubernetes/test/integration/kubeapiservertesting"
 	utilsoidc "k8s.io/kubernetes/test/utils/oidc"
 	"k8s.io/kubernetes/testutils"
 )

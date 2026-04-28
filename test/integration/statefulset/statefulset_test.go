@@ -36,11 +36,11 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/statefulset"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/test/integration/framework"
+	apiservertesting "k8s.io/kubernetes/test/integration/kubeapiservertesting"
 	"k8s.io/kubernetes/testutils/ktesting"
 	"k8s.io/utils/ptr"
 )

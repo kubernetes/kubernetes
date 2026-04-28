@@ -34,9 +34,9 @@ import (
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregator "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	"k8s.io/kube-openapi/pkg/validation/spec"
-	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	testdiscovery "k8s.io/kubernetes/test/integration/apiserver/discovery"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/integration/kubeapiservertesting"
 )
 
 func TestSlowAPIServiceOpenAPIDoesNotBlockHealthCheck(t *testing.T) {

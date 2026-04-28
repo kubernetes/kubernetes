@@ -34,8 +34,8 @@ import (
 	servicecontroller "k8s.io/cloud-provider/controllers/service"
 	fakecloud "k8s.io/cloud-provider/fake"
 	controllersmetrics "k8s.io/component-base/metrics/prometheus/controllers"
-	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/integration/kubeapiservertesting"
 	"k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 )

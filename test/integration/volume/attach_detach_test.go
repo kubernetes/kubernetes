@@ -32,7 +32,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	basemetric "k8s.io/component-base/metrics"
 	metricstestutil "k8s.io/component-base/metrics/testutil"
-	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/podgc"
 	podgcmetrics "k8s.io/kubernetes/pkg/controller/podgc/metrics"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
@@ -44,6 +43,7 @@ import (
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/integration/kubeapiservertesting"
 	"k8s.io/kubernetes/testutils/ktesting"
 )
 

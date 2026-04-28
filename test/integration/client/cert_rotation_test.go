@@ -37,8 +37,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/cert"
-	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	apiservertesting "k8s.io/kubernetes/test/integration/kubeapiservertesting"
 	utils "k8s.io/kubernetes/testutils"
 )
 

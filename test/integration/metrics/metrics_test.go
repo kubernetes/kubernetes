@@ -43,8 +43,8 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
-	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/integration/kubeapiservertesting"
 )
 
 func scrapeMetrics(s *kubeapiservertesting.TestServer) (testutil.Metrics, error) {

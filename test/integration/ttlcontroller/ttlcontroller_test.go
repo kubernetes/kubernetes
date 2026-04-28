@@ -33,9 +33,9 @@ import (
 	listers "k8s.io/client-go/listers/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/klog/v2/ktesting"
-	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/ttl"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/integration/kubeapiservertesting"
 )
 
 func createClientAndInformers(t *testing.T, server *kubeapiservertesting.TestServer) (*clientset.Clientset, informers.SharedInformerFactory) {
