@@ -254,3 +254,29 @@ func TestResolveNameAndNamespace(t *testing.T) {
 		})
 	}
 }
+
+func TestDefaultResourceForGVK(t *testing.T) {
+	tests := []struct {
+		kind    string
+		wantRes string
+	}{
+		{kind: "Pod", wantRes: "pods"},
+		{kind: "Service", wantRes: "services"},
+		{kind: "Deployment", wantRes: "deployments"},
+		{kind: "Ingress", wantRes: "ingresses"},
+		{kind: "NetworkPolicy", wantRes: "networkpolicies"},
+		{kind: "DaemonSet", wantRes: "daemonsets"},
+		{kind: "ConfigMap", wantRes: "configmaps"},
+		{kind: "Endpoints", wantRes: "endpointses"}, // naive but consistent for sibilant ending
+		{kind: "", wantRes: "objects"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.kind, func(t *testing.T) {
+			gvk := schema.GroupVersionKind{Version: "v1", Kind: tt.kind}
+			gvr := defaultResourceForGVK(gvk)
+			if gvr.Resource != tt.wantRes {
+				t.Errorf("defaultResourceForGVK(%q) = %q, want %q", tt.kind, gvr.Resource, tt.wantRes)
+			}
+		})
+	}
+}
