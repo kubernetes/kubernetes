@@ -82,6 +82,12 @@ func TestDeviceTaintRuleStrategy(t *testing.T) {
 	if Strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("DeviceTaintRule should not allow create on update")
 	}
+	if !Strategy.AllowUnconditionalUpdate(context.Background()) {
+		t.Errorf("DeviceTaintRule should allow update without ResourceVersion when the APIVersion is not v1")
+	}
+	if Strategy.AllowCreateOnUpdate(genericapirequest.WithRequestInfo(context.Background(), &genericapirequest.RequestInfo{APIVersion: "v1"})) {
+		t.Errorf("DeviceTaintRule should not allow update without ResourceVersion when the APIVersion is v1")
+	}
 }
 
 func TestDeviceTaintRuleStrategyCreate(t *testing.T) {
