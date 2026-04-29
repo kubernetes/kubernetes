@@ -69,15 +69,15 @@ and ```cpu-<id>.out```, where ```<id>``` is the argument value. Typicall pattern
 of nodes being simulated as the id, or 'all' in case running the full suite.
 
 ### Custom Test Configuration
-It's also possible to run a custom test configuration by passing the -c option. With this option, it then
+It's also possible to run a custom test configuration by passing the -c option. With this option, it is
 possible to specify the number of nodes to simulate and the API server qps values for creation,
-IPAM allocation and cloud endpoint, along with the allocator name to run. The defaults values for the
-qps parmeters are 30 for IPAM allocation, 100 for node creation and 30 for the cloud endpoint, and the
+IPAM allocation and cloud endpoint, along with the allocator name to run. The default values for the
+qps parameters are 30 for IPAM allocation, 100 for node creation and 30 for the cloud endpoint, and the
 default allocator is the RangeAllocator.
 
 Code Organization
 -----
 The core of the tests are defined in [ipam_test.go](ipam_test.go), using the t.Run() helper to control parallelism
-as we want to able to start the master once. [cloud.go](cloud.go) contains the mock of the cloud server endpoint
+as we want to be able to start the master once. [cloud.go](cloud.go) contains the mock of the cloud server endpoint
 and can be configured to behave differently as needed by the various modes. The tracking of the node behavior and
 creation of the test results data is in [results.go](results.go).
