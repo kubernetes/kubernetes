@@ -50,6 +50,11 @@ const (
 // NestedPendingOperations defines the supported set of operations.
 type NestedPendingOperations interface {
 
+	// SetOperationCompletionCallback registers a callback that is invoked whenever an operation
+	// completes (whether successfully or with an error). The callback must be
+	// non-blocking. It is called without any internal locks held.
+	SetOperationCompletionCallback(fn func())
+
 	// Run adds the concatenation of volumeName, podName, and nodeName to the list
 	// of running operations and spawns a new go routine to run
 	// generatedOperations.
@@ -130,6 +135,7 @@ type nestedPendingOperations struct {
 	exponentialBackOffOnError bool
 	cond                      *sync.Cond
 	lock                      sync.RWMutex
+	onOperationCompletion     func()
 }
 
 type operation struct {
@@ -192,6 +198,22 @@ func (grm *nestedPendingOperations) Run(
 
 	return nil
 }
+
+// SetOperationCompletionCallback registers a callback that is invoked whenever an operation
+// completes (whether successfully or with an error). The callback must be
+// non-blocking.
+func (grm *nestedPendingOperations) SetOperationCompletionCallback(fn func()) {
+	grm.lock.Lock()
+	defer grm.lock.Unlock()
+
+	if grm.onOperationCompletion != nil {
+		// We could support a list of callbacks, but we don't need it today.
+		// It's better to know if we have a bug with multiple "watchers" here.
+		panic("AddOperationCompletionListener callback is already set")
+	}
+	grm.onOperationCompletion = fn
+}
+
 func (grm *nestedPendingOperations) IsOperationSafeToRetry(
 	volumeName v1.UniqueVolumeName,
 	podName volumetypes.UniquePodName,
@@ -328,25 +350,27 @@ func (grm *nestedPendingOperations) operationComplete(key operationKey, err *err
 			// Log error
 			klog.Errorf("operation %+v failed with: %v", key, *err)
 		}
-		return
+	} else {
+		// Operation completed with error and exponentialBackOffOnError Enabled
+		existingOpIndex, getOpErr := grm.getOperation(key)
+		if getOpErr != nil {
+			// Failed to find existing operation
+			klog.Errorf("Operation %+v completed. error: %v. exponentialBackOffOnError is enabled, but failed to get operation to update.",
+				key,
+				*err)
+		} else {
+			grm.operations[existingOpIndex].expBackoff.Update(err)
+			grm.operations[existingOpIndex].operationPending = false
+
+			// Log error
+			klog.Errorf("%v", grm.operations[existingOpIndex].expBackoff.
+				GenerateNoRetriesPermittedMsg(fmt.Sprintf("%+v", key)))
+		}
 	}
 
-	// Operation completed with error and exponentialBackOffOnError Enabled
-	existingOpIndex, getOpErr := grm.getOperation(key)
-	if getOpErr != nil {
-		// Failed to find existing operation
-		klog.Errorf("Operation %+v completed. error: %v. exponentialBackOffOnError is enabled, but failed to get operation to update.",
-			key,
-			*err)
-		return
+	if grm.onOperationCompletion != nil {
+		grm.onOperationCompletion()
 	}
-
-	grm.operations[existingOpIndex].expBackoff.Update(err)
-	grm.operations[existingOpIndex].operationPending = false
-
-	// Log error
-	klog.Errorf("%v", grm.operations[existingOpIndex].expBackoff.
-		GenerateNoRetriesPermittedMsg(fmt.Sprintf("%+v", key)))
 }
 
 func (grm *nestedPendingOperations) Wait() {

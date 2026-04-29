@@ -1129,6 +1129,8 @@ func kubeClientConfigOverrides(s *options.KubeletServer, clientConfig *restclien
 	// Override kubeconfig qps/burst settings from flags
 	clientConfig.QPS = float32(s.KubeAPIQPS)
 	clientConfig.Burst = int(s.KubeAPIBurst)
+
+	klog.Infof("client QPS set to %v, client Burst set to %d, content type set to %s", clientConfig.QPS, clientConfig.Burst, clientConfig.ContentType)
 }
 
 // InitializeTLS checks for a configured TLSCertFile and TLSPrivateKeyFile: if unspecified a new self-signed

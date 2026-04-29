@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -86,8 +87,9 @@ var _ = SIGDescribe("Density", framework.WithSerial(), framework.WithSlow(), fun
 		// "kubelet" 0.009 0.082 0.082 0.082 0.101
 		dTests := []densityTest{
 			{
-				podsNr:   10,
-				interval: 0 * time.Millisecond,
+				podsNr:      10,
+				interval:    0 * time.Millisecond,
+				APIQPSLimit: 1000,
 				cpuLimits: e2ekubelet.ContainersCPUSummary{
 					kubeletstatsv1alpha1.SystemContainerKubelet: {0.50: 0.1, 0.95: 0.20},
 					kubeletstatsv1alpha1.SystemContainerRuntime: {0.50: 0.1, 0.95: 1.5},
@@ -109,6 +111,13 @@ var _ = SIGDescribe("Density", framework.WithSerial(), framework.WithSlow(), fun
 
 		for _, testArg := range dTests {
 			itArg := testArg
+
+			tempSetCurrentKubeletConfig(f, func(ctx context.Context, cfg *kubeletconfig.KubeletConfiguration) {
+				framework.Logf("Old QPS limit is: %d", cfg.KubeAPIQPS)
+				// Set new API QPS limit
+				cfg.KubeAPIQPS = int32(itArg.APIQPSLimit)
+			})
+
 			desc := fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval", itArg.podsNr, itArg.interval)
 			ginkgo.It(desc, func(ctx context.Context) {
 				itArg.createMethod = "batch"
@@ -347,6 +356,15 @@ func runDensityBatchTest(ctx context.Context, f *framework.Framework, rc *Resour
 	// create test pod data structure
 	pods := newTestPods(testArg.podsNr, true, imageutils.GetPauseImageName(), podType)
 
+	// Make sure we set ImagePullPolicy to 'PullNever' for all containers, otherwise the pod creation may be delayed by pulling image.
+	// The Pause image should be present; if not, the test will fail with image pull error.
+	for _, pod := range pods {
+		for i := range pod.Spec.Containers {
+			container := &pod.Spec.Containers[i]
+			container.ImagePullPolicy = v1.PullNever
+		}
+	}
+
 	// the controller watches the change of pod status
 	controller := newInformerWatchPod(ctx, f, mutex, watchTimes, podType)
 	go controller.Run(stopCh)
@@ -456,7 +474,9 @@ func createBatchPodWithRateControl(ctx context.Context, f *framework.Framework, 
 	for i := range pods {
 		pod := pods[i]
 		createTimes[pod.ObjectMeta.Name] = metav1.Now()
-		go e2epod.NewPodClient(f).Create(ctx, pod)
+		klog.Infof("Pod %s before create", pod.Name)
+		e2epod.NewPodClient(f).Create(ctx, pod)
+		klog.Infof("Pod %s created", pod.Name)
 		time.Sleep(interval)
 	}
 	return createTimes
@@ -518,6 +538,7 @@ func newInformerWatchPod(ctx context.Context, f *framework.Framework, mutex *syn
 				if !ok {
 					framework.Failf("Failed to cast object %T to Pod", obj)
 				}
+				klog.Infof("Pod %s observed by the watch (created)", p.Name)
 				go checkPodRunning(p)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
@@ -525,6 +546,7 @@ func newInformerWatchPod(ctx context.Context, f *framework.Framework, mutex *syn
 				if !ok {
 					framework.Failf("Failed to cast object %T to Pod", newObj)
 				}
+				klog.Infof("Pod %s observed by the watch (update; state=%v)", p.Name, p.Status.Phase)
 				go checkPodRunning(p)
 			},
 		},

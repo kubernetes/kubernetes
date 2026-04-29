@@ -112,6 +112,7 @@ func NewDesiredStateOfWorldPopulator(
 		actualStateOfWorld:  actualStateOfWorld,
 		pods: processedPods{
 			processedPods: make(map[volumetypes.UniquePodName]bool)},
+		pokeCh:                   make(chan struct{}, 1),
 		hasAddedPods:             false,
 		hasAddedPodsLock:         sync.RWMutex{},
 		csiMigratedPluginManager: csiMigratedPluginManager,
@@ -133,6 +134,11 @@ type desiredStateOfWorldPopulator struct {
 	csiMigratedPluginManager csimigration.PluginManager
 	intreeToCSITranslator    csimigration.InTreeToCSITranslator
 	volumePluginMgr          *volume.VolumePluginMgr
+
+	// pokeCh is a buffered channel (capacity 1) used to wake up the
+	// populator loop immediately when there is new work (e.g. a pod
+	// needs reprocessing), rather than waiting for the next periodic tick.
+	pokeCh chan struct{}
 }
 
 type processedPods struct {
@@ -155,12 +161,27 @@ func (dswp *desiredStateOfWorldPopulator) Run(ctx context.Context, sourcesReady 
 		dswp.hasAddedPods = true
 	}
 	dswp.hasAddedPodsLock.Unlock()
-	wait.UntilWithContext(ctx, dswp.populatorLoop, dswp.loopSleepDuration)
+	for {
+		dswp.populatorLoop(ctx)
+		select {
+		case <-ctx.Done():
+			return
+		case <-dswp.pokeCh:
+			// Woken up early because a pod needs reprocessing.
+		case <-time.After(dswp.loopSleepDuration):
+		}
+	}
 }
 
 func (dswp *desiredStateOfWorldPopulator) ReprocessPod(
 	podName volumetypes.UniquePodName) {
 	dswp.markPodProcessingFailed(podName)
+	// Wake the populator loop so the pod is reprocessed immediately
+	// rather than waiting for the next periodic tick.
+	select {
+	case dswp.pokeCh <- struct{}{}:
+	default:
+	}
 }
 
 func (dswp *desiredStateOfWorldPopulator) HasAddedPods() bool {
