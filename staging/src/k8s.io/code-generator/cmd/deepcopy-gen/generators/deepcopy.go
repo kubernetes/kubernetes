@@ -18,6 +18,7 @@ package generators
 
 import (
 	"fmt"
+	gotypes "go/types"
 	"io"
 	"path"
 	"sort"
@@ -382,6 +383,26 @@ func underlyingType(t *types.Type) *types.Type {
 		t = t.Underlying
 	}
 	return t
+}
+
+func (g *genDeepCopy) hasInaccessibleFields(t *types.Type) bool {
+	if t == nil || t.GoType == nil {
+		return false
+	}
+	s, _ := t.GoType.Underlying().(*gotypes.Struct)
+	if s == nil {
+		return false
+	}
+	for i := range t.Members {
+		if i >= s.NumFields() {
+			break
+		}
+		f := s.Field(i)
+		if !f.Exported() && f.Pkg() != nil && f.Pkg().Path() != g.targetPackage {
+			return true
+		}
+	}
+	return false
 }
 
 func (g *genDeepCopy) isOtherPackage(pkg string) bool {
@@ -794,6 +815,10 @@ func (g *genDeepCopy) doStruct(t *types.Type, sw *generator.SnippetWriter) {
 
 	// Simple copy covers a lot of cases.
 	sw.Do("*out = *in\n", nil)
+
+	if g.hasInaccessibleFields(ut) {
+		return
+	}
 
 	// Now fix-up fields as needed.
 	for _, m := range ut.Members {

@@ -23,3 +23,12 @@ type Object interface {
 type List interface {
 	DeepCopyList() List
 }
+
+// OpaqueStruct has an inaccessible field and may only be shallow coppied.
+type OpaqueStruct struct {
+	value *string
+}
+
+func (o OpaqueStruct) GetValue() *string { // To appease "field value is unused" lint
+	return o.value
+}

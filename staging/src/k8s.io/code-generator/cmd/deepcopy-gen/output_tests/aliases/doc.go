@@ -19,6 +19,10 @@ limitations under the License.
 // This is a test package.
 package aliases
 
+import "k8s.io/code-generator/cmd/deepcopy-gen/output_tests/otherpkg"
+
+type AliasOpaqueStruct otherpkg.OpaqueStruct
+
 // Note: the following AliasInterface and AliasAliasInterface +k8s:deepcopy-gen:interfaces tags
 // are necessary because Golang flattens interface alias in the type system. I.e. an alias J of
 // an interface I is actually equivalent to I. So support deepcopies of those aliases, we have
