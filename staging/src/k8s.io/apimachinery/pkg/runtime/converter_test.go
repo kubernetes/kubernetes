@@ -176,7 +176,7 @@ type PrivateFieldsObject struct {
 
 type PrivateFieldsSpec struct {
 	Hidden  []byte `json:"-"`
-	private []byte `json:"private"`
+	private []byte
 	Visible string `json:"visible"`
 }
 
