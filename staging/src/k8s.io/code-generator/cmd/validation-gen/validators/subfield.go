@@ -126,7 +126,8 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 		if scope == ParentContext {
 			return fn
 		}
-		f := Function(subfieldTagName, fn.Flags, validateSubfield, subname, getFn, equivArg, WrapperFunction{fn, submemb.Type})
+		f := Function(subfieldTagName, fn.Flags, validateSubfield, subname, getFn, equivArg,
+			WrapperFunction{Function: fn, ObjType: submemb.Type, PathFragment: "." + subname})
 		f.Cohort = subname
 		return f
 	})
