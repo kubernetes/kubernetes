@@ -1,0 +1,80 @@
+# Suppressions for the declarative-validation coverage verifier.
+#
+# Each entry filters Uncovered rules by literal-equality on the named fields.
+# Any empty field acts as a wildcard. Combine fields to narrow the scope.
+# `reason` is required and read by sig-api-machinery reviewers — explain
+# why the rule cannot (or should not) be covered by a test.
+#
+# Available fields:
+#   group, version, kind  — GVK selector
+#   path                  — exact field path emitted by validation-gen
+#                           (e.g. "spec.config[*].opaque.driver")
+#   errorType             — field.Error type (e.g. FieldValueRequired,
+#                           FieldValueInvalid, FieldValueNotSupported,
+#                           FieldValueTooLong, FieldValueForbidden)
+#   origin                — origin tag from .WithOrigin (e.g. "minimum",
+#                           "maxLength", "format=k8s-long-name"). Empty
+#                           string matches rules without an origin.
+#   reason                — required, free-form
+#
+# Examples:
+#
+# 1) Whole group/version (use sparingly — see extensions/v1beta1 below):
+#
+#    - group: extensions
+#      version: v1beta1
+#      reason: deprecated group, not served
+#
+# 2) One specific field/error combination on a single Kind:
+#
+#    - group: autoscaling
+#      version: v1
+#      kind: Scale
+#      path: spec.replicas
+#      errorType: FieldValueInvalid
+#      origin: minimum
+#      reason: |
+#        Scale subresource is exercised through HPA tests, not as a
+#        standalone object; minimum-replicas check is covered indirectly.
+#
+# 3) Every error on one path (omit errorType / origin):
+#
+#    - group: resource.k8s.io
+#      version: v1
+#      kind: ResourceClaim
+#      path: status.allocation.devices.config[*].opaque.driver
+#      reason: tracked in #NNNNN — adding status fixture for opaque.driver
+#
+# 4) All rules with a particular origin across a Kind:
+#
+#    - kind: PriorityLevelConfiguration
+#      errorType: FieldValueRequired
+#      reason: discriminator-required gap; awaiting imperative fix
+#
+# Run hack/verify-declarative-validation-coverage.sh after editing.
+
+- group: extensions
+  version: v1beta1
+  reason: Not served by kube-apiserver.
+
+- kind: Scale
+  path: spec.replicas
+  errorType: FieldValueInvalid
+  origin: minimum
+  reason: Scale subresource has no dedicated Strategy; tested separately.
+
+- group: scheduling.k8s.io
+  version: v1alpha2
+  kind: PodGroup
+  path: spec.priority
+  errorType: FieldValueInvalid
+  origin: minimum
+  reason: Unreachable constraint (+k8s:minimum=-2147483648 on int32 = math.MinInt32).
+
+- group: scheduling.k8s.io
+  version: v1alpha2
+  kind: Workload
+  path: spec.podGroupTemplates[*].priority
+  errorType: FieldValueInvalid
+  origin: minimum
+  reason: Unreachable constraint (+k8s:minimum=-2147483648 on int32 = math.MinInt32).
