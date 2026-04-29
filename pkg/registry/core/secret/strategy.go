@@ -21,7 +21,6 @@ import (
 	"crypto/tls"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -60,8 +59,7 @@ func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	newSecret := obj.(*api.Secret)
-	allErrs := validation.ValidateSecret(newSecret)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newSecret, nil, allErrs, operation.Create, rest.DeclarativeValidationConfig{})
+	return validation.ValidateSecret(newSecret)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -91,8 +89,7 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newSecret := obj.(*api.Secret)
 	oldSecret := old.(*api.Secret)
-	allErrs := validation.ValidateSecretUpdate(newSecret, oldSecret)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newSecret, oldSecret, allErrs, operation.Update, rest.DeclarativeValidationConfig{})
+	return validation.ValidateSecretUpdate(newSecret, oldSecret)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
