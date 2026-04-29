@@ -19,8 +19,14 @@ package testing
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"reflect"
+	"slices"
 	"sort"
 	"strconv"
+	"sync"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/operation"
@@ -29,10 +35,12 @@ import (
 	runtimetest "k8s.io/apimachinery/pkg/runtime/testing"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/version"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	validationmetrics "k8s.io/apiserver/pkg/validation"
+	"k8s.io/code-generator/pkg/guardrails"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
@@ -294,7 +302,7 @@ func VerifyValidationEquivalence(t *testing.T, ctx context.Context, obj runtime.
 			errs = dv.ValidateDeclaratively(c, obj, nil, errs, operation.Create, dv.DeclarativeValidationConfig(c, obj, nil))
 		}
 		return errs
-	}, ctx, opts)
+	}, ctx, opts, obj)
 	VerifyVersionedValidationEquivalence(t, obj, nil, testConfigs...)
 }
 
@@ -329,12 +337,12 @@ func VerifyUpdateValidationEquivalence(t *testing.T, ctx context.Context, obj, o
 			errs = dv.ValidateDeclaratively(c, obj, old, errs, operation.Update, dv.DeclarativeValidationConfig(c, obj, old))
 		}
 		return errs
-	}, ctx, opts)
+	}, ctx, opts, obj)
 	VerifyVersionedValidationEquivalence(t, obj, old, testConfigs...)
 }
 
 // verifyValidationEquivalence is a generic helper that verifies validation equivalence with and without declarative validation.
-func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, runValidations func(context.Context) field.ErrorList, ctx context.Context, opt *validationOption) {
+func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, runValidations func(context.Context) field.ErrorList, ctx context.Context, opt *validationOption, obj runtime.Object) {
 	t.Helper()
 	var declarativeBetaEnabledErrs field.ErrorList
 	var declarativeBetaDisabledErrs field.ErrorList
@@ -433,6 +441,13 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 				filteredExpectedErrors = append(filteredExpectedErrors, err)
 			}
 		}
+		// Capture the full set of declarative errors (incl. Alpha) so the
+		// rule-coverage verifier can diff them against the rules declared
+		// by validation-gen --report-rules.
+		if dir := os.Getenv("VALIDATION_RULES_REPORT_DIR"); dir != "" {
+			reportRules(t, dir, ctx, obj, allDeclarativeErrs)
+		}
+
 		// The matcher here is more specific to ensure that errors from Alpha rules
 		// are included and matched correctly.
 		// This also ensure that errors are coming from the declarative validations only.
@@ -489,4 +504,78 @@ func deDuplicateErrors(errs field.ErrorList, matcher field.ErrorMatcher) field.E
 		}
 	}
 	return deduped
+}
+
+// reports accumulates the rules observed during this test process — same
+// shape as validation-gen --report-rules output, so the coverage verifier
+// can diff the two. Rewritten to disk after each update; the verifier
+// normalizes raw runtime paths ("[0]", "[my-key]" → "[*]") before diffing.
+var (
+	reports   []*guardrails.Report
+	reportsMu sync.Mutex
+)
+
+func reportRules(t *testing.T, dir string, ctx context.Context, obj runtime.Object, errs field.ErrorList) {
+	info, ok := genericapirequest.RequestInfoFrom(ctx)
+	if !ok {
+		return
+	}
+	// Prefer the scheme's canonical Kind; fall back to the Go type name.
+	kind := reflect.TypeOf(obj).Elem().Name()
+	if gvks, _, err := legacyscheme.Scheme.ObjectKinds(obj); err == nil && len(gvks) > 0 {
+		kind = gvks[0].Kind
+	}
+
+	reportsMu.Lock()
+	defer reportsMu.Unlock()
+
+	// Find or create the (group, version) entry.
+	var r *guardrails.Report
+	for _, existing := range reports {
+		if existing.Group == info.APIGroup && existing.Version == info.APIVersion {
+			r = existing
+			break
+		}
+	}
+	if r == nil {
+		r = &guardrails.Report{
+			Group:   info.APIGroup,
+			Version: info.APIVersion,
+			Kinds:   map[string]map[string][]guardrails.Rule{},
+		}
+		reports = append(reports, r)
+	}
+	fields, ok := r.Kinds[kind]
+	if !ok {
+		fields = map[string][]guardrails.Rule{}
+		r.Kinds[kind] = fields
+	}
+	added := false
+	for _, e := range errs {
+		rule := guardrails.Rule{ErrorType: string(e.Type), Origin: e.Origin}
+		if !slices.Contains(fields[e.Field], rule) {
+			fields[e.Field] = append(fields[e.Field], rule)
+			added = true
+		}
+	}
+	if !added {
+		return
+	}
+
+	out, err := json.MarshalIndent(reports, "", "  ")
+	if err != nil {
+		t.Logf("VALIDATION_RULES_REPORT_DIR marshal failed: %v", err)
+		return
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Logf("VALIDATION_RULES_REPORT_DIR mkdir failed: %v", err)
+		return
+	}
+	pkgName := "unknown"
+	if cwd, err := os.Getwd(); err == nil {
+		pkgName = filepath.Base(cwd)
+	}
+	if err := os.WriteFile(filepath.Join(dir, pkgName+".json"), append(out, '\n'), 0o644); err != nil {
+		t.Logf("VALIDATION_RULES_REPORT_DIR write failed: %v", err)
+	}
 }
