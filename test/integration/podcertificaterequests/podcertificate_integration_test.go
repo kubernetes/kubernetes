@@ -295,7 +295,8 @@ func TestNodeRestriction(t *testing.T) {
 		err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
 			_, err = node1Client.CertificatesV1beta1().PodCertificateRequests("default").Create(ctx, pcr, metav1.CreateOptions{})
 			if err != nil {
-				return false, err
+				t.Logf("Create PodCertificateRequest default/pcr1 as node1 failed with error: %v, retrying...", err)
+				return false, nil
 			}
 			return true, nil
 		})
@@ -335,7 +336,10 @@ func TestNodeRestriction(t *testing.T) {
 			if err == nil || k8serrors.IsForbidden(err) {
 				return true, err
 			}
-			return false, err
+			if err != nil {
+				t.Logf("Create PodCertificateRequest default/pcr1 as node2 failed with error: %v, retrying...", err)
+			}
+			return false, nil
 		})
 		if err == nil {
 			t.Fatalf("PCR creation unexpectedly succeeded")
@@ -736,7 +740,8 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
 		_, err = node1Client.CertificatesV1beta1().PodCertificateRequests("bar").Create(ctx, pcrBarFoo, metav1.CreateOptions{})
 		if err != nil {
-			return false, err
+			t.Logf("Create PodCertificateRequest bar/foo as node1 failed with error: %v, retrying...", err)
+			return false, nil
 		}
 		return true, nil
 	})
@@ -769,7 +774,8 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
 		_, err = node2Client.CertificatesV1beta1().PodCertificateRequests("foo").Create(ctx, pcrFooBar, metav1.CreateOptions{})
 		if err != nil {
-			return false, err
+			t.Logf("Create PodCertificateRequest foo/bar as node2 failed with error: %v, retrying...", err)
+			return false, nil
 		}
 		return true, nil
 	})
