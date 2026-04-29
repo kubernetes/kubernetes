@@ -61,7 +61,7 @@ func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	newSecret := obj.(*api.Secret)
 	allErrs := validation.ValidateSecret(newSecret)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newSecret, nil, allErrs, operation.Create)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newSecret, nil, allErrs, operation.Create, rest.DeclarativeValidationConfig{})
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -92,7 +92,7 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 	newSecret := obj.(*api.Secret)
 	oldSecret := old.(*api.Secret)
 	allErrs := validation.ValidateSecretUpdate(newSecret, oldSecret)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newSecret, oldSecret, allErrs, operation.Update)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newSecret, oldSecret, allErrs, operation.Update, rest.DeclarativeValidationConfig{})
 }
 
 // WarningsOnUpdate returns warnings for the given update.
