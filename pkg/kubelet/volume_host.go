@@ -60,6 +60,10 @@ func NewInitializedVolumePluginMgr(
 	plugins []volume.VolumePlugin,
 	prober volume.DynamicPluginProber) (*volume.VolumePluginMgr, error) {
 
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+	logger := klog.FromContext(context.TODO())
+
 	// Initialize csiDriverLister before calling InitPlugins
 	var informerFactory informers.SharedInformerFactory
 	var csiDriverLister storagelisters.CSIDriverLister
@@ -73,7 +77,7 @@ func NewInitializedVolumePluginMgr(
 		csiDriversSynced = csiDriverInformer.Informer().HasSynced
 
 	} else {
-		klog.InfoS("KubeClient is nil. Skip initialization of CSIDriverLister")
+		logger.Info("KubeClient is nil. Skip initialization of CSIDriverLister")
 	}
 
 	kvh := &kubeletVolumeHost{
@@ -173,14 +177,17 @@ func (kvh *kubeletVolumeHost) CSIDriversSynced() cache.InformerSynced {
 
 // WaitForCacheSync is a helper function that waits for cache sync for CSIDriverLister
 func (kvh *kubeletVolumeHost) WaitForCacheSync() error {
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+	logger := klog.FromContext(context.TODO())
 	if kvh.csiDriversSynced == nil {
-		klog.ErrorS(nil, "CsiDriversSynced not found on KubeletVolumeHost")
+		logger.Error(nil, "CsiDriversSynced not found on KubeletVolumeHost")
 		return fmt.Errorf("csiDriversSynced not found on KubeletVolumeHost")
 	}
 
 	synced := []cache.InformerSynced{kvh.csiDriversSynced}
 	if !cache.WaitForCacheSync(wait.NeverStop, synced...) {
-		klog.InfoS("Failed to wait for cache sync for CSIDriverLister")
+		logger.Info("Failed to wait for cache sync for CSIDriverLister")
 		return fmt.Errorf("failed to wait for cache sync for CSIDriverLister")
 	}
 
