@@ -66,9 +66,11 @@ func FetchInitConfigurationFromCluster(client clientset.Interface, printer outpu
 		return nil, err
 	}
 
-	// Apply dynamic defaults
-	// NB. skip CRI detection here because it won't be used at all and will be overridden later
-	if err := SetInitDynamicDefaults(cfg, true); err != nil {
+	// Apply dynamic defaults.
+	// NB. skip CRI detection here because it won't be used at all and will be overridden later.
+	// NB. skip LocalAPIEndpoint defaulting when the caller did not request the endpoint (e.g. a
+	// worker join).
+	if err := SetInitDynamicDefaults(cfg, true, !getAPIEndpoint); err != nil {
 		return nil, err
 	}
 
