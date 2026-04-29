@@ -213,23 +213,30 @@ func Validate_ReplicationControllerSpec(
 
 // Validate_Secret validates an instance of Secret according
 // to declarative validation rules in the API schema.
-func Validate_Secret(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.Secret) (errs field.ErrorList) {
+func Validate_Secret(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.Secret) (errs field.ErrorList) {
+
 	// field corev1.Secret.TypeMeta has no validation
 	// field corev1.Secret.ObjectMeta has no validation
 	// field corev1.Secret.Immutable has no validation
 	// field corev1.Secret.Data has no validation
 	// field corev1.Secret.StringData has no validation
 
-	// field corev1.Secret.Type
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *corev1.SecretType, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field corev1.Secret.Type
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.SecretType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -240,7 +247,13 @@ func Validate_Secret(ctx context.Context, op operation.Operation, fldPath *field
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("type"), &obj.Type, safe.Field(oldObj, func(oldObj *corev1.Secret) *corev1.SecretType { return &oldObj.Type }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.Secret) *corev1.SecretType {
+				return &oldObj.Type
+			})
+		errs = append(errs, fn(fldPath.Child("type"), &obj.Type, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }

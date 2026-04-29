@@ -64,21 +64,21 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 			oldObj:    makeValidSecret(),
 			updateObj: makeValidSecret(tweakType(api.SecretType("custom-type"))),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("type"), api.SecretType("custom-type"), "field is immutable").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("type"), api.SecretType("custom-type"), "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
 		"invalid update: type set from unset": {
 			oldObj:    makeValidSecret(tweakType("")),
 			updateObj: makeValidSecret(tweakType(api.SecretTypeOpaque)),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("type"), api.SecretTypeOpaque, "field is immutable").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("type"), api.SecretTypeOpaque, "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
 		"invalid update: type unset from set": {
 			oldObj:    makeValidSecret(),
 			updateObj: makeValidSecret(tweakType("")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("type"), api.SecretType(""), "field is immutable").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("type"), api.SecretType(""), "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
 	}
