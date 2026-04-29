@@ -1616,6 +1616,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1.DeviceSubRequestApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("DeviceTaint"):
 		return &applyconfigurationsresourcev1.DeviceTaintApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("DeviceTaintRule"):
+		return &applyconfigurationsresourcev1.DeviceTaintRuleApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("DeviceTaintRuleSpec"):
+		return &applyconfigurationsresourcev1.DeviceTaintRuleSpecApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("DeviceTaintRuleStatus"):
+		return &applyconfigurationsresourcev1.DeviceTaintRuleStatusApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("DeviceTaintSelector"):
+		return &applyconfigurationsresourcev1.DeviceTaintSelectorApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("DeviceToleration"):
 		return &applyconfigurationsresourcev1.DeviceTolerationApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("ExactDeviceRequest"):
