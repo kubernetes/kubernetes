@@ -19,7 +19,7 @@ require (
 	github.com/ishidawataru/sctp v0.0.0-20250829011129-4b890084db30
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/onsi/ginkgo/v2 v2.28.1
-	github.com/onsi/gomega v1.39.1
+	github.com/onsi/gomega v1.40.0
 	github.com/opencontainers/cgroups v0.0.6
 	github.com/opencontainers/selinux v1.13.1
 	github.com/prometheus/client_model v0.6.2
