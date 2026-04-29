@@ -540,7 +540,7 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 				reqInfo.muTrace.Lock()
 				defer reqInfo.muTrace.Unlock()
 				reqInfo.DNSLookup = time.Since(dnsStart)
-				klog.Info("HTTP Trace: DNS Lookup resolved", "host", host, "address", info.Addrs)
+				klog.InfoS("HTTP Trace: DNS Lookup resolved", "host", host, "address", info.Addrs)
 			},
 			// Dial
 			ConnectStart: func(network, addr string) {
@@ -553,9 +553,9 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 				defer reqInfo.muTrace.Unlock()
 				reqInfo.Dialing = time.Since(dialStart)
 				if err != nil {
-					klog.Info("HTTP Trace: Dial failed", "network", network, "address", addr, "err", err)
+					klog.InfoS("HTTP Trace: Dial failed", "network", network, "address", addr, "err", err)
 				} else {
-					klog.Info("HTTP Trace: Dial succeed", "network", network, "address", addr)
+					klog.InfoS("HTTP Trace: Dial succeed", "network", network, "address", addr)
 				}
 			},
 			// TLS
@@ -618,7 +618,7 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 			kvs = append(kvs, "serverProcessingMilliseconds", reqInfo.ServerProcessing.Nanoseconds()/int64(time.Millisecond))
 		}
 	}
-	klog.Info("HTTP Trace Response", kvs...)
+	klog.InfoS("HTTP Trace Response", kvs...)
 
 	return response, err
 }
