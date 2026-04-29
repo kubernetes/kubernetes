@@ -39,6 +39,7 @@ import (
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
+	netutils "k8s.io/utils/net"
 )
 
 // NodeManager handles the life cycle of kube-proxy based on the NodeIPs and PodCIDRs handles
@@ -175,6 +176,42 @@ func getNodeInfo(nodeLister corelisters.NodeLister, nodeName string) (*v1.Node, 
 	}
 	nodeIPs, _ := utilnode.GetNodeHostIPs(node)
 	return node, nodeIPs, node.Spec.PodCIDRs
+}
+
+func DetectNodeIPs(rawNodeIPs []net.IP, bindAddress string) (v1.IPFamily, map[v1.IPFamily]net.IP) {
+	primaryFamily := v1.IPv4Protocol
+	nodeIPs := map[v1.IPFamily]net.IP{
+		v1.IPv4Protocol: net.IPv4(127, 0, 0, 1),
+		v1.IPv6Protocol: net.IPv6loopback,
+	}
+
+	if len(rawNodeIPs) > 0 {
+		if !netutils.IsIPv4(rawNodeIPs[0]) {
+			primaryFamily = v1.IPv6Protocol
+		}
+		nodeIPs[primaryFamily] = rawNodeIPs[0]
+		if len(rawNodeIPs) > 1 {
+			// If more than one address is returned, they are guaranteed to be of different families
+			family := v1.IPv4Protocol
+			if !netutils.IsIPv4(rawNodeIPs[1]) {
+				family = v1.IPv6Protocol
+			}
+			nodeIPs[family] = rawNodeIPs[1]
+		}
+	}
+
+	// If a bindAddress is passed, override the primary IP
+	bindIP := netutils.ParseIPSloppy(bindAddress)
+	if bindIP != nil && !bindIP.IsUnspecified() {
+		if netutils.IsIPv4(bindIP) {
+			primaryFamily = v1.IPv4Protocol
+		} else {
+			primaryFamily = v1.IPv6Protocol
+		}
+		nodeIPs[primaryFamily] = bindIP
+	}
+
+	return primaryFamily, nodeIPs
 }
 
 // NodeIPs returns the node's IPs. (This may be empty if New() timed out without
