@@ -22,22 +22,31 @@ limitations under the License.
 package devicetaintrule
 
 import (
-	fmt "fmt"
-	os "os"
-	testing "testing"
-
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	coverage "k8s.io/apimachinery/pkg/test/coverage"
 )
 
-var apiVersions = []string{"v1", "v1alpha3", "v1beta2"}
-
-func TestMain(m *testing.M) {
-	code := m.Run()
-	if err := coverage.AssertDeclarativeCoverage(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		if code == 0 {
-			code = 1
-		}
-	}
-	os.Exit(code)
+func init() {
+	coverage.RegisterDeclaredRules(
+		schema.GroupVersionKind{Group: "resource.k8s.io", Version: "v1", Kind: "DeviceTaintRule"},
+		coverage.FieldRules{
+			"spec.taint.effect": {
+				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"status.conditions[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"status.conditions[*].observedGeneration": {
+				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+			},
+			"status.conditions[*].status": {
+				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"status.conditions[*].type": {
+				{ErrorType: "FieldValueRequired"},
+			},
+		},
+	)
 }
