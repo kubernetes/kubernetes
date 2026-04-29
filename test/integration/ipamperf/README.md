@@ -65,7 +65,7 @@ allows for also saving this JSON to a named file.
 ### Profiling the code
 It's possible to get the CPU and memory profiles of code during test execution by using the ```-p``` option.
 The CPU and memory profiles are generated in the same directory with the file names set to ```cpu-<id>.out```
-and ```cpu-<id>.out```, where ```<id>``` is the argument value. Typicall pattern is to put in the number
+and ```mem-<id>.out```, where ```<id>``` is the argument value. Typical pattern is to put in the number
 of nodes being simulated as the id, or 'all' in case running the full suite.
 
 ### Custom Test Configuration
