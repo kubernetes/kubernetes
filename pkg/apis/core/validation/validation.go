@@ -412,35 +412,19 @@ func ValidateImmutableAnnotation(newVal string, oldVal string, annotation string
 // ValidateObjectMetaWithOpts validates an object's metadata on creation. It expects that name generation has already
 // been performed.
 func ValidateObjectMetaWithOpts(meta *metav1.ObjectMeta, isNamespaced bool, nameFn ValidateNameFuncWithErrors, fldPath *field.Path) field.ErrorList {
-	allErrs := apimachineryvalidation.ValidateObjectMetaWithOpts(meta, isNamespaced, nameFn, fldPath)
-	// run additional checks for the finalizer name
-	for i := range meta.Finalizers {
-		allErrs = append(allErrs, validateKubeFinalizerName(string(meta.Finalizers[i]), fldPath.Child("finalizers").Index(i))...)
-	}
-	return allErrs
+	return apimachineryvalidation.ValidateObjectMetaWithOpts(meta, isNamespaced, nameFn, fldPath)
 }
 
 // ValidateObjectMeta validates an object's metadata on creation. It expects that name generation has already
 // been performed.
 // TODO: Remove calls to this method scattered in validations of specific resources, e.g., ValidatePodUpdate.
 func ValidateObjectMeta(meta *metav1.ObjectMeta, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path) field.ErrorList {
-	allErrs := apimachineryvalidation.ValidateObjectMeta(meta, requiresNamespace, apimachineryvalidation.ValidateNameFunc(nameFn), fldPath)
-	// run additional checks for the finalizer name
-	for i := range meta.Finalizers {
-		allErrs = append(allErrs, validateKubeFinalizerName(string(meta.Finalizers[i]), fldPath.Child("finalizers").Index(i))...)
-	}
-	return allErrs
+	return apimachineryvalidation.ValidateObjectMeta(meta, requiresNamespace, apimachineryvalidation.ValidateNameFunc(nameFn), fldPath)
 }
 
 // ValidateObjectMetaUpdate validates an object's metadata when updated
 func ValidateObjectMetaUpdate(newMeta, oldMeta *metav1.ObjectMeta, fldPath *field.Path) field.ErrorList {
-	allErrs := apimachineryvalidation.ValidateObjectMetaUpdate(newMeta, oldMeta, fldPath)
-	// run additional checks for the finalizer name
-	for i := range newMeta.Finalizers {
-		allErrs = append(allErrs, validateKubeFinalizerName(string(newMeta.Finalizers[i]), fldPath.Child("finalizers").Index(i))...)
-	}
-
-	return allErrs
+	return apimachineryvalidation.ValidateObjectMetaUpdate(newMeta, oldMeta, fldPath)
 }
 
 func ValidateVolumes(volumes []core.Volume, podMeta *metav1.ObjectMeta, fldPath *field.Path, opts PodValidationOptions) (map[string]core.VolumeSource, field.ErrorList) {
