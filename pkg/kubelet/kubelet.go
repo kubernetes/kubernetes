@@ -2277,6 +2277,11 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	}
 
 	err = result.Error()
+	if err != nil {
+		if networkErr := sandboxNetworkNotReadyError(result); networkErr != nil {
+			err = fmt.Errorf("%s: %w", NetworkNotReadyErrorMsg, networkErr)
+		}
+	}
 	if len(result.SyncResults) > 0 && err == nil {
 		postSync = func() {
 			kl.RequestPodRelist(pod.UID)
@@ -2284,6 +2289,26 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	}
 
 	return false, postSync, err
+}
+
+func sandboxNetworkNotReadyError(result kubecontainer.PodSyncResult) error {
+	for _, r := range result.SyncResults {
+		if r.Action != kubecontainer.CreatePodSandbox || !errors.Is(r.Error, kubecontainer.ErrCreatePodSandbox) {
+			continue
+		}
+		msg := strings.ToLower(r.Message)
+		switch {
+		case strings.Contains(msg, "network is not ready"):
+			return fmt.Errorf("%s: %s", r.Error, r.Message)
+		case strings.Contains(msg, "cni plugin not initialized"):
+			return fmt.Errorf("%s: %s", r.Error, r.Message)
+		case strings.Contains(msg, "failed to setup network for sandbox") && strings.Contains(msg, "no such file or directory"):
+			return fmt.Errorf("%s: %s", r.Error, r.Message)
+		case strings.Contains(msg, "failed to set up sandbox container") && strings.Contains(msg, "network"):
+			return fmt.Errorf("%s: %s", r.Error, r.Message)
+		}
+	}
+	return nil
 }
 
 // SyncTerminatingPod is expected to terminate all running containers in a pod. Once this method

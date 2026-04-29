@@ -1692,6 +1692,34 @@ func TestNetworkErrorsWithoutHostNetwork(t *testing.T) {
 	}
 }
 
+func TestSyncPodTreatsSandboxCNISetupMissingFileAsNetworkNotReady(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+
+	pod := podWithUIDNameNsSpec("12345678", "flannel-race", "new", v1.PodSpec{
+		Containers: []v1.Container{
+			{Name: "foo"},
+		},
+	})
+	kubelet.podManager.SetPods([]*v1.Pod{pod})
+	testKubelet.fakeRuntime.SyncResults = &kubecontainer.PodSyncResult{
+		SyncResults: []*kubecontainer.SyncResult{{
+			Action:  kubecontainer.CreatePodSandbox,
+			Target:  pod.UID,
+			Error:   kubecontainer.ErrCreatePodSandbox,
+			Message: `rpc error: code = Unknown desc = failed to setup network for sandbox "sandbox-id": plugin type="flannel" failed (add): failed to load flannel 'subnet.env' file: open /run/flannel/subnet.env: no such file or directory`,
+		}},
+	}
+
+	isTerminal, _, err := kubelet.SyncPod(tCtx, kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
+	require.False(t, isTerminal)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), NetworkNotReadyErrorMsg)
+	assert.Contains(t, err.Error(), "CreatePodSandboxError")
+}
+
 func TestFilterOutInactivePods(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
