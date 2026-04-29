@@ -115,12 +115,18 @@ func run(tCtx ktesting.TContext, whatRE string) {
 	// and no ResourceSlices. To test scheduling, a sub-test must create ResourceSlices.
 	// createTestNamespace can be used to create a unique per-test namespace. The name of that
 	// namespace then can be used to create cluster-scoped objects without conflicts between tests.
+	//
+	// Some tests run in different configuration even though the test itself is always
+	// executed the same way. This increases test coverage because the code under test
+	// might be different.
 	for name, tc := range map[string]struct {
 		apis     map[schema.GroupVersion]bool
+		version  string
 		features map[featuregate.Feature]bool
 		f        func(tCtx ktesting.TContext)
 	}{
 		"disabled": {
+			version:  "1.34", // In 1.34 it was still possible to disable DRA.
 			apis:     map[schema.GroupVersion]bool{resourceapi.SchemeGroupVersion: false},
 			features: map[featuregate.Feature]bool{features.DynamicResourceAllocation: false},
 			f: func(tCtx ktesting.TContext) {
@@ -133,6 +139,7 @@ func run(tCtx ktesting.TContext, whatRE string) {
 			features: map[featuregate.Feature]bool{},
 			f: func(tCtx ktesting.TContext) {
 				runSubTest(tCtx, "Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
+				runSubTest(tCtx, "EvictClusterWithV1Rule", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, useV1Rule) })
 				runSubTest(tCtx, "EvictClusterWithSlices", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, useNoRule) })
 				runSubTest(tCtx, "NoScheduleWithSlices", func(tCtx ktesting.TContext) { testNoScheduleRule(tCtx, useNoRule) })
 				// Number of devices per slice is chosen so that Filter takes a few seconds:
@@ -141,6 +148,9 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "UsesAllResources", testUsesAllResources)
 			},
 		},
+		// This covers the *current* Kubernetes version with only GA features enabled.
+		// The GA scenario(s) for other version(s) verify that version emulation works.
+		// Just some key tests get replicated there to keep the overall runtime low enough.
 		"GA": {
 			apis: map[schema.GroupVersion]bool{},
 			features: map[featuregate.Feature]bool{
@@ -148,11 +158,15 @@ func run(tCtx ktesting.TContext, whatRE string) {
 			},
 			f: func(tCtx ktesting.TContext) {
 				runSubTest(tCtx, "AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, false) })
+				runSubTest(tCtx, "EvictClusterWithV1Rule", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, useV1Rule) })
+				runSubTest(tCtx, "EvictClusterWithSlices", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, useNoRule) })
+				runSubTest(tCtx, "NoScheduleWithV1Rule", func(tCtx ktesting.TContext) { testNoScheduleRule(tCtx, useV1Rule) })
+				runSubTest(tCtx, "NoScheduleWithSlices", func(tCtx ktesting.TContext) { testNoScheduleRule(tCtx, useNoRule) })
 				runSubTest(tCtx, "PartitionableDevices", func(tCtx ktesting.TContext) { testPartitionableDevices(tCtx, false) })
 				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
 				runSubTest(tCtx, "Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
 				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
-					testPublishResourceSlices(tCtx, true, features.DRADeviceTaints, features.DRAPartitionableDevices, features.DRADeviceBindingConditions)
+					testPublishResourceSlices(tCtx, true, features.DRAPartitionableDevices, features.DRADeviceBindingConditions)
 				})
 				runSubTest(tCtx, "ExplicitExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, true, true) })
 				runSubTest(tCtx, "ImplicitExtendedResource", func(tCtx ktesting.TContext) { testExtendedResource(tCtx, true, false) })
@@ -166,6 +180,36 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "ShareResourceClaimSequentially", testShareResourceClaimSequentially)
 				runSubTest(tCtx, "UsesAllResources", testUsesAllResources)
 				runSubTest(tCtx, "WorkloadResourceClaims", func(tCtx ktesting.TContext) { testWorkloadResourceClaims(tCtx, false, false) })
+			},
+		},
+		"GA-1.36": {
+			version: "1.36",
+			apis:    map[schema.GroupVersion]bool{},
+			features: map[featuregate.Feature]bool{
+				featuregate.Feature("AllBeta"): false,
+			},
+			f: func(tCtx ktesting.TContext) {
+				runSubTest(tCtx, "AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, false) })
+				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, true) })
+				runSubTest(tCtx, "Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
+				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
+					testPublishResourceSlices(tCtx, true, features.DRADeviceTaints, features.DRAPartitionableDevices, features.DRADeviceBindingConditions)
+				})
+			},
+		},
+		"GA-1.35": {
+			version: "1.35",
+			apis:    map[schema.GroupVersion]bool{},
+			features: map[featuregate.Feature]bool{
+				featuregate.Feature("AllBeta"): false,
+			},
+			f: func(tCtx ktesting.TContext) {
+				runSubTest(tCtx, "AdminAccess", func(tCtx ktesting.TContext) { testAdminAccess(tCtx, false) })
+				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, false) })
+				runSubTest(tCtx, "Pod", func(tCtx ktesting.TContext) { testPod(tCtx, true) })
+				runSubTest(tCtx, "PublishResourceSlices", func(tCtx ktesting.TContext) {
+					testPublishResourceSlices(tCtx, true, features.DRADeviceTaints, features.DRAPartitionableDevices, features.DRADeviceBindingConditions)
+				})
 			},
 		},
 		// This scenario verifies that features which have graduated to GA can
@@ -248,9 +292,11 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				runSubTest(tCtx, "MaxResourceSlice", testMaxResourceSlice)
 				runSubTest(tCtx, "EvictClusterWithV1alpha3Rule", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, useV1alpha3Rule) })
 				runSubTest(tCtx, "EvictClusterWithV1beta2Rule", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, useV1beta2Rule) })
+				runSubTest(tCtx, "EvictClusterWithV1Rule", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, useV1Rule) })
 				runSubTest(tCtx, "EvictClusterWithSlices", func(tCtx ktesting.TContext) { testEvictCluster(tCtx, useNoRule) })
 				runSubTest(tCtx, "NoScheduleWithV1alpha3Rule", func(tCtx ktesting.TContext) { testNoScheduleRule(tCtx, useV1alpha3Rule) })
 				runSubTest(tCtx, "NoScheduleWithV1beta2Rule", func(tCtx ktesting.TContext) { testNoScheduleRule(tCtx, useV1beta2Rule) })
+				runSubTest(tCtx, "NoScheduleWithV1Rule", func(tCtx ktesting.TContext) { testNoScheduleRule(tCtx, useV1Rule) })
 				runSubTest(tCtx, "NoScheduleWithSlices", func(tCtx ktesting.TContext) { testNoScheduleRule(tCtx, useNoRule) })
 				runSubTest(tCtx, "InvalidResourceSlices", testInvalidResourceSlices)
 				// Number of devices per slice is chosen so that Filter takes a few seconds: The allocator
@@ -280,9 +326,8 @@ func run(tCtx ktesting.TContext, whatRE string) {
 			sort.Strings(entries)
 			tCtx.Logf("Config: %s", strings.Join(entries, ","))
 
-			// We need to set emulation version for DynamicResourceAllocation feature gate, which is locked at 1.35.
-			if draEnabled, draExists := tc.features[features.DynamicResourceAllocation]; draExists && !draEnabled {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
+			if tc.version != "" {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse(tc.version))
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(tCtx, utilfeature.DefaultFeatureGate, tc.features)
 

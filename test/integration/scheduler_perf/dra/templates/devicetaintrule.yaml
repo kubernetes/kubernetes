@@ -1,4 +1,4 @@
-apiVersion: resource.k8s.io/v1alpha3
+apiVersion: resource.k8s.io/v1
 kind: DeviceTaintRule
 metadata:
   name: taint-all-devices

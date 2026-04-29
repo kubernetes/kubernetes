@@ -595,7 +595,6 @@ func newTestDRAManager(tCtx ktesting.TContext, objects ...apiruntime.Object) *dy
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	resourceSliceTrackerOpts := tracker.Options{
 		SliceInformer: informerFactory.Resource().V1().ResourceSlices(),
-		TaintInformer: informerFactory.Resource().V1beta2().DeviceTaintRules(),
 		KubeClient:    client,
 	}
 	resourceSliceTracker, err := tracker.StartTracker(tCtx, resourceSliceTrackerOpts)

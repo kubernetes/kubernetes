@@ -491,6 +491,12 @@ func (b *Builder) Create(tCtx ktesting.TContext, objs ...klog.KMetadata) []klog.
 				err := tCtx.Client().ResourceV1beta2().DeviceTaintRules().Delete(tCtx, createdObj.GetName(), metav1.DeleteOptions{})
 				tCtx.ExpectNoError(err, "delete DeviceTaintRule")
 			})
+		case *resourceapi.DeviceTaintRule:
+			createdObj, err = tCtx.Client().ResourceV1().DeviceTaintRules().Create(tCtx, obj, metav1.CreateOptions{})
+			cleanupCtx(func(tCtx ktesting.TContext) {
+				err := tCtx.Client().ResourceV1().DeviceTaintRules().Delete(tCtx, createdObj.GetName(), metav1.DeleteOptions{})
+				tCtx.ExpectNoError(err, "delete DeviceTaintRule")
+			})
 		case *appsv1.DaemonSet:
 			createdObj, err = tCtx.Client().AppsV1().DaemonSets(b.namespace).Create(tCtx, obj, metav1.CreateOptions{})
 			// Cleanup not really needed, but speeds up namespace shutdown.
