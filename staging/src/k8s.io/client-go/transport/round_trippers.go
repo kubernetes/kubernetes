@@ -77,9 +77,7 @@ func HTTPWrappersForConfig(config *Config, rt http.RoundTripper) (http.RoundTrip
 // if that verbosity is >= 6. This may change in the future.
 func DebugWrappers(rt http.RoundTripper) http.RoundTripper {
 	//nolint:logcheck // The actual logging is done with a different logger, so only checking here is okay.
-	if klog.V(6).Enabled() {
-		rt = NewDebuggingRoundTripper(rt, DebugByContext)
-	}
+	rt = NewDebuggingRoundTripper(rt, DebugByContext)
 	return rt
 }
 
@@ -511,12 +509,10 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 	reqInfo := newRequestInfo(req)
 
 	kvs := make([]any, 0, 8) // Exactly large enough for all appends below.
-	if levels&(1<<DebugJustURL) != 0 {
-		kvs = append(kvs,
-			"verb", reqInfo.RequestVerb,
-			"url", reqInfo.RequestURL,
-		)
-	}
+	kvs = append(kvs,
+		"verb", reqInfo.RequestVerb,
+		"url", reqInfo.RequestURL,
+	)
 	if levels&(1<<DebugCurlCommand) != 0 {
 		kvs = append(kvs, "curlCommand", reqInfo.toCurl())
 	}
@@ -544,7 +540,7 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 				reqInfo.muTrace.Lock()
 				defer reqInfo.muTrace.Unlock()
 				reqInfo.DNSLookup = time.Since(dnsStart)
-				logger.Info("HTTP Trace: DNS Lookup resolved", "host", host, "address", info.Addrs)
+				klog.Info("HTTP Trace: DNS Lookup resolved", "host", host, "address", info.Addrs)
 			},
 			// Dial
 			ConnectStart: func(network, addr string) {
@@ -557,9 +553,9 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 				defer reqInfo.muTrace.Unlock()
 				reqInfo.Dialing = time.Since(dialStart)
 				if err != nil {
-					logger.Info("HTTP Trace: Dial failed", "network", network, "address", addr, "err", err)
+					klog.Info("HTTP Trace: Dial failed", "network", network, "address", addr, "err", err)
 				} else {
-					logger.Info("HTTP Trace: Dial succeed", "network", network, "address", addr)
+					klog.Info("HTTP Trace: Dial succeed", "network", network, "address", addr)
 				}
 			},
 			// TLS
@@ -605,32 +601,24 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 	if levels&(1<<DebugURLTiming) != 0 {
 		kvs = append(kvs, "verb", reqInfo.RequestVerb, "url", reqInfo.RequestURL)
 	}
-	if levels&(1<<DebugURLTiming|1<<DebugResponseStatus) != 0 {
-		kvs = append(kvs, "status", reqInfo.ResponseStatus)
-	}
+	kvs = append(kvs, "status", reqInfo.ResponseStatus)
 	if levels&(1<<DebugResponseHeaders) != 0 {
 		kvs = append(kvs, "headers", newHeadersMap(reqInfo.ResponseHeaders))
 	}
-	if levels&(1<<DebugURLTiming|1<<DebugDetailedTiming|1<<DebugResponseStatus) != 0 {
-		kvs = append(kvs, "milliseconds", reqInfo.Duration.Nanoseconds()/int64(time.Millisecond))
-	}
-	if levels&(1<<DebugDetailedTiming) != 0 {
-		if !reqInfo.ConnectionReused {
-			kvs = append(kvs,
-				"dnsLookupMilliseconds", reqInfo.DNSLookup.Nanoseconds()/int64(time.Millisecond),
-				"dialMilliseconds", reqInfo.Dialing.Nanoseconds()/int64(time.Millisecond),
-				"tlsHandshakeMilliseconds", reqInfo.TLSHandshake.Nanoseconds()/int64(time.Millisecond),
-			)
-		} else {
-			kvs = append(kvs, "getConnectionMilliseconds", reqInfo.GetConnection.Nanoseconds()/int64(time.Millisecond))
-		}
+	kvs = append(kvs, "milliseconds", reqInfo.Duration.Nanoseconds()/int64(time.Millisecond))
+	if !reqInfo.ConnectionReused {
+		kvs = append(kvs,
+			"dnsLookupMilliseconds", reqInfo.DNSLookup.Nanoseconds()/int64(time.Millisecond),
+			"dialMilliseconds", reqInfo.Dialing.Nanoseconds()/int64(time.Millisecond),
+			"tlsHandshakeMilliseconds", reqInfo.TLSHandshake.Nanoseconds()/int64(time.Millisecond),
+		)
+	} else {
+		kvs = append(kvs, "getConnectionMilliseconds", reqInfo.GetConnection.Nanoseconds()/int64(time.Millisecond))
 		if reqInfo.ServerProcessing != 0 {
 			kvs = append(kvs, "serverProcessingMilliseconds", reqInfo.ServerProcessing.Nanoseconds()/int64(time.Millisecond))
 		}
 	}
-	if len(kvs) > 0 {
-		logger.Info("Response", kvs...)
-	}
+	klog.Info("HTTP Trace Response", kvs...)
 
 	return response, err
 }
