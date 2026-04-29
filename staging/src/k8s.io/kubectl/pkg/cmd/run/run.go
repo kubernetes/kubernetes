@@ -178,6 +178,9 @@ func NewCmdRun(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Com
 	o.PrintFlags.AddFlags(cmd)
 	o.RecordFlags.AddFlags(cmd)
 
+	_ = cmd.Flags().MarkDeprecated("filename", "it is ignored by kubectl run and will be removed in a future release")
+	_ = cmd.Flags().MarkShorthandDeprecated("filename", "it is ignored by kubectl run and will be removed in a future release")
+
 	addRunFlags(cmd, o)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
