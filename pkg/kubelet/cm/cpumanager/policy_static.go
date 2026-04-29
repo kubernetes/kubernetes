@@ -290,10 +290,6 @@ func (p *staticPolicy) GetAvailableCPUs(s state.State) cpuset.CPUSet {
 	return s.GetDefaultCPUSet().Difference(p.reservedCPUs)
 }
 
-func (p *staticPolicy) GetAvailablePhysicalCPUs(s state.State) cpuset.CPUSet {
-	return s.GetDefaultCPUSet().Difference(p.reservedPhysicalCPUs)
-}
-
 func (p *staticPolicy) updateCPUsToReuse(pod *v1.Pod, container *v1.Container, cset cpuset.CPUSet) {
 	// If pod entries to m.cpusToReuse other than the current pod exist, delete them.
 	for podUID := range p.cpusToReuse {
@@ -540,7 +536,7 @@ func (p *staticPolicy) enforceSMTAlignment(s state.State, numCPUs int) error {
 		}
 	}
 
-	availablePhysicalCPUs := p.GetAvailablePhysicalCPUs(s).Size()
+	availablePhysicalCPUs := s.GetDefaultCPUSet().Difference(p.reservedPhysicalCPUs).Size()
 
 	// It's legal to reserve CPUs which are not core siblings. In this case the CPU allocator can descend to single cores
 	// when picking CPUs. This will void the guarantee of FullPhysicalCPUsOnly. To prevent this, we need to additionally consider
