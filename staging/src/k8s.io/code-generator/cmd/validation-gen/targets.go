@@ -18,6 +18,7 @@ package main
 
 import (
 	"cmp"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"slices"
@@ -25,6 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/code-generator/cmd/validation-gen/validators"
+	"k8s.io/code-generator/pkg/guardrails"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/generator"
@@ -319,6 +321,10 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 	// Create a linter to collect errors as we go.
 	linter := newLinter(lintRules(validator)...)
 
+	// reports accumulates one entry per input package when --report-rules
+	// is set; printed as a single JSON array after the package loop.
+	var reports []guardrails.Report
+
 	// Build a cache of type->callNode for every type we need.
 	for _, input := range context.Inputs {
 		klog.V(2).InfoS("processing", "pkg", input)
@@ -397,6 +403,22 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 			}
 		}
 
+		// --report-rules short-circuit: build a Report for this
+		// package's (Group, Version) and skip code generation.
+		if args.PrintRules {
+			r := guardrails.Report{Kinds: map[string]map[string][]guardrails.Rule{}}
+			for _, t := range rootTypes {
+				if rules := collectRules(td.typeNodes[t]); len(rules) > 0 {
+					r.Kinds[t.Name.Name] = rules
+				}
+			}
+			if len(r.Kinds) > 0 {
+				r.Group, r.Version = gvFor(typesPkg)
+				reports = append(reports, r)
+			}
+			continue
+		}
+
 		extracted := codetags.Extract("+", pkg.Comments)
 		if _, ok := extracted["k8s:validation-gen-nolint"]; !ok {
 			for _, t := range rootTypes {
@@ -445,6 +467,13 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 			}
 		}
 		klog.Fatalf("lint failed:\n%s", buf.String())
+	}
+	if args.PrintRules && len(reports) > 0 {
+		out, err := json.MarshalIndent(reports, "", "  ")
+		if err != nil {
+			klog.Fatalf("failed to marshal rules: %v", err)
+		}
+		fmt.Println(string(out))
 	}
 	return targets
 }

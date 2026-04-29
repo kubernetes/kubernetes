@@ -78,6 +78,7 @@ type Args struct {
 	ReadOnlyPkgs []string // Always consider these as last-ditch possibilities for validations.
 	GoHeaderFile string
 	PrintDocs    bool
+	PrintRules   bool
 }
 
 // AddFlags add the generator flags to the flag set.
@@ -90,14 +91,15 @@ func (args *Args) AddFlags(fs *pflag.FlagSet) {
 		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
 	fs.BoolVar(&args.PrintDocs, "docs", false,
 		"print documentation for supported declarative validations, and then exit")
+	fs.BoolVar(&args.PrintRules, "report-rules", false,
+		"print declared validation rules per (Group, Version, Kind) as JSON to stdout, and skip code generation")
 }
 
 // Validate checks the given arguments.
 func (args *Args) Validate() error {
-	if len(args.OutputFile) == 0 {
+	if len(args.OutputFile) == 0 && !args.PrintRules {
 		return fmt.Errorf("--output-file must be specified")
 	}
-
 	return nil
 }
 
