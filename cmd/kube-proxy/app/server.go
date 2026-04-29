@@ -224,7 +224,7 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 	}
 
 	rawNodeIPs := s.NodeManager.NodeIPs()
-	s.PrimaryIPFamily, s.NodeIPs = detectNodeIPs(rawNodeIPs, config.BindAddress)
+	s.PrimaryIPFamily, s.NodeIPs = nodemanager.DetectNodeIPs(rawNodeIPs, config.BindAddress)
 	if s.NodeIPs[s.PrimaryIPFamily].IsLoopback() {
 		logger.Info("Can't determine this node's IP, assuming loopback; if this is incorrect, please set the --bind-address flag")
 	} else if s.NodeIPs[proxyutil.OtherIPFamily(s.PrimaryIPFamily)].IsLoopback() {
@@ -681,53 +681,4 @@ func expandNodePortAddressKeywords(nodePortAddresses []string, nodeIPs map[v1.IP
 		}
 	}
 	return expanded
-}
-
-// detectNodeIPs returns the proxier's "node IP" or IPs, and the IP family to use if the
-// node turns out to be incapable of dual-stack. (Note that kube-proxy normally runs as
-// dual-stack if the backend is capable of supporting both IP families, regardless of
-// whether the node is *actually* configured as dual-stack or not.)
-
-// (Note that on Linux, the node IPs are used only to determine whether a given
-// LoadBalancerSourceRanges value matches the node or not. In particular, they are *not*
-// used for NodePort handling.)
-//
-// The order of precedence is:
-//  1. if bindAddress is not 0.0.0.0 or ::, then it is used as the primary IP.
-//  2. if rawNodeIPs is not empty, then its address(es) is/are used
-//  3. otherwise the node IPs are 127.0.0.1 and ::1
-func detectNodeIPs(rawNodeIPs []net.IP, bindAddress string) (v1.IPFamily, map[v1.IPFamily]net.IP) {
-	primaryFamily := v1.IPv4Protocol
-	nodeIPs := map[v1.IPFamily]net.IP{
-		v1.IPv4Protocol: net.IPv4(127, 0, 0, 1),
-		v1.IPv6Protocol: net.IPv6loopback,
-	}
-
-	if len(rawNodeIPs) > 0 {
-		if !netutils.IsIPv4(rawNodeIPs[0]) {
-			primaryFamily = v1.IPv6Protocol
-		}
-		nodeIPs[primaryFamily] = rawNodeIPs[0]
-		if len(rawNodeIPs) > 1 {
-			// If more than one address is returned, they are guaranteed to be of different families
-			family := v1.IPv4Protocol
-			if !netutils.IsIPv4(rawNodeIPs[1]) {
-				family = v1.IPv6Protocol
-			}
-			nodeIPs[family] = rawNodeIPs[1]
-		}
-	}
-
-	// If a bindAddress is passed, override the primary IP
-	bindIP := netutils.ParseIPSloppy(bindAddress)
-	if bindIP != nil && !bindIP.IsUnspecified() {
-		if netutils.IsIPv4(bindIP) {
-			primaryFamily = v1.IPv4Protocol
-		} else {
-			primaryFamily = v1.IPv6Protocol
-		}
-		nodeIPs[primaryFamily] = bindIP
-	}
-
-	return primaryFamily, nodeIPs
 }
