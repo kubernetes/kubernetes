@@ -655,6 +655,7 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			Stub:              `{"metadata": {"name": "taint1name"}, "spec": {"taint": {"key": "example.com/taintkey", "value": "taintvalue", "effect": "NoSchedule"}}}`,
 			MutatedStub:       `{"spec": {"taint": {"effect": "NoExecute"}}}`,
 			ExpectedEtcdPath:  "/registry/devicetaintrules/taint1name",
+			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta2", "DeviceTaintRule"),
 			IntroducedVersion: "1.33",
 			RemovedVersion:    "1.39",
 		},
@@ -720,7 +721,6 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			Stub:              `{"metadata": {"name": "taint2name"}, "spec": {"taint": {"key": "example.com/taintkey", "value": "taintvalue", "effect": "NoSchedule"}}}`,
 			MutatedStub:       `{"spec": {"taint": {"effect": "NoExecute"}}}`,
 			ExpectedEtcdPath:  "/registry/devicetaintrules/taint2name",
-			ExpectedGVK:       gvkP("resource.k8s.io", "v1alpha3", "DeviceTaintRule"), // v1beta2 has higher priority, but to support downgrades v1alpha3 is picked automatically.
 			IntroducedVersion: "1.36",
 			RemovedVersion:    "1.42",
 		},
@@ -758,6 +758,13 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			ExpectedEtcdPath:  "/registry/deviceclasses/class4name",
 			ExpectedGVK:       gvkP("resource.k8s.io", "v1", "DeviceClass"),
 			IntroducedVersion: "1.34",
+		},
+		gvr("resource.k8s.io", "v1", "devicetaintrules"): {
+			Stub:              `{"metadata": {"name": "taint4name"}, "spec": {"taint": {"key": "example.com/taintkey", "value": "taintvalue", "effect": "NoSchedule"}}}`,
+			MutatedStub:       `{"spec": {"taint": {"key": "example.com/taintkey", "value": "newtaintvalue", "effect": "NoSchedule"}}}`,
+			ExpectedEtcdPath:  "/registry/devicetaintrules/taint4name",
+			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta2", "DeviceTaintRule"), // v1 has higher priority, but to support downgrades v1beta2 is picked manually in default_storage_factory_builder.go.
+			IntroducedVersion: "1.37",
 		},
 		gvr("resource.k8s.io", "v1", "resourceclaims"): {
 			Stub:              `{"metadata": {"name": "claim4name"}, "spec": {"devices": {"requests": [{"name": "req-0", "exactly": {"deviceClassName": "example-class", "allocationMode": "ExactCount", "count": 1}}]}}}`,

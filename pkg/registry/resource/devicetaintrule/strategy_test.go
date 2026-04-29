@@ -82,6 +82,21 @@ func TestDeviceTaintRuleStrategy(t *testing.T) {
 	if Strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("DeviceTaintRule should not allow create on update")
 	}
+	if Strategy.AllowUnconditionalUpdate(context.Background()) {
+		t.Errorf("DeviceTaintRule should not allow update without ResourceVersion when the APIVersion is unknown")
+	}
+	if Strategy.AllowUnconditionalUpdate(genericapirequest.WithRequestInfo(context.Background(), &genericapirequest.RequestInfo{APIVersion: "v1"})) {
+		t.Errorf("DeviceTaintRule should not allow update without ResourceVersion when the APIVersion is v1")
+	}
+	if Strategy.AllowUnconditionalUpdate(genericapirequest.WithRequestInfo(context.Background(), &genericapirequest.RequestInfo{APIVersion: "no-such-versison"})) {
+		t.Errorf("DeviceTaintRule should not allow update without ResourceVersion when the APIVersion is something unknown")
+	}
+	if !Strategy.AllowUnconditionalUpdate(genericapirequest.WithRequestInfo(context.Background(), &genericapirequest.RequestInfo{APIVersion: "v1beta2"})) {
+		t.Errorf("DeviceTaintRule should allow update without ResourceVersion when the APIVersion is v1beta2")
+	}
+	if !Strategy.AllowUnconditionalUpdate(genericapirequest.WithRequestInfo(context.Background(), &genericapirequest.RequestInfo{APIVersion: "v1alpha3"})) {
+		t.Errorf("DeviceTaintRule should allow update without ResourceVersion when the APIVersion is v1alpha2")
+	}
 }
 
 func TestDeviceTaintRuleStrategyCreate(t *testing.T) {
