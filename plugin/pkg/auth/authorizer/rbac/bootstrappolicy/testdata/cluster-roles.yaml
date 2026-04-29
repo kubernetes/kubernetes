@@ -954,6 +954,14 @@ items:
   - apiGroups:
     - resource.k8s.io
     resources:
+    - devicetaintrules
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - resource.k8s.io
+    resources:
     - resourceclaims/binding
     verbs:
     - patch
