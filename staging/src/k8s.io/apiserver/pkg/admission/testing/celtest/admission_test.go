@@ -474,6 +474,31 @@ func TestEvalAdmission_CompilationError(t *testing.T) {
 	}
 }
 
+func TestEvalAdmission_RejectsPatchTypes(t *testing.T) {
+	e, err := NewEvaluator()
+	if err != nil {
+		t.Fatalf("NewEvaluator() error: %v", err)
+	}
+
+	policy := &AdmissionPolicy{
+		Validations: []Validation{{Path: "validations[0]", Expression: patchTypeBoolExpression}},
+	}
+	input := &AdmissionInput{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata":   map[string]interface{}{"name": "test"},
+		},
+	}
+
+	if _, err := e.EvalAdmission(policy, input); err == nil {
+		t.Fatal("expected validation evaluation to reject mutation patch types")
+	}
+	if _, err := e.EvalValidation(policy, ValidationSelector{Path: "validations[0]"}, input); err == nil {
+		t.Fatal("expected single validation evaluation to reject mutation patch types")
+	}
+}
+
 func TestEvalAdmission_MultipleValidations(t *testing.T) {
 	e, err := NewEvaluator()
 	if err != nil {

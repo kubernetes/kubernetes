@@ -22,6 +22,11 @@ import (
 	"testing"
 )
 
+const (
+	patchTypeBoolExpression   = `JSONPatch{op: "add", path: "/metadata/name", value: "x"}.op == "add"`
+	patchTypeStringExpression = `JSONPatch{op: "add", path: "/metadata/name", value: "x"}.op`
+)
+
 func TestNewEvaluator(t *testing.T) {
 	e, err := NewEvaluator()
 	if err != nil {
@@ -76,6 +81,7 @@ func TestCompileCheck(t *testing.T) {
 		{name: "valid request access", expr: "request.operation == 'CREATE'", wantErr: false},
 		{name: "invalid syntax", expr: "???", wantErr: true},
 		{name: "undefined variable", expr: "nonexistent.field", wantErr: true},
+		{name: "patch types unavailable", expr: patchTypeBoolExpression, wantErr: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -130,6 +136,12 @@ func TestEvalExpression(t *testing.T) {
 			input:   nil,
 			want:    true,
 			wantErr: false,
+		},
+		{
+			name:    "patch types unavailable",
+			expr:    patchTypeBoolExpression,
+			input:   &AdmissionInput{},
+			wantErr: true,
 		},
 	}
 	for _, tt := range tests {

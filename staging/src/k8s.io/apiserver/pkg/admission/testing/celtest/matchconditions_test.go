@@ -18,6 +18,8 @@ package celtest
 
 import (
 	"testing"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 func TestEvalMatchConditions(t *testing.T) {
@@ -113,6 +115,53 @@ func TestEvalMatchConditions(t *testing.T) {
 
 		if _, err := e.EvalMatchConditions(policy, input); err == nil {
 			t.Fatal("expected compile error")
+		}
+	})
+
+	t.Run("patch types are rejected", func(t *testing.T) {
+		policy := &AdmissionPolicy{
+			MatchConditions: []MatchCondition{
+				{Path: "spec.matchConditions[0]", Name: "patch-type", Expression: patchTypeBoolExpression},
+			},
+		}
+
+		if _, err := e.EvalMatchConditions(policy, input); err == nil {
+			t.Fatal("expected match condition evaluation to reject mutation patch types")
+		}
+		if _, err := e.EvalMatchCondition(policy, MatchConditionSelector{Name: "patch-type"}, input); err == nil {
+			t.Fatal("expected single match condition evaluation to reject mutation patch types")
+		}
+	})
+
+	t.Run("namespaceObject is not bound", func(t *testing.T) {
+		policy := &AdmissionPolicy{
+			MatchConditions: []MatchCondition{
+				{Path: "spec.matchConditions[0]", Name: "no-namespace", Expression: "namespaceObject == null"},
+			},
+		}
+		inputWithNamespace := *input
+		inputWithNamespace.Namespace = &corev1.Namespace{}
+
+		result, err := e.EvalMatchConditions(policy, &inputWithNamespace)
+		if err != nil {
+			t.Fatalf("EvalMatchConditions() error: %v", err)
+		}
+		if len(result.Conditions) != 1 {
+			t.Fatalf("got %d conditions, want 1", len(result.Conditions))
+		}
+		if result.Conditions[0].Error != nil {
+			t.Fatalf("condition error: %v", result.Conditions[0].Error)
+		}
+		if result.Conditions[0].Value != true {
+			t.Fatalf("condition value = %v, want true", result.Conditions[0].Value)
+		}
+
+		value, err := e.EvalMatchCondition(policy, MatchConditionSelector{Name: "no-namespace"}, &inputWithNamespace)
+		if err != nil {
+			t.Fatalf("EvalMatchCondition() error: %v", err)
+		}
+		if value != true {
+			t.Fatalf("EvalMatchCondition() = %v, want true", value)
 		}
 	})
 

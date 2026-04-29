@@ -63,7 +63,7 @@ func WithVersion(major, minor uint) Option {
 	}
 }
 
-// WithoutPatchTypes disables mutation-related types (JSONPatch, Object, etc.) in the CEL environment.
+// WithoutPatchTypes disables mutation-related types (JSONPatch, Object, etc.) for mutation expressions.
 func WithoutPatchTypes() Option {
 	return func(e *Evaluator) {
 		e.patchTypesEnabled = false
@@ -261,7 +261,8 @@ type AuditAnnotationResult struct {
 }
 
 // NewEvaluator creates an Evaluator with the given options. By default it uses
-// the current compatibility version with authorizer and patch types enabled.
+// the current compatibility version with authorizer enabled. Mutation patch
+// types are enabled for mutation expressions.
 func NewEvaluator(opts ...Option) (*Evaluator, error) {
 	e := &Evaluator{patchTypesEnabled: true, authorizerEnabled: true}
 	for _, opt := range opts {
@@ -400,6 +401,7 @@ func (e *Evaluator) EvalMutation(policy *AdmissionPolicy, input *AdmissionInput)
 	if err != nil {
 		return nil, err
 	}
+	mutationDecls := e.mutationDeclarations(policy)
 
 	// Pre-compile all mutations and fail fast on compilation errors.
 	compiled := make([]admissioncel.MutatingEvaluator, 0, len(policy.Mutations))
@@ -408,23 +410,19 @@ func (e *Evaluator) EvalMutation(policy *AdmissionPolicy, input *AdmissionInput)
 		if err != nil {
 			return nil, err
 		}
-		evaluator := state.compiler.CompileMutatingEvaluator(accessor, state.decls, e.evaluationMode())
+		evaluator := state.compiler.CompileMutatingEvaluator(accessor, mutationDecls, e.evaluationMode())
 		if err := compilationErrors(evaluator.CompilationErrors()); err != nil {
 			return nil, fmt.Errorf("mutation %q: %w", mutation.Path, err)
 		}
 		compiled = append(compiled, evaluator)
 	}
 
-	budget := e.runtimeCELCostBudget()
 	result := &MutationResult{}
 	for i, mutation := range policy.Mutations {
 		callContext := state.compiler.CreateContext(context.Background())
+		budget := e.runtimeCELCostBudget()
 		evalResult, remaining, err := compiled[i].ForInput(callContext, state.inputs.versionedAttr, state.inputs.request, state.inputs.optionalVars, state.inputs.namespace, budget)
-		if remaining >= 0 {
-			budget = remaining
-		} else {
-			budget = 0
-		}
+		result.Cost += budgetCost(budget, remaining)
 
 		patch := PatchResult{
 			Path:      mutation.Path,
@@ -433,9 +431,6 @@ func (e *Evaluator) EvalMutation(policy *AdmissionPolicy, input *AdmissionInput)
 		if err != nil {
 			patch.Error = err
 			result.Patches = append(result.Patches, patch)
-			if remaining < 0 {
-				break
-			}
 			continue
 		} else if evalResult.Error != nil {
 			patch.Error = evalResult.Error
@@ -445,7 +440,6 @@ func (e *Evaluator) EvalMutation(policy *AdmissionPolicy, input *AdmissionInput)
 		result.Patches = append(result.Patches, patch)
 	}
 
-	result.Cost += budgetCost(e.runtimeCELCostBudget(), budget)
 	return result, nil
 }
 
@@ -469,7 +463,7 @@ func (e *Evaluator) EvalMutationByPath(policy *AdmissionPolicy, selector Mutatio
 		if err != nil {
 			return nil, err
 		}
-		return e.evaluateMutating(state.compiler, state.decls, accessor, state.inputs)
+		return e.evaluateMutating(state.compiler, e.mutationDeclarations(policy), accessor, state.inputs)
 	}
 
 	return nil, fmt.Errorf("mutation %q not found in policy", selector.Path)
@@ -582,7 +576,8 @@ func (e *Evaluator) EvalMatchCondition(policy *AdmissionPolicy, selector MatchCo
 		return nil, fmt.Errorf("match condition matching selector path %q name %q not found in policy", selector.Path, selector.Name)
 	}
 
-	return e.evaluateMutating(state.compiler, state.decls, boolExpressionAccessor(matched.Expression), state.inputs)
+	value, _, err := e.evaluateMutatingWithBindingsAndNamespace(state.compiler, state.decls, boolExpressionAccessor(matched.Expression), state.inputs, state.inputs.optionalVars, nil, e.runtimeMatchCELCostBudget())
+	return value, err
 }
 
 // EvalAuditAnnotations evaluates all audit annotation expressions in the policy.
@@ -631,7 +626,7 @@ func (e *Evaluator) evalMatchConditionsWithInputs(compiler *admissioncel.Composi
 	}
 
 	budget := e.runtimeMatchCELCostBudget()
-	evaluations, remaining, err := conditionEvaluator.ForInput(context.Background(), evalInputs.versionedAttr, evalInputs.request, evalInputs.optionalVars, evalInputs.namespace, budget)
+	evaluations, remaining, err := conditionEvaluator.ForInput(context.Background(), evalInputs.versionedAttr, evalInputs.request, evalInputs.optionalVars, nil, budget)
 	result.Cost = budgetCost(budget, remaining)
 	if err != nil {
 		return nil, err
@@ -744,12 +739,16 @@ func (e *Evaluator) evaluateMutatingWithInputs(compiler *admissioncel.Composited
 }
 
 func (e *Evaluator) evaluateMutatingWithBindings(compiler *admissioncel.CompositedCompiler, decls admissioncel.OptionalVariableDeclarations, accessor admissioncel.ExpressionAccessor, evalInputs *evaluationInputs, optionalVars admissioncel.OptionalVariableBindings, budget int64) (interface{}, int64, error) {
+	return e.evaluateMutatingWithBindingsAndNamespace(compiler, decls, accessor, evalInputs, optionalVars, evalInputs.namespace, budget)
+}
+
+func (e *Evaluator) evaluateMutatingWithBindingsAndNamespace(compiler *admissioncel.CompositedCompiler, decls admissioncel.OptionalVariableDeclarations, accessor admissioncel.ExpressionAccessor, evalInputs *evaluationInputs, optionalVars admissioncel.OptionalVariableBindings, namespace *corev1.Namespace, budget int64) (interface{}, int64, error) {
 	evaluator := compiler.CompileMutatingEvaluator(accessor, decls, e.evaluationMode())
 	if err := compilationErrors(evaluator.CompilationErrors()); err != nil {
 		return nil, budget, err
 	}
 	ctx := compiler.CreateContext(context.Background())
-	result, remaining, err := evaluator.ForInput(ctx, evalInputs.versionedAttr, evalInputs.request, optionalVars, evalInputs.namespace, budget)
+	result, remaining, err := evaluator.ForInput(ctx, evalInputs.versionedAttr, evalInputs.request, optionalVars, namespace, budget)
 	if err != nil {
 		return nil, remaining, err
 	}
@@ -787,8 +786,13 @@ func (e *Evaluator) optionalDeclarations(policy *AdmissionPolicy) admissioncel.O
 	return admissioncel.OptionalVariableDeclarations{
 		HasParams:     hasParams,
 		HasAuthorizer: e.authorizerEnabled,
-		HasPatchTypes: e.patchTypesEnabled,
 	}
+}
+
+func (e *Evaluator) mutationDeclarations(policy *AdmissionPolicy) admissioncel.OptionalVariableDeclarations {
+	decls := e.optionalDeclarations(policy)
+	decls.HasPatchTypes = e.patchTypesEnabled
+	return decls
 }
 
 func (e *Evaluator) compileCheckMode() environment.Type {
@@ -831,6 +835,12 @@ func evaluationValue(result admissioncel.EvaluationResult) interface{} {
 }
 
 func budgetCost(start, remaining int64) int64 {
+	if remaining < 0 {
+		return start
+	}
+	if remaining > start {
+		return 0
+	}
 	return start - remaining
 }
 

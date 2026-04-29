@@ -98,3 +98,28 @@ func TestEvalAuditAnnotations_CompileError(t *testing.T) {
 		t.Fatalf("EvalAdmission should only evaluate validations, got violations: %s", result.FormatViolations())
 	}
 }
+
+func TestEvalAuditAnnotations_RejectsPatchTypes(t *testing.T) {
+	e, err := NewEvaluator()
+	if err != nil {
+		t.Fatalf("NewEvaluator() error: %v", err)
+	}
+
+	policy := &AdmissionPolicy{
+		AuditAnnotations: []AuditAnnotation{{Path: "spec.auditAnnotations[0]", Key: "patch", ValueExpression: patchTypeStringExpression}},
+	}
+	input := &AdmissionInput{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata":   map[string]interface{}{"name": "test-pod"},
+		},
+	}
+
+	if _, err := e.EvalAuditAnnotations(policy, input); err == nil {
+		t.Fatal("expected audit annotation evaluation to reject mutation patch types")
+	}
+	if _, err := e.EvalAuditAnnotation(policy, AuditAnnotationSelector{Path: "spec.auditAnnotations[0]"}, input); err == nil {
+		t.Fatal("expected single audit annotation evaluation to reject mutation patch types")
+	}
+}

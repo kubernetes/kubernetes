@@ -287,8 +287,8 @@ func TestEvalMutation_MultiplePatches(t *testing.T) {
 	}
 }
 
-func TestEvalMutation_CostLimitStopsFurtherMutations(t *testing.T) {
-	e, err := NewEvaluator(WithCostLimit(1))
+func TestEvalMutation_CostLimitIsPerMutation(t *testing.T) {
+	e, err := NewEvaluator(WithCostLimit(1000))
 	if err != nil {
 		t.Fatalf("NewEvaluator() error: %v", err)
 	}
@@ -298,7 +298,7 @@ func TestEvalMutation_CostLimitStopsFurtherMutations(t *testing.T) {
 			{
 				Path:       "spec.mutations[0]",
 				PatchType:  "ApplyConfiguration",
-				Expression: "Object{metadata: Object.metadata{name: object.metadata.name + object.metadata.name}}",
+				Expression: "Object{metadata: Object.metadata{name: string([1,2,3,4,5,6,7,8,9,10].map(x, [1,2,3,4,5,6,7,8,9,10].map(y, x * y)).size())}}",
 			},
 			{
 				Path:       "spec.mutations[1]",
@@ -319,14 +319,14 @@ func TestEvalMutation_CostLimitStopsFurtherMutations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EvalMutation() error: %v", err)
 	}
-	if len(result.Patches) != 1 {
-		t.Fatalf("got %d patches, want 1", len(result.Patches))
+	if len(result.Patches) != 2 {
+		t.Fatalf("got %d patches, want 2", len(result.Patches))
 	}
 	if result.Patches[0].Error == nil {
 		t.Fatal("expected first patch to fail after exceeding the cost budget")
 	}
-	if result.Cost < 0 || result.Cost > 1 {
-		t.Fatalf("Cost = %d, want between 0 and the configured limit", result.Cost)
+	if result.Patches[1].Error != nil {
+		t.Fatalf("expected second patch to get a fresh cost budget, got error: %v", result.Patches[1].Error)
 	}
 }
 
