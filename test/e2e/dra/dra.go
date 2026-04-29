@@ -115,29 +115,29 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		   Testname: CRUD operations for devicetaintrules
 		   Description: kube-apiserver must support create/update/list/patch/delete operations for resource.k8s.io/v1beta2 DeviceTaintRule.
 		*/
-		f.It("resource.k8s.io/v1beta2 DeviceTaintRule", f.WithFeatureGate(features.DRADeviceTaintRules), func(ctx context.Context) {
+		f.It("resource.k8s.io/v1 DeviceTaintRule", f.WithFeatureGate(features.DRADeviceTaintRules), func(ctx context.Context) {
 			lastTransitionTime := metav1.Now()
 			lastTransitionTimeEncoded, err := lastTransitionTime.MarshalJSON()
 			framework.ExpectNoError(err)
 			e2econformance.TestResource(ctx, f,
-				&e2econformance.ResourceTestcase[*resourcev1beta2.DeviceTaintRule]{
-					GVR:        resourcev1beta2.SchemeGroupVersion.WithResource("devicetaintrules"),
+				&e2econformance.ResourceTestcase[*resourceapi.DeviceTaintRule]{
+					GVR:        resourceapi.SchemeGroupVersion.WithResource("devicetaintrules"),
 					Namespaced: ptr.To(false),
-					InitialSpec: &resourcev1beta2.DeviceTaintRule{
-						Spec: resourcev1beta2.DeviceTaintRuleSpec{
+					InitialSpec: &resourceapi.DeviceTaintRule{
+						Spec: resourceapi.DeviceTaintRuleSpec{
 							// Empty DeviceSelector => no devices selected, so this test is safe.
-							Taint: resourcev1beta2.DeviceTaint{
+							Taint: resourceapi.DeviceTaint{
 								Key:    "testing",
-								Effect: resourcev1beta2.DeviceTaintEffectNone,
+								Effect: resourceapi.DeviceTaintEffectNone,
 							},
 						},
 					},
-					UpdateSpec: func(obj *resourcev1beta2.DeviceTaintRule) *resourcev1beta2.DeviceTaintRule {
-						obj.Spec.Taint.Effect = resourcev1beta2.DeviceTaintEffectNoExecute
+					UpdateSpec: func(obj *resourceapi.DeviceTaintRule) *resourceapi.DeviceTaintRule {
+						obj.Spec.Taint.Effect = resourceapi.DeviceTaintEffectNoExecute
 						return obj
 					},
 					StrategicMergePatchSpec: `{"spec": {"taint": {"effect": "NoExecute"}}}`,
-					UpdateStatus: func(obj *resourcev1beta2.DeviceTaintRule) *resourcev1beta2.DeviceTaintRule {
+					UpdateStatus: func(obj *resourceapi.DeviceTaintRule) *resourceapi.DeviceTaintRule {
 						obj.Status.Conditions = append(obj.Status.Conditions, metav1.Condition{
 							Type:               "Testing",
 							Status:             metav1.ConditionTrue,

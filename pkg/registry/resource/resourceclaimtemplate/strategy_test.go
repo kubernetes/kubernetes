@@ -478,12 +478,13 @@ func TestClaimTemplateStrategyCreate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(ns1, ns2)
 			mockNSClient := fakeClient.CoreV1().Namespaces()
-			if !tc.adminAccess {
+			if !tc.adminAccess || !tc.deviceTaints {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.DRAAdminAccess:        tc.adminAccess,
 				features.DRADeviceTaints:       tc.deviceTaints,
+				features.DRADeviceTaintRules:   tc.deviceTaints,
 				features.DRAPrioritizedList:    tc.prioritizedList,
 				features.DRAConsumableCapacity: tc.consumableCapacity,
 			})
@@ -853,13 +854,16 @@ func TestStrategyUpdate(t *testing.T) {
 			fakeClient := fake.NewSimpleClientset(ns1, ns2)
 			mockNSClient := fakeClient.CoreV1().Namespaces()
 
-			if !tc.adminAccess {
+			if !tc.adminAccess || !tc.deviceTaints {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 			}
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAAdminAccess, tc.adminAccess)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRADeviceTaints, tc.deviceTaints)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAPrioritizedList, tc.prioritizedList)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, tc.consumableCapacity)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRAAdminAccess:        tc.adminAccess,
+				features.DRADeviceTaints:       tc.deviceTaints,
+				features.DRADeviceTaintRules:   tc.deviceTaints,
+				features.DRAPrioritizedList:    tc.prioritizedList,
+				features.DRAConsumableCapacity: tc.consumableCapacity,
+			})
 			strategy := NewStrategy(mockNSClient)
 
 			oldObj := tc.oldObj.DeepCopy()

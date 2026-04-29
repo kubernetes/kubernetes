@@ -49,6 +49,7 @@ func testPrioritizedList(tCtx ktesting.TContext, enabled bool) {
 		return
 	}
 
+	require.NoError(tCtx, err, "create ResourceClaim")
 	require.NotEmpty(tCtx, claim.Spec.Devices.Requests[0].FirstAvailable, "should store FirstAvailable")
 	startScheduler(tCtx)
 
