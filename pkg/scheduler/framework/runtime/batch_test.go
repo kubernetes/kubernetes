@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -98,23 +97,6 @@ func (s sharedLister) CompositePodGroups() fwk.CompositePodGroupLister {
 	return nil
 }
 
-var batchRegistry = func() Registry {
-	r := make(Registry)
-	err := r.Register("batchTest", newBatchTestPlugin)
-	if err != nil {
-		log.Fatal("Couldn't register test.")
-	}
-	err = r.Register(queueSortPlugin, newQueueSortPlugin)
-	if err != nil {
-		log.Fatal("Couldn't register test.")
-	}
-	err = r.Register(bindPlugin, newBindPlugin)
-	if err != nil {
-		log.Fatal("Couldn't register test.")
-	}
-	return r
-}()
-
 type BatchTestPlugin struct{}
 
 func (pl *BatchTestPlugin) Name() string {
@@ -150,24 +132,21 @@ func newBatchTestPlugin(_ context.Context, injArgs runtime.Object, f fwk.Handle)
 	return &BatchTestPlugin{}, nil
 }
 
-func newBatchTestFramework(ctx context.Context, r Registry) (framework.Framework, *sharedLister, error) {
+func newBatchTestFramework(ctx context.Context, scorePl *configurableScorePlugin) (framework.Framework, *sharedLister, error) {
+	r := Registry{
+		"batchTest":     newBatchTestPlugin,
+		queueSortPlugin: newQueueSortPlugin,
+		bindPlugin:      newBindPlugin,
+	}
 	plugins := &config.Plugins{}
 	profile := config.KubeSchedulerProfile{Plugins: plugins}
-
-	if _, ok := r[queueSortPlugin]; !ok {
-		r[queueSortPlugin] = newQueueSortPlugin
-	}
-	if _, ok := r[bindPlugin]; !ok {
-		r[bindPlugin] = newBindPlugin
-	}
-
-	if len(profile.Plugins.QueueSort.Enabled) == 0 {
-		profile.Plugins.QueueSort.Enabled = append(profile.Plugins.QueueSort.Enabled, config.Plugin{Name: queueSortPlugin})
-	}
-	if len(profile.Plugins.Bind.Enabled) == 0 {
-		profile.Plugins.Bind.Enabled = append(profile.Plugins.Bind.Enabled, config.Plugin{Name: bindPlugin})
-	}
+	profile.Plugins.QueueSort.Enabled = []config.Plugin{{Name: queueSortPlugin}}
+	profile.Plugins.Bind.Enabled = []config.Plugin{{Name: bindPlugin}}
 	profile.Plugins.Filter.Enabled = []config.Plugin{{Name: "batchTest"}}
+	if scorePl != nil {
+		r["scoringBatchTest"] = func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) { return scorePl, nil }
+		profile.Plugins.Score.Enabled = []config.Plugin{{Name: "scoringBatchTest", Weight: 1}}
+	}
 
 	lister := &sharedLister{nodes: nodeInfoLister{}}
 
@@ -253,7 +232,7 @@ func TestBatchBasic(t *testing.T) {
 			expectedHint:                  "",
 		},
 		{
-			name:                          "a second pod doesn't get a hint if it's not 1-pod-per-node",
+			name:                          "a second non-blocking pod with the same signature gets a hint",
 			firstPodID:                    nonBlockingPodID("1"),
 			firstSig:                      "sig",
 			firstChosenNode:               "n3",
@@ -261,8 +240,8 @@ func TestBatchBasic(t *testing.T) {
 			firstPodScheduledSuccessfully: true,
 			secondPodID:                   nonBlockingPodID("2"),
 			secondSig:                     "sig",
-			secondChosenNode:              "n1",
-			expectedHint:                  "",
+			secondChosenNode:              "n4",
+			expectedHint:                  "n1",
 		},
 		{
 			name:                          "pod doesn't get hint if previous pod didn't scheduled",
@@ -377,7 +356,7 @@ func TestBatchBasic(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
-			testFwk, lister, err := newBatchTestFramework(ctx, batchRegistry)
+			testFwk, lister, err := newBatchTestFramework(ctx, nil)
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
@@ -452,5 +431,160 @@ func TestBatchBasic(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+type configurableScorePlugin struct {
+	score    int64
+	scoreErr bool
+	normErr  bool
+}
+
+func (pl *configurableScorePlugin) Name() string { return "scoringBatchTest" }
+
+func (pl *configurableScorePlugin) Score(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeInfo) (int64, *fwk.Status) {
+	if pl.scoreErr {
+		return 0, fwk.AsStatus(fmt.Errorf("injected score error"))
+	}
+	return pl.score, nil
+}
+
+func (pl *configurableScorePlugin) ScoreExtensions() fwk.ScoreExtensions { return pl }
+
+func (pl *configurableScorePlugin) NormalizeScore(_ context.Context, _ fwk.CycleState, _ *v1.Pod, _ fwk.NodeScoreList) *fwk.Status {
+	if pl.normErr {
+		return fwk.AsStatus(fmt.Errorf("injected normalize error"))
+	}
+	return nil
+}
+
+func TestBatchRescore(t *testing.T) {
+	tests := []struct {
+		name                   string
+		score                  int64
+		scoreErr               bool
+		normErr                bool
+		expectedHint           string
+		expectedRemainingNodes []string
+	}{
+		{
+			name:                   "rescored node competes and wins on highest score",
+			score:                  100,
+			expectedHint:           "n3",
+			expectedRemainingNodes: []string{"n1"},
+		},
+		{
+			name:         "score error flushes state and gives no hint",
+			scoreErr:     true,
+			expectedHint: "",
+		},
+		{
+			name:         "normalize error flushes state and gives no hint",
+			normErr:      true,
+			expectedHint: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			scorePl := &configurableScorePlugin{score: tt.score, scoreErr: tt.scoreErr, normErr: tt.normErr}
+			testFwk, lister, err := newBatchTestFramework(ctx, scorePl)
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+
+			// First pod: non-blocking, chosen node is n3, n1 left as other candidate.
+			pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID(nonBlockingPodID("1"))}}
+			sig := fwk.PodSignature("sig")
+			batch := newOpportunisticBatch(testFwk, false)
+			state := framework.NewCycleState()
+
+			batch.GetNodeHint(ctx, pod1, sig, state, 1)
+			batch.StoreScheduleResults(ctx, []byte("sig"), "", "n3", newTestNodes([]string{"n1"}), 1)
+
+			// Put n3 in the lister so refreshHintCandidates can find it.
+			// Non-blocking pods always pass the filter, so rescoreHintedNode is triggered.
+			n3Info := framework.NewNodeInfo(pod1)
+			n3Info.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n3", UID: "n3"}})
+			lister.nodes = nodeInfoLister{n3Info}
+
+			pod2 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: types.UID(nonBlockingPodID("2"))}}
+			hint := batch.GetNodeHint(ctx, pod2, sig, state, 2)
+
+			if hint != tt.expectedHint {
+				t.Fatalf("got hint %q, expected %q", hint, tt.expectedHint)
+			}
+
+			if tt.expectedRemainingNodes != nil {
+				if batch.state == nil || batch.state.sortedNodes == nil {
+					t.Fatal("expected non-nil batch state after hint")
+				}
+				if got, want := batch.state.sortedNodes.Len(), len(tt.expectedRemainingNodes); got != want {
+					t.Fatalf("remaining node count: got %d, want %d", got, want)
+				}
+				for i, want := range tt.expectedRemainingNodes {
+					if got := batch.state.sortedNodes.Pop().Name; got != want {
+						t.Fatalf("remaining node[%d]: got %q, want %q", i, got, want)
+					}
+				}
+			}
+		})
+	}
+}
+
+// TestBatchRescoreCachedRawScores verifies that NormalizeAndWeightScores during rescoring
+// uses the raw scores stored in the cached node list, not just the freshly rescored node's scores.
+func TestBatchRescoreCachedRawScores(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Plugin returns score 10 for any node it scores (i.e., n3 during rescore).
+	// n1's cached raw score of 50 is higher, so n1 should win.
+	scorePl := &configurableScorePlugin{score: 10}
+	testFwk, lister, err := newBatchTestFramework(ctx, scorePl)
+	if err != nil {
+		t.Fatalf("Failed to create framework: %v", err)
+	}
+
+	batch := newOpportunisticBatch(testFwk, false)
+	state := framework.NewCycleState()
+	sig := fwk.PodSignature("sig")
+
+	pod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID(nonBlockingPodID("1"))}}
+	batch.GetNodeHint(ctx, pod1, sig, state, 1)
+
+	// Store n1 with a raw score of 50, simulating what a full pipeline run would produce.
+	otherNodes := framework.NewSortedScoredNodes([]fwk.NodePluginScores{
+		{Name: "n1", RawScores: []fwk.PluginScore{{Name: "scoringBatchTest", Score: 50}}},
+	})
+	batch.StoreScheduleResults(ctx, []byte("sig"), "", "n3", otherNodes, 1)
+
+	// Put n3 in the lister; non-blocking pods pass the filter, triggering rescoreHintedNode.
+	n3Info := framework.NewNodeInfo(pod1)
+	n3Info.SetNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "n3", UID: "n3"}})
+	lister.nodes = nodeInfoLister{n3Info}
+
+	pod2 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: types.UID(nonBlockingPodID("2"))}}
+	hint := batch.GetNodeHint(ctx, pod2, sig, state, 2)
+
+	// n1's cached raw score (50) beats n3's rescored raw score (10).
+	if hint != "n1" {
+		t.Fatalf("got hint %q, want %q", hint, "n1")
+	}
+
+	// n3 should be the only remaining node after the hint pop.
+	if batch.state == nil || batch.state.sortedNodes == nil {
+		t.Fatal("expected non-nil batch state after hint")
+	}
+	if got := batch.state.sortedNodes.Len(); got != 1 {
+		t.Fatalf("remaining node count: got %d, want 1", got)
+	}
+	if got := batch.state.sortedNodes.Pop().Name; got != "n3" {
+		t.Fatalf("remaining node: got %q, want %q", got, "n3")
 	}
 }
