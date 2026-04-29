@@ -8268,21 +8268,7 @@ func ValidateNamespace(namespace *core.Namespace) field.ErrorList {
 
 // Validate finalizer names
 func validateFinalizerName(stringValue string, fldPath *field.Path) field.ErrorList {
-	allErrs := apimachineryvalidation.ValidateFinalizerName(stringValue, fldPath)
-	allErrs = append(allErrs, validateKubeFinalizerName(stringValue, fldPath)...)
-	return allErrs
-}
-
-// validateKubeFinalizerName checks for "standard" names of legacy finalizer
-func validateKubeFinalizerName(stringValue string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if len(strings.Split(stringValue, "/")) == 1 {
-		if !helper.IsStandardFinalizerName(stringValue) {
-			return append(allErrs, field.Invalid(fldPath, stringValue, "name is neither a standard finalizer name nor is it fully qualified"))
-		}
-	}
-
-	return allErrs
+	return apimachineryvalidation.ValidateFinalizerName(stringValue, fldPath)
 }
 
 // ValidateNamespaceUpdate tests to make sure a namespace update can be applied.

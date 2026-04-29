@@ -303,17 +303,6 @@ func IsServiceIPSet(service *core.Service) bool {
 		service.Spec.ClusterIP != core.ClusterIPNone
 }
 
-var standardFinalizers = sets.New(
-	string(core.FinalizerKubernetes),
-	metav1.FinalizerOrphanDependents,
-	metav1.FinalizerDeleteDependents,
-)
-
-// IsStandardFinalizerName checks if the input string is a standard finalizer name
-func IsStandardFinalizerName(str string) bool {
-	return standardFinalizers.Has(str)
-}
-
 // GetAccessModesAsString returns a string representation of an array of access modes.
 // modes, when present, are always in the same order: RWO,ROX,RWX,RWOP.
 func GetAccessModesAsString(modes []core.PersistentVolumeAccessMode) string {
