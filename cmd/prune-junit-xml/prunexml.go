@@ -25,7 +25,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -283,8 +283,8 @@ func (p *packageOwners) addOwner(name string) string {
 	}
 
 	// Walk up starting from an absolute path until we cannot go up further.
-	for ; dir != "" && dir != "." && dir != "/"; dir = path.Dir(dir) {
-		data, err := os.ReadFile(path.Join(dir, "OWNERS"))
+	for ; dir != "" && dir != "." && dir != "/"; dir = filepath.Dir(dir) {
+		data, err := os.ReadFile(filepath.Join(dir, "OWNERS"))
 		if err != nil {
 			continue
 		}
