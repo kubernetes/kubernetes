@@ -41,22 +41,16 @@ usage: ./test-performance.sh <options>
  -l <num> gce cloud endpoint qps
 ```
 
-The tests follow the pattern TestPerformance/{AllocatorType}-KubeQPS{X}-Nodes{Y}, where AllocatorType
-is one of
-
-- RangeAllocator
-- IPAMFromCluster
-- CloudAllocator
-- IPAMFromCloud
-
-and X represents the QPS configured for the kubernetes API client, and Y is the number of nodes to create.
+The `-r` option is passed through as the `go test -test.run` pattern for the
+package.
 
 The -d flags set the -v level for glog to 6, enabling nearly all of the debug logs in the code.
 
-So to run the test for CloudAllocator with 10 nodes, one can run
+To run the package with a custom configuration for CloudAllocator with 10 nodes,
+one can run
 
 ```shell
-./test-performance.sh -r /CloudAllocator.*Nodes10$
+./test-performance.sh -c -a CloudAllocator -n 10
 ```
 
 At the end of the test, a JSON format of the results for all the tests run is printed. Passing the -o option
@@ -65,19 +59,18 @@ allows for also saving this JSON to a named file.
 ### Profiling the code
 It's possible to get the CPU and memory profiles of code during test execution by using the ```-p``` option.
 The CPU and memory profiles are generated in the same directory with the file names set to ```cpu-<id>.out```
-and ```cpu-<id>.out```, where ```<id>``` is the argument value. Typicall pattern is to put in the number
+and ```mem-<id>.out```, where ```<id>``` is the argument value. Typical pattern is to put in the number
 of nodes being simulated as the id, or 'all' in case running the full suite.
 
 ### Custom Test Configuration
-It's also possible to run a custom test configuration by passing the -c option. With this option, it then
+It's also possible to run a custom test configuration by passing the -c option. With this option, it is
 possible to specify the number of nodes to simulate and the API server qps values for creation,
-IPAM allocation and cloud endpoint, along with the allocator name to run. The defaults values for the
-qps parmeters are 30 for IPAM allocation, 100 for node creation and 30 for the cloud endpoint, and the
+IPAM allocation and cloud endpoint, along with the allocator name to run. The default values for the
+qps parameters are 30 for IPAM allocation, 100 for node creation and 30 for the cloud endpoint, and the
 default allocator is the RangeAllocator.
 
 Code Organization
 -----
-The core of the tests are defined in [ipam_test.go](ipam_test.go), using the t.Run() helper to control parallelism
-as we want to able to start the master once. [cloud.go](cloud.go) contains the mock of the cloud server endpoint
-and can be configured to behave differently as needed by the various modes. The tracking of the node behavior and
-creation of the test results data is in [results.go](results.go).
+[main_test.go](main_test.go) defines the test flags and default custom configuration, and starts the shared
+integration test etcd process. The tracking of node behavior and creation of the test results data is in
+[results.go](results.go).
