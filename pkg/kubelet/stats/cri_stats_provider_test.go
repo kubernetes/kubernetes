@@ -1512,6 +1512,34 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 			},
 			expected: nil,
 		},
+		{
+			desc: "should fall back to cache-based computation if CRI reports 0 UsageNanoCores",
+			stats: &runtimeapi.ContainerStats{
+				Attributes: &runtimeapi.ContainerAttributes{
+					Id: "1",
+				},
+				Cpu: &runtimeapi.CpuUsage{
+					Timestamp: int64(time.Second / time.Nanosecond),
+					UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+						Value: 20000000000,
+					},
+					UsageNanoCores: &runtimeapi.UInt64Value{
+						Value: 0,
+					},
+				},
+			},
+			cpuUsageCache: map[string]*cpuUsageRecord{
+				"1": {
+					stats: &runtimeapi.CpuUsage{
+						Timestamp: 0,
+						UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+							Value: 10000000000,
+						},
+					},
+				},
+			},
+			expected: &value1,
+		},
 	}
 	logger, _ := ktesting.NewTestContext(t)
 	for _, test := range tests {
