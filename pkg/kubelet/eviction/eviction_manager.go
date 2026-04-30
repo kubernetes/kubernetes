@@ -537,13 +537,24 @@ func (m *managerImpl) emptyDirLimitEviction(logger klog.Logger, podStats statsap
 		podVolumeUsed[volume.Name] = resource.NewQuantity(int64(*volume.UsedBytes), resource.BinarySI)
 	}
 	for i := range pod.Spec.Volumes {
-		source := &pod.Spec.Volumes[i].VolumeSource
-		if source.EmptyDir != nil {
-			size := source.EmptyDir.SizeLimit
-			used := podVolumeUsed[pod.Spec.Volumes[i].Name]
+		vol := &pod.Spec.Volumes[i]
+		if vol.EmptyDir != nil {
+			size := vol.EmptyDir.SizeLimit
+
+			// If memory-backed, try to get actual size from stats
+			if vol.EmptyDir.Medium == v1.StorageMediumMemory {
+				for _, vs := range podStats.VolumeStats {
+					if vs.Name == vol.Name && vs.CapacityBytes != nil {
+						size = resource.NewQuantity(int64(*vs.CapacityBytes), resource.BinarySI)
+						break
+					}
+				}
+			}
+
+			used := podVolumeUsed[vol.Name]
 			if used != nil && size != nil && size.Sign() == 1 && used.Cmp(*size) > 0 {
 				// the emptyDir usage exceeds the size limit, evict the pod
-				if m.evictPod(logger, pod, immediateEvictionGracePeriodSeconds, fmt.Sprintf(emptyDirMessageFmt, pod.Spec.Volumes[i].Name, size.String()), nil, nil) {
+				if m.evictPod(logger, pod, immediateEvictionGracePeriodSeconds, fmt.Sprintf(emptyDirMessageFmt, vol.Name, size.String()), nil, nil) {
 					metrics.Evictions.WithLabelValues(signalEmptyDirFsLimit).Inc()
 					return true
 				}
