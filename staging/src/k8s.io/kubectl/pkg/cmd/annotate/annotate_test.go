@@ -374,10 +374,10 @@ func TestUpdateAnnotations(t *testing.T) {
 	}
 	for _, test := range tests {
 		options := &AnnotateOptions{
-			overwrite:         test.overwrite,
-			newAnnotations:    test.annotations,
-			removeAnnotations: test.remove,
-			resourceVersion:   test.version,
+			Overwrite:         test.overwrite,
+			NewAnnotations:    test.annotations,
+			RemoveAnnotations: test.remove,
+			ResourceVersion:   test.version,
 		}
 		err := options.updateAnnotations(test.obj)
 		if test.expectedErr != "" {
@@ -394,6 +394,35 @@ func TestUpdateAnnotations(t *testing.T) {
 		}
 		if !reflect.DeepEqual(test.obj, test.expected) {
 			t.Errorf("expected: %v, got %v", test.expected, test.obj)
+		}
+	}
+}
+
+func TestAnnotateCmdFlags(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	iostreams, _, _, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdAnnotate("kubectl", tf, tf, iostreams)
+
+	expected := []string{
+		"all",
+		"all-namespaces",
+		"dry-run",
+		"field-manager",
+		"field-selector",
+		"filename",
+		"kustomize",
+		"list",
+		"local",
+		"overwrite",
+		"recursive",
+		"resource-version",
+		"selector",
+	}
+	for _, name := range expected {
+		if cmd.Flags().Lookup(name) == nil {
+			t.Errorf("flag %q not registered on annotate command", name)
 		}
 	}
 }
@@ -536,38 +565,39 @@ func TestRunAnnotate(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			iostreams, _, _, _ := genericiooptions.NewTestIOStreams()
+			fakeClient := &fake.RESTClient{
+				GroupVersion:         schema.GroupVersion{Version: "v1"},
+				NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
+				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					if req.Method == "PATCH" && test.verifyPatch != nil {
+						body, err := io.ReadAll(req.Body)
+						if err != nil {
+							t.Fatal(err)
+						}
+						test.verifyPatch(t, body)
+					}
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Header:     cmdtesting.DefaultHeader(),
+						Body:       cmdtesting.ObjBody(codec, &pods.Items[0]),
+					}, nil
+				}),
+			}
+			for _, info := range test.infos {
+				info.Client = fakeClient
+			}
 			o := &AnnotateOptions{
-				resourceFinder:    genericclioptions.NewSimpleFakeResourceFinder(test.infos...),
-				newAnnotations:    test.newAnnotations,
-				removeAnnotations: test.removeAnns,
-				overwrite:         test.overwrite,
-				local:             test.local,
-				list:              test.list,
-				resourceVersion:   test.resourceVer,
+				ResourceBuilder:   genericclioptions.NewSimpleFakeResourceFinder(test.infos...),
+				NewAnnotations:    test.newAnnotations,
+				RemoveAnnotations: test.removeAnns,
+				Overwrite:         test.overwrite,
+				Local:             test.local,
+				List:              test.list,
+				ResourceVersion:   test.resourceVer,
 				Recorder:          genericclioptions.NoopRecorder{},
 				IOStreams:         iostreams,
 				PrintObj: func(obj runtime.Object, out io.Writer) error {
 					return nil
-				},
-				unstructuredClientForMapping: func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
-					return &fake.RESTClient{
-						GroupVersion:         schema.GroupVersion{Version: "v1"},
-						NegotiatedSerializer: resource.UnstructuredPlusDefaultContentConfig().NegotiatedSerializer,
-						Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-							if req.Method == "PATCH" && test.verifyPatch != nil {
-								body, err := io.ReadAll(req.Body)
-								if err != nil {
-									t.Fatal(err)
-								}
-								test.verifyPatch(t, body)
-							}
-							return &http.Response{
-								StatusCode: http.StatusOK,
-								Header:     cmdtesting.DefaultHeader(),
-								Body:       cmdtesting.ObjBody(codec, &pods.Items[0]),
-							}, nil
-						}),
-					}, nil
 				},
 			}
 			err := o.RunAnnotate()
@@ -585,7 +615,7 @@ func TestRunAnnotate(t *testing.T) {
 
 // resourceFinderFunc adapts a resource.Result into a ResourceFinder so tests
 // can inject a real *resource.Result (which supports IntoSingleItemImplied)
-// while AnnotateOptions.resourceFinder uses the narrower ResourceFinder interface.
+// while AnnotateOptions.ResourceBuilder uses the narrower ResourceFinder interface.
 type resourceFinderFunc func() resource.Visitor
 
 func (f resourceFinderFunc) Do() resource.Visitor { return f() }
@@ -641,12 +671,11 @@ func TestAnnotateResourceVersion(t *testing.T) {
 		Do()
 
 	o := &AnnotateOptions{
-		resourceFinder:               resourceFinderFunc(func() resource.Visitor { return result }),
-		newAnnotations:               map[string]string{"a": "b"},
-		resourceVersion:              "10",
-		Recorder:                     genericclioptions.NoopRecorder{},
-		IOStreams:                    iostreams,
-		unstructuredClientForMapping: tf.UnstructuredClientForMapping,
+		ResourceBuilder: resourceFinderFunc(func() resource.Visitor { return result }),
+		NewAnnotations:  map[string]string{"a": "b"},
+		ResourceVersion: "10",
+		Recorder:        genericclioptions.NoopRecorder{},
+		IOStreams:       iostreams,
 		PrintObj: func(obj runtime.Object, out io.Writer) error {
 			return nil
 		},

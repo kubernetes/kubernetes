@@ -56,10 +56,11 @@ func NewResourceBuilderFlags() *ResourceBuilderFlags {
 // WithFile sets the FileNameFlags.
 // If recurse is set, it will process directory recursively. Useful when you want to manage related manifests
 // organized within the same directory.
-func (o *ResourceBuilderFlags) WithFile(recurse bool, files ...string) *ResourceBuilderFlags {
+func (o *ResourceBuilderFlags) WithFile(recurse bool, kustomize *string, files ...string) *ResourceBuilderFlags {
 	o.FileNameFlags = &FileNameFlags{
 		Usage:     "identifying the resource.",
 		Filenames: &files,
+		Kustomize: kustomize,
 		Recursive: ptr.To(recurse),
 	}
 
@@ -119,13 +120,30 @@ func (o *ResourceBuilderFlags) AddFlags(flagset *pflag.FlagSet) {
 	o.FileNameFlags.AddFlags(flagset)
 
 	if o.LabelSelector != nil {
-		flagset.StringVarP(o.LabelSelector, "selector", "l", *o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+		flagset.StringVarP(
+			o.LabelSelector,
+			"selector",
+			"l",
+			*o.LabelSelector,
+			"Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)",
+		)
 	}
 	if o.FieldSelector != nil {
-		flagset.StringVar(o.FieldSelector, "field-selector", *o.FieldSelector, "Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.")
+		flagset.StringVar(
+			o.FieldSelector,
+			"field-selector",
+			*o.FieldSelector,
+			"Selector (field query) to filter on, supports '=', '==', and '!='.(e.g. --field-selector key1=value1,key2=value2). The server only supports a limited number of field queries per type.",
+		)
 	}
 	if o.AllNamespaces != nil {
-		flagset.BoolVarP(o.AllNamespaces, "all-namespaces", "A", *o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+		flagset.BoolVarP(
+			o.AllNamespaces,
+			"all-namespaces",
+			"A",
+			*o.AllNamespaces,
+			"If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.",
+		)
 	}
 	if o.All != nil {
 		flagset.BoolVar(o.All, "all", *o.All, "Select all resources in the namespace of the specified resource types")
