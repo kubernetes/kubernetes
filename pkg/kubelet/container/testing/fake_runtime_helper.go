@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -136,4 +137,14 @@ func (f *FakeRuntimeHelper) PodCPUAndMemoryStats(_ context.Context, pod *v1.Pod,
 func (f *FakeRuntimeHelper) OnPodSandboxReady(_ context.Context, _ *v1.Pod) error {
 	// Not implemented
 	return nil
+}
+
+// ResizeVolume is not implemented
+func (f *FakeRuntimeHelper) ResizeVolume(pod *v1.Pod, volumeName string, newSize *resource.Quantity) error {
+	return nil
+}
+
+// GetVolumeSize is not implemented
+func (f *FakeRuntimeHelper) GetVolumeSize(pod *v1.Pod, volumeName string) (*resource.Quantity, error) {
+	return nil, nil
 }

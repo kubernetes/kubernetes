@@ -631,6 +631,8 @@ type podActions struct {
 	// ContainersToUpdate keeps a list of containers needing resource update.
 	// Container resource update is applicable only for CPU and memory.
 	ContainersToUpdate map[v1.ResourceName][]containerToUpdateInfo
+	// VolumesToUpdate keeps a list of volume names needing resize.
+	VolumesToUpdate []string
 	// UpdatePodResources is true if container(s) need resource update with restart
 	UpdatePodResources bool
 	// ContainersToReset is a list of containers to be killed (if running) and removed from
@@ -817,6 +819,35 @@ func (m *kubeGenericRuntimeManager) computePodResizeAction(ctx context.Context, 
 	return true
 }
 
+// computeVolumeResizeAction determines the actions required (if any) to resize volumes.
+func (m *kubeGenericRuntimeManager) computeVolumeResizeAction(ctx context.Context, pod *v1.Pod, changes *podActions) {
+	logger := klog.FromContext(ctx)
+	for _, vol := range pod.Spec.Volumes {
+		if vol.EmptyDir != nil && vol.EmptyDir.Medium == v1.StorageMediumMemory {
+			currentSize, err := m.runtimeHelper.GetVolumeSize(pod, vol.Name)
+			if err != nil {
+				logger.Error(err, "Failed to get volume size", "volume", vol.Name, "pod", klog.KObj(pod))
+				continue
+			}
+			var newSize *resource.Quantity
+			if vol.EmptyDir.SizeLimit != nil {
+				newSize = vol.EmptyDir.SizeLimit
+			}
+
+			// Compare current size with new size
+			if currentSize == nil && (newSize == nil || newSize.Value() == 0) {
+				continue
+			}
+			if currentSize != nil && newSize != nil && currentSize.Equal(*newSize) {
+				continue
+			}
+
+			// If they differ, mark for update
+			changes.VolumesToUpdate = append(changes.VolumesToUpdate, vol.Name)
+		}
+	}
+}
+
 func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, podContainerChanges podActions) *kubecontainer.SyncResult {
 	logger := klog.FromContext(ctx)
 	start := time.Now()
@@ -960,6 +991,39 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	// If resize results in net pod resource increase, set pod cgroup config before resizing containers.
 	// If resize results in net pod resource decrease, set pod cgroup config after resizing containers.
 	// If an error occurs at any point, abort. Let future syncpod iterations retry the unfinished stuff.
+	updateVolumeSize := func(forUpsize bool) error {
+		for _, volName := range podContainerChanges.VolumesToUpdate {
+			var vol *v1.Volume
+			for _, v := range pod.Spec.Volumes {
+				if v.Name == volName {
+					vol = &v
+					break
+				}
+			}
+			if vol == nil {
+				continue
+			}
+			currentSize, _ := m.runtimeHelper.GetVolumeSize(pod, volName)
+			var newSize *resource.Quantity
+			if vol.EmptyDir.SizeLimit != nil {
+				newSize = vol.EmptyDir.SizeLimit
+			}
+			isUpsize := false
+			if newSize != nil && currentSize != nil && newSize.Cmp(*currentSize) > 0 {
+				isUpsize = true
+			} else if currentSize == nil && newSize != nil {
+				isUpsize = true
+			}
+			if forUpsize == isUpsize {
+				klog.V(2).InfoS("Resizing volume", "volume", volName, "pod", klog.KObj(pod), "isUpsize", isUpsize)
+				if err := m.runtimeHelper.ResizeVolume(pod, volName, newSize); err != nil {
+					return fmt.Errorf("failed to resize volume %s: %w", volName, err)
+				}
+			}
+		}
+		return nil
+	}
+
 	resizeContainers := func(rName v1.ResourceName, currPodCgLimValue, newPodCgLimValue, currPodCgReqValue, newPodCgReqValue int64) error {
 		var err error
 		// At upsizing, limits should expand prior to requests in order to keep "requests <= limits".
@@ -1008,14 +1072,59 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 	// partially actuated.
 	defer m.runtimeHelper.RequestPodReinspect(pod.UID)
 
+	// Determine volume resize direction
+	hasVolumeUpsize := false
+	hasVolumeDownsize := false
+	for _, volName := range podContainerChanges.VolumesToUpdate {
+		var vol *v1.Volume
+		for _, v := range pod.Spec.Volumes {
+			if v.Name == volName {
+				vol = &v
+				break
+			}
+		}
+		if vol == nil {
+			continue
+		}
+		currentSize, _ := m.runtimeHelper.GetVolumeSize(pod, volName)
+		var newSize *resource.Quantity
+		if vol.EmptyDir.SizeLimit != nil {
+			newSize = vol.EmptyDir.SizeLimit
+		}
+		if newSize != nil && currentSize != nil {
+			if newSize.Cmp(*currentSize) > 0 {
+				hasVolumeUpsize = true
+			} else if newSize.Cmp(*currentSize) < 0 {
+				hasVolumeDownsize = true
+			}
+		} else if currentSize == nil && newSize != nil {
+			hasVolumeUpsize = true
+		}
+	}
+
+	// --- 1. VOLUME DOWNSIZE ---
+	if hasVolumeDownsize {
+		if err := updateVolumeSize(false); err != nil {
+			resizeResult.Fail(kubecontainer.ErrResizePodInPlace, err.Error())
+			return resizeResult
+		}
+	}
+
+	// --- 2. CGROUPS (MEMORY) ---
 	if len(podContainerChanges.ContainersToUpdate[v1.ResourceMemory]) > 0 || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources {
 		if podResources.Memory == nil {
-			// Default pod memory limit to the current memory limit if unset to prevent it from updating.
-			// TODO(#128675): This does not support removing limits.
 			podResources.Memory = currentPodMemoryConfig.Memory
 		}
 		if errResize := resizeContainers(v1.ResourceMemory, int64(*currentPodMemoryConfig.Memory), *podResources.Memory, 0, 0); errResize != nil {
 			resizeResult.Fail(kubecontainer.ErrResizePodInPlace, errResize.Error())
+			return resizeResult
+		}
+	}
+
+	// --- 3. VOLUME UPSIZE ---
+	if hasVolumeUpsize {
+		if err := updateVolumeSize(true); err != nil {
+			resizeResult.Fail(kubecontainer.ErrResizePodInPlace, err.Error())
 			return resizeResult
 		}
 	}
@@ -1373,6 +1482,9 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		}
 		logger.V(2).Info("Message for Container of pod", "containerName", container.Name, "containerStatusID", containerStatus.ID, "pod", klog.KObj(pod), "containerMessage", message)
 	}
+
+	// Check for volume resize actions
+	m.computeVolumeResizeAction(ctx, pod, &changes)
 
 	if keepCount == 0 && len(changes.ContainersToStart) == 0 {
 		changes.KillPod = true
@@ -1782,7 +1894,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 
 	// Step 8: For containers in podContainerChanges.ContainersToUpdate[CPU,Memory] list, invoke UpdateContainerResources
 	if resizable, _, _ := allocation.IsInPlacePodVerticalScalingAllowed(pod); resizable {
-		if len(podContainerChanges.ContainersToUpdate) > 0 || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources {
+		if len(podContainerChanges.ContainersToUpdate) > 0 || podContainerChanges.UpdatePodResources || podContainerChanges.UpdatePodLevelResources || len(podContainerChanges.VolumesToUpdate) > 0 {
 			result.AddSyncResult(m.doPodResizeAction(ctx, pod, podStatus, podContainerChanges))
 		}
 	}

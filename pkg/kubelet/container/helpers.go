@@ -26,6 +26,7 @@ import (
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -79,6 +80,12 @@ type RuntimeHelper interface {
 	// OnPodSandboxReady callback is invoked after pod sandbox, networking, volume are ready.
 	// This is used to update the PodReadyToStartContainers condition.
 	OnPodSandboxReady(ctx context.Context, pod *v1.Pod) error
+
+	// ResizeVolume directly triggers a resize of the specified volume.
+	ResizeVolume(pod *v1.Pod, volumeName string, newSize *resource.Quantity) error
+
+	// GetVolumeSize returns the current size of the specified volume.
+	GetVolumeSize(pod *v1.Pod, volumeName string) (*resource.Quantity, error)
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
