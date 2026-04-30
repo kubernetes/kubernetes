@@ -22,6 +22,7 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
@@ -164,6 +165,18 @@ func (sc *stateCheckpoint) SetPodLevelResources(podUID types.UID, resInfo *v1.Re
 	return sc.storeState(logger)
 }
 
+// SetEmptyDirVolumeLimit sets the size limit for a pod's emptyDir volume.
+func (sc *stateCheckpoint) SetEmptyDirVolumeLimit(podUID types.UID, volumeName string, limit *resource.Quantity) error {
+	logger := klog.TODO()
+	sc.mux.Lock()
+	defer sc.mux.Unlock()
+	err := sc.cache.SetEmptyDirVolumeLimit(podUID, volumeName, limit)
+	if err != nil {
+		return err
+	}
+	return sc.storeState(logger)
+}
+
 // SetPodResourceInfo sets pod resource information
 func (sc *stateCheckpoint) SetPodResourceInfo(logger klog.Logger, podUID types.UID, resourceInfo PodResourceInfo) error {
 	sc.mux.Lock()
@@ -219,6 +232,10 @@ func (sc *noopStateCheckpoint) SetContainerResources(_ types.UID, _ string, _ v1
 }
 
 func (sc *noopStateCheckpoint) SetPodLevelResources(_ types.UID, _ *v1.ResourceRequirements) error {
+	return nil
+}
+
+func (sc *noopStateCheckpoint) SetEmptyDirVolumeLimit(_ types.UID, _ string, _ *resource.Quantity) error {
 	return nil
 }
 

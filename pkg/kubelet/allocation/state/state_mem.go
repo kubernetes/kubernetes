@@ -20,6 +20,7 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
@@ -132,6 +133,29 @@ func (s *stateMemory) SetPodLevelResources(podUID types.UID, resources *v1.Resou
 	s.podResources[podUID] = podInfo
 
 	logger.V(3).Info("Updated pod-level resource info", "podUID", podUID, "resources", resources)
+	return nil
+}
+
+func (s *stateMemory) SetEmptyDirVolumeLimit(podUID types.UID, volumeName string, limit *resource.Quantity) error {
+	logger := klog.TODO()
+	s.Lock()
+	defer s.Unlock()
+
+	podInfo, ok := s.podResources[podUID]
+	if !ok {
+		podInfo = PodResourceInfo{
+			ContainerResources: make(map[string]v1.ResourceRequirements),
+		}
+	}
+
+	if podInfo.EmptyDirVolumeLimits == nil {
+		podInfo.EmptyDirVolumeLimits = make(map[string]*resource.Quantity)
+	}
+
+	podInfo.EmptyDirVolumeLimits[volumeName] = limit
+	s.podResources[podUID] = podInfo
+
+	logger.V(3).Info("Updated emptyDir volume limit", "podUID", podUID, "volumeName", volumeName, "limit", limit)
 	return nil
 }
 
