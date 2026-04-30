@@ -163,6 +163,16 @@ func (c *constrainedImpersonationTest) Authorize(ctx context.Context, a authoriz
 	return authorizer.DecisionNoOpinion, "deny by default", nil
 }
 
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (c *constrainedImpersonationTest) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(c.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (*constrainedImpersonationTest) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+}
+
 func (c *constrainedImpersonationTest) echoUserInfoHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		c.lock.Lock()

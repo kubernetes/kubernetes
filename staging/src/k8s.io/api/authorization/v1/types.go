@@ -218,6 +218,14 @@ type SubjectAccessReviewSpec struct {
 	// uid information about the requesting user.
 	// +optional
 	UID string `json:"uid,omitempty" protobuf:"bytes,6,opt,name=uid"`
+
+	// conditionalAuthorization contains options for requesting conditional authorization.
+	// If the field is unset, conditional authorization is not supported, and only Allow/Deny/NoOpinion is returned.
+	// If the field is set, conditional authorization is supported, any of Allow/Deny/NoOpinion/ConditionsMap/Union decisions may be returned.
+	// Requires the ConditionalAuthorization feature to be enabled.
+	// +optional
+	// +featureGate=ConditionalAuthorization
+	ConditionalAuthorization *ConditionalAuthorizationOptions `json:"conditionalAuthorization,omitempty" protobuf:"bytes,7,opt,name=conditionalAuthorization"`
 }
 
 // ExtraValue masks the value so protobuf can generate
@@ -238,16 +246,25 @@ type SelfSubjectAccessReviewSpec struct {
 	// nonResourceAttributes describes information for a non-resource access request
 	// +optional
 	NonResourceAttributes *NonResourceAttributes `json:"nonResourceAttributes,omitempty" protobuf:"bytes,2,opt,name=nonResourceAttributes"`
+
+	// conditionalAuthorization contains options for requesting conditional authorization.
+	// If the field is unset, conditional authorization is not supported, and only Allow/Deny/NoOpinion is returned.
+	// If the field is set, conditional authorization is supported, any of Allow/Deny/NoOpinion/ConditionsMap/Union decisions may be returned.
+	// Requires the ConditionalAuthorization feature to be enabled.
+	// +optional
+	// +featureGate=ConditionalAuthorization
+	ConditionalAuthorization *ConditionalAuthorizationOptions `json:"conditionalAuthorization,omitempty" protobuf:"bytes,3,opt,name=conditionalAuthorization"`
 }
 
 // SubjectAccessReviewStatus
 type SubjectAccessReviewStatus struct {
 	// allowed is required. True if the action would be allowed, false otherwise.
+	// Mutually exclusive with denied and conditionalDecision.
 	Allowed bool `json:"allowed" protobuf:"varint,1,opt,name=allowed"`
-	// denied is optional. True if the action would be denied, otherwise
-	// false. If both allowed is false and denied is false, then the
-	// authorizer has no opinion on whether to authorize the action. Denied
-	// may not be true if Allowed is true.
+	// denied is optional. True if the action would be denied, otherwise false
+	// If allowed is false, denied is false, and conditionalDecision is unset,
+	// then the authorizer has no opinion on whether to authorize the action.
+	// Mutually exclusive with allowed and conditionalDecision.
 	// +optional
 	Denied bool `json:"denied,omitempty" protobuf:"varint,4,opt,name=denied"`
 	// reason is optional.  It indicates why a request was allowed or denied.
@@ -258,6 +275,17 @@ type SubjectAccessReviewStatus struct {
 	// For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.
 	// +optional
 	EvaluationError string `json:"evaluationError,omitempty" protobuf:"bytes,3,opt,name=evaluationError"`
+
+	// conditionalDecision represents a conditional decision returned by the authorizer.
+	// Mutually exclusive with allowed and denied.
+	// The top-level decision type should be ConditionsAwareDecisionTypeConditionsMap or
+	// ConditionsAwareDecisionTypeUnion, as Allow/Deny/NoOpinion decisions can be represented
+	// with SubjectAccessReviewStatus.Allowed and SubjectAccessReviewStatus.Denied alone.
+	// May only be set if spec.conditionalAuthorization is non-null.
+	// Requires the ConditionalAuthorization feature to be enabled.
+	// +optional
+	// +featureGate=ConditionalAuthorization
+	ConditionalDecision *ConditionsAwareDecision `json:"conditionalDecision,omitempty" protobuf:"bytes,5,opt,name=conditionalDecision"`
 }
 
 // +genclient
@@ -351,4 +379,147 @@ type NonResourceRule struct {
 	// +optional
 	// +listType=atomic
 	NonResourceURLs []string `json:"nonResourceURLs,omitempty" protobuf:"bytes,2,rep,name=nonResourceURLs"`
+}
+
+// ConditionalAuthorizationOptions contains options for requesting conditional authorization.
+type ConditionalAuthorizationOptions struct {
+	// enabled specifies whether the client supports conditions or not.
+	// +optional
+	Enabled bool `json:"enabled" protobuf:"varint,1,opt,name=enabled"`
+}
+
+// ConditionEffect specifies how a condition evaluating to
+// true should be treated.
+// +enum
+type ConditionEffect string
+
+const (
+	// ConditionEffectAllow means that if this condition
+	// evaluates to true, the ConditionsMap evaluates to Allow, unless any
+	// Deny/NoOpinion condition also evaluates to true.
+	ConditionEffectAllow ConditionEffect = "Allow"
+
+	// ConditionEffectDeny means that if this condition
+	// evaluates to true, the ConditionsMap necessarily evaluates to Deny.
+	// No further authorizers are consulted.
+	ConditionEffectDeny ConditionEffect = "Deny"
+
+	// ConditionEffectNoOpinion means that if this condition
+	// evaluates to true, the given authorizer's ConditionsMap cannot evaluate
+	// to Allow anymore, but necessarily Deny or NoOpinion.
+	ConditionEffectNoOpinion ConditionEffect = "NoOpinion"
+)
+
+// Condition represents a single authorization condition to be evaluated against
+// data available later in the request chain, e.g. objects available in admission.
+type Condition struct {
+	// id uniquely identifies this condition within the scope of the authorizer
+	// that authored it. Validated as a Kubernetes label key.
+	// +required
+	ID string `json:"id" protobuf:"bytes,1,opt,name=id"`
+
+	// effect specifies how the condition evaluating to "true" should be treated.
+	// +required
+	Effect ConditionEffect `json:"effect" protobuf:"bytes,2,opt,name=effect"`
+
+	// condition is a string encoding of the condition to be evaluated.
+	// It is a pure, deterministic function from condition data to a boolean (or error).
+	// Might or might not be human-readable.
+	// Optional, if the ID alone is enough for the authorizer to know how to evaluate the condition.
+	// +optional
+	Condition string `json:"condition,omitempty" protobuf:"bytes,3,opt,name=condition"`
+
+	// type describes the type (format/encoding/language) of the condition,
+	// if there are multiple possibilities. Should be formatted as a Kubernetes label key.
+	// Any domain suffix of *.k8s.io or *.kubernetes.io is reserved for Kubernetes use.
+	// +optional
+	Type string `json:"type,omitempty" protobuf:"bytes,4,opt,name=type"`
+
+	// description is an optional human-friendly description that can be shown
+	// as an error message or for debugging.
+	// +optional
+	Description string `json:"description,omitempty" protobuf:"bytes,5,opt,name=description"`
+}
+
+// ConditionsMap represents a map of conditions.
+type ConditionsMap struct {
+	// conditions is an unordered map of conditions, keyed by ID, that shall be evaluated
+	// data available later, to determine whether the authorizer that authored the conditions
+	// allows or denies the request.
+	// If any ConditionsEffect=Deny condition evaluates to true or errors, the evaluated decision must be Deny.
+	// Else if any ConditionsEffect=NoOpinion condition evaluates to true or errors, the evaluated decision must be NoOpinion.
+	// Else if any ConditionsEffect=Allow condition evaluates to true, the evaluated decision must be Allow.
+	// Else, the evaluated decision must be NoOpinion.
+	// +listType=map
+	// +listMapKey=id
+	// +required
+	Conditions []Condition `json:"conditions" protobuf:"bytes,1,rep,name=conditions"` //nolint:kubeapilinter // These are authorization conditions.
+}
+
+// ConditionsAwareDecisionType is an enum representing what kind of authorization decision
+// the ConditionsAwareDecision represents. The zero value represents the Deny type.
+// +enum
+type ConditionsAwareDecisionType string
+
+const (
+	// ConditionsAwareDecisionTypeDeny represents an unconditional Deny authorizer decision.
+	ConditionsAwareDecisionTypeDeny ConditionsAwareDecisionType = "Deny"
+
+	// ConditionsAwareDecisionTypeAllow represents an unconditional Allow authorizer decision.
+	ConditionsAwareDecisionTypeAllow ConditionsAwareDecisionType = "Allow"
+
+	// ConditionsAwareDecisionTypeNoOpinion represents an unconditional NoOpinion authorizer decision,
+	// which means that the authorizer does not have a specific opinion on whether the request
+	// should be allowed or denied, and thus can other authorizers later in the union have their say.
+	ConditionsAwareDecisionTypeNoOpinion ConditionsAwareDecisionType = "NoOpinion"
+
+	// ConditionsAwareDecisionTypeConditionsMap represents an authorizer decision that is dependent
+	// on request data available later in the request chain, and thus at this stage conditional.
+	ConditionsAwareDecisionTypeConditionsMap ConditionsAwareDecisionType = "ConditionsMap"
+
+	// ConditionsAwareDecisionTypeUnion is a decision type whose final decision is computed by
+	// an ordered list of sub-authorizers, with their individual decisions. A decision can thus
+	// be represented as a tree, with Union decisions being internal nodes, and
+	// Deny/Allow/NoOpinion/ConditionsMap decisions being leaf nodes, which are visited in depth-first order.
+	ConditionsAwareDecisionTypeUnion ConditionsAwareDecisionType = "Union"
+)
+
+// ConditionsAwareDecision represents one authorizer's decision. It is an enum type,
+// with variants described in ConditionsAwareDecisionType, plus a reason and error.
+type ConditionsAwareDecision struct {
+	// type describes the type of the decision, and acts as an enum discriminator.
+	// +required
+	Type ConditionsAwareDecisionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=ConditionsAwareDecisionType"`
+
+	// reason is optional. It indicates why a request was allowed or denied.
+	// Only applicable when type is one of ConditionsAwareDecisionTypeDeny,
+	// ConditionsAwareDecisionTypeAllow or ConditionsAwareDecisionTypeNoOpinion.
+	// +optional
+	Reason string `json:"reason,omitempty" protobuf:"bytes,2,opt,name=reason"`
+
+	// evaluationError is an indication that some error occurred during the authorization check.
+	// It is entirely possible to get an error and be able to continue determine authorization status in spite of it.
+	// For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.
+	// Only applicable when type is one of ConditionsAwareDecisionTypeDeny,
+	// ConditionsAwareDecisionTypeAllow or ConditionsAwareDecisionTypeNoOpinion.
+	// +optional
+	EvaluationError string `json:"evaluationError,omitempty" protobuf:"bytes,3,opt,name=evaluationError"`
+
+	// conditionsMap represents a conditional decision, modelled as a map of conditions.
+	// Must be non-null when type == "ConditionsMap", otherwise this field must be unset.
+	// +optional
+	ConditionsMap *ConditionsMap `json:"conditionsMap,omitempty" protobuf:"bytes,4,opt,name=conditionsMap"`
+
+	// union forms an ordered tree of decisions, where the union decision is represented by
+	// an internal node, and all other decision types are leaf nodes. During evaluation, the
+	// leaf decisions are evaluated in depth-first order, until an Allow or Deny decision is found.
+	// The order of the decisions must match exactly the order of the authorizers in the union authorizer.
+	// At least one of the leaves must be of type ConditionsMap, as otherwise the union could be trivially
+	// reduced to just a single Allow/Deny/NoOpinion.
+	//
+	// Must have at least one element when type == "Union", otherwise this field must be unset.
+	//
+	// +optional
+	// +listType=atomic
+	Union []ConditionsAwareDecision `json:"union,omitempty" protobuf:"bytes,5,rep,name=union"`
 }

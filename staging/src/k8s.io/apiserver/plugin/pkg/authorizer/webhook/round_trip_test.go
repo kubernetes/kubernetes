@@ -35,6 +35,7 @@ func TestRoundTrip(t *testing.T) {
 	seed := time.Now().UnixNano()
 	t.Logf("seed = %v", seed)
 	f.RandSource(rand.New(rand.NewSource(seed)))
+	f.MaxDepth(3)
 
 	for i := 0; i < 1000; i++ {
 		original := &authorizationv1.SubjectAccessReview{}
@@ -57,22 +58,24 @@ func TestRoundTrip(t *testing.T) {
 // v1StatusToV1beta1Status is only needed to verify round-trip fidelity
 func v1StatusToV1beta1Status(in authorizationv1.SubjectAccessReviewStatus) authorizationv1beta1.SubjectAccessReviewStatus {
 	return authorizationv1beta1.SubjectAccessReviewStatus{
-		Allowed:         in.Allowed,
-		Denied:          in.Denied,
-		Reason:          in.Reason,
-		EvaluationError: in.EvaluationError,
+		Allowed:             in.Allowed,
+		Denied:              in.Denied,
+		Reason:              in.Reason,
+		EvaluationError:     in.EvaluationError,
+		ConditionalDecision: in.ConditionalDecision,
 	}
 }
 
 // v1beta1SpecToV1Spec is only needed to verify round-trip fidelity
 func v1beta1SpecToV1Spec(in authorizationv1beta1.SubjectAccessReviewSpec) authorizationv1.SubjectAccessReviewSpec {
 	return authorizationv1.SubjectAccessReviewSpec{
-		ResourceAttributes:    v1beta1ResourceAttributesToV1ResourceAttributes(in.ResourceAttributes),
-		NonResourceAttributes: v1beta1NonResourceAttributesToV1NonResourceAttributes(in.NonResourceAttributes),
-		User:                  in.User,
-		Groups:                in.Groups,
-		Extra:                 v1beta1ExtraToV1Extra(in.Extra),
-		UID:                   in.UID,
+		ResourceAttributes:       v1beta1ResourceAttributesToV1ResourceAttributes(in.ResourceAttributes),
+		NonResourceAttributes:    v1beta1NonResourceAttributesToV1NonResourceAttributes(in.NonResourceAttributes),
+		User:                     in.User,
+		Groups:                   in.Groups,
+		Extra:                    v1beta1ExtraToV1Extra(in.Extra),
+		UID:                      in.UID,
+		ConditionalAuthorization: in.ConditionalAuthorization,
 	}
 }
 

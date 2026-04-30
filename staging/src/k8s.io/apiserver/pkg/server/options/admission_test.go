@@ -23,6 +23,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 func TestEnabledPluginNames(t *testing.T) {
@@ -33,6 +36,7 @@ func TestEnabledPluginNames(t *testing.T) {
 		setEnablePlugins          []string
 		setDisablePlugins         []string
 		setAdmissionControl       []string
+		featureGateOverrides      featuregatetesting.FeatureOverrides
 	}{
 		// scenario 0: check if a call to enabledPluginNames sets expected values.
 		{
@@ -93,11 +97,19 @@ func TestEnabledPluginNames(t *testing.T) {
 			setDefaultOffPlugins:      sets.New("pluginC", "pluginD"),
 			setAdmissionControl:       []string{"pluginA", "pluginB", "pluginC"},
 		},
+		// scenario 8: check if a call to enabledPluginNames sets expected values when the ConditionalAuthorization feature is on
+		{
+			expectedPluginNames: []string{"NamespaceLifecycle", "MutatingAdmissionPolicy", "MutatingAdmissionWebhook", "AuthorizationConditionsEnforcer", "ValidatingAdmissionPolicy", "ValidatingAdmissionWebhook"},
+			featureGateOverrides: featuregatetesting.FeatureOverrides{
+				features.ConditionalAuthorization: true,
+			},
+		},
 	}
 
 	// act
 	for index, scenario := range scenarios {
 		t.Run(fmt.Sprintf("scenario %d", index), func(t *testing.T) {
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, scenario.featureGateOverrides)
 			target := NewAdmissionOptions()
 
 			if scenario.setDefaultOffPlugins != nil {
@@ -236,4 +248,41 @@ func TestValidate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidateConditionalAuthorizationEnabled(t *testing.T) {
+	t.Run("default options should be valid when feature gate is off", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConditionalAuthorization, false)
+		options := NewAdmissionOptions()
+		errs := options.Validate()
+		if len(errs) > 0 {
+			t.Errorf("expected no errors, got: %v", errs)
+		}
+	})
+	t.Run("it is possible to enable the AuthorizationConditionsEnforcer plugin when feature gate is off", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConditionalAuthorization, false)
+		options := NewAdmissionOptions()
+		options.EnablePlugins = []string{"AuthorizationConditionsEnforcer"}
+		errs := options.Validate()
+		if len(errs) > 0 {
+			t.Errorf("expected no errors, got: %v", errs)
+		}
+	})
+	t.Run("default options should be valid when feature gate is on", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConditionalAuthorization, true)
+		options := NewAdmissionOptions()
+		errs := options.Validate()
+		if len(errs) > 0 {
+			t.Errorf("expected no errors, got: %v", errs)
+		}
+	})
+	t.Run("it is not possible to disable the AuthorizationConditionsEnforcer plugin when feature gate is on", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConditionalAuthorization, true)
+		options := NewAdmissionOptions()
+		options.DisablePlugins = []string{"AuthorizationConditionsEnforcer"}
+		errs := options.Validate()
+		if len(errs) == 0 {
+			t.Errorf("expected Validate() to error, got: %v", errs)
+		}
+	})
 }

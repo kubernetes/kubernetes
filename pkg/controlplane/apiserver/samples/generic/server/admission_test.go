@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/admission/plugin/authorizer/conditionsenforcer"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	"k8s.io/kubernetes/plugin/pkg/admission/job"
 	"k8s.io/kubernetes/plugin/pkg/admission/limitranger"
@@ -54,6 +55,7 @@ var intentionallyOffPlugins = sets.New[string](
 	nodedeclaredfeatures.PluginName,         // NodeDeclaredFeatures
 	job.PluginName,                          // JobValidation
 	podresize.PluginName,                    // PodResize
+	conditionsenforcer.PluginName,           // AuthorizationConditionsEnforcer
 )
 
 func TestDefaultOffAdmissionPlugins(t *testing.T) {

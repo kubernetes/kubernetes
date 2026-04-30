@@ -38,6 +38,16 @@ func (a *mockAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 	return a.decision, a.reason, a.err
 }
 
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (a *mockAuthorizer) ConditionsAwareAuthorize(ctx context.Context, attrs authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(a.Authorize(ctx, attrs))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (*mockAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+}
+
 func TestEnsureAuthorizedForVerb(t *testing.T) {
 	tests := []struct {
 		name          string

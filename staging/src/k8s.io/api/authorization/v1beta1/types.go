@@ -171,6 +171,14 @@ type SubjectAccessReviewSpec struct {
 	// uid information about the requesting user.
 	// +optional
 	UID string `json:"uid,omitempty" protobuf:"bytes,6,opt,name=uid"`
+
+	// conditionalAuthorization contains options for requesting conditional authorization.
+	// If the field is unset, conditional authorization is not supported, and only Allow/Deny/NoOpinion is returned.
+	// If the field is set, conditional authorization is supported, any of Allow/Deny/NoOpinion/ConditionsMap/Union decisions may be returned.
+	// Requires the ConditionalAuthorization feature to be enabled.
+	// +optional
+	// +featureGate=ConditionalAuthorization
+	ConditionalAuthorization *authorizationv1.ConditionalAuthorizationOptions `json:"conditionalAuthorization,omitempty" protobuf:"bytes,7,opt,name=conditionalAuthorization"`
 }
 
 // ExtraValue masks the value so protobuf can generate
@@ -191,16 +199,25 @@ type SelfSubjectAccessReviewSpec struct {
 	// nonResourceAttributes describes information for a non-resource access request
 	// +optional
 	NonResourceAttributes *NonResourceAttributes `json:"nonResourceAttributes,omitempty" protobuf:"bytes,2,opt,name=nonResourceAttributes"`
+
+	// conditionalAuthorization contains options for requesting conditional authorization.
+	// If the field is unset, conditional authorization is not supported, and only Allow/Deny/NoOpinion is returned.
+	// If the field is set, conditional authorization is supported, any of Allow/Deny/NoOpinion/ConditionsMap/Union decisions may be returned.
+	// Requires the ConditionalAuthorization feature to be enabled.
+	// +optional
+	// +featureGate=ConditionalAuthorization
+	ConditionalAuthorization *authorizationv1.ConditionalAuthorizationOptions `json:"conditionalAuthorization,omitempty" protobuf:"bytes,3,opt,name=conditionalAuthorization"`
 }
 
 // SubjectAccessReviewStatus
 type SubjectAccessReviewStatus struct {
 	// allowed is required. True if the action would be allowed, false otherwise.
+	// Mutually exclusive with denied and conditionalDecision.
 	Allowed bool `json:"allowed" protobuf:"varint,1,opt,name=allowed"`
-	// denied is optional. True if the action would be denied, otherwise
-	// false. If both allowed is false and denied is false, then the
-	// authorizer has no opinion on whether to authorize the action. Denied
-	// may not be true if Allowed is true.
+	// denied is optional. True if the action would be denied, otherwise false
+	// If allowed is false, denied is false, and conditionalDecision is unset,
+	// then the authorizer has no opinion on whether to authorize the action.
+	// Mutually exclusive with allowed and conditionalDecision.
 	// +optional
 	Denied bool `json:"denied,omitempty" protobuf:"varint,4,opt,name=denied"`
 	// reason is optional.  It indicates why a request was allowed or denied.
@@ -211,6 +228,17 @@ type SubjectAccessReviewStatus struct {
 	// For instance, RBAC can be missing a role, but enough roles are still present and bound to reason about the request.
 	// +optional
 	EvaluationError string `json:"evaluationError,omitempty" protobuf:"bytes,3,opt,name=evaluationError"`
+
+	// conditionalDecision represents a conditional decision returned by the authorizer.
+	// Mutually exclusive with allowed and denied.
+	// The top-level decision type should be ConditionsAwareDecisionTypeConditionsMap or
+	// ConditionsAwareDecisionTypeUnion, as Allow/Deny/NoOpinion decisions can be represented
+	// with SubjectAccessReviewStatus.Allowed and SubjectAccessReviewStatus.Denied alone.
+	// May only be set if spec.conditionalAuthorization is non-null.
+	// Requires the ConditionalAuthorization feature to be enabled.
+	// +optional
+	// +featureGate=ConditionalAuthorization
+	ConditionalDecision *authorizationv1.ConditionsAwareDecision `json:"conditionalDecision,omitempty" protobuf:"bytes,5,opt,name=conditionalDecision"`
 }
 
 // +genclient

@@ -26,6 +26,7 @@ package union
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -57,6 +58,88 @@ func (authzHandler unionAuthzHandler) Authorize(ctx context.Context, a authorize
 		if len(reason) != 0 {
 			reasonlist = append(reasonlist, reason)
 		}
+		switch decision {
+		case authorizer.DecisionAllow, authorizer.DecisionDeny:
+			return decision, reason, err
+		case authorizer.DecisionNoOpinion:
+			// continue to the next authorizer
+		}
+	}
+
+	return authorizer.DecisionNoOpinion, strings.Join(reasonlist, "\n"), utilerrors.NewAggregate(errlist)
+}
+
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (authzHandler unionAuthzHandler) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	var decisions []authorizer.ConditionsAwareDecision
+
+	for _, currAuthzHandler := range authzHandler {
+		// Precondition: All previously seen leaf decisions were either of NoOpinion or ConditionsMap type.
+
+		// Call the authorizer on its conditions-aware method, and add the decision to the slice,
+		// regardless of type. This due to that later in EvaluateConditions, the decision index
+		// in the slice is what correlates a decision with the authorizer that should be used
+		// for evaluating it (if needed).
+		decision := currAuthzHandler.ConditionsAwareAuthorize(ctx, a)
+		decisions = append(decisions, decision)
+
+		// If there is any Allow/Deny decision leaf, no need to walk the chain further.
+		if decision.ContainsAllowOrDeny() {
+			return authorizer.ConditionsAwareDecisionUnion(decisions...)
+		}
+		// => all leaves are NoOpinion or ConditionsMap, continue to the next authorizer
+	}
+
+	// If we reached here, all leaf decisions were either of NoOpinion or ConditionsMap type.
+	// If all decisions were NoOpinions, the constructor folds into a single NoOpinion decision.
+	return authorizer.ConditionsAwareDecisionUnion(decisions...)
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (authzHandler unionAuthzHandler) EvaluateConditions(ctx context.Context, unevaluatedDecision authorizer.ConditionsAwareDecision, data authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	// Stopping condition for the recursion: Nothing to evaluate here.
+	if unevaluatedDecision.IsUnconditional() {
+		return unevaluatedDecision.UnconditionalParts()
+	}
+	// This should never happen, an authorizer shall only be called back on an unevaluatedDecision that was returned from
+	// AuthorizeConditionsAware(). However, unionAuthzHandler.AuthorizeConditionsAware never returns a "bare" ConditionsMap,
+	// but either Allow/Deny/NoOpinion (the case above), or Union[...], even if the union only contains one element.
+	if unevaluatedDecision.IsConditionsMap() {
+		return unevaluatedDecision.FailClosedDecision(), "failed closed", errors.New("union authorizer never returns a bare ConditionsMap, cannot evaluate")
+	}
+
+	// This logic directly maps 1:1 with Authorize(), now that we get unconditional responses from the evaluation process.
+	var (
+		errlist    []error
+		reasonlist []string
+	)
+
+	for i, unevaluatedSubDecision := range unevaluatedDecision.UnionedDecisions() {
+		// Precondition: All previously seen leaf decisions were or evaluated to NoOpinion, or some unrecognized mode.
+
+		// If we get to an Allow or Deny in the union chain, we have our answer.
+		if unevaluatedSubDecision.IsAllowed() || unevaluatedSubDecision.IsDenied() {
+			return unevaluatedSubDecision.UnconditionalParts()
+		}
+
+		var decision authorizer.Decision
+		var reason string
+		var err error
+		if unevaluatedSubDecision.IsNoOpinion() {
+			// NoOpinions cannot be evaluated, but we should make sure to save the reason and error.
+			decision, reason, err = authorizer.DecisionNoOpinion, unevaluatedSubDecision.Reason(), unevaluatedSubDecision.Error()
+		} else {
+			// ConditionsMap or Union types are evaluated by their authorizer
+			decision, reason, err = authzHandler[i].EvaluateConditions(ctx, unevaluatedSubDecision, data)
+		}
+
+		if err != nil {
+			errlist = append(errlist, err)
+		}
+		if len(reason) != 0 {
+			reasonlist = append(reasonlist, reason)
+		}
+
 		switch decision {
 		case authorizer.DecisionAllow, authorizer.DecisionDeny:
 			return decision, reason, err

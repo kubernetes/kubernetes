@@ -17,10 +17,13 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -649,5 +652,318 @@ func TestAuthorizationAttributesFrom(t *testing.T) {
 				t.Errorf("AuthorizationAttributesFrom(), got:\n%#v\nwant:\n%#v", got, tt.want)
 			}
 		})
+	}
+}
+
+// sarMockAuthorizer implements authorizer.Authorizer for testing SARStatusFromAuthorize.
+type sarMockAuthorizer struct {
+	// makeDecision is called after the feature gate is set, to construct the decision for the mock.
+	// Required to be set, otherwise the authorizer panics.
+	// Serves both the conditions-aware and conditions-unaware endpoint.
+	// If one tries to return conditions to an unaware endpoint, it fails closed.
+	makeDecision func() authorizer.ConditionsAwareDecision
+}
+
+func (m *sarMockAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+	return m.ConditionsAwareAuthorize(ctx, a).UnconditionalParts()
+}
+
+func (m *sarMockAuthorizer) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return m.makeDecision()
+}
+
+func (m *sarMockAuthorizer) EvaluateConditions(ctx context.Context, decision authorizer.ConditionsAwareDecision, data authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "not implemented", authorizer.ErrorConditionEvaluationNotSupported
+}
+
+func TestSARStatusFromAuthorize(t *testing.T) {
+	// Helper to construct a conditions map decision. Must be called with the ConditionalAuthorization gate enabled.
+	makeCondAllowDecision := func() authorizer.ConditionsAwareDecision {
+		return authorizer.ConditionsAwareDecisionConditionsMap(
+			authorizer.GenericCondition{ID: "cond1", Condition: "object.metadata.name == 'foo'", Effect: authorizer.ConditionEffectAllow, Type: "cel", Description: "allow foo"},
+		)
+	}
+
+	makeCondDenyDecision := func() authorizer.ConditionsAwareDecision {
+		return authorizer.ConditionsAwareDecisionConditionsMap(
+			authorizer.GenericCondition{ID: "cond1", Condition: "object.metadata.name == 'foo'", Effect: authorizer.ConditionEffectDeny, Type: "cel", Description: "deny foo"},
+		)
+	}
+
+	// Helper to construct a union decision. Must be called with the ConditionalAuthorization gate enabled.
+	makeUnionDecision := func() authorizer.ConditionsAwareDecision {
+		return authorizer.ConditionsAwareDecisionUnion(
+			makeCondDenyDecision(),
+			authorizer.ConditionsAwareDecisionNoOpinion("no-opinion-reason", fmt.Errorf("no-opinion-err")),
+			authorizer.ConditionsAwareDecisionUnion(
+				authorizer.ConditionsAwareDecisionNoOpinion("", nil),
+				makeCondAllowDecision(),
+			),
+			authorizer.ConditionsAwareDecisionDeny("", nil),
+		)
+	}
+
+	tests := []struct {
+		name         string
+		makeDecision func() authorizer.ConditionsAwareDecision
+		modes        map[string]authorizationapi.SubjectAccessReviewStatus
+	}{
+		{
+			name: "unconditional allow with evaluation error",
+			makeDecision: func() authorizer.ConditionsAwareDecision {
+				return authorizer.ConditionsAwareDecisionAllow("RBAC: allowed", fmt.Errorf("partial error"))
+			},
+			modes: map[string]authorizationapi.SubjectAccessReviewStatus{
+				"featureOffClientOptOut": {
+					Allowed:         true,
+					Reason:          "RBAC: allowed",
+					EvaluationError: "partial error",
+				},
+				"featureOffClientOptIn": {
+					Allowed:         true,
+					Reason:          "RBAC: allowed",
+					EvaluationError: "partial error",
+				},
+				"featureOnClientOptOut": {
+					Allowed:         true,
+					Reason:          "RBAC: allowed",
+					EvaluationError: "partial error",
+				},
+				"featureOnClientOptIn": {
+					Allowed:         true,
+					Reason:          "RBAC: allowed",
+					EvaluationError: "partial error",
+				},
+			},
+		},
+		{
+			name: "unconditional deny",
+			makeDecision: func() authorizer.ConditionsAwareDecision {
+				return authorizer.ConditionsAwareDecisionDeny("Node: denied", nil)
+			},
+			modes: map[string]authorizationapi.SubjectAccessReviewStatus{
+				"featureOffClientOptOut": {
+					Denied: true,
+					Reason: "Node: denied",
+				},
+				"featureOffClientOptIn": {
+					Denied: true,
+					Reason: "Node: denied",
+				},
+				"featureOnClientOptOut": {
+					Denied: true,
+					Reason: "Node: denied",
+				},
+				"featureOnClientOptIn": {
+					Denied: true,
+					Reason: "Node: denied",
+				},
+			},
+		},
+		{
+			name: "no opinion",
+			makeDecision: func() authorizer.ConditionsAwareDecision {
+				return authorizer.ConditionsAwareDecisionNoOpinion("no rules matched", nil)
+			},
+			modes: map[string]authorizationapi.SubjectAccessReviewStatus{
+				"featureOffClientOptOut": {
+					Reason: "no rules matched",
+				},
+				"featureOffClientOptIn": {
+					Reason: "no rules matched",
+				},
+				"featureOnClientOptOut": {
+					Reason: "no rules matched",
+				},
+				"featureOnClientOptIn": {
+					Reason: "no rules matched",
+				},
+			},
+		},
+		{
+			name:         "conditional allow",
+			makeDecision: makeCondAllowDecision,
+			modes: map[string]authorizationapi.SubjectAccessReviewStatus{
+				"featureOffClientOptOut": {
+					// NoOpinion
+					Reason: "authorizer tried to return conditional decision, but the ConditionalAuthorization feature gate is disabled",
+				},
+				"featureOffClientOptIn": {
+					// NoOpinion
+					Reason: "authorizer tried to return conditional decision, but the ConditionalAuthorization feature gate is disabled",
+				},
+				"featureOnClientOptOut": {
+					// NoOpinion
+					Reason: "failed closed: tried to return conditional decision to conditions-unaware authorizer",
+				},
+				"featureOnClientOptIn": {
+					ConditionalDecision: &authorizationapi.ConditionsAwareDecision{
+						Type: authorizationapi.ConditionsAwareDecisionTypeConditionsMap,
+						ConditionsMap: &authorizationapi.ConditionsMap{
+							Conditions: []authorizationapi.Condition{
+								{
+									ID:          "cond1",
+									Effect:      authorizationapi.ConditionEffectAllow,
+									Condition:   "object.metadata.name == 'foo'",
+									Type:        "cel",
+									Description: "allow foo",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:         "conditional deny",
+			makeDecision: makeCondDenyDecision,
+			modes: map[string]authorizationapi.SubjectAccessReviewStatus{
+				"featureOffClientOptOut": {
+					Denied: true, // As the authorizer tried to construct a conditional deny, it fails closed as Deny
+					Reason: "authorizer tried to return conditional decision, but the ConditionalAuthorization feature gate is disabled",
+				},
+				"featureOffClientOptIn": {
+					Denied: true, // As the authorizer tried to construct a conditional deny, it fails closed as Deny
+					Reason: "authorizer tried to return conditional decision, but the ConditionalAuthorization feature gate is disabled",
+				},
+				"featureOnClientOptOut": {
+					Denied: true, // As the authorizer tried to construct a conditional deny, it fails closed as Deny
+					Reason: "failed closed: tried to return conditional decision to conditions-unaware authorizer",
+				},
+				"featureOnClientOptIn": {
+					ConditionalDecision: &authorizationapi.ConditionsAwareDecision{
+						Type: authorizationapi.ConditionsAwareDecisionTypeConditionsMap,
+						ConditionsMap: &authorizationapi.ConditionsMap{
+							Conditions: []authorizationapi.Condition{
+								{
+									ID:          "cond1",
+									Effect:      authorizationapi.ConditionEffectDeny,
+									Condition:   "object.metadata.name == 'foo'",
+									Type:        "cel",
+									Description: "deny foo",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:         "union",
+			makeDecision: makeUnionDecision,
+			modes: map[string]authorizationapi.SubjectAccessReviewStatus{
+				"featureOffClientOptOut": {
+					Denied: true, // As the authorizer tried to construct a conditional deny, it fails closed as Deny
+					Reason: "authorizer tried to return conditional decision, but the ConditionalAuthorization feature gate is disabled",
+				},
+				"featureOffClientOptIn": {
+					Denied: true, // As the authorizer tried to construct a conditional deny, it fails closed as Deny
+					Reason: "authorizer tried to return conditional decision, but the ConditionalAuthorization feature gate is disabled",
+				},
+				"featureOnClientOptOut": {
+					Denied: true, // As the authorizer tried to construct a conditional deny, it fails closed as Deny
+					Reason: "failed closed: tried to return conditional decision to conditions-unaware authorizer",
+				},
+				"featureOnClientOptIn": {
+					ConditionalDecision: &authorizationapi.ConditionsAwareDecision{
+						Type: authorizationapi.ConditionsAwareDecisionTypeUnion,
+						Union: []authorizationapi.ConditionsAwareDecision{
+							{
+								Type: authorizationapi.ConditionsAwareDecisionTypeConditionsMap,
+								ConditionsMap: &authorizationapi.ConditionsMap{
+									Conditions: []authorizationapi.Condition{
+										{
+											ID:          "cond1",
+											Effect:      authorizationapi.ConditionEffectDeny,
+											Condition:   "object.metadata.name == 'foo'",
+											Type:        "cel",
+											Description: "deny foo",
+										},
+									},
+								},
+							},
+							{
+								Type:            authorizationapi.ConditionsAwareDecisionTypeNoOpinion,
+								Reason:          "no-opinion-reason",
+								EvaluationError: "no-opinion-err",
+							},
+							{
+								Type: authorizationapi.ConditionsAwareDecisionTypeUnion,
+								Union: []authorizationapi.ConditionsAwareDecision{
+									{
+										Type: authorizationapi.ConditionsAwareDecisionTypeNoOpinion,
+									},
+									{
+										Type: authorizationapi.ConditionsAwareDecisionTypeConditionsMap,
+										ConditionsMap: &authorizationapi.ConditionsMap{
+											Conditions: []authorizationapi.Condition{
+												{
+													ID:          "cond1",
+													Effect:      authorizationapi.ConditionEffectAllow,
+													Condition:   "object.metadata.name == 'foo'",
+													Type:        "cel",
+													Description: "allow foo",
+												},
+											},
+										},
+									},
+								},
+							},
+							{
+								Type: authorizationapi.ConditionsAwareDecisionTypeDeny,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	modesPerTestCase := map[string]func(t *testing.T) *authorizationapi.ConditionalAuthorizationOptions{
+		"featureOffClientOptOut": func(t *testing.T) *authorizationapi.ConditionalAuthorizationOptions {
+			return nil
+		},
+		"featureOffClientOptIn": func(t *testing.T) *authorizationapi.ConditionalAuthorizationOptions {
+			return &authorizationapi.ConditionalAuthorizationOptions{
+				Enabled: true,
+			}
+		},
+		"featureOnClientOptOut": func(t *testing.T) *authorizationapi.ConditionalAuthorizationOptions {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ConditionalAuthorization, true)
+			return &authorizationapi.ConditionalAuthorizationOptions{
+				Enabled: false,
+			}
+		},
+		"featureOnClientOptIn": func(t *testing.T) *authorizationapi.ConditionalAuthorizationOptions {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ConditionalAuthorization, true)
+			return &authorizationapi.ConditionalAuthorizationOptions{
+				Enabled: true,
+			}
+		},
+	}
+
+	for _, tt := range tests {
+		for modeName, modeSetupFunc := range modesPerTestCase {
+			t.Run(fmt.Sprintf("%s/%s", tt.name, modeName), func(t *testing.T) {
+				conditionalOpts := modeSetupFunc(t)
+				authz := &sarMockAuthorizer{
+					makeDecision: tt.makeDecision,
+				}
+
+				attrs := authorizer.AttributesRecord{
+					User: &user.DefaultInfo{
+						Name: "foo",
+					},
+					Verb:     "create",
+					Resource: "pods",
+				}
+
+				got := SARStatusFromAuthorize(t.Context(), authz, attrs, conditionalOpts)
+				want := tt.modes[modeName]
+				if diff := cmp.Diff(want, got); diff != "" {
+					t.Errorf("Found diff=%s", diff)
+				}
+			})
+		}
 	}
 }

@@ -503,3 +503,13 @@ type FakeAuthorizer struct {
 func (f *FakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 	return f.authorized, f.reason, f.err
 }
+
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (f *FakeAuthorizer) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(f.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (*FakeAuthorizer) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+}

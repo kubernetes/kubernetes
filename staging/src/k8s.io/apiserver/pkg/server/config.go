@@ -395,6 +395,9 @@ type AuthorizationInfo struct {
 	// Authorizer determines whether the subject is allowed to make the request based only
 	// on the RequestURI
 	Authorizer authorizer.Authorizer
+
+	// ConditionalAuthorizationRequestClassifier is a function that returns true if a request with the given attributes supports conditional authorization
+	ConditionalAuthorizationRequestClassifier genericapifilters.ConditionalAuthorizationRequestClassifier
 }
 
 func init() {
@@ -1037,7 +1040,11 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler := apiHandler
 
 	handler = filterlatency.TrackCompleted(handler)
-	handler = genericapifilters.WithAuthorization(handler, c.Authorization.Authorizer, c.Serializer)
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ConditionalAuthorization) {
+		handler = genericapifilters.WithAuthorizationAndConditionsSupport(handler, c.Authorization.Authorizer, c.Serializer, c.Authorization.ConditionalAuthorizationRequestClassifier)
+	} else {
+		handler = genericapifilters.WithAuthorization(handler, c.Authorization.Authorizer, c.Serializer)
+	}
 	handler = filterlatency.TrackStarted(handler, c.TracerProvider, "authorization")
 
 	if c.FlowControl != nil {
