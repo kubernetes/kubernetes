@@ -9403,6 +9403,8 @@ func Convert_core_VolumeSource_To_v1_VolumeSource(in *core.VolumeSource, out *co
 
 func autoConvert_v1_VolumeStatus_To_core_VolumeStatus(in *corev1.VolumeStatus, out *core.VolumeStatus, s conversion.Scope) error {
 	out.Image = (*core.ImageVolumeStatus)(unsafe.Pointer(in.Image))
+	out.AllocatedSizeLimit = (*resource.Quantity)(unsafe.Pointer(in.AllocatedSizeLimit))
+	out.SizeLimit = (*resource.Quantity)(unsafe.Pointer(in.SizeLimit))
 	return nil
 }
 
@@ -9413,6 +9415,8 @@ func Convert_v1_VolumeStatus_To_core_VolumeStatus(in *corev1.VolumeStatus, out *
 
 func autoConvert_core_VolumeStatus_To_v1_VolumeStatus(in *core.VolumeStatus, out *corev1.VolumeStatus, s conversion.Scope) error {
 	out.Image = (*corev1.ImageVolumeStatus)(unsafe.Pointer(in.Image))
+	out.AllocatedSizeLimit = (*resource.Quantity)(unsafe.Pointer(in.AllocatedSizeLimit))
+	out.SizeLimit = (*resource.Quantity)(unsafe.Pointer(in.SizeLimit))
 	return nil
 }
 

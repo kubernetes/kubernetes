@@ -18,6 +18,10 @@ limitations under the License.
 
 package v1
 
+import (
+	resource "k8s.io/apimachinery/pkg/api/resource"
+)
+
 // VolumeStatusApplyConfiguration represents a declarative configuration of the VolumeStatus type for use
 // with apply.
 //
@@ -25,7 +29,9 @@ package v1
 // At most one of its members must be specified.
 type VolumeStatusApplyConfiguration struct {
 	// image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.
-	Image *ImageVolumeStatusApplyConfiguration `json:"image,omitempty"`
+	Image              *ImageVolumeStatusApplyConfiguration `json:"image,omitempty"`
+	AllocatedSizeLimit *resource.Quantity                   `json:"allocatedSizeLimit,omitempty"`
+	SizeLimit          *resource.Quantity                   `json:"sizeLimit,omitempty"`
 }
 
 // VolumeStatusApplyConfiguration constructs a declarative configuration of the VolumeStatus type for use with
@@ -39,5 +45,21 @@ func VolumeStatus() *VolumeStatusApplyConfiguration {
 // If called multiple times, the Image field is set to the value of the last call.
 func (b *VolumeStatusApplyConfiguration) WithImage(value *ImageVolumeStatusApplyConfiguration) *VolumeStatusApplyConfiguration {
 	b.Image = value
+	return b
+}
+
+// WithAllocatedSizeLimit sets the AllocatedSizeLimit field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the AllocatedSizeLimit field is set to the value of the last call.
+func (b *VolumeStatusApplyConfiguration) WithAllocatedSizeLimit(value resource.Quantity) *VolumeStatusApplyConfiguration {
+	b.AllocatedSizeLimit = &value
+	return b
+}
+
+// WithSizeLimit sets the SizeLimit field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the SizeLimit field is set to the value of the last call.
+func (b *VolumeStatusApplyConfiguration) WithSizeLimit(value resource.Quantity) *VolumeStatusApplyConfiguration {
+	b.SizeLimit = &value
 	return b
 }

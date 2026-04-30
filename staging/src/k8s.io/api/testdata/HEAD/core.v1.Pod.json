@@ -1894,7 +1894,9 @@
             "volumeStatus": {
               "image": {
                 "imageRef": "imageRefValue"
-              }
+              },
+              "allocatedSizeLimit": "0",
+              "sizeLimit": "0"
             }
           }
         ],
@@ -1993,7 +1995,9 @@
             "volumeStatus": {
               "image": {
                 "imageRef": "imageRefValue"
-              }
+              },
+              "allocatedSizeLimit": "0",
+              "sizeLimit": "0"
             }
           }
         ],
@@ -2093,7 +2097,9 @@
             "volumeStatus": {
               "image": {
                 "imageRef": "imageRefValue"
-              }
+              },
+              "allocatedSizeLimit": "0",
+              "sizeLimit": "0"
             }
           }
         ],

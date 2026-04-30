@@ -6898,6 +6898,16 @@ func (in *VolumeStatus) DeepCopyInto(out *VolumeStatus) {
 		*out = new(ImageVolumeStatus)
 		**out = **in
 	}
+	if in.AllocatedSizeLimit != nil {
+		in, out := &in.AllocatedSizeLimit, &out.AllocatedSizeLimit
+		x := (*in).DeepCopy()
+		*out = &x
+	}
+	if in.SizeLimit != nil {
+		in, out := &in.SizeLimit, &out.SizeLimit
+		x := (*in).DeepCopy()
+		*out = &x
+	}
 	return
 }
 

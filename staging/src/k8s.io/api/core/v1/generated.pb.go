@@ -14986,6 +14986,30 @@ func (m *VolumeStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.SizeLimit != nil {
+		{
+			size, err := m.SizeLimit.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1a
+	}
+	if m.AllocatedSizeLimit != nil {
+		{
+			size, err := m.AllocatedSizeLimit.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x12
+	}
 	if m.Image != nil {
 		{
 			size, err := m.Image.MarshalToSizedBuffer(dAtA[:i])
@@ -20482,6 +20506,14 @@ func (m *VolumeStatus) Size() (n int) {
 		l = m.Image.Size()
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	if m.AllocatedSizeLimit != nil {
+		l = m.AllocatedSizeLimit.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.SizeLimit != nil {
+		l = m.SizeLimit.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
 	return n
 }
 
@@ -24497,6 +24529,8 @@ func (this *VolumeStatus) String() string {
 	}
 	s := strings.Join([]string{`&VolumeStatus{`,
 		`Image:` + strings.Replace(this.Image.String(), "ImageVolumeStatus", "ImageVolumeStatus", 1) + `,`,
+		`AllocatedSizeLimit:` + strings.Replace(fmt.Sprintf("%v", this.AllocatedSizeLimit), "Quantity", "resource.Quantity", 1) + `,`,
+		`SizeLimit:` + strings.Replace(fmt.Sprintf("%v", this.SizeLimit), "Quantity", "resource.Quantity", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -70779,6 +70813,78 @@ func (m *VolumeStatus) Unmarshal(dAtA []byte) error {
 				m.Image = &ImageVolumeStatus{}
 			}
 			if err := m.Image.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AllocatedSizeLimit", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.AllocatedSizeLimit == nil {
+				m.AllocatedSizeLimit = &resource.Quantity{}
+			}
+			if err := m.AllocatedSizeLimit.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SizeLimit", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SizeLimit == nil {
+				m.SizeLimit = &resource.Quantity{}
+			}
+			if err := m.SizeLimit.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex

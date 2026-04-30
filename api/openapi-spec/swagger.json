@@ -12879,9 +12879,15 @@
     "io.k8s.api.core.v1.VolumeStatus": {
       "description": "VolumeStatus represents the status of a mounted volume. At most one of its members must be specified.",
       "properties": {
+        "allocatedSizeLimit": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
+        },
         "image": {
           "$ref": "#/definitions/io.k8s.api.core.v1.ImageVolumeStatus",
           "description": "image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine."
+        },
+        "sizeLimit": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity"
         }
       },
       "type": "object"

@@ -33367,11 +33367,21 @@ func schema_k8sio_api_core_v1_VolumeStatus(ref common.ReferenceCallback) common.
 							Ref:         ref(corev1.ImageVolumeStatus{}.OpenAPIModelName()),
 						},
 					},
+					"allocatedSizeLimit": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+					"sizeLimit": {
+						SchemaProps: spec.SchemaProps{
+							Ref: ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			corev1.ImageVolumeStatus{}.OpenAPIModelName()},
+			corev1.ImageVolumeStatus{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName()},
 	}
 }
 

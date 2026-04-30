@@ -8490,9 +8490,15 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.core.v1.VolumeStatus
   map:
     fields:
+    - name: allocatedSizeLimit
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
     - name: image
       type:
         namedType: io.k8s.api.core.v1.ImageVolumeStatus
+    - name: sizeLimit
+      type:
+        namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
 - name: io.k8s.api.core.v1.VsphereVirtualDiskVolumeSource
   map:
     fields:

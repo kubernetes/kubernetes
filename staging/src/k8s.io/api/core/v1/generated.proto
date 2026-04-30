@@ -7288,6 +7288,10 @@ message VolumeStatus {
   // +featureGate=ImageVolumeWithDigest
   // +optional
   optional ImageVolumeStatus image = 1;
+
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity allocatedSizeLimit = 2;
+
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity sizeLimit = 3;
 }
 
 // Represents a vSphere volume resource.

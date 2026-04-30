@@ -108,8 +108,10 @@ status:
       readOnly: true
       recursiveReadOnly: recursiveReadOnlyValue
       volumeStatus:
+        allocatedSizeLimit: "0"
         image:
           imageRef: imageRefValue
+        sizeLimit: "0"
   ephemeralContainerStatuses:
   - allocatedResources:
       allocatedResourcesKey: "0"
@@ -175,8 +177,10 @@ status:
       readOnly: true
       recursiveReadOnly: recursiveReadOnlyValue
       volumeStatus:
+        allocatedSizeLimit: "0"
         image:
           imageRef: imageRefValue
+        sizeLimit: "0"
   extendedResourceClaimStatus:
     requestMappings:
     - containerName: containerNameValue
@@ -251,8 +255,10 @@ status:
       readOnly: true
       recursiveReadOnly: recursiveReadOnlyValue
       volumeStatus:
+        allocatedSizeLimit: "0"
         image:
           imageRef: imageRefValue
+        sizeLimit: "0"
   message: messageValue
   nodeAllocatableResourceClaimStatuses:
   - containers:
