@@ -1097,9 +1097,9 @@ func dropDisabledPodStatusFields(podStatus, oldPodStatus *api.PodStatus, podSpec
 		}
 	}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest) && !imageVolumeWithDigestInUse(oldPodStatus) {
-		dropImageVolumeWithDigest(podStatus)
-	}
+	// if !utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest) && !imageVolumeWithDigestInUse(oldPodStatus) {
+	// 	dropImageVolumeWithDigest(podStatus)
+	// }
 
 	dropPodNodeAllocatableResourceStatus(podStatus, oldPodStatus)
 

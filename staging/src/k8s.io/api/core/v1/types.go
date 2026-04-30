@@ -3651,6 +3651,10 @@ type VolumeStatus struct {
 	// +featureGate=ImageVolumeWithDigest
 	// +optional
 	Image *ImageVolumeStatus `json:"image,omitempty" protobuf:"bytes,1,opt,name=image"`
+
+	AllocatedSizeLimit *resource.Quantity `json:"allocatedSizeLimit,omitempty" protobuf:"bytes,2,opt,name=allocatedSizeLimit"`
+
+	SizeLimit *resource.Quantity `json:"sizeLimit,omitempty" protobuf:"bytes,3,opt,name=sizeLimit"`
 }
 
 // ImageVolumeStatus represents the image-based volume status.

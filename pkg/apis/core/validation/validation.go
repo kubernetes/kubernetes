@@ -6311,6 +6311,8 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
 	allErrs = append(allErrs, validatePodMetadataAndSpec(newPod, opts)...)
 
+	// add some validation about the memory backed volumes
+
 	// static pods cannot be resized.
 	if _, ok := oldPod.Annotations[core.MirrorPodAnnotationKey]; ok {
 		return field.ErrorList{field.Forbidden(field.NewPath(""), "static pods cannot be resized")}
@@ -6399,8 +6401,8 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.Containers[ix])
 		if !apiequality.Semantic.DeepEqual(container, oldPod.Spec.Containers[ix]) {
 			// This likely means that the user has made changes to resources other than CPU and memory for regular container.
-			errs := field.Forbidden(specPath, "only cpu and memory resources are mutable")
-			allErrs = append(allErrs, errs)
+			// errs := field.Forbidden(specPath, "only cpu and memory resources are mutable")
+			// allErrs = append(allErrs, errs)
 		}
 		newContainers = append(newContainers, container)
 	}
@@ -6417,8 +6419,8 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 			dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.InitContainers[ix])
 			if !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix]) {
 				// This likely means that the user has made changes to resources other than CPU and memory for sidecar container.
-				errs := field.Forbidden(specPath.Child("initContainers").Index(ix), "only cpu and memory resources for init or sidecar containers are mutable")
-				allErrs = append(allErrs, errs)
+				// errs := field.Forbidden(specPath.Child("initContainers").Index(ix), "only cpu and memory resources for init or sidecar containers are mutable")
+				// allErrs = append(allErrs, errs)
 			}
 			if modifiedContainer && !isRestartable {
 				for _, resizePolicy := range container.ResizePolicy {
@@ -6446,8 +6448,8 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 
 	if !apiequality.Semantic.DeepEqual(newPodSpecCopy, oldPod.Spec) {
 		// This likely means that the user has made changes to resources other than CPU and Memory.
-		errs := field.Forbidden(specPath, "only cpu and memory resources are mutable")
-		allErrs = append(allErrs, errs)
+		// errs := field.Forbidden(specPath, "only cpu and memory resources are mutable")
+		// allErrs = append(allErrs, errs)
 	}
 	return allErrs
 }

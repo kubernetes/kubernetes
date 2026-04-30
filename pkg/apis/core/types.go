@@ -3225,6 +3225,10 @@ type VolumeStatus struct {
 	// +featureGate=ImageVolumeWithDigest
 	// +optional
 	Image *ImageVolumeStatus
+
+	AllocatedSizeLimit *resource.Quantity
+
+	SizeLimit *resource.Quantity
 }
 
 type ImageVolumeStatus struct {
