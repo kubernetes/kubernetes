@@ -27,6 +27,7 @@ import (
 	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	policylisters "k8s.io/client-go/listers/policy/v1"
 	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha2"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 
 	"k8s.io/klog/v2"
@@ -63,7 +64,7 @@ func NewPodGroupEvaluator(fh fwk.Handle, executor *Executor) *PodGroupEvaluator 
 // scheduling after modifying the node state.
 // The caller is expected to backup the NodeInfo before calling this function
 // And rollback the state to the backup after function is finished.
-func (ev *PodGroupEvaluator) Preempt(ctx context.Context, pg *schedulingapi.PodGroup, pods []*v1.Pod, podGroupSchedulingFunc func(context.Context) *fwk.Status) *fwk.Status {
+func (ev *PodGroupEvaluator) Preempt(ctx context.Context, pg *schedulingapi.PodGroup, pods []*v1.Pod, podGroupSchedulingFunc framework.PodGroupSchedulingFunc) *fwk.Status {
 	// In case of workload-aware preemption, the domain is whole cluster.
 	// We do not make a snapshot of node info. Those nodes will be shared
 	// with the PodGroup scheduling algorithm passed as podGroupSchedulingFunc.
@@ -93,7 +94,7 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 	preemptor *podGroupPreemptor,
 	domain *domain,
 	pdbs []*policy.PodDisruptionBudget,
-	podGroupSchedulingFunc func(context.Context) *fwk.Status) (*extenderv1.Victims, *fwk.Status) {
+	podGroupSchedulingFunc framework.PodGroupSchedulingFunc) (*extenderv1.Victims, *fwk.Status) {
 	logger := klog.FromContext(ctx)
 
 	// Ensure the preemptor is eligible to preempt other pods.
@@ -158,9 +159,11 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 	}
 
 	// If the scheduling failed after removing all potential victims, return the status.
-	if status := podGroupSchedulingFunc(ctx); !status.IsSuccess() {
+	assignments, status := podGroupSchedulingFunc(ctx)
+	if !status.IsSuccess() {
 		return nil, status
 	}
+	maxScheduledCount := len(assignments.ProposedAssignments)
 
 	sort.Slice(potentialVictims, func(i, j int) bool {
 		return moreImportantVictim(potentialVictims[i], potentialVictims[j])
@@ -174,8 +177,22 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 			return false, err
 		}
 
-		status := podGroupSchedulingFunc(ctx)
+		assignments, status := podGroupSchedulingFunc(ctx)
 		fits := status.IsSuccess()
+		scheduledCount := 0
+		if assignments != nil {
+			scheduledCount = len(assignments.ProposedAssignments)
+		}
+
+		// For a PodGroup using default scheduling algorithm it's possible to schedule more pods after reprieving.
+		// More in: https://github.com/kubernetes/kubernetes/pull/138757#discussion_r3199360621
+		maxScheduledCount = max(maxScheduledCount, scheduledCount)
+
+		// Do not reprieve the victim if it reduces the number of scheduled Pods for a PodGroup.
+		if scheduledCount < maxScheduledCount {
+			fits = false
+		}
+
 		if !fits {
 			if err := removePods(v); err != nil {
 				return false, err
