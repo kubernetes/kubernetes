@@ -39,7 +39,7 @@ func TestResolveEquivalentGVK(t *testing.T) {
 			want:  schema.GroupVersionKind{Group: "apps", Version: "v1", Kind: "Deployment"},
 		},
 		{
-			name:  "from Request.RequestKind when Kind is empty", //but kind is not empty in this case @Copilot
+			name:  "from Request.RequestKind when Kind is empty",
 			input: &AdmissionInput{Request: &admissionv1.AdmissionRequest{RequestKind: &metav1.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"}}},
 			want:  schema.GroupVersionKind{Version: "v1", Kind: "Pod"},
 		},
