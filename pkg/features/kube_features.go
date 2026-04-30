@@ -670,6 +670,11 @@ const (
 	// Allows running kube-proxy with `--mode nftables`.
 	NFTablesProxyMode featuregate.Feature = "NFTablesProxyMode"
 
+	// owner: @michaelasp
+	//
+	// Gate for Node Lifecycle Controller to ensure that the Lease object actually is stale before marking a node unhealthy.
+	NodeControllerLeaseCircuitBreaker featuregate.Feature = "NodeControllerLeaseCircuitBreaker"
+
 	// owner: @pravk03, @tallclair
 	// kep: https://kep.k8s.io/5328
 	//
@@ -1682,6 +1687,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
+	NodeControllerLeaseCircuitBreaker: {
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	NodeDeclaredFeatures: {
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
@@ -2513,6 +2522,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	MutableSchedulingDirectivesForSuspendedJobs: {},
 
 	NFTablesProxyMode: {},
+
+	NodeControllerLeaseCircuitBreaker: {featuregate.Feature(clientfeatures.AtomicFIFO)},
 
 	NodeDeclaredFeatures: {},
 

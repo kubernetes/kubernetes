@@ -326,6 +326,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 				// used for pod deletion
 				rbacv1helpers.NewRule("patch", "update").Groups(legacyGroup).Resources("pods/status").RuleOrDie(),
 				rbacv1helpers.NewRule("list", "watch", "get", "delete").Groups(legacyGroup).Resources("pods").RuleOrDie(),
+				rbacv1helpers.NewRule("get", "list", "watch").Groups(coordinationGroup).Resources("leases").RuleOrDie(),
 				eventsRule(),
 			},
 		}

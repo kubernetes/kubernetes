@@ -1249,6 +1249,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.33"
+- name: NodeControllerLeaseCircuitBreaker
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: NodeDeclaredFeatures
   versionedSpecs:
   - default: false
