@@ -130,8 +130,24 @@ func TestEventSeries(t *testing.T) {
 	recorder := broadcaster.NewRecorder(scheme.Scheme, "k8s.io/kube-scheduler")
 	broadcaster.StartRecordingToSink(stopCh)
 	recorder.Eventf(regarding, related, v1.EventTypeNormal, "memoryPressure", "killed", "memory pressure")
+
+	// Wait for the first event to be persisted to the API server before firing
+	// the second. Without this, both events may be coalesced client-side before
+	// the first write, and the series counter may never reach 2 within the poll
+	// window, causing a flaky timeout on loaded CI machines.
+	if err := wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+		evs, err := client.EventsV1().Events("").List(ctx, metav1.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+		return len(evs.Items) == 1, nil
+	}); err != nil {
+		t.Fatalf("timed out waiting for first event to be persisted: %v", err)
+	}
+
 	recorder.Eventf(regarding, related, v1.EventTypeNormal, "memoryPressure", "killed", "memory pressure")
-	err = wait.PollImmediate(100*time.Millisecond, 20*time.Second, func() (done bool, err error) {
+	// Increase the poll timeout to give more headroom on slow CI machines.
+	err = wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, 60*time.Second, true, func(ctx context.Context) (bool, error) {
 		events, err := client.EventsV1().Events("").List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			return false, err
