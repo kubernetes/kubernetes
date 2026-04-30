@@ -18,9 +18,11 @@ package volumemanager
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/volume/util/types"
@@ -129,4 +131,14 @@ func (f *FakeVolumeManager) GetVolumesReportedInUse() []v1.UniqueVolumeName {
 		inuse = append(inuse, reportedVolume)
 	}
 	return inuse
+}
+
+// ResizeVolume is not implemented
+func (f *FakeVolumeManager) ResizeVolume(pod *v1.Pod, volumeName string, newSize *resource.Quantity) error {
+	return nil
+}
+
+// GetVolumeSize is not implemented
+func (f *FakeVolumeManager) GetVolumeSize(pod *v1.Pod, volumeName string) (*resource.Quantity, error) {
+	return nil, fmt.Errorf("not implemented")
 }

@@ -30,6 +30,7 @@ import (
 	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -157,6 +158,14 @@ type VolumeManager interface {
 	// Marks the specified volume as having successfully been reported as "in
 	// use" in the nodes's volume status.
 	MarkVolumesAsReportedInUse(volumesReportedAsInUse []v1.UniqueVolumeName)
+
+	// ResizeVolume directly triggers a resize of the specified volume.
+	// This is intended for volumes that support online resizing and require
+	// strict coordination with container runtime operations.
+	ResizeVolume(pod *v1.Pod, volumeName string, newSize *resource.Quantity) error
+
+	// GetVolumeSize returns the current size of the specified volume.
+	GetVolumeSize(pod *v1.Pod, volumeName string) (*resource.Quantity, error)
 }
 
 // podStateProvider can determine if a pod is going to be terminated
@@ -644,4 +653,62 @@ func getExtraSupplementalGID(volumeGIDValue string, pod *v1.Pod) (int64, bool) {
 	}
 
 	return gid, true
+}
+
+// ResizeVolume directly triggers a resize of the specified volume.
+func (vm *volumeManager) ResizeVolume(pod *v1.Pod, volumeName string, newSize *resource.Quantity) error {
+	// 1. Find volume in pod spec
+	var vol *v1.Volume
+	for _, v := range pod.Spec.Volumes {
+		if v.Name == volumeName {
+			vol = &v
+			break
+		}
+	}
+	if vol == nil {
+		return fmt.Errorf("volume %s not found in pod %s", volumeName, pod.Name)
+	}
+
+	// 2. Get the volume plugin
+	plugin, err := vm.volumePluginMgr.FindPluginByName("kubernetes.io/empty-dir")
+	if err != nil {
+		return err
+	}
+
+	// 3. Type assert to check if the plugin supports direct resizing
+	if resizablePlugin, ok := plugin.(volume.DirectResizableVolumePlugin); ok {
+		volumeSpec := volume.NewSpecFromVolume(vol)
+		return resizablePlugin.DirectResize(volumeSpec, pod, newSize)
+	}
+
+	return fmt.Errorf("volume %s (plugin %s) does not support direct resizing", volumeName, plugin.GetPluginName())
+}
+
+// GetVolumeSize returns the current size of the specified volume.
+func (vm *volumeManager) GetVolumeSize(pod *v1.Pod, volumeName string) (*resource.Quantity, error) {
+	// 1. Find volume in pod spec
+	var vol *v1.Volume
+	for _, v := range pod.Spec.Volumes {
+		if v.Name == volumeName {
+			vol = &v
+			break
+		}
+	}
+	if vol == nil {
+		return nil, fmt.Errorf("volume %s not found in pod %s", volumeName, pod.Name)
+	}
+
+	// 2. Get the volume plugin
+	plugin, err := vm.volumePluginMgr.FindPluginByName("kubernetes.io/empty-dir")
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Type assert to check if the plugin supports direct resizing
+	if resizablePlugin, ok := plugin.(volume.DirectResizableVolumePlugin); ok {
+		volumeSpec := volume.NewSpecFromVolume(vol)
+		return resizablePlugin.GetVolumeSize(volumeSpec, pod)
+	}
+
+	return nil, fmt.Errorf("volume %s (plugin %s) does not support direct resizing", volumeName, plugin.GetPluginName())
 }
