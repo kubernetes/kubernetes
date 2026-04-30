@@ -525,7 +525,7 @@ func (rt *debuggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 
 	startTime := time.Now()
 
-	if levels&(1<<DebugDetailedTiming) != 0 {
+	{
 		var getConn, dnsStart, dialStart, tlsStart, serverStart time.Time
 		var host string
 		trace := &httptrace.ClientTrace{
