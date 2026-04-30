@@ -491,7 +491,7 @@ func (vm *volumeManager) WaitForUnmount(ctx context.Context, pod *v1.Pod) error 
 
 	if err != nil {
 		var mountedVolumes []v1.UniqueVolumeName
-		for _, v := range vm.actualStateOfWorld.GetMountedVolumesForPod(uniquePodName) {
+		for _, v := range vm.actualStateOfWorld.GetPossiblyMountedVolumesForPod(uniquePodName) {
 			mountedVolumes = append(mountedVolumes, v.VolumeName)
 		}
 		if len(mountedVolumes) == 0 {
@@ -561,14 +561,17 @@ func (vm *volumeManager) verifyVolumesMountedFunc(podName types.UniquePodName, e
 	}
 }
 
-// verifyVolumesUnmountedFunc returns a method that is true when there are no mounted volumes for this
-// pod.
+// verifyVolumesUnmountedFunc returns a method that is true when there are no
+// mounted or uncertain volumes for this pod. An UnmountVolume.TearDown failure
+// leaves the volume in the uncertain state, and the predicate must keep
+// reporting not-done in that case so WaitForUnmount waits for the next retry
+// rather than declaring the pod cleanly terminated while the mount lingers.
 func (vm *volumeManager) verifyVolumesUnmountedFunc(podName types.UniquePodName) wait.ConditionWithContextFunc {
 	return func(_ context.Context) (done bool, err error) {
 		if errs := vm.desiredStateOfWorld.PopPodErrors(podName); len(errs) > 0 {
 			return true, errors.New(strings.Join(errs, "; "))
 		}
-		return !vm.actualStateOfWorld.PodHasMountedVolumes(podName), nil
+		return len(vm.actualStateOfWorld.GetPossiblyMountedVolumesForPod(podName)) == 0, nil
 	}
 }
 

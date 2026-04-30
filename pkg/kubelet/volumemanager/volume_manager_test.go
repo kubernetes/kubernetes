@@ -43,10 +43,12 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
+	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
+	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/mount-utils"
@@ -890,4 +892,60 @@ func createMultiplePodsWithVolumes(numPods int, pvMode v1.PersistentVolumeMode) 
 	}
 
 	return node, pods, pvs, claims
+}
+
+func TestVerifyVolumesUnmountedFuncTreatsUncertainAsMounted(t *testing.T) {
+	// Uncertain volumes must keep blocking unmount; see kubernetes#113563.
+	logger, ctx := ktesting.NewTestContext(t)
+
+	volumePluginMgr, plugin := volumetest.GetTestKubeletVolumePluginMgr(t)
+	asw := cache.NewActualStateOfWorld(testHostname, volumePluginMgr)
+	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr, util.NewFakeSELinuxLabelTranslator())
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod1",
+			UID:  "pod1uid",
+		},
+		Spec: v1.PodSpec{
+			Volumes: []v1.Volume{
+				{
+					Name: "volume-name-1",
+					VolumeSource: v1.VolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName: "fake-device",
+						},
+					},
+				},
+			},
+		},
+	}
+	volumeSpec := &volume.Spec{Volume: &pod.Spec.Volumes[0]}
+	volumeName, err := util.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
+	require.NoError(t, err)
+
+	require.NoError(t, asw.MarkVolumeAsAttached(logger, volumeName, volumeSpec, "" /* nodeName */, "fake/device/path"))
+
+	podName := util.GetUniquePodName(pod)
+	mounter, err := plugin.NewMounter(volumeSpec, pod)
+	require.NoError(t, err)
+
+	require.NoError(t, asw.MarkVolumeMountAsUncertain(operationexecutor.MarkVolumeOpts{
+		PodName:    podName,
+		PodUID:     pod.UID,
+		VolumeName: volumeName,
+		Mounter:    mounter,
+		VolumeSpec: volumeSpec,
+	}))
+
+	vm := &volumeManager{
+		desiredStateOfWorld: dsw,
+		actualStateOfWorld:  asw,
+	}
+
+	done, err := vm.verifyVolumesUnmountedFunc(podName)(ctx)
+	require.NoError(t, err)
+	if done {
+		t.Errorf("verifyVolumesUnmountedFunc reported done for a pod with an uncertain volume; uncertain volumes must keep blocking unmount completion")
+	}
 }
