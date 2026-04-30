@@ -176,6 +176,7 @@ func memqosMakePod(name, namespace string, requests, limits v1.ResourceList) *v1
 
 var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 	f := framework.NewDefaultFramework("memory-qos")
+	addAfterEachForCleaningUpPods(f)
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 
 	var (
