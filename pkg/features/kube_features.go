@@ -597,11 +597,6 @@ const (
 	// Relies on UserNamespacesSupport feature, and thus should follow it when setting defaults.
 	LocalStorageCapacityIsolationFSQuotaMonitoring featuregate.Feature = "LocalStorageCapacityIsolationFSQuotaMonitoring"
 
-	// owner: @damemi
-	//
-	// Enables scaling down replicas via logarithmic comparison of creation/ready timestamps
-	LogarithmicScaleDown featuregate.Feature = "LogarithmicScaleDown"
-
 	// owner: @sanposhiho
 	// kep: https://kep.k8s.io/3633
 	//
@@ -1623,12 +1618,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.31"), Default: false, PreRelease: featuregate.Beta},
 	},
 
-	LogarithmicScaleDown: {
-		{Version: version.MustParse("1.21"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.22"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
-
 	MatchLabelKeysInPodAffinity: {
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
@@ -2498,8 +2487,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	KubeletTracing: {},
 
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {},
-
-	LogarithmicScaleDown: {},
 
 	MatchLabelKeysInPodAffinity: {},
 
