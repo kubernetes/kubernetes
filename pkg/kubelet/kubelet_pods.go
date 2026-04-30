@@ -2353,6 +2353,35 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 			}
 		}
 
+		// Propagate volume size to status for memory-backed emptyDir volumes
+		for i, vm := range status.VolumeMounts {
+			var volSpec *v1.Volume
+			for _, v := range pod.Spec.Volumes {
+				if v.Name == vm.Name {
+					volSpec = &v
+					break
+				}
+			}
+			if volSpec == nil || volSpec.EmptyDir == nil || volSpec.EmptyDir.Medium != v1.StorageMediumMemory {
+				continue
+			}
+
+			size, err := kl.volumeManager.GetVolumeSize(pod, vm.Name)
+			if err == nil && size != nil {
+				if status.VolumeMounts[i].VolumeStatus == nil {
+					status.VolumeMounts[i].VolumeStatus = &v1.VolumeStatus{}
+				}
+				status.VolumeMounts[i].VolumeStatus.SizeLimit = size
+			}
+
+			if volSpec.EmptyDir.SizeLimit != nil {
+				if status.VolumeMounts[i].VolumeStatus == nil {
+					status.VolumeMounts[i].VolumeStatus = &v1.VolumeStatus{}
+				}
+				status.VolumeMounts[i].VolumeStatus.AllocatedSizeLimit = volSpec.EmptyDir.SizeLimit
+			}
+		}
+
 		switch {
 		case cs.State == kubecontainer.ContainerStateRunning:
 			status.State.Running = &v1.ContainerStateRunning{StartedAt: metav1.NewTime(cs.StartedAt)}

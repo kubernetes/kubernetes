@@ -1019,6 +1019,9 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 				if err := m.runtimeHelper.ResizeVolume(pod, volName, newSize); err != nil {
 					return fmt.Errorf("failed to resize volume %s: %w", volName, err)
 				}
+				if err := m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, volName, newSize); err != nil {
+					return fmt.Errorf("failed to checkpoint actuated volume size: %w", err)
+				}
 			}
 		}
 		return nil
@@ -2304,7 +2307,39 @@ func (m *kubeGenericRuntimeManager) IsPodResizeInProgress(allocatedPod *v1.Pod, 
 		return true
 	}
 
+	if m.isMemoryBackedVolumeResizeInProgress(allocatedPod) {
+		return true
+	}
+
 	return m.isPodLevelResourcesResizeInProgress(allocatedPod, podStatus)
+}
+
+func (m *kubeGenericRuntimeManager) isMemoryBackedVolumeResizeInProgress(allocatedPod *v1.Pod) bool {
+	for _, volume := range allocatedPod.Spec.Volumes {
+		// Only process memory-backed emptyDirs with a size limit
+		if volume.EmptyDir == nil || volume.EmptyDir.Medium != v1.StorageMediumMemory || volume.EmptyDir.SizeLimit == nil {
+			continue
+		}
+
+		found := false
+		for _, cs := range allocatedPod.Status.ContainerStatuses {
+			for _, vm := range cs.VolumeMounts {
+				if vm.Name == volume.Name {
+					if vm.VolumeStatus != nil && vm.VolumeStatus.AllocatedSizeLimit != nil && vm.VolumeStatus.SizeLimit != nil {
+						if !vm.VolumeStatus.AllocatedSizeLimit.Equal(*vm.VolumeStatus.SizeLimit) {
+							return true
+						}
+					}
+					found = true
+					break
+				}
+			}
+			if found {
+				break
+			}
+		}
+	}
+	return false
 }
 
 func (m *kubeGenericRuntimeManager) isContainerResourceResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
