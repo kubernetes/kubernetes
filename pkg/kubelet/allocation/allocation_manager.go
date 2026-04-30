@@ -25,6 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -480,6 +481,22 @@ func updatePodFromAllocation(pod *v1.Pod, allocated state.PodResourceInfo) (*v1.
 			pod.Spec.InitContainers[i].Resources = cAlloc
 		}
 	}
+
+	for i, volume := range pod.Spec.Volumes {
+		if volume.EmptyDir != nil && volume.EmptyDir.Medium == v1.StorageMediumMemory {
+			if alloc, ok := allocated.EmptyDirVolumeLimits[volume.Name]; ok {
+				if volume.EmptyDir.SizeLimit == nil || alloc.Cmp(*volume.EmptyDir.SizeLimit) != 0 {
+					if !updated {
+						pod = pod.DeepCopy()
+						updated = true
+					}
+					allocCopy := alloc.DeepCopy()
+					pod.Spec.Volumes[i].EmptyDir.SizeLimit = &allocCopy
+				}
+			}
+		}
+	}
+
 	return pod, updated
 }
 
@@ -503,6 +520,15 @@ func allocationFromPod(pod *v1.Pod) state.PodResourceInfo {
 		}
 		alloc := *container.Resources.DeepCopy()
 		podAlloc.ContainerResources[container.Name] = alloc
+	}
+	for _, volume := range pod.Spec.Volumes {
+		if volume.EmptyDir != nil && volume.EmptyDir.Medium == v1.StorageMediumMemory && volume.EmptyDir.SizeLimit != nil {
+			alloc := resource.MustParse(volume.EmptyDir.SizeLimit.String())
+			if podAlloc.EmptyDirVolumeLimits == nil {
+				podAlloc.EmptyDirVolumeLimits = make(map[string]*resource.Quantity)
+			}
+			podAlloc.EmptyDirVolumeLimits[volume.Name] = &alloc
+		}
 	}
 
 	return podAlloc

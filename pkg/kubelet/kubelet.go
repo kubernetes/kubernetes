@@ -2987,8 +2987,10 @@ func recordResizeOperations(oldPod, newPod *v1.Pod) bool {
 		return true
 	}
 
-	hasResize := recordContainerResizeOperations(oldPod, newPod) || recordPodLevelResourceResizeOperations(oldPod, newPod)
-	return hasResize
+	hasContainerResize := recordContainerResizeOperations(oldPod, newPod)
+	hasPodLevelResourceResize := recordPodLevelResourceResizeOperations(oldPod, newPod)
+	hasVolumeResize := recordVolumeResizeOperations(oldPod, newPod)
+	return hasContainerResize || hasPodLevelResourceResize || hasVolumeResize
 }
 
 // recordPodLevelResourceResizeOperations records if any of the pod level resources need to be resized, and returns
@@ -3044,6 +3046,23 @@ func recordContainerResizeOperations(oldPod, newPod *v1.Pod) bool {
 		}
 	}
 
+	return hasResize
+}
+
+// recordVolumeResizeOperations records if any of the pod's memory-backed emptyDir volumes needs to be resized, and returns true if so
+func recordVolumeResizeOperations(oldPod, newPod *v1.Pod) bool {
+	hasResize := false
+	for _, oldVol := range oldPod.Spec.Volumes {
+		if oldVol.EmptyDir != nil && oldVol.EmptyDir.Medium == v1.StorageMediumMemory {
+			for _, newVol := range newPod.Spec.Volumes {
+				if newVol.Name == oldVol.Name && newVol.EmptyDir != nil && newVol.EmptyDir.Medium == v1.StorageMediumMemory {
+					if !apiequality.Semantic.DeepEqual(oldVol.EmptyDir.SizeLimit, newVol.EmptyDir.SizeLimit) {
+						hasResize = true
+					}
+				}
+			}
+		}
+	}
 	return hasResize
 }
 
