@@ -465,12 +465,6 @@ const (
 	InPlacePodVerticalScalingInitContainers featuregate.Feature = "InPlacePodVerticalScalingInitContainers"
 
 	// owner: @mimowo
-	// kep: https://kep.k8s.io/3850
-	//
-	// Allows users to specify counting of failed pods per index.
-	JobBackoffLimitPerIndex featuregate.Feature = "JobBackoffLimitPerIndex"
-
-	// owner: @mimowo
 	// kep: https://kep.k8s.io/4368
 	//
 	// Allows to delegate reconciliation of a Job object to an external controller.
@@ -1519,12 +1513,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 	},
 
-	JobBackoffLimitPerIndex: {
-		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.36
-	},
-
 	JobManagedBy: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
@@ -2451,8 +2439,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	InPlacePodVerticalScalingExclusiveMemory: {InPlacePodVerticalScaling},
 
 	InPlacePodVerticalScalingInitContainers: {InPlacePodVerticalScaling, NodeDeclaredFeatures},
-
-	JobBackoffLimitPerIndex: {},
 
 	JobManagedBy: {},
 
