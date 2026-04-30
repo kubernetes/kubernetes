@@ -17,6 +17,7 @@ limitations under the License.
 package store
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -68,6 +69,43 @@ func TestStoreListPrefix(t *testing.T) {
 	assert.Equal(t, []interface{}{
 		testStorageElement("bar", "baz", 4),
 	}, items)
+}
+
+func BenchmarkBtreeStoreListPrefix(b *testing.B) {
+	const namespaces = 100
+	const podsPerNamespace = 1000
+	store := newThreadedBtreeStoreIndexer(nil, btreeDegree)
+	for ns := range namespaces {
+		for pod := range podsPerNamespace {
+			if err := store.Add(testStorageElement(fmt.Sprintf("/pods/ns-%03d/pod-%04d", ns, pod), "data", ns*podsPerNamespace+pod)); err != nil {
+				b.Fatal(err)
+			}
+		}
+	}
+	b.Run("Match=All", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			if got := len(store.ListPrefix("/pods/", "")); got != namespaces*podsPerNamespace {
+				b.Fatalf("unexpected result size %d", got)
+			}
+		}
+	})
+	b.Run("Match=Namespace", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			if got := len(store.ListPrefix("/pods/ns-042/", "")); got != podsPerNamespace {
+				b.Fatalf("unexpected result size %d", got)
+			}
+		}
+	})
+	b.Run("Match=Continue", func(b *testing.B) {
+		b.ReportAllocs()
+		for i := 0; i < b.N; i++ {
+			if got := len(store.ListPrefix("/pods/", "/pods/ns-050/")); got != namespaces/2*podsPerNamespace {
+				b.Fatalf("unexpected result size %d", got)
+			}
+		}
+	})
 }
 
 func TestStoreSnapshotter(t *testing.T) {

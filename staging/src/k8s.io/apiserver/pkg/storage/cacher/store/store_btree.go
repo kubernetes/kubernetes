@@ -257,7 +257,7 @@ func (s *btreeStore) ListPrefix(prefix, continueKey string) []interface{} {
 	if continueKey == "" {
 		continueKey = prefix
 	}
-	var result []interface{}
+	result := make([]interface{}, 0, s.listPrefixCapacityHint(prefix, continueKey))
 	s.tree.AscendGreaterOrEqual(&Element{Key: continueKey}, func(item *Element) bool {
 		if !strings.HasPrefix(item.Key, prefix) {
 			return false
@@ -266,6 +266,24 @@ func (s *btreeStore) ListPrefix(prefix, continueKey string) []interface{} {
 		return true
 	})
 	return result
+}
+
+// listPrefixCapacityHint returns the exact result size for ListPrefix when it
+// can be determined cheaply, or 0 otherwise. Keys matching a given prefix form
+// a contiguous range in key order, so if the tree's smallest key is at or after
+// continueKey and its largest key carries the prefix, every key in the tree will
+// be returned. This covers cluster-scoped LISTs, where the prefix matches every
+// key in the per-resource store.
+func (s *btreeStore) listPrefixCapacityHint(prefix, continueKey string) int {
+	minElem, hasMin := s.tree.Min()
+	maxElem, hasMax := s.tree.Max()
+	if hasMin && hasMax && minElem.Key >= continueKey && strings.HasPrefix(maxElem.Key, prefix) {
+		return s.tree.Len()
+	}
+	// TODO: when the prefix does not cover the whole tree, falling back to
+	// s.Count(prefix, continueKey) would size the result exactly at the cost
+	// of a second tree traversal over the matching range.
+	return 0
 }
 
 func (s *btreeStore) Count(prefix, continueKey string) (count int) {
