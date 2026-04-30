@@ -54,10 +54,8 @@ type AnnotateFlags struct {
 	ResourceBuilderFlags *genericclioptions.ResourceBuilderFlags
 	RESTClientGetter     genericclioptions.RESTClientGetter
 
-	DryRunStrategy  cmdutil.DryRunStrategy
 	FieldManager    string
 	List            bool
-	OutputFormat    string
 	Overwrite       bool
 	ResourceVersion string
 
@@ -229,7 +227,7 @@ func (flags *AnnotateFlags) ToOptions(cmd *cobra.Command, args []string) (*Annot
 	}
 
 	// Checks the options and flags to see if there is sufficient information run the command.
-	if flags.List && len(flags.OutputFormat) > 0 {
+	if flags.List && flags.PrintFlags.OutputFormat != nil && len(*flags.PrintFlags.OutputFormat) > 0 {
 		return nil, fmt.Errorf("--list and --output may not be specified together")
 	}
 	if *flags.ResourceBuilderFlags.All && len(*flags.ResourceBuilderFlags.LabelSelector) > 0 {
