@@ -101,10 +101,6 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.JobManagedBy) {
 		job.Spec.ManagedBy = nil
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.JobSuccessPolicy) {
-		job.Spec.SuccessPolicy = nil
-	}
-
 	if !utilfeature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
 		job.Spec.PodReplacementPolicy = nil
 	}
@@ -117,10 +113,6 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	newJob := obj.(*batch.Job)
 	oldJob := old.(*batch.Job)
 	newJob.Status = oldJob.Status
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.JobSuccessPolicy) && oldJob.Spec.SuccessPolicy == nil {
-		newJob.Spec.SuccessPolicy = nil
-	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) && oldJob.Spec.PodReplacementPolicy == nil {
 		newJob.Spec.PodReplacementPolicy = nil

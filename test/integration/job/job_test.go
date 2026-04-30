@@ -573,14 +573,12 @@ func TestSuccessPolicy(t *testing.T) {
 		},
 	}
 	testCases := map[string]struct {
-		enableJobSuccessPolicy   bool
 		job                      batchv1.Job
 		podTerminations          []podTerminationWithExpectations
 		wantConditionTypes       []batchv1.JobConditionType
 		wantJobFinishedNumMetric []metricLabelsWithValue
 	}{
-		"all indexes succeeded; JobSuccessPolicy is enabled": {
-			enableJobSuccessPolicy: true,
+		"all indexes succeeded": {
 			job: batchv1.Job{
 				Spec: batchv1.JobSpec{
 					Parallelism:    ptr.To[int32](1),
@@ -615,43 +613,7 @@ func TestSuccessPolicy(t *testing.T) {
 				},
 			},
 		},
-		"all indexes succeeded; JobSuccessPolicy is disabled": {
-			job: batchv1.Job{
-				Spec: batchv1.JobSpec{
-					Parallelism:    ptr.To[int32](1),
-					Completions:    ptr.To[int32](1),
-					CompletionMode: completionModePtr(batchv1.IndexedCompletion),
-					Template:       podTemplateSpec,
-					SuccessPolicy: &batchv1.SuccessPolicy{
-						Rules: []batchv1.SuccessPolicyRule{{
-							SucceededIndexes: ptr.To("0"),
-						}},
-					},
-				},
-			},
-			podTerminations: []podTerminationWithExpectations{
-				{
-					index: 0,
-					status: v1.PodStatus{
-						Phase: v1.PodSucceeded,
-					},
-					wantActive:           0,
-					wantFailed:           0,
-					wantSucceeded:        1,
-					wantCompletedIndexes: "0",
-					wantTerminating:      ptr.To[int32](0),
-				},
-			},
-			wantConditionTypes: []batchv1.JobConditionType{batchv1.JobComplete},
-			wantJobFinishedNumMetric: []metricLabelsWithValue{
-				{
-					Labels: []string{"Indexed", "succeeded", ""},
-					Value:  1,
-				},
-			},
-		},
 		"job without successPolicy; incremented the jobs_finished_total metric with CompletionsReached reason": {
-			enableJobSuccessPolicy: true,
 			job: batchv1.Job{
 				Spec: batchv1.JobSpec{
 					Parallelism:    ptr.To[int32](1),
@@ -682,7 +644,6 @@ func TestSuccessPolicy(t *testing.T) {
 			},
 		},
 		"job with successPolicy with succeededIndexes; job has SuccessCriteriaMet and Complete conditions even if some indexes remain pending": {
-			enableJobSuccessPolicy: true,
 			job: batchv1.Job{
 				Spec: batchv1.JobSpec{
 					Parallelism:    ptr.To[int32](2),
@@ -729,7 +690,6 @@ func TestSuccessPolicy(t *testing.T) {
 			},
 		},
 		"job with successPolicy with succeededCount; job has SuccessCriteriaMet and Complete conditions even if some indexes remain pending": {
-			enableJobSuccessPolicy: true,
 			job: batchv1.Job{
 				Spec: batchv1.JobSpec{
 					Parallelism:    ptr.To[int32](2),
@@ -776,7 +736,6 @@ func TestSuccessPolicy(t *testing.T) {
 			},
 		},
 		"job with successPolicy and backoffLimitPerIndex; job has a Failed condition if job meets backoffLimitPerIndex": {
-			enableJobSuccessPolicy: true,
 			job: batchv1.Job{
 				Spec: batchv1.JobSpec{
 					Parallelism:          ptr.To[int32](2),
@@ -826,13 +785,6 @@ func TestSuccessPolicy(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			resetMetrics()
-			if !tc.enableJobSuccessPolicy {
-				// TODO: this will be removed in 1.36
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
-			}
-			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.JobSuccessPolicy: tc.enableJobSuccessPolicy,
-			})
 
 			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)
 			t.Cleanup(cancel)
@@ -873,88 +825,6 @@ func TestSuccessPolicy(t *testing.T) {
 			validateFinishedPodsNoFinalizer(ctx, t, clientSet, jobObj)
 		})
 	}
-}
-
-// TestSuccessPolicy_ReEnabling tests handling of pod successful when
-// re-enabling the JobSuccessPolicy feature.
-func TestSuccessPolicy_ReEnabling(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobSuccessPolicy, true)
-	closeFn, resetConfig, clientSet, ns := setup(t, "success-policy-re-enabling")
-	t.Cleanup(closeFn)
-	ctx, cancel := startJobControllerAndWaitForCaches(t, resetConfig)
-	t.Cleanup(cancel)
-	resetMetrics()
-
-	jobObj, err := createJobWithDefaults(ctx, clientSet, ns.Name, &batchv1.Job{
-		Spec: batchv1.JobSpec{
-			Parallelism:    ptr.To[int32](5),
-			Completions:    ptr.To[int32](5),
-			CompletionMode: completionModePtr(batchv1.IndexedCompletion),
-			SuccessPolicy: &batchv1.SuccessPolicy{
-				Rules: []batchv1.SuccessPolicyRule{{
-					SucceededCount: ptr.To[int32](3),
-				}},
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("Failed to create Job: %v", err)
-	}
-	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
-		Active:      5,
-		Ready:       ptr.To[int32](0),
-		Terminating: ptr.To[int32](0),
-	})
-	validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.New(0, 1, 2, 3, 4), "", nil)
-
-	// First pod from index 0 succeeded
-	if err = setJobPhaseForIndex(ctx, clientSet, jobObj, v1.PodSucceeded, 0); err != nil {
-		t.Fatalf("Failed tring to succeess pod with index 0")
-	}
-	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
-		Active:      4,
-		Succeeded:   1,
-		Ready:       ptr.To[int32](0),
-		Terminating: ptr.To[int32](0),
-	})
-	validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.New(1, 2, 3, 4), "0", nil)
-
-	// Disable the JobSuccessPolicy
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobSuccessPolicy, false)
-
-	// First pod from index 1 succeeded
-	if err = setJobPhaseForIndex(ctx, clientSet, jobObj, v1.PodSucceeded, 1); err != nil {
-		t.Fatalf("Failed trying to succeess pod with index 1")
-	}
-	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
-		Active:      3,
-		Succeeded:   2,
-		Ready:       ptr.To[int32](0),
-		Terminating: ptr.To[int32](0),
-	})
-	validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.New(2, 3, 4), "0,1", nil)
-
-	// ReEnable the JobSuccessPolicy
-	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobSuccessPolicy, true)
-
-	// First pod from index 2 succeeded
-	if err = setJobPhaseForIndex(ctx, clientSet, jobObj, v1.PodSucceeded, 2); err != nil {
-		t.Fatalf("Failed trying to success pod with index 2")
-	}
-
-	// Verify all indexes are terminated as job meets successPolicy.
-	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
-		Active:      0,
-		Succeeded:   3,
-		Ready:       ptr.To[int32](0),
-		Terminating: ptr.To[int32](0),
-	})
-	validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.New[int](), "0-2", nil)
-
-	validateJobCondition(ctx, t, clientSet, jobObj, batchv1.JobSuccessCriteriaMet)
-	validateJobComplete(ctx, t, clientSet, jobObj)
-	validateFinishedPodsNoFinalizer(ctx, t, clientSet, jobObj)
 }
 
 // TestBackoffLimitPerIndex_DelayedPodDeletion tests the pod deletion is delayed
@@ -1198,7 +1068,6 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 	testCases := map[string]struct {
 		enableJobManagedBy            bool
 		enableJobPodReplacementPolicy bool
-		enableJobSuccessPolicy        bool
 
 		job                batchv1.Job
 		action             func(context.Context, clientset.Interface, *batchv1.Job)
@@ -1325,6 +1194,7 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 					{
 						Type:   batchv1.JobComplete,
 						Status: v1.ConditionTrue,
+						Reason: batchv1.JobReasonCompletionsReached,
 					},
 				},
 			},
@@ -1347,8 +1217,10 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 				CompletedIndexes: "0",
 				Conditions: []batchv1.JobCondition{
 					{
-						Type:   batchv1.JobSuccessCriteriaMet,
-						Status: v1.ConditionTrue,
+						Type:    batchv1.JobSuccessCriteriaMet,
+						Status:  v1.ConditionTrue,
+						Reason:  batchv1.JobReasonCompletionsReached,
+						Message: "Reached expected number of succeeded pods",
 					},
 				},
 			},
@@ -1359,12 +1231,16 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 				CompletedIndexes: "0",
 				Conditions: []batchv1.JobCondition{
 					{
-						Type:   batchv1.JobSuccessCriteriaMet,
-						Status: v1.ConditionTrue,
+						Type:    batchv1.JobSuccessCriteriaMet,
+						Status:  v1.ConditionTrue,
+						Reason:  batchv1.JobReasonCompletionsReached,
+						Message: "Reached expected number of succeeded pods",
 					},
 					{
-						Type:   batchv1.JobComplete,
-						Status: v1.ConditionTrue,
+						Type:    batchv1.JobComplete,
+						Status:  v1.ConditionTrue,
+						Reason:  batchv1.JobReasonCompletionsReached,
+						Message: "Reached expected number of succeeded pods",
 					},
 				},
 			},
@@ -1386,8 +1262,10 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 				CompletedIndexes: "0",
 				Conditions: []batchv1.JobCondition{
 					{
-						Type:   batchv1.JobSuccessCriteriaMet,
-						Status: v1.ConditionTrue,
+						Type:    batchv1.JobSuccessCriteriaMet,
+						Status:  v1.ConditionTrue,
+						Reason:  batchv1.JobReasonCompletionsReached,
+						Message: "Reached expected number of succeeded pods",
 					},
 				},
 			},
@@ -1397,98 +1275,16 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 				CompletedIndexes: "0",
 				Conditions: []batchv1.JobCondition{
 					{
-						Type:   batchv1.JobSuccessCriteriaMet,
-						Status: v1.ConditionTrue,
+						Type:    batchv1.JobSuccessCriteriaMet,
+						Status:  v1.ConditionTrue,
+						Reason:  batchv1.JobReasonCompletionsReached,
+						Message: "Reached expected number of succeeded pods",
 					},
 					{
-						Type:   batchv1.JobComplete,
-						Status: v1.ConditionTrue,
-					},
-				},
-			},
-		},
-		"job scale down to meet completions; JobManagedBy and JobSuccessPolicy are enabled": {
-			enableJobManagedBy:     true,
-			enableJobSuccessPolicy: true,
-			job: batchv1.Job{
-				Spec: batchv1.JobSpec{
-					Parallelism:    ptr.To[int32](2),
-					Completions:    ptr.To[int32](2),
-					CompletionMode: ptr.To(batchv1.IndexedCompletion),
-					Template:       podTemplateSpec,
-				},
-			},
-			action: succeedOnePodAndScaleDown,
-			wantInterimStatus: &batchv1.JobStatus{
-				Succeeded:        1,
-				Ready:            ptr.To[int32](0),
-				CompletedIndexes: "0",
-				Conditions: []batchv1.JobCondition{
-					{
-						Type:   batchv1.JobSuccessCriteriaMet,
-						Status: v1.ConditionTrue,
-						Reason: batchv1.JobReasonCompletionsReached,
-					},
-				},
-			},
-			wantTerminalStatus: batchv1.JobStatus{
-				Succeeded:        1,
-				Ready:            ptr.To[int32](0),
-				CompletedIndexes: "0",
-				Conditions: []batchv1.JobCondition{
-					{
-						Type:   batchv1.JobSuccessCriteriaMet,
-						Status: v1.ConditionTrue,
-						Reason: batchv1.JobReasonCompletionsReached,
-					},
-					{
-						Type:   batchv1.JobComplete,
-						Status: v1.ConditionTrue,
-						Reason: batchv1.JobReasonCompletionsReached,
-					},
-				},
-			},
-		},
-		"job scale down to meet completions; JobPodReplacementPolicy and JobSuccessPolicy are enabled": {
-			enableJobPodReplacementPolicy: true,
-			enableJobSuccessPolicy:        true,
-			job: batchv1.Job{
-				Spec: batchv1.JobSpec{
-					Parallelism:    ptr.To[int32](2),
-					Completions:    ptr.To[int32](2),
-					CompletionMode: ptr.To(batchv1.IndexedCompletion),
-					Template:       podTemplateSpec,
-				},
-			},
-			action: succeedOnePodAndScaleDown,
-			wantInterimStatus: &batchv1.JobStatus{
-				Succeeded:        1,
-				Ready:            ptr.To[int32](0),
-				Terminating:      ptr.To[int32](1),
-				CompletedIndexes: "0",
-				Conditions: []batchv1.JobCondition{
-					{
-						Type:   batchv1.JobSuccessCriteriaMet,
-						Status: v1.ConditionTrue,
-						Reason: batchv1.JobReasonCompletionsReached,
-					},
-				},
-			},
-			wantTerminalStatus: batchv1.JobStatus{
-				Succeeded:        1,
-				Ready:            ptr.To[int32](0),
-				Terminating:      ptr.To[int32](0),
-				CompletedIndexes: "0",
-				Conditions: []batchv1.JobCondition{
-					{
-						Type:   batchv1.JobSuccessCriteriaMet,
-						Status: v1.ConditionTrue,
-						Reason: batchv1.JobReasonCompletionsReached,
-					},
-					{
-						Type:   batchv1.JobComplete,
-						Status: v1.ConditionTrue,
-						Reason: batchv1.JobReasonCompletionsReached,
+						Type:    batchv1.JobComplete,
+						Status:  v1.ConditionTrue,
+						Reason:  batchv1.JobReasonCompletionsReached,
+						Message: "Reached expected number of succeeded pods",
 					},
 				},
 			},
@@ -1500,10 +1296,7 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
 			resetMetrics()
-			if !test.enableJobSuccessPolicy {
-				// TODO: this will be removed in 1.36.
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
-			} else if !test.enableJobPodReplacementPolicy {
+			if !test.enableJobPodReplacementPolicy {
 				// TODO: this will be removed in 1.37.
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.33"))
 			} else if !test.enableJobManagedBy {
@@ -1513,7 +1306,6 @@ func TestDelayTerminalPhaseCondition(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.JobPodReplacementPolicy: test.enableJobPodReplacementPolicy,
 				features.JobManagedBy:            test.enableJobManagedBy,
-				features.JobSuccessPolicy:        test.enableJobSuccessPolicy,
 			})
 
 			ctx, cancel := startJobControllerAndWaitForCaches(t, restConfig)

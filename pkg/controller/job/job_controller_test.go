@@ -299,7 +299,6 @@ func TestControllerSyncJob(t *testing.T) {
 
 		// features
 		jobPodReplacementPolicy bool
-		jobSuccessPolicy        bool
 		jobManagedBy            bool
 	}{
 		"job start": {
@@ -600,8 +599,10 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedSucceeded: 5,
 			expectedConditions: []batch.JobCondition{
 				{
-					Type:   batch.JobComplete,
-					Status: v1.ConditionTrue,
+					Type:    batch.JobComplete,
+					Status:  v1.ConditionTrue,
+					Reason:  batch.JobReasonCompletionsReached,
+					Message: "Reached expected number of succeeded pods",
 				},
 			},
 			expectedPodPatches: 5,
@@ -626,8 +627,10 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedSucceeded: 2,
 			expectedConditions: []batch.JobCondition{
 				{
-					Type:   batch.JobComplete,
-					Status: v1.ConditionTrue,
+					Type:    batch.JobComplete,
+					Status:  v1.ConditionTrue,
+					Reason:  batch.JobReasonCompletionsReached,
+					Message: "Reached expected number of succeeded pods",
 				},
 			},
 			expectedPodPatches: 2,
@@ -643,8 +646,10 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedFailed:    1,
 			expectedConditions: []batch.JobCondition{
 				{
-					Type:   batch.JobComplete,
-					Status: v1.ConditionTrue,
+					Type:    batch.JobComplete,
+					Status:  v1.ConditionTrue,
+					Reason:  batch.JobReasonCompletionsReached,
+					Message: "Reached expected number of succeeded pods",
 				},
 			},
 			expectedPodPatches: 2,
@@ -787,8 +792,10 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedCompletedIdxs: "0-2",
 			expectedConditions: []batch.JobCondition{
 				{
-					Type:   batch.JobComplete,
-					Status: v1.ConditionTrue,
+					Type:    batch.JobComplete,
+					Status:  v1.ConditionTrue,
+					Reason:  batch.JobReasonCompletionsReached,
+					Message: "Reached expected number of succeeded pods",
 				},
 			},
 			expectedPodPatches: 4,
@@ -1185,11 +1192,10 @@ func TestControllerSyncJob(t *testing.T) {
 			},
 		},
 		"SuccessCriteriaMet=False condition added manually is ignored": {
-			jobSuccessPolicy: true,
-			parallelism:      1,
-			completions:      1,
-			activePods:       1,
-			readyPods:        1,
+			parallelism: 1,
+			completions: 1,
+			activePods:  1,
+			readyPods:   1,
 			initialStatus: &jobInitialStatus{
 				active: 1,
 				startTime: func() *time.Time {
@@ -1247,16 +1253,12 @@ func TestControllerSyncJob(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			if !tc.jobSuccessPolicy {
-				// TODO: this will be removed in 1.36.
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
-			} else if !tc.jobPodReplacementPolicy {
+			if !tc.jobManagedBy || !tc.jobPodReplacementPolicy {
 				// TODO: this will be removed in 1.37.
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.33"))
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.JobPodReplacementPolicy: tc.jobPodReplacementPolicy,
-				features.JobSuccessPolicy:        tc.jobSuccessPolicy,
 				features.JobManagedBy:            tc.jobManagedBy,
 			})
 			// job manager setup
@@ -1590,7 +1592,6 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 		wantFailedPodsMetric    int
 
 		// features
-		enableJobSuccessPolicy        bool
 		enableJobPodReplacementPolicy bool
 		enableJobManagedBy            bool
 	}{
@@ -1731,21 +1732,18 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 				{
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{
 						Succeeded: []types.UID{"a"},
-						Failed:    []types.UID{"b"},
+						Failed:    []types.UID{"b", "c"},
 					},
-					Conditions: []batch.JobCondition{*succeededCond},
 				},
 				{
 					UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
 					Succeeded:               1,
-					Failed:                  1,
-					Conditions:              []batch.JobCondition{*succeededCond, *completedCond},
-					CompletionTime:          ptr.To(metav1.NewTime(now)),
+					Failed:                  2,
+					Conditions:              []batch.JobCondition{*succeededCond},
 				},
 			},
 			wantSucceededPodsMetric: 1,
-			wantFailedPodsMetric:    1,
-			enableJobSuccessPolicy:  true,
+			wantFailedPodsMetric:    2,
 		},
 		"completing job": {
 			pods: []*v1.Pod{
@@ -2314,7 +2312,6 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 			wantSucceededPodsMetric: 1,
 		},
 		"pod is terminating; JobSuccessCriteriaMet, JobComplete condition is not delayed; JobPodReplacementPolicy and JobManagedBy disabled": {
-			enableJobSuccessPolicy: true,
 			job: batch.Job{
 				Spec: batch.JobSpec{
 					Completions: ptr.To[int32](1),
@@ -2432,12 +2429,11 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			if !tc.enableJobPodReplacementPolicy || !tc.enableJobSuccessPolicy {
+			if !tc.enableJobManagedBy || !tc.enableJobPodReplacementPolicy {
 				// TODO: this will be removed in 1.36
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.JobSuccessPolicy:        tc.enableJobSuccessPolicy,
 				features.JobPodReplacementPolicy: tc.enableJobPodReplacementPolicy,
 				features.JobManagedBy:            tc.enableJobManagedBy,
 			})
@@ -4261,7 +4257,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 	}
 
 	testCases := map[string]struct {
-		enableJobSuccessPolicy        bool
 		enableJobPodReplacementPolicy bool
 		enableJobManagedBy            bool
 		job                           batch.Job
@@ -4269,7 +4264,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 		wantStatus                    batch.JobStatus
 	}{
 		"job with successPolicy; jobPodReplacementPolicy feature enabled; job has SuccessCriteriaMet condition if job meets to successPolicy and some indexes fail": {
-			enableJobSuccessPolicy:        true,
 			enableJobPodReplacementPolicy: true,
 			job: batch.Job{
 				TypeMeta:   validTypeMeta,
@@ -4312,7 +4306,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 			},
 		},
 		"job with successPolicy; jobPodReplacementPolicy feature disabled; job has SuccessCriteriaMet condition if job meets to successPolicy and some indexes fail": {
-			enableJobSuccessPolicy:        true,
 			enableJobPodReplacementPolicy: false,
 			job: batch.Job{
 				TypeMeta:   validTypeMeta,
@@ -4339,7 +4332,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				*buildPod().uid("c").index("2").phase(v1.PodRunning).trackingFinalizer().Pod,
 			},
 			wantStatus: batch.JobStatus{
-				Failed:                  1,
+				Failed:                  3,
 				Succeeded:               1,
 				CompletedIndexes:        "1",
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
@@ -4350,17 +4343,10 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 						Reason:  batch.JobReasonSuccessPolicy,
 						Message: "Matched rules at index 0",
 					},
-					{
-						Type:    batch.JobComplete,
-						Status:  v1.ConditionTrue,
-						Reason:  batch.JobReasonSuccessPolicy,
-						Message: "Matched rules at index 0",
-					},
 				},
 			},
 		},
 		"job with podFailurePolicy and successPolicy; jobPodReplacementPolicy feature enabled; job has SuccessCriteriaMet condition if job meets to successPolicy and doesn't meet to podFailurePolicy": {
-			enableJobSuccessPolicy:        true,
 			enableJobPodReplacementPolicy: true,
 			job: batch.Job{
 				TypeMeta:   validTypeMeta,
@@ -4411,7 +4397,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 			},
 		},
 		"job with podFailurePolicy and successPolicy; jobPodReplacementPolicy feature disabled; job has SuccessCriteriaMet condition if job meets to successPolicy and doesn't meet to podFailurePolicy": {
-			enableJobSuccessPolicy:        true,
 			enableJobPodReplacementPolicy: false,
 			job: batch.Job{
 				TypeMeta:   validTypeMeta,
@@ -4446,7 +4431,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				*buildPod().uid("b").index("1").phase(v1.PodSucceeded).trackingFinalizer().Pod,
 			},
 			wantStatus: batch.JobStatus{
-				Failed:                  1,
+				Failed:                  2,
 				Succeeded:               1,
 				CompletedIndexes:        "1",
 				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
@@ -4457,17 +4442,10 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 						Reason:  batch.JobReasonSuccessPolicy,
 						Message: "Matched rules at index 0",
 					},
-					{
-						Type:    batch.JobComplete,
-						Status:  v1.ConditionTrue,
-						Reason:  batch.JobReasonSuccessPolicy,
-						Message: "Matched rules at index 0",
-					},
 				},
 			},
 		},
 		"job with backoffLimitPerIndex and successPolicy; jobPodReplacementPolicy feature enabled; job has SuccessCriteriaMet condition if job meets to successPolicy and doesn't meet backoffLimitPerIndex": {
-			enableJobSuccessPolicy:        true,
 			enableJobPodReplacementPolicy: true,
 			job: batch.Job{
 				TypeMeta:   validTypeMeta,
@@ -4511,7 +4489,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 			},
 		},
 		"job with successPolicy; jobPodReplacementPolicy feature enabled; job has both Complete and SuccessCriteriaMet condition when job meets to successPolicy and all pods have been already removed": {
-			enableJobSuccessPolicy:        true,
 			enableJobPodReplacementPolicy: true,
 			job: batch.Job{
 				TypeMeta:   validTypeMeta,
@@ -4571,7 +4548,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 		},
 		// REF: https://github.com/kubernetes/kubernetes/issues/123775
 		"job with successPolicy; jobPodReplacementPolicy feature enabled; job has SuccessCriteriaMet condition when job meets to successPolicy and some pods still are running": {
-			enableJobSuccessPolicy:        true,
 			enableJobPodReplacementPolicy: true,
 			job: batch.Job{
 				TypeMeta:   validTypeMeta,
@@ -4627,7 +4603,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 		},
 		// REF: https://github.com/kubernetes/kubernetes/issues/123775
 		"job with successPolicy; JobManagedBy feature enabled; job has SuccessCriteriaMet condition when job meets to successPolicy and some pods still are running": {
-			enableJobSuccessPolicy:        true,
 			enableJobPodReplacementPolicy: false,
 			enableJobManagedBy:            true,
 			job: batch.Job{
@@ -4683,7 +4658,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 			},
 		},
 		"job with successPolicy and podFailurePolicy; jobPodReplacementPolicy feature enabled; job has a failed condition when job meets to both successPolicy and podFailurePolicy": {
-			enableJobSuccessPolicy:        true,
 			enableJobPodReplacementPolicy: true,
 			job: batch.Job{
 				TypeMeta:   validTypeMeta,
@@ -4740,7 +4714,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 			},
 		},
 		"job with successPolicy and backoffLimitPerIndex; jobPodReplacementPolicy feature enabled; job has a failed condition when job meets to both successPolicy and backoffLimitPerIndex": {
-			enableJobSuccessPolicy:        true,
 			enableJobPodReplacementPolicy: true,
 			job: batch.Job{
 				TypeMeta:   validTypeMeta,
@@ -4789,7 +4762,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 			},
 		},
 		"job with successPolicy and backoffLimit; jobPodReplacementPolicy feature enabled; job has a failed condition when job meets to both successPolicy and backoffLimit": {
-			enableJobSuccessPolicy:        true,
 			enableJobPodReplacementPolicy: true,
 			job: batch.Job{
 				TypeMeta:   validTypeMeta,
@@ -4837,7 +4809,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 			},
 		},
 		"job with successPolicy and podFailurePolicy; jobPodReplacementPolicy feature enabled; job with SuccessCriteriaMet has never been transitioned to FailureTarget and Failed even if job meets podFailurePolicy": {
-			enableJobSuccessPolicy:        true,
 			enableJobPodReplacementPolicy: true,
 			job: batch.Job{
 				TypeMeta:   validTypeMeta,
@@ -4913,7 +4884,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 			},
 		},
 		"job with successPolicy and backoffLimitPerIndex; jobPodReplacementPolicy feature enabled; job with SuccessCriteriaMet has never been transitioned to FailureTarget and Failed even if job meet backoffLimitPerIndex": {
-			enableJobSuccessPolicy:        true,
 			enableJobPodReplacementPolicy: true,
 			job: batch.Job{
 				TypeMeta:   validTypeMeta,
@@ -4976,7 +4946,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 			},
 		},
 		"job with successPolicy and backoffLimit; jobPodReplacementPolicy feature enabled; job with SuccessCriteriaMet has never been transitioned to FailureTarget and Failed even if job meets backoffLimit": {
-			enableJobSuccessPolicy:        true,
 			enableJobPodReplacementPolicy: true,
 			job: batch.Job{
 				TypeMeta:   validTypeMeta,
@@ -5038,7 +5007,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 			},
 		},
 		"job with successPolicy and podFailureTarget; jobPodReplacementPolicy feature enabled; job with FailureTarget has never been transitioned to SuccessCriteriaMet even if job meets successPolicy": {
-			enableJobSuccessPolicy:        true,
 			enableJobPodReplacementPolicy: true,
 			job: batch.Job{
 				TypeMeta:   validTypeMeta,
@@ -5114,9 +5082,8 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				},
 			},
 		},
-		"job without successPolicy; jobSuccessPolicy is enabled; job got SuccessCriteriaMet and Completion with CompletionsReached reason conditions": {
-			enableJobSuccessPolicy: true,
-			enableJobManagedBy:     true,
+		"job without successPolicy; job got SuccessCriteriaMet and Completion with CompletionsReached reason conditions": {
+			enableJobManagedBy: true,
 			job: batch.Job{
 				TypeMeta:   validTypeMeta,
 				ObjectMeta: validObjectMeta,
@@ -5153,41 +5120,10 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				},
 			},
 		},
-		"when the JobSuccessPolicy is disabled, the Job never got SuccessCriteriaMet condition even if the Job has the successPolicy field": {
-			job: batch.Job{
-				TypeMeta:   validTypeMeta,
-				ObjectMeta: validObjectMeta,
-				Spec: batch.JobSpec{
-					Selector:       validSelector,
-					Template:       validTemplate,
-					CompletionMode: ptr.To(batch.IndexedCompletion),
-					Parallelism:    ptr.To[int32](3),
-					Completions:    ptr.To[int32](3),
-					BackoffLimit:   ptr.To[int32](math.MaxInt32),
-					SuccessPolicy: &batch.SuccessPolicy{
-						Rules: []batch.SuccessPolicyRule{{
-							SucceededIndexes: ptr.To("0,1"),
-							SucceededCount:   ptr.To[int32](1),
-						}},
-					},
-				},
-			},
-			pods: []v1.Pod{
-				*buildPod().uid("a2").index("0").phase(v1.PodRunning).trackingFinalizer().Pod,
-				*buildPod().uid("b").index("1").phase(v1.PodSucceeded).trackingFinalizer().Pod,
-				*buildPod().uid("c").index("2").phase(v1.PodRunning).trackingFinalizer().Pod,
-			},
-			wantStatus: batch.JobStatus{
-				Active:                  2,
-				Succeeded:               1,
-				CompletedIndexes:        "1",
-				UncountedTerminatedPods: &batch.UncountedTerminatedPods{},
-			},
-		},
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			if !tc.enableJobPodReplacementPolicy || !tc.enableJobSuccessPolicy {
+			if !tc.enableJobPodReplacementPolicy {
 				// TODO: this will be removed in 1.36
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
 			} else if !tc.enableJobManagedBy {
@@ -5195,7 +5131,6 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.34"))
 			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.JobSuccessPolicy:        tc.enableJobSuccessPolicy,
 				features.JobPodReplacementPolicy: tc.enableJobPodReplacementPolicy,
 				features.JobManagedBy:            tc.enableJobManagedBy,
 			})

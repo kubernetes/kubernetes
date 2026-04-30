@@ -21,13 +21,11 @@ import (
 
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 func matchSuccessPolicy(logger klog.Logger, successPolicy *batch.SuccessPolicy, completions int32, succeededIndexes orderedIntervals) (string, bool) {
-	if !feature.DefaultFeatureGate.Enabled(features.JobSuccessPolicy) || successPolicy == nil || len(succeededIndexes) == 0 {
+	if successPolicy == nil || len(succeededIndexes) == 0 {
 		return "", false
 	}
 
@@ -50,7 +48,7 @@ func matchSuccessPolicy(logger klog.Logger, successPolicy *batch.SuccessPolicy, 
 }
 
 func hasSuccessCriteriaMetCondition(job *batch.Job) *batch.JobCondition {
-	if feature.DefaultFeatureGate.Enabled(features.JobSuccessPolicy) || delayTerminalCondition() {
+	if delayTerminalCondition() {
 		successCriteriaMet := findConditionByType(job.Status.Conditions, batch.JobSuccessCriteriaMet)
 		if successCriteriaMet != nil && successCriteriaMet.Status == v1.ConditionTrue {
 			return successCriteriaMet
@@ -60,7 +58,7 @@ func hasSuccessCriteriaMetCondition(job *batch.Job) *batch.JobCondition {
 }
 
 func isSuccessCriteriaMetCondition(cond *batch.JobCondition) bool {
-	return (feature.DefaultFeatureGate.Enabled(features.JobSuccessPolicy) || delayTerminalCondition()) &&
+	return delayTerminalCondition() &&
 		cond != nil && cond.Type == batch.JobSuccessCriteriaMet && cond.Status == v1.ConditionTrue
 }
 
