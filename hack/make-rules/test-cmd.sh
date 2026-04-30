@@ -104,7 +104,7 @@ function run_kube_controller_manager() {
   # Start controller manager
   kube::log::status 'Generate kubeconfig for controller-manager'
   local config
-  config="$(mktemp controller-manager.kubeconfig.XXXXX)"
+  config="$(mktemp -t controller-manager.kubeconfig.XXXXX)"
   cat <<EOF > "$config"
 kind: Config
 users:
