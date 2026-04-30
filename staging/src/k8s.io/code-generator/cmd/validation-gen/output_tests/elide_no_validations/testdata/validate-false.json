@@ -1,5 +1,13 @@
 {
   "*elidenovalidations.T1": {
+    "deepValidatedSlice[0]": [
+      "type DeepTypedefSlice",
+      "type OtherStruct"
+    ],
+    "deepValidatedSlice[1]": [
+      "type DeepTypedefSlice",
+      "type OtherStruct"
+    ],
     "hasFieldVal.s": [
       "field HasFieldVal.S"
     ],
