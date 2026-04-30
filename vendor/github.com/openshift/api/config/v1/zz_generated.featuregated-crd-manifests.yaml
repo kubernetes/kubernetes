@@ -8,6 +8,7 @@ apiservers.config.openshift.io:
   FeatureGates:
   - KMSEncryption
   - KMSEncryptionProvider
+  - TLSAdherence
   FilenameOperatorName: config-operator
   FilenameOperatorOrdering: "01"
   FilenameRunLevel: "0000_10"
@@ -144,6 +145,7 @@ clusterversions.config.openshift.io:
   Category: ""
   FeatureGates:
   - ClusterUpdateAcceptRisks
+  - ClusterUpdatePreflight
   - ImageStreamImportMode
   - SignatureStores
   FilenameOperatorName: cluster-version-operator
@@ -204,7 +206,8 @@ dnses.config.openshift.io:
   CRDName: dnses.config.openshift.io
   Capability: ""
   Category: ""
-  FeatureGates: []
+  FeatureGates:
+  - AWSEuropeanSovereignCloudInstall
   FilenameOperatorName: config-operator
   FilenameOperatorOrdering: "01"
   FilenameRunLevel: "0000_10"
@@ -370,9 +373,6 @@ infrastructures.config.openshift.io:
   - AzureDualStackInstall
   - DualReplica
   - DyanmicServiceEndpointIBMCloud
-  - GCPClusterHostedDNSInstall
-  - HighlyAvailableArbiter
-  - HighlyAvailableArbiter+DualReplica
   - NutanixMultiSubnets
   - OnPremDNSRecords
   - VSphereHostVMGroupZonal

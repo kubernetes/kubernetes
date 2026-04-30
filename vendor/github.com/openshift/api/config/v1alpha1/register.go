@@ -36,12 +36,10 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&InsightsDataGatherList{},
 		&Backup{},
 		&BackupList{},
-		&ImagePolicy{},
-		&ImagePolicyList{},
-		&ClusterImagePolicy{},
-		&ClusterImagePolicyList{},
 		&CRIOCredentialProviderConfig{},
 		&CRIOCredentialProviderConfigList{},
+		&PKI{},
+		&PKIList{},
 	)
 	metav1.AddToGroupVersion(scheme, GroupVersion)
 	return nil

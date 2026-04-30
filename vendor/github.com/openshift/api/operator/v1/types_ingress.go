@@ -2068,7 +2068,50 @@ type IngressControllerTuningOptions struct {
 	// +kubebuilder:validation:Type:=string
 	// +optional
 	ReloadInterval metav1.Duration `json:"reloadInterval,omitempty"`
+
+	// configurationManagement specifies how OpenShift router should update
+	// the HAProxy configuration.  The following values are valid for this
+	// field:
+	//
+	// * "ForkAndReload".
+	// * "Dynamic".
+	//
+	// Omitting this field means that the user has no opinion and the
+	// platform may choose a reasonable default. This default is subject to
+	// change over time.  The current default is "ForkAndReload".
+	//
+	// "ForkAndReload" means that OpenShift router should rewrite the
+	// HAProxy configuration file and instruct HAProxy to fork and reload.
+	// This is OpenShift router's traditional approach.
+	//
+	// "Dynamic" means that OpenShift router may use HAProxy's control
+	// socket for some configuration updates and fall back to fork and
+	// reload for other configuration updates.  This is a newer approach,
+	// which may be less mature than ForkAndReload.  This setting can
+	// improve load-balancing fairness and metrics accuracy and reduce CPU
+	// and memory usage if HAProxy has frequent configuration updates for
+	// route and endpoints updates.
+	//
+	// Note: The "Dynamic" option is currently experimental and should not
+	// be enabled on production clusters.
+	//
+	// +openshift:enable:FeatureGate=IngressControllerDynamicConfigurationManager
+	// +optional
+	ConfigurationManagement IngressControllerConfigurationManagement `json:"configurationManagement,omitempty"`
 }
+
+// IngressControllerConfigurationManagement specifies whether always to use
+// fork-and-reload to update the HAProxy configuration or whether to use
+// HAProxy's control socket for some configuration updates.
+//
+// +enum
+// +kubebuilder:validation:Enum=Dynamic;ForkAndReload
+type IngressControllerConfigurationManagement string
+
+const (
+	IngressControllerConfigurationManagementDynamic       IngressControllerConfigurationManagement = "Dynamic"
+	IngressControllerConfigurationManagementForkAndReload IngressControllerConfigurationManagement = "ForkAndReload"
+)
 
 // HTTPEmptyRequestsPolicy indicates how HTTP connections for which no request
 // is received should be handled.

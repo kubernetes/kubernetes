@@ -324,13 +324,13 @@ github.com/opencontainers/selinux v1.13.0 h1:Zza88GWezyT7RLql12URvoxsbLfjFx988+L
 github.com/opencontainers/selinux v1.13.0/go.mod h1:XxWTed+A/s5NNq4GmYScVy+9jzXhGBVEOAyucdRUY8s=
 github.com/openshift-eng/openshift-tests-extension v0.0.0-20260127124016-0fed2b824818 h1:jJLE/aCAqDf8U4wc3bE1IEKgIxbb0ICjCNVFA49x/8s=
 github.com/openshift-eng/openshift-tests-extension v0.0.0-20260127124016-0fed2b824818/go.mod h1:6gkP5f2HL0meusT0Aim8icAspcD1cG055xxBZ9yC68M=
-github.com/openshift/api v0.0.0-20260302174620-dcac36b908db h1:MOQ5JSIlbP4apwTrEdNpApT6PsnB0/1S6y9aKODp5Ks=
-github.com/openshift/api v0.0.0-20260302174620-dcac36b908db/go.mod h1:pyVjK0nZ4sRs4fuQVQ4rubsJdahI1PB94LnQ8sGdvxo=
+github.com/openshift/api v0.0.0-20260408092441-8b086e6b9eb9 h1:+4hiHKWaTxwZMhyGkOtEWcPaVBbfIup2w91Ik005eHs=
+github.com/openshift/api v0.0.0-20260408092441-8b086e6b9eb9/go.mod h1:pyVjK0nZ4sRs4fuQVQ4rubsJdahI1PB94LnQ8sGdvxo=
 github.com/openshift/apiserver-library-go v0.0.0-20260303173613-cd3676268d31 h1:oYPQMrkzyk002L5aN8I2tkUHTEu9lsVrc1qiJmHJdXU=
 github.com/openshift/apiserver-library-go v0.0.0-20260303173613-cd3676268d31/go.mod h1:mnTsMMTtXSPBQzqBp5HXBjLvliveKenRADFQy9m5jc0=
 github.com/openshift/build-machinery-go v0.0.0-20250530140348-dc5b2804eeee/go.mod h1:8jcm8UPtg2mCAsxfqKil1xrmRMI3a+XU2TZ9fF8A7TE=
-github.com/openshift/client-go v0.0.0-20260302182750-20813ce71ca6 h1:wJv4Ia+R4OxoaJcTUyvMtBc5rWFvfTiEA8d5f1MBPqI=
-github.com/openshift/client-go v0.0.0-20260302182750-20813ce71ca6/go.mod h1:3lkVff575BlbDUUhMsrD1IyvfkZ+oKUB7iZuVy1m0W0=
+github.com/openshift/client-go v0.0.0-20260330134249-7e1499aaacd7 h1:5GSoQlywIwYsRCw3qN+ZDmN6HrXTMZfI33bdRNm2jRQ=
+github.com/openshift/client-go v0.0.0-20260330134249-7e1499aaacd7/go.mod h1:HhXTUIMhgzxR3Ln/zEkr4QjTL0NN7A+t9Py/we9j2ug=
 github.com/openshift/library-go v0.0.0-20260303171201-5d9eb6295ff6 h1:xjqy0OolrFdJ+ofI/aD0+2k9+MSk5anP5dXifFt539Q=
 github.com/openshift/library-go v0.0.0-20260303171201-5d9eb6295ff6/go.mod h1:D797O/ssKTNglbrGchjIguFq+DbyRYdeds5w4/VTrKM=
 github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20251120221002-696928a6a0d7 h1:02E4Ttpu+7yCQLQxtY42JfcfHU7TBGnje6uB2ytBSdU=

@@ -47,9 +47,9 @@ require (
 	github.com/opencontainers/cgroups v0.0.3
 	github.com/opencontainers/selinux v1.13.0
 	github.com/openshift-eng/openshift-tests-extension v0.0.0-20260127124016-0fed2b824818
-	github.com/openshift/api v0.0.0-20260302174620-dcac36b908db
+	github.com/openshift/api v0.0.0-20260408092441-8b086e6b9eb9
 	github.com/openshift/apiserver-library-go v0.0.0-20260303173613-cd3676268d31
-	github.com/openshift/client-go v0.0.0-20260302182750-20813ce71ca6
+	github.com/openshift/client-go v0.0.0-20260330134249-7e1499aaacd7
 	github.com/openshift/library-go v0.0.0-20260303171201-5d9eb6295ff6
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 	github.com/prometheus/client_golang v1.23.2

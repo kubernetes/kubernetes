@@ -14,10 +14,9 @@ type ConfigV1alpha1Interface interface {
 	RESTClient() rest.Interface
 	BackupsGetter
 	CRIOCredentialProviderConfigsGetter
-	ClusterImagePoliciesGetter
 	ClusterMonitoringsGetter
-	ImagePoliciesGetter
 	InsightsDataGathersGetter
+	PKIsGetter
 }
 
 // ConfigV1alpha1Client is used to interact with features provided by the config.openshift.io group.
@@ -33,20 +32,16 @@ func (c *ConfigV1alpha1Client) CRIOCredentialProviderConfigs() CRIOCredentialPro
 	return newCRIOCredentialProviderConfigs(c)
 }
 
-func (c *ConfigV1alpha1Client) ClusterImagePolicies() ClusterImagePolicyInterface {
-	return newClusterImagePolicies(c)
-}
-
 func (c *ConfigV1alpha1Client) ClusterMonitorings() ClusterMonitoringInterface {
 	return newClusterMonitorings(c)
 }
 
-func (c *ConfigV1alpha1Client) ImagePolicies(namespace string) ImagePolicyInterface {
-	return newImagePolicies(c, namespace)
-}
-
 func (c *ConfigV1alpha1Client) InsightsDataGathers() InsightsDataGatherInterface {
 	return newInsightsDataGathers(c)
+}
+
+func (c *ConfigV1alpha1Client) PKIs() PKIInterface {
+	return newPKIs(c)
 }
 
 // NewForConfig creates a new ConfigV1alpha1Client for the given config.

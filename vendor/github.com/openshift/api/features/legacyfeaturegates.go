@@ -33,8 +33,6 @@ var legacyFeatureGates = sets.New(
 	// never add to this list, if you think you have an exception ask @deads2k
 	"GCPClusterHostedDNS",
 	// never add to this list, if you think you have an exception ask @deads2k
-	"GatewayAPI",
-	// never add to this list, if you think you have an exception ask @deads2k
 	"HardwareSpeed",
 	// never add to this list, if you think you have an exception ask @deads2k
 	"ImageStreamImportMode",

@@ -11,7 +11,8 @@ type PrefixedClaimMappingApplyConfiguration struct {
 	TokenClaimMappingApplyConfiguration `json:",inline"`
 	// prefix is an optional field that configures the prefix that will be applied to the cluster identity attribute during the process of mapping JWT claims to cluster identity attributes.
 	//
-	// When omitted (""), no prefix is applied to the cluster identity attribute.
+	// When omitted or set to an empty string (""), no prefix is applied to the cluster identity attribute.
+	// Must not be set to a non-empty value when expression is set.
 	//
 	// Example: if `prefix` is set to "myoidc:" and the `claim` in JWT contains an array of strings "a", "b" and "c", the mapping will result in an array of string "myoidc:a", "myoidc:b" and "myoidc:c".
 	Prefix *string `json:"prefix,omitempty"`
@@ -28,6 +29,14 @@ func PrefixedClaimMapping() *PrefixedClaimMappingApplyConfiguration {
 // If called multiple times, the Claim field is set to the value of the last call.
 func (b *PrefixedClaimMappingApplyConfiguration) WithClaim(value string) *PrefixedClaimMappingApplyConfiguration {
 	b.TokenClaimMappingApplyConfiguration.Claim = &value
+	return b
+}
+
+// WithExpression sets the Expression field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Expression field is set to the value of the last call.
+func (b *PrefixedClaimMappingApplyConfiguration) WithExpression(value string) *PrefixedClaimMappingApplyConfiguration {
+	b.TokenClaimMappingApplyConfiguration.Expression = &value
 	return b
 }
 
