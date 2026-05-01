@@ -327,13 +327,17 @@ func (cm *containerManagerImpl) UpdateAllocatedDevices(_ klog.Logger) {
 	return
 }
 
-func (cm *containerManagerImpl) GetCPUs(podUID, containerName string) []int64 {
+func (cm *containerManagerImpl) GetCPUs(pod *v1.Pod, container *v1.Container) []int64 {
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsCPUAndMemoryAffinity) {
 		if cm.cpuManager != nil {
-			return int64Slice(cm.cpuManager.GetExclusiveCPUs(podUID, containerName).UnsortedList())
+			return int64Slice(cm.cpuManager.GetExclusiveCPUs(string(pod.UID), container.Name).UnsortedList())
 		}
 		return []int64{}
 	}
+	return nil
+}
+
+func (cm *containerManagerImpl) GetPodCPUs(podUID string) []int64 {
 	return nil
 }
 
@@ -347,7 +351,11 @@ func (cm *containerManagerImpl) GetAllocatableCPUs() []int64 {
 	return nil
 }
 
-func (cm *containerManagerImpl) GetMemory(_ klog.Logger, _, _ string) []*podresourcesapi.ContainerMemory {
+func (cm *containerManagerImpl) GetMemory(_ klog.Logger, pod *v1.Pod, container *v1.Container) []*podresourcesapi.ContainerMemory {
+	return nil
+}
+
+func (cm *containerManagerImpl) GetPodMemory(_ klog.Logger, _ string) []*podresourcesapi.ContainerMemory {
 	return nil
 }
 

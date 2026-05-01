@@ -26,9 +26,13 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	podresourcetest "k8s.io/kubernetes/pkg/kubelet/apis/podresources/testing"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
@@ -81,6 +85,57 @@ func TestListPodResourcesV1(t *testing.T) {
 			},
 		},
 	}
+	podsWithPodLevelResources := []*v1.Pod{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      podName,
+				Namespace: podNamespace,
+				UID:       podUID,
+			},
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("5"),
+						v1.ResourceMemory: resource.MustParse("5Gi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("5"),
+						v1.ResourceMemory: resource.MustParse("5Gi"),
+					},
+				},
+				Containers: containers,
+			},
+		},
+	}
+	podsWithMultipleContainers := []*v1.Pod{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      podName,
+				Namespace: podNamespace,
+				UID:       podUID,
+			},
+			Spec: v1.PodSpec{
+				Resources: &v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("5"),
+						v1.ResourceMemory: resource.MustParse("5Gi"),
+					},
+					Limits: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("5"),
+						v1.ResourceMemory: resource.MustParse("5Gi"),
+					},
+				},
+				Containers: []v1.Container{
+					{
+						Name: "exclusive-container",
+					},
+					{
+						Name: "shared-container",
+					},
+				},
+			},
+		},
+	}
 
 	pluginCDIDevices := []*podresourcesapi.CDIDevice{{Name: "dra-dev0"}, {Name: "dra-dev1"}}
 	draDriverName := "dra.example.com"
@@ -95,20 +150,24 @@ func TestListPodResourcesV1(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		desc             string
-		pods             []*v1.Pod
-		devices          []*podresourcesapi.ContainerDevices
-		cpus             []int64
-		memory           []*podresourcesapi.ContainerMemory
-		dynamicResources []*podresourcesapi.DynamicResource
-		expectedResponse *podresourcesapi.ListPodResourcesResponse
+		desc                     string
+		pods                     []*v1.Pod
+		devices                  []*podresourcesapi.ContainerDevices
+		containerCpus            []int64
+		containerMemory          []*podresourcesapi.ContainerMemory
+		podCpus                  []int64
+		podMemory                []*podresourcesapi.ContainerMemory
+		dynamicResources         []*podresourcesapi.DynamicResource
+		expectedResponse         *podresourcesapi.ListPodResourcesResponse
+		podLevelResourcesEnabled bool
+		targetContainerName      string
 	}{
 		{
 			desc:             "no pods",
 			pods:             []*v1.Pod{},
 			devices:          []*podresourcesapi.ContainerDevices{},
-			cpus:             []int64{},
-			memory:           []*podresourcesapi.ContainerMemory{},
+			containerCpus:    []int64{},
+			containerMemory:  []*podresourcesapi.ContainerMemory{},
 			dynamicResources: []*podresourcesapi.DynamicResource{},
 			expectedResponse: &podresourcesapi.ListPodResourcesResponse{},
 		},
@@ -116,8 +175,8 @@ func TestListPodResourcesV1(t *testing.T) {
 			desc:             "pod without devices",
 			pods:             pods,
 			devices:          []*podresourcesapi.ContainerDevices{},
-			cpus:             []int64{},
-			memory:           []*podresourcesapi.ContainerMemory{},
+			containerCpus:    []int64{},
+			containerMemory:  []*podresourcesapi.ContainerMemory{},
 			dynamicResources: []*podresourcesapi.DynamicResource{},
 			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
 				PodResources: []*podresourcesapi.PodResources{
@@ -139,8 +198,8 @@ func TestListPodResourcesV1(t *testing.T) {
 			desc:             "pod with devices",
 			pods:             pods,
 			devices:          devs,
-			cpus:             cpus,
-			memory:           memory,
+			containerCpus:    cpus,
+			containerMemory:  memory,
 			dynamicResources: []*podresourcesapi.DynamicResource{},
 			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
 				PodResources: []*podresourcesapi.PodResources{
@@ -161,11 +220,177 @@ func TestListPodResourcesV1(t *testing.T) {
 			},
 		},
 		{
+			desc:                     "Topology Manager scope: pod, pod-level resources, exclusive container",
+			pods:                     podsWithPodLevelResources,
+			devices:                  []*podresourcesapi.ContainerDevices{},
+			containerCpus:            cpus,
+			containerMemory:          memory,
+			podCpus:                  []int64{12, 23, 30, 31, 32},
+			podMemory:                []*podresourcesapi.ContainerMemory{{MemoryType: "memory", Size: 2147483648, Topology: &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: 1}}}}},
+			dynamicResources:         []*podresourcesapi.DynamicResource{},
+			podLevelResourcesEnabled: true,
+			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
+				PodResources: []*podresourcesapi.PodResources{
+					{
+						Name:      podName,
+						Namespace: podNamespace,
+						CpuIds:    []int64{12, 23, 30, 31, 32},
+						Memory:    []*podresourcesapi.ContainerMemory{{MemoryType: "memory", Size: 2147483648, Topology: &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: 1}}}}},
+						Containers: []*podresourcesapi.ContainerResources{
+							{
+								Name:             containerName,
+								Devices:          []*podresourcesapi.ContainerDevices{},
+								CpuIds:           cpus,
+								Memory:           memory,
+								DynamicResources: []*podresourcesapi.DynamicResource{},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc:                     "Topology Manager scope: pod, pod-level resources, shared pool container",
+			pods:                     podsWithPodLevelResources,
+			devices:                  []*podresourcesapi.ContainerDevices{},
+			containerCpus:            []int64{},
+			containerMemory:          []*podresourcesapi.ContainerMemory{},
+			podCpus:                  []int64{12, 23, 30, 31, 32},
+			podMemory:                []*podresourcesapi.ContainerMemory{{MemoryType: "memory", Size: 2147483648, Topology: &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: 1}}}}},
+			dynamicResources:         []*podresourcesapi.DynamicResource{},
+			podLevelResourcesEnabled: true,
+			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
+				PodResources: []*podresourcesapi.PodResources{
+					{
+						Name:      podName,
+						Namespace: podNamespace,
+						CpuIds:    []int64{12, 23, 30, 31, 32},
+						Memory:    []*podresourcesapi.ContainerMemory{{MemoryType: "memory", Size: 2147483648, Topology: &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: 1}}}}},
+						Containers: []*podresourcesapi.ContainerResources{
+							{
+								Name:             containerName,
+								Devices:          []*podresourcesapi.ContainerDevices{},
+								CpuIds:           []int64{},
+								Memory:           []*podresourcesapi.ContainerMemory{},
+								DynamicResources: []*podresourcesapi.DynamicResource{},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc:                     "Topology Manager scope: pod, pod-level resources, mix of exclusive and shared pool containers",
+			pods:                     podsWithMultipleContainers,
+			devices:                  []*podresourcesapi.ContainerDevices{},
+			containerCpus:            cpus,
+			containerMemory:          memory,
+			podCpus:                  []int64{12, 23, 30, 31, 32},
+			podMemory:                []*podresourcesapi.ContainerMemory{{MemoryType: "memory", Size: 2147483648, Topology: &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: 1}}}}},
+			dynamicResources:         []*podresourcesapi.DynamicResource{},
+			podLevelResourcesEnabled: true,
+			targetContainerName:      "exclusive-container",
+			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
+				PodResources: []*podresourcesapi.PodResources{
+					{
+						Name:      podName,
+						Namespace: podNamespace,
+						CpuIds:    []int64{12, 23, 30, 31, 32},
+						Memory:    []*podresourcesapi.ContainerMemory{{MemoryType: "memory", Size: 2147483648, Topology: &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: 1}}}}},
+						Containers: []*podresourcesapi.ContainerResources{
+							{
+								Name:             "exclusive-container",
+								Devices:          []*podresourcesapi.ContainerDevices{},
+								CpuIds:           cpus,
+								Memory:           memory,
+								DynamicResources: []*podresourcesapi.DynamicResource{},
+							},
+							{
+								Name:             "shared-container",
+								Devices:          []*podresourcesapi.ContainerDevices{},
+								CpuIds:           []int64{},
+								Memory:           []*podresourcesapi.ContainerMemory{},
+								DynamicResources: []*podresourcesapi.DynamicResource{},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc:                     "Topology Manager scope: container, pod-level resources, exclusive container",
+			pods:                     podsWithPodLevelResources,
+			devices:                  []*podresourcesapi.ContainerDevices{},
+			containerCpus:            cpus,
+			containerMemory:          memory,
+			podCpus:                  []int64{},
+			podMemory:                []*podresourcesapi.ContainerMemory{},
+			dynamicResources:         []*podresourcesapi.DynamicResource{},
+			podLevelResourcesEnabled: true,
+			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
+				PodResources: []*podresourcesapi.PodResources{
+					{
+						Name:      podName,
+						Namespace: podNamespace,
+						CpuIds:    []int64{},
+						Memory:    []*podresourcesapi.ContainerMemory{},
+						Containers: []*podresourcesapi.ContainerResources{
+							{
+								Name:             containerName,
+								Devices:          []*podresourcesapi.ContainerDevices{},
+								CpuIds:           cpus,
+								Memory:           memory,
+								DynamicResources: []*podresourcesapi.DynamicResource{},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc:                     "Topology Manager scope: container, pod-level resources, mix of exclusive and shared pool containers",
+			pods:                     podsWithMultipleContainers,
+			devices:                  []*podresourcesapi.ContainerDevices{},
+			containerCpus:            cpus,
+			containerMemory:          memory,
+			podCpus:                  []int64{},
+			podMemory:                []*podresourcesapi.ContainerMemory{},
+			dynamicResources:         []*podresourcesapi.DynamicResource{},
+			podLevelResourcesEnabled: true,
+			targetContainerName:      "exclusive-container",
+			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
+				PodResources: []*podresourcesapi.PodResources{
+					{
+						Name:      podName,
+						Namespace: podNamespace,
+						CpuIds:    []int64{},
+						Memory:    []*podresourcesapi.ContainerMemory{},
+						Containers: []*podresourcesapi.ContainerResources{
+							{
+								Name:             "exclusive-container",
+								Devices:          []*podresourcesapi.ContainerDevices{},
+								CpuIds:           cpus,
+								Memory:           memory,
+								DynamicResources: []*podresourcesapi.DynamicResource{},
+							},
+							{
+								Name:             "shared-container",
+								Devices:          []*podresourcesapi.ContainerDevices{},
+								CpuIds:           []int64{},
+								Memory:           []*podresourcesapi.ContainerMemory{},
+								DynamicResources: []*podresourcesapi.DynamicResource{},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			desc:             "pod with dynamic resources",
 			pods:             pods,
 			devices:          []*podresourcesapi.ContainerDevices{},
-			cpus:             cpus,
-			memory:           memory,
+			containerCpus:    cpus,
+			containerMemory:  memory,
 			dynamicResources: draDevs,
 			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
 				PodResources: []*podresourcesapi.PodResources{
@@ -189,8 +414,8 @@ func TestListPodResourcesV1(t *testing.T) {
 			desc:             "pod with dynamic resources and devices",
 			pods:             pods,
 			devices:          devs,
-			cpus:             cpus,
-			memory:           memory,
+			containerCpus:    cpus,
+			containerMemory:  memory,
 			dynamicResources: draDevs,
 			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
 				PodResources: []*podresourcesapi.PodResources{
@@ -212,6 +437,11 @@ func TestListPodResourcesV1(t *testing.T) {
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
+			if tc.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResources, tc.podLevelResourcesEnabled)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResourceManagers, tc.podLevelResourcesEnabled)
+			}
+
 			mockDevicesProvider := podresourcetest.NewMockDevicesProvider(t)
 			mockPodsProvider := podresourcetest.NewMockPodsProvider(t)
 			mockCPUsProvider := podresourcetest.NewMockCPUsProvider(t)
@@ -220,14 +450,40 @@ func TestListPodResourcesV1(t *testing.T) {
 
 			mockPodsProvider.EXPECT().GetPods().Return(tc.pods).Maybe()
 			mockPodsProvider.EXPECT().GetActivePods().Return(tc.pods).Maybe()
-			mockDevicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(tc.devices).Maybe()
-			mockCPUsProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(tc.cpus).Maybe()
-			mockMemoryProvider.EXPECT().GetMemory(logger, string(podUID), containerName).Return(tc.memory).Maybe()
-			mockDynamicResourcesProvider.EXPECT().GetDynamicResources(logger, pods[0], &containers[0]).Return(tc.dynamicResources).Maybe()
-			mockDevicesProvider.EXPECT().UpdateAllocatedDevices(logger).Return().Maybe()
+			// 1. Setup specific mock overrides based on test case specs
+			targetName := tc.targetContainerName
+			if targetName == "" {
+				targetName = containerName
+			}
+
+			if len(tc.devices) > 0 {
+				mockDevicesProvider.EXPECT().GetDevices(string(podUID), targetName).Return(tc.devices).Maybe()
+			}
+			if len(tc.containerCpus) > 0 {
+				mockCPUsProvider.EXPECT().GetCPUs(mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == targetName })).Return(tc.containerCpus).Maybe()
+			}
+			if len(tc.containerMemory) > 0 {
+				mockMemoryProvider.EXPECT().GetMemory(logger, mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == targetName })).Return(tc.containerMemory).Maybe()
+			}
+			if tc.podLevelResourcesEnabled {
+				mockCPUsProvider.EXPECT().GetPodCPUs(string(podUID)).Return(tc.podCpus).Maybe()
+				mockMemoryProvider.EXPECT().GetPodMemory(logger, string(podUID)).Return(tc.podMemory).Maybe()
+			}
+			if len(tc.dynamicResources) > 0 {
+				mockDynamicResourcesProvider.EXPECT().GetDynamicResources(logger, mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == targetName })).Return(tc.dynamicResources).Maybe()
+			}
+
+			// 2. Setup default mock behaviors (returning empty slices/no-ops by default)
+			mockCPUsProvider.EXPECT().GetCPUs(mock.Anything, mock.Anything).Return([]int64{}).Maybe()
+			mockCPUsProvider.EXPECT().GetPodCPUs(mock.Anything).Return([]int64{}).Maybe()
 			mockCPUsProvider.EXPECT().GetAllocatableCPUs().Return([]int64{}).Maybe()
-			mockDevicesProvider.EXPECT().GetAllocatableDevices(logger).Return([]*podresourcesapi.ContainerDevices{}).Maybe()
+			mockMemoryProvider.EXPECT().GetMemory(logger, mock.Anything, mock.Anything).Return([]*podresourcesapi.ContainerMemory{}).Maybe()
+			mockMemoryProvider.EXPECT().GetPodMemory(logger, mock.Anything).Return([]*podresourcesapi.ContainerMemory{}).Maybe()
 			mockMemoryProvider.EXPECT().GetAllocatableMemory(logger).Return([]*podresourcesapi.ContainerMemory{}).Maybe()
+			mockDevicesProvider.EXPECT().GetDevices(mock.Anything, mock.Anything).Return([]*podresourcesapi.ContainerDevices{}).Maybe()
+			mockDevicesProvider.EXPECT().GetAllocatableDevices(logger).Return([]*podresourcesapi.ContainerDevices{}).Maybe()
+			mockDevicesProvider.EXPECT().UpdateAllocatedDevices(logger).Return().Maybe()
+			mockDynamicResourcesProvider.EXPECT().GetDynamicResources(logger, mock.Anything, mock.Anything).Return([]*podresourcesapi.DynamicResource{}).Maybe()
 
 			providers := PodResourcesProviders{
 				Pods:             mockPodsProvider,
@@ -303,6 +559,7 @@ func TestListPodResourcesUsesOnlyActivePodsV1(t *testing.T) {
 	}
 
 	cpus := []int64{1, 9}
+	podCpus := []int64{1, 9, 10, 11, 12}
 
 	mems := []*podresourcesapi.ContainerMemory{
 		{
@@ -318,9 +575,10 @@ func TestListPodResourcesUsesOnlyActivePodsV1(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		desc       string
-		pods       []*v1.Pod
-		activePods []*v1.Pod
+		desc                     string
+		pods                     []*v1.Pod
+		activePods               []*v1.Pod
+		podLevelResourcesEnabled bool
 	}{
 		{
 			desc:       "no pods",
@@ -363,8 +621,33 @@ func TestListPodResourcesUsesOnlyActivePodsV1(t *testing.T) {
 				makePod(6),
 			},
 		},
+		{
+			desc: "some terminated pods AND pod level resources enabled",
+			pods: []*v1.Pod{
+				makePod(1),
+				makePod(2),
+				makePod(3),
+				makePod(4),
+				makePod(5),
+				makePod(6),
+				makePod(7),
+			},
+			activePods: []*v1.Pod{
+				makePod(1),
+				makePod(3),
+				makePod(4),
+				makePod(5),
+				makePod(6),
+			},
+			podLevelResourcesEnabled: true,
+		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
+			if tc.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResources, tc.podLevelResourcesEnabled)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResourceManagers, tc.podLevelResourcesEnabled)
+			}
+
 			mockDevicesProvider := podresourcetest.NewMockDevicesProvider(t)
 			mockPodsProvider := podresourcetest.NewMockPodsProvider(t)
 			mockCPUsProvider := podresourcetest.NewMockCPUsProvider(t)
@@ -375,6 +658,10 @@ func TestListPodResourcesUsesOnlyActivePodsV1(t *testing.T) {
 			mockPodsProvider.EXPECT().GetActivePods().Return(tc.activePods).Maybe()
 			mockDevicesProvider.EXPECT().GetDevices(mock.Anything, mock.Anything).Return(devs).Maybe()
 			mockCPUsProvider.EXPECT().GetCPUs(mock.Anything, mock.Anything).Return(cpus).Maybe()
+			if tc.podLevelResourcesEnabled {
+				mockCPUsProvider.EXPECT().GetPodCPUs(mock.Anything).Return(podCpus).Maybe()
+				mockMemoryProvider.EXPECT().GetPodMemory(logger, mock.Anything).Return([]*podresourcesapi.ContainerMemory{{MemoryType: "memory", Size: 2147483648, Topology: &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: 1}}}}}).Maybe()
+			}
 			mockMemoryProvider.EXPECT().GetMemory(logger, mock.Anything, mock.Anything).Return(mems).Maybe()
 			mockDevicesProvider.EXPECT().UpdateAllocatedDevices(logger).Return().Maybe()
 			mockCPUsProvider.EXPECT().GetAllocatableCPUs().Return([]int64{}).Maybe()
@@ -422,6 +709,7 @@ func TestListPodResourcesWithInitContainersV1(t *testing.T) {
 	}
 
 	cpus := []int64{12, 23, 30}
+	podCpus := []int64{12, 23, 30, 31, 32}
 
 	memory := []*podresourcesapi.ContainerMemory{
 		{
@@ -451,8 +739,153 @@ func TestListPodResourcesWithInitContainersV1(t *testing.T) {
 			*podresourcetest.MockCPUsProvider,
 			*podresourcetest.MockMemoryProvider,
 			*podresourcetest.MockDynamicResourcesProvider)
-		expectedResponse *podresourcesapi.ListPodResourcesResponse
+		expectedResponse         *podresourcesapi.ListPodResourcesResponse
+		podLevelResourcesEnabled bool
 	}{
+		{
+			desc: "pod having an init container AND pod level resources enabled",
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      podName,
+						Namespace: podNamespace,
+						UID:       podUID,
+					},
+					Spec: v1.PodSpec{
+						Resources: &v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("5"),
+								v1.ResourceMemory: resource.MustParse("5Gi"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("5"),
+								v1.ResourceMemory: resource.MustParse("5Gi"),
+							},
+						},
+						InitContainers: []v1.Container{
+							{
+								Name: initContainerName,
+							},
+						},
+						Containers: containers,
+					},
+				},
+			},
+			mockFunc: func(
+				pods []*v1.Pod,
+				devicesProvider *podresourcetest.MockDevicesProvider,
+				cpusProvider *podresourcetest.MockCPUsProvider,
+				memoryProvider *podresourcetest.MockMemoryProvider,
+				dynamicResourcesProvider *podresourcetest.MockDynamicResourcesProvider) {
+				devicesProvider.EXPECT().UpdateAllocatedDevices(logger).Return().Maybe()
+				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return([]*podresourcesapi.ContainerDevices{}).Maybe()
+				cpusProvider.EXPECT().GetCPUs(mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == containerName })).Return(cpus).Maybe()
+				memoryProvider.EXPECT().GetMemory(logger, mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == containerName })).Return(memory).Maybe()
+				dynamicResourcesProvider.EXPECT().GetDynamicResources(logger, pods[0], &pods[0].Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
+
+				cpusProvider.EXPECT().GetPodCPUs(mock.Anything).Return(podCpus).Maybe()
+				memoryProvider.EXPECT().GetPodMemory(logger, mock.Anything).Return([]*podresourcesapi.ContainerMemory{{MemoryType: "memory", Size: 2147483648, Topology: &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: 1}}}}}).Maybe()
+			},
+			podLevelResourcesEnabled: true,
+			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
+				PodResources: []*podresourcesapi.PodResources{
+					{
+						Name:      podName,
+						Namespace: podNamespace,
+						CpuIds:    podCpus,
+						Memory:    []*podresourcesapi.ContainerMemory{{MemoryType: "memory", Size: 2147483648, Topology: &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: 1}}}}},
+						Containers: []*podresourcesapi.ContainerResources{
+							{
+								Name:             containerName,
+								Devices:          []*podresourcesapi.ContainerDevices{},
+								CpuIds:           cpus,
+								Memory:           memory,
+								DynamicResources: []*podresourcesapi.DynamicResource{},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "pod having a restartable init container AND pod level resources enabled",
+			pods: []*v1.Pod{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      podName,
+						Namespace: podNamespace,
+						UID:       podUID,
+					},
+					Spec: v1.PodSpec{
+						Resources: &v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("5"),
+								v1.ResourceMemory: resource.MustParse("5Gi"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU:    resource.MustParse("5"),
+								v1.ResourceMemory: resource.MustParse("5Gi"),
+							},
+						},
+						InitContainers: []v1.Container{
+							{
+								Name:          initContainerName,
+								RestartPolicy: &containerRestartPolicyAlways,
+							},
+						},
+						Containers: containers,
+					},
+				},
+			},
+			mockFunc: func(
+				pods []*v1.Pod,
+				devicesProvider *podresourcetest.MockDevicesProvider,
+				cpusProvider *podresourcetest.MockCPUsProvider,
+				memoryProvider *podresourcetest.MockMemoryProvider,
+				dynamicResourcesProvider *podresourcetest.MockDynamicResourcesProvider) {
+				devicesProvider.EXPECT().UpdateAllocatedDevices(logger).Return().Maybe()
+
+				devicesProvider.EXPECT().GetDevices(string(podUID), initContainerName).Return([]*podresourcesapi.ContainerDevices{}).Maybe()
+				cpusProvider.EXPECT().GetCPUs(mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == initContainerName })).Return(cpus).Maybe()
+				memoryProvider.EXPECT().GetMemory(logger, mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == initContainerName })).Return(memory).Maybe()
+				dynamicResourcesProvider.EXPECT().GetDynamicResources(logger, pods[0], &pods[0].Spec.InitContainers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
+
+				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return([]*podresourcesapi.ContainerDevices{}).Maybe()
+				cpusProvider.EXPECT().GetCPUs(mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == containerName })).Return(cpus).Maybe()
+				memoryProvider.EXPECT().GetMemory(logger, mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == containerName })).Return(memory).Maybe()
+				dynamicResourcesProvider.EXPECT().GetDynamicResources(logger, pods[0], &pods[0].Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
+
+				cpusProvider.EXPECT().GetPodCPUs(mock.Anything).Return(podCpus).Maybe()
+				memoryProvider.EXPECT().GetPodMemory(logger, mock.Anything).Return([]*podresourcesapi.ContainerMemory{{MemoryType: "memory", Size: 2147483648, Topology: &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: 1}}}}}).Maybe()
+			},
+			podLevelResourcesEnabled: true,
+			expectedResponse: &podresourcesapi.ListPodResourcesResponse{
+				PodResources: []*podresourcesapi.PodResources{
+					{
+						Name:      podName,
+						Namespace: podNamespace,
+						CpuIds:    podCpus,
+						Memory:    []*podresourcesapi.ContainerMemory{{MemoryType: "memory", Size: 2147483648, Topology: &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: 1}}}}},
+						Containers: []*podresourcesapi.ContainerResources{
+							{
+								Name:             initContainerName,
+								Devices:          []*podresourcesapi.ContainerDevices{},
+								CpuIds:           cpus,
+								Memory:           memory,
+								DynamicResources: []*podresourcesapi.DynamicResource{},
+							},
+							{
+								Name:             containerName,
+								Devices:          []*podresourcesapi.ContainerDevices{},
+								CpuIds:           cpus,
+								Memory:           memory,
+								DynamicResources: []*podresourcesapi.DynamicResource{},
+							},
+						},
+					},
+				},
+			},
+		},
 		{
 			desc: "pod having an init container",
 			pods: []*v1.Pod{
@@ -480,8 +913,8 @@ func TestListPodResourcesWithInitContainersV1(t *testing.T) {
 				dynamicResourcesProvider *podresourcetest.MockDynamicResourcesProvider) {
 				devicesProvider.EXPECT().UpdateAllocatedDevices(logger).Return().Maybe()
 				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(devs).Maybe()
-				cpusProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(cpus).Maybe()
-				memoryProvider.EXPECT().GetMemory(logger, string(podUID), containerName).Return(memory).Maybe()
+				cpusProvider.EXPECT().GetCPUs(mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == containerName })).Return(cpus).Maybe()
+				memoryProvider.EXPECT().GetMemory(logger, mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == containerName })).Return(memory).Maybe()
 				dynamicResourcesProvider.EXPECT().GetDynamicResources(logger, pods[0], &pods[0].Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
 
 			},
@@ -532,13 +965,13 @@ func TestListPodResourcesWithInitContainersV1(t *testing.T) {
 				devicesProvider.EXPECT().UpdateAllocatedDevices(logger).Return().Maybe()
 
 				devicesProvider.EXPECT().GetDevices(string(podUID), initContainerName).Return(devs).Maybe()
-				cpusProvider.EXPECT().GetCPUs(string(podUID), initContainerName).Return(cpus).Maybe()
-				memoryProvider.EXPECT().GetMemory(logger, string(podUID), initContainerName).Return(memory).Maybe()
+				cpusProvider.EXPECT().GetCPUs(mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == initContainerName })).Return(cpus).Maybe()
+				memoryProvider.EXPECT().GetMemory(logger, mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == initContainerName })).Return(memory).Maybe()
 				dynamicResourcesProvider.EXPECT().GetDynamicResources(logger, pods[0], &pods[0].Spec.InitContainers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
 
 				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(devs).Maybe()
-				cpusProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(cpus).Maybe()
-				memoryProvider.EXPECT().GetMemory(logger, string(podUID), containerName).Return(memory).Maybe()
+				cpusProvider.EXPECT().GetCPUs(mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == containerName })).Return(cpus).Maybe()
+				memoryProvider.EXPECT().GetMemory(logger, mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == containerName })).Return(memory).Maybe()
 				dynamicResourcesProvider.EXPECT().GetDynamicResources(logger, pods[0], &pods[0].Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
 
 			},
@@ -569,6 +1002,11 @@ func TestListPodResourcesWithInitContainersV1(t *testing.T) {
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
+			if tc.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResources, tc.podLevelResourcesEnabled)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResourceManagers, tc.podLevelResourcesEnabled)
+			}
+
 			mockDevicesProvider := podresourcetest.NewMockDevicesProvider(t)
 			mockPodsProvider := podresourcetest.NewMockPodsProvider(t)
 			mockCPUsProvider := podresourcetest.NewMockCPUsProvider(t)
@@ -863,8 +1301,8 @@ func TestAllocatableResources(t *testing.T) {
 			mockMemoryProvider := podresourcetest.NewMockMemoryProvider(t)
 
 			mockDevicesProvider.EXPECT().GetDevices("", "").Return([]*podresourcesapi.ContainerDevices{}).Maybe()
-			mockCPUsProvider.EXPECT().GetCPUs("", "").Return([]int64{}).Maybe()
-			mockMemoryProvider.EXPECT().GetMemory(logger, "", "").Return([]*podresourcesapi.ContainerMemory{}).Maybe()
+			mockCPUsProvider.EXPECT().GetCPUs(mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == "" }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == "" })).Return([]int64{}).Maybe()
+			mockMemoryProvider.EXPECT().GetMemory(logger, mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == "" }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == "" })).Return([]*podresourcesapi.ContainerMemory{}).Maybe()
 			mockDevicesProvider.EXPECT().UpdateAllocatedDevices(logger).Return().Maybe()
 			mockDevicesProvider.EXPECT().GetAllocatableDevices(logger).Return(tc.allDevices).Maybe()
 			mockCPUsProvider.EXPECT().GetAllocatableCPUs().Return(tc.allCPUs).Maybe()
@@ -907,6 +1345,7 @@ func TestGetPodResourcesV1(t *testing.T) {
 	}
 
 	cpus := []int64{12, 23, 30}
+	podCpus := []int64{12, 23, 30, 31, 32}
 
 	memory := []*podresourcesapi.ContainerMemory{
 		{
@@ -937,6 +1376,53 @@ func TestGetPodResourcesV1(t *testing.T) {
 			Containers: containers,
 		},
 	}
+	podWithPodLevelResources := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: podNamespace,
+			UID:       podUID,
+		},
+		Spec: v1.PodSpec{
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("5"),
+					v1.ResourceMemory: resource.MustParse("5Gi"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("5"),
+					v1.ResourceMemory: resource.MustParse("5Gi"),
+				},
+			},
+			Containers: containers,
+		},
+	}
+	podWithMultipleContainers := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: podNamespace,
+			UID:       podUID,
+		},
+		Spec: v1.PodSpec{
+			Resources: &v1.ResourceRequirements{
+				Requests: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("5"),
+					v1.ResourceMemory: resource.MustParse("5Gi"),
+				},
+				Limits: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("5"),
+					v1.ResourceMemory: resource.MustParse("5Gi"),
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Name: "exclusive-container",
+				},
+				{
+					Name: "shared-container",
+				},
+			},
+		},
+	}
 
 	pluginCDIDevices := []*podresourcesapi.CDIDevice{{Name: "dra-dev0"}, {Name: "dra-dev1"}}
 	draDriverName := "dra.example.com"
@@ -951,15 +1437,19 @@ func TestGetPodResourcesV1(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		desc             string
-		err              error
-		exist            bool
-		pod              *v1.Pod
-		devices          []*podresourcesapi.ContainerDevices
-		cpus             []int64
-		memory           []*podresourcesapi.ContainerMemory
-		dynamicResources []*podresourcesapi.DynamicResource
-		expectedResponse *podresourcesapi.GetPodResourcesResponse
+		desc                     string
+		err                      error
+		exist                    bool
+		pod                      *v1.Pod
+		devices                  []*podresourcesapi.ContainerDevices
+		containerCpus            []int64
+		containerMemory          []*podresourcesapi.ContainerMemory
+		podCpus                  []int64
+		podMemory                []*podresourcesapi.ContainerMemory
+		dynamicResources         []*podresourcesapi.DynamicResource
+		expectedResponse         *podresourcesapi.GetPodResourcesResponse
+		podLevelResourcesEnabled bool
+		targetContainerName      string
 	}{
 		{
 			desc:             "pod not exist",
@@ -967,8 +1457,8 @@ func TestGetPodResourcesV1(t *testing.T) {
 			exist:            false,
 			pod:              nil,
 			devices:          []*podresourcesapi.ContainerDevices{},
-			cpus:             []int64{},
-			memory:           []*podresourcesapi.ContainerMemory{},
+			containerCpus:    []int64{},
+			containerMemory:  []*podresourcesapi.ContainerMemory{},
 			dynamicResources: []*podresourcesapi.DynamicResource{},
 
 			expectedResponse: &podresourcesapi.GetPodResourcesResponse{},
@@ -979,8 +1469,8 @@ func TestGetPodResourcesV1(t *testing.T) {
 			exist:            true,
 			pod:              pod,
 			devices:          []*podresourcesapi.ContainerDevices{},
-			cpus:             []int64{},
-			memory:           []*podresourcesapi.ContainerMemory{},
+			containerCpus:    []int64{},
+			containerMemory:  []*podresourcesapi.ContainerMemory{},
 			dynamicResources: []*podresourcesapi.DynamicResource{},
 			expectedResponse: &podresourcesapi.GetPodResourcesResponse{
 				PodResources: &podresourcesapi.PodResources{
@@ -1002,8 +1492,8 @@ func TestGetPodResourcesV1(t *testing.T) {
 			exist:            true,
 			pod:              pod,
 			devices:          devs,
-			cpus:             cpus,
-			memory:           memory,
+			containerCpus:    cpus,
+			containerMemory:  memory,
 			dynamicResources: draDevs,
 			expectedResponse: &podresourcesapi.GetPodResourcesResponse{
 				PodResources: &podresourcesapi.PodResources{
@@ -1021,8 +1511,179 @@ func TestGetPodResourcesV1(t *testing.T) {
 				},
 			},
 		},
+		{
+			desc:                     "Topology Manager scope: pod, pod-level resources, exclusive container",
+			err:                      nil,
+			exist:                    true,
+			pod:                      podWithPodLevelResources,
+			devices:                  []*podresourcesapi.ContainerDevices{},
+			containerCpus:            cpus,
+			containerMemory:          memory,
+			podCpus:                  podCpus,
+			podMemory:                []*podresourcesapi.ContainerMemory{{MemoryType: "memory", Size: 2147483648, Topology: &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: 1}}}}},
+			dynamicResources:         []*podresourcesapi.DynamicResource{},
+			podLevelResourcesEnabled: true,
+			expectedResponse: &podresourcesapi.GetPodResourcesResponse{
+				PodResources: &podresourcesapi.PodResources{
+					Name:      podName,
+					Namespace: podNamespace,
+					CpuIds:    podCpus,
+					Memory:    []*podresourcesapi.ContainerMemory{{MemoryType: "memory", Size: 2147483648, Topology: &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: 1}}}}},
+					Containers: []*podresourcesapi.ContainerResources{
+						{
+							Name:             containerName,
+							Devices:          []*podresourcesapi.ContainerDevices{},
+							CpuIds:           cpus,
+							Memory:           memory,
+							DynamicResources: []*podresourcesapi.DynamicResource{},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc:                     "Topology Manager scope: pod, pod-level resources, shared pool container",
+			err:                      nil,
+			exist:                    true,
+			pod:                      podWithPodLevelResources,
+			devices:                  []*podresourcesapi.ContainerDevices{},
+			containerCpus:            []int64{},
+			containerMemory:          []*podresourcesapi.ContainerMemory{},
+			podCpus:                  podCpus,
+			podMemory:                []*podresourcesapi.ContainerMemory{{MemoryType: "memory", Size: 2147483648, Topology: &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: 1}}}}},
+			dynamicResources:         []*podresourcesapi.DynamicResource{},
+			podLevelResourcesEnabled: true,
+			expectedResponse: &podresourcesapi.GetPodResourcesResponse{
+				PodResources: &podresourcesapi.PodResources{
+					Name:      podName,
+					Namespace: podNamespace,
+					CpuIds:    podCpus,
+					Memory:    []*podresourcesapi.ContainerMemory{{MemoryType: "memory", Size: 2147483648, Topology: &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: 1}}}}},
+					Containers: []*podresourcesapi.ContainerResources{
+						{
+							Name:             containerName,
+							Devices:          []*podresourcesapi.ContainerDevices{},
+							CpuIds:           []int64{},
+							Memory:           []*podresourcesapi.ContainerMemory{},
+							DynamicResources: []*podresourcesapi.DynamicResource{},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc:                     "Topology Manager scope: pod, pod-level resources, mix of exclusive and shared pool containers",
+			err:                      nil,
+			exist:                    true,
+			pod:                      podWithMultipleContainers,
+			devices:                  []*podresourcesapi.ContainerDevices{},
+			containerCpus:            cpus,
+			containerMemory:          memory,
+			podCpus:                  podCpus,
+			podMemory:                []*podresourcesapi.ContainerMemory{{MemoryType: "memory", Size: 2147483648, Topology: &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: 1}}}}},
+			dynamicResources:         []*podresourcesapi.DynamicResource{},
+			podLevelResourcesEnabled: true,
+			targetContainerName:      "exclusive-container",
+			expectedResponse: &podresourcesapi.GetPodResourcesResponse{
+				PodResources: &podresourcesapi.PodResources{
+					Name:      podName,
+					Namespace: podNamespace,
+					CpuIds:    podCpus,
+					Memory:    []*podresourcesapi.ContainerMemory{{MemoryType: "memory", Size: 2147483648, Topology: &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: 1}}}}},
+					Containers: []*podresourcesapi.ContainerResources{
+						{
+							Name:             "exclusive-container",
+							Devices:          []*podresourcesapi.ContainerDevices{},
+							CpuIds:           cpus,
+							Memory:           memory,
+							DynamicResources: []*podresourcesapi.DynamicResource{},
+						},
+						{
+							Name:             "shared-container",
+							Devices:          []*podresourcesapi.ContainerDevices{},
+							CpuIds:           []int64{},
+							Memory:           []*podresourcesapi.ContainerMemory{},
+							DynamicResources: []*podresourcesapi.DynamicResource{},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc:                     "Topology Manager scope: container, pod-level resources, exclusive container",
+			err:                      nil,
+			exist:                    true,
+			pod:                      podWithPodLevelResources,
+			devices:                  []*podresourcesapi.ContainerDevices{},
+			containerCpus:            cpus,
+			containerMemory:          memory,
+			podCpus:                  []int64{},
+			podMemory:                []*podresourcesapi.ContainerMemory{},
+			dynamicResources:         []*podresourcesapi.DynamicResource{},
+			podLevelResourcesEnabled: true,
+			expectedResponse: &podresourcesapi.GetPodResourcesResponse{
+				PodResources: &podresourcesapi.PodResources{
+					Name:      podName,
+					Namespace: podNamespace,
+					CpuIds:    []int64{},
+					Memory:    []*podresourcesapi.ContainerMemory{},
+					Containers: []*podresourcesapi.ContainerResources{
+						{
+							Name:             containerName,
+							Devices:          []*podresourcesapi.ContainerDevices{},
+							CpuIds:           cpus,
+							Memory:           memory,
+							DynamicResources: []*podresourcesapi.DynamicResource{},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc:                     "Topology Manager scope: container, pod-level resources, mix of exclusive and shared pool containers",
+			err:                      nil,
+			exist:                    true,
+			pod:                      podWithMultipleContainers,
+			devices:                  []*podresourcesapi.ContainerDevices{},
+			containerCpus:            cpus,
+			containerMemory:          memory,
+			podCpus:                  []int64{},
+			podMemory:                []*podresourcesapi.ContainerMemory{},
+			dynamicResources:         []*podresourcesapi.DynamicResource{},
+			podLevelResourcesEnabled: true,
+			targetContainerName:      "exclusive-container",
+			expectedResponse: &podresourcesapi.GetPodResourcesResponse{
+				PodResources: &podresourcesapi.PodResources{
+					Name:      podName,
+					Namespace: podNamespace,
+					CpuIds:    []int64{},
+					Memory:    []*podresourcesapi.ContainerMemory{},
+					Containers: []*podresourcesapi.ContainerResources{
+						{
+							Name:             "exclusive-container",
+							Devices:          []*podresourcesapi.ContainerDevices{},
+							CpuIds:           cpus,
+							Memory:           memory,
+							DynamicResources: []*podresourcesapi.DynamicResource{},
+						},
+						{
+							Name:             "shared-container",
+							Devices:          []*podresourcesapi.ContainerDevices{},
+							CpuIds:           []int64{},
+							Memory:           []*podresourcesapi.ContainerMemory{},
+							DynamicResources: []*podresourcesapi.DynamicResource{},
+						},
+					},
+				},
+			},
+		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
+			if tc.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResources, tc.podLevelResourcesEnabled)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResourceManagers, tc.podLevelResourcesEnabled)
+			}
+
 			mockDevicesProvider := podresourcetest.NewMockDevicesProvider(t)
 			mockPodsProvider := podresourcetest.NewMockPodsProvider(t)
 			mockCPUsProvider := podresourcetest.NewMockCPUsProvider(t)
@@ -1030,14 +1691,40 @@ func TestGetPodResourcesV1(t *testing.T) {
 			mockDynamicResourcesProvider := podresourcetest.NewMockDynamicResourcesProvider(t)
 
 			mockPodsProvider.EXPECT().GetPodByName(podNamespace, podName).Return(tc.pod, tc.exist).Maybe()
-			mockDevicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(tc.devices).Maybe()
-			mockCPUsProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(tc.cpus).Maybe()
-			mockMemoryProvider.EXPECT().GetMemory(logger, string(podUID), containerName).Return(tc.memory).Maybe()
-			mockDynamicResourcesProvider.EXPECT().GetDynamicResources(logger, pod, &containers[0]).Return(tc.dynamicResources).Maybe()
-			mockDevicesProvider.EXPECT().UpdateAllocatedDevices(logger).Return().Maybe()
+			// 1. Setup specific mock overrides based on test case specs
+			targetName := tc.targetContainerName
+			if targetName == "" {
+				targetName = containerName
+			}
+
+			if len(tc.devices) > 0 {
+				mockDevicesProvider.EXPECT().GetDevices(string(podUID), targetName).Return(tc.devices).Maybe()
+			}
+			if len(tc.containerCpus) > 0 {
+				mockCPUsProvider.EXPECT().GetCPUs(mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == targetName })).Return(tc.containerCpus).Maybe()
+			}
+			if len(tc.containerMemory) > 0 {
+				mockMemoryProvider.EXPECT().GetMemory(logger, mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == targetName })).Return(tc.containerMemory).Maybe()
+			}
+			if tc.podLevelResourcesEnabled {
+				mockCPUsProvider.EXPECT().GetPodCPUs(string(podUID)).Return(tc.podCpus).Maybe()
+				mockMemoryProvider.EXPECT().GetPodMemory(logger, string(podUID)).Return(tc.podMemory).Maybe()
+			}
+			if len(tc.dynamicResources) > 0 {
+				mockDynamicResourcesProvider.EXPECT().GetDynamicResources(logger, mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == targetName })).Return(tc.dynamicResources).Maybe()
+			}
+
+			// 2. Setup default mock behaviors (returning empty slices/no-ops by default)
+			mockCPUsProvider.EXPECT().GetCPUs(mock.Anything, mock.Anything).Return([]int64{}).Maybe()
+			mockCPUsProvider.EXPECT().GetPodCPUs(mock.Anything).Return([]int64{}).Maybe()
 			mockCPUsProvider.EXPECT().GetAllocatableCPUs().Return([]int64{}).Maybe()
-			mockDevicesProvider.EXPECT().GetAllocatableDevices(logger).Return([]*podresourcesapi.ContainerDevices{}).Maybe()
+			mockMemoryProvider.EXPECT().GetMemory(logger, mock.Anything, mock.Anything).Return([]*podresourcesapi.ContainerMemory{}).Maybe()
+			mockMemoryProvider.EXPECT().GetPodMemory(logger, mock.Anything).Return([]*podresourcesapi.ContainerMemory{}).Maybe()
 			mockMemoryProvider.EXPECT().GetAllocatableMemory(logger).Return([]*podresourcesapi.ContainerMemory{}).Maybe()
+			mockDevicesProvider.EXPECT().GetDevices(mock.Anything, mock.Anything).Return([]*podresourcesapi.ContainerDevices{}).Maybe()
+			mockDevicesProvider.EXPECT().GetAllocatableDevices(logger).Return([]*podresourcesapi.ContainerDevices{}).Maybe()
+			mockDevicesProvider.EXPECT().UpdateAllocatedDevices(logger).Return().Maybe()
+			mockDynamicResourcesProvider.EXPECT().GetDynamicResources(logger, mock.Anything, mock.Anything).Return([]*podresourcesapi.DynamicResource{}).Maybe()
 
 			providers := PodResourcesProviders{
 				Pods:             mockPodsProvider,
@@ -1087,6 +1774,7 @@ func TestGetPodResourcesWithInitContainersV1(t *testing.T) {
 	}
 
 	cpus := []int64{12, 23, 30}
+	podCpus := []int64{12, 23, 30, 31, 32}
 
 	memory := []*podresourcesapi.ContainerMemory{
 		{
@@ -1116,8 +1804,145 @@ func TestGetPodResourcesWithInitContainersV1(t *testing.T) {
 			*podresourcetest.MockCPUsProvider,
 			*podresourcetest.MockMemoryProvider,
 			*podresourcetest.MockDynamicResourcesProvider)
-		expectedResponse *podresourcesapi.GetPodResourcesResponse
+		expectedResponse         *podresourcesapi.GetPodResourcesResponse
+		podLevelResourcesEnabled bool
 	}{
+		{
+			desc: "pod having an init container AND pod level resources enabled",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      podName,
+					Namespace: podNamespace,
+					UID:       podUID,
+				},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("5"),
+							v1.ResourceMemory: resource.MustParse("5Gi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("5"),
+							v1.ResourceMemory: resource.MustParse("5Gi"),
+						},
+					},
+					InitContainers: []v1.Container{
+						{
+							Name: initContainerName,
+						},
+					},
+					Containers: containers,
+				},
+			},
+			mockFunc: func(
+				pod *v1.Pod,
+				devicesProvider *podresourcetest.MockDevicesProvider,
+				cpusProvider *podresourcetest.MockCPUsProvider,
+				memoryProvider *podresourcetest.MockMemoryProvider,
+				dynamicResourcesProvider *podresourcetest.MockDynamicResourcesProvider) {
+				devicesProvider.EXPECT().UpdateAllocatedDevices(logger).Return().Maybe()
+				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return([]*podresourcesapi.ContainerDevices{}).Maybe()
+				cpusProvider.EXPECT().GetCPUs(mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == containerName })).Return(cpus).Maybe()
+				memoryProvider.EXPECT().GetMemory(logger, mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == containerName })).Return(memory).Maybe()
+				dynamicResourcesProvider.EXPECT().GetDynamicResources(logger, pod, &pod.Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
+
+				cpusProvider.EXPECT().GetPodCPUs(mock.Anything).Return(podCpus).Maybe()
+				memoryProvider.EXPECT().GetPodMemory(logger, mock.Anything).Return([]*podresourcesapi.ContainerMemory{{MemoryType: "memory", Size: 2147483648, Topology: &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: 1}}}}}).Maybe()
+			},
+			podLevelResourcesEnabled: true,
+			expectedResponse: &podresourcesapi.GetPodResourcesResponse{
+				PodResources: &podresourcesapi.PodResources{
+					Name:      podName,
+					Namespace: podNamespace,
+					CpuIds:    podCpus,
+					Memory:    []*podresourcesapi.ContainerMemory{{MemoryType: "memory", Size: 2147483648, Topology: &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: 1}}}}},
+					Containers: []*podresourcesapi.ContainerResources{
+						{
+							Name:             containerName,
+							Devices:          []*podresourcesapi.ContainerDevices{},
+							CpuIds:           cpus,
+							Memory:           memory,
+							DynamicResources: []*podresourcesapi.DynamicResource{},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "pod having a restartable init container AND pod level resources enabled",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      podName,
+					Namespace: podNamespace,
+					UID:       podUID,
+				},
+				Spec: v1.PodSpec{
+					Resources: &v1.ResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("5"),
+							v1.ResourceMemory: resource.MustParse("5Gi"),
+						},
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("5"),
+							v1.ResourceMemory: resource.MustParse("5Gi"),
+						},
+					},
+					InitContainers: []v1.Container{
+						{
+							Name:          initContainerName,
+							RestartPolicy: &containerRestartPolicyAlways,
+						},
+					},
+					Containers: containers,
+				},
+			},
+			mockFunc: func(
+				pod *v1.Pod,
+				devicesProvider *podresourcetest.MockDevicesProvider,
+				cpusProvider *podresourcetest.MockCPUsProvider,
+				memoryProvider *podresourcetest.MockMemoryProvider,
+				dynamicResourcesProvider *podresourcetest.MockDynamicResourcesProvider) {
+				devicesProvider.EXPECT().UpdateAllocatedDevices(logger).Return().Maybe()
+
+				devicesProvider.EXPECT().GetDevices(string(podUID), initContainerName).Return([]*podresourcesapi.ContainerDevices{}).Maybe()
+				cpusProvider.EXPECT().GetCPUs(mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == initContainerName })).Return(cpus).Maybe()
+				memoryProvider.EXPECT().GetMemory(logger, mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == initContainerName })).Return(memory).Maybe()
+				dynamicResourcesProvider.EXPECT().GetDynamicResources(logger, pod, &pod.Spec.InitContainers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
+
+				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return([]*podresourcesapi.ContainerDevices{}).Maybe()
+				cpusProvider.EXPECT().GetCPUs(mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == containerName })).Return(cpus).Maybe()
+				memoryProvider.EXPECT().GetMemory(logger, mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == containerName })).Return(memory).Maybe()
+				dynamicResourcesProvider.EXPECT().GetDynamicResources(logger, pod, &pod.Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
+
+				cpusProvider.EXPECT().GetPodCPUs(mock.Anything).Return(podCpus).Maybe()
+				memoryProvider.EXPECT().GetPodMemory(logger, mock.Anything).Return([]*podresourcesapi.ContainerMemory{{MemoryType: "memory", Size: 2147483648, Topology: &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: 1}}}}}).Maybe()
+			},
+			podLevelResourcesEnabled: true,
+			expectedResponse: &podresourcesapi.GetPodResourcesResponse{
+				PodResources: &podresourcesapi.PodResources{
+					Name:      podName,
+					Namespace: podNamespace,
+					CpuIds:    podCpus,
+					Memory:    []*podresourcesapi.ContainerMemory{{MemoryType: "memory", Size: 2147483648, Topology: &podresourcesapi.TopologyInfo{Nodes: []*podresourcesapi.NUMANode{{ID: 1}}}}},
+					Containers: []*podresourcesapi.ContainerResources{
+						{
+							Name:             initContainerName,
+							Devices:          []*podresourcesapi.ContainerDevices{},
+							CpuIds:           cpus,
+							Memory:           memory,
+							DynamicResources: []*podresourcesapi.DynamicResource{},
+						},
+						{
+							Name:             containerName,
+							Devices:          []*podresourcesapi.ContainerDevices{},
+							CpuIds:           cpus,
+							Memory:           memory,
+							DynamicResources: []*podresourcesapi.DynamicResource{},
+						},
+					},
+				},
+			},
+		},
 		{
 			desc: "pod having an init container",
 			pod: &v1.Pod{
@@ -1143,8 +1968,8 @@ func TestGetPodResourcesWithInitContainersV1(t *testing.T) {
 				dynamicResourcesProvider *podresourcetest.MockDynamicResourcesProvider) {
 				devicesProvider.EXPECT().UpdateAllocatedDevices(logger).Return().Maybe()
 				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(devs).Maybe()
-				cpusProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(cpus).Maybe()
-				memoryProvider.EXPECT().GetMemory(logger, string(podUID), containerName).Return(memory).Maybe()
+				cpusProvider.EXPECT().GetCPUs(mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == containerName })).Return(cpus).Maybe()
+				memoryProvider.EXPECT().GetMemory(logger, mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == containerName })).Return(memory).Maybe()
 				dynamicResourcesProvider.EXPECT().GetDynamicResources(logger, pod, &pod.Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
 
 			},
@@ -1191,13 +2016,13 @@ func TestGetPodResourcesWithInitContainersV1(t *testing.T) {
 				devicesProvider.EXPECT().UpdateAllocatedDevices(logger).Return().Maybe()
 
 				devicesProvider.EXPECT().GetDevices(string(podUID), initContainerName).Return(devs).Maybe()
-				cpusProvider.EXPECT().GetCPUs(string(podUID), initContainerName).Return(cpus).Maybe()
-				memoryProvider.EXPECT().GetMemory(logger, string(podUID), initContainerName).Return(memory).Maybe()
+				cpusProvider.EXPECT().GetCPUs(mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == initContainerName })).Return(cpus).Maybe()
+				memoryProvider.EXPECT().GetMemory(logger, mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == initContainerName })).Return(memory).Maybe()
 				dynamicResourcesProvider.EXPECT().GetDynamicResources(logger, pod, &pod.Spec.InitContainers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
 
 				devicesProvider.EXPECT().GetDevices(string(podUID), containerName).Return(devs).Maybe()
-				cpusProvider.EXPECT().GetCPUs(string(podUID), containerName).Return(cpus).Maybe()
-				memoryProvider.EXPECT().GetMemory(logger, string(podUID), containerName).Return(memory).Maybe()
+				cpusProvider.EXPECT().GetCPUs(mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == containerName })).Return(cpus).Maybe()
+				memoryProvider.EXPECT().GetMemory(logger, mock.MatchedBy(func(p *v1.Pod) bool { return string(p.UID) == string(podUID) }), mock.MatchedBy(func(c *v1.Container) bool { return c.Name == containerName })).Return(memory).Maybe()
 				dynamicResourcesProvider.EXPECT().GetDynamicResources(logger, pod, &pod.Spec.Containers[0]).Return([]*podresourcesapi.DynamicResource{}).Maybe()
 			},
 			expectedResponse: &podresourcesapi.GetPodResourcesResponse{
@@ -1225,6 +2050,11 @@ func TestGetPodResourcesWithInitContainersV1(t *testing.T) {
 		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
+			if tc.podLevelResourcesEnabled {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResources, tc.podLevelResourcesEnabled)
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.PodLevelResourceManagers, tc.podLevelResourcesEnabled)
+			}
+
 			mockDevicesProvider := podresourcetest.NewMockDevicesProvider(t)
 			mockPodsProvider := podresourcetest.NewMockPodsProvider(t)
 			mockCPUsProvider := podresourcetest.NewMockCPUsProvider(t)

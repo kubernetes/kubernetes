@@ -1004,11 +1004,25 @@ func (cm *containerManagerImpl) GetAllocatableDevices(logger klog.Logger) []*pod
 	return containerDevicesFromResourceDeviceInstances(cm.deviceManager.GetAllocatableDevices(logger))
 }
 
-func (cm *containerManagerImpl) GetCPUs(podUID, containerName string) []int64 {
+func (cm *containerManagerImpl) GetCPUs(pod *v1.Pod, container *v1.Container) []int64 {
 	if cm.cpuManager != nil {
-		return int64Slice(cm.cpuManager.GetExclusiveCPUs(podUID, containerName).UnsortedList())
+		// Only report container-level CPUs if the container has exclusive CPUs
+		// (ResourceIsolationContainer). If the container runs on a shared pool
+		// (ResourceIsolationPod or ResourceIsolationHost), we return empty since
+		// these resources are shared and reported at the pod level instead.
+		if cm.cpuManager.GetResourceIsolationLevel(pod, container) != cmqos.ResourceIsolationContainer {
+			return []int64{}
+		}
+		return int64Slice(cm.cpuManager.GetExclusiveCPUs(string(pod.UID), container.Name).UnsortedList())
 	}
 	return []int64{}
+}
+
+func (cm *containerManagerImpl) GetPodCPUs(podUID string) []int64 {
+	if cm.cpuManager == nil {
+		return []int64{}
+	}
+	return int64Slice(cm.cpuManager.GetPodCPUs(podUID).UnsortedList())
 }
 
 func (cm *containerManagerImpl) GetAllocatableCPUs() []int64 {
@@ -1018,22 +1032,35 @@ func (cm *containerManagerImpl) GetAllocatableCPUs() []int64 {
 	return []int64{}
 }
 
-func (cm *containerManagerImpl) GetMemory(logger klog.Logger, podUID, containerName string) []*podresourcesapi.ContainerMemory {
+func (cm *containerManagerImpl) GetMemory(logger klog.Logger, pod *v1.Pod, container *v1.Container) []*podresourcesapi.ContainerMemory {
 	if cm.memoryManager == nil {
 		return []*podresourcesapi.ContainerMemory{}
 	}
 
-	return containerMemoryFromBlock(cm.memoryManager.GetMemory(logger, podUID, containerName))
+	// Only report container-level memory if the container has exclusive memory
+	// (ResourceIsolationContainer). If the container runs on a shared pool
+	// (ResourceIsolationPod or ResourceIsolationHost), we return empty since
+	// these resources are shared and reported at the pod level instead.
+	if cm.memoryManager.GetResourceIsolationLevel(pod, container) != cmqos.ResourceIsolationContainer {
+		return []*podresourcesapi.ContainerMemory{}
+	}
+
+	return containerMemoryFromBlock(cm.memoryManager.GetMemory(logger, string(pod.UID), container.Name))
 }
 
 func (cm *containerManagerImpl) GetAllocatableMemory(logger klog.Logger) []*podresourcesapi.ContainerMemory {
 	if cm.memoryManager == nil {
 		return []*podresourcesapi.ContainerMemory{}
 	}
-
-	// This is tempporary as part of migration of memory manager to Contextual logging.
-	// Direct context to be passed when container manager is migrated.
 	return containerMemoryFromBlock(cm.memoryManager.GetAllocatableMemory(logger))
+}
+
+func (cm *containerManagerImpl) GetPodMemory(logger klog.Logger, podUID string) []*podresourcesapi.ContainerMemory {
+	if cm.memoryManager == nil {
+		return []*podresourcesapi.ContainerMemory{}
+	}
+
+	return containerMemoryFromBlock(cm.memoryManager.GetPodMemory(podUID))
 }
 
 func (cm *containerManagerImpl) GetDynamicResources(logger klog.Logger, pod *v1.Pod, container *v1.Container) []*podresourcesapi.DynamicResource {

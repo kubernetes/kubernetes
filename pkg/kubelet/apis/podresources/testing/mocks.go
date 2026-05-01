@@ -467,16 +467,16 @@ func (_c *MockCPUsProvider_GetAllocatableCPUs_Call) RunAndReturn(run func() []in
 }
 
 // GetCPUs provides a mock function for the type MockCPUsProvider
-func (_mock *MockCPUsProvider) GetCPUs(podUID string, containerName string) []int64 {
-	ret := _mock.Called(podUID, containerName)
+func (_mock *MockCPUsProvider) GetCPUs(pod *v10.Pod, container *v10.Container) []int64 {
+	ret := _mock.Called(pod, container)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetCPUs")
 	}
 
 	var r0 []int64
-	if returnFunc, ok := ret.Get(0).(func(string, string) []int64); ok {
-		r0 = returnFunc(podUID, containerName)
+	if returnFunc, ok := ret.Get(0).(func(*v10.Pod, *v10.Container) []int64); ok {
+		r0 = returnFunc(pod, container)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]int64)
@@ -491,21 +491,21 @@ type MockCPUsProvider_GetCPUs_Call struct {
 }
 
 // GetCPUs is a helper method to define mock.On call
-//   - podUID string
-//   - containerName string
-func (_e *MockCPUsProvider_Expecter) GetCPUs(podUID interface{}, containerName interface{}) *MockCPUsProvider_GetCPUs_Call {
-	return &MockCPUsProvider_GetCPUs_Call{Call: _e.mock.On("GetCPUs", podUID, containerName)}
+//   - pod *v10.Pod
+//   - container *v10.Container
+func (_e *MockCPUsProvider_Expecter) GetCPUs(pod interface{}, container interface{}) *MockCPUsProvider_GetCPUs_Call {
+	return &MockCPUsProvider_GetCPUs_Call{Call: _e.mock.On("GetCPUs", pod, container)}
 }
 
-func (_c *MockCPUsProvider_GetCPUs_Call) Run(run func(podUID string, containerName string)) *MockCPUsProvider_GetCPUs_Call {
+func (_c *MockCPUsProvider_GetCPUs_Call) Run(run func(pod *v10.Pod, container *v10.Container)) *MockCPUsProvider_GetCPUs_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 string
+		var arg0 *v10.Pod
 		if args[0] != nil {
-			arg0 = args[0].(string)
+			arg0 = args[0].(*v10.Pod)
 		}
-		var arg1 string
+		var arg1 *v10.Container
 		if args[1] != nil {
-			arg1 = args[1].(string)
+			arg1 = args[1].(*v10.Container)
 		}
 		run(
 			arg0,
@@ -520,7 +520,60 @@ func (_c *MockCPUsProvider_GetCPUs_Call) Return(int64s []int64) *MockCPUsProvide
 	return _c
 }
 
-func (_c *MockCPUsProvider_GetCPUs_Call) RunAndReturn(run func(podUID string, containerName string) []int64) *MockCPUsProvider_GetCPUs_Call {
+func (_c *MockCPUsProvider_GetCPUs_Call) RunAndReturn(run func(pod *v10.Pod, container *v10.Container) []int64) *MockCPUsProvider_GetCPUs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetPodCPUs provides a mock function for the type MockCPUsProvider
+func (_mock *MockCPUsProvider) GetPodCPUs(podUID string) []int64 {
+	ret := _mock.Called(podUID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPodCPUs")
+	}
+
+	var r0 []int64
+	if returnFunc, ok := ret.Get(0).(func(string) []int64); ok {
+		r0 = returnFunc(podUID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]int64)
+		}
+	}
+	return r0
+}
+
+// MockCPUsProvider_GetPodCPUs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetPodCPUs'
+type MockCPUsProvider_GetPodCPUs_Call struct {
+	*mock.Call
+}
+
+// GetPodCPUs is a helper method to define mock.On call
+//   - podUID string
+func (_e *MockCPUsProvider_Expecter) GetPodCPUs(podUID interface{}) *MockCPUsProvider_GetPodCPUs_Call {
+	return &MockCPUsProvider_GetPodCPUs_Call{Call: _e.mock.On("GetPodCPUs", podUID)}
+}
+
+func (_c *MockCPUsProvider_GetPodCPUs_Call) Run(run func(podUID string)) *MockCPUsProvider_GetPodCPUs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockCPUsProvider_GetPodCPUs_Call) Return(int64s []int64) *MockCPUsProvider_GetPodCPUs_Call {
+	_c.Call.Return(int64s)
+	return _c
+}
+
+func (_c *MockCPUsProvider_GetPodCPUs_Call) RunAndReturn(run func(podUID string) []int64) *MockCPUsProvider_GetPodCPUs_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -606,16 +659,16 @@ func (_c *MockMemoryProvider_GetAllocatableMemory_Call) RunAndReturn(run func(lo
 }
 
 // GetMemory provides a mock function for the type MockMemoryProvider
-func (_mock *MockMemoryProvider) GetMemory(logger klog.Logger, podUID string, containerName string) []*v1.ContainerMemory {
-	ret := _mock.Called(logger, podUID, containerName)
+func (_mock *MockMemoryProvider) GetMemory(logger klog.Logger, pod *v10.Pod, container *v10.Container) []*v1.ContainerMemory {
+	ret := _mock.Called(logger, pod, container)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetMemory")
 	}
 
 	var r0 []*v1.ContainerMemory
-	if returnFunc, ok := ret.Get(0).(func(klog.Logger, string, string) []*v1.ContainerMemory); ok {
-		r0 = returnFunc(logger, podUID, containerName)
+	if returnFunc, ok := ret.Get(0).(func(klog.Logger, *v10.Pod, *v10.Container) []*v1.ContainerMemory); ok {
+		r0 = returnFunc(logger, pod, container)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*v1.ContainerMemory)
@@ -631,25 +684,25 @@ type MockMemoryProvider_GetMemory_Call struct {
 
 // GetMemory is a helper method to define mock.On call
 //   - logger klog.Logger
-//   - podUID string
-//   - containerName string
-func (_e *MockMemoryProvider_Expecter) GetMemory(logger interface{}, podUID interface{}, containerName interface{}) *MockMemoryProvider_GetMemory_Call {
-	return &MockMemoryProvider_GetMemory_Call{Call: _e.mock.On("GetMemory", logger, podUID, containerName)}
+//   - pod *v10.Pod
+//   - container *v10.Container
+func (_e *MockMemoryProvider_Expecter) GetMemory(logger interface{}, pod interface{}, container interface{}) *MockMemoryProvider_GetMemory_Call {
+	return &MockMemoryProvider_GetMemory_Call{Call: _e.mock.On("GetMemory", logger, pod, container)}
 }
 
-func (_c *MockMemoryProvider_GetMemory_Call) Run(run func(logger klog.Logger, podUID string, containerName string)) *MockMemoryProvider_GetMemory_Call {
+func (_c *MockMemoryProvider_GetMemory_Call) Run(run func(logger klog.Logger, pod *v10.Pod, container *v10.Container)) *MockMemoryProvider_GetMemory_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 klog.Logger
 		if args[0] != nil {
 			arg0 = args[0].(klog.Logger)
 		}
-		var arg1 string
+		var arg1 *v10.Pod
 		if args[1] != nil {
-			arg1 = args[1].(string)
+			arg1 = args[1].(*v10.Pod)
 		}
-		var arg2 string
+		var arg2 *v10.Container
 		if args[2] != nil {
-			arg2 = args[2].(string)
+			arg2 = args[2].(*v10.Container)
 		}
 		run(
 			arg0,
@@ -665,7 +718,66 @@ func (_c *MockMemoryProvider_GetMemory_Call) Return(containerMemorys []*v1.Conta
 	return _c
 }
 
-func (_c *MockMemoryProvider_GetMemory_Call) RunAndReturn(run func(logger klog.Logger, podUID string, containerName string) []*v1.ContainerMemory) *MockMemoryProvider_GetMemory_Call {
+func (_c *MockMemoryProvider_GetMemory_Call) RunAndReturn(run func(logger klog.Logger, pod *v10.Pod, container *v10.Container) []*v1.ContainerMemory) *MockMemoryProvider_GetMemory_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetPodMemory provides a mock function for the type MockMemoryProvider
+func (_mock *MockMemoryProvider) GetPodMemory(logger klog.Logger, podUID string) []*v1.ContainerMemory {
+	ret := _mock.Called(logger, podUID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPodMemory")
+	}
+
+	var r0 []*v1.ContainerMemory
+	if returnFunc, ok := ret.Get(0).(func(klog.Logger, string) []*v1.ContainerMemory); ok {
+		r0 = returnFunc(logger, podUID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*v1.ContainerMemory)
+		}
+	}
+	return r0
+}
+
+// MockMemoryProvider_GetPodMemory_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetPodMemory'
+type MockMemoryProvider_GetPodMemory_Call struct {
+	*mock.Call
+}
+
+// GetPodMemory is a helper method to define mock.On call
+//   - logger klog.Logger
+//   - podUID string
+func (_e *MockMemoryProvider_Expecter) GetPodMemory(logger interface{}, podUID interface{}) *MockMemoryProvider_GetPodMemory_Call {
+	return &MockMemoryProvider_GetPodMemory_Call{Call: _e.mock.On("GetPodMemory", logger, podUID)}
+}
+
+func (_c *MockMemoryProvider_GetPodMemory_Call) Run(run func(logger klog.Logger, podUID string)) *MockMemoryProvider_GetPodMemory_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 klog.Logger
+		if args[0] != nil {
+			arg0 = args[0].(klog.Logger)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockMemoryProvider_GetPodMemory_Call) Return(containerMemorys []*v1.ContainerMemory) *MockMemoryProvider_GetPodMemory_Call {
+	_c.Call.Return(containerMemorys)
+	return _c
+}
+
+func (_c *MockMemoryProvider_GetPodMemory_Call) RunAndReturn(run func(logger klog.Logger, podUID string) []*v1.ContainerMemory) *MockMemoryProvider_GetPodMemory_Call {
 	_c.Call.Return(run)
 	return _c
 }
