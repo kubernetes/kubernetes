@@ -949,10 +949,7 @@ kube::golang::build_binaries() {
       grpcnotrace=",grpcnotrace"
   fi
 
-  # If git cannot read the repository (e.g. host git wrote a multi-pack-index
-  # version the container git doesn't recognise), disable Go's VCS stamping so
-  # the build doesn't fail.  Kubernetes version info is embedded via -ldflags
-  # and is unaffected by this flag.
+  # Disable Go VCS stamping if git can't read the repo (e.g. multi-pack-index version mismatch).
   if ! git -C "${KUBE_ROOT}" status --porcelain &>/dev/null; then
     kube::log::warning "git status failed; disabling VCS stamping (-buildvcs=false)"
     goflags+=("-buildvcs=false")
