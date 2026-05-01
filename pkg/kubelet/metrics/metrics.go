@@ -52,7 +52,7 @@ const (
 	PLEGRelistIntervalKey              = "pleg_relist_interval_seconds"
 	PLEGLastSeenKey                    = "pleg_last_seen_seconds"
 	PLEGPodRelistDurationKey           = "pleg_pod_relist_duration_seconds"
-	EventedPLEGConnErrKey              = "evented_pleg_connection_error_count"
+	EventedPLEGConnErrKey              = "evented_pleg_connection_error_total"
 	EventedPLEGConnKey                 = "evented_pleg_connection_success_total"
 	EventedPLEGConnLatencyKey          = "evented_pleg_connection_latency_seconds"
 	EvictionsKey                       = "evictions_total"
