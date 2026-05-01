@@ -350,8 +350,6 @@ linters:
             contextual k8s.io/kubernetes/test/e2e/dra/.*
             contextual k8s.io/kubernetes/test/images/sample-device-plugin/.*
             contextual k8s.io/kubernetes/pkg/kubelet/.*
-            # Temporary carve-outs for PR1 split safety: these files still have legacy global klog calls.
-            # TODO: remove each exclusion as follow-up PRs migrate the file to contextual logging.
       sorted:
         # Installed there by hack/verify-golangci-lint.sh.
         path: _output/local/bin/sorted.so
