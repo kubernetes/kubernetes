@@ -1000,7 +1000,7 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           TopologyManagerAdmissionDurationKey,
 			Help:           "Duration in seconds to serve a pod admission request.",
-			Buckets:        metrics.ExponentialBuckets(.05, 2, 15),
+			Buckets:        metrics.ExponentialBuckets(.00005, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
