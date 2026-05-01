@@ -39,4 +39,10 @@ func TestFakeList(t *testing.T) {
 	if _, err := client.MetricsV1beta1().NodeMetricses().List(context.TODO(), metav1.ListOptions{}); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
+	if _, err := client.MetricsV1().PodMetricses("").List(context.TODO(), metav1.ListOptions{}); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if _, err := client.MetricsV1().NodeMetricses().List(context.TODO(), metav1.ListOptions{}); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
 }
