@@ -281,6 +281,14 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Duplicate(field.NewPath("spec", "resourceClaims").Index(1), nil),
 			},
 		},
+		"resource claim name empty": {
+			input: mkValidPodGroup(addResourceClaims(
+				scheduling.PodGroupResourceClaim{Name: "", ResourceClaimName: new("resource-claim")},
+			)),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "resourceClaims").Index(0).Child("name"), ""),
+			},
+		},
 		"resource claim source empty": {
 			input: mkValidPodGroup(addResourceClaims(
 				scheduling.PodGroupResourceClaim{Name: "my-claim"},
@@ -639,6 +647,27 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 			),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("status", "resourceClaimStatuses").Index(0).Child("name"), nil, "").MarkFromImperative(),
+			},
+		},
+		"too many resource claim statuses": {
+			oldObj: mkValidPodGroup(setResourceVersion("1")),
+			updateObj: mkValidPodGroup(
+				setResourceVersion("1"),
+				addResourceClaimStatuses(
+					scheduling.PodGroupResourceClaimStatus{Name: "claim-1"},
+					scheduling.PodGroupResourceClaimStatus{Name: "claim-2"},
+					scheduling.PodGroupResourceClaimStatus{Name: "claim-3"},
+					scheduling.PodGroupResourceClaimStatus{Name: "claim-4"},
+					scheduling.PodGroupResourceClaimStatus{Name: "claim-5"},
+				),
+			),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("status", "resourceClaimStatuses"), 5, scheduling.MaxPodGroupResourceClaims).WithOrigin("maxItems"),
+				field.Invalid(field.NewPath("status", "resourceClaimStatuses").Index(0).Child("name"), nil, "").MarkFromImperative(),
+				field.Invalid(field.NewPath("status", "resourceClaimStatuses").Index(1).Child("name"), nil, "").MarkFromImperative(),
+				field.Invalid(field.NewPath("status", "resourceClaimStatuses").Index(2).Child("name"), nil, "").MarkFromImperative(),
+				field.Invalid(field.NewPath("status", "resourceClaimStatuses").Index(3).Child("name"), nil, "").MarkFromImperative(),
+				field.Invalid(field.NewPath("status", "resourceClaimStatuses").Index(4).Child("name"), nil, "").MarkFromImperative(),
 			},
 		},
 		"invalid resource claim name": {
