@@ -48,10 +48,27 @@ const (
 	cacheWatcherBookmarkSent
 )
 
+// slowDispatchThreshold is the per (event, watcher) end-to-end
+// dispatch latency above which a structured log line is emitted.
+const slowDispatchThreshold = 500 * time.Millisecond
+
+// inputEvent wraps a watchCacheEvent as it is handed to a specific
+// watcher's input channel, recording the per-event, per-watcher moment it
+// was enqueued.
+type inputEvent struct {
+	event   *watchCacheEvent
+	addedAt time.Time
+}
+
+type sendTimings struct {
+	convertedAt time.Time
+	sentAt      time.Time
+}
+
 // cacheWatcher implements watch.Interface
 // this is not thread-safe
 type cacheWatcher struct {
-	input     chan *watchCacheEvent
+	input     chan inputEvent
 	result    chan watch.Event
 	done      chan struct{}
 	filter    filterWithAttrsFunc
@@ -63,6 +80,7 @@ type cacheWatcher struct {
 	deadline            time.Time
 	allowWatchBookmarks bool
 	groupResource       schema.GroupResource
+	dispatchDuration    *metrics.DispatchDurationObservers
 
 	// human readable identifier that helps assigning cacheWatcher
 	// instance with request
@@ -98,7 +116,7 @@ func newCacheWatcher(
 	identifier string,
 ) *cacheWatcher {
 	return &cacheWatcher{
-		input:               make(chan *watchCacheEvent, chanSize),
+		input:               make(chan inputEvent, chanSize),
 		result:              make(chan watch.Event, chanSize),
 		done:                make(chan struct{}),
 		filter:              filter,
@@ -108,6 +126,7 @@ func newCacheWatcher(
 		deadline:            deadline,
 		allowWatchBookmarks: allowWatchBookmarks,
 		groupResource:       groupResource,
+		dispatchDuration:    metrics.NewDispatchDurationObservers(groupResource),
 		identifier:          identifier,
 	}
 }
@@ -154,7 +173,7 @@ func (c *cacheWatcher) nonblockingAdd(event *watchCacheEvent) bool {
 		return false
 	}
 	select {
-	case c.input <- event:
+	case c.input <- inputEvent{event: event, addedAt: time.Now()}:
 		c.markBookmarkAfterRvAsReceived(event)
 		return true
 	default:
@@ -200,7 +219,13 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 			defer c.stateMutex.Unlock()
 			return c.state == cacheWatcherBookmarkReceived
 		}()
-		klog.V(1).Infof("Forcing %v watcher close due to unresponsiveness: %v. len(c.input) = %v, len(c.result) = %v, graceful = %v", c.groupResource.String(), c.identifier, len(c.input), len(c.result), graceful)
+		undeliveredMs := int64(-1)
+		if !event.RecordTime.IsZero() {
+			d := time.Since(event.RecordTime)
+			c.dispatchDuration.ObserveTerminated(d)
+			undeliveredMs = d.Milliseconds()
+		}
+		klog.V(1).Infof("Forcing %v watcher close due to unresponsiveness: %v. resourceversion = %v, undeliveredMs = %v, len(c.input) = %v, len(c.result) = %v, graceful = %v", c.groupResource.String(), c.identifier, event.ResourceVersion, undeliveredMs, len(c.input), len(c.result), graceful)
 		c.forget(graceful)
 	}
 
@@ -211,7 +236,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 
 	// OK, block sending, but only until timer fires.
 	select {
-	case c.input <- event:
+	case c.input <- inputEvent{event: event, addedAt: time.Now()}:
 		return true
 	case <-timer.C:
 		closeFunc()
@@ -401,11 +426,13 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 }
 
 // NOTE: sendWatchCacheEvent is assumed to not modify <event> !!!
-func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
+func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) sendTimings {
+	var t sendTimings
 	watchEvent := c.convertToWatchEvent(event)
+	t.convertedAt = time.Now()
 	if watchEvent == nil {
 		// Watcher is not interested in that object.
-		return
+		return t
 	}
 
 	// We need to ensure that if we put event X to the c.result, all
@@ -422,15 +449,39 @@ func (c *cacheWatcher) sendWatchCacheEvent(event *watchCacheEvent) {
 	// events.
 	select {
 	case <-c.done:
-		return
+		return t
 	default:
 	}
-
 	select {
 	case c.result <- *watchEvent:
 		c.markBookmarkAfterRvSent(event)
+		t.sentAt = time.Now()
 	case <-c.done:
 	}
+	return t
+}
+
+func (c *cacheWatcher) logIfSlow(event *watchCacheEvent, addedToInputAt, dequeuedAt time.Time, t sendTimings) {
+	if t.sentAt.IsZero() || event.RecordTime.IsZero() {
+		return
+	}
+	total := t.sentAt.Sub(event.RecordTime)
+	if total < slowDispatchThreshold {
+		return
+	}
+
+	klog.InfoS("Slow watch cache processing",
+		"watcher", c.identifier,
+		"resource", c.groupResource,
+		"resourceversion", event.ResourceVersion,
+		"totalMs", total.Milliseconds(),
+		"ingestMs", event.WatchCacheEnqueuedAt.Sub(event.RecordTime).Milliseconds(),
+		"incomingWaitMs", event.DispatchedAt.Sub(event.WatchCacheEnqueuedAt).Milliseconds(),
+		"dispatchWaitMs", addedToInputAt.Sub(event.DispatchedAt).Milliseconds(),
+		"inputWaitMs", dequeuedAt.Sub(addedToInputAt).Milliseconds(),
+		"convertMs", t.convertedAt.Sub(dequeuedAt).Milliseconds(),
+		"sendMs", t.sentAt.Sub(t.convertedAt).Milliseconds(),
+	)
 }
 
 func (c *cacheWatcher) processInterval(ctx context.Context, cacheInterval *watchCacheInterval, resourceVersion uint64) {
@@ -528,15 +579,21 @@ func (c *cacheWatcher) process(ctx context.Context, resourceVersion uint64) {
 
 	for {
 		select {
-		case event, ok := <-c.input:
+		case ie, ok := <-c.input:
 			if !ok {
 				return
 			}
+			event := ie.event
 			// only send events newer than resourceVersion
 			// or a bookmark event with an RV equal to resourceVersion
 			// if we haven't sent one to the client
 			if event.ResourceVersion > resourceVersion || (event.Type == watch.Bookmark && event.ResourceVersion == resourceVersion && !c.wasBookmarkAfterRvSent()) {
-				c.sendWatchCacheEvent(event)
+				dequeuedAt := time.Now()
+				t := c.sendWatchCacheEvent(event)
+				if !t.sentAt.IsZero() && !event.RecordTime.IsZero() {
+					c.dispatchDuration.ObserveDelivered(t.sentAt.Sub(event.RecordTime))
+				}
+				c.logIfSlow(event, ie.addedAt, dequeuedAt, t)
 			}
 		case <-ctx.Done():
 			return

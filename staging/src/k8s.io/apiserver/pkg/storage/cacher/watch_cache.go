@@ -69,16 +69,18 @@ const (
 // the previous value of the object to enable proper filtering in the
 // upper layers.
 type watchCacheEvent struct {
-	Type            watch.EventType
-	Object          runtime.Object
-	ObjLabels       labels.Set
-	ObjFields       fields.Set
-	PrevObject      runtime.Object
-	PrevObjLabels   labels.Set
-	PrevObjFields   fields.Set
-	Key             string
-	ResourceVersion uint64
-	RecordTime      time.Time
+	Type                 watch.EventType
+	Object               runtime.Object
+	ObjLabels            labels.Set
+	ObjFields            fields.Set
+	PrevObject           runtime.Object
+	PrevObjLabels        labels.Set
+	PrevObjFields        fields.Set
+	Key                  string
+	ResourceVersion      uint64
+	RecordTime           time.Time
+	WatchCacheEnqueuedAt time.Time
+	DispatchedAt         time.Time
 }
 
 // watchCache implements a Store interface.
@@ -366,6 +368,7 @@ func (w *watchCache) updateCache(event *watchCacheEvent) {
 	}
 	w.cache[w.endIndex%w.capacity] = event
 	w.endIndex++
+	event.WatchCacheEnqueuedAt = w.clock.Now()
 }
 
 // resizeCacheLocked resizes the cache if necessary:

@@ -990,6 +990,7 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 		//
 		// Make a shallow copy to allow overwriting Object and PrevObject.
 		wcEvent := *event
+		wcEvent.DispatchedAt = c.clock.Now()
 		setCachingObjects(&wcEvent, c.versioner)
 		event = &wcEvent
 

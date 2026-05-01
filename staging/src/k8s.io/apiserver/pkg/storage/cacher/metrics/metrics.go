@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"sync"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/features"
@@ -28,8 +29,10 @@ import (
 )
 
 const (
-	namespace = "apiserver"
-	subsystem = "watch_cache"
+	namespace                 = "apiserver"
+	subsystem                 = "watch_cache"
+	dispatchOutcomeDelivered  = "delivered"
+	dispatchOutcomeTerminated = "terminated"
 )
 
 /*
@@ -195,6 +198,16 @@ var (
 			Buckets:        []float64{0.005, 0.025, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.25, 1.5, 2, 3},
 		}, []string{"group", "resource"})
 
+	dispatchDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "dispatch_duration_seconds",
+			Help:           "Histogram of watch cache event dispatch latency in seconds by resource and outcome (delivered or terminated).",
+			StabilityLevel: compbasemetrics.ALPHA,
+			Buckets:        []float64{0.005, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
+		}, []string{"group", "resource", "outcome"})
+
 	ConsistentReadTotal = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Namespace:      namespace,
@@ -235,6 +248,18 @@ var (
 
 var registerMetrics sync.Once
 
+type DispatchDurationObservers struct {
+	delivered  compbasemetrics.ObserverMetric
+	terminated compbasemetrics.ObserverMetric
+}
+
+func NewDispatchDurationObservers(groupResource schema.GroupResource) *DispatchDurationObservers {
+	return &DispatchDurationObservers{
+		delivered:  dispatchDuration.WithLabelValues(groupResource.Group, groupResource.Resource, dispatchOutcomeDelivered),
+		terminated: dispatchDuration.WithLabelValues(groupResource.Group, groupResource.Resource, dispatchOutcomeTerminated),
+	}
+}
+
 // Register all metrics.
 func Register() {
 	// Register the metrics.
@@ -254,6 +279,7 @@ func Register() {
 		legacyregistry.MustRegister(WatchCacheInitializationErrors)
 		legacyregistry.MustRegister(WatchCacheInitializationDuration)
 		legacyregistry.MustRegister(WatchCacheReadWait)
+		legacyregistry.MustRegister(dispatchDuration)
 		legacyregistry.MustRegister(ConsistentReadTotal)
 		legacyregistry.MustRegister(StorageConsistencyCheckTotal)
 		if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
@@ -301,4 +327,19 @@ func RecordsWatchCacheCapacityChange(groupResource schema.GroupResource, old, ne
 		return
 	}
 	watchCacheCapacityDecreaseTotal.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
+}
+
+func (d *DispatchDurationObservers) ObserveDelivered(duration time.Duration) {
+	observe(d.delivered, duration)
+}
+
+func (d *DispatchDurationObservers) ObserveTerminated(duration time.Duration) {
+	observe(d.terminated, duration)
+}
+
+func observe(m compbasemetrics.ObserverMetric, duration time.Duration) {
+	if duration < 0 {
+		duration = 0
+	}
+	m.Observe(duration.Seconds())
 }

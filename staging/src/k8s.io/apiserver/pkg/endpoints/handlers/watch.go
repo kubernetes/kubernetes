@@ -28,6 +28,7 @@ import (
 	"golang.org/x/net/websocket"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -45,6 +46,8 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/streaming/pkg/httpstream/wsstream"
 )
+
+const slowWatchSerializationThreshold = 100 * time.Millisecond
 
 // timeoutFactory abstracts watch timeout logic for testing
 type TimeoutFactory interface {
@@ -217,10 +220,11 @@ type WatchListCompleteHook func()
 // It is thread-safe, as long as underlying io.Writer is thread-safe.
 // Once all Write calls for a given watch event have finished, RecordEvent must be called.
 type watchEventMetricsRecorder struct {
-	writer      io.Writer
-	countMetric compbasemetrics.CounterMetric
-	sizeMetric  compbasemetrics.ObserverMetric
-	byteCount   atomic.Int64
+	writer                     io.Writer
+	countMetric                compbasemetrics.CounterMetric
+	sizeMetric                 compbasemetrics.ObserverMetric
+	byteCount                  atomic.Int64
+	serializationLatencyMetric compbasemetrics.ObserverMetric
 }
 
 // Write implements io.Writer.
@@ -231,9 +235,10 @@ func (c *watchEventMetricsRecorder) Write(p []byte) (n int, err error) {
 }
 
 // Record reports the metrics and resets the byte count.
-func (c *watchEventMetricsRecorder) RecordEvent() {
+func (c *watchEventMetricsRecorder) RecordEvent(serializationDuration time.Duration) {
 	c.countMetric.Inc()
 	c.sizeMetric.Observe(float64(c.byteCount.Swap(0)))
+	c.serializationLatencyMetric.Observe(serializationDuration.Seconds())
 }
 
 // HandleHTTP serves a series of encoded events via HTTP with Transfer-Encoding: chunked.
@@ -284,9 +289,10 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	gvr := s.Scope.Resource
 
 	recorder := &watchEventMetricsRecorder{
-		writer:      framer,
-		countMetric: metrics.WatchEvents.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource),
-		sizeMetric:  metrics.WatchEventsSizes.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource),
+		writer:                     framer,
+		countMetric:                metrics.WatchEvents.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource),
+		sizeMetric:                 metrics.WatchEventsSizes.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource),
+		serializationLatencyMetric: metrics.WatchEventSerializationDuration.WithContext(req.Context()).WithLabelValues(gvr.Group, gvr.Version, gvr.Resource),
 	}
 
 	watchEncoder := newWatchEncoder(req.Context(), gvr, s.EmbeddedEncoder, s.Encoder, recorder)
@@ -316,15 +322,32 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 			isWatchListLatencyRecordingRequired := shouldRecordWatchListLatency(req.Context(), event)
 
-			if err := watchEncoder.Encode(event); err != nil {
+			serializationStart := time.Now()
+			err := watchEncoder.Encode(event)
+			serializationDuration := time.Since(serializationStart)
+
+			if err != nil {
 				utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to encode watch event")
 				// client disconnect.
 				return
 			}
-			recorder.RecordEvent()
-
+			recorder.RecordEvent(time.Since(serializationStart))
 			if len(ch) == 0 {
 				flusher.Flush()
+			}
+
+			total := time.Since(serializationStart)
+			if total > slowWatchSerializationThreshold {
+				var rv string
+				if accessor, err := meta.Accessor(event.Object); err == nil {
+					rv = accessor.GetResourceVersion()
+				}
+				klog.InfoS("Slow watch serialization/send",
+					"resource", gvr.Resource,
+					"rv", rv,
+					"serializationMs", serializationDuration.Milliseconds(),
+					"flushMs", (total - serializationDuration).Milliseconds(),
+				)
 			}
 			if isWatchListLatencyRecordingRequired {
 				// Record completion of initial listing phase for WatchList

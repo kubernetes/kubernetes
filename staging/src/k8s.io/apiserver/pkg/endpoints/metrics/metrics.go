@@ -186,6 +186,16 @@ var (
 		},
 		[]string{"group", "version", "resource"},
 	)
+	WatchEventSerializationDuration = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Subsystem:      APIServerComponent,
+			Name:           "watch_event_serialization_duration_seconds",
+			Help:           "Watch event serialization duration distribution in seconds",
+			Buckets:        compbasemetrics.ExponentialBuckets(0.0001, 2.0, 8),
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "version", "resource"},
+	)
 	// Because of volatility of the base metric this is pre-aggregated one. Instead of reporting current usage all the time
 	// it reports maximal usage during the last second.
 	currentInflightRequests = compbasemetrics.NewGaugeVec(
@@ -306,6 +316,7 @@ var (
 		TLSHandshakeErrors,
 		WatchEvents,
 		WatchEventsSizes,
+		WatchEventSerializationDuration,
 		currentInflightRequests,
 		currentInqueueRequests,
 		requestTerminationsTotal,
