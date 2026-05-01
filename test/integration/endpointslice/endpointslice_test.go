@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -80,20 +80,20 @@ func TestEndpointsControllersLabelSemantics(t *testing.T) {
 	ns := framework.CreateNamespaceOrDie(client, "test-endpoints-semantics", t)
 	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
-	svc := &corev1.Service{
+	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-123",
 			Labels: map[string]string{
 				"app": "test",
 			},
 		},
-		Spec: corev1.ServiceSpec{
-			Type:      corev1.ServiceTypeClusterIP,
-			ClusterIP: corev1.ClusterIPNone, // Headless service
+		Spec: v1.ServiceSpec{
+			Type:      v1.ServiceTypeClusterIP,
+			ClusterIP: v1.ClusterIPNone, // Headless service
 			Selector: map[string]string{
 				"app": "test",
 			},
-			Ports: []corev1.ServicePort{
+			Ports: []v1.ServicePort{
 				{
 					Port:       80,
 					TargetPort: intstr.FromInt(8080),
@@ -107,7 +107,7 @@ func TestEndpointsControllersLabelSemantics(t *testing.T) {
 	}
 
 	validateLabelsOnEndpointAndEndpointSlice(t, tCtx, client, ns.Name, svc.Name,
-		[]string{corev1.IsHeadlessService, "app"}, nil)
+		[]string{v1.IsHeadlessService, "app"}, nil)
 
 	svc.Labels["new-label"] = "new-label-value"
 	delete(svc.Labels, "app")
@@ -119,7 +119,7 @@ func TestEndpointsControllersLabelSemantics(t *testing.T) {
 
 	// Validate that the new labels are propagated.
 	validateLabelsOnEndpointAndEndpointSlice(t, tCtx, client, ns.Name, svc.Name,
-		[]string{corev1.IsHeadlessService, "new-label"}, []string{"app"})
+		[]string{v1.IsHeadlessService, "new-label"}, []string{"app"})
 }
 
 // TestEndpointsHeadlessLabel tests how the service.kubernetes.io/headless
@@ -179,12 +179,12 @@ func TestEndpointsHeadlessLabel(t *testing.T) {
 		},
 		{
 			name:          "non-headless service with headless label",
-			serviceLabels: map[string]string{corev1.IsHeadlessService: ""},
+			serviceLabels: map[string]string{v1.IsHeadlessService: ""},
 			isHeadless:    false,
 		},
 		{
 			name:          "headless service with headless label",
-			serviceLabels: map[string]string{corev1.IsHeadlessService: ""},
+			serviceLabels: map[string]string{v1.IsHeadlessService: ""},
 			isHeadless:    true,
 		},
 	}
@@ -196,14 +196,14 @@ func TestEndpointsHeadlessLabel(t *testing.T) {
 			defer framework.DeleteNamespaceOrDie(client, ns, t)
 
 			svcName := fmt.Sprintf("test-svc-%d", i)
-			svc := &corev1.Service{
+			svc := &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   svcName,
 					Labels: tc.serviceLabels,
 				},
-				Spec: corev1.ServiceSpec{
+				Spec: v1.ServiceSpec{
 					Selector: map[string]string{"app": "test"},
-					Ports: []corev1.ServicePort{{
+					Ports: []v1.ServicePort{{
 						Port:       80,
 						TargetPort: intstr.FromInt(8080),
 					}},
@@ -211,7 +211,7 @@ func TestEndpointsHeadlessLabel(t *testing.T) {
 			}
 
 			if tc.isHeadless {
-				svc.Spec.ClusterIP = corev1.ClusterIPNone
+				svc.Spec.ClusterIP = v1.ClusterIPNone
 			}
 
 			_, err := client.CoreV1().Services(ns.Name).Create(tCtx, svc, metav1.CreateOptions{})
@@ -221,10 +221,10 @@ func TestEndpointsHeadlessLabel(t *testing.T) {
 
 			if tc.isHeadless {
 				validateLabelsOnEndpointAndEndpointSlice(t, tCtx, client, ns.Name, svc.Name,
-					[]string{corev1.IsHeadlessService}, nil)
+					[]string{v1.IsHeadlessService}, nil)
 			} else {
 				validateLabelsOnEndpointAndEndpointSlice(t, tCtx, client, ns.Name, svc.Name,
-					nil, []string{corev1.IsHeadlessService})
+					nil, []string{v1.IsHeadlessService})
 			}
 
 		})

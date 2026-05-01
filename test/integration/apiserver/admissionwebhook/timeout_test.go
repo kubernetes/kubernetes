@@ -31,9 +31,9 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/admission/v1beta1"
+	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -189,7 +189,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 		t.Run(tt.name, func(t *testing.T) {
 			recorder.Reset()
 			ns := fmt.Sprintf("reinvoke-%d", i)
-			_, err = client.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{})
+			_, err = client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -281,15 +281,15 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 				t.Fatal(err)
 			}
 
-			pod := &corev1.Pod{
+			pod := &v1.Pod{
 				TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: ns,
 					Name:      "labeled",
 					Labels:    map[string]string{"x": "true"},
 				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
 						Name:  "fake-name",
 						Image: "fakeimage",
 					}},
@@ -404,8 +404,8 @@ func (i *timeoutRecorder) RecordInvocation(call invocation) {
 func newTimeoutWebhookHandler(recorder *timeoutRecorder) http.Handler {
 	allow := func(w http.ResponseWriter) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
-			Response: &v1beta1.AdmissionResponse{
+		json.NewEncoder(w).Encode(&admissionv1beta1.AdmissionReview{
+			Response: &admissionv1beta1.AdmissionResponse{
 				Allowed: true,
 			},
 		})
@@ -416,7 +416,7 @@ func newTimeoutWebhookHandler(recorder *timeoutRecorder) http.Handler {
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 		}
-		review := v1beta1.AdmissionReview{}
+		review := admissionv1beta1.AdmissionReview{}
 		if err := json.Unmarshal(data, &review); err != nil {
 			http.Error(w, err.Error(), 400)
 		}
@@ -429,7 +429,7 @@ func newTimeoutWebhookHandler(recorder *timeoutRecorder) http.Handler {
 		if len(review.Request.Object.Raw) == 0 {
 			http.Error(w, err.Error(), 400)
 		}
-		pod := &corev1.Pod{}
+		pod := &v1.Pod{}
 		if err := json.Unmarshal(review.Request.Object.Raw, pod); err != nil {
 			http.Error(w, err.Error(), 400)
 		}
@@ -469,13 +469,13 @@ func newTimeoutWebhookHandler(recorder *timeoutRecorder) http.Handler {
 	})
 }
 
-var timeoutMarkerFixture = &corev1.Pod{
+var timeoutMarkerFixture = &v1.Pod{
 	ObjectMeta: metav1.ObjectMeta{
 		Namespace: "default",
 		Name:      "marker",
 	},
-	Spec: corev1.PodSpec{
-		Containers: []corev1.Container{{
+	Spec: v1.PodSpec{
+		Containers: []v1.Container{{
 			Name:  "fake-name",
 			Image: "fakeimage",
 		}},

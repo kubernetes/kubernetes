@@ -27,7 +27,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"k8s.io/klog/v2"
-	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
+	kubeletdevicepluginv1beta1 "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	plugin "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/plugin/v1beta1"
 )
 
@@ -39,17 +39,17 @@ const (
 )
 
 // stubAllocFunc creates and returns allocation response for the input allocate request
-func stubAllocFunc(r *pluginapi.AllocateRequest, devs map[string]*pluginapi.Device) (*pluginapi.AllocateResponse, error) {
-	var responses pluginapi.AllocateResponse
+func stubAllocFunc(r *kubeletdevicepluginv1beta1.AllocateRequest, devs map[string]*kubeletdevicepluginv1beta1.Device) (*kubeletdevicepluginv1beta1.AllocateResponse, error) {
+	var responses kubeletdevicepluginv1beta1.AllocateResponse
 	for _, req := range r.ContainerRequests {
-		response := &pluginapi.ContainerAllocateResponse{}
+		response := &kubeletdevicepluginv1beta1.ContainerAllocateResponse{}
 		for _, requestID := range req.DevicesIds {
 			dev, ok := devs[requestID]
 			if !ok {
 				return nil, fmt.Errorf("invalid allocation request with non-existing device %s", requestID)
 			}
 
-			if dev.Health != pluginapi.Healthy {
+			if dev.Health != kubeletdevicepluginv1beta1.Healthy {
 				return nil, fmt.Errorf("invalid allocation request with unhealthy device: %s", requestID)
 			}
 
@@ -68,14 +68,14 @@ func stubAllocFunc(r *pluginapi.AllocateRequest, devs map[string]*pluginapi.Devi
 
 			f.Close()
 
-			response.Mounts = append(response.Mounts, &pluginapi.Mount{
+			response.Mounts = append(response.Mounts, &kubeletdevicepluginv1beta1.Mount{
 				ContainerPath: fpath,
 				HostPath:      fpath,
 			})
 
 			if os.Getenv("CDI_ENABLED") != "" {
 				// add the CDI device ID to the response.
-				cdiDevice := &pluginapi.CDIDevice{
+				cdiDevice := &kubeletdevicepluginv1beta1.CDIDevice{
 					Name: fmt.Sprintf("%s=%s", resourceName, cdiPrefix+dev.ID),
 				}
 				response.CdiDevices = append(response.CdiDevices, cdiDevice)
@@ -99,15 +99,15 @@ func main() {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
-	devs := []*pluginapi.Device{
-		{ID: "Dev-1", Health: pluginapi.Healthy},
-		{ID: "Dev-2", Health: pluginapi.Healthy},
+	devs := []*kubeletdevicepluginv1beta1.Device{
+		{ID: "Dev-1", Health: kubeletdevicepluginv1beta1.Healthy},
+		{ID: "Dev-2", Health: kubeletdevicepluginv1beta1.Healthy},
 	}
 
 	cdiEnabled := os.Getenv("CDI_ENABLED")
 	pluginSocksDir := os.Getenv("PLUGIN_SOCK_DIR")
 	if pluginSocksDir == "" {
-		pluginSocksDir = pluginapi.DevicePluginPath
+		pluginSocksDir = kubeletdevicepluginv1beta1.DevicePluginPath
 	}
 	logger.Info("Determined configuration", "CDI_ENABLED", cdiEnabled, "pluginSocksDir", pluginSocksDir)
 
@@ -144,7 +144,7 @@ func main() {
 	}
 
 	if !autoregister {
-		go dp1.Watch(ctx, pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath)
+		go dp1.Watch(ctx, kubeletdevicepluginv1beta1.KubeletSocket, resourceName, kubeletdevicepluginv1beta1.DevicePluginPath)
 
 		triggerPath := filepath.Dir(registerControlFile)
 
@@ -171,7 +171,7 @@ func main() {
 			select {
 			case received := <-updateCh:
 				if received {
-					if err := dp1.Register(ctx, pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath); err != nil {
+					if err := dp1.Register(ctx, kubeletdevicepluginv1beta1.KubeletSocket, resourceName, kubeletdevicepluginv1beta1.DevicePluginPath); err != nil {
 						panic(err)
 					}
 					logger.Info("Control file was deleted, registration succeeded")
@@ -187,11 +187,11 @@ func main() {
 			time.Sleep(5 * time.Second)
 		}
 	} else {
-		if err := dp1.Register(ctx, pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath); err != nil {
+		if err := dp1.Register(ctx, kubeletdevicepluginv1beta1.KubeletSocket, resourceName, kubeletdevicepluginv1beta1.DevicePluginPath); err != nil {
 			panic(err)
 		}
 
-		go dp1.Watch(ctx, pluginapi.KubeletSocket, resourceName, pluginapi.DevicePluginPath)
+		go dp1.Watch(ctx, kubeletdevicepluginv1beta1.KubeletSocket, resourceName, kubeletdevicepluginv1beta1.DevicePluginPath)
 		// Catch termination signals
 		sig := <-sigCh
 		logger.Info("Shutting down, received signal", "signal", sig)
@@ -232,7 +232,7 @@ func handleRegistrationProcess(logger klog.Logger, registerControlFile string, d
 	}
 }
 
-func createCDIFile(logger klog.Logger, devs []*pluginapi.Device) error {
+func createCDIFile(logger klog.Logger, devs []*kubeletdevicepluginv1beta1.Device) error {
 	content := fmt.Sprintf(`{"cdiVersion":"%s","kind":"%s","devices":[`, cdiVersion, resourceName)
 	for i, dev := range devs {
 		name := cdiPrefix + dev.ID

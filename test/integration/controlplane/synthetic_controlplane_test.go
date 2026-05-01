@@ -34,7 +34,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -274,12 +274,12 @@ func constructBody(val string, size int, field string, t *testing.T) *appsv1.Dep
 			Strategy: appsv1.DeploymentStrategy{
 				Type: appsv1.RollingUpdateDeploymentStrategyType,
 			},
-			Template: corev1.PodTemplateSpec{
+			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"foo": "bar"},
 				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Name:  "foo",
 							Image: "foo",
@@ -653,7 +653,7 @@ func TestAccept(t *testing.T) {
 	}
 }
 
-func countEndpoints(eps *corev1.Endpoints) int {
+func countEndpoints(eps *v1.Endpoints) int {
 	count := 0
 	for i := range eps.Subsets {
 		count += len(eps.Subsets[i].Addresses) * len(eps.Subsets[i].Ports)
@@ -722,7 +722,7 @@ func TestUpdateNodeObjects(t *testing.T) {
 
 	for i := 0; i < nodes*6; i++ {
 		c.Nodes().Delete(context.TODO(), fmt.Sprintf("node-%d", i), metav1.DeleteOptions{})
-		_, err := c.Nodes().Create(context.TODO(), &corev1.Node{
+		_, err := c.Nodes().Create(context.TODO(), &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("node-%d", i),
 			},
@@ -755,7 +755,7 @@ func TestUpdateNodeObjects(t *testing.T) {
 			i := 0
 			for r := range w.ResultChan() {
 				i++
-				if _, ok := r.Object.(*corev1.Node); !ok {
+				if _, ok := r.Object.(*v1.Node); !ok {
 					fmt.Printf("[watch:%d] unexpected object after %d: %#v\n", lister, i, r)
 				}
 				if i%100 == 0 {
@@ -810,24 +810,24 @@ func TestUpdateNodeObjects(t *testing.T) {
 				switch {
 				case i%4 == 0:
 					lastCount = 1
-					n.Status.Conditions = []corev1.NodeCondition{
+					n.Status.Conditions = []v1.NodeCondition{
 						{
-							Type:   corev1.NodeReady,
-							Status: corev1.ConditionTrue,
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
 							Reason: "foo",
 						},
 					}
 				case i%4 == 1:
 					lastCount = 2
-					n.Status.Conditions = []corev1.NodeCondition{
+					n.Status.Conditions = []v1.NodeCondition{
 						{
-							Type:   corev1.NodeReady,
-							Status: corev1.ConditionFalse,
+							Type:   v1.NodeReady,
+							Status: v1.ConditionFalse,
 							Reason: "foo",
 						},
 						{
-							Type:   corev1.NodeDiskPressure,
-							Status: corev1.ConditionTrue,
+							Type:   v1.NodeDiskPressure,
+							Status: v1.ConditionTrue,
 							Reason: "bar",
 						},
 					}

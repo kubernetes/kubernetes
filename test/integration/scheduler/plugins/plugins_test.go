@@ -30,7 +30,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -2634,7 +2634,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 				// Expect the runningPod to be deleted physically.
 				if _, err = testutils.GetPod(testCtx.ClientSet, r.Name, r.Namespace); err == nil {
 					t.Error("The running pod still exists.")
-				} else if !errors.IsNotFound(err) {
+				} else if !apierrors.IsNotFound(err) {
 					t.Errorf("Get running pod failed: %v", err)
 				}
 			}

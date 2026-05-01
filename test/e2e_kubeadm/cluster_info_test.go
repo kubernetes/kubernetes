@@ -19,7 +19,7 @@ package kubeadm
 import (
 	"context"
 
-	authv1 "k8s.io/api/authorization/v1"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -36,7 +36,7 @@ const (
 )
 
 var (
-	clusterInfoConfigMapResource = &authv1.ResourceAttributes{
+	clusterInfoConfigMapResource = &authorizationv1.ResourceAttributes{
 		Namespace: kubePublicNamespace,
 		Name:      clusterInfoConfigMapName,
 		Resource:  "configmaps",

@@ -20,8 +20,8 @@ import (
 	"context"
 	"fmt"
 
-	authv1 "k8s.io/api/authorization/v1"
-	corev1 "k8s.io/api/core/v1"
+	authorizationv1 "k8s.io/api/authorization/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -38,7 +38,7 @@ var (
 	kubeadmCertsRoleName        = fmt.Sprintf("kubeadm:%s", kubeadmCertsSecretName)
 	kubeadmCertsRoleBindingName = kubeadmCertsRoleName
 
-	kubeadmCertsSecretResource = &authv1.ResourceAttributes{
+	kubeadmCertsSecretResource = &authorizationv1.ResourceAttributes{
 		Namespace: kubeSystemNamespace,
 		Name:      kubeadmCertsSecretName,
 		Resource:  "secrets",
@@ -72,7 +72,7 @@ var _ = Describe("kubeadm-certs [copy-certs]", func() {
 		gomega.Expect(*ownRef.BlockOwnerDeletion).To(gomega.BeTrueBecause("%s should be deleted on owner deletion", kubeadmCertsSecretName))
 
 		o := GetSecret(f.ClientSet, kubeSystemNamespace, ownRef.Name)
-		gomega.Expect(o.Type).To(gomega.Equal(corev1.SecretTypeBootstrapToken), "%s should have an owner reference that refers to a bootstrap-token", kubeadmCertsSecretName)
+		gomega.Expect(o.Type).To(gomega.Equal(v1.SecretTypeBootstrapToken), "%s should have an owner reference that refers to a bootstrap-token", kubeadmCertsSecretName)
 		gomega.Expect(o.Data).To(gomega.HaveKey("expiration"), "%s should have an owner reference with an expiration", kubeadmCertsSecretName)
 
 		// gets the ClusterConfiguration from the kubeadm kubeadm-config ConfigMap as a untyped map

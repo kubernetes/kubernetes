@@ -31,7 +31,7 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
 	"k8s.io/client-go/kubernetes"
@@ -182,10 +182,10 @@ func TestEgressToWebhookWithProxy(t *testing.T) {
 	// It can take a moment for the webhook to be consistently available.
 	time.Sleep(2 * time.Second)
 
-	pod := &corev1.Pod{
+	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{{Name: "test", Image: "test"}},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{Name: "test", Image: "test"}},
 		},
 	}
 	_, err = clientA.CoreV1().Pods("default").Create(context.Background(), pod, metav1.CreateOptions{})
@@ -231,10 +231,10 @@ func TestEgressToWebhookWithProxy(t *testing.T) {
 		t.Fatalf("failed to create kubernetes client: %v", err)
 	}
 
-	pod2 := &corev1.Pod{
+	pod2 := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-pod-2"},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{{Name: "test", Image: "test"}},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{Name: "test", Image: "test"}},
 		},
 	}
 	_, err = clientB.CoreV1().Pods("default").Create(context.Background(), pod2, metav1.CreateOptions{})

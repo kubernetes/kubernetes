@@ -20,8 +20,8 @@ import (
 	"context"
 
 	appsv1 "k8s.io/api/apps/v1"
-	authv1 "k8s.io/api/authorization/v1"
-	corev1 "k8s.io/api/core/v1"
+	authorizationv1 "k8s.io/api/authorization/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -44,7 +44,7 @@ func ExpectServiceAccount(c clientset.Interface, namespace, name string) {
 // Secret utils
 
 // GetSecret gets Secret with specific name from the namespace
-func GetSecret(c clientset.Interface, namespace, name string) *corev1.Secret {
+func GetSecret(c clientset.Interface, namespace, name string) *v1.Secret {
 	r, err := c.CoreV1().
 		Secrets(namespace).
 		Get(context.TODO(), name, metav1.GetOptions{})
@@ -55,7 +55,7 @@ func GetSecret(c clientset.Interface, namespace, name string) *corev1.Secret {
 // ConfigMaps utils
 
 // GetConfigMap gets ConfigMap with specific name from the namespace
-func GetConfigMap(c clientset.Interface, namespace, name string) *corev1.ConfigMap {
+func GetConfigMap(c clientset.Interface, namespace, name string) *v1.ConfigMap {
 	r, err := c.CoreV1().
 		ConfigMaps(namespace).
 		Get(context.TODO(), name, metav1.GetOptions{})
@@ -149,12 +149,12 @@ func ExpectClusterRoleBindingWithSubjectAndRole(c clientset.Interface, name, sub
 }
 
 // ExpectSubjectHasAccessToResource expects that the subject has access to the target resource
-func ExpectSubjectHasAccessToResource(c clientset.Interface, subjectKind, subject string, resource *authv1.ResourceAttributes) {
-	var sar *authv1.SubjectAccessReview
+func ExpectSubjectHasAccessToResource(c clientset.Interface, subjectKind, subject string, resource *authorizationv1.ResourceAttributes) {
+	var sar *authorizationv1.SubjectAccessReview
 	switch subjectKind {
 	case rbacv1.GroupKind:
-		sar = &authv1.SubjectAccessReview{
-			Spec: authv1.SubjectAccessReviewSpec{
+		sar = &authorizationv1.SubjectAccessReview{
+			Spec: authorizationv1.SubjectAccessReviewSpec{
 				Groups:             []string{subject},
 				ResourceAttributes: resource,
 			},
@@ -162,8 +162,8 @@ func ExpectSubjectHasAccessToResource(c clientset.Interface, subjectKind, subjec
 	case rbacv1.UserKind:
 		fallthrough
 	case rbacv1.ServiceAccountKind:
-		sar = &authv1.SubjectAccessReview{
-			Spec: authv1.SubjectAccessReviewSpec{
+		sar = &authorizationv1.SubjectAccessReview{
+			Spec: authorizationv1.SubjectAccessReviewSpec{
 				User:               subject,
 				ResourceAttributes: resource,
 			},

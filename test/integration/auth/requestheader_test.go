@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	authnv1 "k8s.io/api/authentication/v1"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -109,12 +109,12 @@ func TestAuthnToKAS(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			selfInfo := &authnv1.SelfSubjectReview{}
+			selfInfo := &authenticationv1.SelfSubjectReview{}
 			err = extensionApiserverClient.AuthenticationV1().RESTClient().
 				Post().
 				Resource("selfsubjectreviews").
 				VersionedParams(&metav1.CreateOptions{}, scheme.ParameterCodec).
-				Body(&authnv1.SelfSubjectReview{}).
+				Body(&authenticationv1.SelfSubjectReview{}).
 				SetHeader("X-Remote-Uid", "test-uid").
 				SetHeader("X-Remote-User", "testuser").
 				SetHeader("X-Remote-Groups", "group1", "group2").

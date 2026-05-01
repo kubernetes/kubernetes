@@ -28,7 +28,7 @@ import (
 	"time"
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -266,7 +266,7 @@ func installWebhook(t *testing.T, clientConfig *rest.Config, addr string) error 
 	}
 
 	t.Logf("Waiting for webhook to be established...")
-	invalidNamespace := &corev1.Namespace{
+	invalidNamespace := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "validation-fail",
 			Labels: map[string]string{

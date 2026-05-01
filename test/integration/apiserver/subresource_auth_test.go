@@ -21,9 +21,9 @@ import (
 	"fmt"
 	"testing"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -52,19 +52,19 @@ func TestPodSubresourceAuth(t *testing.T) {
 	}
 
 	ns := "test-pod-subresource-auth"
-	if _, err := adminClientset.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{}); err != nil {
+	if _, err := adminClientset.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
-	sa := &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
+	sa := &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "default"}}
 	if _, err := adminClientset.CoreV1().ServiceAccounts(ns).Create(context.TODO(), sa, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
-	pod := &corev1.Pod{
+	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-pod"},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  "test-container",
 					Image: "test-image",
@@ -160,7 +160,7 @@ func TestPodSubresourceAuth(t *testing.T) {
 				SubResource(subresource).
 				Do(context.TODO()).
 				Error()
-			if !errors.IsForbidden(err) {
+			if !apierrors.IsForbidden(err) {
 				t.Errorf("expected forbidden error for user with only 'get' permissions, but got: %v", err)
 			}
 
@@ -177,7 +177,7 @@ func TestPodSubresourceAuth(t *testing.T) {
 			// server doesn't have a real Kubelet running for the pod, so the
 			// proxying/streaming connection ultimately fails after the authorization
 			// has already succeeded (hence "Bad Request" error).
-			if err != nil && !errors.IsBadRequest(err) {
+			if err != nil && !apierrors.IsBadRequest(err) {
 				t.Errorf("expected nil error for user with 'create' permissions, but got: %v", err)
 			}
 		})

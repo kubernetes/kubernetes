@@ -37,7 +37,7 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/protobuf/proto"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -199,12 +199,12 @@ resources:
 	t.Cleanup(test.cleanUp)
 
 	client := kubernetes.NewForConfigOrDie(test.kubeAPIServer.ClientConfig)
-	if _, err := client.CoreV1().Pods(testNamespace).Create(ctx, &corev1.Pod{
+	if _, err := client.CoreV1().Pods(testNamespace).Create(ctx, &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test",
 		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  "busybox",
 					Image: "busybox",
@@ -742,12 +742,12 @@ resources:
 	const podCount = 1_000
 
 	for i := range podCount {
-		if _, err := client.CoreV1().Pods(testNamespace).Create(ctx, &corev1.Pod{
+		if _, err := client.CoreV1().Pods(testNamespace).Create(ctx, &v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("dek-reuse-%04d", i+1), // making creation order match returned list order / nonce counter
 			},
-			Spec: corev1.PodSpec{
-				Containers: []corev1.Container{
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
 					{
 						Name:  "busybox",
 						Image: "busybox",
@@ -1253,7 +1253,7 @@ func getRESTOptionsGetterForSecrets(t testing.TB, test *transformTest) generic.R
 
 func noValidation(_ context.Context, _ runtime.Object) error { return nil }
 
-var benchRESTSecret *corev1.Secret
+var benchRESTSecret *v1.Secret
 
 func BenchmarkKMSv2REST(b *testing.B) {
 	b.StopTimer()
@@ -1292,10 +1292,10 @@ resources:
 
 	secretStorage := client.CoreV1().Secrets(testNamespace)
 
-	secrets := make([]*corev1.Secret, dataLen)
+	secrets := make([]*v1.Secret, dataLen)
 
 	for i := range dataLen {
-		secrets[i] = &corev1.Secret{
+		secrets[i] = &v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("test-secret-%d", i),
 				Namespace: testNamespace,
@@ -1455,8 +1455,8 @@ resources:
 	dekSourceAESGCMKeyTime := metav1.NewTime(time.Date(2023, 9, 1, 11, 56, 49, 0, time.FixedZone("EDT", -4*60*60)))
 	dekSourceHKDFSHA256XNonceAESGCMSeedTime := metav1.NewTime(time.Date(2023, 9, 1, 10, 23, 13, 0, time.FixedZone("EDT", -4*60*60)))
 
-	expectedLegacySecrets := &corev1.SecretList{
-		Items: []corev1.Secret{
+	expectedLegacySecrets := &v1.SecretList{
+		Items: []v1.Secret{
 			{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:              dekSourceAESGCMKeyName,
@@ -1477,7 +1477,7 @@ resources:
 				Data: map[string][]byte{
 					secretKey: []byte(secretVal),
 				},
-				Type: corev1.SecretTypeOpaque,
+				Type: v1.SecretTypeOpaque,
 			},
 			{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1499,14 +1499,14 @@ resources:
 				Data: map[string][]byte{
 					secretKey: []byte(secretVal),
 				},
-				Type: corev1.SecretTypeOpaque,
+				Type: v1.SecretTypeOpaque,
 			},
 		},
 	}
 
 	if diff := cmp.Diff(expectedLegacySecrets, legacySecrets,
 		// resource version is set after decoding based on etcd state - it is not stored in the etcd value
-		cmpopts.IgnoreFields(corev1.Secret{}, "ResourceVersion"),
+		cmpopts.IgnoreFields(v1.Secret{}, "ResourceVersion"),
 		cmpopts.IgnoreFields(metav1.ListMeta{}, "ResourceVersion"),
 	); len(diff) > 0 {
 		t.Errorf("kms v2 legacy secret data diff (-want, +got):\n%s", diff)

@@ -34,7 +34,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/remotecommand"
@@ -85,22 +85,22 @@ func TestPortforward(t *testing.T) {
 	adminClient, err := kubernetes.NewForConfig(server.ClientConfig)
 	require.NoError(t, err)
 
-	node := &corev1.Node{
+	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: "mynode"},
-		Status: corev1.NodeStatus{
-			DaemonEndpoints: corev1.NodeDaemonEndpoints{KubeletEndpoint: corev1.DaemonEndpoint{Port: int32(backendPort)}},
-			Addresses:       []corev1.NodeAddress{{Type: corev1.NodeInternalIP, Address: backendHost}},
+		Status: v1.NodeStatus{
+			DaemonEndpoints: v1.NodeDaemonEndpoints{KubeletEndpoint: v1.DaemonEndpoint{Port: int32(backendPort)}},
+			Addresses:       []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: backendHost}},
 		},
 	}
 	if _, err := adminClient.CoreV1().Nodes().Create(context.Background(), node, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
-	pod := &corev1.Pod{
+	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "mypod"},
-		Spec: corev1.PodSpec{
+		Spec: v1.PodSpec{
 			NodeName:   "mynode",
-			Containers: []corev1.Container{{Name: "test", Image: "test"}},
+			Containers: []v1.Container{{Name: "test", Image: "test"}},
 		},
 	}
 	if _, err := adminClient.CoreV1().Pods("default").Create(context.Background(), pod, metav1.CreateOptions{}); err != nil {

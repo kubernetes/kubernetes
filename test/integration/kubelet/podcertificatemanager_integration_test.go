@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	certsv1beta1 "k8s.io/api/certificates/v1beta1"
-	corev1 "k8s.io/api/core/v1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -57,7 +57,7 @@ func TestPodCertificateManager(t *testing.T) {
 		[]string{
 			"--authorization-mode=Node,RBAC",
 			"--feature-gates=PodCertificateRequest=true",
-			fmt.Sprintf("--runtime-config=%s=true", certsv1beta1.SchemeGroupVersion),
+			fmt.Sprintf("--runtime-config=%s=true", certificatesv1beta1.SchemeGroupVersion),
 		},
 		framework.SharedEtcd(),
 	)
@@ -73,7 +73,7 @@ func TestPodCertificateManager(t *testing.T) {
 
 	signerName := "foo.com/signer"
 
-	signerSA, err := adminClient.CoreV1().ServiceAccounts("kube-system").Create(ctx, &corev1.ServiceAccount{
+	signerSA, err := adminClient.CoreV1().ServiceAccounts("kube-system").Create(ctx, &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "kube-system",
 			Name:      "foo-pcr-signing-controller",
@@ -143,7 +143,7 @@ func TestPodCertificateManager(t *testing.T) {
 	// Configure and boot up enough Kubelet subsystems to run
 	// podcertificate.IssuingManager.
 	//
-	node1, err := adminClient.CoreV1().Nodes().Create(ctx, &corev1.Node{
+	node1, err := adminClient.CoreV1().Nodes().Create(ctx, &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node1",
 		},
@@ -186,7 +186,7 @@ func TestPodCertificateManager(t *testing.T) {
 	// Make a pod that uses a podcertificate volume.
 	//
 
-	workloadNS, err := adminClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+	workloadNS, err := adminClient.CoreV1().Namespaces().Create(ctx, &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "workload-ns",
 		},
@@ -195,7 +195,7 @@ func TestPodCertificateManager(t *testing.T) {
 		t.Fatalf("Unexpected error creating workload namespace: %v", err)
 	}
 
-	workloadSA, err := adminClient.CoreV1().ServiceAccounts(workloadNS.ObjectMeta.Name).Create(ctx, &corev1.ServiceAccount{
+	workloadSA, err := adminClient.CoreV1().ServiceAccounts(workloadNS.ObjectMeta.Name).Create(ctx, &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: workloadNS.ObjectMeta.Name,
 			Name:      "workload",
@@ -205,19 +205,19 @@ func TestPodCertificateManager(t *testing.T) {
 		t.Fatalf("Unexpected error creating workload serviceaccount: %v", err)
 	}
 
-	workloadPod, err := adminClient.CoreV1().Pods(workloadNS.ObjectMeta.Name).Create(ctx, &corev1.Pod{
+	workloadPod, err := adminClient.CoreV1().Pods(workloadNS.ObjectMeta.Name).Create(ctx, &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: workloadNS.ObjectMeta.Name,
 			Name:      "workload",
 		},
-		Spec: corev1.PodSpec{
+		Spec: v1.PodSpec{
 			ServiceAccountName: workloadSA.ObjectMeta.Name,
 			NodeName:           node1.ObjectMeta.Name,
-			Containers: []corev1.Container{
+			Containers: []v1.Container{
 				{
 					Name:  "main",
 					Image: "notarealimage",
-					VolumeMounts: []corev1.VolumeMount{
+					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      "certificate",
 							MountPath: "/run/foo-cert",
@@ -225,14 +225,14 @@ func TestPodCertificateManager(t *testing.T) {
 					},
 				},
 			},
-			Volumes: []corev1.Volume{
+			Volumes: []v1.Volume{
 				{
 					Name: "certificate",
-					VolumeSource: corev1.VolumeSource{
-						Projected: &corev1.ProjectedVolumeSource{
-							Sources: []corev1.VolumeProjection{
+					VolumeSource: v1.VolumeSource{
+						Projected: &v1.ProjectedVolumeSource{
+							Sources: []v1.VolumeProjection{
 								{
-									PodCertificate: &corev1.PodCertificateProjection{
+									PodCertificate: &v1.PodCertificateProjection{
 										SignerName:           signerName,
 										KeyType:              "ED25519",
 										CredentialBundlePath: "creds.pem",
@@ -264,7 +264,7 @@ func TestPodCertificateManager(t *testing.T) {
 
 	// Within a few seconds, we should see a PodCertificateRequest created for
 	// this pod.
-	var gotPCR *certsv1beta1.PodCertificateRequest
+	var gotPCR *certificatesv1beta1.PodCertificateRequest
 	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
 		pcrs, err := adminClient.CertificatesV1beta1().PodCertificateRequests(workloadNS.ObjectMeta.Name).List(ctx, metav1.ListOptions{})
 		if err != nil {
@@ -285,11 +285,11 @@ func TestPodCertificateManager(t *testing.T) {
 	// Check that the created PCR spec matches expectations.  Blank out fields on
 	// gotPCR that we don't care about.  Blank out status, because the
 	// controller might have already signed it.
-	wantPCR := &certsv1beta1.PodCertificateRequest{
+	wantPCR := &certificatesv1beta1.PodCertificateRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: workloadNS.ObjectMeta.Name,
 		},
-		Spec: certsv1beta1.PodCertificateRequestSpec{
+		Spec: certificatesv1beta1.PodCertificateRequestSpec{
 			SignerName:                workloadPod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].PodCertificate.SignerName,
 			PodName:                   workloadPod.ObjectMeta.Name,
 			PodUID:                    workloadPod.ObjectMeta.UID,
@@ -307,7 +307,7 @@ func TestPodCertificateManager(t *testing.T) {
 	gotPCRClone.Spec.PKIXPublicKey = nil
 	gotPCRClone.Spec.ProofOfPossession = nil
 	gotPCRClone.Spec.StubPKCS10Request = nil
-	gotPCRClone.Status = certsv1beta1.PodCertificateRequestStatus{}
+	gotPCRClone.Status = certificatesv1beta1.PodCertificateRequestStatus{}
 	if diff := cmp.Diff(gotPCRClone, wantPCR); diff != "" {
 		t.Fatalf("PodCertificateManager created a bad PCR; diff (-got +want)\n%s", diff)
 	}
@@ -327,9 +327,9 @@ func TestPodCertificateManager(t *testing.T) {
 
 		for _, cond := range gotPCR.Status.Conditions {
 			switch cond.Type {
-			case certsv1beta1.PodCertificateRequestConditionTypeDenied,
-				certsv1beta1.PodCertificateRequestConditionTypeFailed,
-				certsv1beta1.PodCertificateRequestConditionTypeIssued:
+			case certificatesv1beta1.PodCertificateRequestConditionTypeDenied,
+				certificatesv1beta1.PodCertificateRequestConditionTypeFailed,
+				certificatesv1beta1.PodCertificateRequestConditionTypeIssued:
 				return true, nil
 			}
 		}
@@ -340,7 +340,7 @@ func TestPodCertificateManager(t *testing.T) {
 	}
 
 	isIssued := slices.ContainsFunc(gotPCR.Status.Conditions, func(cond metav1.Condition) bool {
-		return cond.Type == certsv1beta1.PodCertificateRequestConditionTypeIssued
+		return cond.Type == certificatesv1beta1.PodCertificateRequestConditionTypeIssued
 	})
 	if !isIssued {
 		t.Fatalf("The test signingController didn't issue the PCR:\n%+v", gotPCR)
@@ -385,12 +385,12 @@ type FakePodManager struct {
 	podLister corelistersv1.PodLister
 }
 
-func (f *FakePodManager) GetPods() []*corev1.Pod {
+func (f *FakePodManager) GetPods() []*v1.Pod {
 	ret, _ := f.podLister.List(labels.Everything())
 	return ret
 }
 
-func (f *FakePodManager) GetPodByUID(uid types.UID) (*corev1.Pod, bool) {
+func (f *FakePodManager) GetPodByUID(uid types.UID) (*v1.Pod, bool) {
 	list, err := f.podLister.List(labels.Everything())
 	if err != nil {
 		return nil, false

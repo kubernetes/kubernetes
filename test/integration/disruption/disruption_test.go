@@ -30,7 +30,7 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
-	"k8s.io/api/policy/v1beta1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
@@ -212,11 +212,11 @@ func TestEmptySelector(t *testing.T) {
 		{
 			name: "v1beta1 should not target any pods",
 			createPDBFunc: func(ctx context.Context, clientSet clientset.Interface, etcdClient *clientv3.Client, etcdStoragePrefix, name, nsName string, minAvailable intstr.IntOrString) error {
-				pdb := &v1beta1.PodDisruptionBudget{
+				pdb := &policyv1beta1.PodDisruptionBudget{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: name,
 					},
-					Spec: v1beta1.PodDisruptionBudgetSpec{
+					Spec: policyv1beta1.PodDisruptionBudgetSpec{
 						MinAvailable: &minAvailable,
 						Selector:     &metav1.LabelSelector{},
 					},
@@ -336,11 +336,11 @@ func TestSelectorsForPodsWithoutLabels(t *testing.T) {
 		{
 			name: "pods with no labels can be targeted by v1beta1 PDBs with DoesNotExist selector",
 			createPDBFunc: func(ctx context.Context, clientSet clientset.Interface, etcdClient *clientv3.Client, etcdStoragePrefix, name, nsName string, minAvailable intstr.IntOrString) error {
-				pdb := &v1beta1.PodDisruptionBudget{
+				pdb := &policyv1beta1.PodDisruptionBudget{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: name,
 					},
-					Spec: v1beta1.PodDisruptionBudgetSpec{
+					Spec: policyv1beta1.PodDisruptionBudgetSpec{
 						MinAvailable: &minAvailable,
 						Selector: &metav1.LabelSelector{
 							MatchExpressions: []metav1.LabelSelectorRequirement{
@@ -515,8 +515,8 @@ func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podN
 // createPDBUsingRemovedAPI creates a PDB directly using etcd.  This is must *ONLY* be used for checks of compatibility
 // with removed data. Do not use this just because you don't want to update your test to use v1.  Only use this
 // when it actually matters.
-func createPDBUsingRemovedAPI(ctx context.Context, etcdClient *clientv3.Client, etcdStoragePrefix, nsName string, betaPDB *v1beta1.PodDisruptionBudget) error {
-	betaPDB.APIVersion = v1beta1.SchemeGroupVersion.Group + "/" + v1beta1.SchemeGroupVersion.Version
+func createPDBUsingRemovedAPI(ctx context.Context, etcdClient *clientv3.Client, etcdStoragePrefix, nsName string, betaPDB *policyv1beta1.PodDisruptionBudget) error {
+	betaPDB.APIVersion = policyv1beta1.SchemeGroupVersion.Group + "/" + policyv1beta1.SchemeGroupVersion.Version
 	betaPDB.Kind = "PodDisruptionBudget"
 	betaPDB.Namespace = nsName
 	betaPDB.Generation = 1

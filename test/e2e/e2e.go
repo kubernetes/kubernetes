@@ -40,7 +40,7 @@ import (
 	"k8s.io/component-base/version"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/daemonset"
+	e2edaemonset "k8s.io/kubernetes/test/e2e/framework/daemonset"
 	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -396,7 +396,7 @@ func prepullImages(ctx context.Context, c clientset.Interface) {
 	for _, img := range images.List() {
 		dsName := fmt.Sprintf("img-pull-%s", strings.ReplaceAll(strings.ReplaceAll(img, "/", "-"), ":", "-"))
 
-		dsSpec := daemonset.NewDaemonSet(dsName, img, label, nil, nil, nil)
+		dsSpec := e2edaemonset.NewDaemonSet(dsName, img, label, nil, nil, nil)
 		ds, err := c.AppsV1().DaemonSets(ns).Create(ctx, dsSpec, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		imgPullers = append(imgPullers, ds)
@@ -409,7 +409,7 @@ func prepullImages(ctx context.Context, c clientset.Interface) {
 
 	for _, imgPuller := range imgPullers {
 		checkDaemonset := func(ctx context.Context) (bool, error) {
-			return daemonset.CheckPresentOnNodes(ctx, c, imgPuller, ns, framework.TestContext.CloudConfig.NumNodes)
+			return e2edaemonset.CheckPresentOnNodes(ctx, c, imgPuller, ns, framework.TestContext.CloudConfig.NumNodes)
 		}
 		framework.Logf("Waiting for %s", imgPuller.Name)
 		err := wait.PollUntilContextTimeout(ctx, dsRetryPeriod, dsRetryTimeout, true, checkDaemonset)

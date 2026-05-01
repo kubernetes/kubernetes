@@ -22,8 +22,8 @@ import (
 	"testing"
 
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
-	"k8s.io/api/admission/v1"
-	corev1 "k8s.io/api/core/v1"
+	admissionv1 "k8s.io/api/admission/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -53,12 +53,12 @@ func TestAddLabel(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			request := corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Labels: tc.initialLabels}}
+			request := v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Labels: tc.initialLabels}}
 			raw, err := json.Marshal(request)
 			if err != nil {
 				t.Fatal(err)
 			}
-			review := v1.AdmissionReview{Request: &v1.AdmissionRequest{Object: runtime.RawExtension{Raw: raw}}}
+			review := admissionv1.AdmissionReview{Request: &admissionv1.AdmissionRequest{Object: runtime.RawExtension{Raw: raw}}}
 			response := addLabel(review)
 			if response.Patch != nil {
 				patchObj, err := jsonpatch.DecodePatch(response.Patch)
@@ -77,7 +77,7 @@ func TestAddLabel(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			actual := objTest.(*corev1.ConfigMap)
+			actual := objTest.(*v1.ConfigMap)
 			if !reflect.DeepEqual(actual.Labels, tc.expectedLabels) {
 				t.Errorf("\nexpected %#v, got %#v, patch: %v", actual.Labels, tc.expectedLabels, string(response.Patch))
 			}

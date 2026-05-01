@@ -25,7 +25,7 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -70,7 +70,7 @@ func (w *wrappedStorageVersionManager) Completed() bool {
 
 func assertBlocking(name string, t *testing.T, err error, shouldBlock bool) {
 	if shouldBlock {
-		if err == nil || !errors.IsServiceUnavailable(err) {
+		if err == nil || !apierrors.IsServiceUnavailable(err) {
 			t.Fatalf("%q should be rejected with service unavailable error, got %v", name, err)
 		}
 	} else {

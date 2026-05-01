@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"time"
 
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -84,7 +84,7 @@ func CreateRCWithRetries(c clientset.Interface, namespace string, obj *v1.Replic
 	return RetryWithExponentialBackOff(createFunc)
 }
 
-func CreateReplicaSetWithRetries(c clientset.Interface, namespace string, obj *apps.ReplicaSet) error {
+func CreateReplicaSetWithRetries(c clientset.Interface, namespace string, obj *appsv1.ReplicaSet) error {
 	if obj == nil {
 		return fmt.Errorf("object provided to create is empty")
 	}
@@ -101,7 +101,7 @@ func CreateReplicaSetWithRetries(c clientset.Interface, namespace string, obj *a
 	return RetryWithExponentialBackOff(createFunc)
 }
 
-func CreateDeploymentWithRetries(c clientset.Interface, namespace string, obj *apps.Deployment) error {
+func CreateDeploymentWithRetries(c clientset.Interface, namespace string, obj *appsv1.Deployment) error {
 	if obj == nil {
 		return fmt.Errorf("object provided to create is empty")
 	}

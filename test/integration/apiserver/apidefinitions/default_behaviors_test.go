@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -60,7 +60,7 @@ func TestAllowCreateOnUpdate(t *testing.T) {
 		obj.SetResourceVersion("")
 		obj.SetUID("")
 		_, err := client.Update(context.TODO(), obj, metav1.UpdateOptions{})
-		assertDefault(t, api.Mapping.Resource, "AllowCreateOnUpdate must be false", errors.IsNotFound(err), exempt)
+		assertDefault(t, api.Mapping.Resource, "AllowCreateOnUpdate must be false", apierrors.IsNotFound(err), exempt)
 	})
 }
 
@@ -183,7 +183,7 @@ func TestAllowUnconditionalUpdate(t *testing.T) {
 		created.SetResourceVersion("")
 		_, err = client.Update(context.TODO(), created, metav1.UpdateOptions{})
 
-		assertDefault(t, api.Mapping.Resource, "AllowUnconditionalUpdate must be false", errors.IsConflict(err), exempt)
+		assertDefault(t, api.Mapping.Resource, "AllowUnconditionalUpdate must be false", apierrors.IsConflict(err), exempt)
 	})
 }
 

@@ -20,7 +20,7 @@ import (
 	"context"
 
 	yaml "go.yaml.in/yaml/v2"
-	authv1 "k8s.io/api/authorization/v1"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -38,7 +38,7 @@ const (
 )
 
 var (
-	kubeadmConfigConfigMapResource = &authv1.ResourceAttributes{
+	kubeadmConfigConfigMapResource = &authorizationv1.ResourceAttributes{
 		Namespace: kubeSystemNamespace,
 		Name:      kubeadmConfigName,
 		Resource:  "configmaps",

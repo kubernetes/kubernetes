@@ -34,8 +34,8 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -83,8 +83,8 @@ type transformTest struct {
 	transformerConfig string
 	kubeAPIServer     kubeapiservertesting.TestServer
 	restClient        *kubernetes.Clientset
-	ns                *corev1.Namespace
-	secret            *corev1.Secret
+	ns                *v1.Namespace
+	secret            *v1.Secret
 }
 
 type transformTestConfig struct {
@@ -326,15 +326,15 @@ func (e *transformTest) getEncryptionConfig() (*apiserverv1.ProviderConfiguratio
 	return &config.Resources[0].Providers[0], nil
 }
 
-func (e *transformTest) createNamespace(name string) (*corev1.Namespace, error) {
-	ns := &corev1.Namespace{
+func (e *transformTest) createNamespace(name string) (*v1.Namespace, error) {
+	ns := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 	}
 
 	if _, err := e.restClient.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{}); err != nil {
-		if errors.IsAlreadyExists(err) {
+		if apierrors.IsAlreadyExists(err) {
 			existingNs, err := e.restClient.CoreV1().Namespaces().Get(context.TODO(), name, metav1.GetOptions{})
 			if err != nil {
 				return nil, fmt.Errorf("unable to get testing namespace, err: [%v]", err)
@@ -347,8 +347,8 @@ func (e *transformTest) createNamespace(name string) (*corev1.Namespace, error) 
 	return ns, nil
 }
 
-func (e *transformTest) createSecret(name, namespace string) (*corev1.Secret, error) {
-	secret := &corev1.Secret{
+func (e *transformTest) createSecret(name, namespace string) (*v1.Secret, error) {
+	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -364,8 +364,8 @@ func (e *transformTest) createSecret(name, namespace string) (*corev1.Secret, er
 	return secret, nil
 }
 
-func (e *transformTest) createConfigMap(name, namespace string) (*corev1.ConfigMap, error) {
-	cm := &corev1.ConfigMap{
+func (e *transformTest) createConfigMap(name, namespace string) (*v1.ConfigMap, error) {
+	cm := &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
@@ -389,15 +389,15 @@ func (e *transformTest) createJob(name, namespace string) (*batchv1.Job, error) 
 			Namespace: namespace,
 		},
 		Spec: batchv1.JobSpec{
-			Template: corev1.PodTemplateSpec{
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
+			Template: v1.PodTemplateSpec{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Name:  "test",
 							Image: "test",
 						},
 					},
-					RestartPolicy: corev1.RestartPolicyNever,
+					RestartPolicy: v1.RestartPolicyNever,
 				},
 			},
 		},
@@ -423,21 +423,21 @@ func (e *transformTest) createDeployment(name, namespace string) (*appsv1.Deploy
 					"app": "nginx",
 				},
 			},
-			Template: corev1.PodTemplateSpec{
+			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"app": "nginx",
 					},
 				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Name:  "nginx",
 							Image: "nginx:1.17",
-							Ports: []corev1.ContainerPort{
+							Ports: []v1.ContainerPort{
 								{
 									Name:          "http",
-									Protocol:      corev1.ProtocolTCP,
+									Protocol:      v1.ProtocolTCP,
 									ContainerPort: 80,
 								},
 							},

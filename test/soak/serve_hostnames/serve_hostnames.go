@@ -39,7 +39,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/test/e2e/framework/service"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"k8s.io/klog/v2"
@@ -263,7 +263,7 @@ func main() {
 		klog.Warningf("Failed to build restclient: %v", err)
 		return
 	}
-	proxyRequest, errProxy := service.GetServicesProxyRequest(client, rclient.Get())
+	proxyRequest, errProxy := e2eservice.GetServicesProxyRequest(client, rclient.Get())
 	if errProxy != nil {
 		klog.Warningf("Get services proxy request failed: %v", errProxy)
 		return

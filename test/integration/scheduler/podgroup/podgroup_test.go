@@ -24,7 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -137,7 +137,7 @@ func TestPodGroupScheduling(t *testing.T) {
 	// step represents a single step in a test scenario.
 	type step struct {
 		name                         string
-		createPodGroup               *schedulingapi.PodGroup
+		createPodGroup               *schedulingv1alpha2.PodGroup
 		createPods                   []*v1.Pod
 		deletePods                   []string
 		waitForPodsGatedOnPreEnqueue []string
@@ -236,7 +236,7 @@ func TestPodGroupScheduling(t *testing.T) {
 					waitForPodGroupCondition: &podGroupConditionCheck{
 						podGroupName:    "pg1",
 						conditionStatus: metav1.ConditionFalse,
-						reason:          schedulingapi.PodGroupReasonUnschedulable,
+						reason:          schedulingv1alpha2.PodGroupReasonUnschedulable,
 					},
 				},
 				{
@@ -646,7 +646,7 @@ func TestPodGroupScheduling(t *testing.T) {
 					t.Fatalf("Failed to create node: %v", err)
 				}
 
-				for _, w := range []*schedulingapi.Workload{workload, otherWorkload} {
+				for _, w := range []*schedulingv1alpha2.Workload{workload, otherWorkload} {
 					wCopy := w.DeepCopy()
 					wCopy.Namespace = ns
 					if _, err := cs.SchedulingV1alpha2().Workloads(ns).Create(testCtx.Ctx, wCopy, metav1.CreateOptions{}); err != nil {
@@ -779,7 +779,7 @@ func podGroupHasScheduledCondition(cs kubernetes.Interface, ns, name string, sta
 			return false, err
 		}
 		for _, c := range pg.Status.Conditions {
-			if c.Type == schedulingapi.PodGroupScheduled &&
+			if c.Type == schedulingv1alpha2.PodGroupScheduled &&
 				c.Status == status && c.Reason == reason {
 				return true, nil
 			}
@@ -799,7 +799,7 @@ func TestWorkloadAwarePreemptionInvocation(t *testing.T) {
 
 	workload := st.MakeWorkload().Name("workload").PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(3).Obj()).Obj()
 	pg := st.MakePodGroup().Namespace("default").Name("pg1").TemplateRef("t1", "workload").
-		DisruptionMode(schedulingapi.DisruptionModePodGroup).Priority(100).MinCount(3).Obj()
+		DisruptionMode(schedulingv1alpha2.DisruptionModePodGroup).Priority(100).MinCount(3).Obj()
 
 	// Low priority pods taking up all resources
 	lowPods := []*v1.Pod{
@@ -910,7 +910,7 @@ func TestPostFilterInvocationCount(t *testing.T) {
 
 	workload := st.MakeWorkload().Name("workload").PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(3).Obj()).Obj()
 	pg := st.MakePodGroup().Namespace("default").Name("pg1").TemplateRef("t1", "workload").
-		DisruptionMode(schedulingapi.DisruptionModePodGroup).Priority(100).MinCount(3).Obj()
+		DisruptionMode(schedulingv1alpha2.DisruptionModePodGroup).Priority(100).MinCount(3).Obj()
 
 	// Low priority pods taking up all resources
 	lowPods := []*v1.Pod{

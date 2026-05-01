@@ -32,7 +32,7 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -114,8 +114,8 @@ func TestMatchConditions(t *testing.T) {
 	testcases := []struct {
 		name            string
 		matchConditions []admissionregistrationv1.MatchCondition
-		pods            []*corev1.Pod
-		matchedPods     []*corev1.Pod
+		pods            []*v1.Pod
+		matchedPods     []*v1.Pod
 		expectErrorPod  bool
 		failPolicy      *admissionregistrationv1.FailurePolicyType
 		errMessage      string
@@ -128,11 +128,11 @@ func TestMatchConditions(t *testing.T) {
 					Expression: "object.metadata.namespace != 'kube-system'",
 				},
 			},
-			pods: []*corev1.Pod{
+			pods: []*v1.Pod{
 				matchConditionsTestPod("test1", "kube-system"),
 				matchConditionsTestPod("test2", "default"),
 			},
-			matchedPods: []*corev1.Pod{
+			matchedPods: []*v1.Pod{
 				matchConditionsTestPod("test2", "default"),
 			},
 		},
@@ -148,12 +148,12 @@ func TestMatchConditions(t *testing.T) {
 					Expression: "object.metadata.name == 'test1'",
 				},
 			},
-			pods: []*corev1.Pod{
+			pods: []*v1.Pod{
 				matchConditionsTestPod("test1", "kube-system"),
 				matchConditionsTestPod("test1", "default"),
 				matchConditionsTestPod("test2", "default"),
 			},
-			matchedPods: []*corev1.Pod{
+			matchedPods: []*v1.Pod{
 				matchConditionsTestPod("test1", "default"),
 			},
 		},
@@ -181,11 +181,11 @@ func TestMatchConditions(t *testing.T) {
 					Expression: "object.nonExistentProperty == 'someval'",
 				},
 			},
-			pods: []*corev1.Pod{
+			pods: []*v1.Pod{
 				matchConditionsTestPod("test1", "kube-system"),
 				matchConditionsTestPod("test2", "default"),
 			},
-			matchedPods:    []*corev1.Pod{},
+			matchedPods:    []*v1.Pod{},
 			expectErrorPod: false,
 		},
 		{
@@ -208,11 +208,11 @@ func TestMatchConditions(t *testing.T) {
 					Expression: "object.nonExistentProperty == 'someval'",
 				},
 			},
-			pods: []*corev1.Pod{
+			pods: []*v1.Pod{
 				matchConditionsTestPod("test1", "kube-system"),
 				matchConditionsTestPod("test2", "default"),
 			},
-			matchedPods:    []*corev1.Pod{},
+			matchedPods:    []*v1.Pod{},
 			expectErrorPod: true,
 		},
 		{
@@ -235,11 +235,11 @@ func TestMatchConditions(t *testing.T) {
 					Expression: "object.nonExistentProperty == 'someval'",
 				},
 			},
-			pods: []*corev1.Pod{
+			pods: []*v1.Pod{
 				matchConditionsTestPod("test1", "kube-system"),
 				matchConditionsTestPod("test2", "default"),
 			},
-			matchedPods:    []*corev1.Pod{},
+			matchedPods:    []*v1.Pod{},
 			failPolicy:     &fail,
 			expectErrorPod: true,
 		},
@@ -263,11 +263,11 @@ func TestMatchConditions(t *testing.T) {
 					Expression: "object.nonExistentProperty == 'someval'",
 				},
 			},
-			pods: []*corev1.Pod{
+			pods: []*v1.Pod{
 				matchConditionsTestPod("test1", "kube-system"),
 				matchConditionsTestPod("test2", "default"),
 			},
-			matchedPods: []*corev1.Pod{},
+			matchedPods: []*v1.Pod{},
 			failPolicy:  &ignore,
 		},
 		{
@@ -278,10 +278,10 @@ func TestMatchConditions(t *testing.T) {
 					Expression: "oldObject == null",
 				},
 			},
-			pods: []*corev1.Pod{
+			pods: []*v1.Pod{
 				matchConditionsTestPod("test2", "default"),
 			},
-			matchedPods: []*corev1.Pod{
+			matchedPods: []*v1.Pod{
 				matchConditionsTestPod("test2", "default"),
 			},
 		},
@@ -331,7 +331,7 @@ func TestMatchConditions(t *testing.T) {
 
 			// Write markers to a separate namespace to avoid cross-talk
 			markerNs := "marker"
-			_, err = client.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: markerNs}}, metav1.CreateOptions{})
+			_, err = client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: markerNs}}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -367,7 +367,7 @@ func TestMatchConditions(t *testing.T) {
 						NamespaceSelector: &metav1.LabelSelector{
 							MatchExpressions: []metav1.LabelSelectorRequirement{
 								{
-									Key:      corev1.LabelMetadataName,
+									Key:      v1.LabelMetadataName,
 									Operator: metav1.LabelSelectorOpNotIn,
 									Values:   []string{"marker"},
 								},
@@ -388,7 +388,7 @@ func TestMatchConditions(t *testing.T) {
 							CABundle: localhostCert,
 						},
 						NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{
-							corev1.LabelMetadataName: "marker",
+							v1.LabelMetadataName: "marker",
 						}},
 						ObjectSelector:          &metav1.LabelSelector{MatchLabels: map[string]string{"marker": "true"}},
 						FailurePolicy:           testcase.failPolicy,
@@ -484,7 +484,7 @@ func TestMatchConditions(t *testing.T) {
 						NamespaceSelector: &metav1.LabelSelector{
 							MatchExpressions: []metav1.LabelSelectorRequirement{
 								{
-									Key:      corev1.LabelMetadataName,
+									Key:      v1.LabelMetadataName,
 									Operator: metav1.LabelSelectorOpNotIn,
 									Values:   []string{"marker"},
 								},
@@ -505,7 +505,7 @@ func TestMatchConditions(t *testing.T) {
 							CABundle: localhostCert,
 						},
 						NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{
-							corev1.LabelMetadataName: "marker",
+							v1.LabelMetadataName: "marker",
 						}},
 						ObjectSelector:          &metav1.LabelSelector{MatchLabels: map[string]string{"marker": "true"}},
 						FailurePolicy:           testcase.failPolicy,
@@ -569,8 +569,8 @@ func TestMatchConditionsWithStrictCostEnforcement(t *testing.T) {
 	testcases := []struct {
 		name            string
 		matchConditions []admissionregistrationv1.MatchCondition
-		pods            []*corev1.Pod
-		matchedPods     []*corev1.Pod
+		pods            []*v1.Pod
+		matchedPods     []*v1.Pod
 		expectErrorPod  bool
 		failPolicy      *admissionregistrationv1.FailurePolicyType
 		errMessage      string
@@ -583,20 +583,20 @@ func TestMatchConditionsWithStrictCostEnforcement(t *testing.T) {
 					Expression: "authorizer.group('').resource('pods').namespace('default').check('create').allowed() && authorizer.group('').resource('pods').namespace('default').check('create').allowed() && authorizer.group('').resource('pods').namespace('default').check('create').allowed()",
 				},
 			},
-			pods: []*corev1.Pod{
+			pods: []*v1.Pod{
 				matchConditionsTestPod("test1", "default"),
 			},
-			matchedPods:    []*corev1.Pod{},
+			matchedPods:    []*v1.Pod{},
 			expectErrorPod: true,
 			errMessage:     "operation cancelled: actual cost limit exceeded",
 		},
 		{
 			name:            "with strict cost enforcement: exceed overall cost limit should reject request with fail policy fail",
 			matchConditions: generateMatchConditionsWithAuthzCheck(8, "authorizer.group('').resource('pods').name('test1').check('create').allowed() && authorizer.group('').resource('pods').name('test1').check('create').allowed()"),
-			pods: []*corev1.Pod{
+			pods: []*v1.Pod{
 				matchConditionsTestPod("test1", "kube-system"),
 			},
-			matchedPods:    []*corev1.Pod{},
+			matchedPods:    []*v1.Pod{},
 			expectErrorPod: true,
 			errMessage:     "validation failed due to running out of cost budget, no further validation rules will be run",
 		},
@@ -645,7 +645,7 @@ func TestMatchConditionsWithStrictCostEnforcement(t *testing.T) {
 
 			// Write markers to a separate namespace to avoid cross-talk
 			markerNs := "marker"
-			_, err = client.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: markerNs}}, metav1.CreateOptions{})
+			_, err = client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: markerNs}}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -681,7 +681,7 @@ func TestMatchConditionsWithStrictCostEnforcement(t *testing.T) {
 						NamespaceSelector: &metav1.LabelSelector{
 							MatchExpressions: []metav1.LabelSelectorRequirement{
 								{
-									Key:      corev1.LabelMetadataName,
+									Key:      v1.LabelMetadataName,
 									Operator: metav1.LabelSelectorOpNotIn,
 									Values:   []string{"marker"},
 								},
@@ -702,7 +702,7 @@ func TestMatchConditionsWithStrictCostEnforcement(t *testing.T) {
 							CABundle: localhostCert,
 						},
 						NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{
-							corev1.LabelMetadataName: "marker",
+							v1.LabelMetadataName: "marker",
 						}},
 						ObjectSelector:          &metav1.LabelSelector{MatchLabels: map[string]string{"marker": "true"}},
 						FailurePolicy:           testcase.failPolicy,
@@ -798,7 +798,7 @@ func TestMatchConditionsWithStrictCostEnforcement(t *testing.T) {
 						NamespaceSelector: &metav1.LabelSelector{
 							MatchExpressions: []metav1.LabelSelectorRequirement{
 								{
-									Key:      corev1.LabelMetadataName,
+									Key:      v1.LabelMetadataName,
 									Operator: metav1.LabelSelectorOpNotIn,
 									Values:   []string{"marker"},
 								},
@@ -819,7 +819,7 @@ func TestMatchConditionsWithStrictCostEnforcement(t *testing.T) {
 							CABundle: localhostCert,
 						},
 						NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{
-							corev1.LabelMetadataName: "marker",
+							v1.LabelMetadataName: "marker",
 						}},
 						ObjectSelector:          &metav1.LabelSelector{MatchLabels: map[string]string{"marker": "true"}},
 						FailurePolicy:           testcase.failPolicy,
@@ -1049,14 +1049,14 @@ func TestMatchConditions_validation(t *testing.T) {
 	}
 }
 
-func matchConditionsTestPod(name, ns string) *corev1.Pod {
-	return &corev1.Pod{
+func matchConditionsTestPod(name, ns string) *v1.Pod {
+	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: ns,
 		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  "test",
 					Image: "test",
@@ -1066,8 +1066,8 @@ func matchConditionsTestPod(name, ns string) *corev1.Pod {
 	}
 }
 
-func newMarkerPod(namespace string) *corev1.Pod {
-	return &corev1.Pod{
+func newMarkerPod(namespace string) *v1.Pod {
+	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      "marker",
@@ -1075,8 +1075,8 @@ func newMarkerPod(namespace string) *corev1.Pod {
 				"marker": "true",
 			},
 		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
 				Name:  "fake-name",
 				Image: "fakeimage",
 			}},

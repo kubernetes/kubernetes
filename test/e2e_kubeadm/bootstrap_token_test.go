@@ -19,7 +19,7 @@ package kubeadm
 import (
 	"context"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
@@ -60,7 +60,7 @@ var _ = Describe("bootstrap token", func() {
 		tokenNum := 0
 		for _, s := range secrets.Items {
 			// check extra group and usage of token, make sure at least one token exist
-			if s.Type == corev1.SecretTypeBootstrapToken && string(s.Data[bootstrapapi.BootstrapTokenExtraGroupsKey]) == bootstrapTokensGroup {
+			if s.Type == v1.SecretTypeBootstrapToken && string(s.Data[bootstrapapi.BootstrapTokenExtraGroupsKey]) == bootstrapTokensGroup {
 				usageBootstrapAuthentication := string(s.Data[bootstrapapi.BootstrapTokenUsageAuthentication])
 				usageBootstrapSigning := string(s.Data[bootstrapapi.BootstrapTokenUsageSigningKey])
 				gomega.Expect(usageBootstrapAuthentication).Should(gomega.Equal("true"), "the bootstrap token should be able to be used for authentication")

@@ -20,7 +20,7 @@ import (
 	"net/http"
 	"testing"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -29,7 +29,7 @@ func TestExportRejection(t *testing.T) {
 	ctx, clientSet, _, tearDownFn := setup(t)
 	defer tearDownFn()
 
-	_, err := clientSet.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+	_, err := clientSet.CoreV1().Namespaces().Create(ctx, &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{Name: "export-fail"},
 	}, metav1.CreateOptions{})
 	if err != nil {

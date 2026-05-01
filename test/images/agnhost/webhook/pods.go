@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/api/admission/v1"
-	corev1 "k8s.io/api/core/v1"
+	admissionv1 "k8s.io/api/admission/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 )
@@ -36,7 +36,7 @@ const (
 )
 
 // only allow pods to pull images from specific registry.
-func admitPods(ar v1.AdmissionReview) *v1.AdmissionResponse {
+func admitPods(ar admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
 	klog.V(2).Info("admitting pods")
 	podResource := metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 	if ar.Request.Resource != podResource {
@@ -46,13 +46,13 @@ func admitPods(ar v1.AdmissionReview) *v1.AdmissionResponse {
 	}
 
 	raw := ar.Request.Object.Raw
-	pod := corev1.Pod{}
+	pod := v1.Pod{}
 	deserializer := codecs.UniversalDeserializer()
 	if _, _, err := deserializer.Decode(raw, nil, &pod); err != nil {
 		klog.Error(err)
 		return toV1AdmissionResponse(err)
 	}
-	reviewResponse := v1.AdmissionResponse{}
+	reviewResponse := admissionv1.AdmissionResponse{}
 	reviewResponse.Allowed = true
 
 	var msg string
@@ -79,8 +79,8 @@ func admitPods(ar v1.AdmissionReview) *v1.AdmissionResponse {
 	return &reviewResponse
 }
 
-func mutatePods(ar v1.AdmissionReview) *v1.AdmissionResponse {
-	shouldPatchPod := func(pod *corev1.Pod) bool {
+func mutatePods(ar admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
+	shouldPatchPod := func(pod *v1.Pod) bool {
 		if pod.Name != "webhook-to-be-mutated" {
 			return false
 		}
@@ -89,9 +89,9 @@ func mutatePods(ar v1.AdmissionReview) *v1.AdmissionResponse {
 	return applyPodPatch(ar, shouldPatchPod, podsInitContainerPatch)
 }
 
-func mutatePodsSidecar(ar v1.AdmissionReview) *v1.AdmissionResponse {
+func mutatePodsSidecar(ar admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
 	if sidecarImage == "" {
-		return &v1.AdmissionResponse{
+		return &admissionv1.AdmissionResponse{
 			Allowed: false,
 			Result: &metav1.Status{
 				Status:  "Failure",
@@ -100,13 +100,13 @@ func mutatePodsSidecar(ar v1.AdmissionReview) *v1.AdmissionResponse {
 			},
 		}
 	}
-	shouldPatchPod := func(pod *corev1.Pod) bool {
+	shouldPatchPod := func(pod *v1.Pod) bool {
 		return !hasContainer(pod.Spec.Containers, "webhook-added-sidecar")
 	}
 	return applyPodPatch(ar, shouldPatchPod, fmt.Sprintf(podsSidecarPatch, sidecarImage))
 }
 
-func hasContainer(containers []corev1.Container, containerName string) bool {
+func hasContainer(containers []v1.Container, containerName string) bool {
 	for _, container := range containers {
 		if container.Name == containerName {
 			return true
@@ -115,7 +115,7 @@ func hasContainer(containers []corev1.Container, containerName string) bool {
 	return false
 }
 
-func applyPodPatch(ar v1.AdmissionReview, shouldPatchPod func(*corev1.Pod) bool, patch string) *v1.AdmissionResponse {
+func applyPodPatch(ar admissionv1.AdmissionReview, shouldPatchPod func(*v1.Pod) bool, patch string) *admissionv1.AdmissionResponse {
 	klog.V(2).Info("mutating pods")
 	podResource := metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 	if ar.Request.Resource != podResource {
@@ -124,17 +124,17 @@ func applyPodPatch(ar v1.AdmissionReview, shouldPatchPod func(*corev1.Pod) bool,
 	}
 
 	raw := ar.Request.Object.Raw
-	pod := corev1.Pod{}
+	pod := v1.Pod{}
 	deserializer := codecs.UniversalDeserializer()
 	if _, _, err := deserializer.Decode(raw, nil, &pod); err != nil {
 		klog.Error(err)
 		return toV1AdmissionResponse(err)
 	}
-	reviewResponse := v1.AdmissionResponse{}
+	reviewResponse := admissionv1.AdmissionResponse{}
 	reviewResponse.Allowed = true
 	if shouldPatchPod(&pod) {
 		reviewResponse.Patch = []byte(patch)
-		pt := v1.PatchTypeJSONPatch
+		pt := admissionv1.PatchTypeJSONPatch
 		reviewResponse.PatchType = &pt
 	}
 	return &reviewResponse
@@ -142,10 +142,10 @@ func applyPodPatch(ar v1.AdmissionReview, shouldPatchPod func(*corev1.Pod) bool,
 
 // denySpecificAttachment denies `kubectl attach to-be-attached-pod -i -c=container1"
 // or equivalent client requests.
-func denySpecificAttachment(ar v1.AdmissionReview) *v1.AdmissionResponse {
+func denySpecificAttachment(ar admissionv1.AdmissionReview) *admissionv1.AdmissionResponse {
 	klog.V(2).Info("handling attaching pods")
 	if ar.Request.Name != "to-be-attached-pod" {
-		return &v1.AdmissionResponse{Allowed: true}
+		return &admissionv1.AdmissionResponse{Allowed: true}
 	}
 	podResource := metav1.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 	if e, a := podResource, ar.Request.Resource; e != a {
@@ -160,7 +160,7 @@ func denySpecificAttachment(ar v1.AdmissionReview) *v1.AdmissionResponse {
 	}
 
 	raw := ar.Request.Object.Raw
-	podAttachOptions := corev1.PodAttachOptions{}
+	podAttachOptions := v1.PodAttachOptions{}
 	deserializer := codecs.UniversalDeserializer()
 	if _, _, err := deserializer.Decode(raw, nil, &podAttachOptions); err != nil {
 		klog.Error(err)
@@ -168,9 +168,9 @@ func denySpecificAttachment(ar v1.AdmissionReview) *v1.AdmissionResponse {
 	}
 	klog.V(2).Info(fmt.Sprintf("podAttachOptions=%#v\n", podAttachOptions))
 	if !podAttachOptions.Stdin || podAttachOptions.Container != "container1" {
-		return &v1.AdmissionResponse{Allowed: true}
+		return &admissionv1.AdmissionResponse{Allowed: true}
 	}
-	return &v1.AdmissionResponse{
+	return &admissionv1.AdmissionResponse{
 		Allowed: false,
 		Result: &metav1.Status{
 			Message: "attaching to pod 'to-be-attached-pod' is not allowed",

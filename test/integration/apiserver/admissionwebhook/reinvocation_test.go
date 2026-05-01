@@ -33,9 +33,9 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/admission/v1beta1"
+	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -319,7 +319,7 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 			testCaseID := strconv.Itoa(i)
 			ns := "reinvoke-" + testCaseID
 			nsLabels := map[string]string{"test-case": testCaseID}
-			_, err = client.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns, Labels: nsLabels}}, metav1.CreateOptions{})
+			_, err = client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns, Labels: nsLabels}}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -327,7 +327,7 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 			// Write markers to a separate namespace to avoid cross-talk
 			markerNs := ns + "-markers"
 			markerNsLabels := map[string]string{"test-markers": testCaseID}
-			_, err = client.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: markerNs, Labels: markerNsLabels}}, metav1.CreateOptions{})
+			_, err = client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: markerNs, Labels: markerNsLabels}}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -407,14 +407,14 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 				t.Fatal(err)
 			}
 
-			pod := &corev1.Pod{
+			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: ns,
 					Name:      "labeled",
 					Labels:    map[string]string{"x": "true"},
 				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
 						Name:  "fake-name",
 						Image: "fakeimage",
 					}},
@@ -517,9 +517,9 @@ func (i *invocationRecorder) IncrementCount(path string) {
 func newReinvokeWebhookHandler(recorder *invocationRecorder) http.Handler {
 	patch := func(w http.ResponseWriter, patch string) {
 		w.Header().Set("Content-Type", "application/json")
-		pt := v1beta1.PatchTypeJSONPatch
-		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
-			Response: &v1beta1.AdmissionResponse{
+		pt := admissionv1beta1.PatchTypeJSONPatch
+		json.NewEncoder(w).Encode(&admissionv1beta1.AdmissionReview{
+			Response: &admissionv1beta1.AdmissionResponse{
 				Allowed:   true,
 				PatchType: &pt,
 				Patch:     []byte(patch),
@@ -528,8 +528,8 @@ func newReinvokeWebhookHandler(recorder *invocationRecorder) http.Handler {
 	}
 	allow := func(w http.ResponseWriter) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
-			Response: &v1beta1.AdmissionResponse{
+		json.NewEncoder(w).Encode(&admissionv1beta1.AdmissionReview{
+			Response: &admissionv1beta1.AdmissionResponse{
 				Allowed: true,
 			},
 		})
@@ -540,7 +540,7 @@ func newReinvokeWebhookHandler(recorder *invocationRecorder) http.Handler {
 		if err != nil {
 			http.Error(w, err.Error(), 400)
 		}
-		review := v1beta1.AdmissionReview{}
+		review := admissionv1beta1.AdmissionReview{}
 		if err := json.Unmarshal(data, &review); err != nil {
 			http.Error(w, err.Error(), 400)
 		}
@@ -553,7 +553,7 @@ func newReinvokeWebhookHandler(recorder *invocationRecorder) http.Handler {
 		if len(review.Request.Object.Raw) == 0 {
 			http.Error(w, err.Error(), 400)
 		}
-		pod := &corev1.Pod{}
+		pod := &v1.Pod{}
 		if err := json.Unmarshal(review.Request.Object.Raw, pod); err != nil {
 			http.Error(w, err.Error(), 400)
 		}
@@ -627,8 +627,8 @@ func expectedAuditEvents(webhookMutationAnnotations, webhookPatchAnnotations map
 	}
 }
 
-func newReinvocationMarkerFixture(namespace string) *corev1.Pod {
-	return &corev1.Pod{
+func newReinvocationMarkerFixture(namespace string) *v1.Pod {
+	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      "marker",
@@ -636,8 +636,8 @@ func newReinvocationMarkerFixture(namespace string) *corev1.Pod {
 				"marker": "true",
 			},
 		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
 				Name:  "fake-name",
 				Image: "fakeimage",
 			}},

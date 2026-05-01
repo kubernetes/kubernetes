@@ -27,9 +27,9 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	policy "k8s.io/api/policy/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapiv1alpha2 "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -535,7 +535,7 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 			}
 			if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 				options.APIEnablement.RuntimeConfig = cliflag.ConfigurationMap{
-					schedulingapiv1alpha2.SchemeGroupVersion.String(): "true",
+					schedulingv1alpha2.SchemeGroupVersion.String(): "true",
 				}
 			}
 		},
@@ -1098,7 +1098,7 @@ func WaitForPodSchedulingGated(ctx context.Context, cs clientset.Interface, pod 
 
 // WaitForPDBsStable waits for PDBs to have "CurrentHealthy" status equal to
 // the expected values.
-func WaitForPDBsStable(testCtx *TestContext, pdbs []*policy.PodDisruptionBudget, pdbPodNum []int32) error {
+func WaitForPDBsStable(testCtx *TestContext, pdbs []*policyv1.PodDisruptionBudget, pdbPodNum []int32) error {
 	return wait.PollUntilContextTimeout(testCtx.Ctx, time.Second, 60*time.Second, false, func(context.Context) (bool, error) {
 		pdbList, err := testCtx.ClientSet.PolicyV1().PodDisruptionBudgets(testCtx.NS.Name).List(testCtx.Ctx, metav1.ListOptions{})
 		if err != nil {

@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -161,12 +161,12 @@ func TestResourceClaimGranularStatusAuthorization(t *testing.T) {
 			adminClient := clientset.NewForConfigOrDie(server.ClientConfig)
 
 			// Setup Namespace and Service Account
-			_, err := adminClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{})
+			_, err := adminClient.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			_, err = adminClient.CoreV1().ServiceAccounts(ns).Create(context.TODO(), &corev1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: saName}}, metav1.CreateOptions{})
+			_, err = adminClient.CoreV1().ServiceAccounts(ns).Create(context.TODO(), &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: saName}}, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -198,9 +198,9 @@ func TestResourceClaimGranularStatusAuthorization(t *testing.T) {
 					t.Fatalf("Failed to fetch claim for pre-allocation: %v", err)
 				}
 				c.Status.Allocation = &resourceapi.AllocationResult{
-					NodeSelector: &corev1.NodeSelector{
-						NodeSelectorTerms: []corev1.NodeSelectorTerm{{
-							MatchFields: []corev1.NodeSelectorRequirement{{Key: "metadata.name", Operator: corev1.NodeSelectorOpIn, Values: []string{nodeName}}},
+					NodeSelector: &v1.NodeSelector{
+						NodeSelectorTerms: []v1.NodeSelectorTerm{{
+							MatchFields: []v1.NodeSelectorRequirement{{Key: "metadata.name", Operator: v1.NodeSelectorOpIn, Values: []string{nodeName}}},
 						}},
 					},
 					Devices: resourceapi.DeviceAllocationResult{

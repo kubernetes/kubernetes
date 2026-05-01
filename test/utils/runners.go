@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -290,11 +290,11 @@ func RunDeployment(ctx context.Context, config DeploymentConfig) error {
 }
 
 func (config *DeploymentConfig) create() error {
-	deployment := &apps.Deployment{
+	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
 		},
-		Spec: apps.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Replicas: ptr.To[int32](int32(config.Replicas)),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
@@ -365,11 +365,11 @@ func RunReplicaSet(ctx context.Context, config ReplicaSetConfig) error {
 }
 
 func (config *ReplicaSetConfig) create() error {
-	rs := &apps.ReplicaSet{
+	rs := &appsv1.ReplicaSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: config.Name,
 		},
-		Spec: apps.ReplicaSetSpec{
+		Spec: appsv1.ReplicaSetSpec{
 			Replicas: ptr.To[int32](int32(config.Replicas)),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{

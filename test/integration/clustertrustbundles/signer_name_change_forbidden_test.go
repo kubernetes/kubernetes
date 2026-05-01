@@ -24,7 +24,7 @@ import (
 	"math/big"
 	"testing"
 
-	certsv1beta1 "k8s.io/api/certificates/v1beta1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -59,16 +59,16 @@ func TestCTBSignerNameChangeForbidden(t *testing.T) {
 
 			ctx := context.Background()
 
-			server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--feature-gates=ClusterTrustBundle=true", fmt.Sprintf("--runtime-config=%s=true", certsv1beta1.SchemeGroupVersion)}, framework.SharedEtcd())
+			server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--feature-gates=ClusterTrustBundle=true", fmt.Sprintf("--runtime-config=%s=true", certificatesv1beta1.SchemeGroupVersion)}, framework.SharedEtcd())
 			defer server.TearDownFn()
 
 			client := kubernetes.NewForConfigOrDie(server.ClientConfig)
 
-			bundle1 := &certsv1beta1.ClusterTrustBundle{
+			bundle1 := &certificatesv1beta1.ClusterTrustBundle{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: tc.objectName,
 				},
-				Spec: certsv1beta1.ClusterTrustBundleSpec{
+				Spec: certificatesv1beta1.ClusterTrustBundleSpec{
 					SignerName: tc.signer1,
 					TrustBundle: mustMakePEMBlock("CERTIFICATE", nil, mustMakeCertificate(t, &x509.Certificate{
 						SerialNumber: big.NewInt(0),

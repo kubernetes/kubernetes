@@ -29,7 +29,7 @@ import (
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	authorizationv1 "k8s.io/api/authorization/v1"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -288,7 +288,7 @@ func TestStaticPolicyComprehensive(t *testing.T) {
 		// VAP+VAPB was pre-populated — should be active from the first request
 		var lastErr error
 		err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
-			_, lastErr = client.CoreV1().ConfigMaps(ns).Create(ctx, &corev1.ConfigMap{
+			_, lastErr = client.CoreV1().ConfigMaps(ns).Create(ctx, &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Name: "startup-vap-probe", Namespace: ns, Labels: map[string]string{"deny-me": "true"}},
 			}, metav1.CreateOptions{})
 			if lastErr != nil && apierrors.IsInvalid(lastErr) {
@@ -340,7 +340,7 @@ func TestStaticPolicyComprehensive(t *testing.T) {
 
 		var lastErr error
 		err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
-			cm, createErr := client.CoreV1().ConfigMaps(ns).Create(ctx, &corev1.ConfigMap{
+			cm, createErr := client.CoreV1().ConfigMaps(ns).Create(ctx, &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Name: "hot-reload-map-probe", Namespace: ns},
 			}, metav1.CreateOptions{})
 			if createErr != nil {
@@ -363,7 +363,7 @@ func TestStaticPolicyComprehensive(t *testing.T) {
 
 	t.Run("both policies active simultaneously", func(t *testing.T) {
 		// Create configmap without deny-me label — should be mutated but not denied
-		cm, err := client.CoreV1().ConfigMaps(ns).Create(ctx, &corev1.ConfigMap{
+		cm, err := client.CoreV1().ConfigMaps(ns).Create(ctx, &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{Name: "both-active-test", Namespace: ns},
 			Data:       map[string]string{"key": "value"},
 		}, metav1.CreateOptions{})
@@ -416,7 +416,7 @@ items:
 
 		var lastErr error
 		err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
-			_, lastErr = client.CoreV1().ConfigMaps(ns).Create(ctx, &corev1.ConfigMap{
+			_, lastErr = client.CoreV1().ConfigMaps(ns).Create(ctx, &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Name: "annotation-probe", Namespace: ns, Annotations: map[string]string{"blocked": "true"}},
 			}, metav1.CreateOptions{})
 			if lastErr != nil && apierrors.IsInvalid(lastErr) {
@@ -570,7 +570,7 @@ items:
 
 		// Wait for API policy to be active
 		err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
-			_, lastErr = client.CoreV1().Secrets(ns).Create(ctx, &corev1.Secret{
+			_, lastErr = client.CoreV1().Secrets(ns).Create(ctx, &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{Name: "api-vap-probe", Namespace: ns, Labels: map[string]string{"deny-api": "true"}},
 			}, metav1.CreateOptions{})
 			if lastErr != nil && apierrors.IsInvalid(lastErr) {
@@ -586,7 +586,7 @@ items:
 		}
 
 		// Verify static policy still works (deny configmap with deny-me)
-		_, err = client.CoreV1().ConfigMaps(ns).Create(ctx, &corev1.ConfigMap{
+		_, err = client.CoreV1().ConfigMaps(ns).Create(ctx, &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{Name: "coexist-static-check", Namespace: ns, Labels: map[string]string{"deny-me": "true"}},
 		}, metav1.CreateOptions{})
 		if err == nil {
@@ -605,7 +605,7 @@ items:
 
 		// Poll: configmap with deny-me=true now allowed
 		err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
-			cm, createErr := client.CoreV1().ConfigMaps(ns).Create(ctx, &corev1.ConfigMap{
+			cm, createErr := client.CoreV1().ConfigMaps(ns).Create(ctx, &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Name: "post-removal-cm", Namespace: ns, Labels: map[string]string{"deny-me": "true"}},
 			}, metav1.CreateOptions{})
 			if createErr != nil {
@@ -622,7 +622,7 @@ items:
 		}
 
 		// Other static policies still active (annotations via v1.List, mutation via MAP)
-		_, err = client.CoreV1().ConfigMaps(ns).Create(ctx, &corev1.ConfigMap{
+		_, err = client.CoreV1().ConfigMaps(ns).Create(ctx, &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{Name: "post-removal-annotation", Namespace: ns, Annotations: map[string]string{"blocked": "true"}},
 		}, metav1.CreateOptions{})
 		if err == nil {

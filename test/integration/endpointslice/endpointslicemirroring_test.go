@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -87,18 +87,18 @@ func TestEndpointSliceMirroring(t *testing.T) {
 
 	testCases := []struct {
 		testName                     string
-		service                      *corev1.Service
-		customEndpoints              *corev1.Endpoints
+		service                      *v1.Service
+		customEndpoints              *v1.Endpoints
 		expectEndpointSlice          int
 		expectEndpointSliceManagedBy string
 	}{{
 		testName: "Service with selector",
-		service: &corev1.Service{
+		service: &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-123",
 			},
-			Spec: corev1.ServiceSpec{
-				Ports: []corev1.ServicePort{{
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{{
 					Port: int32(80),
 				}},
 				Selector: map[string]string{
@@ -110,25 +110,25 @@ func TestEndpointSliceMirroring(t *testing.T) {
 		expectEndpointSliceManagedBy: "endpointslice-controller.k8s.io",
 	}, {
 		testName: "Service without selector",
-		service: &corev1.Service{
+		service: &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-123",
 			},
-			Spec: corev1.ServiceSpec{
-				Ports: []corev1.ServicePort{{
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{{
 					Port: int32(80),
 				}},
 			},
 		},
-		customEndpoints: &corev1.Endpoints{
+		customEndpoints: &v1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-123",
 			},
-			Subsets: []corev1.EndpointSubset{{
-				Ports: []corev1.EndpointPort{{
+			Subsets: []v1.EndpointSubset{{
+				Ports: []v1.EndpointPort{{
 					Port: 80,
 				}},
-				Addresses: []corev1.EndpointAddress{{
+				Addresses: []v1.EndpointAddress{{
 					IP: "10.0.0.1",
 				}},
 			}},
@@ -137,36 +137,36 @@ func TestEndpointSliceMirroring(t *testing.T) {
 		expectEndpointSliceManagedBy: "endpointslicemirroring-controller.k8s.io",
 	}, {
 		testName: "Service without selector Endpoint multiple subsets and same address",
-		service: &corev1.Service{
+		service: &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-123",
 			},
-			Spec: corev1.ServiceSpec{
-				Ports: []corev1.ServicePort{{
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{{
 					Port: int32(80),
 				}},
 			},
 		},
-		customEndpoints: &corev1.Endpoints{
+		customEndpoints: &v1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-123",
 			},
-			Subsets: []corev1.EndpointSubset{
+			Subsets: []v1.EndpointSubset{
 				{
-					Ports: []corev1.EndpointPort{{
+					Ports: []v1.EndpointPort{{
 						Name: "port1",
 						Port: 80,
 					}},
-					Addresses: []corev1.EndpointAddress{{
+					Addresses: []v1.EndpointAddress{{
 						IP: "10.0.0.1",
 					}},
 				},
 				{
-					Ports: []corev1.EndpointPort{{
+					Ports: []v1.EndpointPort{{
 						Name: "port2",
 						Port: 90,
 					}},
-					Addresses: []corev1.EndpointAddress{{
+					Addresses: []v1.EndpointAddress{{
 						IP: "10.0.0.1",
 					}},
 				},
@@ -176,36 +176,36 @@ func TestEndpointSliceMirroring(t *testing.T) {
 		expectEndpointSliceManagedBy: "endpointslicemirroring-controller.k8s.io",
 	}, {
 		testName: "Service without selector Endpoint multiple subsets",
-		service: &corev1.Service{
+		service: &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-123",
 			},
-			Spec: corev1.ServiceSpec{
-				Ports: []corev1.ServicePort{{
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{{
 					Port: int32(80),
 				}},
 			},
 		},
-		customEndpoints: &corev1.Endpoints{
+		customEndpoints: &v1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-123",
 			},
-			Subsets: []corev1.EndpointSubset{
+			Subsets: []v1.EndpointSubset{
 				{
-					Ports: []corev1.EndpointPort{{
+					Ports: []v1.EndpointPort{{
 						Name: "port1",
 						Port: 80,
 					}},
-					Addresses: []corev1.EndpointAddress{{
+					Addresses: []v1.EndpointAddress{{
 						IP: "10.0.0.1",
 					}},
 				},
 				{
-					Ports: []corev1.EndpointPort{{
+					Ports: []v1.EndpointPort{{
 						Name: "port2",
 						Port: 90,
 					}},
-					Addresses: []corev1.EndpointAddress{{
+					Addresses: []v1.EndpointAddress{{
 						IP: "10.0.0.2",
 					}},
 				},
@@ -215,12 +215,12 @@ func TestEndpointSliceMirroring(t *testing.T) {
 		expectEndpointSliceManagedBy: "endpointslicemirroring-controller.k8s.io",
 	}, {
 		testName: "Service without Endpoints",
-		service: &corev1.Service{
+		service: &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-123",
 			},
-			Spec: corev1.ServiceSpec{
-				Ports: []corev1.ServicePort{{
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{{
 					Port: int32(80),
 				}},
 				Selector: map[string]string{
@@ -234,15 +234,15 @@ func TestEndpointSliceMirroring(t *testing.T) {
 	}, {
 		testName: "Endpoints without Service",
 		service:  nil,
-		customEndpoints: &corev1.Endpoints{
+		customEndpoints: &v1.Endpoints{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-123",
 			},
-			Subsets: []corev1.EndpointSubset{{
-				Ports: []corev1.EndpointPort{{
+			Subsets: []v1.EndpointSubset{{
+				Ports: []v1.EndpointPort{{
 					Port: 80,
 				}},
-				Addresses: []corev1.EndpointAddress{{
+				Addresses: []v1.EndpointAddress{{
 					IP: "10.0.0.1",
 				}},
 			}},
@@ -340,31 +340,31 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 
 	testCases := []struct {
 		testName      string
-		tweakEndpoint func(ep *corev1.Endpoints)
+		tweakEndpoint func(ep *v1.Endpoints)
 	}{
 		{
 			testName: "Update labels",
-			tweakEndpoint: func(ep *corev1.Endpoints) {
+			tweakEndpoint: func(ep *v1.Endpoints) {
 				ep.Labels["foo"] = "bar"
 			},
 		},
 		{
 			testName: "Update annotations",
-			tweakEndpoint: func(ep *corev1.Endpoints) {
+			tweakEndpoint: func(ep *v1.Endpoints) {
 				ep.Annotations["foo2"] = "bar2"
 			},
 		},
 		{
 			testName: "Update annotations but triggertime",
-			tweakEndpoint: func(ep *corev1.Endpoints) {
+			tweakEndpoint: func(ep *v1.Endpoints) {
 				ep.Annotations["foo2"] = "bar2"
-				ep.Annotations[corev1.EndpointsLastChangeTriggerTime] = "date"
+				ep.Annotations[v1.EndpointsLastChangeTriggerTime] = "date"
 			},
 		},
 		{
 			testName: "Update addresses",
-			tweakEndpoint: func(ep *corev1.Endpoints) {
-				ep.Subsets[0].Addresses = []corev1.EndpointAddress{{IP: "1.2.3.4"}, {IP: "1.2.3.6"}}
+			tweakEndpoint: func(ep *v1.Endpoints) {
+				ep.Subsets[0].Addresses = []v1.EndpointAddress{{IP: "1.2.3.4"}, {IP: "1.2.3.6"}}
 			},
 		},
 	}
@@ -374,30 +374,30 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 			ns := framework.CreateNamespaceOrDie(client, fmt.Sprintf("test-endpointslice-mirroring-%d", i), t)
 			defer framework.DeleteNamespaceOrDie(client, ns, t)
 
-			service := &corev1.Service{
+			service := &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-123",
 					Namespace: ns.Name,
 				},
-				Spec: corev1.ServiceSpec{
-					Ports: []corev1.ServicePort{{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{{
 						Port: int32(80),
 					}},
 				},
 			}
 
-			customEndpoints := &corev1.Endpoints{
+			customEndpoints := &v1.Endpoints{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:        "test-123",
 					Namespace:   ns.Name,
 					Labels:      map[string]string{},
 					Annotations: map[string]string{},
 				},
-				Subsets: []corev1.EndpointSubset{{
-					Ports: []corev1.EndpointPort{{
+				Subsets: []v1.EndpointSubset{{
+					Ports: []v1.EndpointPort{{
 						Port: 80,
 					}},
-					Addresses: []corev1.EndpointAddress{{
+					Addresses: []v1.EndpointAddress{{
 						IP: "10.0.0.1",
 					}},
 				}},
@@ -467,7 +467,7 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 					// check annotations but endpoints.kubernetes.io/last-change-trigger-time were mirrored
 					annotations := map[string]string{}
 					for k, v := range customEndpoints.Annotations {
-						if k == corev1.EndpointsLastChangeTriggerTime {
+						if k == v1.EndpointsLastChangeTriggerTime {
 							continue
 						}
 						annotations[k] = v
@@ -556,23 +556,23 @@ func TestEndpointSliceMirroringSelectorTransition(t *testing.T) {
 			defer framework.DeleteNamespaceOrDie(client, ns, t)
 			meta := metav1.ObjectMeta{Name: "test-123", Namespace: ns.Name}
 
-			service := &corev1.Service{
+			service := &v1.Service{
 				ObjectMeta: meta,
-				Spec: corev1.ServiceSpec{
-					Ports: []corev1.ServicePort{{
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{{
 						Port: int32(80),
 					}},
 					Selector: tc.startingSelector,
 				},
 			}
 
-			customEndpoints := &corev1.Endpoints{
+			customEndpoints := &v1.Endpoints{
 				ObjectMeta: meta,
-				Subsets: []corev1.EndpointSubset{{
-					Ports: []corev1.EndpointPort{{
+				Subsets: []v1.EndpointSubset{{
+					Ports: []v1.EndpointPort{{
 						Port: 80,
 					}},
-					Addresses: []corev1.EndpointAddress{{
+					Addresses: []v1.EndpointAddress{{
 						IP: "10.0.0.1",
 					}},
 				}},

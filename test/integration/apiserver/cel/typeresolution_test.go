@@ -30,7 +30,7 @@ import (
 
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
-	apiv1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	nodev1 "k8s.io/api/node/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -418,21 +418,21 @@ func sampleReplicatedDeployment() *appsv1.Deployment {
 					"app": "demo",
 				},
 			},
-			Template: apiv1.PodTemplateSpec{
+			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"app": "demo",
 					},
 				},
-				Spec: apiv1.PodSpec{
-					Containers: []apiv1.Container{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Name:  "web",
 							Image: "nginx",
-							Ports: []apiv1.ContainerPort{
+							Ports: []v1.ContainerPort{
 								{
 									Name:          "http",
-									Protocol:      apiv1.ProtocolTCP,
+									Protocol:      v1.ProtocolTCP,
 									ContainerPort: 80,
 								},
 							},

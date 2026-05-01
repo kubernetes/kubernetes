@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"testing"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -69,7 +69,7 @@ func TestDefaultBinder(t *testing.T) {
 					if err != nil {
 						t.Fatalf("Failed to create pod: %v", err)
 					}
-					defer testutil.CleanupPods(testCtx.Ctx, testCtx.ClientSet, t, []*corev1.Pod{pod})
+					defer testutil.CleanupPods(testCtx.Ctx, testCtx.ClientSet, t, []*v1.Pod{pod})
 
 					podCopy := pod.DeepCopy()
 					if tc.anotherUID {

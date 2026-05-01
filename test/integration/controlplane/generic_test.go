@@ -23,7 +23,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -111,12 +111,12 @@ func TestGenericControlplaneStartUp(t *testing.T) {
 	}
 
 	t.Logf("Create cluster scoped resource: namespace %q", "test")
-	if _, err := client.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test"}}, metav1.CreateOptions{}); err != nil {
+	if _, err := client.CoreV1().Namespaces().Create(ctx, &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test"}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
 	t.Logf("Create namesapces resource: configmap %q", "config")
-	if _, err := client.CoreV1().ConfigMaps("test").Create(ctx, &corev1.ConfigMap{
+	if _, err := client.CoreV1().ConfigMaps("test").Create(ctx, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "test", Name: "config"},
 		Data:       map[string]string{"foo": "bar"},
 	}, metav1.CreateOptions{}); err != nil {

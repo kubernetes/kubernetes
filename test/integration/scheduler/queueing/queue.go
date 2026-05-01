@@ -24,7 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -84,9 +84,9 @@ type CoreResourceEnqueueTestCase struct {
 	// InitialDeviceClasses are the list of DeviceClass to be created at first.
 	InitialDeviceClasses []*resourceapi.DeviceClass
 	// InitialWorkloads is the list of Workloads to be created at first.
-	InitialWorkloads []*schedulingapi.Workload
+	InitialWorkloads []*schedulingv1alpha2.Workload
 	// InitialPodGroups is the list of PodGroups to be created at first.
-	InitialPodGroups []*schedulingapi.PodGroup
+	InitialPodGroups []*schedulingv1alpha2.PodGroup
 	// Pods are the list of Pods to be created.
 	// All of them are expected to be unschedulable at first.
 	Pods []*v1.Pod
@@ -2529,10 +2529,10 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Obj(),
 		},
-		InitialWorkloads: []*schedulingapi.Workload{
+		InitialWorkloads: []*schedulingv1alpha2.Workload{
 			st.MakeWorkload().Name("w").PodGroupTemplate(st.MakePodGroupTemplate().Name("t").MinCount(2).Obj()).Obj(),
 		},
-		InitialPodGroups: []*schedulingapi.PodGroup{
+		InitialPodGroups: []*schedulingv1alpha2.PodGroup{
 			st.MakePodGroup().Name("pg1").MinCount(2).TemplateRef("t", "w").Obj(),
 		},
 		Pods: []*v1.Pod{
@@ -2556,7 +2556,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Obj(),
 		},
-		InitialWorkloads: []*schedulingapi.Workload{
+		InitialWorkloads: []*schedulingv1alpha2.Workload{
 			st.MakeWorkload().Name("w").PodGroupTemplate(st.MakePodGroupTemplate().Name("t").MinCount(1).Obj()).Obj(),
 		},
 		Pods: []*v1.Pod{

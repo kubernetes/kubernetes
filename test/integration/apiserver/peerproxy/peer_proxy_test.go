@@ -31,8 +31,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	v1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
+	batchv1 "k8s.io/api/batch/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/features"
@@ -165,7 +165,7 @@ func TestPeerProxiedRequestToThirdServerAfterFirstDies(t *testing.T) {
 	// shutdown serverA
 	serverA.TearDownFn()
 
-	var jobsB *v1.JobList
+	var jobsB *batchv1.JobList
 	// list jobs using ServerB which it should proxy to ServerC and get back valid response
 	err = wait.PollUntilContextTimeout(t.Context(), 1*time.Second, 1*time.Minute, false, func(ctx context.Context) (bool, error) {
 		select {
@@ -282,22 +282,22 @@ func createProxyCertContent() (kastesting.ProxyCA, error) {
 	return result, nil
 }
 
-func createJobResource() *v1.Job {
-	return &v1.Job{
+func createJobResource() *batchv1.Job {
+	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-job",
 			Namespace: "default",
 		},
-		Spec: v1.JobSpec{
-			Template: corev1.PodTemplateSpec{
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
+		Spec: batchv1.JobSpec{
+			Template: v1.PodTemplateSpec{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Name:  "test",
 							Image: "test",
 						},
 					},
-					RestartPolicy: corev1.RestartPolicyNever,
+					RestartPolicy: v1.RestartPolicyNever,
 				},
 			},
 		},

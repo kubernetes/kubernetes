@@ -36,8 +36,8 @@ import (
 	"k8s.io/klog/v2"
 	conformancetestdata "k8s.io/kubernetes/test/conformance/testdata"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/config"
-	"k8s.io/kubernetes/test/e2e/framework/testfiles"
+	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
+	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
 	testfixtures "k8s.io/kubernetes/test/fixtures"
 
@@ -76,7 +76,7 @@ import (
 
 // handleFlags sets up all flags and parses the command line.
 func handleFlags() {
-	config.CopyFlags(config.Flags, flag.CommandLine)
+	e2econfig.CopyFlags(e2econfig.Flags, flag.CommandLine)
 	framework.RegisterCommonFlags(flag.CommandLine)
 	framework.RegisterClusterFlags(flag.CommandLine)
 	logcheck.RegisterFlags(flag.CommandLine)
@@ -102,9 +102,9 @@ func TestMain(m *testing.M) {
 	}
 
 	// Enable embedded FS file lookup as fallback
-	testfiles.AddFileSource(e2etestingmanifests.GetE2ETestingManifestsFS())
-	testfiles.AddFileSource(testfixtures.GetTestFixturesFS())
-	testfiles.AddFileSource(conformancetestdata.GetConformanceTestdataFS())
+	e2etestfiles.AddFileSource(e2etestingmanifests.GetE2ETestingManifestsFS())
+	e2etestfiles.AddFileSource(testfixtures.GetTestFixturesFS())
+	e2etestfiles.AddFileSource(conformancetestdata.GetConformanceTestdataFS())
 
 	if *listConformanceTests {
 		var tests []struct {
@@ -115,7 +115,7 @@ func TestMain(m *testing.M) {
 			File        string `yaml:"file"`
 		}
 
-		data, err := testfiles.Read("test/conformance/testdata/conformance.yaml")
+		data, err := e2etestfiles.Read("test/conformance/testdata/conformance.yaml")
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
@@ -139,7 +139,7 @@ func TestMain(m *testing.M) {
 	// for providing the optional secret.yaml file and by
 	// test/e2e/framework/util.go for cluster/log-dump.
 	if framework.TestContext.RepoRoot != "" {
-		testfiles.AddFileSource(testfiles.RootFileSource{Root: framework.TestContext.RepoRoot})
+		e2etestfiles.AddFileSource(e2etestfiles.RootFileSource{Root: framework.TestContext.RepoRoot})
 	}
 
 	os.Exit(m.Run())

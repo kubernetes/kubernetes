@@ -26,7 +26,7 @@ import (
 	"time"
 
 	apiextensions "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -151,7 +151,7 @@ func (a applyAPIService) Cleanup(ctx context.Context, client testClient) error {
 
 	err := client.ApiregistrationV1().APIServices().Delete(ctx, name, metav1.DeleteOptions{})
 
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 
@@ -163,7 +163,7 @@ func (a applyAPIService) Cleanup(ctx context.Context, client testClient) error {
 		func(ctx context.Context) (done bool, err error) {
 			obj, err := client.ApiregistrationV1().APIServices().Get(ctx, name, metav1.GetOptions{})
 			switch {
-			case errors.IsNotFound(err):
+			case apierrors.IsNotFound(err):
 				// object is gone
 				return true, nil
 			case err == nil && obj.UID != uid:
@@ -233,7 +233,7 @@ func (a applyCRD) Cleanup(ctx context.Context, client testClient) error {
 
 	err := client.ApiextensionsV1().CustomResourceDefinitions().Delete(ctx, name, metav1.DeleteOptions{})
 
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 
@@ -245,7 +245,7 @@ func (a applyCRD) Cleanup(ctx context.Context, client testClient) error {
 		func(ctx context.Context) (done bool, err error) {
 			obj, err := client.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, name, metav1.GetOptions{})
 			switch {
-			case errors.IsNotFound(err):
+			case apierrors.IsNotFound(err):
 				// object is gone
 				return true, nil
 			case err == nil && obj.UID != uid:
@@ -414,7 +414,7 @@ func (w waitForResourcesV1) Do(ctx context.Context, client testClient) error {
 		})
 
 		if err != nil {
-			if errors.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				return nil
 			}
 			return fmt.Errorf("waiting for resources v1 (%v): %w", w, err)
@@ -450,7 +450,7 @@ func (w waitForResourcesAbsentV1) Do(ctx context.Context, client testClient) err
 		})
 
 		if err != nil {
-			if errors.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				return nil
 			}
 			return fmt.Errorf("waiting for absent resources v1 (%v): %w", w, err)

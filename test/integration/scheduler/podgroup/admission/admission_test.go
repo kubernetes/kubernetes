@@ -19,7 +19,7 @@ package admission
 import (
 	"testing"
 
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -39,7 +39,7 @@ func TestPodGroupAdmission(t *testing.T) {
 		PodGroupTemplate(st.MakePodGroupTemplate().Name("worker").MinCount(3).Obj()).
 		Obj()
 
-	terminatingWorkload := func() *schedulingapi.Workload {
+	terminatingWorkload := func() *schedulingv1alpha2.Workload {
 		w := defaultWorkload.DeepCopy()
 		w.Finalizers = []string{"test.k8s.io/block-deletion"}
 		return w
@@ -47,14 +47,14 @@ func TestPodGroupAdmission(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		workload       *schedulingapi.Workload
+		workload       *schedulingv1alpha2.Workload
 		deleteWorkload bool
-		podGroup       func(ns string) *schedulingapi.PodGroup
+		podGroup       func(ns string) *schedulingv1alpha2.PodGroup
 		expectError    bool
 	}{
 		{
 			name: "PodGroup referencing non-existent Workload is rejected",
-			podGroup: func(ns string) *schedulingapi.PodGroup {
+			podGroup: func(ns string) *schedulingv1alpha2.PodGroup {
 				return st.MakePodGroup().Name("pg1").Namespace(ns).TemplateRef("worker", "non-existent-workload").MinCount(3).Obj()
 			},
 			expectError: true,
@@ -62,7 +62,7 @@ func TestPodGroupAdmission(t *testing.T) {
 		{
 			name:     "PodGroup referencing non-existent template is rejected",
 			workload: defaultWorkload,
-			podGroup: func(ns string) *schedulingapi.PodGroup {
+			podGroup: func(ns string) *schedulingv1alpha2.PodGroup {
 				return st.MakePodGroup().Name("pg1").Namespace(ns).TemplateRef("non-existent-template", "test-workload").MinCount(3).Obj()
 			},
 			expectError: true,
@@ -70,19 +70,19 @@ func TestPodGroupAdmission(t *testing.T) {
 		{
 			name:     "PodGroup referencing valid Workload and template is accepted",
 			workload: defaultWorkload,
-			podGroup: func(ns string) *schedulingapi.PodGroup {
+			podGroup: func(ns string) *schedulingv1alpha2.PodGroup {
 				return st.MakePodGroup().Name("pg1").Namespace(ns).TemplateRef("worker", "test-workload").MinCount(3).Obj()
 			},
 			expectError: false,
 		},
 		{
 			name: "PodGroup without templateRef is accepted",
-			podGroup: func(ns string) *schedulingapi.PodGroup {
-				return &schedulingapi.PodGroup{
+			podGroup: func(ns string) *schedulingv1alpha2.PodGroup {
+				return &schedulingv1alpha2.PodGroup{
 					ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: ns},
-					Spec: schedulingapi.PodGroupSpec{
-						SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
-							Gang: &schedulingapi.GangSchedulingPolicy{MinCount: 3},
+					Spec: schedulingv1alpha2.PodGroupSpec{
+						SchedulingPolicy: schedulingv1alpha2.PodGroupSchedulingPolicy{
+							Gang: &schedulingv1alpha2.GangSchedulingPolicy{MinCount: 3},
 						},
 					},
 				}
@@ -93,7 +93,7 @@ func TestPodGroupAdmission(t *testing.T) {
 			name:           "PodGroup referencing terminating Workload is rejected",
 			workload:       terminatingWorkload,
 			deleteWorkload: true,
-			podGroup: func(ns string) *schedulingapi.PodGroup {
+			podGroup: func(ns string) *schedulingv1alpha2.PodGroup {
 				return st.MakePodGroup().Name("pg1").Namespace(ns).TemplateRef("worker", "test-workload").MinCount(3).Obj()
 			},
 			expectError: true,

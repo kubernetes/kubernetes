@@ -17,19 +17,19 @@ limitations under the License.
 package webhook
 
 import (
-	v1 "k8s.io/api/admission/v1"
-	"k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
+	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func convertAdmissionRequestToV1(r *v1beta1.AdmissionRequest) *v1.AdmissionRequest {
-	return &v1.AdmissionRequest{
+func convertAdmissionRequestToV1(r *admissionv1beta1.AdmissionRequest) *admissionv1.AdmissionRequest {
+	return &admissionv1.AdmissionRequest{
 		Kind:               r.Kind,
 		Namespace:          r.Namespace,
 		Name:               r.Name,
 		Object:             r.Object,
 		Resource:           r.Resource,
-		Operation:          v1.Operation(r.Operation),
+		Operation:          admissionv1.Operation(r.Operation),
 		UID:                r.UID,
 		DryRun:             r.DryRun,
 		OldObject:          r.OldObject,
@@ -42,14 +42,14 @@ func convertAdmissionRequestToV1(r *v1beta1.AdmissionRequest) *v1.AdmissionReque
 	}
 }
 
-func convertAdmissionRequestToV1beta1(r *v1.AdmissionRequest) *v1beta1.AdmissionRequest {
-	return &v1beta1.AdmissionRequest{
+func convertAdmissionRequestToV1beta1(r *admissionv1.AdmissionRequest) *admissionv1beta1.AdmissionRequest {
+	return &admissionv1beta1.AdmissionRequest{
 		Kind:               r.Kind,
 		Namespace:          r.Namespace,
 		Name:               r.Name,
 		Object:             r.Object,
 		Resource:           r.Resource,
-		Operation:          v1beta1.Operation(r.Operation),
+		Operation:          admissionv1beta1.Operation(r.Operation),
 		UID:                r.UID,
 		DryRun:             r.DryRun,
 		OldObject:          r.OldObject,
@@ -62,13 +62,13 @@ func convertAdmissionRequestToV1beta1(r *v1.AdmissionRequest) *v1beta1.Admission
 	}
 }
 
-func convertAdmissionResponseToV1(r *v1beta1.AdmissionResponse) *v1.AdmissionResponse {
-	var pt *v1.PatchType
+func convertAdmissionResponseToV1(r *admissionv1beta1.AdmissionResponse) *admissionv1.AdmissionResponse {
+	var pt *admissionv1.PatchType
 	if r.PatchType != nil {
-		t := v1.PatchType(*r.PatchType)
+		t := admissionv1.PatchType(*r.PatchType)
 		pt = &t
 	}
-	return &v1.AdmissionResponse{
+	return &admissionv1.AdmissionResponse{
 		UID:              r.UID,
 		Allowed:          r.Allowed,
 		AuditAnnotations: r.AuditAnnotations,
@@ -79,13 +79,13 @@ func convertAdmissionResponseToV1(r *v1beta1.AdmissionResponse) *v1.AdmissionRes
 	}
 }
 
-func convertAdmissionResponseToV1beta1(r *v1.AdmissionResponse) *v1beta1.AdmissionResponse {
-	var pt *v1beta1.PatchType
+func convertAdmissionResponseToV1beta1(r *admissionv1.AdmissionResponse) *admissionv1beta1.AdmissionResponse {
+	var pt *admissionv1beta1.PatchType
 	if r.PatchType != nil {
-		t := v1beta1.PatchType(*r.PatchType)
+		t := admissionv1beta1.PatchType(*r.PatchType)
 		pt = &t
 	}
-	return &v1beta1.AdmissionResponse{
+	return &admissionv1beta1.AdmissionResponse{
 		UID:              r.UID,
 		Allowed:          r.Allowed,
 		AuditAnnotations: r.AuditAnnotations,
@@ -96,8 +96,8 @@ func convertAdmissionResponseToV1beta1(r *v1.AdmissionResponse) *v1beta1.Admissi
 	}
 }
 
-func toV1AdmissionResponse(err error) *v1.AdmissionResponse {
-	return &v1.AdmissionResponse{
+func toV1AdmissionResponse(err error) *admissionv1.AdmissionResponse {
+	return &admissionv1.AdmissionResponse{
 		Result: &metav1.Status{
 			Message: err.Error(),
 		},

@@ -32,7 +32,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -90,12 +90,12 @@ func TestRun(t *testing.T) {
 				Type: appsv1.RollingUpdateDeploymentStrategyType,
 			},
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
-			Template: corev1.PodTemplateSpec{
+			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"foo": "bar"},
 				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Name:  "foo",
 							Image: "foo",
@@ -715,7 +715,7 @@ func getOpenAPIDefinition(clientset *apiextensionsclientset.Clientset, definitio
 }
 
 // return the unique endpoint IPs
-func getEndpointIPs(endpoints *corev1.Endpoints) []string {
+func getEndpointIPs(endpoints *v1.Endpoints) []string {
 	endpointMap := make(map[string]bool)
 	ips := make([]string, 0)
 	for _, subset := range endpoints.Subsets {
@@ -860,13 +860,13 @@ func TestMultiAPIServerNodePortAllocation(t *testing.T) {
 		}
 	}
 
-	serviceObject := &corev1.Service{
+	serviceObject := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{"foo": "bar"},
 			Name:   "test-node-port",
 		},
-		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
 				{
 					Name:       "nodeport-test",
 					Port:       443,

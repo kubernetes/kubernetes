@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -125,9 +125,9 @@ func testLabels() map[string]string {
 	return map[string]string{"name": "test"}
 }
 
-func newDaemonSet(name, namespace string) *apps.DaemonSet {
+func newDaemonSet(name, namespace string) *appsv1.DaemonSet {
 	two := int32(2)
-	return &apps.DaemonSet{
+	return &appsv1.DaemonSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "DaemonSet",
 			APIVersion: "apps/v1",
@@ -136,11 +136,11 @@ func newDaemonSet(name, namespace string) *apps.DaemonSet {
 			Namespace: namespace,
 			Name:      name,
 		},
-		Spec: apps.DaemonSetSpec{
+		Spec: appsv1.DaemonSetSpec{
 			RevisionHistoryLimit: &two,
 			Selector:             &metav1.LabelSelector{MatchLabels: testLabels()},
-			UpdateStrategy: apps.DaemonSetUpdateStrategy{
-				Type: apps.OnDeleteDaemonSetStrategyType,
+			UpdateStrategy: appsv1.DaemonSetUpdateStrategy{
+				Type: appsv1.OnDeleteDaemonSetStrategyType,
 			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -155,7 +155,7 @@ func newDaemonSet(name, namespace string) *apps.DaemonSet {
 	}
 }
 
-func cleanupDaemonSets(t *testing.T, cs clientset.Interface, ds *apps.DaemonSet) {
+func cleanupDaemonSets(t *testing.T, cs clientset.Interface, ds *appsv1.DaemonSet) {
 	t.Helper()
 	ds, err := cs.AppsV1().DaemonSets(ds.Namespace).Get(context.TODO(), ds.Name, metav1.GetOptions{})
 	if err != nil {
@@ -201,22 +201,22 @@ func cleanupDaemonSets(t *testing.T, cs clientset.Interface, ds *apps.DaemonSet)
 	}
 }
 
-func newRollbackStrategy() *apps.DaemonSetUpdateStrategy {
+func newRollbackStrategy() *appsv1.DaemonSetUpdateStrategy {
 	one := intstr.FromInt32(1)
-	return &apps.DaemonSetUpdateStrategy{
-		Type:          apps.RollingUpdateDaemonSetStrategyType,
-		RollingUpdate: &apps.RollingUpdateDaemonSet{MaxUnavailable: &one},
+	return &appsv1.DaemonSetUpdateStrategy{
+		Type:          appsv1.RollingUpdateDaemonSetStrategyType,
+		RollingUpdate: &appsv1.RollingUpdateDaemonSet{MaxUnavailable: &one},
 	}
 }
 
-func newOnDeleteStrategy() *apps.DaemonSetUpdateStrategy {
-	return &apps.DaemonSetUpdateStrategy{
-		Type: apps.OnDeleteDaemonSetStrategyType,
+func newOnDeleteStrategy() *appsv1.DaemonSetUpdateStrategy {
+	return &appsv1.DaemonSetUpdateStrategy{
+		Type: appsv1.OnDeleteDaemonSetStrategyType,
 	}
 }
 
-func updateStrategies() []*apps.DaemonSetUpdateStrategy {
-	return []*apps.DaemonSetUpdateStrategy{newOnDeleteStrategy(), newRollbackStrategy()}
+func updateStrategies() []*appsv1.DaemonSetUpdateStrategy {
+	return []*appsv1.DaemonSetUpdateStrategy{newOnDeleteStrategy(), newRollbackStrategy()}
 }
 
 func allocatableResources(memory, cpu string) v1.ResourceList {
@@ -456,7 +456,7 @@ func waitForDaemonSetAndControllerRevisionCreated(c clientset.Interface, name st
 	})
 }
 
-func hashAndNameForDaemonSet(ds *apps.DaemonSet) (string, string) {
+func hashAndNameForDaemonSet(ds *appsv1.DaemonSet) (string, string) {
 	hash := fmt.Sprint(controller.ComputeHash(&ds.Spec.Template, ds.Status.CollisionCount))
 	name := ds.Name + "-" + hash
 	return hash, name
@@ -506,8 +506,8 @@ func validateUpdatedNumberScheduled(
 	}
 }
 
-func updateDS(t *testing.T, dsClient appstyped.DaemonSetInterface, dsName string, updateFunc func(*apps.DaemonSet)) *apps.DaemonSet {
-	var ds *apps.DaemonSet
+func updateDS(t *testing.T, dsClient appstyped.DaemonSetInterface, dsName string, updateFunc func(*appsv1.DaemonSet)) *appsv1.DaemonSet {
+	var ds *appsv1.DaemonSet
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		newDS, err := dsClient.Get(context.TODO(), dsName, metav1.GetOptions{})
 		if err != nil {
@@ -522,7 +522,7 @@ func updateDS(t *testing.T, dsClient appstyped.DaemonSetInterface, dsName string
 	return ds
 }
 
-func forEachStrategy(t *testing.T, tf func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy)) {
+func forEachStrategy(t *testing.T, tf func(t *testing.T, strategy *appsv1.DaemonSetUpdateStrategy)) {
 	for _, strategy := range updateStrategies() {
 		t.Run(string(strategy.Type), func(t *testing.T) {
 			tf(t, strategy)
@@ -531,7 +531,7 @@ func forEachStrategy(t *testing.T, tf func(t *testing.T, strategy *apps.DaemonSe
 }
 
 func TestOneNodeDaemonLaunchesPod(t *testing.T) {
-	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
+	forEachStrategy(t, func(t *testing.T, strategy *appsv1.DaemonSetUpdateStrategy) {
 		ctx, closeFn, dc, informers, clientset := setup(t)
 		defer closeFn()
 		ns := framework.CreateNamespaceOrDie(clientset, "one-node-daemonset-test", t)
@@ -564,7 +564,7 @@ func TestOneNodeDaemonLaunchesPod(t *testing.T) {
 }
 
 func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
-	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
+	forEachStrategy(t, func(t *testing.T, strategy *appsv1.DaemonSetUpdateStrategy) {
 		ctx, closeFn, dc, informers, clientset := setup(t)
 		defer closeFn()
 		ns := framework.CreateNamespaceOrDie(clientset, "simple-daemonset-test", t)
@@ -611,7 +611,7 @@ func TestSimpleDaemonSetRestartsPodsOnTerminalPhase(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
+			forEachStrategy(t, func(t *testing.T, strategy *appsv1.DaemonSetUpdateStrategy) {
 				ctx, closeFn, dc, informers, clientset := setup(t)
 				defer closeFn()
 				ns := framework.CreateNamespaceOrDie(clientset, "daemonset-restart-terminal-pod-test", t)
@@ -656,7 +656,7 @@ func TestSimpleDaemonSetRestartsPodsOnTerminalPhase(t *testing.T) {
 }
 
 func TestDaemonSetWithNodeSelectorLaunchesPods(t *testing.T) {
-	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
+	forEachStrategy(t, func(t *testing.T, strategy *appsv1.DaemonSetUpdateStrategy) {
 		ctx, closeFn, dc, informers, clientset := setup(t)
 		defer closeFn()
 		ns := framework.CreateNamespaceOrDie(clientset, "simple-daemonset-test", t)
@@ -719,7 +719,7 @@ func TestDaemonSetWithNodeSelectorLaunchesPods(t *testing.T) {
 }
 
 func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
-	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
+	forEachStrategy(t, func(t *testing.T, strategy *appsv1.DaemonSetUpdateStrategy) {
 		ctx, closeFn, dc, informers, clientset := setup(t)
 		defer closeFn()
 		ns := framework.CreateNamespaceOrDie(clientset, "simple-daemonset-test", t)
@@ -760,7 +760,7 @@ func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 // Pods for all the nodes regardless of available resource on the nodes, and kube-scheduler should
 // not schedule Pods onto the nodes with insufficient resource.
 func TestInsufficientCapacityNode(t *testing.T) {
-	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
+	forEachStrategy(t, func(t *testing.T, strategy *appsv1.DaemonSetUpdateStrategy) {
 		ctx, closeFn, dc, informers, clientset := setup(t)
 		defer closeFn()
 		ns := framework.CreateNamespaceOrDie(clientset, "insufficient-capacity", t)
@@ -840,9 +840,9 @@ func TestLaunchWithHashCollision(t *testing.T) {
 	// Create new DaemonSet with RollingUpdate strategy
 	orgDs := newDaemonSet("foo", ns.Name)
 	oneIntString := intstr.FromInt32(1)
-	orgDs.Spec.UpdateStrategy = apps.DaemonSetUpdateStrategy{
-		Type: apps.RollingUpdateDaemonSetStrategyType,
-		RollingUpdate: &apps.RollingUpdateDaemonSet{
+	orgDs.Spec.UpdateStrategy = appsv1.DaemonSetUpdateStrategy{
+		Type: appsv1.RollingUpdateDaemonSetStrategyType,
+		RollingUpdate: &appsv1.RollingUpdateDaemonSet{
 			MaxUnavailable: &oneIntString,
 		},
 	}
@@ -879,13 +879,13 @@ func TestLaunchWithHashCollision(t *testing.T) {
 	ds.Spec.Template.Spec.TerminationGracePeriodSeconds = &one
 
 	newHash, newName := hashAndNameForDaemonSet(ds)
-	newRevision := &apps.ControllerRevision{
+	newRevision := &appsv1.ControllerRevision{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            newName,
 			Namespace:       ds.Namespace,
-			Labels:          labelsutil.CloneAndAddLabel(ds.Spec.Template.Labels, apps.DefaultDaemonSetUniqueLabelKey, newHash),
+			Labels:          labelsutil.CloneAndAddLabel(ds.Spec.Template.Labels, appsv1.DefaultDaemonSetUniqueLabelKey, newHash),
 			Annotations:     ds.Annotations,
-			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(ds, apps.SchemeGroupVersion.WithKind("DaemonSet"))},
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(ds, appsv1.SchemeGroupVersion.WithKind("DaemonSet"))},
 		},
 		Data:     revision.Data,
 		Revision: revision.Revision + 1,
@@ -897,7 +897,7 @@ func TestLaunchWithHashCollision(t *testing.T) {
 
 	// Make an update of the DaemonSet which we know will create a hash collision when
 	// the next ControllerRevision is created.
-	ds = updateDS(t, dsClient, ds.Name, func(updateDS *apps.DaemonSet) {
+	ds = updateDS(t, dsClient, ds.Name, func(updateDS *appsv1.DaemonSet) {
 		updateDS.Spec.Template.Spec.TerminationGracePeriodSeconds = &one
 	})
 
@@ -945,9 +945,9 @@ func TestDSCUpdatesPodLabelAfterDedupCurHistories(t *testing.T) {
 	// Create new DaemonSet with RollingUpdate strategy
 	orgDs := newDaemonSet("foo", ns.Name)
 	oneIntString := intstr.FromInt32(1)
-	orgDs.Spec.UpdateStrategy = apps.DaemonSetUpdateStrategy{
-		Type: apps.RollingUpdateDaemonSetStrategyType,
-		RollingUpdate: &apps.RollingUpdateDaemonSet{
+	orgDs.Spec.UpdateStrategy = appsv1.DaemonSetUpdateStrategy{
+		Type: appsv1.RollingUpdateDaemonSetStrategyType,
+		RollingUpdate: &appsv1.RollingUpdateDaemonSet{
 			MaxUnavailable: &oneIntString,
 		},
 	}
@@ -980,13 +980,13 @@ func TestDSCUpdatesPodLabelAfterDedupCurHistories(t *testing.T) {
 	ds.Spec.Template.Spec.TerminationGracePeriodSeconds = &one
 
 	newHash, newName := hashAndNameForDaemonSet(ds)
-	newRevision := &apps.ControllerRevision{
+	newRevision := &appsv1.ControllerRevision{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            newName,
 			Namespace:       ds.Namespace,
-			Labels:          labelsutil.CloneAndAddLabel(ds.Spec.Template.Labels, apps.DefaultDaemonSetUniqueLabelKey, newHash),
+			Labels:          labelsutil.CloneAndAddLabel(ds.Spec.Template.Labels, appsv1.DefaultDaemonSetUniqueLabelKey, newHash),
 			Annotations:     ds.Annotations,
-			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(ds, apps.SchemeGroupVersion.WithKind("DaemonSet"))},
+			OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(ds, appsv1.SchemeGroupVersion.WithKind("DaemonSet"))},
 		},
 		Data:     revision.Data,
 		Revision: revision.Revision + 1,
@@ -1008,10 +1008,10 @@ func TestDSCUpdatesPodLabelAfterDedupCurHistories(t *testing.T) {
 		objects := podInformer.GetIndexer().List()
 		for _, object := range objects {
 			pod := object.(*v1.Pod)
-			t.Logf("newHash: %v, label: %v", newHash, pod.ObjectMeta.Labels[apps.DefaultDaemonSetUniqueLabelKey])
+			t.Logf("newHash: %v, label: %v", newHash, pod.ObjectMeta.Labels[appsv1.DefaultDaemonSetUniqueLabelKey])
 			for _, oref := range pod.OwnerReferences {
 				if oref.Name == ds.Name && oref.UID == ds.UID && oref.Kind == "DaemonSet" {
-					if pod.ObjectMeta.Labels[apps.DefaultDaemonSetUniqueLabelKey] != newHash {
+					if pod.ObjectMeta.Labels[appsv1.DefaultDaemonSetUniqueLabelKey] != newHash {
 						return false, nil
 					}
 				}
@@ -1033,7 +1033,7 @@ func TestDSCUpdatesPodLabelAfterDedupCurHistories(t *testing.T) {
 		}
 
 		for _, rev := range revs.Items {
-			t.Logf("revision: %v;hash: %v", rev.Name, rev.ObjectMeta.Labels[apps.DefaultDaemonSetUniqueLabelKey])
+			t.Logf("revision: %v;hash: %v", rev.Name, rev.ObjectMeta.Labels[appsv1.DefaultDaemonSetUniqueLabelKey])
 			for _, oref := range rev.OwnerReferences {
 				if oref.Kind == "DaemonSet" && oref.UID == ds.UID {
 					if rev.Name != newName {
@@ -1052,7 +1052,7 @@ func TestDSCUpdatesPodLabelAfterDedupCurHistories(t *testing.T) {
 
 // TestTaintedNode tests tainted node isn't expected to have pod scheduled
 func TestTaintedNode(t *testing.T) {
-	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
+	forEachStrategy(t, func(t *testing.T, strategy *appsv1.DaemonSetUpdateStrategy) {
 		ctx, closeFn, dc, informers, clientset := setup(t)
 		defer closeFn()
 		ns := framework.CreateNamespaceOrDie(clientset, "tainted-node", t)
@@ -1111,7 +1111,7 @@ func TestTaintedNode(t *testing.T) {
 // TestUnschedulableNodeDaemonDoesLaunchPod tests that the DaemonSet Pods can still be scheduled
 // to the Unschedulable nodes.
 func TestUnschedulableNodeDaemonDoesLaunchPod(t *testing.T) {
-	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
+	forEachStrategy(t, func(t *testing.T, strategy *appsv1.DaemonSetUpdateStrategy) {
 		ctx, closeFn, dc, informers, clientset := setup(t)
 		defer closeFn()
 		ns := framework.CreateNamespaceOrDie(clientset, "daemonset-unschedulable-test", t)
@@ -1174,7 +1174,7 @@ func TestUnschedulableNodeDaemonDoesLaunchPod(t *testing.T) {
 }
 
 func TestUpdateStatusDespitePodCreationFailure(t *testing.T) {
-	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
+	forEachStrategy(t, func(t *testing.T, strategy *appsv1.DaemonSetUpdateStrategy) {
 		limitedPodNumber := 2
 		ctx, closeFn, dc, informers, clientset := setupWithServerSetup(t, framework.TestServerSetup{
 			ModifyServerConfig: func(config *controlplane.Config) {
@@ -1229,9 +1229,9 @@ func TestDaemonSetRollingUpdateWithTolerations(t *testing.T) {
 	zero := intstr.FromInt32(0)
 	maxSurge := intstr.FromInt32(1)
 	ds := newDaemonSet("foo", ns.Name)
-	ds.Spec.UpdateStrategy = apps.DaemonSetUpdateStrategy{
-		Type: apps.RollingUpdateDaemonSetStrategyType,
-		RollingUpdate: &apps.RollingUpdateDaemonSet{
+	ds.Spec.UpdateStrategy = appsv1.DaemonSetUpdateStrategy{
+		Type: appsv1.RollingUpdateDaemonSetStrategyType,
+		RollingUpdate: &appsv1.RollingUpdateDaemonSet{
 			MaxUnavailable: &zero,
 			MaxSurge:       &maxSurge,
 		},

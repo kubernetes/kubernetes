@@ -19,14 +19,14 @@ package fixtures
 import (
 	"embed"
 
-	"k8s.io/kubernetes/test/e2e/framework/testfiles"
+	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
 //go:embed doc-yaml/user-guide/liveness doc-yaml/user-guide/secrets doc-yaml/user-guide/downward-api doc-yaml/user-guide/update-demo
 var testFixturesFS embed.FS
 
-func GetTestFixturesFS() testfiles.EmbeddedFileSource {
-	return testfiles.EmbeddedFileSource{
+func GetTestFixturesFS() e2etestfiles.EmbeddedFileSource {
+	return e2etestfiles.EmbeddedFileSource{
 		EmbeddedFS: testFixturesFS,
 		Root:       "test/fixtures",
 	}

@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -37,12 +37,12 @@ func TestPatches(t *testing.T) {
 	}{
 		{
 			patch: configMapPatch1,
-			initial: corev1.ConfigMap{
+			initial: v1.ConfigMap{
 				Data: map[string]string{
 					"mutation-start": "yes",
 				},
 			},
-			expected: &corev1.ConfigMap{
+			expected: &v1.ConfigMap{
 				Data: map[string]string{
 					"mutation-start":   "yes",
 					"mutation-stage-1": "yes",
@@ -51,12 +51,12 @@ func TestPatches(t *testing.T) {
 		},
 		{
 			patch: configMapPatch2,
-			initial: corev1.ConfigMap{
+			initial: v1.ConfigMap{
 				Data: map[string]string{
 					"mutation-start": "yes",
 				},
 			},
-			expected: &corev1.ConfigMap{
+			expected: &v1.ConfigMap{
 				Data: map[string]string{
 					"mutation-start":   "yes",
 					"mutation-stage-2": "yes",
@@ -66,18 +66,18 @@ func TestPatches(t *testing.T) {
 
 		{
 			patch: podsInitContainerPatch,
-			initial: corev1.Pod{
-				Spec: corev1.PodSpec{
-					InitContainers: []corev1.Container{},
+			initial: v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{},
 				},
 			},
-			expected: &corev1.Pod{
-				Spec: corev1.PodSpec{
-					InitContainers: []corev1.Container{
+			expected: &v1.Pod{
+				Spec: v1.PodSpec{
+					InitContainers: []v1.Container{
 						{
 							Image:     "webhook-added-image",
 							Name:      "webhook-added-init-container",
-							Resources: corev1.ResourceRequirements{},
+							Resources: v1.ResourceRequirements{},
 						},
 					},
 				},
@@ -85,29 +85,29 @@ func TestPatches(t *testing.T) {
 		},
 		{
 			patch: fmt.Sprintf(podsSidecarPatch, sidecarImage),
-			initial: corev1.Pod{
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
+			initial: v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Image:     "image1",
 							Name:      "container1",
-							Resources: corev1.ResourceRequirements{},
+							Resources: v1.ResourceRequirements{},
 						},
 					},
 				},
 			},
-			expected: &corev1.Pod{
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
+			expected: &v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Image:     "image1",
 							Name:      "container1",
-							Resources: corev1.ResourceRequirements{},
+							Resources: v1.ResourceRequirements{},
 						},
 						{
 							Image:     sidecarImage,
 							Name:      "webhook-added-sidecar",
-							Resources: corev1.ResourceRequirements{},
+							Resources: v1.ResourceRequirements{},
 						},
 					},
 				},

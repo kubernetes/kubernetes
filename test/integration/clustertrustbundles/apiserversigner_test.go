@@ -30,7 +30,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/certificates/v1beta1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -70,7 +70,7 @@ func TestClusterTrustBundlesPublisherController(t *testing.T) {
 		"--disable-admission-plugins", "ServiceAccount",
 		"--authorization-mode=RBAC",
 		"--feature-gates", "ClusterTrustBundle=true",
-		fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion),
+		fmt.Sprintf("--runtime-config=%s=true", certificatesv1beta1.SchemeGroupVersion),
 	}
 	storageConfig := framework.SharedEtcd()
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, apiServerFlags, storageConfig)
@@ -106,11 +106,11 @@ func TestClusterTrustBundlesPublisherController(t *testing.T) {
 	// set up a signer that's completely unrelated to the controller to check
 	// it's not anyhow handled by it
 	unrelatedCTB, err := clientSet.CertificatesV1beta1().ClusterTrustBundles().Create(ctx,
-		&v1beta1.ClusterTrustBundle{
+		&certificatesv1beta1.ClusterTrustBundle{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test.test:unrelated:0",
 			},
-			Spec: v1beta1.ClusterTrustBundleSpec{
+			Spec: certificatesv1beta1.ClusterTrustBundleSpec{
 				SignerName:  "test.test/unrelated",
 				TrustBundle: string(unrelatedPEM),
 			},
@@ -124,11 +124,11 @@ func TestClusterTrustBundlesPublisherController(t *testing.T) {
 	waitUntilSingleKASSignerCTB(ctx, t, clientSet, certPEM)
 
 	t.Log("check that the controller deletes any additional bundles for the same signer")
-	if _, err := clientSet.CertificatesV1beta1().ClusterTrustBundles().Create(ctx, &v1beta1.ClusterTrustBundle{
+	if _, err := clientSet.CertificatesV1beta1().ClusterTrustBundles().Create(ctx, &certificatesv1beta1.ClusterTrustBundle{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "kubernetes.io:kube-apiserver-serving:testname",
 		},
-		Spec: v1beta1.ClusterTrustBundleSpec{
+		Spec: certificatesv1beta1.ClusterTrustBundleSpec{
 			SignerName:  "kubernetes.io/kube-apiserver-serving",
 			TrustBundle: string(certPEM),
 		},

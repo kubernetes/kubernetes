@@ -30,7 +30,7 @@ import (
 
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
@@ -175,7 +175,7 @@ func Test_MutatingWebhookConvertsGVKWithMatchPolicyEquivalent(t *testing.T) {
 
 	// Write markers to a separate namespace to avoid cross-talk
 	markerNs := "marker"
-	_, err = client.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: markerNs}}, metav1.CreateOptions{})
+	_, err = client.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: markerNs}}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,7 +257,7 @@ func Test_MutatingWebhookConvertsGVKWithMatchPolicyEquivalent(t *testing.T) {
 					CABundle: localhostCert,
 				},
 				NamespaceSelector: &metav1.LabelSelector{MatchLabels: map[string]string{
-					corev1.LabelMetadataName: "marker",
+					v1.LabelMetadataName: "marker",
 				}},
 				ObjectSelector:          &metav1.LabelSelector{MatchLabels: map[string]string{"marker": "true"}},
 				SideEffects:             &noSideEffects,
@@ -330,8 +330,8 @@ func Test_MutatingWebhookConvertsGVKWithMatchPolicyEquivalent(t *testing.T) {
 	}
 }
 
-func newMarkerPodGVKConversion(namespace string) *corev1.Pod {
-	return &corev1.Pod{
+func newMarkerPodGVKConversion(namespace string) *v1.Pod {
+	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
 			Name:      "marker",
@@ -339,8 +339,8 @@ func newMarkerPodGVKConversion(namespace string) *corev1.Pod {
 				"marker": "true",
 			},
 		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
 				Name:  "fake-name",
 				Image: "fakeimage",
 			}},

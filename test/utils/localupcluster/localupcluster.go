@@ -47,7 +47,7 @@ import (
 	"github.com/onsi/gomega/format"
 	"github.com/onsi/gomega/gstruct"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -493,11 +493,11 @@ func (c *Cluster) checkReadiness(tCtx ktesting.TContext, cmd *Cmd) {
 		c.checkHealthz(tCtx, cmd, "https", c.settings["KUBELET_HOST"], c.settings["KUBELET_PORT"], tlsConfigWithClientCert)
 
 		// Also wait for the node to be ready.
-		tCtx.WithStep("wait for node ready").Eventually(func(tCtx ktesting.TContext) (*corev1.NodeList, error) {
+		tCtx.WithStep("wait for node ready").Eventually(func(tCtx ktesting.TContext) (*v1.NodeList, error) {
 			return tCtx.Client().CoreV1().Nodes().List(tCtx, metav1.ListOptions{})
 		}).Should(gomega.HaveField("Items", gomega.ConsistOf(gomega.HaveField("Status.Conditions", gomega.ContainElement(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
-			"Type":   gomega.Equal(corev1.NodeReady),
-			"Status": gomega.Equal(corev1.ConditionTrue),
+			"Type":   gomega.Equal(v1.NodeReady),
+			"Status": gomega.Equal(v1.ConditionTrue),
 		}))))))
 	}
 }

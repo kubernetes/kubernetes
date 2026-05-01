@@ -24,7 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -49,7 +49,7 @@ func TestPodGroupPreemption(t *testing.T) {
 	tests := []struct {
 		name                       string
 		nodes                      []*v1.Node
-		podGroups                  []*schedulingapi.PodGroup
+		podGroups                  []*schedulingv1alpha2.PodGroup
 		initialPods                []*v1.Pod // pods that should be scheduled before preemption starts
 		preemptorPods              []*v1.Pod // pods that belong to a group and should trigger preemption
 		pdb                        *policyv1.PodDisruptionBudget
@@ -63,7 +63,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			podGroups: []*schedulingapi.PodGroup{
+			podGroups: []*schedulingv1alpha2.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(3).Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -85,7 +85,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			podGroups: []*schedulingapi.PodGroup{
+			podGroups: []*schedulingv1alpha2.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).BasicPolicy().Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -108,7 +108,7 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			podGroups: []*schedulingapi.PodGroup{
+			podGroups: []*schedulingv1alpha2.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(3).Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -134,7 +134,7 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			podGroups: []*schedulingapi.PodGroup{
+			podGroups: []*schedulingv1alpha2.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).BasicPolicy().Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -159,7 +159,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			podGroups: []*schedulingapi.PodGroup{
+			podGroups: []*schedulingv1alpha2.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -188,7 +188,7 @@ func TestPodGroupPreemption(t *testing.T) {
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 				st.MakeNode().Name("node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			podGroups: []*schedulingapi.PodGroup{
+			podGroups: []*schedulingv1alpha2.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(4).Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -212,7 +212,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			podGroups: []*schedulingapi.PodGroup{
+			podGroups: []*schedulingv1alpha2.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(3).Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -235,7 +235,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			podGroups: []*schedulingapi.PodGroup{
+			podGroups: []*schedulingv1alpha2.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(2).Obj(),
 			},
 			initialPods: []*v1.Pod{
@@ -256,9 +256,9 @@ func TestPodGroupPreemption(t *testing.T) {
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			podGroups: []*schedulingapi.PodGroup{
+			podGroups: []*schedulingv1alpha2.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(1).Obj(),
-				st.MakePodGroup().Name("pg2").Namespace("default").DisruptionMode(schedulingapi.DisruptionModePodGroup).Priority(10).MinCount(3).Obj(),
+				st.MakePodGroup().Name("pg2").Namespace("default").DisruptionMode(schedulingv1alpha2.DisruptionModePodGroup).Priority(10).MinCount(3).Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg2").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -277,9 +277,9 @@ func TestPodGroupPreemption(t *testing.T) {
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			podGroups: []*schedulingapi.PodGroup{
+			podGroups: []*schedulingv1alpha2.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(1).Obj(),
-				st.MakePodGroup().Name("pg2").Namespace("default").DisruptionMode(schedulingapi.DisruptionModePodGroup).Priority(10).BasicPolicy().Obj(),
+				st.MakePodGroup().Name("pg2").Namespace("default").DisruptionMode(schedulingv1alpha2.DisruptionModePodGroup).Priority(10).BasicPolicy().Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg2").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -298,9 +298,9 @@ func TestPodGroupPreemption(t *testing.T) {
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			podGroups: []*schedulingapi.PodGroup{
+			podGroups: []*schedulingv1alpha2.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("default").Priority(100).MinCount(1).Obj(),
-				st.MakePodGroup().Name("pg2").Namespace("default").DisruptionMode(schedulingapi.DisruptionModePodGroup).Priority(10).MinCount(3).Obj(),
+				st.MakePodGroup().Name("pg2").Namespace("default").DisruptionMode(schedulingv1alpha2.DisruptionModePodGroup).Priority(10).MinCount(3).Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("high-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg2").ZeroTerminationGracePeriod().Priority(100).Obj(),
@@ -319,9 +319,9 @@ func TestPodGroupPreemption(t *testing.T) {
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			podGroups: []*schedulingapi.PodGroup{
+			podGroups: []*schedulingv1alpha2.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("default").Priority(10).MinCount(1).Obj(),
-				st.MakePodGroup().Name("pg2").Namespace("default").DisruptionMode(schedulingapi.DisruptionModePodGroup).Priority(100).MinCount(3).Obj(),
+				st.MakePodGroup().Name("pg2").Namespace("default").DisruptionMode(schedulingv1alpha2.DisruptionModePodGroup).Priority(100).MinCount(3).Obj(),
 			},
 			initialPods: []*v1.Pod{
 				st.MakePod().Name("low-1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg2").ZeroTerminationGracePeriod().Priority(10).Obj(),
@@ -341,7 +341,7 @@ func TestPodGroupPreemption(t *testing.T) {
 			nodes: []*v1.Node{
 				st.MakeNode().Name("node1").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "3", v1.ResourceMemory: "4Gi", v1.ResourcePods: "32"}).Obj(),
 			},
-			podGroups: []*schedulingapi.PodGroup{
+			podGroups: []*schedulingv1alpha2.PodGroup{
 				st.MakePodGroup().Name("pg1").Namespace("default").Priority(10).MinCount(1).Obj(),
 			},
 			initialPods: []*v1.Pod{

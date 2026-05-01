@@ -19,14 +19,14 @@ package testdata
 import (
 	"embed"
 
-	"k8s.io/kubernetes/test/e2e/framework/testfiles"
+	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
 //go:embed conformance.yaml ineligible_endpoints.yaml
 var conformanceTestdataFS embed.FS
 
-func GetConformanceTestdataFS() testfiles.EmbeddedFileSource {
-	return testfiles.EmbeddedFileSource{
+func GetConformanceTestdataFS() e2etestfiles.EmbeddedFileSource {
+	return e2etestfiles.EmbeddedFileSource{
 		EmbeddedFS: conformanceTestdataFS,
 		Root:       "test/conformance/testdata",
 	}

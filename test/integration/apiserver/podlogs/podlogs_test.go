@@ -38,8 +38,8 @@ import (
 	"testing"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
@@ -96,7 +96,7 @@ Bgqc+dJN9xS9Ah5gLiGQJ6C4niUA11piCpvMsy+j/LQ1Erx47KMar5fuMXYk7iPq
 
 	pod := prepareFakeNodeAndPod(tCtx, t, clientSet, fakeKubeletServer)
 
-	insecureResult := clientSet.CoreV1().Pods("ns").GetLogs(pod.Name, &corev1.PodLogOptions{InsecureSkipTLSVerifyBackend: true}).Do(context.TODO())
+	insecureResult := clientSet.CoreV1().Pods("ns").GetLogs(pod.Name, &v1.PodLogOptions{InsecureSkipTLSVerifyBackend: true}).Do(context.TODO())
 	if err := insecureResult.Error(); err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +106,7 @@ Bgqc+dJN9xS9Ah5gLiGQJ6C4niUA11piCpvMsy+j/LQ1Erx47KMar5fuMXYk7iPq
 		t.Fatal(insecureStatusCode)
 	}
 
-	secureResult := clientSet.CoreV1().Pods("ns").GetLogs(pod.Name, &corev1.PodLogOptions{}).Do(tCtx)
+	secureResult := clientSet.CoreV1().Pods("ns").GetLogs(pod.Name, &v1.PodLogOptions{}).Do(tCtx)
 	if err := secureResult.Error(); err == nil || !strings.Contains(err.Error(), "x509: certificate signed by unknown authority") {
 		t.Fatal(err)
 	}
@@ -122,7 +122,7 @@ Bgqc+dJN9xS9Ah5gLiGQJ6C4niUA11piCpvMsy+j/LQ1Erx47KMar5fuMXYk7iPq
 	}
 }
 
-func prepareFakeNodeAndPod(ctx context.Context, t *testing.T, clientSet kubernetes.Interface, fakeKubeletServer *httptest.Server) *corev1.Pod {
+func prepareFakeNodeAndPod(ctx context.Context, t *testing.T, clientSet kubernetes.Interface, fakeKubeletServer *httptest.Server) *v1.Pod {
 	t.Helper()
 
 	fakeKubeletURL, err := url.Parse(fakeKubeletServer.URL)
@@ -138,21 +138,21 @@ func prepareFakeNodeAndPod(ctx context.Context, t *testing.T, clientSet kubernet
 		t.Fatal(err)
 	}
 
-	node, err := clientSet.CoreV1().Nodes().Create(ctx, &corev1.Node{
+	node, err := clientSet.CoreV1().Nodes().Create(ctx, &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: "fake"},
 	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	node.Status = corev1.NodeStatus{
-		Addresses: []corev1.NodeAddress{
+	node.Status = v1.NodeStatus{
+		Addresses: []v1.NodeAddress{
 			{
-				Type:    corev1.NodeExternalIP,
+				Type:    v1.NodeExternalIP,
 				Address: fakeKubeletHost,
 			},
 		},
-		DaemonEndpoints: corev1.NodeDaemonEndpoints{
-			KubeletEndpoint: corev1.DaemonEndpoint{
+		DaemonEndpoints: v1.NodeDaemonEndpoints{
+			KubeletEndpoint: v1.DaemonEndpoint{
 				Port: int32(fakeKubeletPort),
 			},
 		},
@@ -162,14 +162,14 @@ func prepareFakeNodeAndPod(ctx context.Context, t *testing.T, clientSet kubernet
 		t.Fatal(err)
 	}
 
-	_, err = clientSet.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+	_, err = clientSet.CoreV1().Namespaces().Create(ctx, &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{Name: "ns"},
 	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = clientSet.CoreV1().ServiceAccounts("ns").Create(ctx, &corev1.ServiceAccount{
+	_, err = clientSet.CoreV1().ServiceAccounts("ns").Create(ctx, &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{Name: "default", Namespace: "ns"},
 	}, metav1.CreateOptions{})
 	if err != nil {
@@ -177,10 +177,10 @@ func prepareFakeNodeAndPod(ctx context.Context, t *testing.T, clientSet kubernet
 	}
 
 	falseRef := false
-	pod, err := clientSet.CoreV1().Pods("ns").Create(ctx, &corev1.Pod{
+	pod, err := clientSet.CoreV1().Pods("ns").Create(ctx, &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "ns"},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  "foo",
 					Image: "some/image:latest",
@@ -262,7 +262,7 @@ func TestPodLogsKubeletClientCertReload(t *testing.T) {
 	pod := prepareFakeNodeAndPod(ctx, t, clientSet, fakeKubeletServer)
 
 	// verify that the starting state works as expected
-	podLogs, err := clientSet.CoreV1().Pods("ns").GetLogs(pod.Name, &corev1.PodLogOptions{}).DoRaw(ctx)
+	podLogs, err := clientSet.CoreV1().Pods("ns").GetLogs(pod.Name, &v1.PodLogOptions{}).DoRaw(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -278,8 +278,8 @@ func TestPodLogsKubeletClientCertReload(t *testing.T) {
 
 	// wait until the kubelet observes the new CA
 	if err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
-		_, errLog := clientSet.CoreV1().Pods("ns").GetLogs(pod.Name, &corev1.PodLogOptions{}).DoRaw(ctx)
-		if errors.IsUnauthorized(errLog) {
+		_, errLog := clientSet.CoreV1().Pods("ns").GetLogs(pod.Name, &v1.PodLogOptions{}).DoRaw(ctx)
+		if apierrors.IsUnauthorized(errLog) {
 			return true, nil
 		}
 		return false, errLog
@@ -297,8 +297,8 @@ func TestPodLogsKubeletClientCertReload(t *testing.T) {
 
 	// confirm that the API server observes the new client cert and closes existing connections to use it
 	if err := wait.PollUntilContextCancel(ctx, time.Second, true, func(ctx context.Context) (bool, error) {
-		fixedPodLogs, errLog := clientSet.CoreV1().Pods("ns").GetLogs(pod.Name, &corev1.PodLogOptions{}).DoRaw(ctx)
-		if errors.IsUnauthorized(errLog) {
+		fixedPodLogs, errLog := clientSet.CoreV1().Pods("ns").GetLogs(pod.Name, &v1.PodLogOptions{}).DoRaw(ctx)
+		if apierrors.IsUnauthorized(errLog) {
 			t.Log("api server has not observed new client cert")
 			return false, nil
 		}

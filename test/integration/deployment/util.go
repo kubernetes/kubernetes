@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -49,18 +49,18 @@ const (
 	fakeImage         = "fakeimage"
 )
 
-var pauseFn = func(update *apps.Deployment) {
+var pauseFn = func(update *appsv1.Deployment) {
 	update.Spec.Paused = true
 }
 
-var resumeFn = func(update *apps.Deployment) {
+var resumeFn = func(update *appsv1.Deployment) {
 	update.Spec.Paused = false
 }
 
 type deploymentTester struct {
 	t          *testing.T
 	c          clientset.Interface
-	deployment *apps.Deployment
+	deployment *appsv1.Deployment
 }
 
 func testLabels() map[string]string {
@@ -68,8 +68,8 @@ func testLabels() map[string]string {
 }
 
 // newDeployment returns a RollingUpdate Deployment with a fake container image
-func newDeployment(name, ns string, replicas int32) *apps.Deployment {
-	return &apps.Deployment{
+func newDeployment(name, ns string, replicas int32) *appsv1.Deployment {
+	return &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Deployment",
 			APIVersion: "apps/v1",
@@ -78,12 +78,12 @@ func newDeployment(name, ns string, replicas int32) *apps.Deployment {
 			Namespace: ns,
 			Name:      name,
 		},
-		Spec: apps.DeploymentSpec{
+		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{MatchLabels: testLabels()},
-			Strategy: apps.DeploymentStrategy{
-				Type:          apps.RollingUpdateDeploymentStrategyType,
-				RollingUpdate: new(apps.RollingUpdateDeployment),
+			Strategy: appsv1.DeploymentStrategy{
+				Type:          appsv1.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: new(appsv1.RollingUpdateDeployment),
 			},
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -339,7 +339,7 @@ func (d *deploymentTester) waitForDeploymentCompleteAndMarkPodsReadyAndRemoveTer
 	return nil
 }
 
-func (d *deploymentTester) updateDeployment(applyUpdate testutil.UpdateDeploymentFunc) (*apps.Deployment, error) {
+func (d *deploymentTester) updateDeployment(applyUpdate testutil.UpdateDeploymentFunc) (*appsv1.Deployment, error) {
 	return testutil.UpdateDeploymentWithRetries(d.c, d.deployment.Namespace, d.deployment.Name, applyUpdate, d.t.Logf, pollInterval, pollTimeout)
 }
 
@@ -350,7 +350,7 @@ func (d *deploymentTester) waitForObservedDeployment(desiredGeneration int64) er
 	return nil
 }
 
-func (d *deploymentTester) getNewReplicaSet() (*apps.ReplicaSet, error) {
+func (d *deploymentTester) getNewReplicaSet() (*appsv1.ReplicaSet, error) {
 	deployment, err := d.c.AppsV1().Deployments(d.deployment.Namespace).Get(context.TODO(), d.deployment.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed retrieving deployment %s: %v", d.deployment.Name, err)
@@ -373,7 +373,7 @@ func (d *deploymentTester) expectNoNewReplicaSet() error {
 	return nil
 }
 
-func (d *deploymentTester) expectNewReplicaSet() (*apps.ReplicaSet, error) {
+func (d *deploymentTester) expectNewReplicaSet() (*appsv1.ReplicaSet, error) {
 	rs, err := d.getNewReplicaSet()
 	if err != nil {
 		return nil, err
@@ -384,7 +384,7 @@ func (d *deploymentTester) expectNewReplicaSet() (*apps.ReplicaSet, error) {
 	return rs, nil
 }
 
-func (d *deploymentTester) updateReplicaSet(name string, applyUpdate testutil.UpdateReplicaSetFunc) (*apps.ReplicaSet, error) {
+func (d *deploymentTester) updateReplicaSet(name string, applyUpdate testutil.UpdateReplicaSetFunc) (*appsv1.ReplicaSet, error) {
 	return testutil.UpdateReplicaSetWithRetries(d.c, d.deployment.Namespace, name, applyUpdate, d.t.Logf, pollInterval, pollTimeout)
 }
 
@@ -392,7 +392,7 @@ func (d *deploymentTester) waitForDeploymentUpdatedReplicasGTE(minUpdatedReplica
 	return testutil.WaitForDeploymentUpdatedReplicasGTE(d.c, d.deployment.Namespace, d.deployment.Name, minUpdatedReplicas, d.deployment.Generation, pollInterval, pollTimeout)
 }
 
-func (d *deploymentTester) waitForDeploymentWithCondition(reason string, condType apps.DeploymentConditionType) error {
+func (d *deploymentTester) waitForDeploymentWithCondition(reason string, condType appsv1.DeploymentConditionType) error {
 	return testutil.WaitForDeploymentWithCondition(d.c, d.deployment.Namespace, d.deployment.Name, reason, condType, d.t.Logf, pollInterval, pollTimeout)
 }
 
@@ -423,13 +423,13 @@ func (d *deploymentTester) listUpdatedPods() ([]v1.Pod, error) {
 	return ownedPods, nil
 }
 
-func (d *deploymentTester) waitRSStable(replicaset *apps.ReplicaSet) error {
+func (d *deploymentTester) waitRSStable(replicaset *appsv1.ReplicaSet) error {
 	return testutil.WaitRSStable(d.t, d.c, replicaset, pollInterval, pollTimeout)
 }
 
 func (d *deploymentTester) scaleDeployment(newReplicas int32) error {
 	var err error
-	d.deployment, err = d.updateDeployment(func(update *apps.Deployment) {
+	d.deployment, err = d.updateDeployment(func(update *appsv1.Deployment) {
 		update.Spec.Replicas = &newReplicas
 	})
 	if err != nil {
@@ -531,7 +531,7 @@ func (d *deploymentTester) checkDeploymentStatusReplicasFields(replicas, updated
 	return nil
 }
 
-func (d *deploymentTester) removeRSPods(ctx context.Context, replicaset *apps.ReplicaSet, count int, targetOnlyTerminating bool, gracePeriodSeconds int64) error {
+func (d *deploymentTester) removeRSPods(ctx context.Context, replicaset *appsv1.ReplicaSet, count int, targetOnlyTerminating bool, gracePeriodSeconds int64) error {
 	selector, err := metav1.LabelSelectorAsSelector(replicaset.Spec.Selector)
 	if err != nil {
 		return fmt.Errorf("could not parse a selector for a replica set %q: %w", replicaset.Name, err)

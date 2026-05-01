@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -67,12 +67,12 @@ func Test_ExternalNameServiceStopsDefaultingInternalTrafficPolicy(t *testing.T) 
 	ns := framework.CreateNamespaceOrDie(client, "test-external-name-drops-internal-traffic-policy", t)
 	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
-	service := &corev1.Service{
+	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-123",
 		},
-		Spec: corev1.ServiceSpec{
-			Type:         corev1.ServiceTypeExternalName,
+		Spec: v1.ServiceSpec{
+			Type:         v1.ServiceTypeExternalName,
 			ExternalName: "foo.bar.com",
 		},
 	}
@@ -111,13 +111,13 @@ func Test_ExternalNameServiceDropsInternalTrafficPolicy(t *testing.T) {
 	ns := framework.CreateNamespaceOrDie(client, "test-external-name-drops-internal-traffic-policy", t)
 	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
-	internalTrafficPolicy := corev1.ServiceInternalTrafficPolicyCluster
-	service := &corev1.Service{
+	internalTrafficPolicy := v1.ServiceInternalTrafficPolicyCluster
+	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-123",
 		},
-		Spec: corev1.ServiceSpec{
-			Type:                  corev1.ServiceTypeExternalName,
+		Spec: v1.ServiceSpec{
+			Type:                  v1.ServiceTypeExternalName,
 			ExternalName:          "foo.bar.com",
 			InternalTrafficPolicy: &internalTrafficPolicy,
 		},
@@ -158,13 +158,13 @@ func Test_ConvertingToExternalNameServiceDropsInternalTrafficPolicy(t *testing.T
 	ns := framework.CreateNamespaceOrDie(client, "test-external-name-drops-internal-traffic-policy", t)
 	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
-	service := &corev1.Service{
+	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-123",
 		},
-		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeClusterIP,
-			Ports: []corev1.ServicePort{{
+		Spec: v1.ServiceSpec{
+			Type: v1.ServiceTypeClusterIP,
+			Ports: []v1.ServicePort{{
 				Port: int32(80),
 			}},
 			Selector: map[string]string{
@@ -178,12 +178,12 @@ func Test_ConvertingToExternalNameServiceDropsInternalTrafficPolicy(t *testing.T
 		t.Fatalf("Error creating test service: %v", err)
 	}
 
-	if *service.Spec.InternalTrafficPolicy != corev1.ServiceInternalTrafficPolicyCluster {
+	if *service.Spec.InternalTrafficPolicy != v1.ServiceInternalTrafficPolicyCluster {
 		t.Error("service internalTrafficPolicy was not set for clusterIP Service")
 	}
 
 	newService := service.DeepCopy()
-	newService.Spec.Type = corev1.ServiceTypeExternalName
+	newService.Spec.Type = v1.ServiceTypeExternalName
 	newService.Spec.ExternalName = "foo.bar.com"
 
 	service, err = client.CoreV1().Services(ns.Name).Update(context.TODO(), newService, metav1.UpdateOptions{})
@@ -219,13 +219,13 @@ func Test_RemovingExternalIPsFromClusterIPServiceDropsExternalTrafficPolicy(t *t
 	ns := framework.CreateNamespaceOrDie(client, "test-removing-external-ips-drops-external-traffic-policy", t)
 	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
-	service := &corev1.Service{
+	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-123",
 		},
-		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeClusterIP,
-			Ports: []corev1.ServicePort{{
+		Spec: v1.ServiceSpec{
+			Type: v1.ServiceTypeClusterIP,
+			Ports: []v1.ServicePort{{
 				Port: int32(80),
 			}},
 			Selector: map[string]string{
@@ -240,7 +240,7 @@ func Test_RemovingExternalIPsFromClusterIPServiceDropsExternalTrafficPolicy(t *t
 		t.Fatalf("Error creating test service: %v", err)
 	}
 
-	if service.Spec.ExternalTrafficPolicy != corev1.ServiceExternalTrafficPolicyCluster {
+	if service.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyCluster {
 		t.Error("service externalTrafficPolicy was not set for clusterIP Service with externalIPs")
 	}
 
@@ -275,7 +275,7 @@ func Test_RemovingExternalIPsFromClusterIPServiceDropsExternalTrafficPolicy(t *t
 		t.Fatalf("error updating service: %v", err)
 	}
 
-	if service.Spec.ExternalTrafficPolicy != corev1.ServiceExternalTrafficPolicyCluster {
+	if service.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyCluster {
 		t.Error("service externalTrafficPolicy was not set for clusterIP Service with externalIPs")
 	}
 
@@ -284,7 +284,7 @@ func Test_RemovingExternalIPsFromClusterIPServiceDropsExternalTrafficPolicy(t *t
 		t.Fatalf("error getting service: %v", err)
 	}
 
-	if service.Spec.ExternalTrafficPolicy != corev1.ServiceExternalTrafficPolicyCluster {
+	if service.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyCluster {
 		t.Error("service externalTrafficPolicy was not set for clusterIP Service with externalIPs")
 	}
 }
@@ -396,16 +396,16 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 	ns := framework.CreateNamespaceOrDie(client, "test-service-traffic-distribution", t)
 	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
-	node := &corev1.Node{
+	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "fake-node",
 			Labels: map[string]string{
-				corev1.LabelTopologyZone: "fake-zone-1",
+				v1.LabelTopologyZone: "fake-zone-1",
 			},
 		},
 	}
 
-	pod := &corev1.Pod{
+	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-pod",
 			Namespace: ns.GetName(),
@@ -413,13 +413,13 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 				"foo": "bar",
 			},
 		},
-		Spec: corev1.PodSpec{
+		Spec: v1.PodSpec{
 			NodeName: node.GetName(),
-			Containers: []corev1.Container{
+			Containers: []v1.Container{
 				{
 					Name:  "fake-name",
 					Image: "fake-image",
-					Ports: []corev1.ContainerPort{
+					Ports: []v1.ContainerPort{
 						{
 							Name:          "port-443",
 							ContainerPort: 443,
@@ -428,16 +428,16 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 				},
 			},
 		},
-		Status: corev1.PodStatus{
-			Phase: corev1.PodRunning,
-			Conditions: []corev1.PodCondition{
+		Status: v1.PodStatus{
+			Phase: v1.PodRunning,
+			Conditions: []v1.PodCondition{
 				{
-					Type:   corev1.PodReady,
-					Status: corev1.ConditionTrue,
+					Type:   v1.PodReady,
+					Status: v1.ConditionTrue,
 				},
 			},
 			PodIP: "10.0.0.1",
-			PodIPs: []corev1.PodIP{
+			PodIPs: []v1.PodIP{
 				{
 					IP: "10.0.0.1",
 				},
@@ -445,16 +445,16 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 		},
 	}
 
-	svc := &corev1.Service{
+	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-service",
 			Namespace: ns.GetName(),
 		},
-		Spec: corev1.ServiceSpec{
+		Spec: v1.ServiceSpec{
 			Selector: map[string]string{
 				"foo": "bar",
 			},
-			Ports: []corev1.ServicePort{
+			Ports: []v1.ServicePort{
 				{Name: "port-443", Port: 443, Protocol: "TCP", TargetPort: intstr.FromInt32(443)},
 			},
 		},
@@ -491,7 +491,7 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 	// Assert that the respective EndpointSlices get the same-zone hints.
 	////////////////////////////////////////////////////////////////////////////
 
-	trafficDist := corev1.ServiceTrafficDistributionPreferClose
+	trafficDist := v1.ServiceTrafficDistributionPreferClose
 	svc.Spec.TrafficDistribution = &trafficDist
 	_, err = client.CoreV1().Services(ns.Name).Update(ctx, svc, metav1.UpdateOptions{})
 	if err != nil {
@@ -509,7 +509,7 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 	// annotation would not work with only one service pod.
 	////////////////////////////////////////////////////////////////////////////
 
-	svc.Annotations = map[string]string{corev1.AnnotationTopologyMode: "Auto"}
+	svc.Annotations = map[string]string{v1.AnnotationTopologyMode: "Auto"}
 	_, err = client.CoreV1().Services(ns.Name).Update(ctx, svc, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to update test service with 'service.kubernetes.io/topology-mode=Auto' annotation: %v", err)
@@ -553,7 +553,7 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 	// Assert that the respective EndpointSlices get the same-zone hints.
 	////////////////////////////////////////////////////////////////////////////
 
-	trafficDist = corev1.ServiceTrafficDistributionPreferSameZone
+	trafficDist = v1.ServiceTrafficDistributionPreferSameZone
 	svc.Spec.TrafficDistribution = &trafficDist
 	_, err = client.CoreV1().Services(ns.Name).Update(ctx, svc, metav1.UpdateOptions{})
 	if err != nil {
@@ -569,7 +569,7 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 	// same-node hints.
 	////////////////////////////////////////////////////////////////////////////
 
-	trafficDist = corev1.ServiceTrafficDistributionPreferSameNode
+	trafficDist = v1.ServiceTrafficDistributionPreferSameNode
 	svc.Spec.TrafficDistribution = &trafficDist
 	_, err = client.CoreV1().Services(ns.Name).Update(ctx, svc, metav1.UpdateOptions{})
 	if err != nil {
@@ -600,13 +600,13 @@ func Test_TransitionsForTrafficDistribution(t *testing.T) {
 	// same-zone.
 	////////////////////////////////////////////////////////////////////////////
 
-	delete(node.Labels, corev1.LabelTopologyZone)
+	delete(node.Labels, v1.LabelTopologyZone)
 	_, err = client.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to update test node with no zone label: %v", err)
 	}
 
-	trafficDist = corev1.ServiceTrafficDistributionPreferSameNode
+	trafficDist = v1.ServiceTrafficDistributionPreferSameNode
 	svc.Spec.TrafficDistribution = &trafficDist
 	_, err = client.CoreV1().Services(ns.Name).Update(ctx, svc, metav1.UpdateOptions{})
 	if err != nil {
@@ -632,15 +632,15 @@ func Test_ServiceClusterIPSelector(t *testing.T) {
 	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
 	// create headless service
-	service := &corev1.Service{
+	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-headless",
 			Namespace: ns.Name,
 		},
-		Spec: corev1.ServiceSpec{
-			ClusterIP: corev1.ClusterIPNone,
-			Type:      corev1.ServiceTypeClusterIP,
-			Ports: []corev1.ServicePort{{
+		Spec: v1.ServiceSpec{
+			ClusterIP: v1.ClusterIPNone,
+			Type:      v1.ServiceTypeClusterIP,
+			Ports: []v1.ServicePort{{
 				Port: int32(80),
 			}},
 			Selector: map[string]string{
@@ -656,7 +656,7 @@ func Test_ServiceClusterIPSelector(t *testing.T) {
 
 	// informer to watch only non-headless services
 	kubeInformers := informers.NewSharedInformerFactoryWithOptions(client, 0, informers.WithTweakListOptions(func(options *metav1.ListOptions) {
-		options.FieldSelector = fields.OneTermNotEqualSelector("spec.clusterIP", corev1.ClusterIPNone).String()
+		options.FieldSelector = fields.OneTermNotEqualSelector("spec.clusterIP", v1.ClusterIPNone).String()
 	}))
 
 	serviceInformer := kubeInformers.Core().V1().Services().Informer()
@@ -665,16 +665,16 @@ func Test_ServiceClusterIPSelector(t *testing.T) {
 	if _, err = serviceInformer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				svc := obj.(*corev1.Service)
+				svc := obj.(*v1.Service)
 				t.Logf("Added Service %#v", svc)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
-				oldSvc := oldObj.(*corev1.Service)
-				newSvc := newObj.(*corev1.Service)
+				oldSvc := oldObj.(*v1.Service)
+				newSvc := newObj.(*v1.Service)
 				t.Logf("Updated Service %#v to %#v", oldSvc, newSvc)
 			},
 			DeleteFunc: func(obj interface{}) {
-				svc := obj.(*corev1.Service)
+				svc := obj.(*v1.Service)
 				t.Logf("Deleted Service %#v", svc)
 			},
 		},
@@ -714,7 +714,7 @@ func Test_ServiceClusterIPSelector(t *testing.T) {
 
 	// mutate the Service to drop the ClusterIP, theoretically ClusterIP is inmutable but ...
 	service.Spec.ExternalName = "test"
-	service.Spec.Type = corev1.ServiceTypeExternalName
+	service.Spec.Type = v1.ServiceTypeExternalName
 	_, err = client.CoreV1().Services(ns.Name).Update(ctx, service, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Error creating test service: %v", err)
@@ -734,7 +734,7 @@ func Test_ServiceClusterIPSelector(t *testing.T) {
 	// mutate the Service to get the ClusterIP again
 	service.Spec.ExternalName = ""
 	service.Spec.ClusterIP = ""
-	service.Spec.Type = corev1.ServiceTypeClusterIP
+	service.Spec.Type = v1.ServiceTypeClusterIP
 	_, err = client.CoreV1().Services(ns.Name).Update(ctx, service, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatalf("Error creating test service: %v", err)
@@ -786,16 +786,16 @@ func Test_ServiceWatchUntil(t *testing.T) {
 		t.Fatalf("failed to list Services: %v", err)
 	}
 	// create  service
-	service := &corev1.Service{
+	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   testSvcName,
 			Labels: testSvcLabels,
 		},
-		Spec: corev1.ServiceSpec{
+		Spec: v1.ServiceSpec{
 			Type: "LoadBalancer",
-			Ports: []corev1.ServicePort{{
+			Ports: []v1.ServicePort{{
 				Name:       "http",
-				Protocol:   corev1.ProtocolTCP,
+				Protocol:   v1.ProtocolTCP,
 				Port:       int32(80),
 				TargetPort: intstr.FromInt32(80),
 			}},
@@ -810,7 +810,7 @@ func Test_ServiceWatchUntil(t *testing.T) {
 	ctxUntil, cancel := context.WithTimeout(ctx, svcReadyTimeout)
 	defer cancel()
 	_, err = watchtools.Until(ctxUntil, svcList.ResourceVersion, w, func(event watch.Event) (bool, error) {
-		if svc, ok := event.Object.(*corev1.Service); ok {
+		if svc, ok := event.Object.(*v1.Service); ok {
 			found := svc.ObjectMeta.Name == service.ObjectMeta.Name &&
 				svc.ObjectMeta.Namespace == ns.Name &&
 				svc.Labels["test-service-static"] == "true"
@@ -829,8 +829,8 @@ func Test_ServiceWatchUntil(t *testing.T) {
 	}
 
 	t.Log("patching the ServiceStatus")
-	lbStatus := corev1.LoadBalancerStatus{
-		Ingress: []corev1.LoadBalancerIngress{{IP: "203.0.113.1"}},
+	lbStatus := v1.LoadBalancerStatus{
+		Ingress: []v1.LoadBalancerIngress{{IP: "203.0.113.1"}},
 	}
 	lbStatusJSON, err := json.Marshal(lbStatus)
 	if err != nil {
@@ -848,7 +848,7 @@ func Test_ServiceWatchUntil(t *testing.T) {
 	defer cancel()
 
 	_, err = watchtools.Until(ctxUntil, svcList.ResourceVersion, w, func(event watch.Event) (bool, error) {
-		if svc, ok := event.Object.(*corev1.Service); ok {
+		if svc, ok := event.Object.(*v1.Service); ok {
 			found := svc.ObjectMeta.Name == service.ObjectMeta.Name &&
 				svc.ObjectMeta.Namespace == ns.Name &&
 				svc.Annotations["patchedstatus"] == "true"
@@ -869,7 +869,7 @@ func Test_ServiceWatchUntil(t *testing.T) {
 
 	t.Log("updating the ServiceStatus")
 
-	var statusToUpdate, updatedStatus *corev1.Service
+	var statusToUpdate, updatedStatus *v1.Service
 	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		statusToUpdate, err = client.CoreV1().Services(ns.Name).Get(ctx, testSvcName, metav1.GetOptions{})
 		if err != nil {
@@ -895,7 +895,7 @@ func Test_ServiceWatchUntil(t *testing.T) {
 	ctxUntil, cancel = context.WithTimeout(ctx, svcReadyTimeout)
 	defer cancel()
 	_, err = watchtools.Until(ctxUntil, svcList.ResourceVersion, w, func(event watch.Event) (bool, error) {
-		if svc, ok := event.Object.(*corev1.Service); ok {
+		if svc, ok := event.Object.(*v1.Service); ok {
 			found := svc.ObjectMeta.Name == service.ObjectMeta.Name &&
 				svc.ObjectMeta.Namespace == ns.Name &&
 				svc.Annotations["patchedstatus"] == "true"
@@ -924,7 +924,7 @@ func Test_ServiceWatchUntil(t *testing.T) {
 	t.Logf("Service %s has service status updated", testSvcName)
 
 	t.Log("patching the service")
-	servicePatchPayload, err := json.Marshal(corev1.Service{
+	servicePatchPayload, err := json.Marshal(v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
 				"test-service": "patched",
@@ -941,7 +941,7 @@ func Test_ServiceWatchUntil(t *testing.T) {
 	ctxUntil, cancel = context.WithTimeout(ctx, svcReadyTimeout)
 	defer cancel()
 	_, err = watchtools.Until(ctxUntil, svcList.ResourceVersion, w, func(event watch.Event) (bool, error) {
-		if svc, ok := event.Object.(*corev1.Service); ok {
+		if svc, ok := event.Object.(*v1.Service); ok {
 			found := svc.ObjectMeta.Name == service.ObjectMeta.Name &&
 				svc.ObjectMeta.Namespace == ns.Name &&
 				svc.Labels["test-service"] == "patched"
@@ -973,7 +973,7 @@ func Test_ServiceWatchUntil(t *testing.T) {
 	_, err = watchtools.Until(ctxUntil, svcList.ResourceVersion, w, func(event watch.Event) (bool, error) {
 		switch event.Type {
 		case watch.Deleted:
-			if svc, ok := event.Object.(*corev1.Service); ok {
+			if svc, ok := event.Object.(*v1.Service); ok {
 				found := svc.ObjectMeta.Name == service.ObjectMeta.Name &&
 					svc.ObjectMeta.Namespace == ns.Name &&
 					svc.Labels["test-service-static"] == "true"
@@ -1019,14 +1019,14 @@ func Test_ServiceValidation_FeatureGateEnableDisable(t *testing.T) {
 	////////////////////////////////////////////////////////////////////////////
 
 	ns := framework.CreateNamespaceOrDie(client1, "test-service-traffic-distribution", t)
-	makeService := func(serviceName string) *corev1.Service {
-		return &corev1.Service{
+	makeService := func(serviceName string) *v1.Service {
+		return &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      serviceName,
 				Namespace: ns.GetName(),
 			},
-			Spec: corev1.ServiceSpec{
-				Ports: []corev1.ServicePort{{Port: 443}},
+			Spec: v1.ServiceSpec{
+				Ports: []v1.ServicePort{{Port: 443}},
 			},
 		}
 	}

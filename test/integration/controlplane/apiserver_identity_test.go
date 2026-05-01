@@ -29,7 +29,7 @@ import (
 	"golang.org/x/crypto/cryptobyte"
 
 	coordinationv1 "k8s.io/api/coordination/v1"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -102,8 +102,8 @@ func TestCreateLeaseOnStart(t *testing.T) {
 			return false, fmt.Errorf("unexpected apiserver identity, got: %v, expected: %v", lease.Name, expectedAPIServerIdentity(t, hostname))
 		}
 
-		if lease.Labels[corev1.LabelHostname] != hostname {
-			return false, fmt.Errorf("unexpected hostname label, got: %v, expected: %v", lease.Labels[corev1.LabelHostname], hostname)
+		if lease.Labels[v1.LabelHostname] != hostname {
+			return false, fmt.Errorf("unexpected hostname label, got: %v, expected: %v", lease.Labels[v1.LabelHostname], hostname)
 		}
 
 		return true, nil

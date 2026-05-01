@@ -23,7 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -37,11 +37,11 @@ import (
 	testutils "k8s.io/kubernetes/test/integration/util"
 )
 
-func makeGangPodGroup(podGroupName, topologyKey string, minCount int32) *schedulingapi.PodGroup {
+func makeGangPodGroup(podGroupName, topologyKey string, minCount int32) *schedulingv1alpha2.PodGroup {
 	return st.MakePodGroup().Name(podGroupName).TemplateRef("t1", "workload").TopologyKey(topologyKey).MinCount(minCount).Obj()
 }
 
-func makeBasicPodGroup(podGroupName, topologyKey string) *schedulingapi.PodGroup {
+func makeBasicPodGroup(podGroupName, topologyKey string) *schedulingv1alpha2.PodGroup {
 	return st.MakePodGroup().Name(podGroupName).TemplateRef("t1", "workload").BasicPolicy().TopologyKey(topologyKey).Obj()
 }
 
@@ -75,7 +75,7 @@ func makeUnfittablePod(podName, podGroupName string) *v1.Pod {
 type step struct {
 	name                      string
 	createNodes               []*v1.Node
-	createPodGroup            *schedulingapi.PodGroup
+	createPodGroup            *schedulingv1alpha2.PodGroup
 	createPods                []*v1.Pod
 	deletePods                []string
 	waitForPodsScheduled      []string

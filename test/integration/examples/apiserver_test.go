@@ -35,8 +35,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	v1 "k8s.io/api/authentication/v1"
-	corev1 "k8s.io/api/core/v1"
+	authenticationv1 "k8s.io/api/authentication/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -296,7 +296,7 @@ func testFrontProxyConfig(t *testing.T, withUID bool) {
 
 	// create the SA that we will use to query the aggregated API
 	kubeClient := client.NewForConfigOrDie(kubeConfig)
-	expectedSA, err := kubeClient.CoreV1().ServiceAccounts(testNamespace).Create(ctx, &corev1.ServiceAccount{
+	expectedSA, err := kubeClient.CoreV1().ServiceAccounts(testNamespace).Create(ctx, &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "wardle-client-sa",
 		},
@@ -305,7 +305,7 @@ func testFrontProxyConfig(t *testing.T, withUID bool) {
 		t.Fatal(err)
 	}
 
-	saTokenReq, err := kubeClient.CoreV1().ServiceAccounts(testNamespace).CreateToken(ctx, "wardle-client-sa", &v1.TokenRequest{}, metav1.CreateOptions{})
+	saTokenReq, err := kubeClient.CoreV1().ServiceAccounts(testNamespace).CreateToken(ctx, "wardle-client-sa", &authenticationv1.TokenRequest{}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,7 +318,7 @@ func testFrontProxyConfig(t *testing.T, withUID bool) {
 	saClientConfig.BearerToken = saToken
 
 	saKubeClient := client.NewForConfigOrDie(saClientConfig)
-	saDetails, err := saKubeClient.AuthenticationV1().SelfSubjectReviews().Create(ctx, &v1.SelfSubjectReview{}, metav1.CreateOptions{})
+	saDetails, err := saKubeClient.AuthenticationV1().SelfSubjectReviews().Create(ctx, &authenticationv1.SelfSubjectReview{}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to retrieve details about the SA: %v", err)
 	}
@@ -619,7 +619,7 @@ func TestAggregatedAPIServerRejectRedirectResponse(t *testing.T) {
 	aggregatorClient := aggregatorclient.NewForConfigOrDie(kubeClientConfig)
 
 	// create the bare minimum resources required to be able to get the API service into an available state
-	_, err := kubeClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+	_, err := kubeClient.CoreV1().Namespaces().Create(ctx, &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "kube-redirect",
 		},
@@ -627,13 +627,13 @@ func TestAggregatedAPIServerRejectRedirectResponse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = kubeClient.CoreV1().Services("kube-redirect").Create(ctx, &corev1.Service{
+	_, err = kubeClient.CoreV1().Services("kube-redirect").Create(ctx, &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "api",
 		},
-		Spec: corev1.ServiceSpec{
+		Spec: v1.ServiceSpec{
 			ExternalName: "needs-to-be-non-empty",
-			Type:         corev1.ServiceTypeExternalName,
+			Type:         v1.ServiceTypeExternalName,
 		},
 	}, metav1.CreateOptions{})
 	if err != nil {
@@ -730,7 +730,7 @@ func prepareAggregatedWardleAPIServer(ctx context.Context, t *testing.T, namespa
 	kubeClient := client.NewForConfigOrDie(getKubeConfig(testServer))
 
 	// create the bare minimum resources required to be able to get the API service into an available state
-	_, err = kubeClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+	_, err = kubeClient.CoreV1().Namespaces().Create(ctx, &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: namespace,
 		},
@@ -738,13 +738,13 @@ func prepareAggregatedWardleAPIServer(ctx context.Context, t *testing.T, namespa
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = kubeClient.CoreV1().Services(namespace).Create(ctx, &corev1.Service{
+	_, err = kubeClient.CoreV1().Services(namespace).Create(ctx, &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "api",
 		},
-		Spec: corev1.ServiceSpec{
+		Spec: v1.ServiceSpec{
 			ExternalName: "needs-to-be-non-empty",
-			Type:         corev1.ServiceTypeExternalName,
+			Type:         v1.ServiceTypeExternalName,
 		},
 	}, metav1.CreateOptions{})
 	if err != nil {

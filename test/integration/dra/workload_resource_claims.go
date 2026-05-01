@@ -24,7 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -59,16 +59,16 @@ func testWorkloadResourceClaims(tCtx ktesting.TContext, workloadAPIEnabled, work
 	schedGroup := &v1.PodSchedulingGroup{
 		PodGroupName: &podGroupName,
 	}
-	podGroup := &schedulingapi.PodGroup{
+	podGroup := &schedulingv1alpha2.PodGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      podGroupName,
 			Namespace: namespace,
 		},
-		Spec: schedulingapi.PodGroupSpec{
-			SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
-				Basic: &schedulingapi.BasicSchedulingPolicy{},
+		Spec: schedulingv1alpha2.PodGroupSpec{
+			SchedulingPolicy: schedulingv1alpha2.PodGroupSchedulingPolicy{
+				Basic: &schedulingv1alpha2.BasicSchedulingPolicy{},
 			},
-			ResourceClaims: []schedulingapi.PodGroupResourceClaim{
+			ResourceClaims: []schedulingv1alpha2.PodGroupResourceClaim{
 				{
 					Name:              podGroupResourceClaim.Name,
 					ResourceClaimName: &podGroupResourceClaim.Name,

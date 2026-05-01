@@ -22,7 +22,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	policy "k8s.io/api/policy/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -592,14 +592,14 @@ func TestPreemptionRaces(t *testing.T) {
 	}
 }
 
-func mkMinAvailablePDB(name, namespace string, uid types.UID, minAvailable int, matchLabels map[string]string) *policy.PodDisruptionBudget {
+func mkMinAvailablePDB(name, namespace string, uid types.UID, minAvailable int, matchLabels map[string]string) *policyv1.PodDisruptionBudget {
 	intMinAvailable := intstr.FromInt32(int32(minAvailable))
-	return &policy.PodDisruptionBudget{
+	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
-		Spec: policy.PodDisruptionBudgetSpec{
+		Spec: policyv1.PodDisruptionBudgetSpec{
 			MinAvailable: &intMinAvailable,
 			Selector:     &metav1.LabelSelector{MatchLabels: matchLabels},
 		},
@@ -639,7 +639,7 @@ func TestPDBInPreemption(t *testing.T) {
 	tests := []struct {
 		name                string
 		nodeCnt             int
-		pdbs                []*policy.PodDisruptionBudget
+		pdbs                []*policyv1.PodDisruptionBudget
 		pdbPodNum           []int32
 		existingPods        []*v1.Pod
 		pod                 *v1.Pod
@@ -648,7 +648,7 @@ func TestPDBInPreemption(t *testing.T) {
 		{
 			name:    "A non-PDB violating pod is preempted despite its higher priority",
 			nodeCnt: 1,
-			pdbs: []*policy.PodDisruptionBudget{
+			pdbs: []*policyv1.PodDisruptionBudget{
 				mkMinAvailablePDB("pdb-1", testCtx.NS.Name, types.UID("pdb-1-uid"), 2, map[string]string{"foo": "bar"}),
 			},
 			pdbPodNum: []int32{2},
@@ -688,7 +688,7 @@ func TestPDBInPreemption(t *testing.T) {
 		{
 			name:    "A node without any PDB violating pods is preferred for preemption",
 			nodeCnt: 2,
-			pdbs: []*policy.PodDisruptionBudget{
+			pdbs: []*policyv1.PodDisruptionBudget{
 				mkMinAvailablePDB("pdb-1", testCtx.NS.Name, types.UID("pdb-1-uid"), 2, map[string]string{"foo": "bar"}),
 			},
 			pdbPodNum: []int32{1},
@@ -723,7 +723,7 @@ func TestPDBInPreemption(t *testing.T) {
 		{
 			name:    "A node with fewer PDB violating pods is preferred for preemption",
 			nodeCnt: 3,
-			pdbs: []*policy.PodDisruptionBudget{
+			pdbs: []*policyv1.PodDisruptionBudget{
 				mkMinAvailablePDB("pdb-1", testCtx.NS.Name, types.UID("pdb-1-uid"), 2, map[string]string{"foo1": "bar"}),
 				mkMinAvailablePDB("pdb-2", testCtx.NS.Name, types.UID("pdb-2-uid"), 2, map[string]string{"foo2": "bar"}),
 			},

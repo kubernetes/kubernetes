@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -43,14 +43,14 @@ func TestWatchNamespaceEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	newWatcher := func(ctx context.Context, ns *corev1.Namespace, resourceVersion string) (watch.Interface, error) {
+	newWatcher := func(ctx context.Context, ns *v1.Namespace, resourceVersion string) (watch.Interface, error) {
 		return clientSet.CoreV1().Namespaces().Watch(ctx, metav1.ListOptions{
 			FieldSelector:   fields.OneTermEqualSelector("metadata.name", ns.Name).String(),
 			ResourceVersion: resourceVersion,
 		})
 	}
 
-	newLegacyNSWatcher := func(ctx context.Context, ns *corev1.Namespace, resourceVersion string) (watch.Interface, error) {
+	newLegacyNSWatcher := func(ctx context.Context, ns *v1.Namespace, resourceVersion string) (watch.Interface, error) {
 		if resourceVersion == "" {
 			return clientSet.CoreV1().RESTClient().Get().
 				RequestURI(fmt.Sprintf("/api/v1/watch/namespaces/%s", ns.Name)).Watch(ctx)
@@ -60,8 +60,8 @@ func TestWatchNamespaceEvent(t *testing.T) {
 		}
 	}
 
-	newTestNamespace := func(name string) *corev1.Namespace {
-		return &corev1.Namespace{
+	newTestNamespace := func(name string) *v1.Namespace {
+		return &v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 			},
@@ -70,9 +70,9 @@ func TestWatchNamespaceEvent(t *testing.T) {
 
 	tt := []struct {
 		name            string
-		namespace       *corev1.Namespace
+		namespace       *v1.Namespace
 		resourceVersion string
-		getWatcher      func(ctx context.Context, ns *corev1.Namespace, resourceVersion string) (watch.Interface, error)
+		getWatcher      func(ctx context.Context, ns *v1.Namespace, resourceVersion string) (watch.Interface, error)
 	}{
 		{
 			name:       "watch namespace",
@@ -127,7 +127,7 @@ func TestWatchNamespaceEvent(t *testing.T) {
 	})
 }
 
-func generateAndWatchNamespaceEvent(ctx context.Context, t *testing.T, clientSet *kubernetes.Clientset, ns *corev1.Namespace, watcher watch.Interface) {
+func generateAndWatchNamespaceEvent(ctx context.Context, t *testing.T, clientSet *kubernetes.Clientset, ns *v1.Namespace, watcher watch.Interface) {
 	timeout := 10 * time.Second
 	nsName := ns.Name
 

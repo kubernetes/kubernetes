@@ -25,8 +25,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"sigs.k8s.io/randfill"
 
-	v1 "k8s.io/api/admission/v1"
-	"k8s.io/api/admission/v1beta1"
+	admissionv1 "k8s.io/api/admission/v1"
+	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	"k8s.io/apimachinery/pkg/api/apitesting/fuzzer"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -37,7 +37,7 @@ func TestConvertAdmissionRequestToV1(t *testing.T) {
 	f := fuzzer.FuzzerFor(admissionfuzzer.Funcs, rand.NewSource(rand.Int63()), serializer.NewCodecFactory(runtime.NewScheme()))
 	for i := range 100 {
 		t.Run(fmt.Sprintf("Run %d/100", i), func(t *testing.T) {
-			orig := &v1beta1.AdmissionRequest{}
+			orig := &admissionv1beta1.AdmissionRequest{}
 			f.Fill(orig)
 			converted := convertAdmissionRequestToV1(orig)
 			rt := convertAdmissionRequestToV1beta1(converted)
@@ -52,7 +52,7 @@ func TestConvertAdmissionResponseToV1beta1(t *testing.T) {
 	f := randfill.New()
 	for i := range 100 {
 		t.Run(fmt.Sprintf("Run %d/100", i), func(t *testing.T) {
-			orig := &v1.AdmissionResponse{}
+			orig := &admissionv1.AdmissionResponse{}
 			f.Fill(orig)
 			converted := convertAdmissionResponseToV1beta1(orig)
 			rt := convertAdmissionResponseToV1(converted)

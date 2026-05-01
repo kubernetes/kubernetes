@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -41,21 +41,21 @@ import (
 func TestEndpointSliceTerminating(t *testing.T) {
 	testcases := []struct {
 		name              string
-		podStatus         corev1.PodStatus
+		podStatus         v1.PodStatus
 		expectedEndpoints []discovery.Endpoint
 	}{
 		{
 			name: "ready terminating pods",
-			podStatus: corev1.PodStatus{
-				Phase: corev1.PodRunning,
-				Conditions: []corev1.PodCondition{
+			podStatus: v1.PodStatus{
+				Phase: v1.PodRunning,
+				Conditions: []v1.PodCondition{
 					{
-						Type:   corev1.PodReady,
-						Status: corev1.ConditionTrue,
+						Type:   v1.PodReady,
+						Status: v1.ConditionTrue,
 					},
 				},
 				PodIP: "10.0.0.1",
-				PodIPs: []corev1.PodIP{
+				PodIPs: []v1.PodIP{
 					{
 						IP: "10.0.0.1",
 					},
@@ -74,16 +74,16 @@ func TestEndpointSliceTerminating(t *testing.T) {
 		},
 		{
 			name: "not ready terminating pods",
-			podStatus: corev1.PodStatus{
-				Phase: corev1.PodRunning,
-				Conditions: []corev1.PodCondition{
+			podStatus: v1.PodStatus{
+				Phase: v1.PodRunning,
+				Conditions: []v1.PodCondition{
 					{
-						Type:   corev1.PodReady,
-						Status: corev1.ConditionFalse,
+						Type:   v1.PodReady,
+						Status: v1.ConditionFalse,
 					},
 				},
 				PodIP: "10.0.0.1",
-				PodIPs: []corev1.PodIP{
+				PodIPs: []v1.PodIP{
 					{
 						IP: "10.0.0.1",
 					},
@@ -135,7 +135,7 @@ func TestEndpointSliceTerminating(t *testing.T) {
 			ns := framework.CreateNamespaceOrDie(client, "test-endpoints-terminating", t)
 			defer framework.DeleteNamespaceOrDie(client, ns, t)
 
-			node := &corev1.Node{
+			node := &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "fake-node",
 				},
@@ -146,7 +146,7 @@ func TestEndpointSliceTerminating(t *testing.T) {
 				t.Fatalf("Failed to create test node: %v", err)
 			}
 
-			svc := &corev1.Service{
+			svc := &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-service",
 					Namespace: ns.Name,
@@ -154,11 +154,11 @@ func TestEndpointSliceTerminating(t *testing.T) {
 						"foo": "bar",
 					},
 				},
-				Spec: corev1.ServiceSpec{
+				Spec: v1.ServiceSpec{
 					Selector: map[string]string{
 						"foo": "bar",
 					},
-					Ports: []corev1.ServicePort{
+					Ports: []v1.ServicePort{
 						{Name: "port-443", Port: 443, Protocol: "TCP", TargetPort: intstr.FromInt32(443)},
 					},
 				},
@@ -169,20 +169,20 @@ func TestEndpointSliceTerminating(t *testing.T) {
 				t.Fatalf("Failed to create test Service: %v", err)
 			}
 
-			pod := &corev1.Pod{
+			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-pod",
 					Labels: map[string]string{
 						"foo": "bar",
 					},
 				},
-				Spec: corev1.PodSpec{
+				Spec: v1.PodSpec{
 					NodeName: "fake-node",
-					Containers: []corev1.Container{
+					Containers: []v1.Container{
 						{
 							Name:  "fakename",
 							Image: "fakeimage",
-							Ports: []corev1.ContainerPort{
+							Ports: []v1.ContainerPort{
 								{
 									Name:          "port-443",
 									ContainerPort: 443,

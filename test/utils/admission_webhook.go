@@ -26,7 +26,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"k8s.io/api/admission/v1beta1"
+	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 )
 
 // NewAdmissionWebhookServer sets up a webhook server with TLS enabled, returns URL and Close function
@@ -52,7 +52,7 @@ func NewAdmissionWebhookServer(handler http.Handler) (string, func(), error) {
 
 // AdmissionWebhookHandler creates a HandlerFunc that decodes/encodes AdmissionReview and performs
 // given admit function
-func AdmissionWebhookHandler(t *testing.T, admit func(*v1beta1.AdmissionReview) error) http.HandlerFunc {
+func AdmissionWebhookHandler(t *testing.T, admit func(*admissionv1beta1.AdmissionReview) error) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 		data, err := io.ReadAll(r.Body)
@@ -65,7 +65,7 @@ func AdmissionWebhookHandler(t *testing.T, admit func(*v1beta1.AdmissionReview) 
 			return
 		}
 
-		review := v1beta1.AdmissionReview{}
+		review := admissionv1beta1.AdmissionReview{}
 		if err := json.Unmarshal(data, &review); err != nil {
 			t.Errorf("Fail to deserialize object: %s with error: %v", string(data), err)
 			http.Error(w, err.Error(), 400)

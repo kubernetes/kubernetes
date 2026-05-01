@@ -19,7 +19,7 @@ package kubeadm
 import (
 	"context"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -51,7 +51,7 @@ var _ = Describe("control-plane node", func() {
 
 		// checks that the control-plane nodes have the expected taints
 		for _, cp := range controlPlanes.Items {
-			e2enode.ExpectNodeHasTaint(ctx, f.ClientSet, cp.GetName(), &corev1.Taint{Key: framework.ControlPlaneLabel, Effect: corev1.TaintEffectNoSchedule})
+			e2enode.ExpectNodeHasTaint(ctx, f.ClientSet, cp.GetName(), &v1.Taint{Key: framework.ControlPlaneLabel, Effect: v1.TaintEffectNoSchedule})
 		}
 	})
 })

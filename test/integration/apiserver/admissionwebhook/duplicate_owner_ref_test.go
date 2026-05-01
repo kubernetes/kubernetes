@@ -30,9 +30,9 @@ import (
 	"testing"
 	"time"
 
-	v1 "k8s.io/api/admission/v1"
-	admissionv1 "k8s.io/api/admissionregistration/v1"
-	corev1 "k8s.io/api/core/v1"
+	admissionv1 "k8s.io/api/admission/v1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -80,19 +80,19 @@ func TestMutatingWebhookDuplicateOwnerReferences(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fail := admissionv1.Fail
-	none := admissionv1.SideEffectClassNone
-	mutatingCfg, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionv1.MutatingWebhookConfiguration{
+	fail := admissionregistrationv1.Fail
+	none := admissionregistrationv1.SideEffectClassNone
+	mutatingCfg, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionregistrationv1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "dup-owner-references.admission.integration.test"},
-		Webhooks: []admissionv1.MutatingWebhook{{
+		Webhooks: []admissionregistrationv1.MutatingWebhook{{
 			Name: "dup-owner-references.admission.integration.test",
-			ClientConfig: admissionv1.WebhookClientConfig{
+			ClientConfig: admissionregistrationv1.WebhookClientConfig{
 				URL:      &webhookServer.URL,
 				CABundle: localhostCert,
 			},
-			Rules: []admissionv1.RuleWithOperations{{
-				Operations: []admissionv1.OperationType{admissionv1.Create, admissionv1.Update},
-				Rule:       admissionv1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
+			Rules: []admissionregistrationv1.RuleWithOperations{{
+				Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update},
+				Rule:       admissionregistrationv1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
 			}},
 			FailurePolicy:           &fail,
 			AdmissionReviewVersions: []string{"v1", "v1beta1"},
@@ -110,7 +110,7 @@ func TestMutatingWebhookDuplicateOwnerReferences(t *testing.T) {
 	}()
 
 	// Make sure dedup happens in patch requests
-	var pod *corev1.Pod
+	var pod *v1.Pod
 	var lastErr string
 	// wait until new webhook is called
 	expectedWarning := fmt.Sprintf(handlers.DuplicateOwnerReferencesAfterMutatingAdmissionWarningFormat,
@@ -180,7 +180,7 @@ func newDuplicateOwnerReferencesWebhookHandler(t *testing.T) http.Handler {
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
-		review := v1.AdmissionReview{}
+		review := admissionv1.AdmissionReview{}
 		if err := json.Unmarshal(data, &review); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}
@@ -189,20 +189,20 @@ func newDuplicateOwnerReferencesWebhookHandler(t *testing.T) http.Handler {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		pod := &corev1.Pod{}
+		pod := &v1.Pod{}
 		if err := json.Unmarshal(review.Request.Object.Raw, pod); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		review.Response = &v1.AdmissionResponse{
+		review.Response = &admissionv1.AdmissionResponse{
 			Allowed: true,
 			UID:     review.Request.UID,
 			Result:  &metav1.Status{Message: "admitted"},
 		}
 		if len(pod.OwnerReferences) > 0 {
 			review.Response.Patch = []byte(fmt.Sprintf(`[{"op":"add","path":"/metadata/ownerReferences/-","value":{"apiVersion":"v1", "kind": "Node", "name": "fake-node", "uid": "%v"}}]`, pod.OwnerReferences[0].UID))
-			jsonPatch := v1.PatchTypeJSONPatch
+			jsonPatch := admissionv1.PatchTypeJSONPatch
 			review.Response.PatchType = &jsonPatch
 		}
 
@@ -213,7 +213,7 @@ func newDuplicateOwnerReferencesWebhookHandler(t *testing.T) http.Handler {
 	})
 }
 
-var duplicateOwnerReferencesMarkerFixture = &corev1.Pod{
+var duplicateOwnerReferencesMarkerFixture = &v1.Pod{
 	ObjectMeta: metav1.ObjectMeta{
 		Namespace: "default",
 		Name:      "duplicate-owner-references-test-marker",
@@ -224,8 +224,8 @@ var duplicateOwnerReferencesMarkerFixture = &corev1.Pod{
 			UID:        uuid.NewUUID(),
 		}},
 	},
-	Spec: corev1.PodSpec{
-		Containers: []corev1.Container{{
+	Spec: v1.PodSpec{
+		Containers: []v1.Container{{
 			Name:  "fake-name",
 			Image: "fakeimage",
 		}},

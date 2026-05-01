@@ -25,9 +25,9 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -75,7 +75,7 @@ func TestNondeterministicResponseEncoding(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	namespace, err := client.Namespaces().Create(context.TODO(), &corev1.Namespace{
+	namespace, err := client.Namespaces().Create(context.TODO(), &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "test-nondeterministic-response-encoding",
 			Annotations: map[string]string{"hello": "world"},
@@ -102,9 +102,9 @@ func TestNondeterministicResponseEncoding(t *testing.T) {
 
 		// get again at same resource version
 		trial := request.VersionedParams(&metav1.GetOptions{ResourceVersion: namespace.ResourceVersion}, scheme.ParameterCodec).Do(context.TODO())
-		var trialObject corev1.Namespace
+		var trialObject v1.Namespace
 		if err := trial.Into(&trialObject); err != nil {
-			if errors.IsResourceExpired(err) {
+			if apierrors.IsResourceExpired(err) {
 				t.Logf("retrying: %v", err)
 				continue
 			}
@@ -200,7 +200,7 @@ func TestNondeterministicResponseEncoding(t *testing.T) {
 
 		event1, raw1, err := getRawEventAndRawObject()
 		if err != nil {
-			if errors.IsResourceExpired(err) {
+			if apierrors.IsResourceExpired(err) {
 				t.Logf("retrying: %v", err)
 				continue
 			}
@@ -213,7 +213,7 @@ func TestNondeterministicResponseEncoding(t *testing.T) {
 
 		event2, raw2, err := getRawEventAndRawObject()
 		if err != nil {
-			if errors.IsResourceExpired(err) {
+			if apierrors.IsResourceExpired(err) {
 				t.Logf("retrying: %v", err)
 				continue
 			}

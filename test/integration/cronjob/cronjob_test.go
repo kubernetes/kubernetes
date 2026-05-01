@@ -23,7 +23,7 @@ import (
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
@@ -77,9 +77,9 @@ func newCronJob(name, namespace, schedule string) *batchv1.CronJob {
 			SuccessfulJobsHistoryLimit: &zero32,
 			JobTemplate: batchv1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers:                    []corev1.Container{{Name: "foo", Image: "bar"}},
+					Template: v1.PodTemplateSpec{
+						Spec: v1.PodSpec{
+							Containers:                    []v1.Container{{Name: "foo", Image: "bar"}},
 							TerminationGracePeriodSeconds: &zero64,
 							RestartPolicy:                 "Never",
 						},

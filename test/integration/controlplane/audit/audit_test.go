@@ -26,12 +26,12 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/admission/v1beta1"
+	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
-	apiv1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -446,7 +446,7 @@ func testAudit(t *testing.T, version string, level auditinternal.Level, enableMu
 func testAuditCrossGroupSubResource(t *testing.T, version string, expEvents []utils.AuditEvent, namespace string, kubeclient clientset.Interface, logFile *os.File) {
 	var (
 		lastMissingReport string
-		sa                *apiv1.ServiceAccount
+		sa                *v1.ServiceAccount
 		deploy            *appsv1.Deployment
 	)
 
@@ -552,7 +552,7 @@ func getExpectedEvents(level auditinternal.Level, enableMutatingWebhook bool, na
 // This is shared by the dynamic test
 func configMapOperations(t *testing.T, kubeclient clientset.Interface, namespace string) {
 	// create, get, watch, update, patch, list and delete configmap.
-	configMap := &apiv1.ConfigMap{
+	configMap := &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "audit-configmap",
 			Namespace: namespace,
@@ -632,7 +632,7 @@ func expectNoError(t *testing.T, err error, msg string) {
 	}
 }
 
-func admitFunc(review *v1beta1.AdmissionReview) error {
+func admitFunc(review *admissionv1beta1.AdmissionReview) error {
 	gvk := schema.GroupVersionKind{Group: "admission.k8s.io", Version: "v1beta1", Kind: "AdmissionReview"}
 	if review.GetObjectKind().GroupVersionKind() != gvk {
 		return fmt.Errorf("invalid admission review kind: %#v", review.GetObjectKind().GroupVersionKind())
@@ -652,13 +652,13 @@ func admitFunc(review *v1beta1.AdmissionReview) error {
 		review.Request.OldObject.Object = u
 	}
 
-	review.Response = &v1beta1.AdmissionResponse{
+	review.Response = &admissionv1beta1.AdmissionResponse{
 		Allowed: true,
 		UID:     review.Request.UID,
 		Result:  &metav1.Status{Message: "admitted"},
 	}
 	review.Response.Patch = []byte(`[{"op":"add","path":"/data","value":{"test":"dummy"}}]`)
-	jsonPatch := v1beta1.PatchTypeJSONPatch
+	jsonPatch := admissionv1beta1.PatchTypeJSONPatch
 	review.Response.PatchType = &jsonPatch
 	return nil
 }
@@ -689,7 +689,7 @@ func createMutationWebhook(client clientset.Interface, endpoint string) error {
 }
 
 func createNamespace(t *testing.T, kubeclient clientset.Interface, namespace string) {
-	ns := &apiv1.Namespace{
+	ns := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: namespace,
 		},
@@ -698,8 +698,8 @@ func createNamespace(t *testing.T, kubeclient clientset.Interface, namespace str
 	expectNoError(t, err, fmt.Sprintf("failed to create namespace ns %s", namespace))
 }
 
-func createServiceAccount(t *testing.T, cs clientset.Interface, namespace string) *apiv1.ServiceAccount {
-	sa := &apiv1.ServiceAccount{
+func createServiceAccount(t *testing.T, cs clientset.Interface, namespace string) *v1.ServiceAccount {
+	sa := &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "audit-serviceaccount",
 			Namespace: namespace,
@@ -720,9 +720,9 @@ func createDeployment(t *testing.T, cs clientset.Interface, namespace string) *a
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": "test"},
 			},
-			Template: apiv1.PodTemplateSpec{
-				Spec: apiv1.PodSpec{
-					Containers: []apiv1.Container{
+			Template: v1.PodTemplateSpec{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
 						{
 							Name:  "foo",
 							Image: "foo/bar",

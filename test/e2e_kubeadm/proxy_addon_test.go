@@ -19,7 +19,7 @@ package kubeadm
 import (
 	"context"
 
-	authv1 "k8s.io/api/authorization/v1"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
@@ -41,7 +41,7 @@ const (
 )
 
 var (
-	kubeProxyConfigMapResource = &authv1.ResourceAttributes{
+	kubeProxyConfigMapResource = &authorizationv1.ResourceAttributes{
 		Namespace: kubeSystemNamespace,
 		Name:      kubeProxyConfigMap,
 		Resource:  "configmaps",

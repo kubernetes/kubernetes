@@ -26,8 +26,8 @@ import (
 	"testing"
 	"time"
 
-	v1 "k8s.io/api/admission/v1"
-	corev1 "k8s.io/api/core/v1"
+	admissionv1 "k8s.io/api/admission/v1"
+	v1 "k8s.io/api/core/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -213,7 +213,7 @@ func createV1beta1ValidatingPolicyAndBinding(ctx ktesting.TContext, client clien
 	}
 
 	// Create a param that holds the options for this
-	configuration, err := client.CoreV1().ConfigMaps("default").Create(ctx, &corev1.ConfigMap{
+	configuration, err := client.CoreV1().ConfigMaps("default").Create(ctx, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-policy-v1beta1-param",
 			Namespace: "default",
@@ -231,7 +231,7 @@ func createV1beta1ValidatingPolicyAndBinding(ctx ktesting.TContext, client clien
 		return err
 	}
 
-	configurationConvert, err := client.CoreV1().ConfigMaps("default").Create(ctx, &corev1.ConfigMap{
+	configurationConvert, err := client.CoreV1().ConfigMaps("default").Create(ctx, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-policy-v1beta1-convert-param",
 			Namespace: "default",
@@ -330,7 +330,7 @@ func createV1ValidatingPolicyAndBinding(ctx ktesting.TContext, client clientset.
 	}
 
 	// Create a param that holds the options for this
-	configuration, err := client.CoreV1().ConfigMaps("default").Create(ctx, &corev1.ConfigMap{
+	configuration, err := client.CoreV1().ConfigMaps("default").Create(ctx, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-policy-v1-param",
 			Namespace: "default",
@@ -348,7 +348,7 @@ func createV1ValidatingPolicyAndBinding(ctx ktesting.TContext, client clientset.
 		return err
 	}
 
-	configurationConvert, err := client.CoreV1().ConfigMaps("default").Create(ctx, &corev1.ConfigMap{
+	configurationConvert, err := client.CoreV1().ConfigMaps("default").Create(ctx, &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-policy-v1-convert-param",
 			Namespace: "default",
@@ -466,7 +466,7 @@ func testPolicyAdmission(t *testing.T, supportV1Beta1 bool) {
 	// create CRDs
 	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
 
-	if _, err := client.CoreV1().Namespaces().Create(tCtx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}, metav1.CreateOptions{}); err != nil {
+	if _, err := client.CoreV1().Namespaces().Create(tCtx, &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -572,7 +572,7 @@ func testPolicyAdmission(t *testing.T, supportV1Beta1 bool) {
 		}
 	}
 
-	testConfigmap := corev1.ConfigMap{
+	testConfigmap := v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-k8s",
 		},
@@ -661,7 +661,7 @@ func (p *policyExpectationHolder) reset(t *testing.T) {
 	p.holder.reset(t)
 
 }
-func (p *policyExpectationHolder) expect(gvr schema.GroupVersionResource, gvk, optionsGVK schema.GroupVersionKind, operation v1.Operation, name, namespace string, object, oldObject, options bool) {
+func (p *policyExpectationHolder) expect(gvr schema.GroupVersionResource, gvk, optionsGVK schema.GroupVersionKind, operation admissionv1.Operation, name, namespace string, object, oldObject, options bool) {
 	p.holder.expect(gvr, gvk, optionsGVK, operation, name, namespace, object, oldObject, options)
 
 	p.lock.Lock()

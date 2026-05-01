@@ -25,10 +25,10 @@ import (
 	"testing"
 	"time"
 
-	v1 "k8s.io/api/admission/v1"
+	admissionv1 "k8s.io/api/admission/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	authenticationv1 "k8s.io/api/authentication/v1"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	policyv1 "k8s.io/api/policy/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -68,7 +68,7 @@ const (
 // able to inject a policy-specific holder
 type admissionTestExpectationHolder interface {
 	reset(t *testing.T)
-	expect(gvr schema.GroupVersionResource, gvk, optionsGVK schema.GroupVersionKind, operation v1.Operation, name, namespace string, object, oldObject, options bool)
+	expect(gvr schema.GroupVersionResource, gvk, optionsGVK schema.GroupVersionKind, operation admissionv1.Operation, name, namespace string, object, oldObject, options bool)
 	verify(t *testing.T)
 }
 
@@ -262,7 +262,7 @@ func (h *holder) reset(t *testing.T) {
 		}
 	}
 }
-func (h *holder) expect(gvr schema.GroupVersionResource, gvk, optionsGVK schema.GroupVersionKind, operation v1.Operation, name, namespace string, object, oldObject, options bool) {
+func (h *holder) expect(gvr schema.GroupVersionResource, gvk, optionsGVK schema.GroupVersionKind, operation admissionv1.Operation, name, namespace string, object, oldObject, options bool) {
 	// Special-case namespaces, since the object name shows up in request attributes
 	if len(namespace) == 0 && gvk.Group == "" && gvk.Version == "v1" && gvk.Kind == "Namespace" {
 		namespace = name
@@ -541,7 +541,7 @@ func testResourceCreate(c *testContext) {
 	if c.resource.Namespaced {
 		ns = testNamespace
 	}
-	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkCreateOptions, v1.Create, stubObj.GetName(), ns, true, false, true)
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkCreateOptions, admissionv1.Create, stubObj.GetName(), ns, true, false, true)
 	_, err = c.client.Resource(c.gvr).Namespace(ns).Create(context.TODO(), stubObj, metav1.CreateOptions{})
 	if err != nil {
 		c.t.Error(err)
@@ -556,7 +556,7 @@ func testResourceUpdate(c *testContext) {
 			return err
 		}
 		obj.SetAnnotations(map[string]string{"update": "true"})
-		c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkUpdateOptions, v1.Update, obj.GetName(), obj.GetNamespace(), true, true, true)
+		c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkUpdateOptions, admissionv1.Update, obj.GetName(), obj.GetNamespace(), true, true, true)
 		_, err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Update(context.TODO(), obj, metav1.UpdateOptions{})
 		return err
 	}); err != nil {
@@ -571,7 +571,7 @@ func testResourcePatch(c *testContext) {
 		c.t.Error(err)
 		return
 	}
-	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkUpdateOptions, v1.Update, obj.GetName(), obj.GetNamespace(), true, true, true)
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkUpdateOptions, admissionv1.Update, obj.GetName(), obj.GetNamespace(), true, true, true)
 	_, err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Patch(
 		context.TODO(),
 		obj.GetName(),
@@ -593,7 +593,7 @@ func testResourceDelete(c *testContext) {
 	}
 	background := metav1.DeletePropagationBackground
 	zero := int64(0)
-	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1.Delete, obj.GetName(), obj.GetNamespace(), false, true, true)
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, admissionv1.Delete, obj.GetName(), obj.GetNamespace(), false, true, true)
 	err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Delete(context.TODO(), obj.GetName(), metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
 	if err != nil {
 		c.t.Error(err)
@@ -638,7 +638,7 @@ func testResourceDelete(c *testContext) {
 		c.t.Error(err)
 		return
 	}
-	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1.Delete, obj.GetName(), obj.GetNamespace(), false, true, true)
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, admissionv1.Delete, obj.GetName(), obj.GetNamespace(), false, true, true)
 	err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Delete(context.TODO(), obj.GetName(), metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
 	if err != nil {
 		c.t.Error(err)
@@ -718,7 +718,7 @@ func testResourceDeletecollection(c *testContext) {
 	}
 
 	// set expectations
-	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1.Delete, "", obj.GetNamespace(), false, true, true)
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, admissionv1.Delete, "", obj.GetNamespace(), false, true, true)
 
 	// delete
 	err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background}, metav1.ListOptions{LabelSelector: "webhooktest=true"})
@@ -763,7 +763,7 @@ func testTokenCreate(c *testContext) {
 		return
 	}
 
-	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkCreateOptions, v1.Create, sa.GetName(), sa.GetNamespace(), true, false, true)
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkCreateOptions, admissionv1.Create, sa.GetName(), sa.GetNamespace(), true, false, true)
 	if err = c.clientset.CoreV1().RESTClient().Post().Namespace(sa.GetNamespace()).Resource("serviceaccounts").Name(sa.GetName()).SubResource("token").Body(&authenticationv1.TokenRequest{
 		ObjectMeta: metav1.ObjectMeta{Name: sa.GetName()},
 		Spec: authenticationv1.TokenRequestSpec{
@@ -804,7 +804,7 @@ func testSubresourceUpdate(c *testContext) {
 		submitObj.SetAnnotations(map[string]string{"subresourceupdate": "true"})
 
 		// set expectations
-		c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkUpdateOptions, v1.Update, obj.GetName(), obj.GetNamespace(), true, true, true)
+		c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkUpdateOptions, admissionv1.Update, obj.GetName(), obj.GetNamespace(), true, true, true)
 
 		_, err = c.client.Resource(gvrWithoutSubresources).Namespace(obj.GetNamespace()).Update(
 			context.TODO(),
@@ -832,7 +832,7 @@ func testSubresourcePatch(c *testContext) {
 	subresources := strings.Split(c.gvr.Resource, "/")[1:]
 
 	// set expectations
-	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkUpdateOptions, v1.Update, obj.GetName(), obj.GetNamespace(), true, true, true)
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkUpdateOptions, admissionv1.Update, obj.GetName(), obj.GetNamespace(), true, true, true)
 
 	_, err = c.client.Resource(gvrWithoutSubresources).Namespace(obj.GetNamespace()).Patch(
 		context.TODO(),
@@ -869,7 +869,7 @@ func testNamespaceDelete(c *testContext) {
 	background := metav1.DeletePropagationBackground
 	zero := int64(0)
 
-	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, v1.Delete, obj.GetName(), obj.GetNamespace(), false, true, true)
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkDeleteOptions, admissionv1.Delete, obj.GetName(), obj.GetNamespace(), false, true, true)
 	err = c.client.Resource(c.gvr).Namespace(obj.GetNamespace()).Delete(context.TODO(), obj.GetName(), metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
 	if err != nil {
 		c.t.Error(err)
@@ -915,7 +915,7 @@ func testDeploymentRollback(c *testContext) {
 	gvrWithoutSubresources.Resource = strings.Split(gvrWithoutSubresources.Resource, "/")[0]
 	subresources := strings.Split(c.gvr.Resource, "/")[1:]
 
-	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkCreateOptions, v1.Create, obj.GetName(), obj.GetNamespace(), true, false, true)
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkCreateOptions, admissionv1.Create, obj.GetName(), obj.GetNamespace(), true, false, true)
 
 	var rollbackObj runtime.Object
 	switch c.gvr {
@@ -964,7 +964,7 @@ func testPodConnectSubresource(c *testContext) {
 	for _, httpMethod := range []string{"GET", "POST"} {
 		c.t.Logf("verifying %v", httpMethod)
 
-		c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), schema.GroupVersionKind{}, v1.Connect, pod.GetName(), pod.GetNamespace(), true, false, false)
+		c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), schema.GroupVersionKind{}, admissionv1.Connect, pod.GetName(), pod.GetNamespace(), true, false, false)
 		var err error
 		switch c.gvr {
 		case gvr("", "v1", "pods/exec"):
@@ -1006,19 +1006,19 @@ func testPodBindingEviction(c *testContext) {
 		}
 	}()
 
-	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkCreateOptions, v1.Create, pod.GetName(), pod.GetNamespace(), true, false, true)
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkCreateOptions, admissionv1.Create, pod.GetName(), pod.GetNamespace(), true, false, true)
 
 	switch c.gvr {
 	case gvr("", "v1", "bindings"):
-		err = c.clientset.CoreV1().RESTClient().Post().Namespace(pod.GetNamespace()).Resource("bindings").Body(&corev1.Binding{
+		err = c.clientset.CoreV1().RESTClient().Post().Namespace(pod.GetNamespace()).Resource("bindings").Body(&v1.Binding{
 			ObjectMeta: metav1.ObjectMeta{Name: pod.GetName()},
-			Target:     corev1.ObjectReference{Name: "foo", Kind: "Node", APIVersion: "v1"},
+			Target:     v1.ObjectReference{Name: "foo", Kind: "Node", APIVersion: "v1"},
 		}).Do(context.TODO()).Error()
 
 	case gvr("", "v1", "pods/binding"):
-		err = c.clientset.CoreV1().RESTClient().Post().Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("binding").Body(&corev1.Binding{
+		err = c.clientset.CoreV1().RESTClient().Post().Namespace(pod.GetNamespace()).Resource("pods").Name(pod.GetName()).SubResource("binding").Body(&v1.Binding{
 			ObjectMeta: metav1.ObjectMeta{Name: pod.GetName()},
-			Target:     corev1.ObjectReference{Name: "foo", Kind: "Node", APIVersion: "v1"},
+			Target:     v1.ObjectReference{Name: "foo", Kind: "Node", APIVersion: "v1"},
 		}).Do(context.TODO()).Error()
 
 	case gvr("", "v1", "pods/eviction"):
@@ -1074,7 +1074,7 @@ func testSubresourceProxy(c *testContext) {
 		}
 
 		// set expectations
-		c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), schema.GroupVersionKind{}, v1.Connect, obj.GetName(), obj.GetNamespace(), true, false, false)
+		c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), schema.GroupVersionKind{}, admissionv1.Connect, obj.GetName(), obj.GetNamespace(), true, false, false)
 		// run the request. we don't actually care if the request is successful, just that admission gets called as expected
 		err = request.Resource(gvrWithoutSubresources.Resource).Name(obj.GetName()).SubResource(subresources...).Do(context.TODO()).Error()
 		if err != nil {

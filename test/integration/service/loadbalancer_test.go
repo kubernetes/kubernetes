@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -54,14 +54,14 @@ func Test_ServiceLoadBalancerDisableAllocateNodePorts(t *testing.T) {
 	ns := framework.CreateNamespaceOrDie(client, "test-service-allocate-node-ports", t)
 	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
-	service := &corev1.Service{
+	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-123",
 		},
-		Spec: corev1.ServiceSpec{
-			Type:                          corev1.ServiceTypeLoadBalancer,
+		Spec: v1.ServiceSpec{
+			Type:                          v1.ServiceTypeLoadBalancer,
 			AllocateLoadBalancerNodePorts: ptr.To(false),
-			Ports: []corev1.ServicePort{{
+			Ports: []v1.ServicePort{{
 				Port: int32(80),
 			}},
 			Selector: map[string]string{
@@ -94,13 +94,13 @@ func Test_ServiceUpdateLoadBalancerDisableAllocateNodePorts(t *testing.T) {
 	ns := framework.CreateNamespaceOrDie(client, "test-service-allocate-node-ports", t)
 	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
-	service := &corev1.Service{
+	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-123",
 		},
-		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeClusterIP,
-			Ports: []corev1.ServicePort{{
+		Spec: v1.ServiceSpec{
+			Type: v1.ServiceTypeClusterIP,
+			Ports: []v1.ServicePort{{
 				Port: int32(80),
 			}},
 			Selector: map[string]string{
@@ -118,7 +118,7 @@ func Test_ServiceUpdateLoadBalancerDisableAllocateNodePorts(t *testing.T) {
 		t.Error("found node ports when none was expected")
 	}
 
-	service.Spec.Type = corev1.ServiceTypeLoadBalancer
+	service.Spec.Type = v1.ServiceTypeLoadBalancer
 	service.Spec.AllocateLoadBalancerNodePorts = ptr.To(false)
 	service, err = client.CoreV1().Services(ns.Name).Update(context.TODO(), service, metav1.UpdateOptions{})
 	if err != nil {
@@ -144,14 +144,14 @@ func Test_ServiceLoadBalancerEnableThenDisableAllocatedNodePorts(t *testing.T) {
 	ns := framework.CreateNamespaceOrDie(client, "test-service-deallocate-node-ports", t)
 	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
-	service := &corev1.Service{
+	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-123",
 		},
-		Spec: corev1.ServiceSpec{
-			Type:                          corev1.ServiceTypeLoadBalancer,
+		Spec: v1.ServiceSpec{
+			Type:                          v1.ServiceTypeLoadBalancer,
 			AllocateLoadBalancerNodePorts: ptr.To(true),
-			Ports: []corev1.ServicePort{{
+			Ports: []v1.ServicePort{{
 				Port: int32(80),
 			}},
 			Selector: map[string]string{
@@ -194,14 +194,14 @@ func Test_ServiceLoadBalancerDisableAllocatedNodePort(t *testing.T) {
 	ns := framework.CreateNamespaceOrDie(client, "test-service-deallocate-node-ports", t)
 	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
-	service := &corev1.Service{
+	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-123",
 		},
-		Spec: corev1.ServiceSpec{
-			Type:                          corev1.ServiceTypeLoadBalancer,
+		Spec: v1.ServiceSpec{
+			Type:                          v1.ServiceTypeLoadBalancer,
 			AllocateLoadBalancerNodePorts: ptr.To(true),
-			Ports: []corev1.ServicePort{{
+			Ports: []v1.ServicePort{{
 				Port: int32(80),
 			}},
 			Selector: map[string]string{
@@ -245,14 +245,14 @@ func Test_ServiceLoadBalancerDisableAllocatedNodePorts(t *testing.T) {
 	ns := framework.CreateNamespaceOrDie(client, "test-service-deallocate-node-ports", t)
 	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
-	service := &corev1.Service{
+	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-123",
 		},
-		Spec: corev1.ServiceSpec{
-			Type:                          corev1.ServiceTypeLoadBalancer,
+		Spec: v1.ServiceSpec{
+			Type:                          v1.ServiceTypeLoadBalancer,
 			AllocateLoadBalancerNodePorts: ptr.To(true),
-			Ports: []corev1.ServicePort{{
+			Ports: []v1.ServicePort{{
 				Name: "np-1",
 				Port: int32(80),
 			}, {
@@ -303,14 +303,14 @@ func Test_ServiceLoadBalancerDisableAllocatedNodePortsByPatch(t *testing.T) {
 	ns := framework.CreateNamespaceOrDie(client, "test-service-deallocate-node-ports", t)
 	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
-	service := &corev1.Service{
+	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-123",
 		},
-		Spec: corev1.ServiceSpec{
-			Type:                          corev1.ServiceTypeLoadBalancer,
+		Spec: v1.ServiceSpec{
+			Type:                          v1.ServiceTypeLoadBalancer,
 			AllocateLoadBalancerNodePorts: ptr.To(true),
-			Ports: []corev1.ServicePort{{
+			Ports: []v1.ServicePort{{
 				Name: "np-1",
 				Port: int32(80),
 			}, {
@@ -344,7 +344,7 @@ func Test_ServiceLoadBalancerDisableAllocatedNodePortsByPatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error marshalling test service: %v", err)
 	}
-	patch, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, corev1.Service{})
+	patch, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, v1.Service{})
 	if err != nil {
 		t.Fatalf("Error creating patch: %v", err)
 	}
@@ -376,14 +376,14 @@ func Test_ServiceLoadBalancerDisableThenEnableAllocatedNodePorts(t *testing.T) {
 	ns := framework.CreateNamespaceOrDie(client, "test-service-reallocate-node-ports", t)
 	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
-	service := &corev1.Service{
+	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-123",
 		},
-		Spec: corev1.ServiceSpec{
-			Type:                          corev1.ServiceTypeLoadBalancer,
+		Spec: v1.ServiceSpec{
+			Type:                          v1.ServiceTypeLoadBalancer,
 			AllocateLoadBalancerNodePorts: ptr.To(false),
-			Ports: []corev1.ServicePort{{
+			Ports: []v1.ServicePort{{
 				Port: int32(80),
 			}},
 			Selector: map[string]string{
@@ -412,7 +412,7 @@ func Test_ServiceLoadBalancerDisableThenEnableAllocatedNodePorts(t *testing.T) {
 	}
 }
 
-func serviceHasNodePorts(svc *corev1.Service) bool {
+func serviceHasNodePorts(svc *v1.Service) bool {
 	for _, port := range svc.Spec.Ports {
 		if port.NodePort > 0 {
 			return true
@@ -443,13 +443,13 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClass(t *testing.T) {
 	informer.Start(ctx.Done())
 	go controller.Run(ctx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
 
-	service := &corev1.Service{
+	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-load-balancer-class",
 		},
-		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeLoadBalancer,
-			Ports: []corev1.ServicePort{{
+		Spec: v1.ServiceSpec{
+			Type: v1.ServiceTypeLoadBalancer,
+			Ports: []v1.ServicePort{{
 				Port: int32(80),
 			}},
 			LoadBalancerClass: ptr.To("test.com/test"),
@@ -489,13 +489,13 @@ func Test_SetLoadBalancerClassThenUpdateLoadBalancerClass(t *testing.T) {
 	informer.Start(ctx.Done())
 	go controller.Run(ctx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
 
-	service := &corev1.Service{
+	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-load-balancer-class",
 		},
-		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeLoadBalancer,
-			Ports: []corev1.ServicePort{{
+		Spec: v1.ServiceSpec{
+			Type: v1.ServiceTypeLoadBalancer,
+			Ports: []v1.ServicePort{{
 				Port: int32(80),
 			}},
 			LoadBalancerClass: ptr.To("test.com/test"),
@@ -540,13 +540,13 @@ func Test_UpdateLoadBalancerWithLoadBalancerClass(t *testing.T) {
 	informer.Start(ctx.Done())
 	go controller.Run(ctx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
 
-	service := &corev1.Service{
+	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-update-load-balancer-class",
 		},
-		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeLoadBalancer,
-			Ports: []corev1.ServicePort{{
+		Spec: v1.ServiceSpec{
+			Type: v1.ServiceTypeLoadBalancer,
+			Ports: []v1.ServicePort{{
 				Port: int32(80),
 			}},
 		},
@@ -590,22 +590,22 @@ func Test_ServiceLoadBalancerMixedProtocolSetup(t *testing.T) {
 	informer.Start(ctx.Done())
 	go controller.Run(ctx, 1, controllersmetrics.NewControllerManagerMetrics("loadbalancer-test"))
 
-	service := &corev1.Service{
+	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-123",
 		},
-		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeLoadBalancer,
-			Ports: []corev1.ServicePort{
+		Spec: v1.ServiceSpec{
+			Type: v1.ServiceTypeLoadBalancer,
+			Ports: []v1.ServicePort{
 				{
 					Name:     "tcpport",
 					Port:     int32(53),
-					Protocol: corev1.ProtocolTCP,
+					Protocol: v1.ProtocolTCP,
 				},
 				{
 					Name:     "udpport",
 					Port:     int32(53),
-					Protocol: corev1.ProtocolUDP,
+					Protocol: v1.ProtocolUDP,
 				},
 			},
 		},
@@ -643,48 +643,48 @@ func newServiceController(t *testing.T, client *clientset.Clientset) (*serviceco
 
 // Test_ServiceLoadBalancerIPMode tests whether the cloud provider has correctly updated the ipMode field.
 func Test_ServiceLoadBalancerIPMode(t *testing.T) {
-	baseService := &corev1.Service{
+	baseService := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-update-load-balancer-ip-mode",
 		},
-		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeLoadBalancer,
-			Ports: []corev1.ServicePort{{
+		Spec: v1.ServiceSpec{
+			Type: v1.ServiceTypeLoadBalancer,
+			Ports: []v1.ServicePort{{
 				Port: int32(80),
 			}},
 		},
 	}
 
 	testCases := []struct {
-		setIPMode       *corev1.LoadBalancerIPMode
+		setIPMode       *v1.LoadBalancerIPMode
 		externalIP      string
-		expectedIngress corev1.LoadBalancerIngress
+		expectedIngress v1.LoadBalancerIngress
 	}{
 		{
 			setIPMode:  nil,
 			externalIP: "1.2.3.4",
-			expectedIngress: corev1.LoadBalancerIngress{
+			expectedIngress: v1.LoadBalancerIngress{
 				IP:     "1.2.3.4",
-				IPMode: ptr.To(corev1.LoadBalancerIPModeVIP),
-				Ports:  []corev1.PortStatus{{Port: 80, Protocol: corev1.ProtocolTCP}},
+				IPMode: ptr.To(v1.LoadBalancerIPModeVIP),
+				Ports:  []v1.PortStatus{{Port: 80, Protocol: v1.ProtocolTCP}},
 			},
 		},
 		{
-			setIPMode:  ptr.To(corev1.LoadBalancerIPModeVIP),
+			setIPMode:  ptr.To(v1.LoadBalancerIPModeVIP),
 			externalIP: "1.2.3.4",
-			expectedIngress: corev1.LoadBalancerIngress{
+			expectedIngress: v1.LoadBalancerIngress{
 				IP:     "1.2.3.4",
-				IPMode: ptr.To(corev1.LoadBalancerIPModeVIP),
-				Ports:  []corev1.PortStatus{{Port: 80, Protocol: corev1.ProtocolTCP}},
+				IPMode: ptr.To(v1.LoadBalancerIPModeVIP),
+				Ports:  []v1.PortStatus{{Port: 80, Protocol: v1.ProtocolTCP}},
 			},
 		},
 		{
-			setIPMode:  ptr.To(corev1.LoadBalancerIPModeProxy),
+			setIPMode:  ptr.To(v1.LoadBalancerIPModeProxy),
 			externalIP: "1.2.3.4",
-			expectedIngress: corev1.LoadBalancerIngress{
+			expectedIngress: v1.LoadBalancerIngress{
 				IP:     "1.2.3.4",
-				IPMode: ptr.To(corev1.LoadBalancerIPModeProxy),
-				Ports:  []corev1.PortStatus{{Port: 80, Protocol: corev1.ProtocolTCP}},
+				IPMode: ptr.To(v1.LoadBalancerIPModeProxy),
+				Ports:  []v1.PortStatus{{Port: 80, Protocol: v1.ProtocolTCP}},
 			},
 		},
 	}

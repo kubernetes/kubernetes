@@ -49,7 +49,7 @@ import (
 	authenticationv1beta1 "k8s.io/api/authentication/v1beta1"
 	certificatesv1 "k8s.io/api/certificates/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -1028,7 +1028,7 @@ func TestImpersonateWithUID(t *testing.T) {
 		client := clientset.NewForConfigOrDie(clientConfig)
 		_, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 
-		if !errors.IsBadRequest(err) {
+		if !apierrors.IsBadRequest(err) {
 			t.Fatalf("expected bad request, got %T %v", err, err)
 		}
 		if diff := cmp.Diff(
@@ -1068,7 +1068,7 @@ func TestImpersonateWithUID(t *testing.T) {
 		client := clientset.NewForConfigOrDie(clientConfig)
 		_, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 
-		if !errors.IsForbidden(err) {
+		if !apierrors.IsForbidden(err) {
 			t.Fatalf("expected forbidden error, got %T %v", err, err)
 		}
 		if diff := cmp.Diff(
@@ -1154,7 +1154,7 @@ func TestConstrainedImpersonation(t *testing.T) {
 
 		client := clientset.NewForConfigOrDie(impersonatorClientConfig)
 		_, err := client.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
-		if !errors.IsForbidden(err) {
+		if !apierrors.IsForbidden(err) {
 			t.Fatalf("expected forbidden error, got %T %v", err, err)
 		}
 
@@ -1173,7 +1173,7 @@ func TestConstrainedImpersonation(t *testing.T) {
 		})
 
 		_, err = client.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
-		if !errors.IsForbidden(err) {
+		if !apierrors.IsForbidden(err) {
 			t.Fatalf("expected forbidden error, got %T %v", err, err)
 		}
 
@@ -1197,7 +1197,7 @@ func TestConstrainedImpersonation(t *testing.T) {
 		}
 
 		_, err = client.CoreV1().Pods(metav1.NamespaceAll).Watch(ctx, metav1.ListOptions{})
-		if !errors.IsForbidden(err) {
+		if !apierrors.IsForbidden(err) {
 			t.Fatalf("expected forbidden error, got %T %v", err, err)
 		}
 
@@ -1238,7 +1238,7 @@ func TestConstrainedImpersonation(t *testing.T) {
 
 		client := clientset.NewForConfigOrDie(impersonatorClientConfig)
 		_, err := client.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
-		if !errors.IsForbidden(err) {
+		if !apierrors.IsForbidden(err) {
 			t.Fatalf("expected forbidden error, got %T %v", err, err)
 		}
 
@@ -1263,7 +1263,7 @@ func TestConstrainedImpersonation(t *testing.T) {
 		})
 
 		_, err = client.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
-		if !errors.IsForbidden(err) {
+		if !apierrors.IsForbidden(err) {
 			t.Fatalf("expected forbidden error, got %T %v", err, err)
 		}
 
@@ -1334,7 +1334,7 @@ func TestConstrainedImpersonation(t *testing.T) {
 		})
 
 		_, err := client.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
-		if !errors.IsForbidden(err) {
+		if !apierrors.IsForbidden(err) {
 			t.Fatalf("expected forbidden error, got %T %v", err, err)
 		}
 
@@ -1695,7 +1695,7 @@ func TestConstrainedImpersonationDisabled(t *testing.T) {
 
 		client := clientset.NewForConfigOrDie(impersonatorClientConfig)
 		_, err := client.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
-		if !errors.IsForbidden(err) {
+		if !apierrors.IsForbidden(err) {
 			t.Fatalf("expected forbidden error, got %T %v", err, err)
 		}
 
@@ -1745,7 +1745,7 @@ func TestConstrainedImpersonationDisabled(t *testing.T) {
 
 		client := clientset.NewForConfigOrDie(impersonatorClientConfig)
 		_, err := client.CoreV1().Pods(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
-		if !errors.IsForbidden(err) {
+		if !apierrors.IsForbidden(err) {
 			t.Fatalf("expected forbidden error, got %T %v", err, err)
 		}
 

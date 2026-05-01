@@ -24,7 +24,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -45,7 +45,7 @@ func TestNamespaceCondition(t *testing.T) {
 	ctx, closeFn, nsController, informers, kubeClient, dynamicClient := namespaceLifecycleSetup(t)
 	defer closeFn()
 	nsName := "test-namespace-conditions"
-	_, err := kubeClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+	_, err := kubeClient.CoreV1().Namespaces().Create(ctx, &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nsName,
 		},
@@ -63,11 +63,11 @@ func TestNamespaceCondition(t *testing.T) {
 	go nsController.Run(ctx, 5)
 
 	data := etcd.GetEtcdStorageDataForNamespace(nsName)
-	podJSON, err := jsonToUnstructured(data[corev1.SchemeGroupVersion.WithResource("pods")].Stub, "v1", "Pod")
+	podJSON, err := jsonToUnstructured(data[v1.SchemeGroupVersion.WithResource("pods")].Stub, "v1", "Pod")
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = dynamicClient.Resource(corev1.SchemeGroupVersion.WithResource("pods")).Namespace(nsName).Create(ctx, podJSON, metav1.CreateOptions{})
+	_, err = dynamicClient.Resource(v1.SchemeGroupVersion.WithResource("pods")).Namespace(nsName).Create(ctx, podJSON, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,19 +94,19 @@ func TestNamespaceCondition(t *testing.T) {
 
 		conditionsFound := 0
 		for _, condition := range curr.Status.Conditions {
-			if condition.Type == corev1.NamespaceDeletionGVParsingFailure && condition.Message == `All legacy kube types successfully parsed` {
+			if condition.Type == v1.NamespaceDeletionGVParsingFailure && condition.Message == `All legacy kube types successfully parsed` {
 				conditionsFound++
 			}
-			if condition.Type == corev1.NamespaceDeletionDiscoveryFailure && condition.Message == `All resources successfully discovered` {
+			if condition.Type == v1.NamespaceDeletionDiscoveryFailure && condition.Message == `All resources successfully discovered` {
 				conditionsFound++
 			}
-			if condition.Type == corev1.NamespaceDeletionContentFailure && condition.Message == `All content successfully deleted, may be waiting on finalization` {
+			if condition.Type == v1.NamespaceDeletionContentFailure && condition.Message == `All content successfully deleted, may be waiting on finalization` {
 				conditionsFound++
 			}
-			if condition.Type == corev1.NamespaceContentRemaining && condition.Message == `Some resources are remaining: deployments.apps has 1 resource instances` {
+			if condition.Type == v1.NamespaceContentRemaining && condition.Message == `Some resources are remaining: deployments.apps has 1 resource instances` {
 				conditionsFound++
 			}
-			if condition.Type == corev1.NamespaceFinalizersRemaining && condition.Message == `Some content in the namespace has finalizers remaining: custom.io/finalizer in 1 resource instances` {
+			if condition.Type == v1.NamespaceFinalizersRemaining && condition.Message == `Some content in the namespace has finalizers remaining: custom.io/finalizer in 1 resource instances` {
 				conditionsFound++
 			}
 		}
@@ -132,7 +132,7 @@ func TestNamespaceLabels(t *testing.T) {
 
 	nsName := "test-namespace-labels-generated"
 	// Create a new namespace w/ no name
-	ns, err := kubeClient.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+	ns, err := kubeClient.CoreV1().Namespaces().Create(ctx, &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: nsName,
 		},
@@ -142,8 +142,8 @@ func TestNamespaceLabels(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if ns.Name != ns.Labels[corev1.LabelMetadataName] {
-		t.Fatal(fmt.Errorf("expected %q, got %q", ns.Name, ns.Labels[corev1.LabelMetadataName]))
+	if ns.Name != ns.Labels[v1.LabelMetadataName] {
+		t.Fatal(fmt.Errorf("expected %q, got %q", ns.Name, ns.Labels[v1.LabelMetadataName]))
 	}
 
 	nsList, err := kubeClient.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
@@ -153,8 +153,8 @@ func TestNamespaceLabels(t *testing.T) {
 	}
 
 	for _, ns := range nsList.Items {
-		if ns.Name != ns.Labels[corev1.LabelMetadataName] {
-			t.Fatal(fmt.Errorf("expected %q, got %q", ns.Name, ns.Labels[corev1.LabelMetadataName]))
+		if ns.Name != ns.Labels[v1.LabelMetadataName] {
+			t.Fatal(fmt.Errorf("expected %q, got %q", ns.Name, ns.Labels[v1.LabelMetadataName]))
 		}
 	}
 }
@@ -202,7 +202,7 @@ func namespaceLifecycleSetup(t *testing.T) (context.Context, kubeapiservertestin
 		discoverResourcesFn,
 		informers.Core().V1().Namespaces(),
 		10*time.Hour,
-		corev1.FinalizerKubernetes)
+		v1.FinalizerKubernetes)
 
 	return ctx, server.TearDownFn, controller, informers, clientSet, dynamic.NewForConfigOrDie(config)
 }

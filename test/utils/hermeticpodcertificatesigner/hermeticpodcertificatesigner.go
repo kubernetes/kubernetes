@@ -30,9 +30,9 @@ import (
 	"strings"
 	"time"
 
-	certsv1beta1 "k8s.io/api/certificates/v1beta1"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -114,7 +114,7 @@ func (c *Controller) Run(ctx context.Context) {
 	defer func() {
 		klog.Infof("Deleting ClusterTrustBundle %s", ctbName)
 		err := c.kc.CertificatesV1beta1().ClusterTrustBundles().Delete(context.Background(), ctbName, metav1.DeleteOptions{})
-		if err != nil && !k8serrors.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			klog.Errorf("Failed to delete ClusterTrustBundle %s: %v", ctbName, err)
 		}
 	}()
@@ -134,9 +134,9 @@ func (c *Controller) ensureTrustBundle(ctx context.Context) {
 	prefix := strings.Replace(c.signerName, "/", ":", 1)
 	ctbName := prefix + ":primary-bundle"
 	caCertPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: c.caCerts[0]})
-	wantCTB := &certsv1beta1.ClusterTrustBundle{
+	wantCTB := &certificatesv1beta1.ClusterTrustBundle{
 		ObjectMeta: metav1.ObjectMeta{Name: ctbName},
-		Spec: certsv1beta1.ClusterTrustBundleSpec{
+		Spec: certificatesv1beta1.ClusterTrustBundleSpec{
 			SignerName:  c.signerName,
 			TrustBundle: string(caCertPEM),
 		},
@@ -144,7 +144,7 @@ func (c *Controller) ensureTrustBundle(ctx context.Context) {
 
 	klog.Infof("Getting ClusterTrustBundle %s", ctbName)
 	ctb, err := c.kc.CertificatesV1beta1().ClusterTrustBundles().Get(ctx, wantCTB.ObjectMeta.Name, metav1.GetOptions{})
-	if k8serrors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		_, err := c.kc.CertificatesV1beta1().ClusterTrustBundles().Create(ctx, wantCTB, metav1.CreateOptions{})
 		if err != nil {
 			klog.Errorf("Failed to create ClusterTrustBundle %s: %v", ctbName, err)
@@ -191,7 +191,7 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	}
 
 	pcr, err := c.pcrLister.PodCertificateRequests(namespace).Get(name)
-	if k8serrors.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		c.pcrQueue.Forget(key)
 		return true
 	} else if err != nil {
@@ -210,7 +210,7 @@ func (c *Controller) processNextWorkItem(ctx context.Context) bool {
 	return true
 }
 
-func (c *Controller) handlePCR(ctx context.Context, pcr *certsv1beta1.PodCertificateRequest) error {
+func (c *Controller) handlePCR(ctx context.Context, pcr *certificatesv1beta1.PodCertificateRequest) error {
 	if pcr.Spec.SignerName != c.signerName {
 		return nil
 	}
@@ -304,7 +304,7 @@ func (c *Controller) handlePCR(ctx context.Context, pcr *certsv1beta1.PodCertifi
 	pcr = pcr.DeepCopy()
 	pcr.Status.Conditions = []metav1.Condition{
 		{
-			Type:               certsv1beta1.PodCertificateRequestConditionTypeIssued,
+			Type:               certificatesv1beta1.PodCertificateRequestConditionTypeIssued,
 			Status:             metav1.ConditionTrue,
 			Reason:             "Reason",
 			Message:            "Issued",

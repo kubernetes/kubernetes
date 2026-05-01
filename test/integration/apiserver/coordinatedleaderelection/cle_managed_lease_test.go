@@ -23,8 +23,8 @@ import (
 	"testing"
 	"time"
 
-	v1 "k8s.io/api/coordination/v1"
-	v1beta1 "k8s.io/api/coordination/v1beta1"
+	coordinationv1 "k8s.io/api/coordination/v1"
+	coordinationv1beta1 "k8s.io/api/coordination/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -45,18 +45,18 @@ import (
 func TestSingleLeaseCandidate(t *testing.T) {
 	tests := []struct {
 		name                   string
-		preferredStrategy      v1.CoordinatedLeaseStrategy
+		preferredStrategy      coordinationv1.CoordinatedLeaseStrategy
 		expectedHolderIdentity *string
 	}{
 		{
 			name:                   "default strategy, has lease identity",
-			preferredStrategy:      v1.OldestEmulationVersion,
+			preferredStrategy:      coordinationv1.OldestEmulationVersion,
 			expectedHolderIdentity: ptr.To("foo1"),
 		},
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 
-	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", coordinationv1beta1.SchemeGroupVersion)}
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
@@ -80,12 +80,12 @@ func TestSingleLeaseCandidate(t *testing.T) {
 func TestSingleLeaseCandidateUsingThirdPartyStrategy(t *testing.T) {
 	tests := []struct {
 		name                   string
-		preferredStrategy      v1.CoordinatedLeaseStrategy
+		preferredStrategy      coordinationv1.CoordinatedLeaseStrategy
 		expectedHolderIdentity *string
 	}{
 		{
 			name:              "third party strategy, no holder identity",
-			preferredStrategy: v1.CoordinatedLeaseStrategy("foo.com/bar"),
+			preferredStrategy: coordinationv1.CoordinatedLeaseStrategy("foo.com/bar"),
 			// Because a third-party CoordinatedLeaseStrategy is in use,
 			// the coordinated leader election controller doesn't manage
 			// the lease's leader election and does not set the holder identity,
@@ -95,7 +95,7 @@ func TestSingleLeaseCandidateUsingThirdPartyStrategy(t *testing.T) {
 		},
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
-	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", coordinationv1beta1.SchemeGroupVersion)}
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
@@ -119,12 +119,12 @@ func TestSingleLeaseCandidateUsingThirdPartyStrategy(t *testing.T) {
 func TestMultipleLeaseCandidate(t *testing.T) {
 	tests := []struct {
 		name                   string
-		preferredStrategy      v1.CoordinatedLeaseStrategy
+		preferredStrategy      coordinationv1.CoordinatedLeaseStrategy
 		expectedHolderIdentity *string
 	}{
 		{
 			name:              "default strategy, has lease identity",
-			preferredStrategy: v1.OldestEmulationVersion,
+			preferredStrategy: coordinationv1.OldestEmulationVersion,
 			// Because the OldestEmulationVersion strategy is used here, the
 			// the coordinated leader election controller will pick the candidate
 			// with OldestEmulationVersion and OldestBinaryVersion.
@@ -133,7 +133,7 @@ func TestMultipleLeaseCandidate(t *testing.T) {
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 
-	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", coordinationv1beta1.SchemeGroupVersion)}
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
@@ -160,12 +160,12 @@ func TestMultipleLeaseCandidate(t *testing.T) {
 func TestMultipleLeaseCandidateUsingThirdPartyStrategy(t *testing.T) {
 	tests := []struct {
 		name                   string
-		preferredStrategy      v1.CoordinatedLeaseStrategy
+		preferredStrategy      coordinationv1.CoordinatedLeaseStrategy
 		expectedHolderIdentity *string
 	}{
 		{
 			name:              "third party strategy, no holder identity",
-			preferredStrategy: v1.CoordinatedLeaseStrategy("foo.com/bar"),
+			preferredStrategy: coordinationv1.CoordinatedLeaseStrategy("foo.com/bar"),
 			// Because a third-party CoordinatedLeaseStrategy is in use,
 			// the coordinated leader election controller doesn't manage
 			// the lease's leader election and does not set the holder identity,
@@ -175,7 +175,7 @@ func TestMultipleLeaseCandidateUsingThirdPartyStrategy(t *testing.T) {
 		},
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
-	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", coordinationv1beta1.SchemeGroupVersion)}
 
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
 	if err != nil {
@@ -204,7 +204,7 @@ func TestMultipleLeaseCandidateUsingThirdPartyStrategy(t *testing.T) {
 func TestLeaseSwapIfBetterAvailable(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 
-	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", coordinationv1beta1.SchemeGroupVersion)}
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
@@ -217,9 +217,9 @@ func TestLeaseSwapIfBetterAvailable(t *testing.T) {
 	cletest := setupCLE(config, ctx, t)
 	defer cletest.cleanup()
 
-	go cletest.createAndRunFakeController("bar1", "default", "bar", "1.20.0", "1.20.0", v1.OldestEmulationVersion)
+	go cletest.createAndRunFakeController("bar1", "default", "bar", "1.20.0", "1.20.0", coordinationv1.OldestEmulationVersion)
 	cletest.pollForLease(ctx, "bar", "default", ptr.To("bar1"))
-	go cletest.createAndRunFakeController("bar2", "default", "bar", "1.19.0", "1.19.0", v1.OldestEmulationVersion)
+	go cletest.createAndRunFakeController("bar2", "default", "bar", "1.19.0", "1.19.0", coordinationv1.OldestEmulationVersion)
 	cletest.pollForLease(ctx, "bar", "default", ptr.To("bar2"))
 }
 
@@ -227,7 +227,7 @@ func TestLeaseSwapIfBetterAvailable(t *testing.T) {
 func TestUpgradeSkew(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.CoordinatedLeaderElection, true)
 
-	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", coordinationv1beta1.SchemeGroupVersion)}
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
@@ -242,7 +242,7 @@ func TestUpgradeSkew(t *testing.T) {
 
 	go cletest.createAndRunFakeLegacyController("foo1-130", "default", "foobar")
 	cletest.pollForLease(ctx, "foobar", "default", ptr.To("foo1-130"))
-	go cletest.createAndRunFakeController("foo1-131", "default", "foobar", "1.31.0", "1.31.0", v1.OldestEmulationVersion)
+	go cletest.createAndRunFakeController("foo1-131", "default", "foobar", "1.31.0", "1.31.0", coordinationv1.OldestEmulationVersion)
 	// running a new controller should not kick off old leader
 	cletest.pollForLease(ctx, "foobar", "default", ptr.To("foo1-130"))
 	cletest.cancelController("foo1-130", "default")
@@ -257,7 +257,7 @@ func TestLeaseCandidateCleanup(t *testing.T) {
 		apiserver.LeaseCandidateGCPeriod = 30 * time.Minute
 	}()
 
-	flags := []string{fmt.Sprintf("--runtime-config=%s=true", v1beta1.SchemeGroupVersion)}
+	flags := []string{fmt.Sprintf("--runtime-config=%s=true", coordinationv1beta1.SchemeGroupVersion)}
 	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), flags, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
@@ -268,16 +268,16 @@ func TestLeaseCandidateCleanup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expiredLC := &v1beta1.LeaseCandidate{
+	expiredLC := &coordinationv1beta1.LeaseCandidate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "expired",
 			Namespace: "default",
 		},
-		Spec: v1beta1.LeaseCandidateSpec{
+		Spec: coordinationv1beta1.LeaseCandidateSpec{
 			LeaseName:        "foobaz",
 			BinaryVersion:    "0.1.0",
 			EmulationVersion: "0.1.0",
-			Strategy:         v1.OldestEmulationVersion,
+			Strategy:         coordinationv1.OldestEmulationVersion,
 			RenewTime:        &metav1.MicroTime{Time: time.Now().Add(-2 * time.Hour)},
 			PingTime:         &metav1.MicroTime{Time: time.Now().Add(-1 * time.Hour)},
 		},
@@ -335,7 +335,7 @@ func (t *cleTest) createAndRunFakeLegacyController(name string, namespace string
 		})
 
 }
-func (t *cleTest) createAndRunFakeController(name string, namespace string, targetLease string, binaryVersion string, compatibilityVersion string, preferredStrategy v1.CoordinatedLeaseStrategy) {
+func (t *cleTest) createAndRunFakeController(name string, namespace string, targetLease string, binaryVersion string, compatibilityVersion string, preferredStrategy coordinationv1.CoordinatedLeaseStrategy) {
 	identityLease, _, err := leaderelection.NewCandidate(
 		t.clientset,
 		namespace,

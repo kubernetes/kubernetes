@@ -24,7 +24,7 @@ import (
 	"sync"
 	"testing"
 
-	authorizationapi "k8s.io/api/authorization/v1"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -71,15 +71,15 @@ func TestSubjectAccessReview(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		sar            *authorizationapi.SubjectAccessReview
+		sar            *authorizationv1.SubjectAccessReview
 		expectedError  string
-		expectedStatus authorizationapi.SubjectAccessReviewStatus
+		expectedStatus authorizationv1.SubjectAccessReviewStatus
 	}{
 		{
 			name: "simple allow",
-			sar: &authorizationapi.SubjectAccessReview{
-				Spec: authorizationapi.SubjectAccessReviewSpec{
-					ResourceAttributes: &authorizationapi.ResourceAttributes{
+			sar: &authorizationv1.SubjectAccessReview{
+				Spec: authorizationv1.SubjectAccessReviewSpec{
+					ResourceAttributes: &authorizationv1.ResourceAttributes{
 						Verb:     "list",
 						Group:    api.GroupName,
 						Version:  "v1",
@@ -88,16 +88,16 @@ func TestSubjectAccessReview(t *testing.T) {
 					User: "alice",
 				},
 			},
-			expectedStatus: authorizationapi.SubjectAccessReviewStatus{
+			expectedStatus: authorizationv1.SubjectAccessReviewStatus{
 				Allowed: true,
 				Reason:  "you're not dave",
 			},
 		},
 		{
 			name: "simple deny",
-			sar: &authorizationapi.SubjectAccessReview{
-				Spec: authorizationapi.SubjectAccessReviewSpec{
-					ResourceAttributes: &authorizationapi.ResourceAttributes{
+			sar: &authorizationv1.SubjectAccessReview{
+				Spec: authorizationv1.SubjectAccessReviewSpec{
+					ResourceAttributes: &authorizationv1.ResourceAttributes{
 						Verb:     "list",
 						Group:    api.GroupName,
 						Version:  "v1",
@@ -106,7 +106,7 @@ func TestSubjectAccessReview(t *testing.T) {
 					User: "dave",
 				},
 			},
-			expectedStatus: authorizationapi.SubjectAccessReviewStatus{
+			expectedStatus: authorizationv1.SubjectAccessReviewStatus{
 				Allowed:         false,
 				Reason:          "no",
 				EvaluationError: "I'm sorry, Dave",
@@ -114,9 +114,9 @@ func TestSubjectAccessReview(t *testing.T) {
 		},
 		{
 			name: "simple error",
-			sar: &authorizationapi.SubjectAccessReview{
-				Spec: authorizationapi.SubjectAccessReviewSpec{
-					ResourceAttributes: &authorizationapi.ResourceAttributes{
+			sar: &authorizationv1.SubjectAccessReview{
+				Spec: authorizationv1.SubjectAccessReviewSpec{
+					ResourceAttributes: &authorizationv1.ResourceAttributes{
 						Verb:     "list",
 						Group:    api.GroupName,
 						Version:  "v1",
@@ -188,16 +188,16 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 	tests := []struct {
 		name           string
 		username       string
-		sar            *authorizationapi.SelfSubjectAccessReview
+		sar            *authorizationv1.SelfSubjectAccessReview
 		expectedError  string
-		expectedStatus authorizationapi.SubjectAccessReviewStatus
+		expectedStatus authorizationv1.SubjectAccessReviewStatus
 	}{
 		{
 			name:     "simple allow",
 			username: "alice",
-			sar: &authorizationapi.SelfSubjectAccessReview{
-				Spec: authorizationapi.SelfSubjectAccessReviewSpec{
-					ResourceAttributes: &authorizationapi.ResourceAttributes{
+			sar: &authorizationv1.SelfSubjectAccessReview{
+				Spec: authorizationv1.SelfSubjectAccessReviewSpec{
+					ResourceAttributes: &authorizationv1.ResourceAttributes{
 						Verb:     "list",
 						Group:    api.GroupName,
 						Version:  "v1",
@@ -205,7 +205,7 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 					},
 				},
 			},
-			expectedStatus: authorizationapi.SubjectAccessReviewStatus{
+			expectedStatus: authorizationv1.SubjectAccessReviewStatus{
 				Allowed: true,
 				Reason:  "you're not dave",
 			},
@@ -213,9 +213,9 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 		{
 			name:     "simple deny",
 			username: "dave",
-			sar: &authorizationapi.SelfSubjectAccessReview{
-				Spec: authorizationapi.SelfSubjectAccessReviewSpec{
-					ResourceAttributes: &authorizationapi.ResourceAttributes{
+			sar: &authorizationv1.SelfSubjectAccessReview{
+				Spec: authorizationv1.SelfSubjectAccessReviewSpec{
+					ResourceAttributes: &authorizationv1.ResourceAttributes{
 						Verb:     "list",
 						Group:    api.GroupName,
 						Version:  "v1",
@@ -223,7 +223,7 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 					},
 				},
 			},
-			expectedStatus: authorizationapi.SubjectAccessReviewStatus{
+			expectedStatus: authorizationv1.SubjectAccessReviewStatus{
 				Allowed:         false,
 				Reason:          "no",
 				EvaluationError: "I'm sorry, Dave",
@@ -272,17 +272,17 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 	tests := []struct {
 		name           string
 		namespace      string
-		sar            *authorizationapi.LocalSubjectAccessReview
+		sar            *authorizationv1.LocalSubjectAccessReview
 		expectedError  string
-		expectedStatus authorizationapi.SubjectAccessReviewStatus
+		expectedStatus authorizationv1.SubjectAccessReviewStatus
 	}{
 		{
 			name:      "simple allow",
 			namespace: "foo",
-			sar: &authorizationapi.LocalSubjectAccessReview{
+			sar: &authorizationv1.LocalSubjectAccessReview{
 				ObjectMeta: metav1.ObjectMeta{Namespace: "foo"},
-				Spec: authorizationapi.SubjectAccessReviewSpec{
-					ResourceAttributes: &authorizationapi.ResourceAttributes{
+				Spec: authorizationv1.SubjectAccessReviewSpec{
+					ResourceAttributes: &authorizationv1.ResourceAttributes{
 						Verb:      "list",
 						Group:     api.GroupName,
 						Version:   "v1",
@@ -292,7 +292,7 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 					User: "alice",
 				},
 			},
-			expectedStatus: authorizationapi.SubjectAccessReviewStatus{
+			expectedStatus: authorizationv1.SubjectAccessReviewStatus{
 				Allowed: true,
 				Reason:  "you're not dave",
 			},
@@ -300,10 +300,10 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 		{
 			name:      "simple deny",
 			namespace: "foo",
-			sar: &authorizationapi.LocalSubjectAccessReview{
+			sar: &authorizationv1.LocalSubjectAccessReview{
 				ObjectMeta: metav1.ObjectMeta{Namespace: "foo"},
-				Spec: authorizationapi.SubjectAccessReviewSpec{
-					ResourceAttributes: &authorizationapi.ResourceAttributes{
+				Spec: authorizationv1.SubjectAccessReviewSpec{
+					ResourceAttributes: &authorizationv1.ResourceAttributes{
 						Verb:      "list",
 						Group:     api.GroupName,
 						Version:   "v1",
@@ -313,7 +313,7 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 					User: "dave",
 				},
 			},
-			expectedStatus: authorizationapi.SubjectAccessReviewStatus{
+			expectedStatus: authorizationv1.SubjectAccessReviewStatus{
 				Allowed:         false,
 				Reason:          "no",
 				EvaluationError: "I'm sorry, Dave",
@@ -322,10 +322,10 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 		{
 			name:      "conflicting namespace",
 			namespace: "foo",
-			sar: &authorizationapi.LocalSubjectAccessReview{
+			sar: &authorizationv1.LocalSubjectAccessReview{
 				ObjectMeta: metav1.ObjectMeta{Namespace: "foo"},
-				Spec: authorizationapi.SubjectAccessReviewSpec{
-					ResourceAttributes: &authorizationapi.ResourceAttributes{
+				Spec: authorizationv1.SubjectAccessReviewSpec{
+					ResourceAttributes: &authorizationv1.ResourceAttributes{
 						Verb:      "list",
 						Group:     api.GroupName,
 						Version:   "v1",
@@ -340,10 +340,10 @@ func TestLocalSubjectAccessReview(t *testing.T) {
 		{
 			name:      "missing namespace",
 			namespace: "foo",
-			sar: &authorizationapi.LocalSubjectAccessReview{
+			sar: &authorizationv1.LocalSubjectAccessReview{
 				ObjectMeta: metav1.ObjectMeta{Namespace: "foo"},
-				Spec: authorizationapi.SubjectAccessReviewSpec{
-					ResourceAttributes: &authorizationapi.ResourceAttributes{
+				Spec: authorizationv1.SubjectAccessReviewSpec{
+					ResourceAttributes: &authorizationv1.ResourceAttributes{
 						Verb:     "list",
 						Group:    api.GroupName,
 						Version:  "v1",

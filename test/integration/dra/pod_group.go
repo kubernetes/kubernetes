@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
@@ -32,17 +32,17 @@ func testPodGroup(tCtx ktesting.TContext) {
 	podGroupName := "podgroup"
 	tests := map[string]struct {
 		numPods  int
-		podGroup *schedulingapi.PodGroup
+		podGroup *schedulingv1alpha2.PodGroup
 	}{
 		"gang-2-pods-mincount-2": {
 			numPods: 2,
-			podGroup: &schedulingapi.PodGroup{
+			podGroup: &schedulingv1alpha2.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: podGroupName,
 				},
-				Spec: schedulingapi.PodGroupSpec{
-					SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
-						Gang: &schedulingapi.GangSchedulingPolicy{
+				Spec: schedulingv1alpha2.PodGroupSpec{
+					SchedulingPolicy: schedulingv1alpha2.PodGroupSchedulingPolicy{
+						Gang: &schedulingv1alpha2.GangSchedulingPolicy{
 							MinCount: 2,
 						},
 					},
@@ -51,13 +51,13 @@ func testPodGroup(tCtx ktesting.TContext) {
 		},
 		"gang-20-pods-mincount-20": {
 			numPods: 20,
-			podGroup: &schedulingapi.PodGroup{
+			podGroup: &schedulingv1alpha2.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: podGroupName,
 				},
-				Spec: schedulingapi.PodGroupSpec{
-					SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
-						Gang: &schedulingapi.GangSchedulingPolicy{
+				Spec: schedulingv1alpha2.PodGroupSpec{
+					SchedulingPolicy: schedulingv1alpha2.PodGroupSchedulingPolicy{
+						Gang: &schedulingv1alpha2.GangSchedulingPolicy{
 							MinCount: 20,
 						},
 					},
@@ -66,13 +66,13 @@ func testPodGroup(tCtx ktesting.TContext) {
 		},
 		"gang-5-pods-mincount-2": {
 			numPods: 5,
-			podGroup: &schedulingapi.PodGroup{
+			podGroup: &schedulingv1alpha2.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: podGroupName,
 				},
-				Spec: schedulingapi.PodGroupSpec{
-					SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
-						Gang: &schedulingapi.GangSchedulingPolicy{
+				Spec: schedulingv1alpha2.PodGroupSpec{
+					SchedulingPolicy: schedulingv1alpha2.PodGroupSchedulingPolicy{
+						Gang: &schedulingv1alpha2.GangSchedulingPolicy{
 							MinCount: 2,
 						},
 					},
@@ -81,26 +81,26 @@ func testPodGroup(tCtx ktesting.TContext) {
 		},
 		"basic-2-pods": {
 			numPods: 2,
-			podGroup: &schedulingapi.PodGroup{
+			podGroup: &schedulingv1alpha2.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: podGroupName,
 				},
-				Spec: schedulingapi.PodGroupSpec{
-					SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
-						Basic: &schedulingapi.BasicSchedulingPolicy{},
+				Spec: schedulingv1alpha2.PodGroupSpec{
+					SchedulingPolicy: schedulingv1alpha2.PodGroupSchedulingPolicy{
+						Basic: &schedulingv1alpha2.BasicSchedulingPolicy{},
 					},
 				},
 			},
 		},
 		"basic-20-pods": {
 			numPods: 20,
-			podGroup: &schedulingapi.PodGroup{
+			podGroup: &schedulingv1alpha2.PodGroup{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: podGroupName,
 				},
-				Spec: schedulingapi.PodGroupSpec{
-					SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
-						Basic: &schedulingapi.BasicSchedulingPolicy{},
+				Spec: schedulingv1alpha2.PodGroupSpec{
+					SchedulingPolicy: schedulingv1alpha2.PodGroupSchedulingPolicy{
+						Basic: &schedulingv1alpha2.BasicSchedulingPolicy{},
 					},
 				},
 			},

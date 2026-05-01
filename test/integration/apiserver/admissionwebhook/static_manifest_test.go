@@ -33,9 +33,9 @@ import (
 	"testing"
 	"time"
 
-	admissionreviewv1 "k8s.io/api/admission/v1"
+	admissionv1 "k8s.io/api/admission/v1"
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -160,7 +160,7 @@ func TestStaticWebhookComprehensive(t *testing.T) {
 	validatingServer.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		validatingRequestCount.Add(1)
 		body, _ := readStaticBody(r)
-		var req admissionreviewv1.AdmissionReview
+		var req admissionv1.AdmissionReview
 		_ = json.Unmarshal(body, &req)
 		uid := types.UID("test")
 		allowed := true
@@ -172,9 +172,9 @@ func TestStaticWebhookComprehensive(t *testing.T) {
 				message = "denied by static webhook"
 			}
 		}
-		review := &admissionreviewv1.AdmissionReview{
+		review := &admissionv1.AdmissionReview{
 			TypeMeta: metav1.TypeMeta{APIVersion: "admission.k8s.io/v1", Kind: "AdmissionReview"},
-			Response: &admissionreviewv1.AdmissionResponse{
+			Response: &admissionv1.AdmissionResponse{
 				UID:     uid,
 				Allowed: allowed,
 			},
@@ -304,7 +304,7 @@ func TestStaticWebhookComprehensive(t *testing.T) {
 		// VWC was pre-populated — should be active from the first request
 		var lastErr error
 		err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
-			cm := &corev1.ConfigMap{
+			cm := &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "startup-probe-cm",
 					Namespace: ns,
@@ -329,7 +329,7 @@ func TestStaticWebhookComprehensive(t *testing.T) {
 
 		var lastErr error
 		err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
-			cm := &corev1.ConfigMap{
+			cm := &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "mutating-reload-cm",
 					Namespace: ns,
@@ -357,7 +357,7 @@ func TestStaticWebhookComprehensive(t *testing.T) {
 
 	t.Run("both webhooks active simultaneously", func(t *testing.T) {
 		countBefore := validatingRequestCount.Load()
-		cm := &corev1.ConfigMap{
+		cm := &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "both-active-cm",
 				Namespace: ns,
@@ -431,7 +431,7 @@ func TestStaticWebhookComprehensive(t *testing.T) {
 		countBefore := validatingRequestCount.Load()
 		var lastErr error
 		err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
-			_, lastErr = client.CoreV1().Secrets(ns).Create(ctx, &corev1.Secret{
+			_, lastErr = client.CoreV1().Secrets(ns).Create(ctx, &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{Name: "list-webhook-probe", Namespace: ns},
 			}, metav1.CreateOptions{})
 			if lastErr == nil {
@@ -524,7 +524,7 @@ func TestStaticWebhookComprehensive(t *testing.T) {
 
 		// Wait for API webhook to be active
 		err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
-			_, lastErr = client.CoreV1().Secrets(ns).Create(ctx, &corev1.Secret{
+			_, lastErr = client.CoreV1().Secrets(ns).Create(ctx, &v1.Secret{
 				ObjectMeta: metav1.ObjectMeta{Name: "api-webhook-probe", Namespace: ns},
 			}, metav1.CreateOptions{})
 			if lastErr == nil {
@@ -537,7 +537,7 @@ func TestStaticWebhookComprehensive(t *testing.T) {
 		}
 
 		// Verify static mutating webhook still works on configmaps
-		cm, err := client.CoreV1().ConfigMaps(ns).Create(ctx, &corev1.ConfigMap{
+		cm, err := client.CoreV1().ConfigMaps(ns).Create(ctx, &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{Name: "coexist-check-cm", Namespace: ns, Labels: map[string]string{"app": "test"}},
 		}, metav1.CreateOptions{})
 		if err != nil {
@@ -553,7 +553,7 @@ func TestStaticWebhookComprehensive(t *testing.T) {
 		// Wait for it to reload
 		err = wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 			countBefore := validatingRequestCount.Load()
-			_, _ = client.CoreV1().ConfigMaps(ns).Create(ctx, &corev1.ConfigMap{
+			_, _ = client.CoreV1().ConfigMaps(ns).Create(ctx, &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Name: "reload-check-cm", Namespace: ns, Labels: map[string]string{"app": "test"}},
 			}, metav1.CreateOptions{})
 			_ = client.CoreV1().ConfigMaps(ns).Delete(ctx, "reload-check-cm", metav1.DeleteOptions{})
@@ -576,7 +576,7 @@ func TestStaticWebhookComprehensive(t *testing.T) {
 
 		err := wait.PollUntilContextTimeout(ctx, 500*time.Millisecond, 30*time.Second, true, func(ctx context.Context) (bool, error) {
 			countBefore := validatingRequestCount.Load()
-			cm := &corev1.ConfigMap{
+			cm := &v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "post-removal-cm",
 					Namespace: ns,
@@ -599,7 +599,7 @@ func TestStaticWebhookComprehensive(t *testing.T) {
 	})
 
 	t.Run("mutating webhook still active after validating removed", func(t *testing.T) {
-		cm := &corev1.ConfigMap{
+		cm := &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "still-mutated-cm",
 				Namespace: ns,
@@ -633,12 +633,12 @@ func createStaticTestWebhookServer(t *testing.T) (*httptest.Server, []byte, *ato
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		requestCount.Add(1)
 		// Allow all requests
-		review := &admissionreviewv1.AdmissionReview{
+		review := &admissionv1.AdmissionReview{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: "admission.k8s.io/v1",
 				Kind:       "AdmissionReview",
 			},
-			Response: &admissionreviewv1.AdmissionResponse{
+			Response: &admissionv1.AdmissionResponse{
 				UID:     "test",
 				Allowed: true,
 			},
@@ -647,7 +647,7 @@ func createStaticTestWebhookServer(t *testing.T) (*httptest.Server, []byte, *ato
 		// Parse the request to get the UID
 		body, _ := readStaticBody(r)
 		if len(body) > 0 {
-			var req admissionreviewv1.AdmissionReview
+			var req admissionv1.AdmissionReview
 			if err := json.Unmarshal(body, &req); err == nil && req.Request != nil {
 				review.Response.UID = req.Request.UID
 			}
@@ -709,20 +709,20 @@ func createStaticMutatingTestWebhookServer(t *testing.T) (*httptest.Server, []by
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := readStaticBody(r)
-		var req admissionreviewv1.AdmissionReview
+		var req admissionv1.AdmissionReview
 		if err := json.Unmarshal(body, &req); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
 		patch := `[{"op":"add","path":"/metadata/labels/static-mutated","value":"true"}]`
-		patchType := admissionreviewv1.PatchTypeJSONPatch
-		review := &admissionreviewv1.AdmissionReview{
+		patchType := admissionv1.PatchTypeJSONPatch
+		review := &admissionv1.AdmissionReview{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: "admission.k8s.io/v1",
 				Kind:       "AdmissionReview",
 			},
-			Response: &admissionreviewv1.AdmissionResponse{
+			Response: &admissionv1.AdmissionResponse{
 				UID:       req.Request.UID,
 				Allowed:   true,
 				Patch:     []byte(patch),

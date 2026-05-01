@@ -24,7 +24,7 @@ import (
 	"testing"
 	"time"
 
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,9 +60,9 @@ func labelMap() map[string]string {
 	return map[string]string{"foo": "bar"}
 }
 
-func newRS(name, namespace string, replicas int) *apps.ReplicaSet {
+func newRS(name, namespace string, replicas int) *appsv1.ReplicaSet {
 	replicasCopy := int32(replicas)
-	return &apps.ReplicaSet{
+	return &appsv1.ReplicaSet{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ReplicaSet",
 			APIVersion: "apps/v1",
@@ -71,7 +71,7 @@ func newRS(name, namespace string, replicas int) *apps.ReplicaSet {
 			Namespace: namespace,
 			Name:      name,
 		},
-		Spec: apps.ReplicaSetSpec{
+		Spec: appsv1.ReplicaSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labelMap(),
 			},
@@ -180,8 +180,8 @@ func waitToObservePods(t *testing.T, podInformer cache.SharedIndexInformer, podN
 	}
 }
 
-func createRSsPods(t *testing.T, clientSet clientset.Interface, rss []*apps.ReplicaSet, pods []*v1.Pod) ([]*apps.ReplicaSet, []*v1.Pod) {
-	var createdRSs []*apps.ReplicaSet
+func createRSsPods(t *testing.T, clientSet clientset.Interface, rss []*appsv1.ReplicaSet, pods []*v1.Pod) ([]*appsv1.ReplicaSet, []*v1.Pod) {
+	var createdRSs []*appsv1.ReplicaSet
 	var createdPods []*v1.Pod
 	for _, rs := range rss {
 		createdRS, err := clientSet.AppsV1().ReplicaSets(rs.Namespace).Create(context.TODO(), rs, metav1.CreateOptions{})
@@ -202,14 +202,14 @@ func createRSsPods(t *testing.T, clientSet clientset.Interface, rss []*apps.Repl
 }
 
 // Verify .Status.Replicas is equal to .Spec.Replicas
-func waitRSStable(t *testing.T, clientSet clientset.Interface, rs *apps.ReplicaSet) {
+func waitRSStable(t *testing.T, clientSet clientset.Interface, rs *appsv1.ReplicaSet) {
 	if err := testutil.WaitRSStable(t, clientSet, rs, interval, timeout); err != nil {
 		t.Fatal(err)
 	}
 }
 
 // Verify .Status.TerminatingPods is equal to terminatingPods.
-func waitForTerminatingPods(clientSet clientset.Interface, ctx context.Context, rs *apps.ReplicaSet, terminatingPods *int32) error {
+func waitForTerminatingPods(clientSet clientset.Interface, ctx context.Context, rs *appsv1.ReplicaSet, terminatingPods *int32) error {
 	if err := wait.PollUntilContextTimeout(ctx, interval, timeout, true, func(c context.Context) (bool, error) {
 		newRS, err := clientSet.AppsV1().ReplicaSets(rs.Namespace).Get(c, rs.Name, metav1.GetOptions{})
 		if err != nil {
@@ -223,9 +223,9 @@ func waitForTerminatingPods(clientSet clientset.Interface, ctx context.Context, 
 }
 
 // Update .Spec.Replicas to replicas and verify .Status.Replicas is changed accordingly
-func scaleRS(t *testing.T, c clientset.Interface, rs *apps.ReplicaSet, replicas int32) {
+func scaleRS(t *testing.T, c clientset.Interface, rs *appsv1.ReplicaSet, replicas int32) {
 	rsClient := c.AppsV1().ReplicaSets(rs.Namespace)
-	rs = updateRS(t, rsClient, rs.Name, func(rs *apps.ReplicaSet) {
+	rs = updateRS(t, rsClient, rs.Name, func(rs *appsv1.ReplicaSet) {
 		*rs.Spec.Replicas = replicas
 	})
 	waitRSStable(t, c, rs)
@@ -271,8 +271,8 @@ func getPods(t *testing.T, podClient typedv1.PodInterface, labelMap map[string]s
 	return pods
 }
 
-func updateRS(t *testing.T, rsClient appsclient.ReplicaSetInterface, rsName string, updateFunc func(*apps.ReplicaSet)) *apps.ReplicaSet {
-	var rs *apps.ReplicaSet
+func updateRS(t *testing.T, rsClient appsclient.ReplicaSetInterface, rsName string, updateFunc func(*appsv1.ReplicaSet)) *appsv1.ReplicaSet {
+	var rs *appsv1.ReplicaSet
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		newRS, err := rsClient.Get(context.TODO(), rsName, metav1.GetOptions{})
 		if err != nil {
@@ -288,7 +288,7 @@ func updateRS(t *testing.T, rsClient appsclient.ReplicaSetInterface, rsName stri
 }
 
 // Verify ControllerRef of a RS pod that has incorrect attributes is automatically patched by the RS
-func testPodControllerRefPatch(t *testing.T, c clientset.Interface, pod *v1.Pod, ownerReference *metav1.OwnerReference, rs *apps.ReplicaSet, expectedOwnerReferenceNum int) {
+func testPodControllerRefPatch(t *testing.T, c clientset.Interface, pod *v1.Pod, ownerReference *metav1.OwnerReference, rs *appsv1.ReplicaSet, expectedOwnerReferenceNum int) {
 	ns := rs.Namespace
 	podClient := c.CoreV1().Pods(ns)
 	updatePod(t, podClient, pod.Name, func(pod *v1.Pod) {
@@ -357,7 +357,7 @@ func setPodsReadyCondition(t *testing.T, clientSet clientset.Interface, pods *v1
 	}
 }
 
-func testScalingUsingScaleSubresource(t *testing.T, c clientset.Interface, rs *apps.ReplicaSet, replicas int32) {
+func testScalingUsingScaleSubresource(t *testing.T, c clientset.Interface, rs *appsv1.ReplicaSet, replicas int32) {
 	ns := rs.Namespace
 	rsClient := c.AppsV1().ReplicaSets(ns)
 	newRS, err := rsClient.Get(context.TODO(), rs.Name, metav1.GetOptions{})
@@ -396,45 +396,45 @@ func testScalingUsingScaleSubresource(t *testing.T, c clientset.Interface, rs *a
 func TestAdoption(t *testing.T) {
 	testCases := []struct {
 		name                    string
-		existingOwnerReferences func(rs *apps.ReplicaSet) []metav1.OwnerReference
-		expectedOwnerReferences func(rs *apps.ReplicaSet) []metav1.OwnerReference
+		existingOwnerReferences func(rs *appsv1.ReplicaSet) []metav1.OwnerReference
+		expectedOwnerReferences func(rs *appsv1.ReplicaSet) []metav1.OwnerReference
 	}{
 		{
 			"pod refers rs as an owner, not a controller",
-			func(rs *apps.ReplicaSet) []metav1.OwnerReference {
+			func(rs *appsv1.ReplicaSet) []metav1.OwnerReference {
 				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet"}}
 			},
-			func(rs *apps.ReplicaSet) []metav1.OwnerReference {
+			func(rs *appsv1.ReplicaSet) []metav1.OwnerReference {
 				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet", Controller: ptr.To(true), BlockOwnerDeletion: ptr.To(true)}}
 			},
 		},
 		{
 			"pod doesn't have owner references",
-			func(rs *apps.ReplicaSet) []metav1.OwnerReference {
+			func(rs *appsv1.ReplicaSet) []metav1.OwnerReference {
 				return []metav1.OwnerReference{}
 			},
-			func(rs *apps.ReplicaSet) []metav1.OwnerReference {
+			func(rs *appsv1.ReplicaSet) []metav1.OwnerReference {
 				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet", Controller: ptr.To(true), BlockOwnerDeletion: ptr.To(true)}}
 			},
 		},
 		{
 			"pod refers rs as a controller",
-			func(rs *apps.ReplicaSet) []metav1.OwnerReference {
+			func(rs *appsv1.ReplicaSet) []metav1.OwnerReference {
 				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet", Controller: ptr.To(true)}}
 			},
-			func(rs *apps.ReplicaSet) []metav1.OwnerReference {
+			func(rs *appsv1.ReplicaSet) []metav1.OwnerReference {
 				return []metav1.OwnerReference{{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet", Controller: ptr.To(true)}}
 			},
 		},
 		{
 			"pod refers other rs as the controller, refers the rs as an owner",
-			func(rs *apps.ReplicaSet) []metav1.OwnerReference {
+			func(rs *appsv1.ReplicaSet) []metav1.OwnerReference {
 				return []metav1.OwnerReference{
 					{UID: "1", Name: "anotherRS", APIVersion: "apps/v1", Kind: "ReplicaSet", Controller: ptr.To(true)},
 					{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet"},
 				}
 			},
-			func(rs *apps.ReplicaSet) []metav1.OwnerReference {
+			func(rs *appsv1.ReplicaSet) []metav1.OwnerReference {
 				return []metav1.OwnerReference{
 					{UID: "1", Name: "anotherRS", APIVersion: "apps/v1", Kind: "ReplicaSet", Controller: ptr.To(true)},
 					{UID: rs.UID, Name: rs.Name, APIVersion: "apps/v1", Kind: "ReplicaSet"},
@@ -494,7 +494,7 @@ func TestRSSelectorImmutability(t *testing.T) {
 	ns := framework.CreateNamespaceOrDie(clientSet, "rs-selector-immutability", t)
 	defer framework.DeleteNamespaceOrDie(clientSet, ns, t)
 	rs := newRS("rs", ns.Name, 0)
-	createRSsPods(t, clientSet, []*apps.ReplicaSet{rs}, []*v1.Pod{})
+	createRSsPods(t, clientSet, []*appsv1.ReplicaSet{rs}, []*v1.Pod{})
 
 	// test to ensure apps/v1 selector is immutable
 	rsV1, err := clientSet.AppsV1().ReplicaSets(ns.Name).Get(context.TODO(), rs.Name, metav1.GetOptions{})
@@ -524,7 +524,7 @@ func TestSpecReplicasChange(t *testing.T) {
 	defer stopControllers()
 
 	rs := newRS("rs", ns.Name, 2)
-	rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
+	rss, _ := createRSsPods(t, c, []*appsv1.ReplicaSet{rs}, []*v1.Pod{})
 	rs = rss[0]
 	waitRSStable(t, c, rs)
 
@@ -537,7 +537,7 @@ func TestSpecReplicasChange(t *testing.T) {
 	// without .Spec.Replicas change
 	rsClient := c.AppsV1().ReplicaSets(ns.Name)
 	var oldGeneration int64
-	newRS := updateRS(t, rsClient, rs.Name, func(rs *apps.ReplicaSet) {
+	newRS := updateRS(t, rsClient, rs.Name, func(rs *appsv1.ReplicaSet) {
 		oldGeneration = rs.Generation
 		rs.Spec.Template.Annotations = map[string]string{"test": "annotation"}
 	})
@@ -567,7 +567,7 @@ func TestDeletingAndFailedPods(t *testing.T) {
 	defer stopControllers()
 
 	rs := newRS("rs", ns.Name, 2)
-	rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
+	rss, _ := createRSsPods(t, c, []*appsv1.ReplicaSet{rs}, []*v1.Pod{})
 	rs = rss[0]
 	waitRSStable(t, c, rs)
 
@@ -670,7 +670,7 @@ func TestPodDeletionCost(t *testing.T) {
 			defer stopControllers()
 
 			rs := newRS("rs", ns.Name, 2)
-			rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
+			rss, _ := createRSsPods(t, c, []*appsv1.ReplicaSet{rs}, []*v1.Pod{})
 			rs = rss[0]
 			waitRSStable(t, c, rs)
 
@@ -700,7 +700,7 @@ func TestPodDeletionCost(t *testing.T) {
 
 			// Change RS's number of replics to 1
 			rsClient := c.AppsV1().ReplicaSets(ns.Name)
-			updateRS(t, rsClient, rs.Name, func(rs *apps.ReplicaSet) {
+			updateRS(t, rsClient, rs.Name, func(rs *appsv1.ReplicaSet) {
 				rs.Spec.Replicas = ptr.To[int32](1)
 			})
 
@@ -732,7 +732,7 @@ func TestOverlappingRSs(t *testing.T) {
 	for i := range 2 {
 		// One RS has 1 replica, and another has 2 replicas
 		rs := newRS(fmt.Sprintf("rs-%d", i+1), ns.Name, i+1)
-		rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
+		rss, _ := createRSsPods(t, c, []*appsv1.ReplicaSet{rs}, []*v1.Pod{})
 		waitRSStable(t, c, rss[0])
 	}
 
@@ -764,7 +764,7 @@ func TestPodOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 	defer stopControllers()
 
 	rs := newRS("rs", ns.Name, 1)
-	rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
+	rss, _ := createRSsPods(t, c, []*appsv1.ReplicaSet{rs}, []*v1.Pod{})
 	rs = rss[0]
 	waitRSStable(t, c, rs)
 
@@ -842,7 +842,7 @@ func TestGeneralPodAdoption(t *testing.T) {
 	defer stopControllers()
 
 	rs := newRS("rs", ns.Name, 1)
-	rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
+	rss, _ := createRSsPods(t, c, []*appsv1.ReplicaSet{rs}, []*v1.Pod{})
 	rs = rss[0]
 	waitRSStable(t, c, rs)
 
@@ -875,7 +875,7 @@ func TestReadyAndAvailableReplicas(t *testing.T) {
 
 	rs := newRS("rs", ns.Name, 3)
 	rs.Spec.MinReadySeconds = 3600
-	rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
+	rss, _ := createRSsPods(t, c, []*appsv1.ReplicaSet{rs}, []*v1.Pod{})
 	rs = rss[0]
 	waitRSStable(t, c, rs)
 
@@ -926,7 +926,7 @@ func TestRSScaleSubresource(t *testing.T) {
 	defer stopControllers()
 
 	rs := newRS("rs", ns.Name, 1)
-	rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
+	rss, _ := createRSsPods(t, c, []*appsv1.ReplicaSet{rs}, []*v1.Pod{})
 	rs = rss[0]
 	waitRSStable(t, c, rs)
 
@@ -950,7 +950,7 @@ func TestExtraPodsAdoptionAndDeletion(t *testing.T) {
 		pod.Labels = labelMap()
 		podList = append(podList, pod)
 	}
-	rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, podList)
+	rss, _ := createRSsPods(t, c, []*appsv1.ReplicaSet{rs}, podList)
 	rs = rss[0]
 	stopControllers := runControllerAndInformers(t, rm, informers, 3)
 	defer stopControllers()
@@ -978,13 +978,13 @@ func TestFullyLabeledReplicas(t *testing.T) {
 
 	extraLabelMap := map[string]string{"foo": "bar", "extraKey": "extraValue"}
 	rs := newRS("rs", ns.Name, 2)
-	rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
+	rss, _ := createRSsPods(t, c, []*appsv1.ReplicaSet{rs}, []*v1.Pod{})
 	rs = rss[0]
 	waitRSStable(t, c, rs)
 
 	// Change RS's template labels to have extra labels, but not its selector
 	rsClient := c.AppsV1().ReplicaSets(ns.Name)
-	updateRS(t, rsClient, rs.Name, func(rs *apps.ReplicaSet) {
+	updateRS(t, rsClient, rs.Name, func(rs *appsv1.ReplicaSet) {
 		rs.Spec.Template.Labels = extraLabelMap
 	})
 
@@ -1022,7 +1022,7 @@ func TestReplicaSetsAppsV1DefaultGCPolicy(t *testing.T) {
 	rs := newRS("rs", ns.Name, 2)
 	fakeFinalizer := "kube.io/dummy-finalizer"
 	rs.Finalizers = []string{fakeFinalizer}
-	rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
+	rss, _ := createRSsPods(t, c, []*appsv1.ReplicaSet{rs}, []*v1.Pod{})
 	rs = rss[0]
 	waitRSStable(t, c, rs)
 
@@ -1056,7 +1056,7 @@ func TestReplicaSetsAppsV1DefaultGCPolicy(t *testing.T) {
 		t.Fatalf("Failed to verify the finalizer: %v", err)
 	}
 
-	updateRS(t, c.AppsV1().ReplicaSets(ns.Name), rs.Name, func(rs *apps.ReplicaSet) {
+	updateRS(t, c.AppsV1().ReplicaSets(ns.Name), rs.Name, func(rs *appsv1.ReplicaSet) {
 		var finalizers []string
 		// remove fakeFinalizer
 		for _, finalizer := range rs.Finalizers {
@@ -1083,7 +1083,7 @@ func TestTerminatingReplicas(t *testing.T) {
 	rs := newRS("rs", ns.Name, 5)
 	rs.Spec.Template.Spec.NodeName = "fake-node"
 	rs.Spec.Template.Spec.TerminationGracePeriodSeconds = ptr.To(int64(300))
-	rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
+	rss, _ := createRSsPods(t, c, []*appsv1.ReplicaSet{rs}, []*v1.Pod{})
 	rs = rss[0]
 	waitRSStable(t, c, rs)
 	if err := waitForTerminatingPods(c, tCtx, rs, nil); err != nil {

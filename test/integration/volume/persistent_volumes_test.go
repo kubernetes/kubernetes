@@ -26,7 +26,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -1069,7 +1069,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	defer testClient.CoreV1().PersistentVolumes().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 	defer testClient.StorageV1().StorageClasses().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
-	storageClass := storage.StorageClass{
+	storageClass := storagev1.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
@@ -1252,7 +1252,7 @@ func TestRetroactiveStorageClassAssignment(t *testing.T) {
 	defer testClient.StorageV1().StorageClasses().DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
 
 	// Create non default SC (extra SC - should not be used by any PVC in this test).
-	nonDefaultSC := storage.StorageClass{
+	nonDefaultSC := storagev1.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},
@@ -1312,7 +1312,7 @@ func TestRetroactiveStorageClassAssignment(t *testing.T) {
 	t.Log("claim created")
 
 	// Create default SC.
-	defaultSC := storage.StorageClass{
+	defaultSC := storagev1.StorageClass{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "StorageClass",
 		},

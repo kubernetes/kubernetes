@@ -27,8 +27,8 @@ import (
 	"testing"
 	"time"
 
-	authv1 "k8s.io/api/authentication/v1"
-	corev1 "k8s.io/api/core/v1"
+	authenticationv1 "k8s.io/api/authentication/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -88,7 +88,7 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 	}
 
 	// Create Namesapce (ns-1) to work with.
-	if _, err := client.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+	if _, err := client.CoreV1().Namespaces().Create(ctx, &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "ns-1",
 		},
@@ -97,7 +97,7 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 	}
 
 	// Create ServiceAccount (sa-1) to work with.
-	if _, err := client.CoreV1().ServiceAccounts("ns-1").Create(ctx, &corev1.ServiceAccount{
+	if _, err := client.CoreV1().ServiceAccounts("ns-1").Create(ctx, &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "sa-1",
 		},
@@ -213,8 +213,8 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 
 			// Request a token for ns-1:sa-1.
 			tokenExpirationSec := int64(2 * 60 * 60) // 2h
-			tokenRequest, err := client.CoreV1().ServiceAccounts("ns-1").CreateToken(ctx, "sa-1", &authv1.TokenRequest{
-				Spec: authv1.TokenRequestSpec{
+			tokenRequest, err := client.CoreV1().ServiceAccounts("ns-1").CreateToken(ctx, "sa-1", &authenticationv1.TokenRequest{
+				Spec: authenticationv1.TokenRequestSpec{
 					ExpirationSeconds: &tokenExpirationSec,
 				},
 			}, metav1.CreateOptions{})
@@ -231,8 +231,8 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 			tc.preValidationSignerUpdate(t)
 
 			// Try Validating the token.
-			tokenReviewResult, err := client.AuthenticationV1().TokenReviews().Create(ctx, &authv1.TokenReview{
-				Spec: authv1.TokenReviewSpec{
+			tokenReviewResult, err := client.AuthenticationV1().TokenReviews().Create(ctx, &authenticationv1.TokenReview{
+				Spec: authenticationv1.TokenReviewSpec{
 					Token: tokenRequest.Status.Token,
 				},
 			}, metav1.CreateOptions{})
@@ -256,7 +256,7 @@ func TestExternalJWTSigningAndAuth(t *testing.T) {
 					t.Fatalf("While creating a new client using token: %v", err)
 				}
 
-				ssr, err := newClient.AuthenticationV1().SelfSubjectReviews().Create(ctx, &authv1.SelfSubjectReview{
+				ssr, err := newClient.AuthenticationV1().SelfSubjectReviews().Create(ctx, &authenticationv1.SelfSubjectReview{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "SelfSubjectReview",
 						APIVersion: "authentication.k8s.io/v1",
@@ -331,7 +331,7 @@ func TestDelayedStartForSigner(t *testing.T) {
 	defer tearDownFn()
 
 	// Create Namesapce (ns-1) to work with.
-	if _, err := client.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+	if _, err := client.CoreV1().Namespaces().Create(ctx, &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "ns-1",
 		},
@@ -340,7 +340,7 @@ func TestDelayedStartForSigner(t *testing.T) {
 	}
 
 	// Create ServiceAccount (sa-1) to work with.
-	if _, err := client.CoreV1().ServiceAccounts("ns-1").Create(ctx, &corev1.ServiceAccount{
+	if _, err := client.CoreV1().ServiceAccounts("ns-1").Create(ctx, &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "sa-1",
 		},
@@ -350,8 +350,8 @@ func TestDelayedStartForSigner(t *testing.T) {
 
 	// Request a token for ns-1:sa-1.
 	tokenExpirationSec := int64(2 * 60 * 60) // 2h
-	tokenRequest, err := client.CoreV1().ServiceAccounts("ns-1").CreateToken(ctx, "sa-1", &authv1.TokenRequest{
-		Spec: authv1.TokenRequestSpec{
+	tokenRequest, err := client.CoreV1().ServiceAccounts("ns-1").CreateToken(ctx, "sa-1", &authenticationv1.TokenRequest{
+		Spec: authenticationv1.TokenRequestSpec{
 			ExpirationSeconds: &tokenExpirationSec,
 		},
 	}, metav1.CreateOptions{})
@@ -360,8 +360,8 @@ func TestDelayedStartForSigner(t *testing.T) {
 	}
 
 	// Try Validating the token.
-	tokenReviewResult, err := client.AuthenticationV1().TokenReviews().Create(ctx, &authv1.TokenReview{
-		Spec: authv1.TokenReviewSpec{
+	tokenReviewResult, err := client.AuthenticationV1().TokenReviews().Create(ctx, &authenticationv1.TokenReview{
+		Spec: authenticationv1.TokenReviewSpec{
 			Token: tokenRequest.Status.Token,
 		},
 	}, metav1.CreateOptions{})

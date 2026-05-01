@@ -31,7 +31,7 @@ import (
 
 	"golang.org/x/net/websocket"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
@@ -102,13 +102,13 @@ func TestWebsocketWatchClientTimeout(t *testing.T) {
 	defer server.TearDownFn()
 
 	// object setup
-	service := &corev1.Service{
+	service := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "test"},
-		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{{Name: "http", Port: 80}},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{{Name: "http", Port: 80}},
 		},
 	}
-	configmap := &corev1.ConfigMap{
+	configmap := &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: "test"},
 	}
 	clientset, err := kubernetes.NewForConfig(server.ClientConfig)
@@ -288,7 +288,7 @@ func testWatchClientTimeout(t *testing.T, config *restclient.Config, timeout, ti
 			return client.CoreV1().ConfigMaps(metav1.NamespaceAll).Watch(context.TODO(), options)
 		},
 	}
-	_, informer := cache.NewIndexerInformer(listWatch, &corev1.ConfigMap{}, 30*time.Minute, cache.ResourceEventHandlerFuncs{}, cache.Indexers{})
+	_, informer := cache.NewIndexerInformer(listWatch, &v1.ConfigMap{}, 30*time.Minute, cache.ResourceEventHandlerFuncs{}, cache.Indexers{})
 	informer.Run(stopCh)
 	select {
 	case <-stopCh:

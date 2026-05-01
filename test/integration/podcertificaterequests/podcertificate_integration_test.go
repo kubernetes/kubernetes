@@ -26,9 +26,9 @@ import (
 	"fmt"
 	"time"
 
-	certsv1beta1 "k8s.io/api/certificates/v1beta1"
-	corev1 "k8s.io/api/core/v1"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -59,7 +59,7 @@ func TestCleanerController(t *testing.T) {
 		[]string{
 			"--authorization-mode=Node,RBAC",
 			"--feature-gates=PodCertificateRequest=true",
-			fmt.Sprintf("--runtime-config=%s=true", certsv1beta1.SchemeGroupVersion),
+			fmt.Sprintf("--runtime-config=%s=true", certificatesv1beta1.SchemeGroupVersion),
 		},
 		framework.SharedEtcd(),
 	)
@@ -87,11 +87,11 @@ func TestCleanerController(t *testing.T) {
 	informers.Start(ctx.Done())
 
 	// Make a node
-	node := &corev1.Node{
+	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node1",
 		},
-		Spec: corev1.NodeSpec{},
+		Spec: v1.NodeSpec{},
 	}
 	node, err = client.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{})
 	if err != nil {
@@ -99,7 +99,7 @@ func TestCleanerController(t *testing.T) {
 	}
 
 	// Make a serviceaccount
-	sa := &corev1.ServiceAccount{
+	sa := &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "sa1",
@@ -111,15 +111,15 @@ func TestCleanerController(t *testing.T) {
 	}
 
 	// Make a pod
-	pod := &corev1.Pod{
+	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "pod1",
 		},
-		Spec: corev1.PodSpec{
+		Spec: v1.PodSpec{
 			ServiceAccountName: sa.ObjectMeta.Name,
 			NodeName:           node.ObjectMeta.Name,
-			Containers: []corev1.Container{
+			Containers: []v1.Container{
 				{
 					Name:  "main",
 					Image: "notarealimage",
@@ -140,12 +140,12 @@ func TestCleanerController(t *testing.T) {
 
 	// Have node1 create a PodCertificateRequest for pod1
 	_, _, pubPKIX, proof := mustMakeEd25519KeyAndProof(t, []byte(pod.ObjectMeta.UID))
-	pcr := &certsv1beta1.PodCertificateRequest{
+	pcr := &certificatesv1beta1.PodCertificateRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "pcr1",
 		},
-		Spec: certsv1beta1.PodCertificateRequestSpec{
+		Spec: certificatesv1beta1.PodCertificateRequestSpec{
 			SignerName:                "kubernetes.io/foo",
 			PodName:                   pod.ObjectMeta.Name,
 			PodUID:                    pod.ObjectMeta.UID,
@@ -164,7 +164,7 @@ func TestCleanerController(t *testing.T) {
 	}
 	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
 		_, err := client.CertificatesV1beta1().PodCertificateRequests(pcr.ObjectMeta.Namespace).Get(ctx, pcr.ObjectMeta.Name, metav1.GetOptions{})
-		if k8serrors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return true, nil
 		} else if err != nil {
 			return false, err
@@ -194,7 +194,7 @@ func TestNodeRestriction(t *testing.T) {
 			"--authorization-mode=Node,RBAC",
 			"--enable-admission-plugins=NodeRestriction",
 			"--feature-gates=PodCertificateRequest=true",
-			fmt.Sprintf("--runtime-config=%s=true", certsv1beta1.SchemeGroupVersion),
+			fmt.Sprintf("--runtime-config=%s=true", certificatesv1beta1.SchemeGroupVersion),
 		},
 		framework.SharedEtcd(),
 	)
@@ -203,21 +203,21 @@ func TestNodeRestriction(t *testing.T) {
 	client := clientset.NewForConfigOrDie(s.ClientConfig)
 
 	// Make node1 and node2
-	node1 := &corev1.Node{
+	node1 := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node1",
 		},
-		Spec: corev1.NodeSpec{},
+		Spec: v1.NodeSpec{},
 	}
 	node1, err := client.CoreV1().Nodes().Create(ctx, node1, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error creating node1: %v", err)
 	}
-	node2 := &corev1.Node{
+	node2 := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node2",
 		},
-		Spec: corev1.NodeSpec{},
+		Spec: v1.NodeSpec{},
 	}
 	node2, err = client.CoreV1().Nodes().Create(ctx, node2, metav1.CreateOptions{})
 	if err != nil {
@@ -235,7 +235,7 @@ func TestNodeRestriction(t *testing.T) {
 	}
 
 	// Make a serviceaccount
-	sa := &corev1.ServiceAccount{
+	sa := &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "sa1",
@@ -247,15 +247,15 @@ func TestNodeRestriction(t *testing.T) {
 	}
 
 	// Make a pod
-	pod := &corev1.Pod{
+	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "pod1",
 		},
-		Spec: corev1.PodSpec{
+		Spec: v1.PodSpec{
 			ServiceAccountName: sa.ObjectMeta.Name,
 			NodeName:           node1.ObjectMeta.Name,
-			Containers: []corev1.Container{
+			Containers: []v1.Container{
 				{
 					Name:  "main",
 					Image: "notarealimage",
@@ -271,12 +271,12 @@ func TestNodeRestriction(t *testing.T) {
 	t.Run("node1 can create PCR for pod on node1", func(t *testing.T) {
 		// Have node2 create a PodCertificateRequest for pod1
 		_, _, pubPKIX, proof := mustMakeEd25519KeyAndProof(t, []byte(pod.ObjectMeta.UID))
-		pcr := &certsv1beta1.PodCertificateRequest{
+		pcr := &certificatesv1beta1.PodCertificateRequest{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
 				Name:      "pcr1",
 			},
-			Spec: certsv1beta1.PodCertificateRequestSpec{
+			Spec: certificatesv1beta1.PodCertificateRequestSpec{
 				SignerName:                "kubernetes.io/foo",
 				PodName:                   pod.ObjectMeta.Name,
 				PodUID:                    pod.ObjectMeta.UID,
@@ -307,12 +307,12 @@ func TestNodeRestriction(t *testing.T) {
 	t.Run("node2 cannot create PCR for pod on node1", func(t *testing.T) {
 		// Have node2 create a PodCertificateRequest for pod1
 		_, _, pubPKIX, proof := mustMakeEd25519KeyAndProof(t, []byte(pod.ObjectMeta.UID))
-		pcr := &certsv1beta1.PodCertificateRequest{
+		pcr := &certificatesv1beta1.PodCertificateRequest{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
 				Name:      "pcr1",
 			},
-			Spec: certsv1beta1.PodCertificateRequestSpec{
+			Spec: certificatesv1beta1.PodCertificateRequestSpec{
 				SignerName:                "kubernetes.io/foo",
 				PodName:                   pod.ObjectMeta.Name,
 				PodUID:                    pod.ObjectMeta.UID,
@@ -332,14 +332,14 @@ func TestNodeRestriction(t *testing.T) {
 		// durable error condition.
 		err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
 			_, err = node2Client.CertificatesV1beta1().PodCertificateRequests("default").Create(ctx, pcr, metav1.CreateOptions{})
-			if err == nil || k8serrors.IsForbidden(err) {
+			if err == nil || apierrors.IsForbidden(err) {
 				return true, err
 			}
 			return false, err
 		})
 		if err == nil {
 			t.Fatalf("PCR creation unexpectedly succeeded")
-		} else if !k8serrors.IsForbidden(err) {
+		} else if !apierrors.IsForbidden(err) {
 			t.Fatalf("PCR creation failed with unexpected error code (wanted Forbidden): %v", err)
 		}
 	})
@@ -347,12 +347,12 @@ func TestNodeRestriction(t *testing.T) {
 	t.Run("node2 cannot create PCR for pod that doesn't exist", func(t *testing.T) {
 		// Have node2 create a PodCertificateRequest for pod1
 		_, _, pubPKIX, proof := mustMakeEd25519KeyAndProof(t, []byte(pod.ObjectMeta.UID))
-		pcr := &certsv1beta1.PodCertificateRequest{
+		pcr := &certificatesv1beta1.PodCertificateRequest{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
 				Name:      "pcr1",
 			},
-			Spec: certsv1beta1.PodCertificateRequestSpec{
+			Spec: certificatesv1beta1.PodCertificateRequestSpec{
 				SignerName:                "kubernetes.io/foo",
 				PodName:                   "dnepod",
 				PodUID:                    "dnepoduid",
@@ -397,7 +397,7 @@ func TestNodeAuthorization(t *testing.T) {
 			"--authorization-mode=Node,RBAC",
 			"--enable-admission-plugins=NodeRestriction",
 			"--feature-gates=PodCertificateRequest=true",
-			fmt.Sprintf("--runtime-config=%s=true", certsv1beta1.SchemeGroupVersion),
+			fmt.Sprintf("--runtime-config=%s=true", certificatesv1beta1.SchemeGroupVersion),
 		},
 		framework.SharedEtcd(),
 	)
@@ -406,21 +406,21 @@ func TestNodeAuthorization(t *testing.T) {
 	client := clientset.NewForConfigOrDie(s.ClientConfig)
 
 	// Make node1 and node2
-	node1 := &corev1.Node{
+	node1 := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node1",
 		},
-		Spec: corev1.NodeSpec{},
+		Spec: v1.NodeSpec{},
 	}
 	node1, err := client.CoreV1().Nodes().Create(ctx, node1, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error creating node1: %v", err)
 	}
-	node2 := &corev1.Node{
+	node2 := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node2",
 		},
-		Spec: corev1.NodeSpec{},
+		Spec: v1.NodeSpec{},
 	}
 	_, err = client.CoreV1().Nodes().Create(ctx, node2, metav1.CreateOptions{})
 	if err != nil {
@@ -428,7 +428,7 @@ func TestNodeAuthorization(t *testing.T) {
 	}
 
 	// Make a serviceaccount
-	sa := &corev1.ServiceAccount{
+	sa := &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "sa1",
@@ -440,15 +440,15 @@ func TestNodeAuthorization(t *testing.T) {
 	}
 
 	// Make a pod
-	pod := &corev1.Pod{
+	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "pod1",
 		},
-		Spec: corev1.PodSpec{
+		Spec: v1.PodSpec{
 			ServiceAccountName: sa.ObjectMeta.Name,
 			NodeName:           node1.ObjectMeta.Name,
-			Containers: []corev1.Container{
+			Containers: []v1.Container{
 				{
 					Name:  "main",
 					Image: "notarealimage",
@@ -473,12 +473,12 @@ func TestNodeAuthorization(t *testing.T) {
 
 	// Have node1 create a PodCertificateRequest for pod1
 	_, _, pubPKIX, proof := mustMakeEd25519KeyAndProof(t, []byte(pod.ObjectMeta.UID))
-	pcr := &certsv1beta1.PodCertificateRequest{
+	pcr := &certificatesv1beta1.PodCertificateRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "default",
 			Name:      "pcr1",
 		},
-		Spec: certsv1beta1.PodCertificateRequestSpec{
+		Spec: certificatesv1beta1.PodCertificateRequestSpec{
 			SignerName:                "kubernetes.io/foo",
 			PodName:                   pod.ObjectMeta.Name,
 			PodUID:                    pod.ObjectMeta.UID,
@@ -545,7 +545,7 @@ func TestNodeAuthorization(t *testing.T) {
 		})
 		if err == nil {
 			t.Fatalf("Listing PodCertificateRequests unexpectedly succeeded")
-		} else if !k8serrors.IsForbidden(err) {
+		} else if !apierrors.IsForbidden(err) {
 			t.Fatalf("Listing PodCertificateRequests failed with unexpected error (want Forbidden): %v", err)
 		}
 	})
@@ -554,7 +554,7 @@ func TestNodeAuthorization(t *testing.T) {
 		_, err := node2Client.CertificatesV1beta1().PodCertificateRequests("default").Get(ctx, "pcr1", metav1.GetOptions{})
 		if err == nil {
 			t.Fatalf("Getting pcr1 unexpectedly succeeded")
-		} else if !k8serrors.IsForbidden(err) {
+		} else if !apierrors.IsForbidden(err) {
 			t.Fatalf("Getting pcr1 failed with unexpected error (want Forbidden): %v", err)
 		}
 	})
@@ -589,7 +589,7 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 			"--authorization-mode=Node,RBAC",
 			"--enable-admission-plugins=NodeRestriction",
 			"--feature-gates=PodCertificateRequest=true",
-			fmt.Sprintf("--runtime-config=%s=true", certsv1beta1.SchemeGroupVersion),
+			fmt.Sprintf("--runtime-config=%s=true", certificatesv1beta1.SchemeGroupVersion),
 		},
 		framework.SharedEtcd(),
 	)
@@ -598,21 +598,21 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 	client := clientset.NewForConfigOrDie(s.ClientConfig)
 
 	// Make node1 and node2
-	node1 := &corev1.Node{
+	node1 := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node1",
 		},
-		Spec: corev1.NodeSpec{},
+		Spec: v1.NodeSpec{},
 	}
 	node1, err := client.CoreV1().Nodes().Create(ctx, node1, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error creating node1: %v", err)
 	}
-	node2 := &corev1.Node{
+	node2 := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "node2",
 		},
-		Spec: corev1.NodeSpec{},
+		Spec: v1.NodeSpec{},
 	}
 	node2, err = client.CoreV1().Nodes().Create(ctx, node2, metav1.CreateOptions{})
 	if err != nil {
@@ -620,7 +620,7 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 	}
 
 	// Make namespaces "foo" and "bar"
-	_, err = client.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+	_, err = client.CoreV1().Namespaces().Create(ctx, &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
 		},
@@ -628,7 +628,7 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error creating namespace foo: %v", err)
 	}
-	_, err = client.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+	_, err = client.CoreV1().Namespaces().Create(ctx, &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "bar",
 		},
@@ -638,7 +638,7 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 	}
 
 	// Make a serviceaccount in each namespace
-	saFoo := &corev1.ServiceAccount{
+	saFoo := &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "foo",
 			Name:      "foo",
@@ -648,7 +648,7 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error creating serviceaccount foo: %v", err)
 	}
-	saBar := &corev1.ServiceAccount{
+	saBar := &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "bar",
 			Name:      "bar",
@@ -660,15 +660,15 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 	}
 
 	// Make a pod named "foo" in namespace "bar", and vice-versa
-	podBarFoo := &corev1.Pod{
+	podBarFoo := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "bar",
 			Name:      "foo",
 		},
-		Spec: corev1.PodSpec{
+		Spec: v1.PodSpec{
 			ServiceAccountName: saBar.ObjectMeta.Name,
 			NodeName:           node1.ObjectMeta.Name,
-			Containers: []corev1.Container{
+			Containers: []v1.Container{
 				{
 					Name:  "main",
 					Image: "notarealimage",
@@ -680,15 +680,15 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error creating pod bar/foo: %v", err)
 	}
-	podFooBar := &corev1.Pod{
+	podFooBar := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "foo",
 			Name:      "bar",
 		},
-		Spec: corev1.PodSpec{
+		Spec: v1.PodSpec{
 			ServiceAccountName: saFoo.ObjectMeta.Name,
 			NodeName:           node2.ObjectMeta.Name,
-			Containers: []corev1.Container{
+			Containers: []v1.Container{
 				{
 					Name:  "main",
 					Image: "notarealimage",
@@ -713,12 +713,12 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 
 	// Have node1 create a PodCertificateRequest for bar/foo
 	_, _, pubPKIX, proof := mustMakeEd25519KeyAndProof(t, []byte(podBarFoo.ObjectMeta.UID))
-	pcrBarFoo := &certsv1beta1.PodCertificateRequest{
+	pcrBarFoo := &certificatesv1beta1.PodCertificateRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "bar",
 			Name:      "foo",
 		},
-		Spec: certsv1beta1.PodCertificateRequestSpec{
+		Spec: certificatesv1beta1.PodCertificateRequestSpec{
 			SignerName:                "kubernetes.io/foo",
 			PodName:                   podBarFoo.ObjectMeta.Name,
 			PodUID:                    podBarFoo.ObjectMeta.UID,
@@ -746,12 +746,12 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 
 	// Have node2 create a PodCertificateRequest for foo/bar
 	_, _, pubPKIXFooBar, proofFooBar := mustMakeEd25519KeyAndProof(t, []byte(podFooBar.ObjectMeta.UID))
-	pcrFooBar := &certsv1beta1.PodCertificateRequest{
+	pcrFooBar := &certificatesv1beta1.PodCertificateRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: "foo",
 			Name:      "bar",
 		},
-		Spec: certsv1beta1.PodCertificateRequestSpec{
+		Spec: certificatesv1beta1.PodCertificateRequestSpec{
 			SignerName:                "kubernetes.io/foo",
 			PodName:                   podFooBar.ObjectMeta.Name,
 			PodUID:                    podFooBar.ObjectMeta.UID,

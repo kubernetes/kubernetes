@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -80,8 +80,8 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 	namespaceObject := framework.CreateNamespaceOrDie(clientset, "retry-watch", t)
 	defer framework.DeleteNamespaceOrDie(clientset, namespaceObject, t)
 
-	getListFunc := func(c *kubernetes.Clientset, secret *corev1.Secret) func(options metav1.ListOptions) *corev1.SecretList {
-		return func(options metav1.ListOptions) *corev1.SecretList {
+	getListFunc := func(c *kubernetes.Clientset, secret *v1.Secret) func(options metav1.ListOptions) *v1.SecretList {
+		return func(options metav1.ListOptions) *v1.SecretList {
 			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", secret.Name).String()
 			res, err := c.CoreV1().Secrets(secret.Namespace).List(context.TODO(), options)
 			if err != nil {
@@ -91,7 +91,7 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 		}
 	}
 
-	getWatchFunc := func(c *kubernetes.Clientset, secret *corev1.Secret) func(options metav1.ListOptions) (watch.Interface, error) {
+	getWatchFunc := func(c *kubernetes.Clientset, secret *v1.Secret) func(options metav1.ListOptions) (watch.Interface, error) {
 		return func(options metav1.ListOptions) (watch.Interface, error) {
 			options.FieldSelector = fields.OneTermEqualSelector("metadata.name", secret.Name).String()
 			res, err := c.CoreV1().Secrets(secret.Namespace).Watch(context.TODO(), options)
@@ -102,7 +102,7 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 		}
 	}
 
-	generateEvents := func(t *testing.T, c *kubernetes.Clientset, secret *corev1.Secret, referenceOutput *[]string, stopChan chan struct{}, stoppedChan chan struct{}) {
+	generateEvents := func(t *testing.T, c *kubernetes.Clientset, secret *v1.Secret, referenceOutput *[]string, stopChan chan struct{}, stoppedChan chan struct{}) {
 		defer close(stoppedChan)
 		counter := 0
 
@@ -135,8 +135,8 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 	}
 
 	initialCount := "0"
-	newTestSecret := func(name string) *corev1.Secret {
-		return &corev1.Secret{
+	newTestSecret := func(name string) *v1.Secret {
+		return &v1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
 				Namespace: namespaceObject.Name,
@@ -153,15 +153,15 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 	tt := []struct {
 		name                string
 		succeed             bool
-		secret              *corev1.Secret
-		getWatcher          func(c *kubernetes.Clientset, secret *corev1.Secret) (watch.Interface, error, func())
+		secret              *v1.Secret
+		getWatcher          func(c *kubernetes.Clientset, secret *v1.Secret) (watch.Interface, error, func())
 		normalizeOutputFunc func(referenceOutput []string) []string
 	}{
 		{
 			name:    "regular watcher should fail",
 			succeed: false,
 			secret:  newTestSecret("secret-01"),
-			getWatcher: func(c *kubernetes.Clientset, secret *corev1.Secret) (watch.Interface, error, func()) {
+			getWatcher: func(c *kubernetes.Clientset, secret *v1.Secret) (watch.Interface, error, func()) {
 				options := metav1.ListOptions{
 					ResourceVersion: secret.ResourceVersion,
 				}
@@ -174,7 +174,7 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 			name:    "RetryWatcher survives closed watches",
 			succeed: true,
 			secret:  newTestSecret("secret-02"),
-			getWatcher: func(c *kubernetes.Clientset, secret *corev1.Secret) (watch.Interface, error, func()) {
+			getWatcher: func(c *kubernetes.Clientset, secret *v1.Secret) (watch.Interface, error, func()) {
 				lw := &cache.ListWatch{
 					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 						return getWatchFunc(c, secret)(options)
@@ -189,7 +189,7 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 			name:    "InformerWatcher survives closed watches",
 			succeed: true,
 			secret:  newTestSecret("secret-03"),
-			getWatcher: func(c *kubernetes.Clientset, secret *corev1.Secret) (watch.Interface, error, func()) {
+			getWatcher: func(c *kubernetes.Clientset, secret *v1.Secret) (watch.Interface, error, func()) {
 				lw := &cache.ListWatch{
 					ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 						return getListFunc(c, secret)(options), nil
@@ -202,7 +202,7 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 				// since the watcher is driven by an informer it is crucial to start producing only after the informer has synced
 				// otherwise we might not get all expected events since the informer LIST (or watchelist) and only then WATCHES
 				// all events received during the initial LIST (or watchlist) will be seen as a single event (to most recent version of an obj)
-				_, informer, w, done := watchtools.NewIndexerInformerWatcherWithLogger(logger, lw, &corev1.Secret{})
+				_, informer, w, done := watchtools.NewIndexerInformerWatcherWithLogger(logger, lw, &v1.Secret{})
 				cache.WaitForCacheSync(context.TODO().Done(), informer.HasSynced)
 				return w, nil, func() { <-done }
 			},
@@ -241,7 +241,7 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 				ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)
 				defer cancel()
 				_, err = watchtools.UntilWithoutRetry(ctx, watcher, func(event watch.Event) (bool, error) {
-					s, ok := event.Object.(*corev1.Secret)
+					s, ok := event.Object.(*v1.Secret)
 					if !ok {
 						t.Fatalf("Received an object that is not a Secret: %#v", event.Object)
 					}

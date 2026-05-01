@@ -28,8 +28,8 @@ import (
 	"strings"
 	"testing"
 
-	corev1 "k8s.io/api/core/v1"
-	rbacapi "k8s.io/api/rbac/v1"
+	v1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -129,10 +129,10 @@ func newRBACAuthorizer(t *testing.T, config *controlplane.Config) (authorizer.Au
 
 // bootstrapRoles are a set of RBAC roles which will be populated before the test.
 type bootstrapRoles struct {
-	roles               []rbacapi.Role
-	roleBindings        []rbacapi.RoleBinding
-	clusterRoles        []rbacapi.ClusterRole
-	clusterRoleBindings []rbacapi.ClusterRoleBinding
+	roles               []rbacv1.Role
+	roleBindings        []rbacv1.RoleBinding
+	clusterRoles        []rbacv1.ClusterRole
+	clusterRoleBindings []rbacv1.ClusterRoleBinding
 }
 
 // bootstrap uses the provided client to create the bootstrap roles and role bindings.
@@ -316,23 +316,23 @@ func TestRBAC(t *testing.T) {
 	}{
 		{
 			bootstrapRoles: bootstrapRoles{
-				clusterRoles: []rbacapi.ClusterRole{
+				clusterRoles: []rbacv1.ClusterRole{
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "allow-all"},
-						Rules:      []rbacapi.PolicyRule{ruleAllowAll},
+						Rules:      []rbacv1.PolicyRule{ruleAllowAll},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "read-pods"},
-						Rules:      []rbacapi.PolicyRule{ruleReadPods},
+						Rules:      []rbacv1.PolicyRule{ruleReadPods},
 					},
 				},
-				clusterRoleBindings: []rbacapi.ClusterRoleBinding{
+				clusterRoleBindings: []rbacv1.ClusterRoleBinding{
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "read-pods"},
-						Subjects: []rbacapi.Subject{
+						Subjects: []rbacv1.Subject{
 							{Kind: "User", Name: "pod-reader"},
 						},
-						RoleRef: rbacapi.RoleRef{Kind: "ClusterRole", Name: "read-pods"},
+						RoleRef: rbacv1.RoleRef{Kind: "ClusterRole", Name: "read-pods"},
 					},
 				},
 			},
@@ -354,63 +354,63 @@ func TestRBAC(t *testing.T) {
 		},
 		{
 			bootstrapRoles: bootstrapRoles{
-				clusterRoles: []rbacapi.ClusterRole{
+				clusterRoles: []rbacv1.ClusterRole{
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "write-jobs"},
-						Rules:      []rbacapi.PolicyRule{ruleWriteJobs},
+						Rules:      []rbacv1.PolicyRule{ruleWriteJobs},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "create-rolebindings"},
-						Rules: []rbacapi.PolicyRule{
+						Rules: []rbacv1.PolicyRule{
 							rbachelper.NewRule("create").Groups("rbac.authorization.k8s.io").Resources("rolebindings").RuleOrDie(),
 						},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "bind-any-clusterrole"},
-						Rules: []rbacapi.PolicyRule{
+						Rules: []rbacv1.PolicyRule{
 							rbachelper.NewRule("bind").Groups("rbac.authorization.k8s.io").Resources("clusterroles").RuleOrDie(),
 						},
 					},
 				},
-				clusterRoleBindings: []rbacapi.ClusterRoleBinding{
+				clusterRoleBindings: []rbacv1.ClusterRoleBinding{
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "write-jobs"},
-						Subjects:   []rbacapi.Subject{{Kind: "User", Name: "job-writer"}},
-						RoleRef:    rbacapi.RoleRef{Kind: "ClusterRole", Name: "write-jobs"},
+						Subjects:   []rbacv1.Subject{{Kind: "User", Name: "job-writer"}},
+						RoleRef:    rbacv1.RoleRef{Kind: "ClusterRole", Name: "write-jobs"},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "create-rolebindings"},
-						Subjects: []rbacapi.Subject{
+						Subjects: []rbacv1.Subject{
 							{Kind: "User", Name: "job-writer"},
 							{Kind: "User", Name: "nonescalating-rolebinding-writer"},
 							{Kind: "User", Name: "any-rolebinding-writer"},
 						},
-						RoleRef: rbacapi.RoleRef{Kind: "ClusterRole", Name: "create-rolebindings"},
+						RoleRef: rbacv1.RoleRef{Kind: "ClusterRole", Name: "create-rolebindings"},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "bind-any-clusterrole"},
-						Subjects:   []rbacapi.Subject{{Kind: "User", Name: "any-rolebinding-writer"}},
-						RoleRef:    rbacapi.RoleRef{Kind: "ClusterRole", Name: "bind-any-clusterrole"},
+						Subjects:   []rbacv1.Subject{{Kind: "User", Name: "any-rolebinding-writer"}},
+						RoleRef:    rbacv1.RoleRef{Kind: "ClusterRole", Name: "bind-any-clusterrole"},
 					},
 				},
-				roleBindings: []rbacapi.RoleBinding{
+				roleBindings: []rbacv1.RoleBinding{
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "write-jobs", Namespace: "job-namespace"},
-						Subjects:   []rbacapi.Subject{{Kind: "User", Name: "job-writer-namespace"}},
-						RoleRef:    rbacapi.RoleRef{Kind: "ClusterRole", Name: "write-jobs"},
+						Subjects:   []rbacv1.Subject{{Kind: "User", Name: "job-writer-namespace"}},
+						RoleRef:    rbacv1.RoleRef{Kind: "ClusterRole", Name: "write-jobs"},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "create-rolebindings", Namespace: "job-namespace"},
-						Subjects: []rbacapi.Subject{
+						Subjects: []rbacv1.Subject{
 							{Kind: "User", Name: "job-writer-namespace"},
 							{Kind: "User", Name: "any-rolebinding-writer-namespace"},
 						},
-						RoleRef: rbacapi.RoleRef{Kind: "ClusterRole", Name: "create-rolebindings"},
+						RoleRef: rbacv1.RoleRef{Kind: "ClusterRole", Name: "create-rolebindings"},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "bind-any-clusterrole", Namespace: "job-namespace"},
-						Subjects:   []rbacapi.Subject{{Kind: "User", Name: "any-rolebinding-writer-namespace"}},
-						RoleRef:    rbacapi.RoleRef{Kind: "ClusterRole", Name: "bind-any-clusterrole"},
+						Subjects:   []rbacv1.Subject{{Kind: "User", Name: "any-rolebinding-writer-namespace"}},
+						RoleRef:    rbacv1.RoleRef{Kind: "ClusterRole", Name: "bind-any-clusterrole"},
 					},
 				},
 			},
@@ -461,25 +461,25 @@ func TestRBAC(t *testing.T) {
 		},
 		{
 			bootstrapRoles: bootstrapRoles{
-				clusterRoles: []rbacapi.ClusterRole{
+				clusterRoles: []rbacv1.ClusterRole{
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "allow-all"},
-						Rules:      []rbacapi.PolicyRule{ruleAllowAll},
+						Rules:      []rbacv1.PolicyRule{ruleAllowAll},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "update-limitranges"},
-						Rules: []rbacapi.PolicyRule{
+						Rules: []rbacv1.PolicyRule{
 							rbachelper.NewRule("update").Groups("").Resources("limitranges").RuleOrDie(),
 						},
 					},
 				},
-				clusterRoleBindings: []rbacapi.ClusterRoleBinding{
+				clusterRoleBindings: []rbacv1.ClusterRoleBinding{
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "update-limitranges"},
-						Subjects: []rbacapi.Subject{
+						Subjects: []rbacv1.Subject{
 							{Kind: "User", Name: "limitrange-updater"},
 						},
-						RoleRef: rbacapi.RoleRef{Kind: "ClusterRole", Name: "update-limitranges"},
+						RoleRef: rbacv1.RoleRef{Kind: "ClusterRole", Name: "update-limitranges"},
 					},
 				},
 			},
@@ -495,25 +495,25 @@ func TestRBAC(t *testing.T) {
 		},
 		{
 			bootstrapRoles: bootstrapRoles{
-				clusterRoles: []rbacapi.ClusterRole{
+				clusterRoles: []rbacv1.ClusterRole{
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "allow-all"},
-						Rules:      []rbacapi.PolicyRule{ruleAllowAll},
+						Rules:      []rbacv1.PolicyRule{ruleAllowAll},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "patch-limitranges"},
-						Rules: []rbacapi.PolicyRule{
+						Rules: []rbacv1.PolicyRule{
 							rbachelper.NewRule("patch").Groups("").Resources("limitranges").RuleOrDie(),
 						},
 					},
 				},
-				clusterRoleBindings: []rbacapi.ClusterRoleBinding{
+				clusterRoleBindings: []rbacv1.ClusterRoleBinding{
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "patch-limitranges"},
-						Subjects: []rbacapi.Subject{
+						Subjects: []rbacv1.Subject{
 							{Kind: "User", Name: "limitrange-patcher"},
 						},
-						RoleRef: rbacapi.RoleRef{Kind: "ClusterRole", Name: "patch-limitranges"},
+						RoleRef: rbacv1.RoleRef{Kind: "ClusterRole", Name: "patch-limitranges"},
 					},
 				},
 			},
@@ -757,7 +757,7 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 	}
 	discRoleBinding.Annotations["rbac.authorization.kubernetes.io/autoupdate"] = "false"
 	discRoleBinding.Annotations["rbac-discovery-upgrade-test"] = "pass"
-	discRoleBinding.Subjects = []rbacapi.Subject{
+	discRoleBinding.Subjects = []rbacv1.Subject{
 		{
 			Name:     "system:authenticated",
 			Kind:     "Group",
@@ -849,14 +849,14 @@ func TestRBACContextContamination(t *testing.T) {
 	// should allow namespace-scoped request in any namespace
 	// should disallow request for resource not in rules
 	{
-		roles.clusterRoles = append(roles.clusterRoles, rbacapi.ClusterRole{
+		roles.clusterRoles = append(roles.clusterRoles, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: "c1-clusterrole"},
-			Rules:      []rbacapi.PolicyRule{ruleReadPods},
+			Rules:      []rbacv1.PolicyRule{ruleReadPods},
 		})
-		roles.clusterRoleBindings = append(roles.clusterRoleBindings, rbacapi.ClusterRoleBinding{
+		roles.clusterRoleBindings = append(roles.clusterRoleBindings, rbacv1.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{Name: "c1-clusterrolebinding"},
-			Subjects:   []rbacapi.Subject{{Kind: "User", Name: "c1-user"}},
-			RoleRef:    rbacapi.RoleRef{Kind: "ClusterRole", Name: "c1-clusterrole"},
+			Subjects:   []rbacv1.Subject{{Kind: "User", Name: "c1-user"}},
+			RoleRef:    rbacv1.RoleRef{Kind: "ClusterRole", Name: "c1-clusterrole"},
 		})
 
 		user := &user.DefaultInfo{Name: "c1-user"}
@@ -883,17 +883,17 @@ func TestRBACContextContamination(t *testing.T) {
 	// should disallow namespace-scoped request in other namespace
 	// should disallow request for resource not in rules
 	{
-		roles.clusterRoles = append(roles.clusterRoles, rbacapi.ClusterRole{
+		roles.clusterRoles = append(roles.clusterRoles, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: "c2-clusterrole"},
-			Rules:      []rbacapi.PolicyRule{ruleReadPods},
+			Rules:      []rbacv1.PolicyRule{ruleReadPods},
 		})
-		roles.roleBindings = append(roles.roleBindings, rbacapi.RoleBinding{
+		roles.roleBindings = append(roles.roleBindings, rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "c2-rolebinding",
 				Namespace: validNamespace,
 			},
-			Subjects: []rbacapi.Subject{{Kind: "User", Name: "c2-user"}},
-			RoleRef:  rbacapi.RoleRef{Kind: "ClusterRole", Name: "c2-clusterrole"},
+			Subjects: []rbacv1.Subject{{Kind: "User", Name: "c2-user"}},
+			RoleRef:  rbacv1.RoleRef{Kind: "ClusterRole", Name: "c2-clusterrole"},
 		})
 
 		user := &user.DefaultInfo{Name: "c2-user"}
@@ -924,20 +924,20 @@ func TestRBACContextContamination(t *testing.T) {
 	// should disallow namespace-scoped request in other namespace
 	// should disallow request for resource not in rules
 	{
-		roles.roles = append(roles.roles, rbacapi.Role{
+		roles.roles = append(roles.roles, rbacv1.Role{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "c3-role",
 				Namespace: validNamespace,
 			},
-			Rules: []rbacapi.PolicyRule{ruleReadPods},
+			Rules: []rbacv1.PolicyRule{ruleReadPods},
 		})
-		roles.roleBindings = append(roles.roleBindings, rbacapi.RoleBinding{
+		roles.roleBindings = append(roles.roleBindings, rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "c3-rolebinding",
 				Namespace: validNamespace,
 			},
-			Subjects: []rbacapi.Subject{{Kind: "User", Name: "c3-user"}},
-			RoleRef:  rbacapi.RoleRef{Kind: "Role", Name: "c3-role"},
+			Subjects: []rbacv1.Subject{{Kind: "User", Name: "c3-user"}},
+			RoleRef:  rbacv1.RoleRef{Kind: "Role", Name: "c3-role"},
 		})
 
 		user := &user.DefaultInfo{Name: "c3-user"}
@@ -1000,7 +1000,7 @@ func TestRBACContextContamination(t *testing.T) {
 	}
 
 	for _, ns := range []string{validNamespace, invalidNamespace} {
-		_, err := superuserClient.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
+		_, err := superuserClient.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: ns,
 			},

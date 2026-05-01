@@ -37,7 +37,7 @@ import (
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -373,9 +373,9 @@ func createEncryptionConfig(t *testing.T, encryptionConfig string) (
 	return tempDir, nil
 }
 
-func (svm *svmTest) createSecret(ctx context.Context, t *testing.T, name, namespace string) (*corev1.Secret, error) {
+func (svm *svmTest) createSecret(ctx context.Context, t *testing.T, name, namespace string) (*v1.Secret, error) {
 	t.Helper()
-	secret := &corev1.Secret{
+	secret := &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,

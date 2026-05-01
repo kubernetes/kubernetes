@@ -30,7 +30,7 @@ import (
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -208,10 +208,10 @@ func run(tCtx ktesting.TContext, whatRE string) {
 		},
 		"all": {
 			apis: map[schema.GroupVersion]bool{
-				resourcev1beta1.SchemeGroupVersion:  true,
-				resourcev1beta2.SchemeGroupVersion:  true,
-				resourcealphaapi.SchemeGroupVersion: true,
-				schedulingapi.SchemeGroupVersion:    true,
+				resourcev1beta1.SchemeGroupVersion:    true,
+				resourcev1beta2.SchemeGroupVersion:    true,
+				resourcealphaapi.SchemeGroupVersion:   true,
+				schedulingv1alpha2.SchemeGroupVersion: true,
 			},
 			features: map[featuregate.Feature]bool{
 				// Additional DRA feature gates go here,

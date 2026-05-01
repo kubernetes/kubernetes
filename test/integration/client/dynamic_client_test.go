@@ -27,8 +27,8 @@ import (
 	"testing"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
@@ -66,12 +66,12 @@ func TestDynamicClient(t *testing.T) {
 	resource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
 
 	// Create a Pod with the normal client
-	pod := &corev1.Pod{
+	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "test",
 		},
-		Spec: corev1.PodSpec{
-			Containers: []corev1.Container{
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
 				{
 					Name:  "test",
 					Image: "test-image",
@@ -199,16 +199,16 @@ func TestDynamicClientWatchWithCBOR(t *testing.T) {
 }
 
 func testDynamicClientWatch(t *testing.T, client clientset.Interface, dynamicClient dynamic.Interface) {
-	resource := corev1.SchemeGroupVersion.WithResource("events")
+	resource := v1.SchemeGroupVersion.WithResource("events")
 
-	mkEvent := func(i int) *corev1.Event {
+	mkEvent := func(i int) *v1.Event {
 		name := fmt.Sprintf("event-%v", i)
-		return &corev1.Event{
+		return &v1.Event{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: "default",
 				Name:      name,
 			},
-			InvolvedObject: corev1.ObjectReference{
+			InvolvedObject: v1.ObjectReference{
 				Namespace: "default",
 				Name:      name,
 			},
@@ -341,25 +341,25 @@ func TestUnstructuredExtract(t *testing.T) {
 
 }
 
-func unstructuredToPod(obj *unstructured.Unstructured) (*corev1.Pod, error) {
+func unstructuredToPod(obj *unstructured.Unstructured) (*v1.Pod, error) {
 	json, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
 		return nil, err
 	}
-	pod := new(corev1.Pod)
-	err = runtime.DecodeInto(clientscheme.Codecs.LegacyCodec(corev1.SchemeGroupVersion), json, pod)
+	pod := new(v1.Pod)
+	err = runtime.DecodeInto(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), json, pod)
 	pod.Kind = ""
 	pod.APIVersion = ""
 	return pod, err
 }
 
-func unstructuredToEvent(obj *unstructured.Unstructured) (*corev1.Event, error) {
+func unstructuredToEvent(obj *unstructured.Unstructured) (*v1.Event, error) {
 	json, err := runtime.Encode(unstructured.UnstructuredJSONScheme, obj)
 	if err != nil {
 		return nil, err
 	}
-	event := new(corev1.Event)
-	err = runtime.DecodeInto(clientscheme.Codecs.LegacyCodec(corev1.SchemeGroupVersion), json, event)
+	event := new(v1.Event)
+	err = runtime.DecodeInto(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), json, event)
 	return event, err
 }
 
@@ -370,7 +370,7 @@ func TestDynamicClientCBOREnablement(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		_, err = client.Resource(corev1.SchemeGroupVersion.WithResource("namespaces")).Create(
+		_, err = client.Resource(v1.SchemeGroupVersion.WithResource("namespaces")).Create(
 			context.TODO(),
 			&unstructured.Unstructured{
 				Object: map[string]interface{}{
@@ -391,7 +391,7 @@ func TestDynamicClientCBOREnablement(t *testing.T) {
 		}
 
 		name := "test-dynamic-client-cbor-enablement"
-		_, err = client.Resource(corev1.SchemeGroupVersion.WithResource("namespaces")).Apply(
+		_, err = client.Resource(v1.SchemeGroupVersion.WithResource("namespaces")).Apply(
 			context.TODO(),
 			name,
 			&unstructured.Unstructured{
@@ -417,7 +417,7 @@ func TestDynamicClientCBOREnablement(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		w, err := client.Resource(corev1.SchemeGroupVersion.WithResource("namespaces")).Watch(context.TODO(), metav1.ListOptions{LabelSelector: "a,!a"})
+		w, err := client.Resource(v1.SchemeGroupVersion.WithResource("namespaces")).Watch(context.TODO(), metav1.ListOptions{LabelSelector: "a,!a"})
 		if err != nil {
 			return err
 		}
@@ -609,7 +609,7 @@ func TestDynamicClientCBOREnablement(t *testing.T) {
 					})
 					err := tc.doRequest(t, config)
 					switch {
-					case tc.wantStatusError && errors.IsUnsupportedMediaType(err):
+					case tc.wantStatusError && apierrors.IsUnsupportedMediaType(err):
 						// ok
 					case !tc.wantStatusError && err == nil:
 						// ok
@@ -636,16 +636,16 @@ func TestUnsupportedMediaTypeCircuitBreakerDynamicClient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := client.Resource(corev1.SchemeGroupVersion.WithResource("namespaces")).Create(
+	if _, err := client.Resource(v1.SchemeGroupVersion.WithResource("namespaces")).Create(
 		context.TODO(),
 		&unstructured.Unstructured{Object: map[string]interface{}{"metadata": map[string]interface{}{"name": "test-dynamic-client-415"}}},
 		metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
-	); !errors.IsUnsupportedMediaType(err) {
+	); !apierrors.IsUnsupportedMediaType(err) {
 		t.Errorf("expected to receive unsupported media type on first cbor request, got: %v", err)
 	}
 
 	// Requests from this client should fall back from application/cbor to application/json.
-	if _, err := client.Resource(corev1.SchemeGroupVersion.WithResource("namespaces")).Create(
+	if _, err := client.Resource(v1.SchemeGroupVersion.WithResource("namespaces")).Create(
 		context.TODO(),
 		&unstructured.Unstructured{Object: map[string]interface{}{"metadata": map[string]interface{}{"name": "test-dynamic-client-415"}}},
 		metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
@@ -660,11 +660,11 @@ func TestUnsupportedMediaTypeCircuitBreakerDynamicClient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := client.Resource(corev1.SchemeGroupVersion.WithResource("namespaces")).Create(
+	if _, err := client.Resource(v1.SchemeGroupVersion.WithResource("namespaces")).Create(
 		context.TODO(),
 		&unstructured.Unstructured{Object: map[string]interface{}{"metadata": map[string]interface{}{"name": "test-dynamic-client-415"}}},
 		metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}},
-	); !errors.IsUnsupportedMediaType(err) {
+	); !apierrors.IsUnsupportedMediaType(err) {
 		t.Errorf("expected to receive unsupported media type on cbor request with fresh client, got: %v", err)
 	}
 }

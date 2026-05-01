@@ -27,7 +27,7 @@ import (
 	"google.golang.org/grpc/grpclog"
 
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -137,7 +137,7 @@ func TestScaleSubresources(t *testing.T) {
 	// Ensure scale subresources return and accept expected kinds
 	for gvr, gvk := range discoveredScaleSubresources {
 		prefix := "/apis"
-		if gvr.Group == corev1.GroupName {
+		if gvr.Group == v1.GroupName {
 			prefix = "/api"
 		}
 
@@ -176,14 +176,14 @@ func TestScaleSubresources(t *testing.T) {
 var (
 	replicas = int32(1)
 
-	podStub = corev1.PodTemplateSpec{
+	podStub = v1.PodTemplateSpec{
 		ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "bar"}},
-		Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "test", Image: "busybox"}}},
+		Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "test", Image: "busybox"}}},
 	}
 
-	rcStub = &corev1.ReplicationController{
+	rcStub = &v1.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{Name: "test"},
-		Spec:       corev1.ReplicationControllerSpec{Selector: podStub.Labels, Replicas: &replicas, Template: &podStub},
+		Spec:       v1.ReplicationControllerSpec{Selector: podStub.Labels, Replicas: &replicas, Template: &podStub},
 	}
 
 	rsStub = &appsv1.ReplicaSet{
