@@ -288,7 +288,6 @@ message PodGroupSpec {
   // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
   // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:immutable
   // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:maximum=1000000000 # HighestUserDefinablePriority
-  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:minimum=-2147483648
   optional int32 priority = 7;
 }
 
@@ -376,7 +375,6 @@ message PodGroupTemplate {
   // +k8s:listType=map
   // +k8s:listMapKey=name
   // +k8s:maxItems=4
-  // +k8s:immutable
   // +featureGate=DRAWorkloadResourceClaims
   repeated PodGroupResourceClaim resourceClaims = 4;
 
@@ -418,7 +416,6 @@ message PodGroupTemplate {
   // +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
   // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
   // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:maximum=1000000000 # HighestUserDefinablePriority
-  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:minimum=-2147483648
   optional int32 priority = 7;
 }
 

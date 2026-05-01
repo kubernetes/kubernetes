@@ -761,12 +761,6 @@ func Validate_PodGroupSpec(
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "WorkloadAwarePreemption", true,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int32) field.ErrorList {
-					return validate.Minimum(ctx, op, fldPath, obj, oldObj, -2147483648)
-				}); len(e) != 0 {
-				errs = append(errs, e...)
-			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -946,10 +940,6 @@ func Validate_PodGroupTemplate(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 4).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
@@ -1087,12 +1077,6 @@ func Validate_PodGroupTemplate(
 			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "WorkloadAwarePreemption", true,
 				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int32) field.ErrorList {
 					return validate.Maximum(ctx, op, fldPath, obj, oldObj, 1000000000)
-				}); len(e) != 0 {
-				errs = append(errs, e...)
-			}
-			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "WorkloadAwarePreemption", true,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int32) field.ErrorList {
-					return validate.Minimum(ctx, op, fldPath, obj, oldObj, -2147483648)
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}

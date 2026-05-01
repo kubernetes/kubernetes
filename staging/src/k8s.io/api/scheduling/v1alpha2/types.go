@@ -159,7 +159,6 @@ type PodGroupTemplate struct {
 	// +k8s:listType=map
 	// +k8s:listMapKey=name
 	// +k8s:maxItems=4
-	// +k8s:immutable
 	// +featureGate=DRAWorkloadResourceClaims
 	ResourceClaims []PodGroupResourceClaim `json:"resourceClaims,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,4,rep,name=resourceClaims"`
 
@@ -201,7 +200,6 @@ type PodGroupTemplate struct {
 	// +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
 	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
 	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:maximum=1000000000 # HighestUserDefinablePriority
-	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:minimum=-2147483648
 	Priority *int32 `json:"priority,omitempty" protobuf:"varint,7,opt,name=priority"`
 }
 
@@ -456,7 +454,6 @@ type PodGroupSpec struct {
 	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
 	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:immutable
 	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:maximum=1000000000 # HighestUserDefinablePriority
-	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:minimum=-2147483648
 	Priority *int32 `json:"priority,omitempty" protobuf:"varint,7,opt,name=priority"`
 }
 
