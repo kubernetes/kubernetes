@@ -439,6 +439,114 @@ func TestCPUManagerAdd(t *testing.T) {
 	}
 }
 
+func TestAddContainerAppliesCpusetBeforeStart(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	pod := makePod("fakePod", "fakeContainer", "2", "2")
+	container := &pod.Spec.Containers[0]
+	dedicatedCPUs := cpuset.New(3, 4)
+
+	mgr := &manager{
+		policy: &mockPolicy{},
+		state: &mockState{
+			assignments: state.ContainerCPUAssignments{
+				string(pod.UID): {container.Name: dedicatedCPUs},
+			},
+			defaultCPUSet: cpuset.New(1, 2),
+		},
+		lastUpdateState: state.NewMemoryState(logger),
+		containerRuntime: mockRuntimeService{
+			err: nil,
+		},
+		containerMap:      containermap.NewContainerMap(),
+		podStatusProvider: mockPodStatusProvider{},
+		sourcesReady:      &sourcesReadyStub{},
+	}
+	mgr.activePods = func() []*v1.Pod { return []*v1.Pod{pod} }
+
+	// Before AddContainer, lastUpdateState should be empty.
+	_, lastExists := mgr.lastUpdateState.GetCPUSet(string(pod.UID), container.Name)
+	if lastExists {
+		t.Error("lastUpdateState should be empty before AddContainer")
+	}
+
+	mgr.AddContainer(logger, pod, container, "fakeID")
+
+	// After AddContainer, lastUpdateState should match the dedicated cpuset
+	// because AddContainer writes the cgroup and records the successful write.
+	lastCset, lastExists := mgr.lastUpdateState.GetCPUSet(string(pod.UID), container.Name)
+	if !lastExists {
+		t.Error("lastUpdateState should be set after AddContainer")
+	}
+	if !dedicatedCPUs.Equals(lastCset) {
+		t.Errorf("lastUpdateState cpuset mismatch: expected %v, got %v", dedicatedCPUs, lastCset)
+	}
+}
+
+func TestAddContainerDoesNotRecordFailedUpdate(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	pod := makePod("fakePod", "fakeContainer", "2", "2")
+	container := &pod.Spec.Containers[0]
+	dedicatedCPUs := cpuset.New(3, 4)
+
+	mgr := &manager{
+		policy: &mockPolicy{},
+		state: &mockState{
+			assignments: state.ContainerCPUAssignments{
+				string(pod.UID): {container.Name: dedicatedCPUs},
+			},
+			defaultCPUSet: cpuset.New(1, 2),
+		},
+		lastUpdateState: state.NewMemoryState(logger),
+		containerRuntime: mockRuntimeService{
+			err: fmt.Errorf("runtime unavailable"),
+		},
+		containerMap:      containermap.NewContainerMap(),
+		podStatusProvider: mockPodStatusProvider{},
+		sourcesReady:      &sourcesReadyStub{},
+	}
+	mgr.activePods = func() []*v1.Pod { return []*v1.Pod{pod} }
+
+	mgr.AddContainer(logger, pod, container, "fakeID")
+
+	// When the cgroup write fails, lastUpdateState must NOT be set.
+	// This allows the reconciler to retry on its next cycle.
+	_, lastExists := mgr.lastUpdateState.GetCPUSet(string(pod.UID), container.Name)
+	if lastExists {
+		t.Error("lastUpdateState should not be set when cgroup write fails")
+	}
+}
+
+func TestAddContainerSkipsDefaultCpuset(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	mgr := &manager{
+		policy: &mockPolicy{},
+		state: &mockState{
+			assignments:   state.ContainerCPUAssignments{},
+			defaultCPUSet: cpuset.New(0, 1, 2, 3),
+		},
+		lastUpdateState:  state.NewMemoryState(logger),
+		containerRuntime: mockRuntimeService{},
+		containerMap:     containermap.NewContainerMap(),
+		podStatusProvider: mockPodStatusProvider{},
+		sourcesReady:     &sourcesReadyStub{},
+	}
+
+	pod := makePod("fakePod", "fakeContainer", "100m", "100m")
+	container := &pod.Spec.Containers[0]
+	mgr.activePods = func() []*v1.Pod { return []*v1.Pod{pod} }
+
+	mgr.AddContainer(logger, pod, container, "fakeID")
+
+	// Non-dedicated container should NOT have lastUpdateState set.
+	_, lastExists := mgr.lastUpdateState.GetCPUSet(string(pod.UID), container.Name)
+	if lastExists {
+		t.Error("lastUpdateState should not be set for non-dedicated container")
+	}
+}
+
 func TestCPUManagerAddWithInitContainers(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsCPUAndMemoryAffinity, true)
