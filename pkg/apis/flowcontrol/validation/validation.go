@@ -415,6 +415,8 @@ func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfi
 		} else {
 			allErrs = append(allErrs, ValidateLimitedPriorityLevelConfiguration(spec.Limited, requestGV, fldPath.Child("limited"), opts)...)
 		}
+	case "":
+		allErrs = append(allErrs, field.Required(fldPath.Child("type"), "").MarkCoveredByDeclarative())
 	default:
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), spec.Type, supportedPriorityLevelEnablement.List()))
 	}
@@ -474,6 +476,8 @@ func ValidateLimitResponse(lr flowcontrol.LimitResponse, fldPath *field.Path) fi
 		} else {
 			allErrs = append(allErrs, ValidatePriorityLevelQueuingConfiguration(lr.Queuing, fldPath.Child("queuing"))...)
 		}
+	case "":
+		allErrs = append(allErrs, field.Required(fldPath.Child("type"), "").MarkCoveredByDeclarative())
 	default:
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("type"), lr.Type, supportedLimitResponseType.List()))
 	}

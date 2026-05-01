@@ -103,6 +103,18 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.Forbidden(specPath.Child("limited", "limitResponse", "queuing"), "").MarkCoveredByDeclarative().MarkAlpha(),
 			},
 		},
+		"spec.type: set to empty string": {
+			input: mkPLC(tweakType("")),
+			expectedErrs: field.ErrorList{
+				field.Required(specPath.Child("type"), "").MarkCoveredByDeclarative().MarkAlpha(),
+			},
+		},
+		"limitResponse.type: set to empty string": {
+			input: mkPLC(tweakLimitResponseType("")),
+			expectedErrs: field.ErrorList{
+				field.Required(specPath.Child("limited", "limitResponse", "type"), "").MarkCoveredByDeclarative().MarkAlpha(),
+			},
+		},
 	}
 
 	for name, tc := range testCases {
@@ -168,6 +180,20 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				field.Forbidden(specPath.Child("limited", "limitResponse", "queuing"), "").MarkCoveredByDeclarative().MarkAlpha(),
 			},
 		},
+		"update: spec.type changed to empty string": {
+			old: mkPLC(),
+			update: mkPLC(tweakType("")),
+			expectedErrs: field.ErrorList{
+				field.Required(specPath.Child("type"), "").MarkCoveredByDeclarative().MarkAlpha(),
+			},
+		},
+		"update: limitResponse.type changed to empty string": {
+			old: mkPLC(),
+			update: mkPLC(tweakLimitResponseType("")),
+			expectedErrs: field.ErrorList{
+				field.Required(specPath.Child("limited", "limitResponse", "type"), "").MarkCoveredByDeclarative().MarkAlpha(),
+			},
+		},
 	}
 
 	for name, tc := range testCases {
@@ -216,6 +242,16 @@ func tweakExempt() func(*flowcontrol.PriorityLevelConfiguration) {
 		obj.Name = "exempt"
 		obj.Spec.Type = flowcontrol.PriorityLevelEnablementExempt
 		obj.Spec.Limited = nil
+	}
+}
+
+// tweakType sets the Type field directly and clears Limited if empty.
+func tweakType(t flowcontrol.PriorityLevelEnablement) func(*flowcontrol.PriorityLevelConfiguration) {
+	return func(obj *flowcontrol.PriorityLevelConfiguration) {
+		obj.Spec.Type = t
+		if t == "" {
+			obj.Spec.Limited = nil
+		}
 	}
 }
 
