@@ -3866,7 +3866,7 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
-- name: evented_pleg_connection_error_count
+- name: evented_pleg_connection_error_total
   subsystem: kubelet
   help: The number of errors encountered during the establishment of streaming connection
     with the CRI runtime.
