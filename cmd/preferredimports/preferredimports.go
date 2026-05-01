@@ -88,36 +88,75 @@ func (a *analyzer) collect(dir string) {
 		for _, file := range files {
 			replacements := make(map[string]string)
 			pathToFile := a.fset.File(file.Pos()).Name()
+
+			// Build the effective-alias map (alias → importPath) from the current
+			// import declarations. It is updated as renames are applied so that
+			// later imports in the same pass (or a subsequent pass) can see freed
+			// aliases and don't falsely detect conflicts.
+			effectiveAlias := make(map[string]string)
 			for _, imp := range file.Imports {
-				importPath := strings.Replace(imp.Path.Value, "\"", "", -1)
-				pathSegments := strings.Split(importPath, "/")
-				importName := pathSegments[len(pathSegments)-1]
+				path := strings.Replace(imp.Path.Value, "\"", "", -1)
+				segs := strings.Split(path, "/")
+				name := segs[len(segs)-1]
 				if imp.Name != nil {
-					importName = imp.Name.Name
+					name = imp.Name.Name
 				}
-				for re, template := range aliases {
-					match := re.FindStringSubmatchIndex(importPath)
-					if match == nil {
-						// No match.
-						continue
+				if name != "_" && name != "." {
+					effectiveAlias[name] = path
+				}
+			}
+
+			// Iterate until no new renames are found. A single pass may leave some
+			// imports unhandled because their target alias is temporarily held by
+			// another import that will be freed in the same iteration, but after
+			// the current position in the import list. Subsequent passes pick those
+			// up once the conflicting alias has been released.
+			for {
+				iterCount := 0
+				for _, imp := range file.Imports {
+					importPath := strings.Replace(imp.Path.Value, "\"", "", -1)
+					pathSegments := strings.Split(importPath, "/")
+					importName := pathSegments[len(pathSegments)-1]
+					if imp.Name != nil {
+						importName = imp.Name.Name
 					}
-					if match[0] > 0 || match[1] < len(importPath) {
-						// Not a full match.
-						continue
-					}
-					alias := string(re.ExpandString(nil, template, importPath, match))
-					if alias != importName {
-						if !*confirm {
-							fmt.Fprintf(os.Stderr, "%sERROR wrong alias for import \"%s\" should be %s in file %s\n", logPrefix, importPath, alias, pathToFile)
-							a.failed = true
+					for re, template := range aliases {
+						match := re.FindStringSubmatchIndex(importPath)
+						if match == nil {
+							// No match.
+							continue
 						}
-						replacements[importName] = alias
-						if imp.Name != nil {
-							imp.Name.Name = alias
-						} else {
-							imp.Name = ast.NewIdent(alias)
+						if match[0] > 0 || match[1] < len(importPath) {
+							// Not a full match.
+							continue
 						}
+						alias := string(re.ExpandString(nil, template, importPath, match))
+						if alias != importName {
+							// Skip if the target alias is still in use by a different
+							// import; it may be freed in a later pass.
+							if existingPath, conflict := effectiveAlias[alias]; conflict && existingPath != importPath {
+								break
+							}
+							if !*confirm {
+								fmt.Fprintf(os.Stderr, "%sERROR wrong alias for import \"%s\" should be %s in file %s\n", logPrefix, importPath, alias, pathToFile)
+								a.failed = true
+							}
+							replacements[importName] = alias
+							delete(effectiveAlias, importName)
+							effectiveAlias[alias] = importPath
+							if imp.Name != nil {
+								imp.Name.Name = alias
+							} else {
+								ident := ast.NewIdent(alias)
+								ident.NamePos = imp.Path.Pos()
+								imp.Name = ident
+							}
+							iterCount++
+						}
+						break
 					}
+				}
+				if iterCount == 0 {
 					break
 				}
 			}
@@ -125,9 +164,7 @@ func (a *analyzer) collect(dir string) {
 			if len(replacements) > 0 {
 				if *confirm {
 					fmt.Printf("%sReplacing imports with aliases in file %s\n", logPrefix, pathToFile)
-					for key, value := range replacements {
-						renameImportUsages(file, key, value)
-					}
+					renameImportUsages(file, replacements)
 					ast.SortImports(a.fset, file)
 					var buffer bytes.Buffer
 					if err = format.Node(&buffer, a.fset, file); err != nil {
@@ -149,15 +186,12 @@ func (a *analyzer) collect(dir string) {
 	}
 }
 
-func renameImportUsages(f *ast.File, old, new string) {
-	// use this to avoid renaming the package declaration, eg:
-	//   given: package foo; import foo "bar"; foo.Baz, rename foo->qux
-	//   yield: package foo; import qux "bar"; qux.Baz
+// renameImportUsages applies all alias replacements in a single AST walk so
+// that chained renames (A→B, B→C in the same file) don't cascade incorrectly.
+// Import declarations are skipped because their alias identifiers are already
+// updated by the caller before this function is invoked.
+func renameImportUsages(f *ast.File, replacements map[string]string) {
 	var pkg *ast.Ident
-
-	// Rename top-level old to new, both unresolved names
-	// (probably defined in another file) and names that resolve
-	// to a declaration we renamed.
 	ast.Inspect(f, func(node ast.Node) bool {
 		if node == nil {
 			return false
@@ -165,12 +199,14 @@ func renameImportUsages(f *ast.File, old, new string) {
 		switch id := node.(type) {
 		case *ast.File:
 			pkg = id.Name
+		case *ast.ImportSpec:
+			return false
 		case *ast.Ident:
 			if pkg != nil && id == pkg {
 				return false
 			}
-			if id.Name == old {
-				id.Name = new
+			if newName, ok := replacements[id.Name]; ok {
+				id.Name = newName
 			}
 		}
 		return true
@@ -180,9 +216,22 @@ func renameImportUsages(f *ast.File, old, new string) {
 func (a *analyzer) filterFiles(fs map[string]*ast.File) []*ast.File {
 	var files []*ast.File
 	for _, f := range fs {
-		files = append(files, f)
+		if !isGeneratedFile(f) {
+			files = append(files, f)
+		}
 	}
 	return files
+}
+
+func isGeneratedFile(f *ast.File) bool {
+	for _, cg := range f.Comments {
+		for _, c := range cg.List {
+			if strings.Contains(c.Text, "DO NOT EDIT") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 type collector struct {
