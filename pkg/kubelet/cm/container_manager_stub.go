@@ -157,7 +157,11 @@ func (cm *containerManagerStub) UpdateAllocatedDevices() {
 	return
 }
 
-func (cm *containerManagerStub) GetCPUs(_, _ string) []int64 {
+func (cm *containerManagerStub) GetCPUs(pod *v1.Pod, container *v1.Container) []int64 {
+	return nil
+}
+
+func (cm *containerManagerStub) GetPodCPUs(_ string) []int64 {
 	return nil
 }
 
@@ -165,7 +169,11 @@ func (cm *containerManagerStub) GetAllocatableCPUs() []int64 {
 	return nil
 }
 
-func (cm *containerManagerStub) GetMemory(_, _ string) []*podresourcesapi.ContainerMemory {
+func (cm *containerManagerStub) GetMemory(pod *v1.Pod, container *v1.Container) []*podresourcesapi.ContainerMemory {
+	return nil
+}
+
+func (cm *containerManagerStub) GetPodMemory(_ string) []*podresourcesapi.ContainerMemory {
 	return nil
 }
 

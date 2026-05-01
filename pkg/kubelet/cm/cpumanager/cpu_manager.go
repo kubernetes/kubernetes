@@ -89,6 +89,10 @@ type Manager interface {
 	// exclusively allocated cpus for the container
 	GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet
 
+	// GetPodCPUs implements the podresources.CPUsProvider interface to provide
+	// the total cpuset allocated to the pod
+	GetPodCPUs(podUID string) cpuset.CPUSet
+
 	// GetPodTopologyHints implements the topologymanager.HintProvider Interface
 	// and is consulted to achieve NUMA aware resource alignment per Pod
 	// among this and other resource controllers.
@@ -561,6 +565,13 @@ func findContainerStatusByName(status *v1.PodStatus, name string) (*v1.Container
 
 func (m *manager) GetExclusiveCPUs(podUID, containerName string) cpuset.CPUSet {
 	if result, ok := m.state.GetCPUSet(podUID, containerName); ok {
+		return result
+	}
+	return cpuset.New()
+}
+
+func (m *manager) GetPodCPUs(podUID string) cpuset.CPUSet {
+	if result, ok := m.state.GetPodCPUSet(podUID); ok {
 		return result
 	}
 	return cpuset.New()

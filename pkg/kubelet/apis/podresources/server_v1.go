@@ -79,6 +79,10 @@ func (p *v1PodResourcesServer) List(ctx context.Context, req *podresourcesv1.Lis
 			Namespace:  pod.Namespace,
 			Containers: make([]*podresourcesv1.ContainerResources, 0, len(pod.Spec.Containers)),
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResourceManagers) {
+			pRes.CpuIds = p.cpusProvider.GetPodCPUs(string(pod.UID))
+			pRes.Memory = p.memoryProvider.GetPodMemory(string(pod.UID))
+		}
 
 		pRes.Containers = make([]*podresourcesv1.ContainerResources, 0, len(pod.Spec.InitContainers)+len(pod.Spec.Containers))
 		for _, container := range pod.Spec.InitContainers {
@@ -131,6 +135,10 @@ func (p *v1PodResourcesServer) Get(ctx context.Context, req *podresourcesv1.GetP
 		Namespace:  pod.Namespace,
 		Containers: make([]*podresourcesv1.ContainerResources, 0, len(pod.Spec.Containers)),
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResourceManagers) {
+		podResources.CpuIds = p.cpusProvider.GetPodCPUs(string(pod.UID))
+		podResources.Memory = p.memoryProvider.GetPodMemory(string(pod.UID))
+	}
 
 	podResources.Containers = make([]*podresourcesv1.ContainerResources, 0, len(pod.Spec.InitContainers)+len(pod.Spec.Containers))
 	for _, container := range pod.Spec.InitContainers {
@@ -155,8 +163,8 @@ func (p *v1PodResourcesServer) getContainerResources(pod *v1.Pod, container *v1.
 	containerResources := &podresourcesv1.ContainerResources{
 		Name:             container.Name,
 		Devices:          p.devicesProvider.GetDevices(string(pod.UID), container.Name),
-		CpuIds:           p.cpusProvider.GetCPUs(string(pod.UID), container.Name),
-		Memory:           p.memoryProvider.GetMemory(string(pod.UID), container.Name),
+		CpuIds:           p.cpusProvider.GetCPUs(pod, container),
+		Memory:           p.memoryProvider.GetMemory(pod, container),
 		DynamicResources: p.dynamicResourcesProvider.GetDynamicResources(pod, container),
 	}
 	return containerResources

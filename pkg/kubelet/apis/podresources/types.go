@@ -41,15 +41,19 @@ type PodsProvider interface {
 
 // CPUsProvider knows how to provide the cpus used by the given container
 type CPUsProvider interface {
-	// GetCPUs returns information about the cpus assigned to pods and containers
-	GetCPUs(podUID, containerName string) []int64
-	// GetAllocatableCPUs returns the allocatable (not allocated) CPUs
+	// GetCPUs returns information about the cpus assigned to containers
+	GetCPUs(pod *v1.Pod, container *v1.Container) []int64
+	// GetPodCPUs returns information about the cpus assigned to a pod
+	GetPodCPUs(podUID string) []int64
+	// GetAllocatableCPUs returns the allocatable cpus from the node
 	GetAllocatableCPUs() []int64
 }
 
 type MemoryProvider interface {
 	// GetMemory returns information about the memory assigned to containers
-	GetMemory(podUID, containerName string) []*podresourcesapi.ContainerMemory
+	GetMemory(pod *v1.Pod, container *v1.Container) []*podresourcesapi.ContainerMemory
+	// GetPodMemory returns information about the memory assigned to a pod
+	GetPodMemory(podUID string) []*podresourcesapi.ContainerMemory
 	// GetAllocatableMemory returns the allocatable memory from the node
 	GetAllocatableMemory() []*podresourcesapi.ContainerMemory
 }

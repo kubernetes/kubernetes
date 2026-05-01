@@ -35,6 +35,8 @@ message PodResources {
     string name = 1;
     string namespace = 2;
     repeated ContainerResources containers = 3;
+    repeated int64 cpu_ids = 4;
+    repeated ContainerMemory memory = 5;
 }
 
 // ContainerResources contains information about the resources assigned to a container
