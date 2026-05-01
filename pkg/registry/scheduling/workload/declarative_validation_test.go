@@ -153,6 +153,10 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			input:                         mkValidWorkload(addTopologyConstraint(0, "foo")),
 			enableTopologyAwareScheduling: true,
 		},
+		"with schedulingConstraints and TAS disabled": {
+			input:        mkValidWorkload(addTopologyConstraint(0, "foo")),
+			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingConstraints"), "")},
+		},
 		"valid with empty schedulingConstraints": {
 			input:                         mkValidWorkload(setSchedulingConstraints(0)),
 			enableTopologyAwareScheduling: true,
@@ -306,6 +310,14 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			)),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "podGroupTemplates").Index(0).Child("resourceClaims").Index(0), nil, "").WithOrigin("union"),
+			},
+		},
+		"resource claim name empty": {
+			input: mkValidWorkload(addResourceClaims(
+				scheduling.PodGroupResourceClaim{Name: "", ResourceClaimName: new("resource-claim")},
+			)),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "podGroupTemplates").Index(0).Child("resourceClaims").Index(0).Child("name"), ""),
 			},
 		},
 		"resource claim reference and template": {
