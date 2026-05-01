@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics"
 	metricsV1beta1api "k8s.io/metrics/pkg/apis/metrics/v1beta1"
+	metricsV1api "k8s.io/metrics/pkg/apis/metrics/v1"
 	metricsclientset "k8s.io/metrics/pkg/client/clientset/versioned"
 )
 
@@ -162,11 +163,11 @@ func (o TopNodeOptions) RunTopNode() error {
 
 	metricsAPIAvailable := SupportedMetricsAPIVersionAvailable(apiGroups)
 
-	if !metricsAPIAvailable {
+	if metricsAPIAvailable == "" {
 		return errors.New("Metrics API not available")
 	}
 
-	metrics, err := getNodeMetricsFromMetricsAPI(o.MetricsClient, o.ResourceName, selector)
+	metrics, err := getNodeMetricsFromMetricsAPI(o.MetricsClient, o.ResourceName, selector, metricsAPIAvailable)
 	if err != nil {
 		return err
 	}
@@ -213,8 +214,32 @@ func (o TopNodeOptions) RunTopNode() error {
 	return o.Printer.PrintNodeMetrics(metrics.Items, availableResources, o.NoHeaders, o.SortBy)
 }
 
-func getNodeMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, resourceName string, selector labels.Selector) (*metricsapi.NodeMetricsList, error) {
+func getNodeMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, resourceName string, selector labels.Selector, metricsVersion string) (*metricsapi.NodeMetricsList, error) {
 	var err error
+	if metricsVersion == "v1" {
+		versionedMetrics := &metricsV1api.NodeMetricsList{}
+		mc := metricsClient.MetricsV1()
+		nm := mc.NodeMetricses()
+		if resourceName != "" {
+			m, err := nm.Get(context.TODO(), resourceName, metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			versionedMetrics.Items = []metricsV1api.NodeMetrics{*m}
+		} else {
+			versionedMetrics, err = nm.List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
+			if err != nil {
+				return nil, err
+			}
+		}
+		metrics := &metricsapi.NodeMetricsList{}
+		err = metricsV1api.Convert_v1_NodeMetricsList_To_metrics_NodeMetricsList(versionedMetrics, metrics, nil)
+		if err != nil {
+			return nil, err
+		}
+		return metrics, nil
+	}
+	// fallback to metric v1beta1
 	versionedMetrics := &metricsV1beta1api.NodeMetricsList{}
 	mc := metricsClient.MetricsV1beta1()
 	nm := mc.NodeMetricses()

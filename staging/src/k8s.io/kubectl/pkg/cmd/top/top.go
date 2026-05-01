@@ -34,6 +34,7 @@ const (
 
 var (
 	supportedMetricsAPIVersions = []string{
+		"v1",
 		"v1beta1",
 	}
 	topLong = templates.LongDesc(i18n.T(`
@@ -84,18 +85,18 @@ func NewCmdTop(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Com
 	return cmd
 }
 
-func SupportedMetricsAPIVersionAvailable(discoveredAPIGroups *metav1.APIGroupList) bool {
+func SupportedMetricsAPIVersionAvailable(discoveredAPIGroups *metav1.APIGroupList) string {
 	for _, discoveredAPIGroup := range discoveredAPIGroups.Groups {
 		if discoveredAPIGroup.Name != metricsapi.GroupName {
 			continue
 		}
-		for _, version := range discoveredAPIGroup.Versions {
-			for _, supportedVersion := range supportedMetricsAPIVersions {
+		for _, supportedVersion := range supportedMetricsAPIVersions {
+			for _, version := range discoveredAPIGroup.Versions {
 				if version.Version == supportedVersion {
-					return true
+					return supportedVersion
 				}
 			}
 		}
 	}
-	return false
+	return ""
 }
