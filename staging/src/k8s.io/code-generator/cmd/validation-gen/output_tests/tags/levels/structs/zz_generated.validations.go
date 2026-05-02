@@ -270,6 +270,9 @@ func Validate_MixedStruct(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -299,6 +302,9 @@ func Validate_MixedStruct(
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 5).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed

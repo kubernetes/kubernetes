@@ -76,7 +76,8 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "stringField"
+			func() {
+				// cohort = "stringField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
 					func(o *InnerStruct) *string { return &o.StringField }, validate.DirectEqualPtr,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
@@ -113,7 +114,11 @@ func Validate_Struct(
 			if earlyReturn {
 				return // do not proceed
 			}
-			func() { // cohort = "stringField"
+			if earlyReturn {
+				return // do not proceed
+			}
+			func() {
+				// cohort = "stringField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
 					func(o *InnerStruct) *string { return &o.StringField }, validate.DirectEqualPtr,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
@@ -122,6 +127,9 @@ func Validate_Struct(
 					errs = append(errs, e...)
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -265,7 +273,8 @@ func Validate_ValidatedInnerStruct(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *ValidatedInnerStruct) (errs field.ErrorList) {
 
-	func() { // cohort = "stringField"
+	func() {
+		// cohort = "stringField"
 		if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
 			func(o *ValidatedInnerStruct) *string { return &o.StringField }, validate.DirectEqualPtr,
 			func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {

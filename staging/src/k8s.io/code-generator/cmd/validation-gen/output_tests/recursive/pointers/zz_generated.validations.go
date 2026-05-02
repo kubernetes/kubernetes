@@ -111,6 +111,9 @@ func Validate_T1(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_T1(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -163,6 +166,9 @@ func Validate_T1(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_T2(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -202,6 +208,9 @@ func Validate_T2(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_T1(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -232,6 +241,9 @@ func Validate_T2(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_T2(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -258,6 +270,9 @@ func Validate_T2(
 			earlyReturn := false
 			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed

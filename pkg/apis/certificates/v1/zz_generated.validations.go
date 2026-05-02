@@ -139,6 +139,9 @@ func Validate_CertificateSigningRequestStatus(
 				}).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,

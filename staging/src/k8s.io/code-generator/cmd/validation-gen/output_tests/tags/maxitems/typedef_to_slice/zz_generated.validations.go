@@ -70,6 +70,9 @@ func Validate_Max0Type(
 	if earlyReturn {
 		return // do not proceed
 	}
+	if earlyReturn {
+		return // do not proceed
+	}
 
 	return errs
 }
@@ -84,6 +87,9 @@ func Validate_Max0TypedefType(
 	if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 0).MarkShortCircuit(); len(e) != 0 {
 		errs = append(errs, e...)
 		earlyReturn = true
+	}
+	if earlyReturn {
+		return // do not proceed
 	}
 	if earlyReturn {
 		return // do not proceed
@@ -106,6 +112,9 @@ func Validate_Max10Type(
 	if earlyReturn {
 		return // do not proceed
 	}
+	if earlyReturn {
+		return // do not proceed
+	}
 
 	return errs
 }
@@ -120,6 +129,9 @@ func Validate_Max10TypedefType(
 	if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 10).MarkShortCircuit(); len(e) != 0 {
 		errs = append(errs, e...)
 		earlyReturn = true
+	}
+	if earlyReturn {
+		return // do not proceed
 	}
 	if earlyReturn {
 		return // do not proceed

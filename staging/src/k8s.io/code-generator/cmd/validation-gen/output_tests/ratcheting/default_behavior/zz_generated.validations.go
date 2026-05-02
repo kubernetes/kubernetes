@@ -667,6 +667,9 @@ func Validate_StructPrimitive(
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field intPtrField"); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,

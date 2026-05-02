@@ -76,8 +76,9 @@ func Validate_UpdateTestStruct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoSet).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -86,6 +87,9 @@ func Validate_UpdateTestStruct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -107,8 +111,9 @@ func Validate_UpdateTestStruct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoUnset).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -117,6 +122,9 @@ func Validate_UpdateTestStruct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -138,8 +146,9 @@ func Validate_UpdateTestStruct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -148,6 +157,9 @@ func Validate_UpdateTestStruct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -169,8 +181,9 @@ func Validate_UpdateTestStruct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoSet, validate.NoUnset, validate.NoModify).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -179,6 +192,9 @@ func Validate_UpdateTestStruct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -200,8 +216,9 @@ func Validate_UpdateTestStruct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoUnset, validate.NoModify).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -210,6 +227,9 @@ func Validate_UpdateTestStruct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -231,8 +251,9 @@ func Validate_UpdateTestStruct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -241,6 +262,9 @@ func Validate_UpdateTestStruct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -262,8 +286,9 @@ func Validate_UpdateTestStruct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -272,6 +297,9 @@ func Validate_UpdateTestStruct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -293,8 +321,9 @@ func Validate_UpdateTestStruct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -303,6 +332,9 @@ func Validate_UpdateTestStruct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -324,8 +356,9 @@ func Validate_UpdateTestStruct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -334,6 +367,9 @@ func Validate_UpdateTestStruct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -355,8 +391,9 @@ func Validate_UpdateTestStruct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -365,6 +402,9 @@ func Validate_UpdateTestStruct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -386,8 +426,9 @@ func Validate_UpdateTestStruct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -396,6 +437,9 @@ func Validate_UpdateTestStruct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -417,8 +461,9 @@ func Validate_UpdateTestStruct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -427,6 +472,9 @@ func Validate_UpdateTestStruct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -448,8 +496,9 @@ func Validate_UpdateTestStruct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -458,6 +507,9 @@ func Validate_UpdateTestStruct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -479,8 +531,9 @@ func Validate_UpdateTestStruct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.UpdateStruct(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -489,6 +542,9 @@ func Validate_UpdateTestStruct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -510,8 +566,9 @@ func Validate_UpdateTestStruct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.UpdateStruct(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -520,6 +577,9 @@ func Validate_UpdateTestStruct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -541,8 +601,9 @@ func Validate_UpdateTestStruct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoSet).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -551,6 +612,9 @@ func Validate_UpdateTestStruct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -572,8 +636,9 @@ func Validate_UpdateTestStruct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoUnset).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -582,6 +647,9 @@ func Validate_UpdateTestStruct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -603,8 +671,9 @@ func Validate_UpdateTestStruct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -613,6 +682,9 @@ func Validate_UpdateTestStruct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -634,8 +706,9 @@ func Validate_UpdateTestStruct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoSet, validate.NoUnset, validate.NoModify).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -644,6 +717,9 @@ func Validate_UpdateTestStruct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -665,8 +741,9 @@ func Validate_UpdateTestStruct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -675,6 +752,9 @@ func Validate_UpdateTestStruct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -696,8 +776,9 @@ func Validate_UpdateTestStruct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -706,6 +787,9 @@ func Validate_UpdateTestStruct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -727,8 +811,9 @@ func Validate_UpdateTestStruct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -737,6 +822,9 @@ func Validate_UpdateTestStruct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -758,8 +846,9 @@ func Validate_UpdateTestStruct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -768,6 +857,9 @@ func Validate_UpdateTestStruct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -789,8 +881,9 @@ func Validate_UpdateTestStruct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoSet).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -799,6 +892,9 @@ func Validate_UpdateTestStruct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,

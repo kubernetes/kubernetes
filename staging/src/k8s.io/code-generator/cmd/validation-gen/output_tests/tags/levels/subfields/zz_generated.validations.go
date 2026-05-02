@@ -78,7 +78,8 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "inner"
+			func() {
+				// cohort = "inner"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "inner",
 					func(o *SubStruct) *int { return &o.Inner }, validate.DirectEqualPtr,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
@@ -108,7 +109,8 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "inner"
+			func() {
+				// cohort = "inner"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "inner",
 					func(o *SubStruct) *int { return &o.Inner }, validate.DirectEqualPtr,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {

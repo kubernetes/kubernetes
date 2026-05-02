@@ -140,13 +140,25 @@ func Validate_IPAddressSpec(
 			}
 			// call field-attached validations
 			earlyReturn := false
+			func() {
+				// cohort = "update"
+				if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -187,6 +199,9 @@ func Validate_IPBlock(
 			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -266,6 +281,9 @@ func Validate_IngressClassParametersReference(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -291,6 +309,9 @@ func Validate_IngressClassParametersReference(
 			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -332,6 +353,9 @@ func Validate_IngressClassSpec(
 			earlyReturn := false
 			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -411,6 +435,9 @@ func Validate_NetworkPolicyEgressRule(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_NetworkPolicyPeer); len(e) != 0 {
 				errs = append(errs, e...)
@@ -450,6 +477,9 @@ func Validate_NetworkPolicyIngressRule(
 			earlyReturn := false
 			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -498,6 +528,9 @@ func Validate_NetworkPolicyPeer(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_IPBlock(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -539,6 +572,9 @@ func Validate_NetworkPolicySpec(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_NetworkPolicyIngressRule); len(e) != 0 {
 				errs = append(errs, e...)
@@ -567,6 +603,9 @@ func Validate_NetworkPolicySpec(
 			earlyReturn := false
 			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -616,6 +655,9 @@ func Validate_ParentReference(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -643,6 +685,9 @@ func Validate_ParentReference(
 			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed

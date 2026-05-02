@@ -62,8 +62,9 @@ func Validate_ImmutableType(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *ImmutableType) (errs field.ErrorList) {
 
-	func() { // cohort = "update"
-		earlyReturn := false
+	earlyReturn := false
+	func() {
+		// cohort = "update"
 		if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 			errs = append(errs, e...)
 			earlyReturn = true
@@ -72,6 +73,9 @@ func Validate_ImmutableType(
 			return // do not proceed
 		}
 	}()
+	if earlyReturn {
+		return // do not proceed
+	}
 
 	return errs
 }
@@ -96,8 +100,9 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -106,6 +111,9 @@ func Validate_Struct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -127,8 +135,9 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -137,6 +146,9 @@ func Validate_Struct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -158,8 +170,9 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -168,6 +181,9 @@ func Validate_Struct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -189,8 +205,9 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -199,6 +216,9 @@ func Validate_Struct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -220,8 +240,9 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -230,6 +251,9 @@ func Validate_Struct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -251,8 +275,9 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -261,6 +286,9 @@ func Validate_Struct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -282,8 +310,9 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -292,6 +321,9 @@ func Validate_Struct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -313,8 +345,9 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "update"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "update"
 				if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -323,6 +356,9 @@ func Validate_Struct(
 					return // do not proceed
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,

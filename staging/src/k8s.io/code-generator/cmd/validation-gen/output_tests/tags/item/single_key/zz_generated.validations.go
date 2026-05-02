@@ -96,7 +96,8 @@ func Validate_Struct(
 				func(a Item, b Item) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			func() { // cohort = "{"key": "target"}"
+			func() {
+				// cohort = "{"key": "target"}"
 				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *Item) bool { return item.Key == "target" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
@@ -138,7 +139,8 @@ func Validate_Struct(
 				func(a IntKeyItem, b IntKeyItem) bool { return a.IntField == b.IntField }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			func() { // cohort = "{"intField": 42}"
+			func() {
+				// cohort = "{"intField": 42}"
 				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *IntKeyItem) bool { return item.IntField == 42 }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *IntKeyItem) field.ErrorList {
@@ -180,7 +182,8 @@ func Validate_Struct(
 				func(a BoolKeyItem, b BoolKeyItem) bool { return a.BoolField == b.BoolField }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			func() { // cohort = "{"boolField": true}"
+			func() {
+				// cohort = "{"boolField": true}"
 				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *BoolKeyItem) bool { return item.BoolField == true }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *BoolKeyItem) field.ErrorList {
@@ -222,7 +225,8 @@ func Validate_Struct(
 				func(a TypedefItem, b TypedefItem) bool { return a.ID == b.ID }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			func() { // cohort = "{"id": "typedef-target"}"
+			func() {
+				// cohort = "{"id": "typedef-target"}"
 				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *TypedefItem) bool { return item.ID == "typedef-target" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *TypedefItem) field.ErrorList {
@@ -264,7 +268,8 @@ func Validate_Struct(
 				func(a Item, b Item) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			func() { // cohort = "{"key": "target"}"
+			func() {
+				// cohort = "{"key": "target"}"
 				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *Item) bool { return item.Key == "target" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
@@ -301,7 +306,8 @@ func Validate_Struct(
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			func() { // cohort = "{"key": "target-ptr"}"
+			func() {
+				// cohort = "{"key": "target-ptr"}"
 				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *PtrKeyItem) bool { return item.Key != nil && *item.Key == "target-ptr" }, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *PtrKeyItem) field.ErrorList {
@@ -347,7 +353,8 @@ func Validate_StructWithNestedTypedef(
 				func(a NestedTypedefItem, b NestedTypedefItem) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			func() { // cohort = "{"key": "nested-target"}"
+			func() {
+				// cohort = "{"key": "nested-target"}"
 				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *NestedTypedefItem) bool { return item.Key == "nested-target" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NestedTypedefItem) field.ErrorList {

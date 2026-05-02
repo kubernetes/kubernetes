@@ -83,7 +83,8 @@ func Validate_Struct(
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			func() { // cohort = "{"stringKey": "target", "intKey": 42, "boolKey": true}"
+			func() {
+				// cohort = "{"stringKey": "target", "intKey": 42, "boolKey": true}"
 				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *Item) bool { return item.StringKey == "target" && item.IntKey == 42 && item.BoolKey == true }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
@@ -127,7 +128,8 @@ func Validate_Struct(
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			func() { // cohort = "{"boolKey": true, "stringKey": "target", "intKey": 42}"
+			func() {
+				// cohort = "{"boolKey": true, "stringKey": "target", "intKey": 42}"
 				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *Item) bool { return item.StringKey == "target" && item.IntKey == 42 && item.BoolKey == true }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
@@ -164,7 +166,8 @@ func Validate_Struct(
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			func() { // cohort = "{"stringKey": "target-ptr", "intKey": 42, "boolKey": true}"
+			func() {
+				// cohort = "{"stringKey": "target-ptr", "intKey": 42, "boolKey": true}"
 				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *PtrItem) bool {
 						return item.StringKey != nil && *item.StringKey == "target-ptr" && item.IntKey == 42 && item.BoolKey == true
@@ -203,7 +206,8 @@ func Validate_Struct(
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			func() { // cohort = "{"stringPtrKey": "target-ptr", "stringKey": "target"}"
+			func() {
+				// cohort = "{"stringPtrKey": "target-ptr", "stringKey": "target"}"
 				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *MixedPtrItem) bool {
 						return item.StringPtrKey != nil && *item.StringPtrKey == "target-ptr" && item.StringKey == "target"

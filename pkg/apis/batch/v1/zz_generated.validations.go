@@ -118,6 +118,9 @@ func Validate_CronJobSpec(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,

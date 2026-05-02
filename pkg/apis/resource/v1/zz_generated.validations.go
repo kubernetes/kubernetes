@@ -137,6 +137,9 @@ func Validate_AllocatedDeviceStatus(
 			if e := validate.UUID(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -164,6 +167,9 @@ func Validate_AllocatedDeviceStatus(
 			earlyReturn := false
 			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -259,6 +265,9 @@ func Validate_CounterSet(
 			if e := validate.ShortName(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -290,6 +299,9 @@ func Validate_CounterSet(
 			}
 			if e := validate.EachMapKey(ctx, op, fldPath, obj, oldObj, validate.ShortName).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			return
 		}
@@ -326,6 +338,9 @@ func Validate_Device(
 			earlyReturn := false
 			if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -375,6 +390,9 @@ func Validate_Device(
 				}).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a resourcev1.DeviceCounterConsumption, b resourcev1.DeviceCounterConsumption) bool {
@@ -410,6 +428,9 @@ func Validate_Device(
 			earlyReturn := false
 			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -452,6 +473,9 @@ func Validate_Device(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -480,6 +504,9 @@ func Validate_Device(
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 4).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -524,6 +551,9 @@ func Validate_DeviceAllocationConfiguration(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_AllocationConfigSource(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -561,6 +591,9 @@ func Validate_DeviceAllocationConfiguration(
 			// lists with set semantics require unique values
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			return
 		}
@@ -640,6 +673,9 @@ func Validate_DeviceAllocationResult(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceRequestAllocationResult); len(e) != 0 {
 				errs = append(errs, e...)
@@ -672,6 +708,9 @@ func Validate_DeviceAllocationResult(
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 64).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -771,6 +810,9 @@ func Validate_DeviceAttribute(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -795,6 +837,9 @@ func Validate_DeviceAttribute(
 			earlyReturn := false
 			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -827,6 +872,9 @@ func Validate_DeviceAttribute(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -851,6 +899,9 @@ func Validate_DeviceAttribute(
 			earlyReturn := false
 			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -883,6 +934,9 @@ func Validate_DeviceAttribute(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -907,6 +961,9 @@ func Validate_DeviceAttribute(
 			earlyReturn := false
 			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -945,6 +1002,9 @@ func Validate_DeviceAttribute(
 				}).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -969,6 +1029,9 @@ func Validate_DeviceAttribute(
 			earlyReturn := false
 			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -1019,6 +1082,9 @@ func Validate_DeviceClaim(
 				func(a resourcev1.DeviceRequest, b resourcev1.DeviceRequest) bool { return a.Name == b.Name }).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
 				func(a resourcev1.DeviceRequest, b resourcev1.DeviceRequest) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_DeviceRequest); len(e) != 0 {
@@ -1056,6 +1122,9 @@ func Validate_DeviceClaim(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceConstraint); len(e) != 0 {
 				errs = append(errs, e...)
@@ -1088,6 +1157,9 @@ func Validate_DeviceClaim(
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -1140,6 +1212,9 @@ func Validate_DeviceClaimConfiguration(
 			// lists with set semantics require unique values
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			return
 		}
@@ -1195,8 +1270,9 @@ func Validate_DeviceClass(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "name"
-				earlyReturn := false
+			earlyReturn := false
+			func() {
+				// cohort = "name"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "name",
 					func(o *metav1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.OptionalValue).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 					earlyReturn = true
@@ -1209,6 +1285,9 @@ func Validate_DeviceClass(
 					errs = append(errs, e...)
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -1303,6 +1382,9 @@ func Validate_DeviceClassSpec(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -1331,6 +1413,9 @@ func Validate_DeviceClassSpec(
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -1370,6 +1455,9 @@ func Validate_DeviceClassSpec(
 			if e := validate.ExtendedResourceName(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -1403,6 +1491,9 @@ func Validate_DeviceConfiguration(
 			earlyReturn := false
 			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -1454,6 +1545,9 @@ func Validate_DeviceConstraint(
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -1484,6 +1578,9 @@ func Validate_DeviceConstraint(
 			}
 			if e := validate.ResourceFullyQualifiedName(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			return
 		}
@@ -1527,6 +1624,9 @@ func Validate_DeviceCounterConsumption(
 			if e := validate.ShortName(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -1558,6 +1658,9 @@ func Validate_DeviceCounterConsumption(
 			}
 			if e := validate.EachMapKey(ctx, op, fldPath, obj, oldObj, validate.ShortName).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			return
 		}
@@ -1594,6 +1697,9 @@ func Validate_DeviceRequest(
 			earlyReturn := false
 			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -1636,6 +1742,9 @@ func Validate_DeviceRequest(
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
 				func(a resourcev1.DeviceSubRequest, b resourcev1.DeviceSubRequest) bool { return a.Name == b.Name }).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
@@ -1688,6 +1797,9 @@ func Validate_DeviceRequestAllocationResult(
 			if e := validate.MaxLength(ctx, op, fldPath, obj, oldObj, 63).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -1720,6 +1832,9 @@ func Validate_DeviceRequestAllocationResult(
 			if e := validate.ResourcePoolName(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -1747,6 +1862,9 @@ func Validate_DeviceRequestAllocationResult(
 			earlyReturn := false
 			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -1787,6 +1905,9 @@ func Validate_DeviceRequestAllocationResult(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -1815,6 +1936,9 @@ func Validate_DeviceRequestAllocationResult(
 			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 4).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -1849,6 +1973,9 @@ func Validate_DeviceRequestAllocationResult(
 			}
 			if e := validate.UUID(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			return
 		}
@@ -1894,6 +2021,9 @@ func Validate_DeviceSubRequest(
 			if e := validate.LongName(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -1926,6 +2056,9 @@ func Validate_DeviceSubRequest(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -1950,6 +2083,9 @@ func Validate_DeviceSubRequest(
 			earlyReturn := false
 			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -1982,6 +2118,9 @@ func Validate_DeviceSubRequest(
 			earlyReturn := false
 			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -2028,6 +2167,9 @@ func Validate_DeviceTaint(
 			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -2090,6 +2232,9 @@ func Validate_DeviceToleration(
 			if e := validate.LabelKey(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -2116,6 +2261,9 @@ func Validate_DeviceToleration(
 			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -2148,6 +2296,9 @@ func Validate_DeviceToleration(
 			earlyReturn := false
 			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -2213,6 +2364,9 @@ func Validate_ExactDeviceRequest(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -2237,6 +2391,9 @@ func Validate_ExactDeviceRequest(
 			earlyReturn := false
 			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -2270,6 +2427,9 @@ func Validate_ExactDeviceRequest(
 			earlyReturn := false
 			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -2319,6 +2479,9 @@ func Validate_NetworkDeviceData(
 			if e := validate.MaxBytes(ctx, op, fldPath, obj, oldObj, 256).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -2355,6 +2518,9 @@ func Validate_NetworkDeviceData(
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -2385,6 +2551,9 @@ func Validate_NetworkDeviceData(
 			}
 			if e := validate.MaxBytes(ctx, op, fldPath, obj, oldObj, 128).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			return
 		}
@@ -2430,6 +2599,9 @@ func Validate_OpaqueDeviceConfiguration(
 			if e := validate.MaxLength(ctx, op, fldPath, obj, oldObj, 63).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -2465,10 +2637,16 @@ func Validate_ResourceClaim(
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
+			func() {
+				// cohort = "update"
+				if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
 			if earlyReturn {
 				return // do not proceed
 			}
@@ -2558,12 +2736,24 @@ func Validate_ResourceClaimStatus(
 			}
 			// call field-attached validations
 			earlyReturn := false
+			func() {
+				// cohort = "update"
+				if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
-			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -2609,6 +2799,9 @@ func Validate_ResourceClaimStatus(
 				}).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -2643,6 +2836,9 @@ func Validate_ResourceClaimStatus(
 					return a.Driver == b.Driver && a.Device == b.Device && a.Pool == b.Pool && ((a.ShareID == nil && b.ShareID == nil) || (a.ShareID != nil && b.ShareID != nil && *a.ShareID == *b.ShareID))
 				}).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
@@ -2795,6 +2991,9 @@ func Validate_ResourceSliceSpec(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Device); len(e) != 0 {
 				errs = append(errs, e...)
@@ -2837,6 +3036,9 @@ func Validate_ResourceSliceSpec(
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
 				func(a resourcev1.CounterSet, b resourcev1.CounterSet) bool { return a.Name == b.Name }).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,

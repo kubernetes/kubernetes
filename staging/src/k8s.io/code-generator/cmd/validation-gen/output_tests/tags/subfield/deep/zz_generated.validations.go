@@ -76,7 +76,8 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "structField"
+			func() {
+				// cohort = "stringField@structField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "structField",
 					func(o *OtherStruct) *SmallStruct { return &o.StructField }, validate.DirectEqualPtr,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SmallStruct) field.ErrorList {
@@ -100,7 +101,8 @@ func Validate_Struct(
 					errs = append(errs, e...)
 				}
 			}()
-			func() { // cohort = "sliceField"
+			func() {
+				// cohort = "sliceField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "sliceField",
 					func(o *OtherStruct) []SmallStruct { return o.SliceField }, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []SmallStruct) field.ErrorList {
@@ -116,7 +118,8 @@ func Validate_Struct(
 					errs = append(errs, e...)
 				}
 			}()
-			func() { // cohort = "mapField"
+			func() {
+				// cohort = "mapField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "mapField",
 					func(o *OtherStruct) map[string]SmallStruct { return o.MapField }, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj map[string]SmallStruct) field.ErrorList {
@@ -153,7 +156,8 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "structField"
+			func() {
+				// cohort = "stringField@structField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "structField",
 					func(o *OtherStruct) *SmallStruct { return &o.StructField }, validate.DirectEqualPtr,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SmallStruct) field.ErrorList {
@@ -177,7 +181,8 @@ func Validate_Struct(
 					errs = append(errs, e...)
 				}
 			}()
-			func() { // cohort = "sliceField"
+			func() {
+				// cohort = "sliceField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "sliceField",
 					func(o *OtherStruct) []SmallStruct { return o.SliceField }, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []SmallStruct) field.ErrorList {
@@ -193,7 +198,8 @@ func Validate_Struct(
 					errs = append(errs, e...)
 				}
 			}()
-			func() { // cohort = "mapField"
+			func() {
+				// cohort = "mapField"
 				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "mapField",
 					func(o *OtherStruct) map[string]SmallStruct { return o.MapField }, validate.SemanticDeepEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj map[string]SmallStruct) field.ErrorList {

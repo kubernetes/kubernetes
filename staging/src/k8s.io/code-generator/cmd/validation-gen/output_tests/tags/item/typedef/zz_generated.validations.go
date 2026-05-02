@@ -67,7 +67,8 @@ func Validate_ConflictingItemList(
 		func(a DualItem, b DualItem) bool { return a.ID == b.ID }); len(e) != 0 {
 		errs = append(errs, e...)
 	}
-	func() { // cohort = "{"id": "target"}"
+	func() {
+		// cohort = "{"id": "target"}"
 		if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
 			func(item *DualItem) bool { return item.ID == "target" }, validate.DirectEqual,
 			func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *DualItem) field.ErrorList {
@@ -91,7 +92,8 @@ func Validate_DualItemList(
 		func(a DualItem, b DualItem) bool { return a.ID == b.ID }); len(e) != 0 {
 		errs = append(errs, e...)
 	}
-	func() { // cohort = "{"id": "typedef-target"}"
+	func() {
+		// cohort = "{"id": "typedef-target"}"
 		if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
 			func(item *DualItem) bool { return item.ID == "typedef-target" }, validate.DirectEqual,
 			func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *DualItem) field.ErrorList {
@@ -110,13 +112,9 @@ func Validate_ItemList(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj ItemList) (errs field.ErrorList) {
 
-	// lists with map semantics require unique keys
-	if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-		func(a Item, b Item) bool { return a.Key == b.Key }); len(e) != 0 {
-		errs = append(errs, e...)
-	}
-	func() { // cohort = "{"key": "immutable"}"
-		earlyReturn := false
+	earlyReturn := false
+	func() {
+		// cohort = "update@{"key": "immutable"}"
 		if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
 			func(item *Item) bool { return item.Key == "immutable" }, validate.DirectEqual, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 			errs = append(errs, e...)
@@ -126,7 +124,19 @@ func Validate_ItemList(
 			return // do not proceed
 		}
 	}()
-	func() { // cohort = "{"key": "validated"}"
+	if earlyReturn {
+		return // do not proceed
+	}
+	// lists with map semantics require unique keys
+	if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+		func(a Item, b Item) bool { return a.Key == b.Key }); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+	if earlyReturn {
+		return // do not proceed
+	}
+	func() {
+		// cohort = "{"key": "validated"}"
 		if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
 			func(item *Item) bool { return item.Key == "validated" }, validate.DirectEqual,
 			func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
@@ -135,6 +145,9 @@ func Validate_ItemList(
 			errs = append(errs, e...)
 		}
 	}()
+	if earlyReturn {
+		return // do not proceed
+	}
 
 	return errs
 }
@@ -150,7 +163,8 @@ func Validate_ItemListAlias(
 		func(a Item, b Item) bool { return a.Key == b.Key }); len(e) != 0 {
 		errs = append(errs, e...)
 	}
-	func() { // cohort = "{"key": "aliased"}"
+	func() {
+		// cohort = "{"key": "aliased"}"
 		if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
 			func(item *Item) bool { return item.Key == "aliased" }, validate.DirectEqual,
 			func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
@@ -227,7 +241,8 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "{"id": "field-target"}"
+			func() {
+				// cohort = "{"id": "field-target"}"
 				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *DualItem) bool { return item.ID == "field-target" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *DualItem) field.ErrorList {
@@ -259,7 +274,8 @@ func Validate_Struct(
 				}
 			}
 			// call field-attached validations
-			func() { // cohort = "{"id": "target"}"
+			func() {
+				// cohort = "{"id": "target"}"
 				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *DualItem) bool { return item.ID == "target" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *DualItem) field.ErrorList {

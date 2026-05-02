@@ -223,6 +223,9 @@ func Validate_Struct(
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.StructPtrField"); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_OtherStruct(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -280,6 +283,9 @@ func Validate_Struct(
 			}
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Struct.OpaqueStructPtrField"); len(e) != 0 {
 				errs = append(errs, e...)
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			return
 		}

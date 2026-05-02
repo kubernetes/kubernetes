@@ -486,6 +486,9 @@ func Validate_NegativeMinimumStruct(
 			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, -10); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -516,6 +519,9 @@ func Validate_NegativeMinimumStruct(
 			}
 			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, -10); len(e) != 0 {
 				errs = append(errs, e...)
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			return
 		}
@@ -549,6 +555,9 @@ func Validate_NegativeMinimumStruct(
 			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, -10); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -580,6 +589,9 @@ func Validate_NegativeMinimumStruct(
 			}
 			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, -10); len(e) != 0 {
 				errs = append(errs, e...)
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			return
 		}
@@ -623,6 +635,9 @@ func Validate_OptionalStruct(
 			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 1); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -654,6 +669,9 @@ func Validate_OptionalStruct(
 			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 1); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -678,6 +696,9 @@ func Validate_OptionalStruct(
 			earlyReturn := false
 			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -708,6 +729,9 @@ func Validate_OptionalStruct(
 			earlyReturn := false
 			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -757,6 +781,9 @@ func Validate_RequiredStruct(
 			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 1); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -789,6 +816,9 @@ func Validate_RequiredStruct(
 			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 1); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -814,6 +844,9 @@ func Validate_RequiredStruct(
 			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -845,6 +878,9 @@ func Validate_RequiredStruct(
 			if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed

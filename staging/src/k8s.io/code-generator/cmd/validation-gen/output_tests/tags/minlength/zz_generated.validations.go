@@ -108,6 +108,9 @@ func Validate_Struct(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -138,6 +141,9 @@ func Validate_Struct(
 			}
 			if e := validate.MinLength(ctx, op, fldPath, obj, oldObj, 2).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			return
 		}
@@ -170,6 +176,9 @@ func Validate_Struct(
 			if e := validate.MinLength(ctx, op, fldPath, obj, oldObj, 2).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -200,6 +209,9 @@ func Validate_Struct(
 			}
 			if e := validate.MinLength(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			return
 		}
@@ -232,6 +244,9 @@ func Validate_Struct(
 			if e := validate.MinLength(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -262,6 +277,9 @@ func Validate_Struct(
 			}
 			if e := validate.MinLength(ctx, op, fldPath, obj, oldObj, 2).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			return
 		}
@@ -294,6 +312,9 @@ func Validate_Struct(
 			if e := validate.MinLength(ctx, op, fldPath, obj, oldObj, 2).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -324,6 +345,9 @@ func Validate_Struct(
 			}
 			if e := validate.MinLength(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			return
 		}
@@ -356,6 +380,9 @@ func Validate_Struct(
 			if e := validate.MinLength(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -380,6 +407,9 @@ func Validate_Struct(
 			earlyReturn := false
 			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -414,6 +444,9 @@ func Validate_Struct(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_Min2Type(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -444,6 +477,9 @@ func Validate_Struct(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			// call the type's validation function
 			errs = append(errs, Validate_Min10Type(ctx, op, fldPath, obj, oldObj)...)
 			return
@@ -470,6 +506,9 @@ func Validate_Struct(
 			earlyReturn := false
 			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -507,6 +546,9 @@ func Validate_Struct(
 			if e := validate.MinLength(ctx, op, fldPath, obj, oldObj, 2).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -537,6 +579,9 @@ func Validate_Struct(
 			}
 			if e := validate.MinLength(ctx, op, fldPath, obj, oldObj, 2).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			return
 		}

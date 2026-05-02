@@ -146,6 +146,9 @@ func Validate_HorizontalPodAutoscalerSpec(
 				}).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -177,6 +180,9 @@ func Validate_HorizontalPodAutoscalerSpec(
 			}
 			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 1).MarkAlpha(); len(e) != 0 {
 				errs = append(errs, e...)
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			return
 		}

@@ -127,6 +127,9 @@ func Validate_E02(
 	if earlyReturn {
 		return // do not proceed
 	}
+	if earlyReturn {
+		return // do not proceed
+	}
 
 	return errs
 }
@@ -147,6 +150,9 @@ func Validate_E03(
 	}
 	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "E03, no flags"); len(e) != 0 {
 		errs = append(errs, e...)
+	}
+	if earlyReturn {
+		return // do not proceed
 	}
 
 	return errs
@@ -178,6 +184,9 @@ func Validate_EMultiple(
 	}
 	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "EMultiple, no flags 2"); len(e) != 0 {
 		errs = append(errs, e...)
+	}
+	if earlyReturn {
+		return // do not proceed
 	}
 
 	return errs

@@ -72,8 +72,11 @@ func Validate_T(
 	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T Regular"); len(e) != 0 {
 		errs = append(errs, e...)
 	}
-	func() { // cohort = "c2"
-		earlyReturn := false
+	if earlyReturn {
+		return // do not proceed
+	}
+	func() {
+		// cohort = "c2"
 		if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T c2 ShortCircuit").MarkShortCircuit(); len(e) != 0 {
 			errs = append(errs, e...)
 			earlyReturn = true
@@ -85,8 +88,11 @@ func Validate_T(
 			errs = append(errs, e...)
 		}
 	}()
-	func() { // cohort = "c1"
-		earlyReturn := false
+	if earlyReturn {
+		return // do not proceed
+	}
+	func() {
+		// cohort = "c1"
 		if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type T c1 ShortCircuit").MarkShortCircuit(); len(e) != 0 {
 			errs = append(errs, e...)
 			earlyReturn = true
@@ -98,6 +104,9 @@ func Validate_T(
 			errs = append(errs, e...)
 		}
 	}()
+	if earlyReturn {
+		return // do not proceed
+	}
 
 	// field T.TypeMeta has no validation
 
@@ -124,8 +133,11 @@ func Validate_T(
 			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T.S Regular"); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			func() { // cohort = "c2"
-				earlyReturn := false
+			if earlyReturn {
+				return // do not proceed
+			}
+			func() {
+				// cohort = "c2"
 				if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T.S c2 ShortCircuit").MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -137,8 +149,11 @@ func Validate_T(
 					errs = append(errs, e...)
 				}
 			}()
-			func() { // cohort = "c1"
-				earlyReturn := false
+			if earlyReturn {
+				return // do not proceed
+			}
+			func() {
+				// cohort = "c1"
 				if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T.S c1 ShortCircuit").MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
@@ -150,6 +165,9 @@ func Validate_T(
 					errs = append(errs, e...)
 				}
 			}()
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,

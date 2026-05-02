@@ -99,6 +99,9 @@ func Validate_ImmutableStruct(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -132,6 +135,9 @@ func Validate_ImmutableStruct(
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -157,6 +163,9 @@ func Validate_ImmutableStruct(
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -194,6 +203,9 @@ func Validate_ImmutableStruct(
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -219,6 +231,9 @@ func Validate_ImmutableStruct(
 			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -256,6 +271,9 @@ func Validate_ImmutableStruct(
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -288,6 +306,9 @@ func Validate_ImmutableStruct(
 			// lists with set semantics require unique values
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual); len(e) != 0 {
 				errs = append(errs, e...)
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			return
 		}

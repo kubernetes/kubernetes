@@ -111,6 +111,9 @@ func Validate_Struct(
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -150,6 +153,9 @@ func Validate_Struct(
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -178,6 +184,9 @@ func Validate_Struct(
 				}, validate.DirectEqual, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed
@@ -286,7 +295,8 @@ func Validate_Struct(
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			func() { // cohort = "{"key1Field": "target-ptr", "key2Field": 42}"
+			func() {
+				// cohort = "{"key1Field": "target-ptr", "key2Field": 42}"
 				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *PtrKeyStruct) bool {
 						return item.Key1Field != nil && *item.Key1Field == "target-ptr" && item.Key2Field == 42
@@ -325,7 +335,8 @@ func Validate_Struct(
 				}); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			func() { // cohort = "{"stringPtrKey": "target-ptr", "stringKey": "target"}"
+			func() {
+				// cohort = "{"stringPtrKey": "target-ptr", "stringKey": "target"}"
 				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *MixedPtrKeyStruct) bool {
 						return item.StringPtrKey != nil && *item.StringPtrKey == "target-ptr" && item.StringKey == "target"

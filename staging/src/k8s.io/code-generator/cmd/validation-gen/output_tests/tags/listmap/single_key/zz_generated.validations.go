@@ -105,6 +105,9 @@ func Validate_Struct(
 				func(a OtherStruct, b OtherStruct) bool { return a.KeyField == b.KeyField }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -140,6 +143,9 @@ func Validate_Struct(
 				func(a OtherTypedefStruct, b OtherTypedefStruct) bool { return a.KeyField == b.KeyField }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -166,6 +172,9 @@ func Validate_Struct(
 				func(a OtherStruct, b OtherStruct) bool { return a.KeyField == b.KeyField }, validate.DirectEqual, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed

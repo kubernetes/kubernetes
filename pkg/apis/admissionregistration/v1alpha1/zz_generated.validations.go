@@ -117,6 +117,9 @@ func Validate_ValidatingAdmissionPolicyBindingSpec(
 			if earlyReturn {
 				return // do not proceed
 			}
+			if earlyReturn {
+				return // do not proceed
+			}
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -145,6 +148,9 @@ func Validate_ValidatingAdmissionPolicyBindingSpec(
 			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			if earlyReturn {
 				return // do not proceed

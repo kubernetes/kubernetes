@@ -81,7 +81,8 @@ func Validate_Struct(
 				func(a Item, b Item) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			func() { // cohort = "{"key": "target"}"
+			func() {
+				// cohort = "stringField@{"key": "target"}"
 				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *Item) bool { return item.Key == "target" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
@@ -120,7 +121,8 @@ func Validate_Struct(
 				func(a RatchetItem, b RatchetItem) bool { return a.Key == b.Key }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
-			func() { // cohort = "{"key": "ratchet"}"
+			func() {
+				// cohort = "status@{"key": "ratchet"}"
 				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
 					func(item *RatchetItem) bool { return item.Key == "ratchet" }, validate.DirectEqual,
 					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *RatchetItem) field.ErrorList {
