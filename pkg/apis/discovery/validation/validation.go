@@ -85,10 +85,11 @@ func ValidateEndpointSliceCreate(endpointSlice *discovery.EndpointSlice) field.E
 
 // ValidateEndpointSliceUpdate validates an EndpointSlice when it is updated.
 func ValidateEndpointSliceUpdate(newEndpointSlice, oldEndpointSlice *discovery.EndpointSlice) field.ErrorList {
-	allErrs := ValidateEndpointSlice(newEndpointSlice, oldEndpointSlice)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(newEndpointSlice.AddressType, oldEndpointSlice.AddressType, field.NewPath("addressType")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
-
-	return allErrs
+	allErrs := apivalidation.ValidateImmutableField(newEndpointSlice.AddressType, oldEndpointSlice.AddressType, field.NewPath("addressType")).WithOrigin("immutable").MarkCoveredByDeclarative()
+	if len(allErrs) > 0 {
+		return allErrs
+	}
+	return ValidateEndpointSlice(newEndpointSlice, oldEndpointSlice)
 }
 
 func validateEndpoints(endpoints []discovery.Endpoint, addrType discovery.AddressType, fldPath *field.Path) field.ErrorList {

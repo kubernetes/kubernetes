@@ -71,9 +71,11 @@ func (storageClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 }
 
 func (storageClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	allErrs := validation.ValidateStorageClass(obj.(*storage.StorageClass))
-	allErrs = append(allErrs, validation.ValidateStorageClassUpdate(obj.(*storage.StorageClass), old.(*storage.StorageClass))...)
-	return allErrs
+	allErrs := validation.ValidateStorageClassUpdate(obj.(*storage.StorageClass), old.(*storage.StorageClass))
+	if len(allErrs) > 0 {
+		return allErrs
+	}
+	return validation.ValidateStorageClass(obj.(*storage.StorageClass))
 }
 
 // WarningsOnUpdate returns warnings for the given update.

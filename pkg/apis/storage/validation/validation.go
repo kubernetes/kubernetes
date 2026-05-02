@@ -224,9 +224,11 @@ func validateVolumeError(e *storage.VolumeError, fldPath *field.Path) field.Erro
 
 // ValidateVolumeAttachmentUpdate validates a VolumeAttachment.
 func ValidateVolumeAttachmentUpdate(new, old *storage.VolumeAttachment) field.ErrorList {
-	allErrs := ValidateVolumeAttachment(new)
-	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(new.Spec, old.Spec, field.NewPath("spec")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
-	return allErrs
+	allErrs := apimachineryvalidation.ValidateImmutableField(new.Spec, old.Spec, field.NewPath("spec")).WithOrigin("immutable").MarkCoveredByDeclarative()
+	if len(allErrs) > 0 {
+		return allErrs
+	}
+	return ValidateVolumeAttachment(new)
 }
 
 var supportedVolumeBindingModes = sets.NewString(string(storage.VolumeBindingImmediate), string(storage.VolumeBindingWaitForFirstConsumer))

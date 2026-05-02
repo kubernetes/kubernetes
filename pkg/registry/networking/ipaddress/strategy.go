@@ -88,9 +88,11 @@ func (ipAddressStrategy) AllowCreateOnUpdate() bool {
 func (ipAddressStrategy) ValidateUpdate(ctx context.Context, new, old runtime.Object) field.ErrorList {
 	newIPAddress := new.(*networking.IPAddress)
 	oldIPAddress := old.(*networking.IPAddress)
-	errList := validation.ValidateIPAddress(newIPAddress)
-	errList = append(errList, validation.ValidateIPAddressUpdate(newIPAddress, oldIPAddress)...)
-	return errList
+	allErrs := validation.ValidateIPAddressUpdate(newIPAddress, oldIPAddress)
+	if len(allErrs) > 0 {
+		return allErrs
+	}
+	return validation.ValidateIPAddress(newIPAddress)
 }
 
 // AllowUnconditionalUpdate is the default update policy for IPAddress objects.
