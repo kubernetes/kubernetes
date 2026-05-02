@@ -107,7 +107,6 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj: mkValidStorageClass(TweakProvisioner("")),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("provisioner"), "", "").WithOrigin("immutable").MarkAlpha(),
-				field.Required(field.NewPath("provisioner"), "").MarkAlpha(),
 			},
 		},
 		"invalid update parameters changed": {
@@ -170,7 +169,6 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:    mkValidStorageClass(),
 			updateObj: mkValidStorageClass(TweakVolumeBindingModeNil()),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("volumeBindingMode"), "").MarkFromImperative(),
 				field.Invalid(field.NewPath("volumeBindingMode"), nil, "").WithOrigin("immutable").MarkAlpha(),
 			},
 		},

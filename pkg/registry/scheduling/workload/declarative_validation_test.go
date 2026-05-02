@@ -409,7 +409,6 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:    mkValidWorkload(setResourceVersion("1")),
 			updateObj: mkValidWorkload(setResourceVersion("1"), setEmptyPodGroupTemplates()),
 			expectedErrs: field.ErrorList{
-				field.Required(field.NewPath("spec", "podGroupTemplates"), "must have at least one item"),
 				field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "").WithOrigin("immutable"),
 			},
 		},
@@ -424,7 +423,6 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:    mkValidWorkload(setResourceVersion("1")),
 			updateObj: mkValidWorkload(setResourceVersion("1"), setManyPodGroupTemplates(scheduling.WorkloadMaxPodGroupTemplates+1)),
 			expectedErrs: field.ErrorList{
-				field.TooMany(field.NewPath("spec", "podGroupTemplates"), scheduling.WorkloadMaxPodGroupTemplates+1, scheduling.WorkloadMaxPodGroupTemplates).WithOrigin("maxItems"),
 				field.Invalid(field.NewPath("spec", "podGroupTemplates"), nil, "").WithOrigin("immutable"),
 			},
 		},

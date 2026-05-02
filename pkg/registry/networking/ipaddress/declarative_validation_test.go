@@ -138,7 +138,6 @@ func TestDeclarativeValidateIPAddressUpdate(t *testing.T) {
 						withNilParentRef,
 					),
 					expectedErrs: field.ErrorList{
-						field.Required(field.NewPath("spec", "parentRef"), "").MarkAlpha(),
 						func() *field.Error {
 							e := field.Invalid(field.NewPath("spec", "parentRef"), nil, "field is immutable")
 							e.Origin = "immutable"

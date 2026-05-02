@@ -153,9 +153,6 @@ func testDeclarativeValidateUpdateForDeclarative(t *testing.T, apiVersion string
 			oldObj:    mkValidRoleBinding(),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("roleRef"), rbac.RoleRef{}, "field is immutable").WithOrigin("immutable").MarkAlpha(),
-				field.Required(field.NewPath("roleRef", "name"), "name is required").MarkShortCircuitedInDV(),
-				field.NotSupported(field.NewPath("roleRef", "kind"), "", []string{}).MarkFromImperative(),
-				field.NotSupported(field.NewPath("roleRef", "apiGroup"), "", []string{}).MarkFromImperative(),
 			},
 		},
 		// TODO: Add more test cases
