@@ -44,6 +44,9 @@ type Endpoint interface {
 	// IsTerminating returns true if an endpoint is terminating. For pods,
 	// that is any pod with a deletion timestamp.
 	IsTerminating() bool
+	// IsProcessing returns true if an endpoint is processing existing connections,
+	// even if it's not ready for new ones. A nil value defaults to true.
+	IsProcessing() bool
 
 	// ZoneHints returns the zone hint for the endpoint. This is based on
 	// endpoint.hints.forZones[*].name in the EndpointSlice API.
@@ -77,6 +80,10 @@ type BaseEndpointInfo struct {
 	// terminating indicates whether this endpoint is terminating.
 	// For pods this is true if it has a non-nil deletion timestamp.
 	terminating bool
+	// processing indicates whether this endpoint is processing existing connections.
+	// A nil value defaults to true. If ready is false but processing is true,
+	// the endpoint is not accepting new connections but is still handling existing ones.
+	processing bool
 
 	// zoneHints represent the zone hints for the endpoint. This is based on
 	// endpoint.hints.forZones[*].name in the EndpointSlice API.
@@ -125,6 +132,12 @@ func (info *BaseEndpointInfo) IsTerminating() bool {
 	return info.terminating
 }
 
+// IsProcessing returns true if an endpoint is processing existing connections.
+// Defaults to true if not explicitly set to false.
+func (info *BaseEndpointInfo) IsProcessing() bool {
+	return info.processing
+}
+
 // ZoneHints returns the zone hints for the endpoint.
 func (info *BaseEndpointInfo) ZoneHints() sets.Set[string] {
 	return info.zoneHints
@@ -135,7 +148,7 @@ func (info *BaseEndpointInfo) NodeHints() sets.Set[string] {
 	return info.nodeHints
 }
 
-func newBaseEndpointInfo(ip string, port int, isLocal, ready, serving, terminating bool, zoneHints, nodeHints sets.Set[string]) *BaseEndpointInfo {
+func newBaseEndpointInfo(ip string, port int, isLocal, ready, serving, terminating, processing bool, zoneHints, nodeHints sets.Set[string]) *BaseEndpointInfo {
 	return &BaseEndpointInfo{
 		ip:          ip,
 		port:        port,
@@ -144,6 +157,7 @@ func newBaseEndpointInfo(ip string, port int, isLocal, ready, serving, terminati
 		ready:       ready,
 		serving:     serving,
 		terminating: terminating,
+		processing:  processing,
 		zoneHints:   zoneHints,
 		nodeHints:   nodeHints,
 	}

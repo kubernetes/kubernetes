@@ -80,7 +80,7 @@ func CleanStaleEntries(ct Interface, ipFamily v1.IPFamily,
 			// traffic policies, topology, or terminating status of the service into account.
 			// This ensures that the behavior of UDP services remains consistent with TCP
 			// services.
-			if endpoint.IsServing() {
+			if endpoint.IsServing() || endpoint.IsProcessing() {
 				portStr := strconv.Itoa(int(endpoint.Port()))
 				endpoints.Insert(net.JoinHostPort(endpoint.IP(), portStr))
 			}

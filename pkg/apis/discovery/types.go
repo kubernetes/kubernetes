@@ -129,6 +129,11 @@ type EndpointConditions struct {
 	// to mean that the endpoint is not terminating.
 	// +optional
 	Terminating *bool
+
+	// processing indicates that this endpoint is processing existing connections.
+	// A nil value should be interpreted as "true".
+	// +optional
+	Processing *bool
 }
 
 // EndpointHints provides hints describing how an endpoint should be consumed.

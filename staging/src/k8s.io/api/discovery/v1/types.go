@@ -163,6 +163,11 @@ type EndpointConditions struct {
 	// should be interpreted as "false".
 	// +optional
 	Terminating *bool `json:"terminating,omitempty" protobuf:"bytes,3,name=terminating"`
+
+	// processing indicates that this endpoint is processing existing connections.
+	// A nil value should be interpreted as "true".
+	// +optional
+	Processing *bool `json:"processing,omitempty" protobuf:"bytes,4,name=processing"`
 }
 
 // EndpointHints provides hints describing how an endpoint should be consumed.
