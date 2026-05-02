@@ -127,7 +127,11 @@ func (stv subfieldTagValidator) GetValidations(context Context, tag codetags.Tag
 			return fn
 		}
 		f := Function(subfieldTagName, fn.Flags, validateSubfield, subname, getFn, equivArg, WrapperFunction{fn, submemb.Type})
-		f.Cohort = subname
+		if fn.Cohort != "" {
+			f.Cohort = fn.Cohort + "@" + subname
+		} else {
+			f.Cohort = subname
+		}
 		return f
 	})
 

@@ -1393,10 +1393,28 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 	// Group and sort the inputs.
 	cohorts := sortIntoCohorts(validations)
 
-	for _, validations := range cohorts {
+	hasAnyShortCircuit := false
+	for _, cohort := range cohorts {
+		for _, v := range cohort {
+			if v.Flags.IsSet(validators.ShortCircuit) {
+				hasAnyShortCircuit = true
+				break
+			}
+		}
+		if hasAnyShortCircuit {
+			break
+		}
+	}
+
+	if hasAnyShortCircuit {
+		sw.Do("earlyReturn := false\n", nil)
+	}
+
+	for i, validations := range cohorts {
 		cohortName := validations[0].Cohort
 		if cohortName != "" {
-			sw.Do("func() { // cohort = \"$.$\"\n", cohortName)
+			sw.Do("func() {\n", nil)
+			sw.Do("  // cohort = \"$.$\"\n", cohortName)
 		}
 
 		hasShortCircuits := false
@@ -1406,10 +1424,6 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 				hasShortCircuits = true
 				lastShortCircuitIdx = i
 			}
-		}
-
-		if hasShortCircuits {
-			sw.Do("earlyReturn := false\n", nil)
 		}
 
 		for i, v := range validations {
@@ -1491,7 +1505,8 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 				sw.Do("  earlyReturn = true\n", nil)
 				sw.Do("}\n", nil)
 
-				// Check for early return ONLY after the LAST short-circuit
+				// Check for early return ONLY after the LAST short-circuit in THIS cohort.
+				// This stops processing WITHIN the cohort (e.g. stop structural checks if required fails).
 				if hasShortCircuits && i == lastShortCircuitIdx {
 					sw.Do("if earlyReturn {\n", nil)
 					sw.Do("  return // do not proceed\n", nil)
@@ -1512,82 +1527,76 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 		if cohortName != "" {
 			sw.Do("}()\n", nil)
 		}
+
+		// After each cohort, decide if we should stop entirely.
+		// We only stop entirely if we have completed the "update" stage and found errors,
+		// OR if the current cohort is the default one and it found errors.
+		// This allows multiple items to report their update-constraint failures together.
+		isUpdateStage := strings.HasPrefix(cohortName, validators.UpdateCohort)
+		isNextUpdateStage := false
+		if i+1 < len(cohorts) {
+			isNextUpdateStage = strings.HasPrefix(cohorts[i+1][0].Cohort, validators.UpdateCohort)
+		}
+
+		if hasAnyShortCircuit {
+			if (isUpdateStage && !isNextUpdateStage) || !isUpdateStage {
+				sw.Do("if earlyReturn {\n", nil)
+				sw.Do("  return // do not proceed\n", nil)
+				sw.Do("}\n", nil)
+			}
+		}
 	}
 }
 
 // sortIntoCohorts groups the inputs into a list of cohorts. Within each
 // cohort, function calls are sorted such that short-circuiting function
-// calls are handled before others. The first cohort is always the
-// default cohort (named "") if it exists. Other cohorts are returned in
-// the order they were defined in the input.
-//
-// NOTE: There should be exactly two cohorts: the default cohort (for structural
-// validity checks like required/maxItems) and the update cohort (for
-// update-constraint checks like immutable). These two represent orthogonal
-// concerns: "is this value structurally valid?" vs "was this value illegally
-// modified?". Adding more cohorts would make the short-circuit semantics harder
-// to reason about and should be avoided.
-func sortIntoCohorts(in []validators.FunctionGen) [][]validators.FunctionGen {
-	defaultCohort := make([]validators.FunctionGen, 0, len(in))
-	namedCohorts := map[string][]validators.FunctionGen{}
-	idx := make([]string, 0, len(in))
-	for _, fg := range in {
-		key := fg.Cohort
-		if key == "" {
-			defaultCohort = append(defaultCohort, fg)
-		} else {
-			if !slices.Contains(idx, key) {
-				idx = append(idx, key)
-			}
-			namedCohorts[key] = append(namedCohorts[key], fg)
+// calls are handled before others. The "update" stage cohorts (those starting
+// with validators.UpdateCohort) are always placed before default cohorts.
+func sortIntoCohorts(validations []validators.FunctionGen) [][]validators.FunctionGen {
+	cohortMap := make(map[string][]validators.FunctionGen)
+	cohortNames := []string{}
+	for _, v := range validations {
+		if _, ok := cohortMap[v.Cohort]; !ok {
+			cohortNames = append(cohortNames, v.Cohort)
 		}
+		cohortMap[v.Cohort] = append(cohortMap[v.Cohort], v)
 	}
-	// Special handling for the "update" cohort: it should always run before the
-	// default cohort. This ensures that update-related constraints (like
-	// +k8s:immutable) take precedence and short-circuit structural checks
-	// (like +k8s:required) if they fail, matching the behavior described in
-	// the UpdateCohort documentation.
-	updateIdx := -1
-	for i, key := range idx {
-		if key == validators.UpdateCohort {
-			updateIdx = i
-			break
+
+	// Sort cohort names such that update cohorts come first, then the default cohort,
+	// then others, while preserving original order within each group.
+	slices.SortStableFunc(cohortNames, func(aName, bName string) int {
+		if aName == bName {
+			return 0
 		}
-	}
-
-	newIdx := make([]string, 0, len(idx)+1)
-	if updateIdx != -1 {
-		newIdx = append(newIdx, validators.UpdateCohort)
-		// remove it from old idx so we don't add it again
-		idx = append(idx[:updateIdx], idx[updateIdx+1:]...)
-	}
-	if len(defaultCohort) > 0 {
-		newIdx = append(newIdx, "")
-	}
-	newIdx = append(newIdx, idx...)
-	idx = newIdx
-	// NOTE: we do not sort cohorts by name, because we want to preserve
-	// their definition order.
-
-	result := make([][]validators.FunctionGen, 0, len(in))
-	for _, key := range idx {
-		var cohort []validators.FunctionGen
-		if key == "" {
-			cohort = defaultCohort
-		} else {
-			cohort = namedCohorts[key]
+		aIsUpdate := strings.HasPrefix(aName, validators.UpdateCohort)
+		bIsUpdate := strings.HasPrefix(bName, validators.UpdateCohort)
+		if aIsUpdate && !bIsUpdate {
+			return -1
 		}
+		if bIsUpdate && !aIsUpdate {
+			return 1
+		}
+		if aName == "" {
+			return -1
+		}
+		if bName == "" {
+			return 1
+		}
+		// Preserve relative order for same stage
+		return 0
+	})
 
-		sooner := make([]validators.FunctionGen, 0, len(cohort))
-		later := make([]validators.FunctionGen, 0, len(cohort))
-
-		for _, fg := range cohort {
-			isShortCircuit := (fg.Flags.IsSet(validators.ShortCircuit))
-
-			if isShortCircuit {
-				sooner = append(sooner, fg)
+	result := [][]validators.FunctionGen{}
+	for _, name := range cohortNames {
+		cohortValidations := cohortMap[name]
+		// Within each cohort, sort short-circuiting functions first.
+		sooner := []validators.FunctionGen{}
+		later := []validators.FunctionGen{}
+		for _, v := range cohortValidations {
+			if v.Flags.IsSet(validators.ShortCircuit) {
+				sooner = append(sooner, v)
 			} else {
-				later = append(later, fg)
+				later = append(later, v)
 			}
 		}
 		sorted := sooner

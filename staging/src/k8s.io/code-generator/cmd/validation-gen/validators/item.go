@@ -124,7 +124,11 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 			deferredResult := Validations{}
 			for _, vfn := range validations.Functions {
 				f := Function(itemTagName, vfn.Flags, validateSliceItem, matchArg, equivArg, WrapperFunction{Function: vfn, ObjType: elemT})
-				f.Cohort = itemKey
+				if vfn.Cohort != "" {
+					f.Cohort = vfn.Cohort + "@" + itemKey
+				} else {
+					f.Cohort = itemKey
+				}
 				vfn = f
 				deferredResult.AddFunction(vfn)
 			}
@@ -168,7 +172,11 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 					return fn
 				}
 				f := Function(itemTagName, fn.Flags, validateSliceItem, matchArg, equivArg, WrapperFunction{Function: fn, ObjType: elemT})
-				f.Cohort = itemKey
+				if fn.Cohort != "" {
+					f.Cohort = fn.Cohort + "@" + itemKey
+				} else {
+					f.Cohort = itemKey
+				}
 				return f
 			}, d.Scope), nil
 		}))
