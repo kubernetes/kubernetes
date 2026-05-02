@@ -448,24 +448,17 @@ func TestSortIntoCohorts(t *testing.T) {
 			{TagName: "e", Cohort: "bar", Flags: validators.DefaultFlags},
 		}},
 	}, {
-		// default and non-default cohorts with short-circuit
+		// default and update cohorts with short-circuits
 		in: []validators.FunctionGen{
-			{TagName: "a", Cohort: "foo", Flags: validators.DefaultFlags},
-			{TagName: "b", Cohort: "bar", Flags: validators.DefaultFlags},
-			{TagName: "c", Cohort: "", Flags: validators.DefaultFlags},
-			{TagName: "d", Cohort: "foo", Flags: validators.ShortCircuit},
-			{TagName: "e", Cohort: "bar", Flags: validators.ShortCircuit},
-			{TagName: "f", Cohort: "", Flags: validators.ShortCircuit},
+			{TagName: "required", Cohort: "", Flags: validators.ShortCircuit},
+			{TagName: "maxItems", Cohort: "", Flags: validators.ShortCircuit},
+			{TagName: "immutable", Cohort: "update", Flags: validators.ShortCircuit},
 		},
 		expected: [][]validators.FunctionGen{{
-			{TagName: "f", Cohort: "", Flags: validators.ShortCircuit},
-			{TagName: "c", Cohort: "", Flags: validators.DefaultFlags},
+			{TagName: "immutable", Cohort: "update", Flags: validators.ShortCircuit},
 		}, {
-			{TagName: "d", Cohort: "foo", Flags: validators.ShortCircuit},
-			{TagName: "a", Cohort: "foo", Flags: validators.DefaultFlags},
-		}, {
-			{TagName: "e", Cohort: "bar", Flags: validators.ShortCircuit},
-			{TagName: "b", Cohort: "bar", Flags: validators.DefaultFlags},
+			{TagName: "required", Cohort: "", Flags: validators.ShortCircuit},
+			{TagName: "maxItems", Cohort: "", Flags: validators.ShortCircuit},
 		}},
 	}}
 

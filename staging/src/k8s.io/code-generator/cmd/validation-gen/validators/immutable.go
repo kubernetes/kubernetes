@@ -48,11 +48,31 @@ var (
 	immutableValidator = types.Name{Package: libValidationPkg, Name: "Immutable"}
 )
 
+// UpdateCohort is the name of the cohort used for update-related validations
+// (immutable, update constraints). This cohort runs independently from the
+// default cohort, ensuring that update-related errors are always reported even
+// when the default cohort short-circuits due to other failures (e.g. required
+// or maxItems).
+//
+// NOTE: There should be exactly two cohorts: the default cohort (for structural
+// validity checks like required/maxItems) and this update cohort (for
+// update-constraint checks like immutable). These two represent orthogonal
+// concerns: "is this value structurally valid?" vs "was this value illegally
+// modified?". Adding more cohorts would make the short-circuit semantics harder
+// to reason about and should be avoided.
+const UpdateCohort = "update"
+
 func (immutableTagValidator) GetValidations(context Context, _ codetags.Tag) (Validations, error) {
 	var result Validations
 
-	// Use ShortCircuit flag so immutable runs in the same group as +k8s:optional.
-	result.AddFunction(Function(immutableTagName, ShortCircuit, immutableValidator))
+	// Use ShortCircuit flag and put in the "update" cohort so that immutable
+	// checks run independently from the default cohort. This ensures that if a
+	// field has both +k8s:immutable and +k8s:required/+k8s:maxItems, the
+	// immutable error is always reported on updates even when the default cohort
+	// short-circuits.
+	fn := Function(immutableTagName, ShortCircuit, immutableValidator)
+	fn.Cohort = UpdateCohort
+	result.AddFunction(fn)
 	return result, nil
 }
 

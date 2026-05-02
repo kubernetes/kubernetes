@@ -1520,6 +1520,13 @@ func emitCallsToValidators(c *generator.Context, validations []validators.Functi
 // calls are handled before others. The first cohort is always the
 // default cohort (named "") if it exists. Other cohorts are returned in
 // the order they were defined in the input.
+//
+// NOTE: There should be exactly two cohorts: the default cohort (for structural
+// validity checks like required/maxItems) and the update cohort (for
+// update-constraint checks like immutable). These two represent orthogonal
+// concerns: "is this value structurally valid?" vs "was this value illegally
+// modified?". Adding more cohorts would make the short-circuit semantics harder
+// to reason about and should be avoided.
 func sortIntoCohorts(in []validators.FunctionGen) [][]validators.FunctionGen {
 	defaultCohort := make([]validators.FunctionGen, 0, len(in))
 	namedCohorts := map[string][]validators.FunctionGen{}
@@ -1535,9 +1542,30 @@ func sortIntoCohorts(in []validators.FunctionGen) [][]validators.FunctionGen {
 			namedCohorts[key] = append(namedCohorts[key], fg)
 		}
 	}
-	if len(defaultCohort) > 0 {
-		idx = append([]string{""}, idx...)
+	// Special handling for the "update" cohort: it should always run before the
+	// default cohort. This ensures that update-related constraints (like
+	// +k8s:immutable) take precedence and short-circuit structural checks
+	// (like +k8s:required) if they fail, matching the behavior described in
+	// the UpdateCohort documentation.
+	updateIdx := -1
+	for i, key := range idx {
+		if key == validators.UpdateCohort {
+			updateIdx = i
+			break
+		}
 	}
+
+	newIdx := make([]string, 0, len(idx)+1)
+	if updateIdx != -1 {
+		newIdx = append(newIdx, validators.UpdateCohort)
+		// remove it from old idx so we don't add it again
+		idx = append(idx[:updateIdx], idx[updateIdx+1:]...)
+	}
+	if len(defaultCohort) > 0 {
+		newIdx = append(newIdx, "")
+	}
+	newIdx = append(newIdx, idx...)
+	idx = newIdx
 	// NOTE: we do not sort cohorts by name, because we want to preserve
 	// their definition order.
 

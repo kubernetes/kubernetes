@@ -291,16 +291,20 @@ func generateSliceValidation(listByPath map[string]*listMetadata, context Contex
 
 	args := append([]any{matchArg}, constraintIdentifierArgs(constraints)...)
 
-	// Use ShortCircuit flag so these run in the same group as +k8s:optional
+	// Use ShortCircuit flag and put in the "update" cohort so these run
+	// independently from the default cohort (see UpdateCohort in immutable.go).
 	fn := Function(updateTagName, ShortCircuit, updateSliceValidator, args...)
+	fn.Cohort = UpdateCohort
 	return Validations{Functions: []FunctionGen{fn}}, nil
 }
 
 // generateMapValidation emits validate.UpdateMap. The map key is the item
 // identity, so no list metadata or match function is needed.
 func generateMapValidation(constraints []validate.UpdateConstraint) Validations {
-	// Use ShortCircuit flag so these run in the same group as +k8s:optional
+	// Use ShortCircuit flag and put in the "update" cohort so these run
+	// independently from the default cohort (see UpdateCohort in immutable.go).
 	fn := Function(updateTagName, ShortCircuit, updateMapValidator, constraintIdentifierArgs(constraints)...)
+	fn.Cohort = UpdateCohort
 	return Validations{Functions: []FunctionGen{fn}}
 }
 
@@ -327,8 +331,10 @@ func emitScalarUpdate(context Context, constraints []validate.UpdateConstraint) 
 		validatorFunc = updateValueByReflectValidator
 	}
 
-	// Use ShortCircuit flag so these run in the same group as +k8s:optional
+	// Use ShortCircuit flag and put in the "update" cohort so these run
+	// independently from the default cohort (see UpdateCohort in immutable.go).
 	fn := Function(updateTagName, ShortCircuit, validatorFunc, constraintIdentifierArgs(constraints)...)
+	fn.Cohort = UpdateCohort
 	return Validations{Functions: []FunctionGen{fn}}
 }
 
