@@ -587,7 +587,12 @@ func (w *watchCache) waitUntilFreshAndList(ctx context.Context, key string, opts
 	return w.waitAndListLatestRV(ctx, listRV, key, "", opts.Predicate.MatcherIndex(ctx))
 }
 
-func (w *watchCache) waitAndListExactRV(ctx context.Context, key, continueKey string, resourceVersion uint64) (resp listResp, index string, err error) {
+// snapshotAtRV blocks until the cache is fresh enough for resourceVersion and
+// returns the immutable snapshot at the greatest revision <= resourceVersion.
+// The lock is held only to fetch the snapshot reference, so the returned
+// snapshot can be iterated without it.
+func (w *watchCache) snapshotAtRV(ctx context.Context, resourceVersion uint64) (store.OrderedLister, error) {
+	var err error
 	if delegator.ConsistentReadSupported() && w.notFresh(resourceVersion) {
 		w.waitingUntilFresh.Add()
 		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
@@ -595,21 +600,28 @@ func (w *watchCache) waitAndListExactRV(ctx context.Context, key, continueKey st
 	} else {
 		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
 	}
+	// waitUntilFreshAndBlock returns with w.RLock held on every path.
 	defer w.RUnlock()
+	if err != nil {
+		return nil, err
+	}
+	if w.snapshots == nil {
+		return nil, errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", resourceVersion))
+	}
+	snapshot, ok := w.snapshots.GetLessOrEqual(resourceVersion)
+	if !ok {
+		return nil, errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", resourceVersion))
+	}
+	return snapshot, nil
+}
+
+func (w *watchCache) waitAndListExactRV(ctx context.Context, key, continueKey string, resourceVersion uint64) (resp listResp, index string, err error) {
+	snapshot, err := w.snapshotAtRV(ctx, resourceVersion)
 	if err != nil {
 		return listResp{}, "", err
 	}
-
-	if w.snapshots == nil {
-		return listResp{}, "", errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", resourceVersion))
-	}
-	store, ok := w.snapshots.GetLessOrEqual(resourceVersion)
-	if !ok {
-		return listResp{}, "", errors.NewResourceExpired(fmt.Sprintf("too old resource version: %d", resourceVersion))
-	}
-	items := store.OrderedListPrefix(key, continueKey)
 	return listResp{
-		Items:           items,
+		Items:           snapshot.OrderedListPrefix(key, continueKey),
 		ResourceVersion: resourceVersion,
 	}, "", nil
 }
@@ -630,10 +642,20 @@ func (w *watchCache) waitAndListLatestRV(ctx context.Context, resourceVersion ui
 	} else {
 		err = w.waitUntilFreshAndBlock(ctx, resourceVersion)
 	}
-	defer w.RUnlock()
+	// waitUntilFreshAndBlock returns with w.RLock held on every path.
 	if err != nil {
+		w.RUnlock()
 		return listResp{}, "", err
 	}
+	if len(matchValues) == 0 && w.snapshots != nil && w.snapshottingEnabled.Load() {
+		snapshotRV := w.resourceVersion
+		if snapshot, ok := w.snapshots.GetLessOrEqual(snapshotRV); ok {
+			// The snapshot is an immutable clone, so iterate it after releasing the lock.
+			w.RUnlock()
+			return listResp{Items: snapshot.OrderedListPrefix(key, continueKey), ResourceVersion: snapshotRV}, "", nil
+		}
+	}
+	defer w.RUnlock()
 	return w.listLatestRV(key, continueKey, matchValues)
 }
 
