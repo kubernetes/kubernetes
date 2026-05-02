@@ -24,6 +24,11 @@ import (
 	"golang.org/x/time/rate"
 )
 
+// DefaultMaxFailureEntries is the maximum number of entries
+// tracked in the failure map. This prevents unbounded memory
+// growth when Forget() is not called by the controller author.
+const DefaultMaxFailureEntries = 1000
+
 // Deprecated: RateLimiter is deprecated, use TypedRateLimiter instead.
 type RateLimiter TypedRateLimiter[any]
 
@@ -84,6 +89,7 @@ type ItemExponentialFailureRateLimiter = TypedItemExponentialFailureRateLimiter[
 type TypedItemExponentialFailureRateLimiter[T comparable] struct {
 	failuresLock sync.Mutex
 	failures     map[T]int
+	maxEntries   int
 
 	baseDelay time.Duration
 	maxDelay  time.Duration
@@ -98,9 +104,10 @@ func NewItemExponentialFailureRateLimiter(baseDelay time.Duration, maxDelay time
 
 func NewTypedItemExponentialFailureRateLimiter[T comparable](baseDelay time.Duration, maxDelay time.Duration) TypedRateLimiter[T] {
 	return &TypedItemExponentialFailureRateLimiter[T]{
-		failures:  map[T]int{},
-		baseDelay: baseDelay,
-		maxDelay:  maxDelay,
+		failures:   map[T]int{},
+		maxEntries: DefaultMaxFailureEntries,
+		baseDelay:  baseDelay,
+		maxDelay:   maxDelay,
 	}
 }
 
@@ -116,6 +123,12 @@ func DefaultTypedItemBasedRateLimiter[T comparable]() TypedRateLimiter[T] {
 func (r *TypedItemExponentialFailureRateLimiter[T]) When(item T) time.Duration {
 	r.failuresLock.Lock()
 	defer r.failuresLock.Unlock()
+
+	if _, exists := r.failures[item]; !exists {
+		if len(r.failures) >= r.maxEntries {
+			return r.maxDelay
+		}
+	}
 
 	exp := r.failures[item]
 	r.failures[item] = r.failures[item] + 1
@@ -156,6 +169,7 @@ type ItemFastSlowRateLimiter = TypedItemFastSlowRateLimiter[any]
 type TypedItemFastSlowRateLimiter[T comparable] struct {
 	failuresLock sync.Mutex
 	failures     map[T]int
+	maxEntries   int
 
 	maxFastAttempts int
 	fastDelay       time.Duration
@@ -172,6 +186,7 @@ func NewItemFastSlowRateLimiter(fastDelay, slowDelay time.Duration, maxFastAttem
 func NewTypedItemFastSlowRateLimiter[T comparable](fastDelay, slowDelay time.Duration, maxFastAttempts int) TypedRateLimiter[T] {
 	return &TypedItemFastSlowRateLimiter[T]{
 		failures:        map[T]int{},
+		maxEntries:      DefaultMaxFailureEntries,
 		fastDelay:       fastDelay,
 		slowDelay:       slowDelay,
 		maxFastAttempts: maxFastAttempts,
@@ -181,6 +196,12 @@ func NewTypedItemFastSlowRateLimiter[T comparable](fastDelay, slowDelay time.Dur
 func (r *TypedItemFastSlowRateLimiter[T]) When(item T) time.Duration {
 	r.failuresLock.Lock()
 	defer r.failuresLock.Unlock()
+
+	if _, exists := r.failures[item]; !exists {
+		if len(r.failures) >= r.maxEntries {
+			return r.fastDelay
+		}
+	}
 
 	r.failures[item] = r.failures[item] + 1
 
