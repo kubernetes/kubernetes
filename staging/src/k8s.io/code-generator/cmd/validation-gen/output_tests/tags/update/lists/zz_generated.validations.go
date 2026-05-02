@@ -91,14 +91,16 @@ func Validate_UpdateListStruct(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj, nil, validate.NoSet).MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
+			func() { // cohort = "update"
+				earlyReturn := false
+				if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj, nil, validate.NoSet).MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -120,14 +122,16 @@ func Validate_UpdateListStruct(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj, nil, validate.NoUnset).MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
+			func() { // cohort = "update"
+				earlyReturn := false
+				if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj, nil, validate.NoUnset).MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -149,18 +153,20 @@ func Validate_UpdateListStruct(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, validate.NoAddItem).MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
 			// lists with set semantics require unique values
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			func() { // cohort = "update"
+				earlyReturn := false
+				if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, validate.NoAddItem).MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -182,18 +188,20 @@ func Validate_UpdateListStruct(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
 			// lists with set semantics require unique values
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			func() { // cohort = "update"
+				earlyReturn := false
+				if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -215,18 +223,20 @@ func Validate_UpdateListStruct(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
 			// lists with set semantics require unique values
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			func() { // cohort = "update"
+				earlyReturn := false
+				if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -248,20 +258,22 @@ func Validate_UpdateListStruct(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj,
-				func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }, validate.NoAddItem).MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
 				func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			func() { // cohort = "update"
+				earlyReturn := false
+				if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj,
+					func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }, validate.NoAddItem).MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -283,20 +295,22 @@ func Validate_UpdateListStruct(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj,
-				func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
 				func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			func() { // cohort = "update"
+				earlyReturn := false
+				if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj,
+					func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -318,20 +332,22 @@ func Validate_UpdateListStruct(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj,
-				func(a CompositeKeyItem, b CompositeKeyItem) bool { return a.Name == b.Name && a.Priority == b.Priority }, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
 				func(a CompositeKeyItem, b CompositeKeyItem) bool { return a.Name == b.Name && a.Priority == b.Priority }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			func() { // cohort = "update"
+				earlyReturn := false
+				if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj,
+					func(a CompositeKeyItem, b CompositeKeyItem) bool { return a.Name == b.Name && a.Priority == b.Priority }, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -353,18 +369,20 @@ func Validate_UpdateListStruct(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, validate.NoAddItem).MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
 			// lists with set semantics require unique values
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			func() { // cohort = "update"
+				earlyReturn := false
+				if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, validate.NoAddItem).MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -386,20 +404,22 @@ func Validate_UpdateListStruct(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj,
-				func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
 			// lists with map semantics require unique keys
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
 				func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			func() { // cohort = "update"
+				earlyReturn := false
+				if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj,
+					func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -421,18 +441,20 @@ func Validate_UpdateListStruct(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
 			// lists with set semantics require unique values
 			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual); len(e) != 0 {
 				errs = append(errs, e...)
 			}
+			func() { // cohort = "update"
+				earlyReturn := false
+				if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
 			return
 		}
 		oldVal := safe.Field(oldObj,
@@ -454,15 +476,17 @@ func Validate_UpdateListStruct(
 				}
 			}
 			// call field-attached validations
-			earlyReturn := false
-			if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj,
-				func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
+			func() { // cohort = "update"
+				earlyReturn := false
+				if e := validate.UpdateSlice(ctx, op, fldPath, obj, oldObj,
+					func(a UpdateItem, b UpdateItem) bool { return a.Name == b.Name }, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
+					errs = append(errs, e...)
+					earlyReturn = true
+				}
+				if earlyReturn {
+					return // do not proceed
+				}
+			}()
 			// call the type's validation function
 			errs = append(errs, Validate_FrozenUserList(ctx, op, fldPath, obj, oldObj)...)
 			return
