@@ -110,7 +110,7 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 	}
 
 	// Starts device manager.
-	if err := cm.deviceManager.Start(logger, devicemanager.ActivePodsFunc(activePods), sourcesReady, containerMap.Clone(), containerRunningSet); err != nil {
+	if err := cm.deviceManager.Start(logger, devicemanager.ActivePodsFunc(activePods), sourcesReady, containerRunningSet); err != nil {
 		return err
 	}
 
@@ -187,7 +187,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 	}
 
 	logger.Info("Creating device plugin manager")
-	cm.deviceManager, err = devicemanager.NewManagerImpl(nil, cm.topologyManager)
+	cm.deviceManager, err = devicemanager.NewManagerImpl(nil, cm.topologyManager, machineInfo.BootID)
 	if err != nil {
 		return nil, err
 	}

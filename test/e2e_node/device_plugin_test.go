@@ -18,6 +18,7 @@ package e2enode
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -40,7 +41,6 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	kubeletdevicepluginv1beta1 "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/ptr"
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -362,7 +362,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			restartKubelet(ctx, true)
 
 			ginkgo.By("Wait for node to be ready again")
-			e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)
+			gomega.Expect(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)).To(gomega.Succeed())
 
 			ginkgo.By("Waiting for resource to become available on the local node after restart")
 			gomega.Eventually(ctx, func() bool {
@@ -413,7 +413,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Wait for node to be ready again")
-			e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)
+			gomega.Expect(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)).To(gomega.Succeed())
 
 			ginkgo.By("Waiting for container to restart")
 			ensurePodContainerRestart(ctx, f, pod1.Name, pod1.Name)
@@ -427,7 +427,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			restartKubelet(ctx, true)
 
 			ginkgo.By("Wait for node to be ready again")
-			e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)
+			gomega.Expect(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)).To(gomega.Succeed())
 
 			ginkgo.By("Checking an instance of the pod is running")
 			gomega.Eventually(ctx, getPodByName).
@@ -527,7 +527,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Wait for node to be ready again")
-			e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)
+			gomega.Expect(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)).To(gomega.Succeed())
 
 			ginkgo.By("Re-Register resources and delete the plugin pod")
 			gp := int64(0)
@@ -584,7 +584,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			restartKubelet(ctx, true)
 
 			ginkgo.By("Wait for node to be ready again")
-			e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)
+			gomega.Expect(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)).To(gomega.Succeed())
 
 			ginkgo.By("Checking the same instance of the pod is still running after kubelet restart")
 			gomega.Eventually(ctx, getPodByName).
@@ -781,167 +781,295 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 	})
 }
 
+// setupSampleDevicePluginWithRegistrationControl creates the sample device plugin pod with
+// manual registration control, triggers registration, and waits for the resource to become
+// available. Returns the device plugin pod for use in the test body and cleanup.
+func setupSampleDevicePluginWithRegistrationControl(ctx context.Context, f *framework.Framework) *v1.Pod {
+	ginkgo.By("Wait for node to be ready")
+	gomega.Eventually(ctx, e2enode.TotalReady).
+		WithArguments(f.ClientSet).
+		WithTimeout(time.Minute).
+		Should(gomega.BeEquivalentTo(1))
+
+	// Before we run the device plugin test, we need to ensure
+	// that the cluster is in a clean state and there are no
+	// pods running on this node.
+	// This is done in a gomega.Eventually with retries since a prior test in a different test suite could've run and the deletion of it's resources may still be in progress.
+	// xref: https://issue.k8s.io/115381
+	gomega.Eventually(ctx, func(ctx context.Context) error {
+		v1PodResources, err := getV1NodeDevices(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get node local podresources by accessing the (v1) podresources API endpoint: %w", err)
+		}
+
+		if len(v1PodResources.PodResources) > 0 {
+			return fmt.Errorf("expected v1 pod resources to be empty, but got non-empty resources: %+v", v1PodResources.PodResources)
+		}
+		return nil
+	}).WithTimeout(f.Timeouts.SystemDaemonsetStartup).WithPolling(f.Timeouts.Poll).Should(gomega.Succeed())
+
+	ginkgo.By("Setting up the directory for controlling registration")
+	triggerPathDir := filepath.Join(devicePluginDir, "sample")
+	if _, err := os.Stat(triggerPathDir); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			if err := os.Mkdir(triggerPathDir, os.ModePerm); err != nil {
+				framework.Fail(fmt.Sprintf("registration control directory %q creation failed: %v ", triggerPathDir, err))
+			}
+			framework.Logf("registration control directory created successfully")
+		} else {
+			framework.Fail(fmt.Sprintf("unexpected error checking %q: %v", triggerPathDir, err))
+		}
+	} else {
+		framework.Logf("registration control directory %q already present", triggerPathDir)
+	}
+
+	ginkgo.By("Setting up the file trigger for controlling registration")
+	triggerPathFile := filepath.Join(triggerPathDir, "registration")
+	if _, err := os.Stat(triggerPathFile); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			if _, err = os.Create(triggerPathFile); err != nil {
+				framework.Fail(fmt.Sprintf("registration control file %q creation failed: %v", triggerPathFile, err))
+			}
+			framework.Logf("registration control file created successfully")
+		} else {
+			framework.Fail(fmt.Sprintf("unexpected error creating %q: %v", triggerPathFile, err))
+		}
+	} else {
+		framework.Logf("registration control file %q already present", triggerPathFile)
+	}
+
+	ginkgo.By("Scheduling a sample device plugin pod")
+	data, err := e2etestfiles.Read(e2enode.SampleDevicePluginControlRegistrationDSYAML)
+	if err != nil {
+		framework.Fail(fmt.Sprintf("error reading test data %q: %v", e2enode.SampleDevicePluginControlRegistrationDSYAML, err))
+	}
+	ds := readDaemonSetV1OrDie(data)
+
+	dp := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: e2enode.SampleDevicePluginName,
+		},
+		Spec: ds.Spec.Template.Spec,
+	}
+
+	devicePluginPod := e2epod.NewPodClient(f).CreateSync(ctx, dp)
+
+	framework.Logf("Waiting for device plugin pod to be Running")
+	err = e2epod.WaitForPodCondition(ctx, f.ClientSet, devicePluginPod.Namespace, devicePluginPod.Name, "Ready", 2*time.Minute, testutils.PodRunningReady)
+	if err != nil {
+		framework.Logf("Sample Device Pod %v took too long to enter running/ready: %v", dp.Name, err)
+	}
+	framework.ExpectNoError(err, "WaitForPodCondition() failed err: %v", err)
+
+	go func() {
+		// Since autoregistration is disabled for the device plugin (as REGISTER_CONTROL_FILE
+		// environment variable is specified), device plugin registration needs to be triggerred
+		// manually.
+		// This is done by deleting the control file at the following path:
+		// `/var/lib/kubelet/device-plugins/sample/registration`.
+
+		defer ginkgo.GinkgoRecover()
+		framework.Logf("Deleting the control file: %q to trigger registration", triggerPathFile)
+		err := os.Remove(triggerPathFile)
+		framework.ExpectNoError(err)
+	}()
+
+	ginkgo.By("Waiting for devices to become available on the local node")
+	gomega.Eventually(ctx, func(ctx context.Context) bool {
+		node, ready := getLocalTestNode(ctx, f)
+		return ready && e2enode.CountSampleDeviceCapacity(node) > 0
+	}).WithTimeout(5 * time.Minute).WithPolling(framework.Poll).Should(gomega.BeTrueBecause("expected devices to be available on the local node"))
+	framework.Logf("Successfully created device plugin pod")
+
+	ginkgo.By(fmt.Sprintf("Waiting for the resource exported by the sample device plugin to become available on the local node (instances: %d)", e2enode.SampleDevsAmount))
+	gomega.Eventually(ctx, func(ctx context.Context) bool {
+		node, ready := getLocalTestNode(ctx, f)
+		return ready &&
+			e2enode.CountSampleDeviceCapacity(node) == e2enode.SampleDevsAmount &&
+			e2enode.CountSampleDeviceAllocatable(node) == e2enode.SampleDevsAmount
+	}).WithTimeout(2 * time.Minute).WithPolling(framework.Poll).Should(gomega.BeTrueBecause("expected resource exported by the sample device plugin to be available on local node"))
+
+	return devicePluginPod
+}
+
+// teardownSampleDevicePluginWithRegistrationControl deletes the device plugin pod and any
+// test pods, removes the registration control directory, and waits for the resource to
+// become unavailable.
+func teardownSampleDevicePluginWithRegistrationControl(ctx context.Context, f *framework.Framework, devicePluginPod *v1.Pod) {
+	ginkgo.By("Deleting the device plugin pod")
+	e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+
+	ginkgo.By("Deleting any Pods created by the test")
+	l, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{})
+	framework.ExpectNoError(err)
+	for _, p := range l.Items {
+		if p.Namespace != f.Namespace.Name {
+			continue
+		}
+
+		ginkgo.By("Removing the finalizer from the pod in case it was used")
+		e2epod.NewPodClient(f).RemoveFinalizer(ctx, p.Name, testFinalizer)
+
+		framework.Logf("Deleting pod: %s", p.Name)
+		e2epod.NewPodClient(f).DeleteSync(ctx, p.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+	}
+
+	triggerPathDir := filepath.Join(devicePluginDir, "sample")
+	err = os.Remove(triggerPathDir)
+	framework.ExpectNoError(err)
+
+	ginkgo.By("Waiting for devices to become unavailable on the local node")
+	gomega.Eventually(ctx, func(ctx context.Context) bool {
+		node, ready := getLocalTestNode(ctx, f)
+		return ready && e2enode.CountSampleDeviceCapacity(node) <= 0
+	}).WithTimeout(5 * time.Minute).WithPolling(framework.Poll).Should(gomega.BeTrueBecause("expected devices to be unavailable on local node"))
+
+	ginkgo.By("devices now unavailable on the local node")
+}
+
 func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 	f.Context("DevicePlugin", f.WithSerial(), f.WithDisruptive(), func() {
 		var devicePluginPod *v1.Pod
-		var v1PodResources *kubeletpodresourcesv1.ListPodResourcesResponse
-		var triggerPathFile, triggerPathDir string
-		var err error
 
 		ginkgo.BeforeEach(func(ctx context.Context) {
-			ginkgo.By("Wait for node to be ready")
-			gomega.Eventually(ctx, e2enode.TotalReady).
-				WithArguments(f.ClientSet).
-				WithTimeout(time.Minute).
-				Should(gomega.BeEquivalentTo(1))
-
-			// Before we run the device plugin test, we need to ensure
-			// that the cluster is in a clean state and there are no
-			// pods running on this node.
-			// This is done in a gomega.Eventually with retries since a prior test in a different test suite could've run and the deletion of it's resources may still be in progress.
-			// xref: https://issue.k8s.io/115381
-			gomega.Eventually(ctx, func(ctx context.Context) error {
-				v1PodResources, err = getV1NodeDevices(ctx)
-				if err != nil {
-					return fmt.Errorf("failed to get node local podresources by accessing the (v1) podresources API endpoint: %v", err)
-				}
-
-				if len(v1PodResources.PodResources) > 0 {
-					return fmt.Errorf("expected v1 pod resources to be empty, but got non-empty resources: %+v", v1PodResources.PodResources)
-				}
-				return nil
-			}, f.Timeouts.SystemDaemonsetStartup, f.Timeouts.Poll).Should(gomega.Succeed())
-
-			ginkgo.By("Setting up the directory for controlling registration")
-			triggerPathDir = filepath.Join(devicePluginDir, "sample")
-			if _, err := os.Stat(triggerPathDir); err != nil {
-				if errors.Is(err, os.ErrNotExist) {
-					if err := os.Mkdir(triggerPathDir, os.ModePerm); err != nil {
-						framework.Fail(fmt.Sprintf("registration control directory %q creation failed: %v ", triggerPathDir, err))
-					}
-					framework.Logf("registration control directory created successfully")
-				} else {
-					framework.Fail(fmt.Sprintf("unexpected error checking %q: %v", triggerPathDir, err))
-				}
-			} else {
-				framework.Logf("registration control directory %q already present", triggerPathDir)
-			}
-
-			ginkgo.By("Setting up the file trigger for controlling registration")
-			triggerPathFile = filepath.Join(triggerPathDir, "registration")
-			if _, err := os.Stat(triggerPathFile); err != nil {
-				if errors.Is(err, os.ErrNotExist) {
-					if _, err = os.Create(triggerPathFile); err != nil {
-						framework.Fail(fmt.Sprintf("registration control file %q creation failed: %v", triggerPathFile, err))
-					}
-					framework.Logf("registration control file created successfully")
-				} else {
-					framework.Fail(fmt.Sprintf("unexpected error creating %q: %v", triggerPathFile, err))
-				}
-			} else {
-				framework.Logf("registration control file %q already present", triggerPathFile)
-			}
-
-			ginkgo.By("Scheduling a sample device plugin pod")
-			data, err := e2etestfiles.Read(e2enode.SampleDevicePluginControlRegistrationDSYAML)
-			if err != nil {
-				framework.Fail(fmt.Sprintf("error reading test data %q: %v", e2enode.SampleDevicePluginControlRegistrationDSYAML, err))
-			}
-			ds := readDaemonSetV1OrDie(data)
-
-			dp := &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: e2enode.SampleDevicePluginName,
-				},
-				Spec: ds.Spec.Template.Spec,
-			}
-
-			devicePluginPod = e2epod.NewPodClient(f).CreateSync(ctx, dp)
-
-			framework.Logf("Waiting for device plugin pod to be Running")
-			err = e2epod.WaitForPodCondition(ctx, f.ClientSet, devicePluginPod.Namespace, devicePluginPod.Name, "Ready", 2*time.Minute, testutils.PodRunningReady)
-			if err != nil {
-				framework.Logf("Sample Device Pod %v took too long to enter running/ready: %v", dp.Name, err)
-			}
-			framework.ExpectNoError(err, "WaitForPodCondition() failed err: %v", err)
-
-			go func() {
-				// Since autoregistration is disabled for the device plugin (as REGISTER_CONTROL_FILE
-				// environment variable is specified), device plugin registration needs to be triggerred
-				// manually.
-				// This is done by deleting the control file at the following path:
-				// `/var/lib/kubelet/device-plugins/sample/registration`.
-
-				defer ginkgo.GinkgoRecover()
-				framework.Logf("Deleting the control file: %q to trigger registration", triggerPathFile)
-				err := os.Remove(triggerPathFile)
-				framework.ExpectNoError(err)
-			}()
-
-			ginkgo.By("Waiting for devices to become available on the local node")
-			gomega.Eventually(ctx, func(ctx context.Context) bool {
-				node, ready := getLocalTestNode(ctx, f)
-				return ready && e2enode.CountSampleDeviceCapacity(node) > 0
-			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrueBecause("expected devices to be available on the local node"))
-			framework.Logf("Successfully created device plugin pod")
-
-			ginkgo.By(fmt.Sprintf("Waiting for the resource exported by the sample device plugin to become available on the local node (instances: %d)", e2enode.SampleDevsAmount))
-			gomega.Eventually(ctx, func(ctx context.Context) bool {
-				node, ready := getLocalTestNode(ctx, f)
-				return ready &&
-					e2enode.CountSampleDeviceCapacity(node) == e2enode.SampleDevsAmount &&
-					e2enode.CountSampleDeviceAllocatable(node) == e2enode.SampleDevsAmount
-			}, 2*time.Minute, framework.Poll).Should(gomega.BeTrueBecause("expected resource exported by the sample device plugin to be available on local node"))
+			devicePluginPod = setupSampleDevicePluginWithRegistrationControl(ctx, f)
 		})
 
 		ginkgo.AfterEach(func(ctx context.Context) {
-			ginkgo.By("Deleting the device plugin pod")
-			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
-
-			ginkgo.By("Deleting any Pods created by the test")
-			l, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{})
-			framework.ExpectNoError(err)
-			for _, p := range l.Items {
-				if p.Namespace != f.Namespace.Name {
-					continue
-				}
-
-				ginkgo.By("Removing the finalizer from the pod in case it was used")
-				e2epod.NewPodClient(f).RemoveFinalizer(context.TODO(), p.Name, testFinalizer)
-
-				framework.Logf("Deleting pod: %s", p.Name)
-				e2epod.NewPodClient(f).DeleteSync(ctx, p.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+			if devicePluginPod == nil {
+				return
 			}
-
-			err = os.Remove(triggerPathDir)
-			framework.ExpectNoError(err)
-
-			ginkgo.By("Waiting for devices to become unavailable on the local node")
-			gomega.Eventually(ctx, func(ctx context.Context) bool {
-				node, ready := getLocalTestNode(ctx, f)
-				return ready && e2enode.CountSampleDeviceCapacity(node) <= 0
-			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrueBecause("expected devices to be unavailable on local node"))
-
-			ginkgo.By("devices now unavailable on the local node")
+			teardownSampleDevicePluginWithRegistrationControl(ctx, f, devicePluginPod)
 		})
 
-		// simulate node reboot scenario by removing pods using CRI before kubelet is started. In addition to that,
-		// intentionally a scenario is created where after node reboot, application pods requesting devices appear before the device plugin pod
-		// exposing those devices as resource has restarted. The expected behavior is that the application pod fails at admission time.
-		framework.It("Does not keep device plugin assignments across node reboots if fails admission (no pod restart, no device plugin re-registration)", func(ctx context.Context) {
+		// Kubelet restart with all containers terminated (the checkpoint's BootID still
+		// matches the live boot_id, so detectNodeReboot returns false). The device plugin
+		// uses manual registration and is not re-triggered, so it never re-registers.
+		// Admission passes on the checkpoint's allocation; container start defers at
+		// GetDeviceRunContainerOptions until the plugin reports — the pod stays in
+		// ContainerCreating rather than going to Phase=Failed.
+		framework.It("Defers container start after kubelet restart with all containers terminated when device plugin has not re-registered", func(ctx context.Context) {
 			podRECMD := fmt.Sprintf("devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep %s", sleepIntervalForever)
-			testPod := makeBusyboxPod(e2enode.SampleDeviceResourceName, podRECMD)
-			// Set a short termination grace period to speed up the test.
-			// After kubelet restart, this pod will fail admission and need to be terminated.
-			// The default 30s grace period causes the test to timeout waiting for the pod
-			// to be filtered from the active pods list.
-			testPod.Spec.TerminationGracePeriodSeconds = ptr.To(int64(1))
-			pod1 := e2epod.NewPodClient(f).CreateSync(ctx, testPod)
-			deviceIDRE := "stub devices: (Dev-[0-9]+)"
-			devID1, err := parseLog(ctx, f, pod1.Name, pod1.Name, deviceIDRE)
+			pod1 := e2epod.NewPodClient(f).CreateSync(ctx, makeBusyboxPod(e2enode.SampleDeviceResourceName, podRECMD))
+			devID1, err := parseLog(ctx, f, pod1.Name, pod1.Name, "stub devices: (Dev-[0-9]+)")
 			framework.ExpectNoError(err, "getting logs for pod %q", pod1.Name)
+			gomega.Expect(devID1).NotTo(gomega.BeEmpty())
 
-			gomega.Expect(devID1).To(gomega.Not(gomega.Equal("")))
+			ginkgo.By("stopping the kubelet")
+			restartKubelet := mustStopKubelet(ctx, f)
+
+			removeAllPodSandboxes(ctx)
+
+			ginkgo.By("restarting the kubelet")
+			restartKubelet(ctx)
+
+			ginkgo.By("Wait for node to be ready again")
+			gomega.Expect(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)).To(gomega.Succeed())
+
+			ginkgo.By("Waiting for the pod to be deferred waiting for the device plugin to report")
+			gomega.Eventually(ctx, getPodByName).
+				WithArguments(f, pod1.Name).
+				WithTimeout(time.Minute).
+				Should(BeDeferredWaitingForDevicePlugin(),
+					"the pod should be stuck in ContainerCreating with the device-plugin defer message while the plugin has not re-registered")
+
+			ginkgo.By("Verifying the checkpoint allocation is still reported via the podresources API")
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				v1PodResources, err := getV1NodeDevices(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to get node devices: %w", err)
+				}
+				matchErr, _ := checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, e2enode.SampleDeviceResourceName, []string{devID1})
+				return matchErr
+			}).WithTimeout(time.Minute).WithPolling(framework.Poll).Should(gomega.Succeed(), "pod passed admission on its checkpoint allocation, so it should appear in podresources with the original device")
+		})
+
+		// Simulated node reboot: checkpoint BootID is rewritten to a value that does not
+		// match the live boot_id, so detectNodeReboot returns true. With nodeRebooted=true
+		// the admission bypass is disabled and devicesToAllocate falls through to the
+		// health checks, which fail (no healthy devices yet) — the existing pod terminates
+		// with UnexpectedAdmissionError. After the plugin re-registers, a freshly created
+		// pod allocates normally.
+		framework.It("Converges after a simulated node reboot: existing pod fails admission, new pod allocates once plugin re-registers", func(ctx context.Context) {
+			podRECMD := fmt.Sprintf("devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep %s", sleepIntervalForever)
+			pod1 := e2epod.NewPodClient(f).CreateSync(ctx, makeBusyboxPod(e2enode.SampleDeviceResourceName, podRECMD))
+
+			ginkgo.By("stopping the kubelet")
+			restartKubelet := mustStopKubelet(ctx, f)
+
+			restore := rewriteDeviceManagerCheckpointBootID("fake-boot-id-that-does-not-match")
+			ginkgo.DeferCleanup(restore)
+
+			removeAllPodSandboxes(ctx)
+
+			ginkgo.By("restarting the kubelet")
+			restartKubelet(ctx)
+
+			ginkgo.By("Wait for node to be ready again")
+			gomega.Expect(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)).To(gomega.Succeed())
+
+			ginkgo.By("Waiting for the existing pod to fail admission")
+			gomega.Eventually(ctx, getPodByName).
+				WithArguments(f, pod1.Name).
+				WithTimeout(time.Minute).
+				Should(HaveFailedWithAdmissionError(),
+					"after a node reboot the admission bypass is disabled, so the pod should fail with UnexpectedAdmissionError")
+
+			ginkgo.By("Triggering device plugin registration and waiting for the resource to become allocatable")
+			triggerSampleDevicePluginRegistration()
+			gomega.Eventually(ctx, func(ctx context.Context) bool {
+				node, ready := getLocalTestNode(ctx, f)
+				return ready && e2enode.CountSampleDeviceAllocatable(node) == e2enode.SampleDevsAmount
+			}).WithTimeout(2 * time.Minute).WithPolling(framework.Poll).Should(gomega.BeTrueBecause("expected sample device resource to become allocatable after plugin re-registers"))
+
+			ginkgo.By("Creating a new pod and verifying it allocates a device")
+			pod2 := e2epod.NewPodClient(f).CreateSync(ctx, makeBusyboxPod(e2enode.SampleDeviceResourceName, podRECMD))
+			devID2, err := parseLog(ctx, f, pod2.Name, pod2.Name, "stub devices: (Dev-[0-9]+)")
+			framework.ExpectNoError(err, "getting logs for pod %q", pod2.Name)
+			gomega.Expect(devID2).NotTo(gomega.BeEmpty())
+		})
+
+		// Simulated node reboot, plugin never re-registers. Same setup as the recovery
+		// case above, but registration is never triggered. The pod must terminate in
+		// Phase=Failed (UnexpectedAdmissionError) and must NOT wedge in ContainerCreating
+		// — proving the boot_id gate prevents the checkpoint-trust bypass from holding a
+		// pod indefinitely on a dead node.
+		framework.It("Fails admission (does not wedge in ContainerCreating) after a simulated node reboot when the device plugin never re-registers", func(ctx context.Context) {
+			podRECMD := fmt.Sprintf("devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep %s", sleepIntervalForever)
+			pod1 := e2epod.NewPodClient(f).CreateSync(ctx, makeBusyboxPod(e2enode.SampleDeviceResourceName, podRECMD))
+
+			ginkgo.By("stopping the kubelet")
+			restartKubelet := mustStopKubelet(ctx, f)
+
+			restore := rewriteDeviceManagerCheckpointBootID("fake-boot-id-that-does-not-match")
+			ginkgo.DeferCleanup(restore)
+
+			removeAllPodSandboxes(ctx)
+
+			ginkgo.By("restarting the kubelet")
+			restartKubelet(ctx)
+
+			ginkgo.By("Wait for node to be ready again")
+			gomega.Expect(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)).To(gomega.Succeed())
+
+			ginkgo.By("Waiting for the pod to fail admission")
+			gomega.Eventually(ctx, getPodByName).
+				WithArguments(f, pod1.Name).
+				WithTimeout(time.Minute).
+				Should(HaveFailedWithAdmissionError(),
+					"after a node reboot the admission bypass is disabled, so the pod must converge to Failed (not wedge in ContainerCreating)")
+		})
+
+		// Upgrade transition (kubelet-only restart): checkpoint has no BootID (older
+		// kubelet wrote it). detectNodeReboot falls back to the CRI startup snapshot;
+		// containers are still running so it treats this as a kubelet-only restart and
+		// the workload pod survives admission with its original allocation.
+		framework.It("Keeps device plugin assignments after kubelet restart when checkpoint has no BootID and containers are running (upgrade path)", func(ctx context.Context) {
+			podRECMD := fmt.Sprintf("devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep %s", sleepIntervalForever)
+			pod1 := e2epod.NewPodClient(f).CreateSync(ctx, makeBusyboxPod(e2enode.SampleDeviceResourceName, podRECMD))
+			devID1, err := parseLog(ctx, f, pod1.Name, pod1.Name, "stub devices: (Dev-[0-9]+)")
+			framework.ExpectNoError(err, "getting logs for pod %q", pod1.Name)
+			gomega.Expect(devID1).NotTo(gomega.BeEmpty())
 
 			pod1, err = e2epod.NewPodClient(f).Get(ctx, pod1.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
@@ -949,56 +1077,155 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 			ginkgo.By("stopping the kubelet")
 			restartKubelet := mustStopKubelet(ctx, f)
 
-			ginkgo.By("stopping all the local containers - using CRI")
-			rs, _, err := getCRIClient(ctx)
-			framework.ExpectNoError(err)
-			sandboxes, err := rs.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{})
-			framework.ExpectNoError(err)
-			for _, sandbox := range sandboxes {
-				gomega.Expect(sandbox.Metadata).ToNot(gomega.BeNil())
-				ginkgo.By(fmt.Sprintf("deleting pod using CRI: %s/%s -> %s", sandbox.Metadata.Namespace, sandbox.Metadata.Name, sandbox.Id))
-
-				err := rs.RemovePodSandbox(ctx, sandbox.Id)
-				framework.ExpectNoError(err)
-			}
+			restore := rewriteDeviceManagerCheckpointBootID("")
+			ginkgo.DeferCleanup(restore)
 
 			ginkgo.By("restarting the kubelet")
 			restartKubelet(ctx)
 
 			ginkgo.By("Wait for node to be ready again")
-			e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)
+			gomega.Expect(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)).To(gomega.Succeed())
 
-			ginkgo.By("Waiting for the pod to fail with admission error as device plugin hasn't re-registered yet")
-			gomega.Eventually(ctx, getPod).
+			ginkgo.By("Confirming the workload pod survives with its original allocation")
+			gomega.Consistently(ctx, getPodByName).
+				WithArguments(f, pod1.Name).
+				WithTimeout(30*time.Second).
+				Should(BeTheSamePodStillRunning(pod1),
+					"with no BootID and containers still running, CRI fallback should treat this as a kubelet-only restart")
+
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				v1PodResources, err := getV1NodeDevices(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to get node devices: %w", err)
+				}
+				matchErr, _ := checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, e2enode.SampleDeviceResourceName, []string{devID1})
+				return matchErr
+			}).WithTimeout(time.Minute).WithPolling(framework.Poll).Should(gomega.Succeed())
+		})
+
+		// Upgrade transition coinciding with reboot: checkpoint has no BootID and no
+		// containers are running. detectNodeReboot's CRI fallback treats this as a
+		// reboot, the bypass is disabled, and the pod fails admission (matching the
+		// pre-existing reboot path).
+		framework.It("Fails admission after kubelet restart when checkpoint has no BootID and no containers are running (upgrade-at-reboot path)", func(ctx context.Context) {
+			podRECMD := fmt.Sprintf("devs=$(ls /tmp/ | egrep '^Dev-[0-9]+$') && echo stub devices: $devs && sleep %s", sleepIntervalForever)
+			pod1 := e2epod.NewPodClient(f).CreateSync(ctx, makeBusyboxPod(e2enode.SampleDeviceResourceName, podRECMD))
+
+			ginkgo.By("stopping the kubelet")
+			restartKubelet := mustStopKubelet(ctx, f)
+
+			restore := rewriteDeviceManagerCheckpointBootID("")
+			ginkgo.DeferCleanup(restore)
+
+			removeAllPodSandboxes(ctx)
+
+			ginkgo.By("restarting the kubelet")
+			restartKubelet(ctx)
+
+			ginkgo.By("Wait for node to be ready again")
+			gomega.Expect(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)).To(gomega.Succeed())
+
+			ginkgo.By("Waiting for the pod to fail admission")
+			gomega.Eventually(ctx, getPodByName).
 				WithArguments(f, pod1.Name).
 				WithTimeout(time.Minute).
 				Should(HaveFailedWithAdmissionError(),
-					"the pod succeeded to start, when it should fail with the admission error")
+					"with no BootID and no running containers, CRI fallback should treat this as a reboot")
+		})
 
-			// crosscheck from the device assignment is preserved and stable from perspective of the kubelet.
-			// note we don't check again the logs of the container: the check is done at startup, the container
-			// never restarted (runs "forever" from this test timescale perspective) hence re-doing this check
-			// is useless.
-			ginkgo.By("Verifying the device assignment after kubelet restart using podresources API")
+		// Mechanism sanity: the device manager checkpoint records the kernel boot_id.
+		// Read the on-disk checkpoint and compare to /proc/sys/kernel/random/boot_id.
+		framework.It("Persists the kernel boot_id into the device manager checkpoint", func(ctx context.Context) {
+			expected, err := os.ReadFile("/proc/sys/kernel/random/boot_id")
+			framework.ExpectNoError(err)
+			expectedBootID := strings.TrimSpace(string(expected))
+			gomega.Expect(expectedBootID).NotTo(gomega.BeEmpty())
 
-			// if we got this far, podresources API will now report only the sample device plugin pod,
-			// because pods that failed admission are no longer reported in the list
-			// (see https://github.com/kubernetes/kubernetes/pull/132028).
-			// Hence, we verify that our test pod is NOT present in the podresources response.
+			ginkgo.By("Reading the device manager checkpoint and comparing BootID")
+			gomega.Eventually(ctx, readDeviceManagerCheckpointBootID).
+				WithTimeout(time.Minute).WithPolling(framework.Poll).
+				Should(gomega.Equal(expectedBootID),
+					"device manager checkpoint should record the live kernel boot_id")
 
-			// We need to poll because there's a delay between the pod failing admission and being
-			// removed from the podresources list.
-			gomega.Eventually(ctx, func(ctx context.Context) bool {
-				v1PodResources, err := getV1NodeDevices(ctx)
-				if err != nil {
-					framework.Logf("Failed to get node devices: %v, will retry", err)
-					return true // Return true to continue polling on error
-				}
-				_, found := checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, e2enode.SampleDeviceResourceName, []string{})
-				return found
-			}, 30*time.Second, framework.Poll).Should(gomega.BeFalseBecause("%s/%s/%s failed admission, so it must not appear in podresources list", pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name))
+			ginkgo.By("Restarting the kubelet and confirming BootID persists")
+			restartKubelet := mustStopKubelet(ctx, f)
+			restartKubelet(ctx)
+			gomega.Expect(e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)).To(gomega.Succeed())
+
+			gomega.Eventually(ctx, readDeviceManagerCheckpointBootID).
+				WithTimeout(time.Minute).WithPolling(framework.Poll).
+				Should(gomega.Equal(expectedBootID),
+					"device manager checkpoint BootID should persist across kubelet restart")
 		})
 	})
+}
+
+// removeAllPodSandboxes removes every pod sandbox known to the CRI. Combined with
+// a kubelet restart this approximates a node reboot from the kubelet's perspective:
+// all containers are gone, but the on-disk checkpoint survives.
+func removeAllPodSandboxes(ctx context.Context) {
+	ginkgo.By("stopping all the local containers - using CRI")
+	rs, _, err := getCRIClient(ctx)
+	framework.ExpectNoError(err)
+	sandboxes, err := rs.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{})
+	framework.ExpectNoError(err)
+	for _, sandbox := range sandboxes {
+		gomega.Expect(sandbox.Metadata).ToNot(gomega.BeNil())
+		ginkgo.By(fmt.Sprintf("deleting pod using CRI: %s/%s -> %s", sandbox.Metadata.Namespace, sandbox.Metadata.Name, sandbox.Id))
+		framework.ExpectNoError(rs.RemovePodSandbox(ctx, sandbox.Id))
+	}
+}
+
+// triggerSampleDevicePluginRegistration creates and immediately removes the
+// registration control file so the sample-device-plugin's fsnotify watcher
+// observes a Remove event and registers with the kubelet.
+func triggerSampleDevicePluginRegistration() {
+	path := filepath.Join(devicePluginDir, "sample", "registration")
+	f, err := os.Create(path)
+	framework.ExpectNoError(err, "creating registration control file %q", path)
+	framework.ExpectNoError(f.Close())
+	framework.ExpectNoError(os.Remove(path), "removing registration control file %q", path)
+}
+
+func deviceManagerCheckpointPath() string {
+	return filepath.Join(devicePluginDir, "kubelet_internal_checkpoint")
+}
+
+// rewriteDeviceManagerCheckpointBootID rewrites the BootID field in the on-disk
+// device manager checkpoint and returns a function that restores the original
+// bytes. Passing "" deletes the key. The BootID field lives outside the
+// checksummed Data payload, so editing it does not invalidate the checksum.
+func rewriteDeviceManagerCheckpointBootID(newBootID string) func() {
+	path := deviceManagerCheckpointPath()
+	original, err := os.ReadFile(path)
+	framework.ExpectNoError(err, "reading device manager checkpoint %q", path)
+	var cp map[string]any
+	framework.ExpectNoError(json.Unmarshal(original, &cp), "unmarshalling device manager checkpoint")
+	if newBootID == "" {
+		delete(cp, "BootID")
+	} else {
+		cp["BootID"] = newBootID
+	}
+	rewritten, err := json.Marshal(cp)
+	framework.ExpectNoError(err, "marshalling device manager checkpoint")
+	framework.ExpectNoError(os.WriteFile(path, rewritten, 0600), "writing device manager checkpoint %q", path)
+	ginkgo.By(fmt.Sprintf("rewrote device manager checkpoint BootID to %q", newBootID))
+	return func() {
+		framework.ExpectNoError(os.WriteFile(path, original, 0600), "restoring device manager checkpoint %q", path)
+	}
+}
+
+// readDeviceManagerCheckpointBootID returns the BootID field from the on-disk
+// device manager checkpoint, or "" if the field is absent.
+func readDeviceManagerCheckpointBootID() string {
+	raw, err := os.ReadFile(deviceManagerCheckpointPath())
+	framework.ExpectNoError(err, "reading device manager checkpoint")
+	var cp map[string]any
+	framework.ExpectNoError(json.Unmarshal(raw, &cp), "unmarshalling device manager checkpoint")
+	if v, ok := cp["BootID"].(string); ok {
+		return v
+	}
+	return ""
 }
 
 // makeBusyboxPod returns a simple Pod spec with a busybox container
