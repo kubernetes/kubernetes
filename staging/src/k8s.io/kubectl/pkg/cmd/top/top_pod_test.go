@@ -54,7 +54,53 @@ const (
 	]
 }`
 
+	apisV1BodyWithMetrics = `{
+	"kind": "APIGroupList",
+	"apiVersion": "v1",
+	"groups": [
+		{
+			"name":"metrics.k8s.io",
+			"versions":[
+				{
+					"groupVersion":"metrics.k8s.io/v1",
+					"version":"v1"
+				},
+				{
+					"groupVersion":"metrics.k8s.io/v1beta1",
+					"version":"v1beta1"
+				}
+			],
+			"preferredVersion":{
+				"groupVersion":"metrics.k8s.io/v1",
+				"version":"v1"
+			},
+			"serverAddressByClientCIDRs":null
+		}
+	]
+}`
+
 	apisbodyWithMetrics = `{
+	"kind": "APIGroupList",
+	"apiVersion": "v1",
+	"groups": [
+		{
+			"name":"metrics.k8s.io",
+			"versions":[
+				{
+					"groupVersion":"metrics.k8s.io/v1beta1",
+					"version":"v1beta1"
+				}
+			],
+			"preferredVersion":{
+				"groupVersion":"metrics.k8s.io/v1beta1",
+				"version":"v1beta1"
+			},
+			"serverAddressByClientCIDRs":null
+		}
+	]
+}`
+
+	apisV1beta1BodyWithMetrics = `{
 	"kind": "APIGroupList",
 	"apiVersion": "v1",
 	"groups": [
