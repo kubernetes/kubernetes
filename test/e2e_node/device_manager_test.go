@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -247,12 +246,12 @@ var _ = SIGDescribe("Device Manager", framework.WithSerial(), feature.DeviceMana
 
 			// NOTE: The device plugin won't re-register again and this is intentional.
 			// Because of this, the testpod (requesting a device) should fail with an admission error.
-
-			gomega.Eventually(ctx, getPod).
-				WithArguments(f, testPod.Name).
-				WithTimeout(time.Minute).
-				Should(HaveFailedWithAdmissionError(),
-					"the pod succeeded to start, when it should fail with the admission error")
+			getPod := e2epod.Get(f.ClientSet, testPod)
+			haveFailedWithAdmissionError := gomega.And(
+				e2epod.BeInPhase(v1.PodFailed),
+				HaveReasonUnexpectedAdmissionError(),
+			)
+			gomega.Eventually(ctx, getPod).WithTimeout(time.Minute).WithPolling(framework.Poll).Should(haveFailedWithAdmissionError, "the pod succeeded to start, when it should fail with the admission error")
 
 			ginkgo.By("removing application pods")
 			e2epod.NewPodClient(f).DeleteSync(ctx, testPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
@@ -396,48 +395,6 @@ func isNodeReadyWithoutSampleResources(ctx context.Context, f *framework.Framewo
 	return true, nil
 }
 
-// HaveFailedWithAdmissionError verifies that a pod fails at admission.
-func HaveFailedWithAdmissionError() types.GomegaMatcher {
-	return gomega.And(
-		gcustom.MakeMatcher(func(hasFailed bool) (bool, error) {
-			if !hasFailed {
-				return false, fmt.Errorf("expected pod to have failed=%t", hasFailed)
-			}
-			return true, nil
-		}),
-		hasFailed(true),
-	)
-}
-
-// hasFailed matches if pod has failed.
-func hasFailed(hasFailed bool) types.GomegaMatcher {
-	return gcustom.MakeMatcher(func(hasPodFailed bool) (bool, error) {
-		return hasPodFailed == hasFailed, nil
-	}).WithTemplate("expected Pod failed {{.To}} be in {{format .Data}}\nGot instead:\n{{.FormattedActual}}").WithTemplateData(hasFailed)
-}
-
 func getPodByName(ctx context.Context, f *framework.Framework, podName string) (*v1.Pod, error) {
 	return e2epod.NewPodClient(f).Get(ctx, podName, metav1.GetOptions{})
-}
-
-func getPod(ctx context.Context, f *framework.Framework, podName string) (bool, error) {
-	pod, err := getPodByName(ctx, f, podName)
-	if err != nil {
-		return false, err
-	}
-
-	expectedStatusReason := "UnexpectedAdmissionError"
-	expectedStatusMessage := "Allocate failed due to no healthy devices present; cannot allocate unhealthy devices"
-
-	// This additional matcher checks for the final error condition.
-	if pod.Status.Phase != v1.PodFailed {
-		return false, fmt.Errorf("expected pod to reach phase %q, got final phase %q instead.", v1.PodFailed, pod.Status.Phase)
-	}
-	if pod.Status.Reason != expectedStatusReason {
-		return false, fmt.Errorf("expected pod status reason to be %q, got %q instead.", expectedStatusReason, pod.Status.Reason)
-	}
-	if !strings.Contains(pod.Status.Message, expectedStatusMessage) {
-		return false, fmt.Errorf("expected pod status reason to contain %q, got %q instead.", expectedStatusMessage, pod.Status.Message)
-	}
-	return true, nil
 }

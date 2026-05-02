@@ -18,6 +18,7 @@ package e2enode
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -969,11 +970,13 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 			e2enode.WaitForAllNodesSchedulable(ctx, f.ClientSet, 5*time.Minute)
 
 			ginkgo.By("Waiting for the pod to fail with admission error as device plugin hasn't re-registered yet")
-			gomega.Eventually(ctx, getPod).
-				WithArguments(f, pod1.Name).
-				WithTimeout(time.Minute).
-				Should(HaveFailedWithAdmissionError(),
-					"the pod succeeded to start, when it should fail with the admission error")
+			getPod := e2epod.Get(f.ClientSet, pod1)
+			haveFailedAdmissionBecauseUnhealthyDevices := gomega.And(
+				e2epod.BeInPhase(v1.PodFailed),
+				HaveReasonUnexpectedAdmissionError(),
+				HaveStatusUnhealthyDevices(),
+			)
+			gomega.Eventually(ctx, getPod).WithTimeout(time.Minute).WithPolling(framework.Poll).Should(haveFailedAdmissionBecauseUnhealthyDevices, "the pod succeeded to start, when it should fail with the admission error because unhealthy devices")
 
 			// crosscheck from the device assignment is preserved and stable from perspective of the kubelet.
 			// note we don't check again the logs of the container: the check is done at startup, the container
@@ -988,15 +991,21 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 
 			// We need to poll because there's a delay between the pod failing admission and being
 			// removed from the podresources list.
-			gomega.Eventually(ctx, func(ctx context.Context) bool {
+			gomega.Eventually(ctx, func(ctx context.Context) error {
 				v1PodResources, err := getV1NodeDevices(ctx)
 				if err != nil {
-					framework.Logf("Failed to get node devices: %v, will retry", err)
-					return true // Return true to continue polling on error
+					return err
 				}
-				_, found := checkPodResourcesAssignment(v1PodResources, pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name, e2enode.SampleDeviceResourceName, []string{})
-				return found
-			}, 30*time.Second, framework.Poll).Should(gomega.BeFalseBecause("%s/%s/%s failed admission, so it must not appear in podresources list", pod1.Namespace, pod1.Name, pod1.Spec.Containers[0].Name))
+				for _, podRes := range v1PodResources.GetPodResources() {
+					if podRes.Namespace == pod1.Namespace && podRes.Name == pod1.Name {
+						if data, err := json.Marshal(podRes); err != nil {
+							framework.Logf("unexpected podresources data: %v", string(data))
+						}
+						return fmt.Errorf("pod %s/%s failed admission, so it should not be present in podresources List", pod1.Namespace, pod1.Name)
+					}
+				}
+				return nil
+			}).WithTimeout(30 * time.Second).WithPolling(framework.Poll).Should(gomega.Succeed())
 		})
 	})
 }
@@ -1141,6 +1150,20 @@ func BeTheSamePodStillRunning(expected *v1.Pod) types.GomegaMatcher {
 		BeAPodInPhase(v1.PodRunning),
 		BeAPodReady(),
 	)
+}
+
+// HaveStatusUnhealthyDevices checks, lacks better reporting, that status messages complains about unhealthy devices
+func HaveStatusUnhealthyDevices() types.GomegaMatcher {
+	return gcustom.MakeMatcher(func(actual *v1.Pod) (bool, error) {
+		return strings.Contains(actual.Status.Message, "cannot allocate unhealthy devices"), nil
+	}).WithTemplate("Pod {{.Actual.Namespace}}/{{.Actual.Name}} UID {{.Actual.UID}} has mismatching status message {{.Actual.Status.Message}}")
+}
+
+// HaveReasonUnexpectedAdmissionError checks the status reason is `UnexepctedAdmissionError`, regardless of phase or else
+func HaveReasonUnexpectedAdmissionError() types.GomegaMatcher {
+	return gcustom.MakeMatcher(func(actual *v1.Pod) (bool, error) {
+		return actual.Status.Reason == "UnexpectedAdmissionError", nil
+	}).WithTemplate("Pod {{.Actual.Namespace}}/{{.Actual.Name}} UID {{.Actual.UID}} has mismatching reason {{.Actual.Status.Reason}}")
 }
 
 // BeReady matches if the pod is reported ready
