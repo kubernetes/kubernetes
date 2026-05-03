@@ -294,7 +294,7 @@ func (o *EditOptions) Run() error {
 
 			// launch the editor
 			editedDiff := edited
-			edited, file, err = edit.LaunchTempFile(fmt.Sprintf("%s-edit-", filepath.Base(os.Args[0])), o.editPrinterOptions.ext, buf)
+			edited, file, err = edit.LaunchTempFile(fmt.Sprintf("%s-edit-", filepath.Base(os.Args[0])), fmt.Sprintf(".kubernetes%s", o.editPrinterOptions.ext), buf)
 			if err != nil {
 				return preservedFile(err, results.file, o.ErrOut)
 			}
