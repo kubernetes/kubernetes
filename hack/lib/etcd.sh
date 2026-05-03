@@ -16,7 +16,7 @@
 
 # A set of helpers for starting/running etcd for tests
 
-ETCD_VERSION=${ETCD_VERSION:-$(grep -oP "etcd_version',\s*'\K[0-9.]+" "${KUBE_ROOT}/cluster/gce/manifests/etcd.manifest" 2>/dev/null || echo "3.6.10")}
+ETCD_VERSION=${ETCD_VERSION:-$(grep -oP "etcd_version',\s*'\K[0-9.]+" "${KUBE_ROOT}/cluster/gce/manifests/etcd.manifest" 2>/dev/null || echo "3.6.11")}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
 # This is intentionally not called ETCD_LOG_LEVEL:
