@@ -304,11 +304,20 @@ func (m *manager) AllocatePod(pod *v1.Pod) error {
 
 func (m *manager) AddContainer(logger logr.Logger, pod *v1.Pod, container *v1.Container, containerID string) {
 	m.Lock()
-	defer m.Unlock()
-	if cset, exists := m.state.GetCPUSet(string(pod.UID), container.Name); exists {
-		m.lastUpdateState.SetCPUSet(string(pod.UID), container.Name, cset)
-	}
 	m.containerMap.Add(string(pod.UID), container.Name, containerID)
+	cset, hasDedicatedCPUs := m.state.GetCPUSet(string(pod.UID), container.Name)
+	m.Unlock()
+
+	if hasDedicatedCPUs && !cset.IsEmpty() {
+		if err := m.updateContainerCPUSet(context.TODO(), containerID, cset); err != nil {
+			logger.Error(err, "Failed to apply cpuset before container start", "containerID", containerID, "cpuSet", cset)
+		} else {
+			m.Lock()
+			m.lastUpdateState.SetCPUSet(string(pod.UID), container.Name, cset)
+			m.Unlock()
+		}
+	}
+
 	logger.V(4).Info("Added Container", "pod", klog.KObj(pod), "podUID", pod.UID, "containerName", container.Name, "containerID", containerID)
 }
 

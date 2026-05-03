@@ -173,6 +173,20 @@ func (rt mockRuntimeService) UpdateContainerResources(_ context.Context, id stri
 	return rt.err
 }
 
+type trackingRuntimeService struct {
+	err       error
+	calls     int
+	id        string
+	resources *runtimeapi.ContainerResources
+}
+
+func (rt *trackingRuntimeService) UpdateContainerResources(_ context.Context, id string, resources *runtimeapi.ContainerResources) error {
+	rt.calls++
+	rt.id = id
+	rt.resources = resources
+	return rt.err
+}
+
 type mockPodStatusProvider struct {
 	podStatus v1.PodStatus
 	found     bool
@@ -432,6 +446,122 @@ func TestCPUManagerAdd(t *testing.T) {
 			t.Errorf("CPU Manager AddContainer() error (%v). expected cpuset: %v but got: %v",
 				testCase.description, testCase.expCPUSet, mgr.state.GetDefaultCPUSet())
 		}
+	}
+}
+
+func TestAddContainerAppliesDedicatedCPUSetBeforeStart(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("verifies Linux/non-Windows cpuset behavior")
+	}
+
+	logger, _ := ktesting.NewTestContext(t)
+
+	pod := makePod("fakePod", "fakeContainer", "2", "2")
+	container := &pod.Spec.Containers[0]
+	dedicatedCPUs := cpuset.New(3, 4)
+	runtimeService := &trackingRuntimeService{}
+
+	mgr := &manager{
+		policy: &mockPolicy{},
+		state: &mockState{
+			assignments: state.ContainerCPUAssignments{
+				string(pod.UID): {container.Name: dedicatedCPUs},
+			},
+			defaultCPUSet: cpuset.New(1, 2),
+		},
+		lastUpdateState:   state.NewMemoryState(logger),
+		containerRuntime:  runtimeService,
+		containerMap:      containermap.NewContainerMap(),
+		podStatusProvider: mockPodStatusProvider{},
+		sourcesReady:      &sourcesReadyStub{},
+	}
+
+	mgr.AddContainer(logger, pod, container, "fakeID")
+
+	lastCset, exists := mgr.lastUpdateState.GetCPUSet(string(pod.UID), container.Name)
+	if !exists {
+		t.Fatal("expected lastUpdateState to be recorded after a successful cpuset write")
+	}
+	if !dedicatedCPUs.Equals(lastCset) {
+		t.Fatalf("expected lastUpdateState cpuset %v, got %v", dedicatedCPUs, lastCset)
+	}
+	if runtimeService.calls != 1 {
+		t.Fatalf("expected one runtime update call, got %d", runtimeService.calls)
+	}
+	if runtimeService.id != "fakeID" {
+		t.Fatalf("expected runtime update for container fakeID, got %q", runtimeService.id)
+	}
+	if runtimeService.resources == nil || runtimeService.resources.GetLinux() == nil {
+		t.Fatal("expected runtime update resources to include linux settings")
+	}
+	if runtimeService.resources.GetLinux().GetCpusetCpus() != dedicatedCPUs.String() {
+		t.Fatalf("expected runtime cpuset %q, got %q", dedicatedCPUs.String(), runtimeService.resources.GetLinux().GetCpusetCpus())
+	}
+}
+
+func TestAddContainerLeavesLastUpdateStateUnsetOnRuntimeFailure(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("verifies Linux/non-Windows cpuset behavior")
+	}
+
+	logger, _ := ktesting.NewTestContext(t)
+
+	pod := makePod("fakePod", "fakeContainer", "2", "2")
+	container := &pod.Spec.Containers[0]
+	runtimeService := &trackingRuntimeService{err: fmt.Errorf("runtime unavailable")}
+
+	mgr := &manager{
+		policy: &mockPolicy{},
+		state: &mockState{
+			assignments: state.ContainerCPUAssignments{
+				string(pod.UID): {container.Name: cpuset.New(3, 4)},
+			},
+			defaultCPUSet: cpuset.New(1, 2),
+		},
+		lastUpdateState:   state.NewMemoryState(logger),
+		containerRuntime:  runtimeService,
+		containerMap:      containermap.NewContainerMap(),
+		podStatusProvider: mockPodStatusProvider{},
+		sourcesReady:      &sourcesReadyStub{},
+	}
+
+	mgr.AddContainer(logger, pod, container, "fakeID")
+
+	if _, exists := mgr.lastUpdateState.GetCPUSet(string(pod.UID), container.Name); exists {
+		t.Fatal("expected lastUpdateState to remain unset when runtime update fails")
+	}
+	if runtimeService.calls != 1 {
+		t.Fatalf("expected one runtime update attempt, got %d", runtimeService.calls)
+	}
+}
+
+func TestAddContainerSkipsRuntimeUpdateWithoutDedicatedCPUs(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+
+	pod := makePod("fakePod", "fakeContainer", "100m", "100m")
+	container := &pod.Spec.Containers[0]
+	runtimeService := &trackingRuntimeService{}
+
+	mgr := &manager{
+		policy: &mockPolicy{},
+		state: &mockState{
+			assignments:   state.ContainerCPUAssignments{},
+			defaultCPUSet: cpuset.New(0, 1, 2, 3),
+		},
+		lastUpdateState:   state.NewMemoryState(logger),
+		containerRuntime:  runtimeService,
+		containerMap:      containermap.NewContainerMap(),
+		podStatusProvider: mockPodStatusProvider{},
+		sourcesReady:      &sourcesReadyStub{},
+	}
+
+	mgr.AddContainer(logger, pod, container, "fakeID")
+
+	if _, exists := mgr.lastUpdateState.GetCPUSet(string(pod.UID), container.Name); exists {
+		t.Fatal("expected lastUpdateState to remain unset when no dedicated cpuset exists")
+	}
+	if runtimeService.calls != 0 {
+		t.Fatalf("expected no runtime update attempts, got %d", runtimeService.calls)
 	}
 }
 
