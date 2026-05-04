@@ -47,6 +47,19 @@ type UpdateApplyConfiguration struct {
 	// acceptRisks must not contain more than 1000 entries.
 	// Entries in this list must be unique.
 	AcceptRisks []AcceptRiskApplyConfiguration `json:"acceptRisks,omitempty"`
+	// mode determines how an update should be processed.
+	// The only valid value is "Preflight".
+	// When omitted, the cluster performs a normal update by applying the specified version or image to the cluster.
+	// This is the standard update behavior.
+	// When set to "Preflight", the cluster runs compatibility checks against the target release without
+	// performing an actual update. Compatibility results, including any detected risks, are reported
+	// in status.conditionalUpdates and status.conditionalUpdateRisks alongside risks from the update
+	// recommendation service.
+	// This allows administrators to assess update readiness and address issues before committing to the update.
+	// Preflight mode is particularly useful for skip-level updates where upgrade compatibility needs to be
+	// verified across multiple minor versions.
+	// When mode is set to "Preflight", the same rules for version, image, and architecture apply as for normal updates.
+	Mode *configv1.UpdateMode `json:"mode,omitempty"`
 }
 
 // UpdateApplyConfiguration constructs a declarative configuration of the Update type for use with
@@ -97,5 +110,13 @@ func (b *UpdateApplyConfiguration) WithAcceptRisks(values ...*AcceptRiskApplyCon
 		}
 		b.AcceptRisks = append(b.AcceptRisks, *values[i])
 	}
+	return b
+}
+
+// WithMode sets the Mode field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Mode field is set to the value of the last call.
+func (b *UpdateApplyConfiguration) WithMode(value configv1.UpdateMode) *UpdateApplyConfiguration {
+	b.Mode = &value
 	return b
 }

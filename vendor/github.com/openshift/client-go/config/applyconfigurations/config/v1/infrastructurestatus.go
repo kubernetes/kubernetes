@@ -42,6 +42,8 @@ type InfrastructureStatusApplyConfiguration struct {
 	// and the operators should not configure the operand for highly-available operation
 	// The 'External' mode indicates that the control plane is hosted externally to the cluster and that
 	// its components are not visible within the cluster.
+	// The 'HighlyAvailableArbiter' mode indicates that the control plane will consist of 2 control-plane nodes
+	// that run conventional services and 1 smaller sized arbiter node that runs a bare minimum of services to maintain quorum.
 	ControlPlaneTopology *configv1.TopologyMode `json:"controlPlaneTopology,omitempty"`
 	// infrastructureTopology expresses the expectations for infrastructure services that do not run on control
 	// plane nodes, usually indicated by a node selector for a `role` value

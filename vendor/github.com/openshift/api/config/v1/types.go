@@ -284,7 +284,12 @@ type ClientConnectionOverrides struct {
 }
 
 // GenericControllerConfig provides information to configure a controller
+//
+// Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +openshift:compatibility-gen:level=1
 type GenericControllerConfig struct {
+	metav1.TypeMeta `json:",inline"`
+
 	// servingInfo is the HTTP serving information for the controller's endpoints
 	ServingInfo HTTPServingInfo `json:"servingInfo"`
 

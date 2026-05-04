@@ -6,9 +6,9 @@ clusterresourcequotas.quota.openshift.io:
   Capability: ""
   Category: ""
   FeatureGates: []
-  FilenameOperatorName: config-operator
+  FilenameOperatorName: apiserver
   FilenameOperatorOrdering: "01"
-  FilenameRunLevel: "0000_03"
+  FilenameRunLevel: "0000_00"
   GroupName: quota.openshift.io
   HasStatus: true
   KindName: ClusterResourceQuota

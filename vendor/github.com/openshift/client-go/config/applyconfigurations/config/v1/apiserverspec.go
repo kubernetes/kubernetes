@@ -2,6 +2,10 @@
 
 package v1
 
+import (
+	configv1 "github.com/openshift/api/config/v1"
+)
+
 // APIServerSpecApplyConfiguration represents a declarative configuration of the APIServerSpec type for use
 // with apply.
 type APIServerSpecApplyConfiguration struct {
@@ -26,6 +30,37 @@ type APIServerSpecApplyConfiguration struct {
 	// When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time.
 	// The current default is the Intermediate profile.
 	TLSSecurityProfile *TLSSecurityProfileApplyConfiguration `json:"tlsSecurityProfile,omitempty"`
+	// tlsAdherence controls if components in the cluster adhere to the TLS security profile
+	// configured on this APIServer resource.
+	//
+	// Valid values are "LegacyAdheringComponentsOnly" and "StrictAllComponents".
+	//
+	// When set to "LegacyAdheringComponentsOnly", components that already honor the
+	// cluster-wide TLS profile continue to do so. Components that do not already honor
+	// it continue to use their individual TLS configurations.
+	//
+	// When set to "StrictAllComponents", all components must honor the configured TLS
+	// profile unless they have a component-specific TLS configuration that overrides
+	// it. This mode is recommended for security-conscious deployments and is required
+	// for certain compliance frameworks.
+	//
+	// Note: Some components such as Kubelet and IngressController have their own
+	// dedicated TLS configuration mechanisms via KubeletConfig and IngressController
+	// CRs respectively. When these component-specific TLS configurations are set,
+	// they take precedence over the cluster-wide tlsSecurityProfile. When not set,
+	// these components fall back to the cluster-wide default.
+	//
+	// Components that encounter an unknown value for tlsAdherence should treat it
+	// as "StrictAllComponents" and log a warning to ensure forward compatibility
+	// while defaulting to the more secure behavior.
+	//
+	// This field is optional.
+	// When omitted, this means the user has no opinion and the platform is left
+	// to choose reasonable defaults. These defaults are subject to change over time.
+	// The current default is LegacyAdheringComponentsOnly.
+	//
+	// Once set, this field may be changed to a different value, but may not be removed.
+	TLSAdherence *configv1.TLSAdherencePolicy `json:"tlsAdherence,omitempty"`
 	// audit specifies the settings for audit configuration to be applied to all OpenShift-provided
 	// API servers in the cluster.
 	Audit *AuditApplyConfiguration `json:"audit,omitempty"`
@@ -76,6 +111,14 @@ func (b *APIServerSpecApplyConfiguration) WithEncryption(value *APIServerEncrypt
 // If called multiple times, the TLSSecurityProfile field is set to the value of the last call.
 func (b *APIServerSpecApplyConfiguration) WithTLSSecurityProfile(value *TLSSecurityProfileApplyConfiguration) *APIServerSpecApplyConfiguration {
 	b.TLSSecurityProfile = value
+	return b
+}
+
+// WithTLSAdherence sets the TLSAdherence field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the TLSAdherence field is set to the value of the last call.
+func (b *APIServerSpecApplyConfiguration) WithTLSAdherence(value configv1.TLSAdherencePolicy) *APIServerSpecApplyConfiguration {
+	b.TLSAdherence = &value
 	return b
 }
 

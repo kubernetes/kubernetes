@@ -3,6 +3,7 @@ package authentication
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -91,6 +92,130 @@ func TestFailValidateAuthenticationSpec(t *testing.T) {
 			},
 			errorType:  field.ErrorTypeInvalid,
 			errorField: "spec.oidcProviders[0].claimMappings.extra[0].valueExpression",
+		},
+		"invalid username CEL expression": {
+			spec: configv1.AuthenticationSpec{
+				Type: "OIDC",
+				OIDCProviders: []configv1.OIDCProvider{
+					{
+						ClaimMappings: configv1.TokenClaimMappings{
+							Username: configv1.UsernameClaimMapping{
+								Expression: "!@^#",
+							},
+						},
+					},
+				},
+			},
+			errorType:  field.ErrorTypeInvalid,
+			errorField: "spec.oidcProviders[0].claimMappings.username.expression",
+		},
+		"invalid groups CEL expression": {
+			spec: configv1.AuthenticationSpec{
+				Type: "OIDC",
+				OIDCProviders: []configv1.OIDCProvider{
+					{
+						ClaimMappings: configv1.TokenClaimMappings{
+							Groups: configv1.PrefixedClaimMapping{
+								TokenClaimMapping: configv1.TokenClaimMapping{
+									Expression: "!@^#",
+								},
+							},
+						},
+					},
+				},
+			},
+			errorType:  field.ErrorTypeInvalid,
+			errorField: "spec.oidcProviders[0].claimMappings.groups.expression",
+		},
+		"invalid claimValidationRule CEL expression": {
+			spec: configv1.AuthenticationSpec{
+				Type: "OIDC",
+				OIDCProviders: []configv1.OIDCProvider{
+					{
+						ClaimValidationRules: []configv1.TokenClaimValidationRule{
+							{
+								Type: configv1.TokenValidationRuleTypeCEL,
+								CEL: configv1.TokenClaimValidationCELRule{
+									Expression: "user.groups",
+									Message:    "invalid",
+								},
+							},
+						},
+					},
+				},
+			},
+			errorType:  field.ErrorTypeInvalid,
+			errorField: "spec.oidcProviders[0].claimValidationRules[0].cel.expression",
+		},
+		"invalid userValidationRule CEL expression": {
+			spec: configv1.AuthenticationSpec{
+				Type: "OIDC",
+				OIDCProviders: []configv1.OIDCProvider{
+					{
+						UserValidationRules: []configv1.TokenUserValidationRule{
+							{
+								Expression: "claims.email",
+								Message:    "invalid",
+							},
+						},
+					},
+				},
+			},
+			errorType:  field.ErrorTypeInvalid,
+			errorField: "spec.oidcProviders[0].userValidationRules[0].expression",
+		},
+		"claimValidationRule CEL expression does not return bool": {
+			spec: configv1.AuthenticationSpec{
+				Type: "OIDC",
+				OIDCProviders: []configv1.OIDCProvider{
+					{
+						ClaimValidationRules: []configv1.TokenClaimValidationRule{
+							{
+								Type: configv1.TokenValidationRuleTypeCEL,
+								CEL: configv1.TokenClaimValidationCELRule{
+									Expression: "claims.email",
+									Message:    "invalid",
+								},
+							},
+						},
+					},
+				},
+			},
+			errorType:  field.ErrorTypeInvalid,
+			errorField: "spec.oidcProviders[0].claimValidationRules[0].cel.expression",
+		},
+		"userValidationRule CEL expression does not return bool": {
+			spec: configv1.AuthenticationSpec{
+				Type: "OIDC",
+				OIDCProviders: []configv1.OIDCProvider{
+					{
+						UserValidationRules: []configv1.TokenUserValidationRule{
+							{
+								Expression: "user.username",
+								Message:    "invalid",
+							},
+						},
+					},
+				},
+			},
+			errorType:  field.ErrorTypeInvalid,
+			errorField: "spec.oidcProviders[0].userValidationRules[0].expression",
+		},
+		"username expression uses claims.email without claims.email_verified": {
+			spec: configv1.AuthenticationSpec{
+				Type: "OIDC",
+				OIDCProviders: []configv1.OIDCProvider{
+					{
+						ClaimMappings: configv1.TokenClaimMappings{
+							Username: configv1.UsernameClaimMapping{
+								Expression: "claims.email",
+							},
+						},
+					},
+				},
+			},
+			errorType:  field.ErrorTypeInvalid,
+			errorField: "spec.oidcProviders[0].claimMappings.username.expression",
 		},
 	}
 
@@ -184,6 +309,137 @@ func TestSucceedValidateAuthenticationSpec(t *testing.T) {
 				},
 			},
 		},
+		"valid username CEL expression": {
+			Type: "OIDC",
+			OIDCProviders: []configv1.OIDCProvider{
+				{
+					ClaimMappings: configv1.TokenClaimMappings{
+						Username: configv1.UsernameClaimMapping{
+							Expression: "claims.email",
+						},
+					},
+					ClaimValidationRules: []configv1.TokenClaimValidationRule{
+						{
+							Type: configv1.TokenValidationRuleTypeCEL,
+							CEL: configv1.TokenClaimValidationCELRule{
+								Expression: "claims.email_verified == true",
+								Message:    "email must be verified",
+							},
+						},
+					},
+				},
+			},
+		},
+		"valid groups CEL expression": {
+			Type: "OIDC",
+			OIDCProviders: []configv1.OIDCProvider{
+				{
+					ClaimMappings: configv1.TokenClaimMappings{
+						Groups: configv1.PrefixedClaimMapping{
+							TokenClaimMapping: configv1.TokenClaimMapping{
+								Expression: "claims.groups",
+							},
+						},
+					},
+				},
+			},
+		},
+		"valid claimValidationRule CEL expression": {
+			Type: "OIDC",
+			OIDCProviders: []configv1.OIDCProvider{
+				{
+					ClaimValidationRules: []configv1.TokenClaimValidationRule{
+						{
+							Type: configv1.TokenValidationRuleTypeCEL,
+							CEL: configv1.TokenClaimValidationCELRule{
+								Expression: "claims.iss == 'https://example.com'",
+								Message:    "issuer must be https://example.com",
+							},
+						},
+					},
+				},
+			},
+		},
+		"valid userValidationRule CEL expression": {
+			Type: "OIDC",
+			OIDCProviders: []configv1.OIDCProvider{
+				{
+					UserValidationRules: []configv1.TokenUserValidationRule{
+						{
+							Expression: "user.username != ''",
+							Message:    "username must not be empty",
+						},
+					},
+				},
+			},
+		},
+		"RequiredClaim type skips CEL validation": {
+			Type: "OIDC",
+			OIDCProviders: []configv1.OIDCProvider{
+				{
+					ClaimValidationRules: []configv1.TokenClaimValidationRule{
+						{
+							Type: configv1.TokenValidationRuleTypeRequiredClaim,
+							RequiredClaim: &configv1.TokenRequiredClaim{
+								Claim:         "email_verified",
+								RequiredValue: "true",
+							},
+						},
+					},
+				},
+			},
+		},
+		"username expression uses claims.email with claims.email_verified in username expression": {
+			Type: "OIDC",
+			OIDCProviders: []configv1.OIDCProvider{
+				{
+					ClaimMappings: configv1.TokenClaimMappings{
+						Username: configv1.UsernameClaimMapping{
+							Expression: "claims.email_verified ? claims.email : 'unverified'",
+						},
+					},
+				},
+			},
+		},
+		"username expression uses claims.email with claims.email_verified in claimValidationRule": {
+			Type: "OIDC",
+			OIDCProviders: []configv1.OIDCProvider{
+				{
+					ClaimMappings: configv1.TokenClaimMappings{
+						Username: configv1.UsernameClaimMapping{
+							Expression: "claims.email",
+						},
+					},
+					ClaimValidationRules: []configv1.TokenClaimValidationRule{
+						{
+							Type: configv1.TokenValidationRuleTypeCEL,
+							CEL: configv1.TokenClaimValidationCELRule{
+								Expression: "claims.email_verified == true",
+								Message:    "email must be verified",
+							},
+						},
+					},
+				},
+			},
+		},
+		"username expression uses claims.email with claims.email_verified in extra": {
+			Type: "OIDC",
+			OIDCProviders: []configv1.OIDCProvider{
+				{
+					ClaimMappings: configv1.TokenClaimMappings{
+						Username: configv1.UsernameClaimMapping{
+							Expression: "claims.email",
+						},
+						Extra: []configv1.ExtraMapping{
+							{
+								Key:             "example.com/email-verified",
+								ValueExpression: "claims.email_verified ? 'true' : 'false'",
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for tcName, s := range successCases {
@@ -257,17 +513,15 @@ func TestSucceedValidateAuthenticationStatus(t *testing.T) {
 	}
 }
 
-func TestValidateCELExpression(t *testing.T) {
+func TestCompileExpression(t *testing.T) {
 	type testcase struct {
 		name       string
 		cel        func() *celStore
 		ctx        func() context.Context
 		shouldErr  bool
 		shouldWarn bool
-	}
-
-	expression := &authenticationcel.ClaimMappingExpression{
-		Expression: `["foo", "bar"].exists(x, x == "foo")`,
+		expression authenticationcel.ExpressionAccessor
+		compileFn  func(*celStore) func(authenticationcel.ExpressionAccessor) (authenticationcel.CompilationResult, error)
 	}
 
 	testcases := []testcase{
@@ -285,7 +539,31 @@ func TestValidateCELExpression(t *testing.T) {
 					},
 				}
 			},
-			ctx: func() context.Context { return context.TODO() },
+			ctx:        func() context.Context { return context.TODO() },
+			expression: &authenticationcel.ClaimMappingExpression{Expression: `["foo", "bar"].exists(x, x == "foo")`},
+			compileFn: func(s *celStore) func(authenticationcel.ExpressionAccessor) (authenticationcel.CompilationResult, error) {
+				return s.compiler.CompileClaimsExpression
+			},
+		},
+		{
+			name: "does not return a warning when excessive compilation timer is not triggered (user expression)",
+			cel: func() *celStore {
+				return &celStore{
+					compiler: &mockCompiler{
+						err: nil,
+					},
+					compilingGroup: new(singleflight.Group),
+					compiledStore:  lru.New(1),
+					timerFactory: &mockTimerFactory{
+						trigger: false,
+					},
+				}
+			},
+			ctx:        func() context.Context { return context.TODO() },
+			expression: &authenticationcel.UserValidationCondition{Expression: `user.username != ""`},
+			compileFn: func(s *celStore) func(authenticationcel.ExpressionAccessor) (authenticationcel.CompilationResult, error) {
+				return s.compiler.CompileUserExpression
+			},
 		},
 		{
 			name: "returns a warning when excessive compilation timer is triggered",
@@ -303,6 +581,31 @@ func TestValidateCELExpression(t *testing.T) {
 			},
 			ctx:        func() context.Context { return context.TODO() },
 			shouldWarn: true,
+			expression: &authenticationcel.ClaimMappingExpression{Expression: `["foo", "bar"].exists(x, x == "foo")`},
+			compileFn: func(s *celStore) func(authenticationcel.ExpressionAccessor) (authenticationcel.CompilationResult, error) {
+				return s.compiler.CompileClaimsExpression
+			},
+		},
+		{
+			name: "returns a warning when excessive compilation timer is triggered (user expression)",
+			cel: func() *celStore {
+				return &celStore{
+					compiler: &mockCompiler{
+						err: nil,
+					},
+					compilingGroup: new(singleflight.Group),
+					compiledStore:  lru.New(1),
+					timerFactory: &mockTimerFactory{
+						trigger: true,
+					},
+				}
+			},
+			ctx:        func() context.Context { return context.TODO() },
+			shouldWarn: true,
+			expression: &authenticationcel.UserValidationCondition{Expression: `user.username != ""`},
+			compileFn: func(s *celStore) func(authenticationcel.ExpressionAccessor) (authenticationcel.CompilationResult, error) {
+				return s.compiler.CompileUserExpression
+			},
 		},
 		{
 			name: "still returns error if excessive compilation timer is triggered and errors out",
@@ -321,6 +624,32 @@ func TestValidateCELExpression(t *testing.T) {
 			ctx:        func() context.Context { return context.TODO() },
 			shouldWarn: true,
 			shouldErr:  true,
+			expression: &authenticationcel.ClaimMappingExpression{Expression: `["foo", "bar"].exists(x, x == "foo")`},
+			compileFn: func(s *celStore) func(authenticationcel.ExpressionAccessor) (authenticationcel.CompilationResult, error) {
+				return s.compiler.CompileClaimsExpression
+			},
+		},
+		{
+			name: "still returns error if excessive compilation timer is triggered and errors out (user expression)",
+			cel: func() *celStore {
+				return &celStore{
+					compiler: &mockCompiler{
+						err: errors.New("boom"),
+					},
+					compilingGroup: new(singleflight.Group),
+					compiledStore:  lru.New(1),
+					timerFactory: &mockTimerFactory{
+						trigger: true,
+					},
+				}
+			},
+			ctx:        func() context.Context { return context.TODO() },
+			shouldWarn: true,
+			shouldErr:  true,
+			expression: &authenticationcel.UserValidationCondition{Expression: `user.username != ""`},
+			compileFn: func(s *celStore) func(authenticationcel.ExpressionAccessor) (authenticationcel.CompilationResult, error) {
+				return s.compiler.CompileUserExpression
+			},
 		},
 		{
 			name: "returns an error if the context has been canceled",
@@ -341,19 +670,49 @@ func TestValidateCELExpression(t *testing.T) {
 				cancel()
 				return ctx
 			},
-			shouldErr: true,
+			shouldErr:  true,
+			expression: &authenticationcel.ClaimMappingExpression{Expression: `["foo", "bar"].exists(x, x == "foo")`},
+			compileFn: func(s *celStore) func(authenticationcel.ExpressionAccessor) (authenticationcel.CompilationResult, error) {
+				return s.compiler.CompileClaimsExpression
+			},
+		},
+		{
+			name: "returns an error if the context has been canceled (user expression)",
+			cel: func() *celStore {
+				return &celStore{
+					compiler: &mockCompiler{
+						err: nil,
+					},
+					compilingGroup: new(singleflight.Group),
+					compiledStore:  lru.New(1),
+					timerFactory: &mockTimerFactory{
+						trigger: false,
+					},
+				}
+			},
+			ctx: func() context.Context {
+				ctx, cancel := context.WithCancel(context.TODO())
+				cancel()
+				return ctx
+			},
+			shouldErr:  true,
+			expression: &authenticationcel.UserValidationCondition{Expression: `user.username != ""`},
+			compileFn: func(s *celStore) func(authenticationcel.ExpressionAccessor) (authenticationcel.CompilationResult, error) {
+				return s.compiler.CompileUserExpression
+			},
 		},
 		{
 			name: "returns already compiled expression results if the expression has been compiled before",
 			cel: func() *celStore {
+				expression := &authenticationcel.ClaimMappingExpression{Expression: `["foo", "bar"].exists(x, x == "foo")`}
 				compiledLRU := lru.New(1)
 				res := celCompileResult{
 					err: errors.New("boom"),
 				}
-				compiledLRU.Add(expression.Expression, res)
+				compiledLRU.Add(fmt.Sprintf("%T:%s", expression, expression.Expression), res)
 
 				return &celStore{
-					compiler:       nil, // should never end up calling this
+					compiler:       &mockCompiler{},
 					compilingGroup: new(singleflight.Group),
 					compiledStore:  compiledLRU,
 					timerFactory: &mockTimerFactory{
@@ -364,6 +723,54 @@ func TestValidateCELExpression(t *testing.T) {
 			ctx:        func() context.Context { return context.TODO() },
 			shouldErr:  true,
 			shouldWarn: false,
+			expression: &authenticationcel.ClaimMappingExpression{Expression: `["foo", "bar"].exists(x, x == "foo")`},
+			compileFn: func(s *celStore) func(authenticationcel.ExpressionAccessor) (authenticationcel.CompilationResult, error) {
+				return s.compiler.CompileClaimsExpression
+			},
+		},
+		{
+			name: "returns already compiled expression results if the expression has been compiled before (user expression)",
+			cel: func() *celStore {
+				expression := &authenticationcel.UserValidationCondition{Expression: `user.username != ""`}
+				compiledLRU := lru.New(1)
+				res := celCompileResult{
+					err: errors.New("boom"),
+				}
+				compiledLRU.Add(fmt.Sprintf("%T:%s", expression, expression.Expression), res)
+
+				return &celStore{
+					compiler:       &mockCompiler{},
+					compilingGroup: new(singleflight.Group),
+					compiledStore:  compiledLRU,
+					timerFactory: &mockTimerFactory{
+						trigger: false,
+					},
+				}
+			},
+			ctx:        func() context.Context { return context.TODO() },
+			shouldErr:  true,
+			shouldWarn: false,
+			expression: &authenticationcel.UserValidationCondition{Expression: `user.username != ""`},
+			compileFn: func(s *celStore) func(authenticationcel.ExpressionAccessor) (authenticationcel.CompilationResult, error) {
+				return s.compiler.CompileUserExpression
+			},
+		},
+		{
+			name: "failed compilation with one accessor type does not poison cache for same expression with different accessor type",
+			cel: func() *celStore {
+				return defaultCelStore()
+			},
+			ctx:        func() context.Context { return context.TODO() },
+			shouldErr:  false,
+			expression: &authenticationcel.ClaimMappingExpression{Expression: "claims.email"},
+			compileFn: func(s *celStore) func(authenticationcel.ExpressionAccessor) (authenticationcel.CompilationResult, error) {
+				// First compile as UserValidationCondition to poison the cache with a failure
+				// because claims.* is not in scope for user expressions.
+				// Then return CompileClaimsExpression which should succeed for the same expression.
+				userAccessor := &authenticationcel.UserValidationCondition{Expression: "claims.email"}
+				_, _ = compileExpression(context.TODO(), s, &costRecorder{}, field.NewPath("user"), userAccessor, s.compiler.CompileUserExpression)
+				return s.compiler.CompileClaimsExpression
+			},
 		},
 	}
 
@@ -371,8 +778,9 @@ func TestValidateCELExpression(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			warningRecorder := &mockWarningRecorder{}
 			ctx := warning.WithWarningRecorder(tc.ctx(), warningRecorder)
-			err := validateCELExpression(ctx, tc.cel(), &costRecorder{}, field.NewPath("^"), expression)
-			if tc.shouldErr != (err != nil) {
+			celStore := tc.cel()
+			_, err := compileExpression(ctx, celStore, &costRecorder{}, field.NewPath("^"), tc.expression, tc.compileFn(celStore))
+			if tc.shouldErr != (len(err) > 0) {
 				t.Fatalf("error expectation does not match actual. expected? %v . received: %v", tc.shouldErr, err)
 			}
 
@@ -474,7 +882,7 @@ func (ssfg *signallingSingleFlightGroup) Do(key string, fn func() (any, error)) 
 	return res.Val, res.Err, res.Shared
 }
 
-// TestValidateCELExpressionDeduplicatesWork ensures
+// TestCompileExpressionDeduplicatesWork ensures
 // that we only do work to compile a CEL expression across
 // goroutines once.
 // We do this by:
@@ -492,7 +900,7 @@ func (ssfg *signallingSingleFlightGroup) Do(key string, fn func() (any, error)) 
 // the first goroutine to actually call the compiler.CompileClaimsExpression method
 // will hog the singleflight.Group and the rest of the goroutines will wait for
 // it's results.
-func TestValidateCELExpressionDeduplicatesWork(t *testing.T) {
+func TestCompileExpressionDeduplicatesWork(t *testing.T) {
 	// [1] Mock the compiler and have it block until
 	// we send an error on a channel
 	receiver := make(chan error)
@@ -531,7 +939,8 @@ func TestValidateCELExpressionDeduplicatesWork(t *testing.T) {
 	duplicates := 2
 	for range duplicates {
 		go func() {
-			results <- validateCELExpression(context.TODO(), cel, &costRecorder{}, fieldPath, expression)
+			_, errs := compileExpression(context.TODO(), cel, &costRecorder{}, fieldPath, expression, cel.compiler.CompileClaimsExpression)
+			results <- errs
 		}()
 	}
 
