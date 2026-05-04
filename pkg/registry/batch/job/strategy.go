@@ -101,9 +101,6 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.JobManagedBy) {
 		job.Spec.ManagedBy = nil
 	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
-		job.Spec.PodReplacementPolicy = nil
-	}
 
 	pod.DropDisabledTemplateFields(&job.Spec.Template, nil)
 }
@@ -113,10 +110,6 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	newJob := obj.(*batch.Job)
 	oldJob := old.(*batch.Job)
 	newJob.Status = oldJob.Status
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) && oldJob.Spec.PodReplacementPolicy == nil {
-		newJob.Spec.PodReplacementPolicy = nil
-	}
 
 	pod.DropDisabledTemplateFields(&newJob.Spec.Template, &oldJob.Spec.Template)
 
@@ -376,19 +369,12 @@ func getStatusValidationOptions(newJob, oldJob *batch.Job) batchvalidation.JobSt
 			RejectCompleteJobWithoutCompletionTime:       isJobCompleteChanged || isCompletionTimeChanged,
 			RejectCompleteJobWithFailedCondition:         isJobCompleteChanged || isJobFailedChanged,
 			RejectCompleteJobWithFailureTargetCondition:  isJobCompleteChanged || isJobFailureTargetChanged,
-			AllowForSuccessCriteriaMetInExtendedScope:    true,
 			RejectMoreReadyThanActivePods:                isReadyChanged || isActiveChanged,
 			RejectFinishedJobWithTerminatingPods:         isJobFinishedChanged || isTerminatingChanged,
 		}
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.JobPodReplacementPolicy) {
-		return batchvalidation.JobStatusValidationOptions{
-			AllowForSuccessCriteriaMetInExtendedScope: true,
-		}
-	}
-	return batchvalidation.JobStatusValidationOptions{
-		AllowForSuccessCriteriaMetInExtendedScope: batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobSuccessCriteriaMet),
-	}
+
+	return batchvalidation.JobStatusValidationOptions{}
 }
 
 // WarningsOnUpdate returns warnings for the given update.

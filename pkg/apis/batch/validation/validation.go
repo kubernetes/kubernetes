@@ -587,17 +587,11 @@ func validateJobStatus(job *batch.Job, fldPath *field.Path, opts JobStatusValida
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("ready"), *status.Ready, "cannot set more ready pods than active"))
 		}
 	}
-	if !opts.AllowForSuccessCriteriaMetInExtendedScope && ptr.Deref(job.Spec.CompletionMode, batch.NonIndexedCompletion) != batch.IndexedCompletion && isJobSuccessCriteriaMet(job) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set SuccessCriteriaMet to NonIndexed Job"))
-	}
 	if isJobSuccessCriteriaMet(job) && IsJobFailed(job) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set SuccessCriteriaMet=True and Failed=true conditions"))
 	}
 	if isJobSuccessCriteriaMet(job) && isJobFailureTarget(job) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set SuccessCriteriaMet=True and FailureTarget=true conditions"))
-	}
-	if !opts.AllowForSuccessCriteriaMetInExtendedScope && job.Spec.SuccessPolicy == nil && isJobSuccessCriteriaMet(job) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set SuccessCriteriaMet=True for Job without SuccessPolicy"))
 	}
 	if job.Spec.SuccessPolicy != nil && !isJobSuccessCriteriaMet(job) && IsJobComplete(job) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("conditions"), field.OmitValueType{}, "cannot set Complete=True for Job with SuccessPolicy unless SuccessCriteriaMet=True"))
@@ -1090,7 +1084,6 @@ type JobStatusValidationOptions struct {
 	RejectNotCompleteJobWithCompletionTime       bool
 	RejectCompleteJobWithFailedCondition         bool
 	RejectCompleteJobWithFailureTargetCondition  bool
-	AllowForSuccessCriteriaMetInExtendedScope    bool
 	RejectMoreReadyThanActivePods                bool
 	RejectFinishedJobWithTerminatingPods         bool
 }

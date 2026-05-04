@@ -48,18 +48,15 @@ func matchSuccessPolicy(logger klog.Logger, successPolicy *batch.SuccessPolicy, 
 }
 
 func hasSuccessCriteriaMetCondition(job *batch.Job) *batch.JobCondition {
-	if delayTerminalCondition() {
-		successCriteriaMet := findConditionByType(job.Status.Conditions, batch.JobSuccessCriteriaMet)
-		if successCriteriaMet != nil && successCriteriaMet.Status == v1.ConditionTrue {
-			return successCriteriaMet
-		}
+	successCriteriaMet := findConditionByType(job.Status.Conditions, batch.JobSuccessCriteriaMet)
+	if successCriteriaMet != nil && successCriteriaMet.Status == v1.ConditionTrue {
+		return successCriteriaMet
 	}
 	return nil
 }
 
 func isSuccessCriteriaMetCondition(cond *batch.JobCondition) bool {
-	return delayTerminalCondition() &&
-		cond != nil && cond.Type == batch.JobSuccessCriteriaMet && cond.Status == v1.ConditionTrue
+	return cond != nil && cond.Type == batch.JobSuccessCriteriaMet && cond.Status == v1.ConditionTrue
 }
 
 func matchSucceededIndexesRule(ruleIndexes, succeededIndexes orderedIntervals, succeededCount *int32) bool {

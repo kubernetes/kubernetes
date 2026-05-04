@@ -470,13 +470,6 @@ const (
 	// Allows to delegate reconciliation of a Job object to an external controller.
 	JobManagedBy featuregate.Feature = "JobManagedBy"
 
-	// owner: @kannon92
-	// kep : https://kep.k8s.io/3939
-	//
-	// Allow users to specify recreating pods of a job only when
-	// pods have fully terminated.
-	JobPodReplacementPolicy featuregate.Feature = "JobPodReplacementPolicy"
-
 	// owner: @marquiz
 	// kep: http://kep.k8s.io/4033
 	//
@@ -1512,12 +1505,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.38
 	},
 
-	JobPodReplacementPolicy: {
-		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.29"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37
-	},
-
 	KubeletCgroupDriverFromCRI: {
 		{Version: version.MustParse("1.28"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
@@ -2428,8 +2415,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	InPlacePodVerticalScalingInitContainers: {InPlacePodVerticalScaling, NodeDeclaredFeatures},
 
 	JobManagedBy: {},
-
-	JobPodReplacementPolicy: {},
 
 	KubeletCgroupDriverFromCRI: {},
 
