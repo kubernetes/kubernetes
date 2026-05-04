@@ -484,10 +484,13 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 }
 
 func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
+	startTime := time.Now()
 	c.watchCache.SetOnReplace(func() {
 		c.ready.setReady()
-		klog.V(1).InfoS("cacher initialized", "group", c.groupResource.Group, "resource", c.groupResource.Resource)
+		duration := time.Since(startTime)
+		klog.V(1).InfoS("cacher initialized", "group", c.groupResource.Group, "resource", c.groupResource.Resource, "duration", duration)
 		metrics.WatchCacheInitializations.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Inc()
+		metrics.WatchCacheInitializationDuration.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Observe(duration.Seconds())
 	})
 	var err error
 	defer func() {
