@@ -19,22 +19,22 @@ package podgroup
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	schedulingapi "k8s.io/api/scheduling/v1alpha2"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	configv1 "k8s.io/kube-scheduler/config/v1"
 	framework "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	configtesting "k8s.io/kubernetes/pkg/scheduler/apis/config/testing"
-
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
@@ -122,10 +122,6 @@ func TestPodGroupScheduling(t *testing.T) {
 					CreatePodGroup: gangPodGroup,
 				},
 				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
-				},
-				{
 					Name:       "Create all pods belonging to the gang",
 					CreatePods: []*v1.Pod{p1, p2, p3},
 				},
@@ -149,10 +145,6 @@ func TestPodGroupScheduling(t *testing.T) {
 				{
 					Name:           "Create the PodGroup object",
 					CreatePodGroup: gangPodGroup,
-				},
-				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
 				},
 				{
 					Name:       "Create subset of pods belonging to the gang",
@@ -194,10 +186,6 @@ func TestPodGroupScheduling(t *testing.T) {
 				{
 					Name:           "Create the PodGroup to unblock PreEnqueue",
 					CreatePodGroup: gangPodGroup,
-				},
-				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
 				},
 				{
 					Name:                     "Verify pods become unschedulable (Permit timeout due to resource blocker)",
@@ -249,10 +237,6 @@ func TestPodGroupScheduling(t *testing.T) {
 					CreatePodGroup: gangPodGroup,
 				},
 				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
-				},
-				{
 					Name: "Verify minCount pods is scheduled successfully and one becomes unschedulable (resource-blocking pod is blocking the space)",
 					WaitForAnyPodsScheduled: &stepsframework.WaitForAnyPodsScheduled{
 						Pods:             []*v1.Pod{p1, p2, p3, p4},
@@ -278,16 +262,8 @@ func TestPodGroupScheduling(t *testing.T) {
 					CreatePodGroup: gangPodGroup,
 				},
 				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
-				},
-				{
 					Name:           "Create the other PodGroup object",
 					CreatePodGroup: otherGangPodGroup,
-				},
-				{
-					Name:                   "Verify other PodGroup created",
-					WaitForPodGroupCreated: "pg2",
 				},
 				{
 					Name:       "Create pods from both gangs",
@@ -311,16 +287,8 @@ func TestPodGroupScheduling(t *testing.T) {
 					CreatePodGroup: gangPodGroup,
 				},
 				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
-				},
-				{
 					Name:           "Create the other PodGroup object",
 					CreatePodGroup: otherGangPodGroup,
-				},
-				{
-					Name:                   "Verify other PodGroup created",
-					WaitForPodGroupCreated: "pg2",
 				},
 				{
 					Name:       "Create pods from both gangs",
@@ -352,10 +320,6 @@ func TestPodGroupScheduling(t *testing.T) {
 					CreatePodGroup: gangPodGroup,
 				},
 				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
-				},
-				{
 					Name:       "Create high priority gang pods",
 					CreatePods: []*v1.Pod{p1, p2, p3, p4},
 				},
@@ -383,10 +347,6 @@ func TestPodGroupScheduling(t *testing.T) {
 				{
 					Name:           "Create the PodGroup object",
 					CreatePodGroup: basicPodGroup,
-				},
-				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
 				},
 				{
 					Name:       "Create one pod belonging to the group",
@@ -430,10 +390,6 @@ func TestPodGroupScheduling(t *testing.T) {
 					CreatePodGroup: basicPodGroup,
 				},
 				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
-				},
-				{
 					Name: "Verify two pods are scheduled successfully and one becomes unschedulable (resource-blocking pod is blocking the space)",
 					WaitForAnyPodsScheduled: &stepsframework.WaitForAnyPodsScheduled{
 						Pods:             []*v1.Pod{p1, p2, p3},
@@ -467,10 +423,6 @@ func TestPodGroupScheduling(t *testing.T) {
 					CreatePodGroup: basicPodGroup,
 				},
 				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
-				},
-				{
 					Name:       "Create high priority group's pods",
 					CreatePods: []*v1.Pod{p1, p2, p3, p4},
 				},
@@ -498,10 +450,6 @@ func TestPodGroupScheduling(t *testing.T) {
 				{
 					Name:           "Create the PodGroup object",
 					CreatePodGroup: basicPodGroup,
-				},
-				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
 				},
 				{
 					Name:       "Create high priority group's pods",
@@ -534,10 +482,6 @@ func TestPodGroupScheduling(t *testing.T) {
 					CreatePodGroup: gangPodGroup,
 				},
 				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
-				},
-				{
 					Name:       "Create high priority gang pods",
 					CreatePods: []*v1.Pod{p1, p2, p3, p4},
 				},
@@ -566,10 +510,6 @@ func TestPodGroupScheduling(t *testing.T) {
 				{
 					Name:           "Create the mid PodGroup object",
 					CreatePodGroup: midPodGroup,
-				},
-				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "mid-pg",
 				},
 				{
 					Name:       "Create mid priority gang pods",
@@ -602,10 +542,6 @@ func TestPodGroupScheduling(t *testing.T) {
 					CreatePodGroup: midPodGroupWithConstraint,
 				},
 				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "mid-pg",
-				},
-				{
 					Name:       "Create mid priority gang pods",
 					CreatePods: []*v1.Pod{midP1, midP2},
 				},
@@ -631,10 +567,6 @@ func TestPodGroupScheduling(t *testing.T) {
 				{
 					Name:           "Create the mid PodGroup object with constraint",
 					CreatePodGroup: midPodGroupWithConstraint,
-				},
-				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "mid-pg",
 				},
 				{
 					Name:       "Create mid priority gang pods",
@@ -719,42 +651,84 @@ func TestWorkloadAwarePreemptionInvocation(t *testing.T) {
 	testCtx := testutils.InitTestSchedulerWithNS(t, "wap-inv",
 		scheduler.WithPodMaxBackoffSeconds(0),
 		scheduler.WithPodInitialBackoffSeconds(0))
-	ns := testCtx.NS.Name
+	cs, ns := testCtx.ClientSet, testCtx.NS.Name
 
-	steps := []stepsframework.Step{
-		{
-			Name:        "Create node",
-			CreateNodes: []*v1.Node{node},
-		},
-		{
-			Name:       "Create low priority pods",
-			CreatePods: lowPods,
-		},
-		{
-			Name:                 "Wait for low priority pods to be scheduled",
-			WaitForPodsScheduled: []string{"low-1", "low-2", "low-3", "low-4"},
-		},
-		{
-			Name:            "Create workload",
-			CreateWorkloads: []*schedulingapi.Workload{workload},
-		},
-		{
-			Name:           "Create PodGroup",
-			CreatePodGroup: pg,
-		},
-		{
-			Name:       "Create high priority pods",
-			CreatePods: highPods,
-		},
-		{
-			Name:                          "Verify WorkloadAwarePreemption was called",
-			VerifyWorkloadAwarePreemption: lowPods,
-		},
+	_, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create node: %v", err)
 	}
 
-	if err := stepsframework.RunSteps(testCtx, ns, steps); err != nil {
-		t.Fatal(err)
+	// 1. Create low priority pods
+	for _, p := range lowPods {
+		p.Namespace = ns
+		if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create pod %s: %v", p.Name, err)
+		}
 	}
+
+	// Wait for low priority pods to be scheduled
+	for _, p := range lowPods {
+		if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+			testutils.PodScheduled(cs, ns, p.Name)); err != nil {
+			t.Fatalf("Failed to wait for pod %s to be scheduled: %v", p.Name, err)
+		}
+	}
+
+	// 2. Create workload
+	if _, err := cs.SchedulingV1alpha2().Workloads(ns).Create(testCtx.Ctx, workload, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create workload: %v", err)
+	}
+
+	// 3. Create PodGroup
+	pg.Namespace = ns
+	if _, err := cs.SchedulingV1alpha2().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create PodGroup: %v", err)
+	}
+
+	// 4. Create high priority pods
+	for _, p := range highPods {
+		p.Namespace = ns
+		if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create pod %s: %v", p.Name, err)
+		}
+	}
+
+	// 5. Verify that WorkloadAwarePreemption was called
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+		for _, pod := range lowPods {
+			events, err := cs.CoreV1().Events(ns).List(ctx, metav1.ListOptions{
+				FieldSelector: "involvedObject.name=" + pod.Name,
+			})
+			if err != nil {
+				return false, err
+			}
+			for _, event := range events.Items {
+				if event.Reason == "Preempted" && strings.HasPrefix(event.Message, "Preempted by podgroup") {
+					return true, nil
+				}
+			}
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Errorf("WorkloadAwarePreemption was not called within timeout")
+	}
+
+	t.Logf("WorkloadAwarePreemption was called (verified via events)")
+}
+
+// mockPostFilterPlugin is a custom PostFilter plugin that just counts invocations.
+type mockPostFilterPlugin struct {
+	count int
+}
+
+func (m *mockPostFilterPlugin) Name() string {
+	return "MockPostFilter"
+}
+
+func (m *mockPostFilterPlugin) PostFilter(ctx context.Context, state framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusReader) (*framework.PostFilterResult, *framework.Status) {
+	m.count++
+	return nil, framework.NewStatus(framework.Unschedulable)
 }
 
 func TestPostFilterInvocationCount(t *testing.T) {
@@ -785,7 +759,7 @@ func TestPostFilterInvocationCount(t *testing.T) {
 		st.MakePod().Namespace("default").Name("high-3").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").PodGroupName("pg1").Priority(100).Obj(),
 	}
 
-	mockPlugin := &stepsframework.MockPostFilterPlugin{}
+	mockPlugin := &mockPostFilterPlugin{}
 	registry := frameworkruntime.Registry{
 		"MockPostFilter": func(ctx context.Context, obj runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 			return mockPlugin, nil
@@ -812,45 +786,58 @@ func TestPostFilterInvocationCount(t *testing.T) {
 		scheduler.WithFrameworkOutOfTreeRegistry(registry),
 		scheduler.WithProfiles(cfg.Profiles...),
 	)
-	ns := testCtx.NS.Name
+	cs, ns := testCtx.ClientSet, testCtx.NS.Name
 
-	steps := []stepsframework.Step{
-		{
-			Name:        "Create node",
-			CreateNodes: []*v1.Node{node},
-		},
-		{
-			Name:       "Create low priority pods",
-			CreatePods: lowPods,
-		},
-		{
-			Name:                 "Wait for low priority pods to be scheduled",
-			WaitForPodsScheduled: []string{"low-1", "low-2", "low-3", "low-4"},
-		},
-		{
-			Name:            "Create workload",
-			CreateWorkloads: []*schedulingapi.Workload{workload},
-		},
-		{
-			Name:           "Create PodGroup",
-			CreatePodGroup: pg,
-		},
-		{
-			Name:       "Create high priority pods",
-			CreatePods: highPods,
-		},
-		{
-			// It should be called for each pod from pod group in pod group cycle
-			// but should not be called in WAP.
-			Name: "Verify MockPostFilter was called 3 times",
-			VerifyMockPostFilterPluginCalled: &stepsframework.VerifyMockPostFilterPluginCalled{
-				Called: 3,
-				Mock:   mockPlugin,
-			},
-		},
+	_, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create node: %v", err)
 	}
 
-	if err := stepsframework.RunSteps(testCtx, ns, steps); err != nil {
-		t.Fatal(err)
+	// 1. Create low priority pods
+	for _, p := range lowPods {
+		p.Namespace = ns
+		if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create pod %s: %v", p.Name, err)
+		}
+	}
+
+	// Wait for low priority pods to be scheduled
+	for _, p := range lowPods {
+		if err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+			testutils.PodScheduled(cs, ns, p.Name)); err != nil {
+			t.Fatalf("Failed to wait for pod %s to be scheduled: %v", p.Name, err)
+		}
+	}
+
+	// 2. Create workload
+	if _, err := cs.SchedulingV1alpha2().Workloads(ns).Create(testCtx.Ctx, workload, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create workload: %v", err)
+	}
+
+	// 3. Create PodGroup
+	pg.Namespace = ns
+	if _, err := cs.SchedulingV1alpha2().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create PodGroup: %v", err)
+	}
+
+	// 4. Create high priority pods
+	for _, p := range highPods {
+		p.Namespace = ns
+		if _, err := cs.CoreV1().Pods(ns).Create(testCtx.Ctx, p, metav1.CreateOptions{}); err != nil {
+			t.Fatalf("Failed to create pod %s: %v", p.Name, err)
+		}
+	}
+
+	// 5. Verify that MockPostFilter was called exactly 3 times
+	// It should be called for each pod from pod group in pod group cycle
+	// but should not be called in WAP.
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
+		if mockPlugin.count == 3 {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		t.Errorf("MockPostFilter was called %d times, expected exactly 3", mockPlugin.count)
 	}
 }

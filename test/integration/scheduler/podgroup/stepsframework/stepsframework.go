@@ -19,7 +19,6 @@ package podgroup
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -29,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 	framework "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	testutils "k8s.io/kubernetes/test/integration/util"
@@ -61,87 +61,95 @@ type VerifyMockPostFilterPluginCalled struct {
 	Mock   *MockPostFilterPlugin
 }
 
-/*
-	 Steps are allowing us to create a test in a more readable way.
+// 	 Step is allowing us to create a test in a more readable way.
 
-		We can create test as a fllow of steps, each step is an operation that will be performed on the cluster.
-		Every Step should have a Name, that is used to identify the step and one operation.
-		Step framework will perform only first operation it will enounter in a given step.
+// 		We can create test as a flow of steps, each step is an operation that will be performed on the cluster.
+// 		Every Step should have a Name, that is used to identify the step and one operation.
+// 		Step framework will perform only first operation it will enounter in a given step.
 
-		For example, this will only create workload but will not wait for it to be ready:
-		Step {
-			Name: "Create and wait for workload to be ready",
-			CreateWorkloads: []*schedulingapi.Workload{
-				st.MakeWorkload().Name("workload").
-					PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(3).Obj()).
-					Obj(),
-			},
-			WaitForWorkloadReady: "workload",
-		}
+// 		For example, this will only create workload but will not wait for it to be ready:
+// 		Step {
+// 			Name: "Create and wait for workload to be ready",
+// 			CreateWorkloads: []*schedulingapi.Workload{
+// 				st.MakeWorkload().Name("workload").
+// 					PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(3).Obj()).
+// 					Obj(),
+// 			},
+// 			WaitForWorkloadReady: "workload",
+// 		}
 
-		When we have all steps defined, we can run the test by iterating over the steps using the RunSteps function.
+// 		When all steps are defined, we can run the test by iterating over the steps using the RunSteps function.
 
-		For example:
-
-		steps := []Step{
-			{
-				Name: "Create node",
-				CreateNodes: []*v1.Node{
-					st.MakeNode().Name("node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "4"}).Obj(),
-				},
-			},
-			{
-				Name: "Create a pod group"
-				CreatePodGroup: st.MakePodGroup().Name("pg1").TemplateRef("t1", "workload").
-					Priority(100).MinCount(3).Obj(),
-			},
-			{
-				Name:                   "Verify pod group is created",
-				WaitForPodGroupCreated: "pg1",
-			},
-		}
-		runSteps(t, testCtx, steps)
-*/
+//	For example:
+//
+// ns := testCtx.NS.Name
+//
+//	steps := []Step{
+//			{
+//				Name:        "Create Nodes",
+//				CreateNodes: []*v1.Node{node},
+//			},
+//			{
+//				Name:            "Create workloads",
+//				CreateWorkloads: []*schedulingapi.Workload{workload, otherWorkload},
+//			},
+//			{
+//				Name:           "Create the PodGroup object",
+//				CreatePodGroup: gangPodGroup,
+//			},
+//			{
+//				Name:                   "Verify PodGroup created",
+//				WaitForPodGroupCreated: "pg1",
+//			},
+//			{
+//				Name:       "Create all pods belonging to the gang",
+//				CreatePods: []*v1.Pod{p1, p2, p3},
+//			},
+//			{
+//				Name:                 "Verify all gang pods are scheduled successfully",
+//				WaitForPodsScheduled: []string{"p1", "p2", "p3"},
+//			},
+//			{
+//				Name: "Verify PodGroup condition is set to Scheduled",
+//				WaitForPodGroupCondition: &stepsframework.PodGroupConditionCheck{
+//					PodGroupName:    "pg1",
+//					ConditionStatus: metav1.ConditionTrue,
+//					Reason:          "Scheduled",
+//				},
+//			},
+//		}
+//
+// runSteps(t, ns, steps)
 type Step struct {
 	// Name of the step, used to identify the step. Should be in every step.
 	// Used to describe the step in the test output.
 	Name string
-	// CreateNodes is use to create nodes in the cluster, it takes []*v1.Node as input.
+	// CreateNodes is use to create nodes in the cluster.
 	CreateNodes []*v1.Node
-	// CreatePodGroup is use to create a pod group, it takes *schedulingapi.PodGroup as input.
+	// CreatePodGroup is use to create a pod group and wait for it to be ready.
 	CreatePodGroup *schedulingapi.PodGroup
-	// CreatePodGroupForbiddenError is use to create a pod group that should be rejected by the cluster, it takes *schedulingapi.PodGroup as input.
-	CreatePodGroupForbiddenError *schedulingapi.PodGroup
-	// CreatePods is use to create pods in the cluster, it takes []*v1.Pod as input.
+	// CreatePods is use to create pods in the cluster.
 	CreatePods []*v1.Pod
-	// CreateWorkloads is use to create workloads in the cluster, it takes []*schedulingapi.Workload as input.
+	// CreateWorkloads is use to create workloads in the cluster.
 	CreateWorkloads []*schedulingapi.Workload
-	// DeletePods is use to delete pods from the cluster, it takes []string as input.
+	// DeletePods is use to delete pods from the cluster.
 	DeletePods []string
-	// DeleteWorkloads is use to delete workloads from the cluster, it takes []*schedulingapi.Workload as input.
-	DeleteWorkloads []*schedulingapi.Workload
-	// WaitForPodsGatedOnPreEnqueue is use to wait for pods to be gated on pre-enqueue, it takes []string as input.
+	// DeleteWorkloads is use to delete workloads from the cluster.
 	WaitForPodsGatedOnPreEnqueue []string
-	// WaitForPodsUnschedulable is use to wait for pods to be unschedulable, it takes []string as input.
+	// WaitForPodsUnschedulable is use to wait for pods to be unschedulable.
 	WaitForPodsUnschedulable []string
-	// WaitForPodsScheduled is use to wait for pods to be scheduled, it takes []string as input.
+	// WaitForPodsScheduled is use to wait for pods to be scheduled.
 	WaitForPodsScheduled []string
-	// WaitForPodsRemoved is use to wait for pods to be removed, it takes []string as input.
+	// WaitForPodsRemoved is use to wait for pods to be removed.
 	WaitForPodsRemoved []string
-	// WaitForPodGroupCreated is use to wait for a pod group to be created, it takes string as input.
-	WaitForPodGroupCreated string
-	// WaitForAnyPodsScheduled is use to wait for any pod in the pod group to be scheduled, it takes *WaitForAnyPodsScheduled as input.
+	// WaitForAnyPodsScheduled is use to wait for any pod in the pod group to be scheduled.
 	WaitForAnyPodsScheduled *WaitForAnyPodsScheduled
-	// WaitForPodGroupCondition is use to wait for a pod group to have a certain condition, it takes *PodGroupConditionCheck as input.
+	// WaitForPodGroupCondition is use to wait for a pod group to have a certain condition.
 	WaitForPodGroupCondition *PodGroupConditionCheck
-	// VerifyAssignments is use to verify that the pods are assigned to the correct nodes, it takes *VerifyAssignments as input.
+	// VerifyAssignments is use to verify that the pods are assigned to the correct nodes.
 	VerifyAssignments *VerifyAssignments
-	// VerifyAssignedInOneDomain is use to verify that the pods are assigned to nodes in the same domain, it takes *VerifyAssignedInOneDomain as input.
+	// VerifyAssignedInOneDomain is use to verify that the pods are assigned to nodes in the same domain.
 	VerifyAssignedInOneDomain *VerifyAssignedInOneDomain
-	// VerifyWorkloadAwarePreemption is use to verify that the workloads are preempted according to the workload aware preemption policy, it takes []*v1.Pod as input.
-	VerifyWorkloadAwarePreemption []*v1.Pod
-	// VerifyMockPostFilterPluginCalled is use to verify that the mock post filter plugin is called, it takes *VerifyMockPostFilterPluginCalled as input.
-	VerifyMockPostFilterPluginCalled *VerifyMockPostFilterPluginCalled
 }
 
 // MockPostFilterPlugin is a custom PostFilter plugin that just counts invocations.
@@ -217,20 +225,20 @@ func createPodGroup(testCtx *testutils.TestContext, ns string, pg *schedulingapi
 	if _, err := cs.SchedulingV1alpha2().PodGroups(ns).Create(testCtx.Ctx, pgCopy, metav1.CreateOptions{}); err != nil {
 		return fmt.Errorf("failed to create pod group %s: %w", pgCopy.Name, err)
 	}
-	return nil
-}
-
-func createPodGroupForbiddenError(testCtx *testutils.TestContext, ns string, pg *schedulingapi.PodGroup) error {
-	cs := testCtx.ClientSet
-	pgCopy := pg.DeepCopy()
-	pgCopy.Namespace = ns
-	_, err := cs.SchedulingV1alpha2().PodGroups(ns).Create(testCtx.Ctx, pgCopy, metav1.CreateOptions{})
-
-	if err == nil {
-		return fmt.Errorf("expected PodGroup creation to be rejected, but it succeeded")
-	}
-	if !apierrors.IsForbidden(err) {
-		return fmt.Errorf("expected Forbidden error, got: %w", err)
+	err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
+		func(_ context.Context) (bool, error) {
+			_, err := testCtx.InformerFactory.Scheduling().V1alpha2().PodGroups().Lister().PodGroups(ns).Get(pgCopy.Name)
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					return false, nil
+				}
+				return false, err
+			}
+			return true, nil
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to wait for pod group %s to be discoverable by scheduler: %w", pgCopy.Name, err)
 	}
 	return nil
 }
@@ -267,16 +275,6 @@ func deletePods(testCtx *testutils.TestContext, ns string, podNames []string) er
 		)
 		if err != nil {
 			return fmt.Errorf("failed to wait for pod %s to be no longer visible in scheduler: %w", podName, err)
-		}
-	}
-	return nil
-}
-
-func deleteWorkloads(testCtx *testutils.TestContext, ns string, wls []*schedulingapi.Workload) error {
-	cs := testCtx.ClientSet
-	for _, wl := range wls {
-		if err := cs.SchedulingV1alpha2().Workloads(ns).Delete(testCtx.Ctx, wl.Name, metav1.DeleteOptions{}); err != nil {
-			return fmt.Errorf("failed to delete workload %s: %w", wl.Name, err)
 		}
 	}
 	return nil
@@ -360,25 +358,6 @@ func waitForAnyPodsScheduled(testCtx *testutils.TestContext, ns string, waitAny 
 	return nil
 }
 
-func waitForPodGroupCreated(testCtx *testutils.TestContext, ns string, pgName string) error {
-	err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
-		func(_ context.Context) (bool, error) {
-			_, err := testCtx.InformerFactory.Scheduling().V1alpha2().PodGroups().Lister().PodGroups(ns).Get(pgName)
-			if err != nil {
-				if apierrors.IsNotFound(err) {
-					return false, nil
-				}
-				return false, err
-			}
-			return true, nil
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("failed to wait for pod group %s to be discoverable by scheduler: %w", pgName, err)
-	}
-	return nil
-}
-
 func waitForPodGroupCondition(testCtx *testutils.TestContext, ns string, check *PodGroupConditionCheck) error {
 	cs := testCtx.ClientSet
 	err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, wait.ForeverTestTimeout, false,
@@ -437,48 +416,12 @@ func verifyAssignedInOneDomain(testCtx *testutils.TestContext, ns string, verify
 	return nil
 }
 
-func verifyWorkloadAwarePreemption(testCtx *testutils.TestContext, ns string, pods []*v1.Pod) error {
-	cs := testCtx.ClientSet
-	err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
-		for _, pod := range pods {
-			events, err := cs.CoreV1().Events(ns).List(ctx, metav1.ListOptions{
-				FieldSelector: "involvedObject.name=" + pod.Name,
-			})
-			if err != nil {
-				return false, err
-			}
-			for _, event := range events.Items {
-				if event.Reason == "Preempted" && strings.HasPrefix(event.Message, "Preempted by podgroup") {
-					return true, nil
-				}
-			}
-		}
-		return false, nil
-	})
-	if err != nil {
-		return fmt.Errorf("WorkloadAwarePreemption was not called within timeout")
-	}
-	return nil
-}
-
-func verifyMockPostFilterPluginCalled(testCtx *testutils.TestContext, ns string, verify *VerifyMockPostFilterPluginCalled) error {
-	err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
-		if verify.Mock.count == verify.Called {
-			return true, nil
-		}
-		return false, nil
-	})
-	if err != nil {
-		return fmt.Errorf("MockPostFilter was called %d times, expected exactly %d", verify.Mock.count, verify.Called)
-	}
-	return nil
-}
-
 // RunSteps executes steps in the given order. It executes only first encountered operation in step.
 // If there is no operation in the step, it will skip the step.
 // If there is an error in any step, it will stop and return the error.
 func RunSteps(testCtx *testutils.TestContext, ns string, steps []Step) error {
 	for i, step := range steps {
+		klog.FromContext(testCtx.Ctx).V(3).Info("Executing step", "step", i, "name", step.Name)
 		if step.Name == "" {
 			return fmt.Errorf("step name cannot be empty")
 		}
@@ -490,14 +433,10 @@ func RunSteps(testCtx *testutils.TestContext, ns string, steps []Step) error {
 			err = createPods(testCtx, ns, step.CreatePods)
 		case step.CreatePodGroup != nil:
 			err = createPodGroup(testCtx, ns, step.CreatePodGroup)
-		case step.CreatePodGroupForbiddenError != nil:
-			err = createPodGroupForbiddenError(testCtx, ns, step.CreatePodGroupForbiddenError)
 		case step.CreateWorkloads != nil:
 			err = createWorkloads(testCtx, ns, step.CreateWorkloads)
 		case step.DeletePods != nil:
 			err = deletePods(testCtx, ns, step.DeletePods)
-		case step.DeleteWorkloads != nil:
-			err = deleteWorkloads(testCtx, ns, step.DeleteWorkloads)
 		case step.WaitForPodsGatedOnPreEnqueue != nil:
 			err = waitForPodsGatedOnPreEnqueue(testCtx, ns, step.WaitForPodsGatedOnPreEnqueue)
 		case step.WaitForPodsUnschedulable != nil:
@@ -508,18 +447,14 @@ func RunSteps(testCtx *testutils.TestContext, ns string, steps []Step) error {
 			err = waitForPodsRemoved(testCtx, ns, step.WaitForPodsRemoved)
 		case step.WaitForAnyPodsScheduled != nil:
 			err = waitForAnyPodsScheduled(testCtx, ns, step.WaitForAnyPodsScheduled)
-		case step.WaitForPodGroupCreated != "":
-			err = waitForPodGroupCreated(testCtx, ns, step.WaitForPodGroupCreated)
 		case step.WaitForPodGroupCondition != nil:
 			err = waitForPodGroupCondition(testCtx, ns, step.WaitForPodGroupCondition)
 		case step.VerifyAssignments != nil:
 			err = verifyAssignments(testCtx, ns, step.VerifyAssignments)
 		case step.VerifyAssignedInOneDomain != nil:
 			err = verifyAssignedInOneDomain(testCtx, ns, step.VerifyAssignedInOneDomain)
-		case step.VerifyWorkloadAwarePreemption != nil:
-			err = verifyWorkloadAwarePreemption(testCtx, ns, step.VerifyWorkloadAwarePreemption)
-		case step.VerifyMockPostFilterPluginCalled != nil:
-			err = verifyMockPostFilterPluginCalled(testCtx, ns, step.VerifyMockPostFilterPluginCalled)
+		default:
+			err = fmt.Errorf("no operation specified for step %d (%s)", i, step.Name)
 		}
 		if err != nil {
 			return fmt.Errorf("step %d (%s) failed: %w", i, step.Name, err)

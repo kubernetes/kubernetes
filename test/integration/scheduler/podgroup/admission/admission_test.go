@@ -20,13 +20,13 @@ import (
 	"testing"
 
 	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
-	stepsframework "k8s.io/kubernetes/test/integration/scheduler/podgroup/stepsframework"
 	testutils "k8s.io/kubernetes/test/integration/util"
 )
 
@@ -46,76 +46,57 @@ func TestPodGroupAdmission(t *testing.T) {
 	}()
 
 	tests := []struct {
-		name  string
-		steps []stepsframework.Step
+		name           string
+		workload       *schedulingapi.Workload
+		deleteWorkload bool
+		podGroup       func(ns string) *schedulingapi.PodGroup
+		expectError    bool
 	}{
 		{
 			name: "PodGroup referencing non-existent Workload is rejected",
-			steps: []stepsframework.Step{
-				{
-					Name:                         "Creating podgroup referencing non-existent workload expecting failure",
-					CreatePodGroupForbiddenError: st.MakePodGroup().Name("pg1").TemplateRef("worker", "non-existent-workload").MinCount(3).Obj(),
-				},
+			podGroup: func(ns string) *schedulingapi.PodGroup {
+				return st.MakePodGroup().Name("pg1").Namespace(ns).TemplateRef("worker", "non-existent-workload").MinCount(3).Obj()
 			},
+			expectError: true,
 		},
 		{
-			name: "PodGroup referencing non-existent template is rejected",
-			steps: []stepsframework.Step{
-				{
-					Name:            "Creating workload",
-					CreateWorkloads: []*schedulingapi.Workload{defaultWorkload},
-				},
-				{
-					Name:                         "Creating podgroup referencing non-existent template expecting failure",
-					CreatePodGroupForbiddenError: st.MakePodGroup().Name("pg1").TemplateRef("non-existent-template", "test-workload").MinCount(3).Obj(),
-				},
+			name:     "PodGroup referencing non-existent template is rejected",
+			workload: defaultWorkload,
+			podGroup: func(ns string) *schedulingapi.PodGroup {
+				return st.MakePodGroup().Name("pg1").Namespace(ns).TemplateRef("non-existent-template", "test-workload").MinCount(3).Obj()
 			},
+			expectError: true,
 		},
 		{
-			name: "PodGroup referencing valid Workload and template is accepted",
-			steps: []stepsframework.Step{
-				{
-					Name:            "Creating workload",
-					CreateWorkloads: []*schedulingapi.Workload{defaultWorkload},
-				},
-				{
-					Name:           "Creating podgroup referencing valid workload and template",
-					CreatePodGroup: st.MakePodGroup().Name("pg1").TemplateRef("worker", "test-workload").MinCount(3).Obj(),
-				},
+			name:     "PodGroup referencing valid Workload and template is accepted",
+			workload: defaultWorkload,
+			podGroup: func(ns string) *schedulingapi.PodGroup {
+				return st.MakePodGroup().Name("pg1").Namespace(ns).TemplateRef("worker", "test-workload").MinCount(3).Obj()
 			},
+			expectError: false,
 		},
 		{
 			name: "PodGroup without templateRef is accepted",
-			steps: []stepsframework.Step{
-				{
-					Name: "Creating podgroup without templateRef",
-					CreatePodGroup: &schedulingapi.PodGroup{
-						ObjectMeta: metav1.ObjectMeta{Name: "pg1"},
-						Spec: schedulingapi.PodGroupSpec{
-							SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
-								Gang: &schedulingapi.GangSchedulingPolicy{MinCount: 3},
-							},
+			podGroup: func(ns string) *schedulingapi.PodGroup {
+				return &schedulingapi.PodGroup{
+					ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: ns},
+					Spec: schedulingapi.PodGroupSpec{
+						SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
+							Gang: &schedulingapi.GangSchedulingPolicy{MinCount: 3},
 						},
 					},
-				},
+				}
 			},
+			expectError: false,
 		},
 		{
-			name: "PodGroup referencing terminating Workload is rejected",
-			steps: []stepsframework.Step{
-				{
-					Name:            "Creating workload",
-					CreateWorkloads: []*schedulingapi.Workload{terminatingWorkload},
-				},
-				{
-					Name:            "Deleting workload",
-					DeleteWorkloads: []*schedulingapi.Workload{terminatingWorkload},
-				},
-				{
-					Name:                         "Creating podgroup referencing terminating workload expecting failure",
-					CreatePodGroupForbiddenError: st.MakePodGroup().Name("pg1").TemplateRef("worker", "test-workload").MinCount(3).Obj(),
-				},
+			name:           "PodGroup referencing terminating Workload is rejected",
+			workload:       terminatingWorkload,
+			deleteWorkload: true,
+			podGroup: func(ns string) *schedulingapi.PodGroup {
+				return st.MakePodGroup().Name("pg1").Namespace(ns).TemplateRef("worker", "test-workload").MinCount(3).Obj()
 			},
+			expectError: true,
 		},
 	}
 
@@ -124,10 +105,30 @@ func TestPodGroupAdmission(t *testing.T) {
 			testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-admission",
 				scheduler.WithPodMaxBackoffSeconds(0),
 				scheduler.WithPodInitialBackoffSeconds(0))
-			ns := testCtx.NS.Name
+			cs, ns := testCtx.ClientSet, testCtx.NS.Name
 
-			if err := stepsframework.RunSteps(testCtx, ns, tt.steps); err != nil {
-				t.Fatalf("Unexpected error: %v", err)
+			if tt.workload != nil {
+				tt.workload.Namespace = ns
+				if _, err := cs.SchedulingV1alpha2().Workloads(ns).Create(testCtx.Ctx, tt.workload, metav1.CreateOptions{}); err != nil {
+					t.Fatalf("Failed to create Workload: %v", err)
+				}
+				if tt.deleteWorkload {
+					if err := cs.SchedulingV1alpha2().Workloads(ns).Delete(testCtx.Ctx, tt.workload.Name, metav1.DeleteOptions{}); err != nil {
+						t.Fatalf("Failed to delete Workload: %v", err)
+					}
+				}
+			}
+
+			_, err := cs.SchedulingV1alpha2().PodGroups(ns).Create(testCtx.Ctx, tt.podGroup(ns), metav1.CreateOptions{})
+			if tt.expectError {
+				if err == nil {
+					t.Fatal("Expected PodGroup creation to be rejected, but it succeeded")
+				}
+				if !apierrors.IsForbidden(err) {
+					t.Fatalf("Expected Forbidden error, got: %v", err)
+				}
+			} else if err != nil {
+				t.Fatalf("Expected PodGroup creation to succeed, got: %v", err)
 			}
 		})
 	}

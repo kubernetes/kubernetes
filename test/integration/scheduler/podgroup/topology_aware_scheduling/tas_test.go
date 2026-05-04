@@ -98,10 +98,6 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 					CreatePodGroup: makeGangPodGroup("pg1", "rack", 3),
 				},
 				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
-				},
-				{
 					Name: "Create all pods belonging to the podgroup",
 					CreatePods: []*v1.Pod{
 						makePod("p1", "pg1"),
@@ -139,10 +135,6 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 					CreatePodGroup: makeGangPodGroup("pg1", "rack", 3),
 				},
 				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
-				},
-				{
 					Name: "Create all pods belonging to the podgroup, requesting more resources in total than available in any rack",
 					CreatePods: []*v1.Pod{
 						makeLargePod("p1", "pg1"),
@@ -177,10 +169,6 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 				{
 					Name:           "Create the PodGroup object (Gang with minCount=3) that should be scheduled on one rack",
 					CreatePodGroup: makeGangPodGroup("pg1", "rack", 3),
-				},
-				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
 				},
 				{
 					Name: "Create all pods belonging to the podgroup, requesting more resources in total than available in any rack",
@@ -221,10 +209,6 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 				{
 					Name:           "Create the PodGroup object (Gang with minCount=3) that should be scheduled on one rack",
 					CreatePodGroup: makeGangPodGroup("pg1", "rack", 3),
-				},
-				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
 				},
 				{
 					Name: "Create all pods belonging to the podgroup. Pods won't fit on rack3, and will score higher on rack1 than rack2",
@@ -278,10 +262,6 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 					CreatePodGroup: makeGangPodGroup("pg1", "rack", 3),
 				},
 				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
-				},
-				{
 					Name: "Create all pods belonging to the podgroup. Pods won't fit on rack4, and will score highest on rack2",
 					CreatePods: []*v1.Pod{
 						makePod("p1", "pg1"),
@@ -327,10 +307,6 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 					CreatePodGroup: makeGangPodGroup("pg1", "rack", 3),
 				},
 				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
-				},
-				{
 					Name: "Create all pods belonging to gang pg1. Pods are large, pg1 will only fit on rack1",
 					CreatePods: []*v1.Pod{
 						makeLargePod("p1", "pg1"),
@@ -345,10 +321,6 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 				{
 					Name:           "Create the PodGroup object (Gang with minCount=2) that should be scheduled on one rack",
 					CreatePodGroup: makeGangPodGroup("pg2", "rack", 2),
-				},
-				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg2",
 				},
 				{
 					Name: "Create all pods belonging to gang pg2",
@@ -394,10 +366,6 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 					CreatePodGroup: makeGangPodGroup("pg1", "rack", 2),
 				},
 				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
-				},
-				{
 					Name: "Create all pods belonging to gang pg1",
 					CreatePods: []*v1.Pod{
 						makeLargePod("p1", "pg1"),
@@ -407,10 +375,6 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 				{
 					Name:           "Create the PodGroup object (Gang with minCount=3) that should be scheduled on one rack",
 					CreatePodGroup: makeGangPodGroup("pg2", "rack", 3),
-				},
-				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg2",
 				},
 				{
 					Name: "Create all pods belonging to gang pg2",
@@ -463,10 +427,6 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 					CreatePodGroup: makeGangPodGroup("pg1", "rack", 3),
 				},
 				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
-				},
-				{
 					Name: "Create all pods belonging to gang pg1",
 					CreatePods: []*v1.Pod{
 						makeLargePod("p1", "pg1"),
@@ -481,10 +441,6 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 				{
 					Name:           "Create the PodGroup object (Gang with minCount=3) that should be scheduled in one zone",
 					CreatePodGroup: makeGangPodGroup("pg2", "zone", 3),
-				},
-				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg2",
 				},
 				{
 					Name: "Create all pods belonging to gang pg2",
@@ -529,10 +485,6 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 					CreatePodGroup: makeGangPodGroup("pg1", "rack", 3),
 				},
 				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
-				},
-				{
 					Name: "Create all pods belonging to gang pg1",
 					CreatePods: []*v1.Pod{
 						makePod("p1", "pg1"),
@@ -547,10 +499,6 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 				{
 					Name:           "Create the PodGroup object (Gang with minCount=2) that should be scheduled on one rack",
 					CreatePodGroup: makeGangPodGroup("pg2", "rack", 2),
-				},
-				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg2",
 				},
 				{
 					Name: "Create all pods belonging to gang pg2",
@@ -587,10 +535,6 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 				{
 					Name:           "Create the PodGroup object (Gang with minCount=2) that should be scheduled on one rack",
 					CreatePodGroup: makeGangPodGroup("pg1", "rack", 2),
-				},
-				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
 				},
 				{
 					Name: "Create 3 pods (more than minCount) belonging to the podgroup",
@@ -631,10 +575,6 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 				{
 					Name:           "Create the PodGroup object (Gang with minCount=3) that should be scheduled on one rack",
 					CreatePodGroup: makeGangPodGroup("pg1", "rack", 3),
-				},
-				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
 				},
 				{
 					Name: "Create 3 pods (=minCount) belonging to the gang",
@@ -701,10 +641,6 @@ func TestTopologyAwareSchedulingWithGangPolicy(t *testing.T) {
 					CreatePodGroup: makeGangPodGroup("pg1", "rack", 3),
 				},
 				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
-				},
-				{
 					Name: "Create all pods belonging to the podgroup",
 					CreatePods: []*v1.Pod{
 						makePod("p1", "pg1"),
@@ -742,10 +678,6 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				{
 					Name:           "Create the PodGroup object that should be scheduled on one rack",
 					CreatePodGroup: makeBasicPodGroup("pg1", "rack"),
-				},
-				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
 				},
 				{
 					Name: "Create all pods belonging to the podgroup",
@@ -787,10 +719,6 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 					CreatePodGroup: makeBasicPodGroup("pg1", "rack"),
 				},
 				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
-				},
-				{
 					Name: "Create all pods belonging to the podgroup",
 					CreatePods: []*v1.Pod{
 						makePod("p1", "pg1"),
@@ -824,10 +752,6 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				{
 					Name:           "Create the PodGroup object that should be scheduled on one rack",
 					CreatePodGroup: makeBasicPodGroup("pg1", "rack"),
-				},
-				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
 				},
 				{
 					Name: "Create all pods belonging to the podgroup, more than fitting in a single rack",
@@ -869,10 +793,6 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 					CreatePodGroup: makeBasicPodGroup("pg1", "rack"),
 				},
 				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
-				},
-				{
 					Name: "Create all pods belonging to the podgroup, each pod not fitting any nodes in the cluster",
 					CreatePods: []*v1.Pod{
 						makeUnfittablePod("p1", "pg1"),
@@ -898,10 +818,6 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				{
 					Name:           "Create the PodGroup object that should be scheduled on one rack",
 					CreatePodGroup: makeBasicPodGroup("pg1", "rack"),
-				},
-				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
 				},
 				{
 					Name: "Create all pods belonging to the podgroup, some of them not fitting any nodes in the cluster",
@@ -936,10 +852,6 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				{
 					Name:           "Create the PodGroup object that should be scheduled on one rack",
 					CreatePodGroup: makeBasicPodGroup("pg1", "rack"),
-				},
-				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
 				},
 				{
 					Name: "Create all pods belonging to the podgroup",
@@ -999,10 +911,6 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 					CreatePodGroup: makeBasicPodGroup("pg1", "rack"),
 				},
 				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
-				},
-				{
 					Name: "Create all pods belonging to the podgroup",
 					CreatePods: []*v1.Pod{
 						makePod("p1", "pg1"),
@@ -1052,10 +960,6 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				{
 					Name:           "Create the PodGroup object that should be scheduled on one rack",
 					CreatePodGroup: makeBasicPodGroup("pg1", "rack"),
-				},
-				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
 				},
 				{
 					// Fixing test flakiness:
@@ -1117,10 +1021,6 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 					CreatePodGroup: makeBasicPodGroup("pg1", "rack"),
 				},
 				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
-				},
-				{
 					Name: "Create all pods belonging to podgroup pg1",
 					CreatePods: []*v1.Pod{
 						makePod("p1", "pg1"),
@@ -1130,10 +1030,6 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				{
 					Name:           "Create the PodGroup object that should be scheduled on one rack",
 					CreatePodGroup: makeBasicPodGroup("pg2", "rack"),
-				},
-				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg2",
 				},
 				{
 					Name: "Create all pods belonging to podgroup pg2",
@@ -1188,10 +1084,6 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 					CreatePodGroup: makeBasicPodGroup("pg1", "rack"),
 				},
 				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
-				},
-				{
 					Name: "Create all pods belonging to podgroup pg1",
 					CreatePods: []*v1.Pod{
 						makePod("p1", "pg1"),
@@ -1201,10 +1093,6 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				{
 					Name:           "Create the PodGroup object that should be scheduled on one rack",
 					CreatePodGroup: makeBasicPodGroup("pg2", "rack"),
-				},
-				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg2",
 				},
 				{
 					Name: "Create all pods belonging to podgroup pg2",
@@ -1238,10 +1126,6 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 					CreatePodGroup: makeBasicPodGroup("pg1", "rack"),
 				},
 				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
-				},
-				{
 					Name: "Create all pods belonging to podgroup pg1",
 					CreatePods: []*v1.Pod{
 						makePod("p1", "pg1"),
@@ -1251,10 +1135,6 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				{
 					Name:           "Create the PodGroup object that should be scheduled in one zone",
 					CreatePodGroup: makeBasicPodGroup("pg2", "zone"),
-				},
-				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg2",
 				},
 				{
 					Name: "Create all pods belonging to podgroup pg2. Large pods, each consumes CPU of an entire node",
@@ -1298,10 +1178,6 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				{
 					Name:           "Create the PodGroup object that should be scheduled on one rack",
 					CreatePodGroup: makeBasicPodGroup("pg1", "rack"),
-				},
-				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
 				},
 				{
 					// Fixing test flakiness:
@@ -1349,10 +1225,6 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 					CreatePodGroup: makeBasicPodGroup("pg2", "rack"),
 				},
 				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg2",
-				},
-				{
 					Name: "Create all pods belonging to podgroup pg2",
 					CreatePods: []*v1.Pod{
 						makePod("p4", "pg2"),
@@ -1396,10 +1268,6 @@ func TestTopologyAwareSchedulingWithBasicPolicy(t *testing.T) {
 				{
 					Name:           "Create the PodGroup object that should be scheduled on one rack",
 					CreatePodGroup: makeBasicPodGroup("pg1", "rack"),
-				},
-				{
-					Name:                   "Verify PodGroup created",
-					WaitForPodGroupCreated: "pg1",
 				},
 				{
 					// Fixing test flakiness:
