@@ -159,7 +159,6 @@ type PodGroupTemplate struct {
 	// +k8s:listType=map
 	// +k8s:listMapKey=name
 	// +k8s:maxItems=4
-	// +k8s:immutable
 	// +featureGate=DRAWorkloadResourceClaims
 	ResourceClaims []PodGroupResourceClaim `json:"resourceClaims,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,4,rep,name=resourceClaims"`
 

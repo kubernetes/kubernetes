@@ -376,7 +376,6 @@ message PodGroupTemplate {
   // +k8s:listType=map
   // +k8s:listMapKey=name
   // +k8s:maxItems=4
-  // +k8s:immutable
   // +featureGate=DRAWorkloadResourceClaims
   repeated PodGroupResourceClaim resourceClaims = 4;
 
