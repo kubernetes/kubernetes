@@ -33,16 +33,16 @@ const (
 	// VolumeGroupSnapshot is the group snapshot api
 	VolumeGroupSnapshotAPIGroup = "groupsnapshot.storage.k8s.io"
 	// VolumeGroupSnapshotAPIVersion is the group snapshot api version
-	VolumeGroupSnapshotAPIVersion = "groupsnapshot.storage.k8s.io/v1beta2"
+	VolumeGroupSnapshotAPIVersion = "groupsnapshot.storage.k8s.io/v1"
 )
 
 var (
 
 	// VolumeGroupSnapshotGVR is GroupVersionResource for volumegroupsnapshots
-	VolumeGroupSnapshotGVR = schema.GroupVersionResource{Group: VolumeGroupSnapshotAPIGroup, Version: "v1beta2", Resource: "volumegroupsnapshots"}
+	VolumeGroupSnapshotGVR = schema.GroupVersionResource{Group: VolumeGroupSnapshotAPIGroup, Version: "v1", Resource: "volumegroupsnapshots"}
 	// VolumeGroupSnapshotClassGVR is GroupVersionResource for volumegroupsnapshotsclasses
-	VolumeGroupSnapshotClassGVR   = schema.GroupVersionResource{Group: VolumeGroupSnapshotAPIGroup, Version: "v1beta2", Resource: "volumegroupsnapshotclasses"}
-	VolumeGroupSnapshotContentGVR = schema.GroupVersionResource{Group: VolumeGroupSnapshotAPIGroup, Version: "v1beta2", Resource: "volumegroupsnapshotcontents"}
+	VolumeGroupSnapshotClassGVR   = schema.GroupVersionResource{Group: VolumeGroupSnapshotAPIGroup, Version: "v1", Resource: "volumegroupsnapshotclasses"}
+	VolumeGroupSnapshotContentGVR = schema.GroupVersionResource{Group: VolumeGroupSnapshotAPIGroup, Version: "v1", Resource: "volumegroupsnapshotcontents"}
 )
 
 // WaitForVolumeGroupSnapshotReady waits for a VolumeGroupSnapshot to be ready to use or until timeout occurs, whichever comes first.
