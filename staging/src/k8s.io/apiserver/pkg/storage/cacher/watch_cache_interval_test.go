@@ -460,7 +460,7 @@ func TestCacheIntervalFromStoreSorted(t *testing.T) {
 			}
 
 			got := make([]string, 0, n)
-			for i := 0; i < n; i++ {
+			for range n {
 				ev, err := wci.Next()
 				if err != nil {
 					t.Fatal(err)
