@@ -331,6 +331,12 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.TooMany(field.NewPath("spec", "resourceClaims"), scheduling.MaxPodGroupResourceClaims+1, scheduling.MaxPodGroupResourceClaims).WithOrigin("maxItems"),
 			},
 		},
+		"empty claim name": {
+			input: mkValidPodGroup(addResourceClaims(scheduling.PodGroupResourceClaim{Name: "", ResourceClaimName: new("resource-claim")})),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "resourceClaims").Index(0).Child("name"), ""),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -685,6 +691,18 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 				field.Duplicate(field.NewPath("status", "resourceClaimStatuses").Index(2), nil),
 			},
 		},
+		"too many resource claim statuses": {
+			oldObj: mkValidPodGroup(setResourceVersion("1"),
+				addManyResourceClaims(scheduling.MaxPodGroupResourceClaims+1),
+			),
+			updateObj: mkValidPodGroup(setResourceVersion("1"),
+				addManyResourceClaims(scheduling.MaxPodGroupResourceClaims+1),
+				addManyResourceClaimStatuses(scheduling.MaxPodGroupResourceClaims+1),
+			),
+			expectedErrs: field.ErrorList{
+				field.TooMany(field.NewPath("status", "resourceClaimStatuses"), scheduling.MaxPodGroupResourceClaims+1, scheduling.MaxPodGroupResourceClaims).WithOrigin("maxItems"),
+			},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
@@ -786,6 +804,28 @@ func addResourceClaimStatuses(statuses ...scheduling.PodGroupResourceClaimStatus
 	return func(obj *scheduling.PodGroup) {
 		obj.Status.ResourceClaimStatuses = append(obj.Status.ResourceClaimStatuses, statuses...)
 	}
+}
+
+func addManyResourceClaims(n int) func(obj *scheduling.PodGroup) {
+	claims := make([]scheduling.PodGroupResourceClaim, n)
+	for i := range n {
+		claims[i] = scheduling.PodGroupResourceClaim{
+			Name:              "c" + strconv.Itoa(i),
+			ResourceClaimName: new("r" + strconv.Itoa(i)),
+		}
+	}
+	return addResourceClaims(claims...)
+}
+
+func addManyResourceClaimStatuses(n int) func(obj *scheduling.PodGroup) {
+	statuses := make([]scheduling.PodGroupResourceClaimStatus, n)
+	for i := range n {
+		statuses[i] = scheduling.PodGroupResourceClaimStatus{
+			Name:              "c" + strconv.Itoa(i),
+			ResourceClaimName: new("r" + strconv.Itoa(i)),
+		}
+	}
+	return addResourceClaimStatuses(statuses...)
 }
 
 func addCondition(conditionType string) func(obj *scheduling.PodGroup) {

@@ -349,6 +349,16 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				field.TooMany(field.NewPath("spec", "podGroupTemplates").Index(0).Child("resourceClaims"), scheduling.MaxPodGroupResourceClaims+1, scheduling.MaxPodGroupResourceClaims).WithOrigin("maxItems"),
 			},
 		},
+		"empty claim name": {
+			input: mkValidWorkload(addResourceClaims(scheduling.PodGroupResourceClaim{Name: "", ResourceClaimName: new("resource-claim")})),
+			expectedErrs: field.ErrorList{
+				field.Required(field.NewPath("spec", "podGroupTemplates").Index(0).Child("resourceClaims").Index(0).Child("name"), ""),
+			},
+		},
+		"schedulingConstraints set with TAS disabled": {
+			input:        mkValidWorkload(setSchedulingConstraints(0)),
+			expectedErrs: field.ErrorList{field.Forbidden(field.NewPath("spec", "podGroupTemplates").Index(0).Child("schedulingConstraints"), "")},
+		},
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
