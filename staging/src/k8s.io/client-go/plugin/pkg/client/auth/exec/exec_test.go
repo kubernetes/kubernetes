@@ -26,6 +26,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -41,8 +42,11 @@ import (
 	"testing"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/features"
+	featurestesting "k8s.io/client-go/features/testing"
 	"k8s.io/client-go/pkg/apis/clientauthentication"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/transport"
@@ -322,6 +326,8 @@ func TestRefreshCreds(t *testing.T) {
 		wantExpiry       time.Time
 		wantErr          bool
 		wantErrSubstr    string
+		wantStatusErr    bool
+		disableStatusErr bool
 	}{
 		{
 			name: "beta-with-TLS-credentials",
@@ -676,6 +682,103 @@ func TestRefreshCreds(t *testing.T) {
 			wantErrSubstr: "73",
 		},
 		{
+			name: "binary-fails-with-status",
+			config: api.ExecConfig{
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
+			},
+			exitCode: 1,
+			output: `{
+				"kind": "Status",
+				"apiVersion": "v1",
+				"status": "Failure",
+				"message": "plugin failed with status",
+				"reason": "Forbidden",
+				"code": 403
+			}`,
+			wantErr:       true,
+			wantErrSubstr: "plugin failed with status",
+			wantStatusErr: true,
+		},
+		{
+			name: "binary-fails-with-status-feature-disabled",
+			config: api.ExecConfig{
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
+			},
+			exitCode: 1,
+			output: `{
+				"kind": "Status",
+				"apiVersion": "v1",
+				"status": "Failure",
+				"message": "plugin failed with status",
+				"reason": "Forbidden",
+				"code": 403
+			}`,
+			wantErr:          true,
+			wantErrSubstr:    "failed with exit code 1",
+			wantStatusErr:    false,
+			disableStatusErr: true,
+		},
+		{
+			name: "binary-fails-with-invalid-status-too-large",
+			config: api.ExecConfig{
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
+				Env: []api.ExecEnvVar{
+					{Name: "TEST_GENERATE_LARGE_OUTPUT", Value: "true"},
+				},
+			},
+			exitCode:      1,
+			wantErr:       true,
+			wantErrSubstr: "failed with exit code 1",
+		},
+		{
+			name: "binary-fails-with-invalid-status-not-failure",
+			config: api.ExecConfig{
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
+			},
+			exitCode: 1,
+			output: `{
+				"kind": "Status",
+				"apiVersion": "v1",
+				"status": "Success",
+				"message": "plugin failed with status"
+			}`,
+			wantErr:       true,
+			wantErrSubstr: "failed with exit code 1",
+		},
+		{
+			name: "binary-fails-with-invalid-status-empty-status",
+			config: api.ExecConfig{
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
+			},
+			exitCode: 1,
+			output: `{
+				"kind": "Status",
+				"apiVersion": "v1",
+				"message": "plugin failed with status"
+			}`,
+			wantErr:       true,
+			wantErrSubstr: "failed with exit code 1",
+		},
+		{
+			name: "binary-fails-with-invalid-status-wrong-gvk",
+			config: api.ExecConfig{
+				APIVersion:      "client.authentication.k8s.io/v1beta1",
+				InteractiveMode: api.IfAvailableExecInteractiveMode,
+			},
+			exitCode: 1,
+			output: `{
+				"kind": "Config",
+				"apiVersion": "v1"
+			}`,
+			wantErr:       true,
+			wantErrSubstr: "failed with exit code 1",
+		},
+		{
 			name: "beta-with-cluster-and-provide-cluster-info-is-serialized",
 			config: api.ExecConfig{
 				APIVersion:         "client.authentication.k8s.io/v1beta1",
@@ -794,6 +897,11 @@ func TestRefreshCreds(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			if test.disableStatusErr {
+				featurestesting.SetFeatureDuringTest(t, features.ExecPluginStatusError, false)
+			} else if test.wantStatusErr {
+				featurestesting.SetFeatureDuringTest(t, features.ExecPluginStatusError, true)
+			}
 			c := test.config
 
 			if c.Command == "" {
@@ -820,8 +928,14 @@ func TestRefreshCreds(t *testing.T) {
 			if err := a.refreshCredsLocked(); err != nil {
 				if !test.wantErr {
 					t.Errorf("get token %v", err)
-				} else if !strings.Contains(err.Error(), test.wantErrSubstr) {
-					t.Errorf("expected error with substring '%v' got '%v'", test.wantErrSubstr, err.Error())
+				} else {
+					if !strings.Contains(err.Error(), test.wantErrSubstr) {
+						t.Errorf("expected error with substring '%v' got '%v'", test.wantErrSubstr, err.Error())
+					}
+					_, isStatusErr := errors.AsType[*apierrors.StatusError](err)
+					if test.wantStatusErr != isStatusErr {
+						t.Errorf("expected StatusError: %v, got: %v", test.wantStatusErr, isStatusErr)
+					}
 				}
 				return
 			}
