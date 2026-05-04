@@ -38,7 +38,7 @@ import (
 	"github.com/opencontainers/selinux/go-selinux"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.opentelemetry.io/otel/trace"
 
 	"k8s.io/client-go/informers"
@@ -643,6 +643,7 @@ func NewMainKubelet(ctx context.Context,
 		enableControllerAttachDetach: kubeCfg.EnableControllerAttachDetach,
 		makeIPTablesUtilChains:       kubeCfg.MakeIPTablesUtilChains,
 		nodeStatusMaxImages:          nodeStatusMaxImages,
+		pluginManagerStopCh:          wait.NeverStop,
 		tracer:                       tracer,
 		nodeStartupLatencyTracker:    kubeDeps.NodeStartupLatencyTracker,
 		podStartupLatencyTracker:     kubeDeps.PodStartupLatencyTracker,
@@ -818,7 +819,6 @@ func NewMainKubelet(ctx context.Context,
 	klet.containerRuntime = runtime
 	klet.streamingRuntime = runtime
 	klet.runner = runtime
-	klet.allocationManager.SetContainerRuntime(runtime)
 	resizeAdmitHandler := allocation.NewPodResizesAdmitHandler(klet.containerManager, runtime, klet.allocationManager, logger)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime, runtimeCacheRefreshPeriod)
@@ -900,7 +900,7 @@ func NewMainKubelet(ctx context.Context,
 		return nil, err
 	}
 	klet.containerGC = containerGC
-	klet.containerDeletor = newPodContainerDeletor(klet.containerRuntime, max(containerGCPolicy.MaxPerPodContainer, minDeadContainerInPod))
+	klet.containerDeletor = newPodContainerDeletor(logger, klet.containerRuntime, max(containerGCPolicy.MaxPerPodContainer, minDeadContainerInPod))
 
 	// setup imageManager
 	imageManager, err := images.NewImageGCManager(klet.containerRuntime, klet.StatsProvider, postImageGCHooks, kubeDeps.Recorder, nodeRef, imageGCPolicy, kubeDeps.TracerProvider)
@@ -1558,6 +1558,10 @@ type Kubelet struct {
 	// plugins need to be registered/unregistered based on this node and makes it so.
 	pluginManager pluginmanager.PluginManager
 
+	// pluginManagerStopCh controls plugin manager shutdown. Production kubelets
+	// use wait.NeverStop, while tests may inject a closable channel.
+	pluginManagerStopCh <-chan struct{}
+
 	// This flag sets a maximum number of images to report in the node status.
 	nodeStatusMaxImages int32
 
@@ -1837,7 +1841,11 @@ func (kl *Kubelet) initializeRuntimeDependentModules(ctx context.Context) {
 
 	// Start the plugin manager
 	logger.V(4).Info("Starting plugin manager")
-	go kl.pluginManager.Run(ctx, kl.sourcesReady, wait.NeverStop)
+	pluginManagerStopCh := kl.pluginManagerStopCh
+	if pluginManagerStopCh == nil {
+		pluginManagerStopCh = wait.NeverStop
+	}
+	go kl.pluginManager.Run(ctx, kl.sourcesReady, pluginManagerStopCh)
 
 	err = kl.shutdownManager.Start(ctx)
 	if err != nil {
@@ -3171,7 +3179,7 @@ func (kl *Kubelet) HandlePodReconcile(ctx context.Context, pods []*v1.Pod) {
 		// can do better. If it's about preserving pod status info we can also do better.
 		if eviction.PodIsEvicted(pod.Status) {
 			if podStatus, err := kl.podCache.Get(pod.UID); err == nil {
-				kl.containerDeletor.deleteContainersInPod("", podStatus, true)
+				kl.containerDeletor.deleteContainersInPod(logger, "", podStatus, true)
 			}
 		}
 	}
@@ -3371,7 +3379,7 @@ func (kl *Kubelet) cleanUpContainersInPod(ctx context.Context, podID types.UID, 
 	if podStatus, err := kl.podCache.Get(podID); err == nil {
 		// When an evicted or deleted pod has already synced, all containers can be removed.
 		removeAll := kl.podWorkers.ShouldPodContentBeRemoved(podID)
-		kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, removeAll)
+		kl.containerDeletor.deleteContainersInPod(klog.FromContext(ctx), exitedContainerID, podStatus, removeAll)
 	}
 }
 

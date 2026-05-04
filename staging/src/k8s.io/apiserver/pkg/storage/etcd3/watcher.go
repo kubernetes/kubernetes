@@ -43,6 +43,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/clock"
 )
 
 const (
@@ -50,6 +51,9 @@ const (
 	incomingBufSize         = 100
 	outgoingBufSize         = 100
 	processEventConcurrency = 10
+
+	watchChanLogWarningInterval  = 5 * time.Second
+	watchChanLogWarningThreshold = 100 * time.Millisecond
 )
 
 // defaultWatcherMaxLimit is used to facilitate construction tests
@@ -94,6 +98,9 @@ type watchChan struct {
 	incomingEventChan        chan *event
 	resultChan               chan watch.Event
 	getResourceSizeEstimator func() *resourceSizeEstimator
+
+	incomingEventLogger *blockLogger
+	resultLogger        *blockLogger
 }
 
 // Watch watches on a key and returns a watch.Interface that transfers relevant notifications.
@@ -144,6 +151,10 @@ func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, re
 		wc.internalPred = storage.Everything
 	}
 	wc.ctx, wc.cancel = context.WithCancel(ctx)
+
+	wc.incomingEventLogger = newBlockLogger(watchChanLogWarningInterval, watchChanLogWarningThreshold, "Fast watcher, slow processing. Probably caused by slow decoding, user not receiving fast, or other processing logic", wc.watcher.objectType, wc.watcher.groupResource, clock.RealClock{})
+	wc.resultLogger = newBlockLogger(watchChanLogWarningInterval, watchChanLogWarningThreshold, "Fast watcher, slow processing. Probably caused by slow dispatching events to watchers", wc.watcher.objectType, wc.watcher.groupResource, clock.RealClock{})
+
 	return wc
 }
 
@@ -674,9 +685,8 @@ func (wc *watchChan) sendError(err error) {
 // sendEvent synchronously puts an event into resultChan.
 // Returns true if it was successful.
 func (wc *watchChan) sendEvent(event *watch.Event) bool {
-	if len(wc.resultChan) == cap(wc.resultChan) {
-		klog.V(3).InfoS("Fast watcher, slow processing. Probably caused by slow dispatching events to watchers", "outgoingEvents", outgoingBufSize, "objectType", wc.watcher.objectType, "groupResource", wc.watcher.groupResource)
-	}
+	defer func(start time.Time) { wc.resultLogger.recordWait(time.Since(start)) }(time.Now())
+
 	// If user couldn't receive results fast enough, we also block incoming events from watcher.
 	// Because storing events in local will cause more memory usage.
 	// The worst case would be closing the fast watcher.
@@ -689,9 +699,8 @@ func (wc *watchChan) sendEvent(event *watch.Event) bool {
 }
 
 func (wc *watchChan) queueEvent(e *event) {
-	if len(wc.incomingEventChan) == incomingBufSize {
-		klog.V(3).InfoS("Fast watcher, slow processing. Probably caused by slow decoding, user not receiving fast, or other processing logic", "incomingEvents", incomingBufSize, "objectType", wc.watcher.objectType, "groupResource", wc.watcher.groupResource)
-	}
+	defer func(start time.Time) { wc.incomingEventLogger.recordWait(time.Since(start)) }(time.Now())
+
 	select {
 	case wc.incomingEventChan <- e:
 	case <-wc.ctx.Done():

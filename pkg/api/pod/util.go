@@ -486,6 +486,9 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		// If old spec has userns and volume devices (doesn't work), we still allow
 		// modifications to it.
 		opts.AllowUserNamespacesWithVolumeDevices = hasUserNamespacesWithVolumeDevices(oldPodSpec)
+
+		// If old spec already had an image volume with empty reference, allow it
+		opts.AllowEmptyImageVolumeReference = hasEmptyImageVolumeReference(oldPodSpec)
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
@@ -770,14 +773,6 @@ func dropDisabledFields(
 		for i := range podSpec.EphemeralContainers {
 			podSpec.EphemeralContainers[i].ResizePolicy = nil
 		}
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) && !restartableInitContainersInUse(oldPodSpec) {
-		// Drop the RestartPolicy field of init containers.
-		for i := range podSpec.InitContainers {
-			podSpec.InitContainers[i].RestartPolicy = nil
-		}
-		// For other types of containers, validateContainers will handle them.
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ContainerRestartRules) && !containerRestartRulesInUse(oldPodSpec) {
@@ -1477,23 +1472,6 @@ func procMountInUse(podSpec *api.PodSpec) bool {
 	return inUse
 }
 
-// restartableInitContainersInUse returns true if the pod spec is non-nil and
-// it has any init container with ContainerRestartPolicyAlways.
-func restartableInitContainersInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	var inUse bool
-	VisitContainers(podSpec, InitContainers, func(c *api.Container, containerType ContainerType) bool {
-		if c.RestartPolicy != nil && *c.RestartPolicy == api.ContainerRestartPolicyAlways {
-			inUse = true
-			return false
-		}
-		return true
-	})
-	return inUse
-}
-
 func clusterTrustBundleProjectionInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
 		return false
@@ -1781,6 +1759,19 @@ func hasRestartableInitContainerResizePolicy(podSpec *api.PodSpec) bool {
 	}
 	for _, c := range podSpec.InitContainers {
 		if IsRestartableInitContainer(&c) && len(c.ResizePolicy) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// hasEmptyImageVolumeReference returns true if the pod spec has any image volume with an empty reference.
+func hasEmptyImageVolumeReference(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for _, v := range podSpec.Volumes {
+		if v.Image != nil && len(v.Image.Reference) == 0 {
 			return true
 		}
 	}

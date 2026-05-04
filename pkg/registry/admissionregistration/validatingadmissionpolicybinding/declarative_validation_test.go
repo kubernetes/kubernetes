@@ -67,7 +67,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
-			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs)
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, &Strategy, tc.expectedErrs)
 		})
 	}
 }
@@ -117,7 +117,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				IsResourceRequest: true,
 				Verb:              "update",
 			})
-			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, Strategy.ValidateUpdate, tc.expectedErrs)
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, &Strategy, tc.expectedErrs)
 		})
 	}
 }

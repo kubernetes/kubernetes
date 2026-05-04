@@ -81,5 +81,6 @@ func Register() {
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(MaxUnavailable)
 		legacyregistry.MustRegister(UnavailableReplicas)
+		legacyregistry.MustRegister(StatefulSetRequeueSkips)
 	})
 }

@@ -64,7 +64,7 @@ func Test(t *testing.T) {
 	st.Value(&structA).OldValue(&structA2).ExpectValid()
 	st.Value(&structA2).OldValue(&structA).ExpectValid()
 
-	st.Value(&structA).OldValue(&structB).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin(), field.ErrorList{
+	st.Value(&structA).OldValue(&structB).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin().MatchShortCircuit(), field.ErrorList{
 		field.Invalid(field.NewPath("stringField"), nil, "").WithOrigin("immutable"),
 		field.Invalid(field.NewPath("stringPtrField"), nil, "").WithOrigin("immutable"),
 		field.Invalid(field.NewPath("structField"), nil, "").WithOrigin("immutable"),
@@ -75,5 +75,5 @@ func Test(t *testing.T) {
 		field.Invalid(field.NewPath("mapField"), nil, "").WithOrigin("immutable"),
 		field.Invalid(field.NewPath("immutableField"), nil, "").WithOrigin("immutable"),
 		field.Invalid(field.NewPath("immutablePtrField"), nil, "").WithOrigin("immutable"),
-	})
+	}.MarkShortCircuit())
 }

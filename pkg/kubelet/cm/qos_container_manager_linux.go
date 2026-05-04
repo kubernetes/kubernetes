@@ -353,9 +353,9 @@ func (m *qosContainerManagerImpl) UpdateCgroups(logger logr.Logger) error {
 		return err
 	}
 
-	// Update cgroup v2 memory.min settings. Called regardless of the MemoryQoS
-	// feature gate to clear stale values when the feature is disabled.
-	if libcontainercgroups.IsCgroup2UnifiedMode() {
+	// Update cgroup v2 memory.min settings. Called only when MemoryQoS is
+	// enabled and cgroups v2 is the unified mode.
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) && libcontainercgroups.IsCgroup2UnifiedMode() {
 		m.setMemoryQoS(logger, qosConfigs)
 	}
 

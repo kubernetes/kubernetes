@@ -690,13 +690,9 @@ func TestEphemeralStorageResource(t *testing.T) {
 }
 
 func Test_AddPodGroupMember(t *testing.T) {
-	podGroupName := "pg"
-	// Pod with no pod group name.
-	pod1 := st.MakePod().Namespace("namespace").Name("non-workload-pod").Obj()
-	// Unscheduled pod with a pod group name.
-	pod2 := st.MakePod().Namespace("namespace").Name("unscheduled-pod").PodGroupName(podGroupName).Obj()
-	// Assigned pod with the same pod group name.
-	pod3 := st.MakePod().Namespace("namespace").Name("assigned-pod").Node("node1").PodGroupName(podGroupName).Obj()
+	podWithNoPodGroup := st.MakePod().Namespace("namespace").Name("non-workload-pod").Obj()
+	unscheduledPodGroupMember := st.MakePod().Namespace("namespace").Name("unscheduled-pod").PodGroupName("pg").Obj()
+	assignedPodGroupMember := st.MakePod().Namespace("namespace").Name("assigned-pod").Node("node1").PodGroupName("pg").Obj()
 
 	tests := []struct {
 		name                    string
@@ -706,24 +702,24 @@ func Test_AddPodGroupMember(t *testing.T) {
 		expectInAssignedPods    bool
 	}{
 		{
-			name:                   "generic workload disabled",
-			pod:                    pod2,
+			name:                   "add pod group member with GenericWorkload disabled should be no-op",
+			pod:                    unscheduledPodGroupMember,
 			genericWorkloadEnabled: false,
 		},
 		{
-			name:                   "pod with no pod group name",
-			pod:                    pod1,
+			name:                   "add pod with no pod group name",
+			pod:                    podWithNoPodGroup,
 			genericWorkloadEnabled: true,
 		},
 		{
-			name:                    "unscheduled pod with a pod group name",
-			pod:                     pod2,
+			name:                    "add unscheduled pod group member",
+			pod:                     unscheduledPodGroupMember,
 			genericWorkloadEnabled:  true,
 			expectInUnscheduledPods: true,
 		},
 		{
-			name:                   "assigned pod with a pod group name",
-			pod:                    pod3,
+			name:                   "add assigned pod group member",
+			pod:                    assignedPodGroupMember,
 			genericWorkloadEnabled: true,
 			expectInAssignedPods:   true,
 		},
@@ -734,19 +730,16 @@ func Test_AddPodGroupMember(t *testing.T) {
 			cache := newCache(context.Background(), time.Second, nil, tt.genericWorkloadEnabled)
 			cache.AddPodGroupMember(tt.pod)
 
-			if tt.pod.Spec.SchedulingGroup == nil {
-				if tt.expectInAssignedPods || tt.expectInUnscheduledPods {
-					t.Errorf("Expected pod group to exist, but pod has no pod group")
+			if !tt.genericWorkloadEnabled || tt.pod.Spec.SchedulingGroup == nil {
+				if count := len(cache.podGroupStates); count != 0 {
+					t.Errorf("Expected no pod groups states to exist in cache, but found %d", count)
 				}
 				return
 			}
 
 			podGroupState, err := cache.PodGroupStates().Get(tt.pod.Namespace, *tt.pod.Spec.SchedulingGroup.PodGroupName)
 			if err != nil {
-				if tt.genericWorkloadEnabled {
-					t.Errorf("Expected pod group to exist, but got error: %v", err)
-				}
-				return
+				t.Fatalf("Unexpected error getting pod group state: %v", err)
 			}
 
 			_, inUnscheduledPods := podGroupState.UnscheduledPods()[tt.pod.Name]
@@ -788,20 +781,19 @@ func Test_UpdatePodGroupMember(t *testing.T) {
 		expectInAssignedPods    bool
 	}{
 		{
-			name:                    "updating a pod with genericWorkload disabled should be a no-op",
-			oldPod:                  pod,
-			newPod:                  updatedPod,
-			genericWorkloadEnabled:  false,
-			expectInUnscheduledPods: true,
+			name:                   "update a pod group member with GenericWorkload disabled should be a no-op",
+			oldPod:                 pod,
+			newPod:                 updatedPod,
+			genericWorkloadEnabled: false,
 		},
 		{
-			name:                   "update a pod with no pod group name should be a no-op",
+			name:                   "update a pod with no pod group name",
 			oldPod:                 noPodGroupPod,
 			newPod:                 updatedNoPodGroupPod,
 			genericWorkloadEnabled: true,
 		},
 		{
-			name:                    "update a pod",
+			name:                    "update a pod group member, add label",
 			isAssumedPod:            true,
 			oldPod:                  pod,
 			newPod:                  updatedPod,
@@ -809,7 +801,7 @@ func Test_UpdatePodGroupMember(t *testing.T) {
 			expectInUnscheduledPods: true,
 		},
 		{
-			name:                   "update a pod, move to assigned",
+			name:                   "update an unscheduled pod group member, set NodeName",
 			isAssumedPod:           true,
 			oldPod:                 pod,
 			newPod:                 assignedPod,
@@ -821,9 +813,8 @@ func Test_UpdatePodGroupMember(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			cache := newCache(context.Background(), time.Second, nil, true)
+			cache := newCache(context.Background(), time.Second, nil, tt.genericWorkloadEnabled)
 			cache.AddPodGroupMember(tt.oldPod)
-			cache.genericWorkloadEnabled = tt.genericWorkloadEnabled
 
 			newPod := tt.newPod
 			if newPod == nil {
@@ -831,16 +822,16 @@ func Test_UpdatePodGroupMember(t *testing.T) {
 			}
 			cache.UpdatePodGroupMember(logger, tt.oldPod, newPod)
 
-			if newPod.Spec.SchedulingGroup == nil {
-				if tt.expectInAssumedPods || tt.expectInUnscheduledPods || tt.expectInAssignedPods {
-					t.Errorf("Expected pod group to exist, but pod has no SchedulingGroup")
+			if !tt.genericWorkloadEnabled || newPod.Spec.SchedulingGroup == nil {
+				if count := len(cache.podGroupStates); count != 0 {
+					t.Errorf("Expected no pod groups states to exist in cache, but found %d", count)
 				}
 				return
 			}
 
 			podGroupState, err := cache.PodGroupStates().Get(newPod.Namespace, *newPod.Spec.SchedulingGroup.PodGroupName)
 			if err != nil {
-				return
+				t.Fatalf("Unexpected error getting pod group state: %v", err)
 			}
 
 			_, inUnscheduledPods := podGroupState.UnscheduledPods()[newPod.Name]
@@ -854,10 +845,6 @@ func Test_UpdatePodGroupMember(t *testing.T) {
 
 			if inAssumedPods := podGroupState.AssumedPods().Has(newPod.UID); inAssumedPods != tt.expectInAssumedPods {
 				t.Errorf("expected pod in AssumedPods: %v, got %v", tt.expectInAssumedPods, inAssumedPods)
-			}
-
-			if !tt.genericWorkloadEnabled {
-				return
 			}
 
 			podGroupKey := newPodGroupKey(newPod.Namespace, *newPod.Spec.SchedulingGroup.PodGroupName)
@@ -904,13 +891,7 @@ func Test_RemovePodGroupMember(t *testing.T) {
 			genericWorkloadEnabled:   true,
 		},
 		{
-			name:                     "remove a non-existent pod from a group should be a no-op",
-			podToDelete:              pod1,
-			expectPodGroupStateCount: 0,
-			genericWorkloadEnabled:   true,
-		},
-		{
-			name:                     "remove a pod while generic workload disabled should be a no-op",
+			name:                     "remove a pod with GenericWorkload disabled should be a no-op",
 			initPods:                 []*v1.Pod{pod1},
 			expectPodGroupStateCount: 0,
 			podToDelete:              pod1,
@@ -1025,51 +1006,68 @@ func TestUpdatePodGroupStateSnapshot(t *testing.T) {
 	}
 }
 
-// TestBindingPodGroupMember simulates binding and tests that when an assumed pod
-// gets bound, its state within pod group transitions from assumed to assigned.
+// TestBindingPodGroupMember simulates binding and tests that when an assumed or
+// unscheduled pod gets bound, its state within pod group becomes assigned.
 func TestBindingPodGroupMember(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	cache := newCache(ctx, time.Second, nil, true)
-	podGroupName := "pg"
-	pod := st.MakePod().Namespace("namespace").Name("pod1").UID("pod1-uid").
-		PodGroupName(podGroupName).Obj()
-
-	// Simulate the informer firing an Add event for an unscheduled
-	// pod (no NodeName set) reflecting on PodGroupStates.
-	cache.AddPodGroupMember(pod)
-
-	// Simulate the scheduler assuming the pod on a node.
-	assumedPod := pod.DeepCopy()
-	assumedPod.Spec.NodeName = "node1"
-	if err := cache.AssumePod(logger, assumedPod); err != nil {
-		t.Fatalf("AssumePod failed: %v", err)
+	tests := []struct {
+		name         string
+		pod          *v1.Pod
+		assumedPod   *v1.Pod
+		scheduledPod *v1.Pod
+	}{
+		{
+			name: "bind unscheduled pod group member",
+			pod: st.MakePod().Namespace("namespace").Name("pod1").UID("pod1-uid").
+				PodGroupName("pg").Obj(),
+			scheduledPod: st.MakePod().Namespace("namespace").Name("pod1").UID("pod1-uid").
+				PodGroupName("pg").Node("node1").Obj(),
+		},
+		{
+			name: "bind assumed pod group member",
+			pod: st.MakePod().Namespace("namespace").Name("pod1").UID("pod1-uid").
+				PodGroupName("pg").Obj(),
+			assumedPod: st.MakePod().Namespace("namespace").Name("pod1").UID("pod1-uid").
+				PodGroupName("pg").Node("node1").Obj(),
+			scheduledPod: st.MakePod().Namespace("namespace").Name("pod1").UID("pod1-uid").
+				PodGroupName("pg").Node("node1").Obj(),
+		},
 	}
 
-	podGroupState, err := cache.PodGroupStates().Get(pod.Namespace, podGroupName)
-	if err != nil {
-		t.Fatalf("Unexpected error getting pod group state after AssumePod: %v", err)
-	}
-	if !podGroupState.AssumedPods().Has(assumedPod.UID) {
-		t.Errorf("Expected pod to be in AssumedPods after AssumePod")
-	}
-	if podGroupState.AssignedPods().Has(assumedPod.UID) {
-		t.Errorf("Expected pod NOT to be in AssignedPods after AssumePod")
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			cache := newCache(ctx, time.Second, nil, true)
 
-	// Simulate binding confirmation: the informer fires an Add event with NodeName set.
-	if err := cache.AddPod(logger, assumedPod); err != nil {
-		t.Fatalf("AddPod (binding confirmation) failed: %v", err)
-	}
+			// Simulate the informer firing an Add event for an unscheduled pod.
+			cache.AddPodGroupMember(tt.pod)
 
-	podGroupState, err = cache.PodGroupStates().Get(pod.Namespace, podGroupName)
-	if err != nil {
-		t.Fatalf("Unexpected error getting pod group state after AddPod: %v", err)
-	}
-	if podGroupState.AssumedPods().Has(assumedPod.UID) {
-		t.Errorf("Expected pod not to be in AssumedPods after binding confirmation")
-	}
-	if !podGroupState.AssignedPods().Has(assumedPod.UID) {
-		t.Errorf("Expected pod to be in AssignedPods after binding confirmation")
+			if tt.assumedPod != nil {
+				if err := cache.AssumePod(logger, tt.assumedPod); err != nil {
+					t.Fatalf("AssumePod failed: %v", err)
+				}
+			}
+
+			// Simulate the informer firing an Add event with NodeName set to bind a pod.
+			if err := cache.AddPod(logger, tt.scheduledPod); err != nil {
+				t.Fatalf("AddPod (binding) failed: %v", err)
+			}
+
+			podGroupState, err := cache.PodGroupStates().Get(tt.pod.Namespace, *tt.pod.Spec.SchedulingGroup.PodGroupName)
+			if err != nil {
+				t.Fatalf("Unexpected error getting pod group state: %v", err)
+			}
+			if !podGroupState.AssignedPods().Has(tt.pod.UID) {
+				t.Errorf("Expected pod to be in AssignedPods after binding")
+			}
+			if podGroupState.AssumedPods().Has(tt.pod.UID) {
+				t.Errorf("Expected pod not to be in AssumedPods after binding")
+			}
+			if podGroupState.UnscheduledPods()[tt.pod.Name] != nil {
+				t.Errorf("Expected pod not to be in UnscheduledPods after binding")
+			}
+		})
 	}
 }
 
@@ -1192,6 +1190,145 @@ func TestForgetPod(t *testing.T) {
 		if err := cache.ForgetPod(logger, pod); err != nil {
 			t.Error("expected no error, error found")
 		}
+	}
+}
+
+func TestForgetPodGroupMember(t *testing.T) {
+	pod := st.MakePod().Namespace("test-ns").Name("pod-0").UID("uid-0").
+		PodGroupName("pg").Obj()
+	podWithNodeName := st.MakePod().Namespace("test-ns").Name("pod-0").UID("uid-0").
+		Node("node-1").PodGroupName("pg").Obj()
+
+	tests := []struct {
+		name                   string
+		pod                    *v1.Pod
+		expectInAssigned       bool
+		expectInUnscheduled    bool
+		genericWorkloadEnabled bool
+	}{
+		{
+			name: "forget pod group member with GenericWorkload disabled",
+			pod:  pod,
+		},
+		{
+			name:                   "add pod group member without NodeName, then call assume and forget",
+			pod:                    pod,
+			genericWorkloadEnabled: true,
+			expectInUnscheduled:    true,
+		},
+		{
+			name:                   "add pod group member with NodeName, then call assume and forget",
+			pod:                    podWithNodeName,
+			genericWorkloadEnabled: true,
+			expectInAssigned:       true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled)
+			cache.AddPodGroupMember(tt.pod)
+			if err := cache.AssumePod(logger, podWithNodeName); err != nil {
+				t.Fatalf("AssumePod failed: %v", err)
+			}
+
+			if err := cache.ForgetPod(logger, podWithNodeName); err != nil {
+				t.Fatalf("ForgetPod failed: %v", err)
+			}
+
+			if !tt.genericWorkloadEnabled {
+				if count := len(cache.podGroupStates); count != 0 {
+					t.Errorf("Expected no pod group states to exist in cache, but found %d", count)
+				}
+				return
+			}
+
+			pgs, err := cache.PodGroupStates().Get("test-ns", *tt.pod.Spec.SchedulingGroup.PodGroupName)
+			if err != nil {
+				t.Fatalf("expected pod group state to exist, but got error: %v", err)
+			}
+
+			if pgs.AssumedPods().Has(tt.pod.UID) {
+				t.Fatalf("pod cannot be in AssumedPods after ForgetPod")
+			}
+
+			if inAssigned := pgs.AssignedPods().Has(tt.pod.UID); inAssigned != tt.expectInAssigned {
+				t.Errorf("pod in assignedPods: got %v, want %v", inAssigned, tt.expectInAssigned)
+			}
+			if inUnscheduled := pgs.UnscheduledPods()[tt.pod.Name] != nil; inUnscheduled != tt.expectInUnscheduled {
+				t.Errorf("pod in unscheduledPods: got %v, want %v", inUnscheduled, tt.expectInUnscheduled)
+			}
+		})
+	}
+}
+
+func TestAssumePodGroupMember(t *testing.T) {
+	pod := st.MakePod().Namespace("test-ns").Name("pod-0").UID("uid-0").
+		PodGroupName("pg").Obj()
+	podWithNodeName := st.MakePod().Namespace("test-ns").Name("pod-0").UID("uid-0").
+		Node("node-1").PodGroupName("pg").Obj()
+
+	tests := []struct {
+		name                   string
+		genericWorkloadEnabled bool
+		pod                    *v1.Pod
+		expectInAssumed        bool
+		expectInAssigned       bool
+	}{
+		{
+			name: "assume a pod group member with GenericWorkload disabled",
+			pod:  pod,
+		},
+		{
+			name:                   "add pod group member without NodeName, then call assume",
+			pod:                    pod,
+			genericWorkloadEnabled: true,
+			expectInAssumed:        true,
+		},
+		{
+			name:                   "add pod group member with NodeName, then call assume",
+			pod:                    podWithNodeName,
+			genericWorkloadEnabled: true,
+			expectInAssigned:       true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			cache := newCache(ctx, time.Second, nil, tt.genericWorkloadEnabled)
+			cache.AddPodGroupMember(tt.pod)
+
+			if err := cache.AssumePod(logger, podWithNodeName); err != nil {
+				t.Fatalf("AssumePod failed: %v", err)
+			}
+
+			if !tt.genericWorkloadEnabled {
+				if count := len(cache.podGroupStates); count != 0 {
+					t.Errorf("Expected no pod group states to exist in cache, but found %d", count)
+				}
+				return
+			}
+
+			pgs, err := cache.PodGroupStates().Get("test-ns", *pod.Spec.SchedulingGroup.PodGroupName)
+			if err != nil {
+				t.Fatalf("unexpected error getting pod group state: %v", err)
+			}
+
+			if inAssigned := pgs.AssignedPods().Has(tt.pod.UID); inAssigned != tt.expectInAssigned {
+				t.Errorf("pod in assignedPods: got %v, want %v", inAssigned, tt.expectInAssigned)
+			}
+			if inAssumed := pgs.AssumedPods().Has(tt.pod.UID); inAssumed != tt.expectInAssumed {
+				t.Errorf("pod in assumedPods: got %v, want %v", inAssumed, tt.expectInAssumed)
+			}
+		})
 	}
 }
 

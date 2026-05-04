@@ -78,6 +78,18 @@ func MaxItems[T any](_ context.Context, _ operation.Operation, fldPath *field.Pa
 	return nil
 }
 
+// MaxProperties verifies that the specified map has no more than max keys.
+func MaxProperties[K comparable, V any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ map[K]V, max int) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+
+	if len(value) > max {
+		return field.ErrorList{field.TooMany(fldPath, len(value), max).WithOrigin("maxProperties")}
+	}
+	return nil
+}
+
 // MinItems verifies that the specified slice is not shorter than min items.
 func MinItems[T any](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ []T, min int) field.ErrorList {
 	if len(value) < min {

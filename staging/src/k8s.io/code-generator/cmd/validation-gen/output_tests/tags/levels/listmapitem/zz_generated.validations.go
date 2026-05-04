@@ -39,160 +39,303 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	// type ListMapItemStruct
-	scheme.AddValidationFunc((*ListMapItemStruct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_ListMapItemStruct(ctx, op, nil /* fldPath */, obj.(*ListMapItemStruct), safe.Cast[*ListMapItemStruct](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*ListMapItemStruct)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_ListMapItemStruct(
+					ctx, op, nil, /* fldPath */
+					obj.(*ListMapItemStruct),
+					safe.Cast[*ListMapItemStruct](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
 // Validate_ListMapItemStruct validates an instance of ListMapItemStruct according
 // to declarative validation rules in the API schema.
-func Validate_ListMapItemStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ListMapItemStruct) (errs field.ErrorList) {
+func Validate_ListMapItemStruct(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *ListMapItemStruct) (errs field.ErrorList) {
+
 	// field ListMapItemStruct.TypeMeta has no validation
 
-	// field ListMapItemStruct.StandardItem
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []MapItem, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field ListMapItemStruct.StandardItem
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []MapItem,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a MapItem, b MapItem) bool { return a.Key == b.Key })...)
-			func() { // cohort {"key": "foo"}
-				errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
-					return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value", func(o *MapItem) *int { return &o.Value }, validate.DirectEqualPtr, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
-						return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10)
-					})
-				})...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+				func(a MapItem, b MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			func() { // cohort = "{"key": "foo"}"
+				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+					func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
+						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
+							func(o *MapItem) *int { return &o.Value }, validate.DirectEqualPtr,
+							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
+								return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10)
+							})
+					}); len(e) != 0 {
+					errs = append(errs, e...)
+				}
 			}()
 			return
-		}(fldPath.Child("standardItem"), obj.StandardItem, safe.Field(oldObj, func(oldObj *ListMapItemStruct) []MapItem { return oldObj.StandardItem }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *ListMapItemStruct) []MapItem {
+				return oldObj.StandardItem
+			})
+		errs = append(errs, fn(fldPath.Child("standardItem"), obj.StandardItem, oldVal, oldObj != nil)...)
+	}
 
-	// field ListMapItemStruct.AlphaItemTag
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []MapItem, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field ListMapItemStruct.AlphaItemTag
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []MapItem,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a MapItem, b MapItem) bool { return a.Key == b.Key })...)
-			func() { // cohort {"key": "foo"}
-				errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
-					return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value", func(o *MapItem) *int { return &o.Value }, validate.DirectEqualPtr, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
-						return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10)
-					})
-				}).MarkAlpha()...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+				func(a MapItem, b MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			func() { // cohort = "{"key": "foo"}"
+				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+					func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
+						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
+							func(o *MapItem) *int { return &o.Value }, validate.DirectEqualPtr,
+							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
+								return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10)
+							})
+					}).MarkAlpha(); len(e) != 0 {
+					errs = append(errs, e...)
+				}
 			}()
 			return
-		}(fldPath.Child("alphaItemTag"), obj.AlphaItemTag, safe.Field(oldObj, func(oldObj *ListMapItemStruct) []MapItem { return oldObj.AlphaItemTag }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *ListMapItemStruct) []MapItem {
+				return oldObj.AlphaItemTag
+			})
+		errs = append(errs, fn(fldPath.Child("alphaItemTag"), obj.AlphaItemTag, oldVal, oldObj != nil)...)
+	}
 
-	// field ListMapItemStruct.AlphaValidation
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []MapItem, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field ListMapItemStruct.AlphaValidation
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []MapItem,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a MapItem, b MapItem) bool { return a.Key == b.Key })...)
-			func() { // cohort {"key": "foo"}
-				errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
-					return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value", func(o *MapItem) *int { return &o.Value }, validate.DirectEqualPtr, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
-						return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha()
-					})
-				})...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+				func(a MapItem, b MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			func() { // cohort = "{"key": "foo"}"
+				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+					func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
+						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
+							func(o *MapItem) *int { return &o.Value }, validate.DirectEqualPtr,
+							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
+								return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha()
+							})
+					}); len(e) != 0 {
+					errs = append(errs, e...)
+				}
 			}()
 			return
-		}(fldPath.Child("alphaValidation"), obj.AlphaValidation, safe.Field(oldObj, func(oldObj *ListMapItemStruct) []MapItem { return oldObj.AlphaValidation }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *ListMapItemStruct) []MapItem {
+				return oldObj.AlphaValidation
+			})
+		errs = append(errs, fn(fldPath.Child("alphaValidation"), obj.AlphaValidation, oldVal, oldObj != nil)...)
+	}
 
-	// field ListMapItemStruct.DoubleAlpha
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []MapItem, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field ListMapItemStruct.DoubleAlpha
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []MapItem,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a MapItem, b MapItem) bool { return a.Key == b.Key })...)
-			func() { // cohort {"key": "foo"}
-				errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
-					return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value", func(o *MapItem) *int { return &o.Value }, validate.DirectEqualPtr, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
-						return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha()
-					})
-				}).MarkAlpha()...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+				func(a MapItem, b MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			func() { // cohort = "{"key": "foo"}"
+				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+					func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
+						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
+							func(o *MapItem) *int { return &o.Value }, validate.DirectEqualPtr,
+							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
+								return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha()
+							})
+					}).MarkAlpha(); len(e) != 0 {
+					errs = append(errs, e...)
+				}
 			}()
 			return
-		}(fldPath.Child("doubleAlpha"), obj.DoubleAlpha, safe.Field(oldObj, func(oldObj *ListMapItemStruct) []MapItem { return oldObj.DoubleAlpha }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *ListMapItemStruct) []MapItem {
+				return oldObj.DoubleAlpha
+			})
+		errs = append(errs, fn(fldPath.Child("doubleAlpha"), obj.DoubleAlpha, oldVal, oldObj != nil)...)
+	}
 
-	// field ListMapItemStruct.BetaItemTag
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []MapItem, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field ListMapItemStruct.BetaItemTag
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []MapItem,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a MapItem, b MapItem) bool { return a.Key == b.Key })...)
-			func() { // cohort {"key": "foo"}
-				errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
-					return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value", func(o *MapItem) *int { return &o.Value }, validate.DirectEqualPtr, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
-						return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10)
-					})
-				}).MarkBeta()...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+				func(a MapItem, b MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			func() { // cohort = "{"key": "foo"}"
+				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+					func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
+						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
+							func(o *MapItem) *int { return &o.Value }, validate.DirectEqualPtr,
+							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
+								return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10)
+							})
+					}).MarkBeta(); len(e) != 0 {
+					errs = append(errs, e...)
+				}
 			}()
 			return
-		}(fldPath.Child("betaItemTag"), obj.BetaItemTag, safe.Field(oldObj, func(oldObj *ListMapItemStruct) []MapItem { return oldObj.BetaItemTag }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *ListMapItemStruct) []MapItem {
+				return oldObj.BetaItemTag
+			})
+		errs = append(errs, fn(fldPath.Child("betaItemTag"), obj.BetaItemTag, oldVal, oldObj != nil)...)
+	}
 
-	// field ListMapItemStruct.BetaValidation
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []MapItem, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field ListMapItemStruct.BetaValidation
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []MapItem,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a MapItem, b MapItem) bool { return a.Key == b.Key })...)
-			func() { // cohort {"key": "foo"}
-				errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
-					return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value", func(o *MapItem) *int { return &o.Value }, validate.DirectEqualPtr, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
-						return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkBeta()
-					})
-				})...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+				func(a MapItem, b MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			func() { // cohort = "{"key": "foo"}"
+				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+					func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
+						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
+							func(o *MapItem) *int { return &o.Value }, validate.DirectEqualPtr,
+							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
+								return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkBeta()
+							})
+					}); len(e) != 0 {
+					errs = append(errs, e...)
+				}
 			}()
 			return
-		}(fldPath.Child("betaValidation"), obj.BetaValidation, safe.Field(oldObj, func(oldObj *ListMapItemStruct) []MapItem { return oldObj.BetaValidation }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *ListMapItemStruct) []MapItem {
+				return oldObj.BetaValidation
+			})
+		errs = append(errs, fn(fldPath.Child("betaValidation"), obj.BetaValidation, oldVal, oldObj != nil)...)
+	}
 
-	// field ListMapItemStruct.DoubleBeta
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []MapItem, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field ListMapItemStruct.DoubleBeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []MapItem,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a MapItem, b MapItem) bool { return a.Key == b.Key })...)
-			func() { // cohort {"key": "foo"}
-				errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
-					return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value", func(o *MapItem) *int { return &o.Value }, validate.DirectEqualPtr, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
-						return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkBeta()
-					})
-				}).MarkBeta()...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+				func(a MapItem, b MapItem) bool { return a.Key == b.Key }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			func() { // cohort = "{"key": "foo"}"
+				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+					func(item *MapItem) bool { return item.Key == "foo" }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
+						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "value",
+							func(o *MapItem) *int { return &o.Value }, validate.DirectEqualPtr,
+							func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
+								return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkBeta()
+							})
+					}).MarkBeta(); len(e) != 0 {
+					errs = append(errs, e...)
+				}
 			}()
 			return
-		}(fldPath.Child("doubleBeta"), obj.DoubleBeta, safe.Field(oldObj, func(oldObj *ListMapItemStruct) []MapItem { return oldObj.DoubleBeta }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *ListMapItemStruct) []MapItem {
+				return oldObj.DoubleBeta
+			})
+		errs = append(errs, fn(fldPath.Child("doubleBeta"), obj.DoubleBeta, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }

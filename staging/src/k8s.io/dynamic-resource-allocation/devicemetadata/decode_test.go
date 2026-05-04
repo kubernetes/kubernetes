@@ -321,6 +321,14 @@ func TestReadRequestDir(t *testing.T) {
 			},
 		}},
 	}
+	gpuAltInternal := metadata.DeviceMetadataRequest{
+		Name: "gpu",
+		Devices: []metadata.Device{{
+			Driver: "mlx.example.com",
+			Pool:   "worker-1",
+			Name:   "gpu-1",
+		}},
+	}
 	nicInternal := metadata.DeviceMetadataRequest{
 		Name: "nic",
 		Devices: []metadata.Device{{
@@ -353,6 +361,59 @@ func TestReadRequestDir(t *testing.T) {
 			Devices: []v1alpha1.Device{{Driver: "nic.example.com", Pool: "worker-0", Name: "nic-0"}},
 		}},
 	})
+	primaryDriverJSON := mustMarshal(&v1alpha1.DeviceMetadata{
+		TypeMeta:   metav1.TypeMeta{APIVersion: v1alpha1.SchemeGroupVersion.String(), Kind: "DeviceMetadata"},
+		ObjectMeta: metav1.ObjectMeta{Name: "my-claim", Namespace: "default", UID: "uid-1234", Generation: 1},
+		Requests: []v1alpha1.DeviceMetadataRequest{
+			{
+				Name: "gpu-0",
+				Devices: []v1alpha1.Device{{
+					Driver: "gpu.example.com",
+					Pool:   "worker-0",
+					Name:   "gpu-0",
+					Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"model": {StringValue: ptr.To("LATEST-GPU-MODEL")}, //nolint:modernize
+					},
+				}},
+			},
+			{
+				Name: "single-gpu",
+				Devices: []v1alpha1.Device{{
+					Driver: "gpu.example.com",
+					Pool:   "worker-0",
+					Name:   "gpu-0",
+					Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"model": {StringValue: ptr.To("LATEST-GPU-MODEL")}, //nolint:modernize
+					},
+				}},
+			},
+			{
+				Name: "gpu-1",
+				Devices: []v1alpha1.Device{{
+					Driver: "gpu.example.com",
+					Pool:   "worker-0",
+					Name:   "gpu-0",
+					Attributes: map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"model": {StringValue: ptr.To("LATEST-GPU-MODEL")}, //nolint:modernize
+					},
+				}},
+			},
+		},
+	})
+	secondaryDriverJSON := mustMarshal(&v1alpha1.DeviceMetadata{
+		TypeMeta:   metav1.TypeMeta{APIVersion: v1alpha1.SchemeGroupVersion.String(), Kind: "DeviceMetadata"},
+		ObjectMeta: metav1.ObjectMeta{Name: "my-claim", Namespace: "default", UID: "uid-1234", Generation: 1},
+		Requests: []v1alpha1.DeviceMetadataRequest{
+			{
+				Name:    "gpu-0",
+				Devices: []v1alpha1.Device{{Driver: "mlx.example.com", Pool: "worker-1", Name: "gpu-1"}},
+			},
+			{
+				Name:    "gpu-1",
+				Devices: []v1alpha1.Device{{Driver: "mlx.example.com", Pool: "worker-1", Name: "gpu-1"}},
+			},
+		},
+	})
 	podClaimJSON := mustMarshal(&v1alpha1.DeviceMetadata{
 		TypeMeta:     metav1.TypeMeta{APIVersion: v1alpha1.SchemeGroupVersion.String(), Kind: "DeviceMetadata"},
 		ObjectMeta:   metav1.ObjectMeta{Name: "my-claim", Namespace: "default", UID: "uid-1234", Generation: 1},
@@ -377,6 +438,8 @@ func TestReadRequestDir(t *testing.T) {
 	singleDir := writeFile("single", "gpu.example.com"+metadata.MetadataFileSuffix, gpuJSON)
 	multiDir := writeFile("multi", "gpu.example.com"+metadata.MetadataFileSuffix, gpuJSON)
 	writeFile("multi", "nic.example.com"+metadata.MetadataFileSuffix, nicJSON)
+	sameRequestNameDir := writeFile("same-request-name", "gpu.example.com"+metadata.MetadataFileSuffix, primaryDriverJSON)
+	writeFile("same-request-name", "mlx.example.com"+metadata.MetadataFileSuffix, secondaryDriverJSON)
 	emptyDir := writeFile("empty", "unrelated.txt", []byte("not metadata"))
 	mixedDir := writeFile("mixed", "gpu.example.com"+metadata.MetadataFileSuffix, gpuJSON)
 	writeFile("mixed", "unrelated.json", []byte(`{"foo":"bar"}`))
@@ -397,6 +460,25 @@ func TestReadRequestDir(t *testing.T) {
 			dir: multiDir,
 			expected: &metadata.DeviceMetadata{
 				Requests: []metadata.DeviceMetadataRequest{gpuInternal, nicInternal},
+			},
+		},
+		"merge-same-request-name-across-drivers": {
+			dir: sameRequestNameDir,
+			expected: &metadata.DeviceMetadata{
+				Requests: []metadata.DeviceMetadataRequest{
+					{
+						Name:    "gpu-0",
+						Devices: append(gpuInternal.Devices, gpuAltInternal.Devices...),
+					},
+					{
+						Name:    "single-gpu",
+						Devices: gpuInternal.Devices,
+					},
+					{
+						Name:    "gpu-1",
+						Devices: append(gpuInternal.Devices, gpuAltInternal.Devices...),
+					},
+				},
 			},
 		},
 		"empty-directory": {

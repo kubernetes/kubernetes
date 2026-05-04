@@ -665,7 +665,7 @@ func (m *Manager) unprepareResources(ctx context.Context, podUID types.UID, name
 	for driverName, claims := range batches {
 		// Call NodeUnprepareResources RPC for all resource handles.
 		plugin, err := m.draPlugins.GetPlugin(driverName)
-		if plugin == nil {
+		if err != nil {
 			// No wrapping, error includes driver name already.
 			return err
 		}

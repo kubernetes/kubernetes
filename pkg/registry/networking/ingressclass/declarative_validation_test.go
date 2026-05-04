@@ -76,7 +76,7 @@ func TestDeclarativeValidateParameter(t *testing.T) {
 						t,
 						ctx,
 						&tc.input,
-						Strategy.Validate,
+						Strategy,
 						tc.expectedErrs,
 					)
 				})
@@ -155,7 +155,7 @@ func TestDeclarativeValidateUpdateParameters(t *testing.T) {
 						ctx,
 						&tc.updateObj,
 						&tc.oldObj,
-						Strategy.ValidateUpdate,
+						Strategy,
 						tc.expectedErrs,
 					)
 				})

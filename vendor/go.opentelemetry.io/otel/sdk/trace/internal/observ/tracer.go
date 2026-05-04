@@ -13,7 +13,7 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/sdk"
 	"go.opentelemetry.io/otel/sdk/internal/x"
-	"go.opentelemetry.io/otel/semconv/v1.39.0/otelconv"
+	"go.opentelemetry.io/otel/semconv/v1.40.0/otelconv"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -55,6 +55,10 @@ func NewTracer() (Tracer, error) {
 func (t Tracer) Enabled() bool { return t.enabled }
 
 func (t Tracer) SpanStarted(ctx context.Context, psc trace.SpanContext, span trace.Span) {
+	if !t.started.Enabled(ctx) {
+		return
+	}
+
 	key := spanStartedKey{
 		parent:   parentStateNoParent,
 		sampling: samplingStateDrop,
@@ -89,6 +93,10 @@ func (t Tracer) SpanEnded(ctx context.Context, span trace.Span) {
 }
 
 func (t Tracer) spanLive(ctx context.Context, value int64, span trace.Span) {
+	if !t.live.Enabled(ctx) {
+		return
+	}
+
 	key := spanLiveKey{sampled: span.SpanContext().IsSampled()}
 	opts := spanLiveOpts[key]
 	t.live.Add(ctx, value, opts...)

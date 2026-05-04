@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -38,13 +37,13 @@ import (
 
 // csrStrategy implements behavior for CSRs
 type csrStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // csrStrategy is the default logic that applies when creating and updating
 // CSR objects.
-var Strategy = csrStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = csrStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // NamespaceScoped is false for CSRs.
 func (csrStrategy) NamespaceScoped() bool {
@@ -114,8 +113,7 @@ func (csrStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 // Validate validates a new CSR. Validation must check for a correct signature.
 func (csrStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	csr := obj.(*certificates.CertificateSigningRequest)
-	allErrs := validation.ValidateCertificateSigningRequestCreate(csr)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, csr, nil, allErrs, operation.Create)
+	return validation.ValidateCertificateSigningRequestCreate(csr)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -128,8 +126,7 @@ func (csrStrategy) Canonicalize(obj runtime.Object) {}
 func (csrStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	oldCSR := old.(*certificates.CertificateSigningRequest)
 	newCSR := obj.(*certificates.CertificateSigningRequest)
-	errs := validation.ValidateCertificateSigningRequestUpdate(newCSR, oldCSR)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newCSR, oldCSR, errs, operation.Update)
+	return validation.ValidateCertificateSigningRequestUpdate(newCSR, oldCSR)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -244,8 +241,7 @@ func populateConditionTimestamps(newCSR, oldCSR *certificates.CertificateSigning
 func (csrStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newCSR := obj.(*certificates.CertificateSigningRequest)
 	oldCSR := old.(*certificates.CertificateSigningRequest)
-	errs := validation.ValidateCertificateSigningRequestStatusUpdate(newCSR, oldCSR)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newCSR, oldCSR, errs, operation.Update)
+	return validation.ValidateCertificateSigningRequestStatusUpdate(newCSR, oldCSR)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -299,8 +295,7 @@ func (csrApprovalStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 func (csrApprovalStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newCSR := obj.(*certificates.CertificateSigningRequest)
 	oldCSR := old.(*certificates.CertificateSigningRequest)
-	errs := validation.ValidateCertificateSigningRequestApprovalUpdate(newCSR, oldCSR)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newCSR, oldCSR, errs, operation.Update)
+	return validation.ValidateCertificateSigningRequestApprovalUpdate(newCSR, oldCSR)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

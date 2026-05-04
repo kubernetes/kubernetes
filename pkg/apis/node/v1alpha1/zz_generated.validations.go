@@ -40,63 +40,98 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
 	// type RuntimeClass
-	scheme.AddValidationFunc((*nodev1alpha1.RuntimeClass)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_RuntimeClass(ctx, op, nil /* fldPath */, obj.(*nodev1alpha1.RuntimeClass), safe.Cast[*nodev1alpha1.RuntimeClass](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*nodev1alpha1.RuntimeClass)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_RuntimeClass(
+					ctx, op, nil, /* fldPath */
+					obj.(*nodev1alpha1.RuntimeClass),
+					safe.Cast[*nodev1alpha1.RuntimeClass](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
 // Validate_RuntimeClass validates an instance of RuntimeClass according
 // to declarative validation rules in the API schema.
-func Validate_RuntimeClass(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *nodev1alpha1.RuntimeClass) (errs field.ErrorList) {
+func Validate_RuntimeClass(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *nodev1alpha1.RuntimeClass) (errs field.ErrorList) {
+
 	// field nodev1alpha1.RuntimeClass.TypeMeta has no validation
 	// field nodev1alpha1.RuntimeClass.ObjectMeta has no validation
 
-	// field nodev1alpha1.RuntimeClass.Spec
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *nodev1alpha1.RuntimeClassSpec, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field nodev1alpha1.RuntimeClass.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *nodev1alpha1.RuntimeClassSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_RuntimeClassSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *nodev1alpha1.RuntimeClass) *nodev1alpha1.RuntimeClassSpec { return &oldObj.Spec }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *nodev1alpha1.RuntimeClass) *nodev1alpha1.RuntimeClassSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }
 
 // Validate_RuntimeClassSpec validates an instance of RuntimeClassSpec according
 // to declarative validation rules in the API schema.
-func Validate_RuntimeClassSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *nodev1alpha1.RuntimeClassSpec) (errs field.ErrorList) {
-	// field nodev1alpha1.RuntimeClassSpec.RuntimeHandler
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_RuntimeClassSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *nodev1alpha1.RuntimeClassSpec) (errs field.ErrorList) {
+
+	{ // field nodev1alpha1.RuntimeClassSpec.RuntimeHandler
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.ShortName(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
+			if e := validate.ShortName(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("runtimeHandler"), &obj.RuntimeHandler, safe.Field(oldObj, func(oldObj *nodev1alpha1.RuntimeClassSpec) *string { return &oldObj.RuntimeHandler }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *nodev1alpha1.RuntimeClassSpec) *string {
+				return &oldObj.RuntimeHandler
+			})
+		errs = append(errs, fn(fldPath.Child("runtimeHandler"), &obj.RuntimeHandler, oldVal, oldObj != nil)...)
+	}
 
 	// field nodev1alpha1.RuntimeClassSpec.Overhead has no validation
 	// field nodev1alpha1.RuntimeClassSpec.Scheduling has no validation

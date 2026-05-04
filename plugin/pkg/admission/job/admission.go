@@ -54,10 +54,10 @@ var _ genericadmissioninitializer.WantsFeatures = &Plugin{}
 // against gang-scheduled PodGroups.
 type Plugin struct {
 	*admission.Handler
-	genericWorkloadEnabled       bool
-	enableWorkloadWithJobEnabled bool
-	inspectedFeatureGates        bool
-	pgLister                     schedulingv1alpha2listers.PodGroupLister
+	genericWorkloadEnabled bool
+	workloadWithJobEnabled bool
+	inspectedFeatureGates  bool
+	pgLister               schedulingv1alpha2listers.PodGroupLister
 }
 
 // NewPlugin creates a new JobValidation admission plugin.
@@ -69,7 +69,7 @@ func NewPlugin() *Plugin {
 
 func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
 	p.genericWorkloadEnabled = featureGates.Enabled(features.GenericWorkload)
-	p.enableWorkloadWithJobEnabled = featureGates.Enabled(features.EnableWorkloadWithJob)
+	p.workloadWithJobEnabled = featureGates.Enabled(features.WorkloadWithJob)
 	p.inspectedFeatureGates = true
 }
 
@@ -122,7 +122,7 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 // validateParallelismChange rejects parallelism changes on Jobs whose
 // PodGroup uses gang scheduling.
 func (p *Plugin) validateParallelismChange(a admission.Attributes, job, oldJob *batch.Job) error {
-	if !p.genericWorkloadEnabled && !p.enableWorkloadWithJobEnabled {
+	if !p.genericWorkloadEnabled && !p.workloadWithJobEnabled {
 		return nil
 	}
 	if ptr.Equal(job.Spec.Parallelism, oldJob.Spec.Parallelism) {

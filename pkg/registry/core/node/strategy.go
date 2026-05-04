@@ -33,6 +33,7 @@ import (
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -46,13 +47,13 @@ import (
 
 // nodeStrategy implements behavior for nodes
 type nodeStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Nodes is the default logic that applies when creating and updating Node
 // objects.
-var Strategy = nodeStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = nodeStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // NamespaceScoped is false for nodes.
 func (nodeStrategy) NamespaceScoped() bool {

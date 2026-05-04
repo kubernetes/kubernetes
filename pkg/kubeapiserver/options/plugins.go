@@ -105,7 +105,7 @@ var AllOrderedPlugins = []string{
 	podtopologylabels.PluginName,            // PodTopologyLabels
 	podgroup.PluginName,                     // PodGroupWorkloadExists
 	nodedeclaredfeatures.PluginName,         // NodeDeclaredFeatureValidator
-	jobadmission.PluginName,                 // JobValidation, only active when feature gate EnableWorkloadWithJob is enabled.
+	jobadmission.PluginName,                 // JobValidation, only active when feature gate WorkloadWithJob is enabled.
 	podresize.PluginName,                    // PodResizeValidator
 
 	// new admission plugins should generally be inserted above here
@@ -194,7 +194,7 @@ func DefaultOffAdmissionPlugins() sets.Set[string] {
 		validatingadmissionpolicy.PluginName,    // ValidatingAdmissionPolicy, only active when feature gate ValidatingAdmissionPolicy is enabled
 		podgroup.PluginName,                     // PodGroupWorkloadExists, only active when feature gate GenericWorkload is enabled
 		nodedeclaredfeatures.PluginName,         // NodeDeclaredFeatureValidator, only active when feature gate NodeDeclaredFeatures is enabled
-		jobadmission.PluginName,                 // JobValidation, only active when feature gate EnableWorkloadWithJob is enabled
+		jobadmission.PluginName,                 // JobValidation, only active when feature gate WorkloadWithJob is enabled
 		podresize.PluginName,                    // PodResizeValidator, only active when feature gate InPlacePodVerticalScaling is enabled
 	)
 

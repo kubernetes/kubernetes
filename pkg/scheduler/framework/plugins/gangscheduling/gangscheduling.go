@@ -73,15 +73,18 @@ func (pl *GangScheduling) Name() string {
 // EventsToRegister returns the possible events that may make a Pod failed by this plugin schedulable.
 func (pl *GangScheduling) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
 	return []fwk.ClusterEventWithHint{
-		// A new pod being added might be the one that completes a gang, meeting its MinCount requirement.
+		// A new pod (either unscheduled or pre-bound) being added might be the one that completes a gang, meeting its MinCount requirement.
 		// PodSchedulingGroup field is immutable, so there is no need to subscribe on Pod/Update event.
-		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Add}, QueueingHintFn: pl.isSchedulableAfterPodAdded},
+		{Event: fwk.ClusterEvent{Resource: fwk.UnscheduledPod, ActionType: fwk.Add}, QueueingHintFn: pl.isSchedulableAfterPodAdded},
+		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Add}, QueueingHintFn: pl.isSchedulableAfterPodAdded},
 		// A PodGroup being added can be making a waiting gang schedulable.
 		// PodGroups are immutable, so there's no need to handle PodGroup/Update event.
 		{Event: fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Add}, QueueingHintFn: pl.isSchedulableAfterPodGroupAdded},
 	}, nil
 }
 
+// isSchedulableAfterPodAdded checks whether a newly added pod (either unscheduled or pre-bound)
+// could make a previously unschedulable pod schedulable by completing the gang's MinCount.
 func (pl *GangScheduling) isSchedulableAfterPodAdded(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	_, addedPod, err := util.As[*v1.Pod](oldObj, newObj)
 	if err != nil {

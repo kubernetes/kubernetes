@@ -102,7 +102,7 @@ func TestRuntimeClass_DeclarativeValidate_Create(t *testing.T) {
 
 			for name, tc := range tests {
 				t.Run(name, func(t *testing.T) {
-					apitesting.VerifyValidationEquivalence(t, ctx, &tc.obj, Strategy.Validate, tc.expectedErrs,
+					apitesting.VerifyValidationEquivalence(t, ctx, &tc.obj, Strategy, tc.expectedErrs,
 						apitesting.WithNormalizationRules(validation.NodeNormalizationRules...))
 				})
 			}
@@ -148,7 +148,7 @@ func TestRuntimeClass_DeclarativeValidate_Update(t *testing.T) {
 				t.Run(name, func(t *testing.T) {
 					tc.oldObj.ObjectMeta.ResourceVersion = "1"
 					tc.newObj.ObjectMeta.ResourceVersion = "1"
-					apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.newObj, &tc.oldObj, Strategy.ValidateUpdate, tc.expectedErrs, apitesting.WithNormalizationRules(validation.NodeNormalizationRules...))
+					apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.newObj, &tc.oldObj, Strategy, tc.expectedErrs, apitesting.WithNormalizationRules(validation.NodeNormalizationRules...))
 				})
 			}
 		})

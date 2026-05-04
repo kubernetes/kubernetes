@@ -35,12 +35,12 @@ import (
 
 // serviceCIDRStrategy implements verification logic for ServiceCIDR allocators.
 type serviceCIDRStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Replication ServiceCIDR objects.
-var Strategy = serviceCIDRStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = serviceCIDRStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // Strategy should implement rest.RESTCreateStrategy
 var _ rest.RESTCreateStrategy = Strategy

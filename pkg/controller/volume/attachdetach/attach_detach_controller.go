@@ -441,19 +441,18 @@ func (adc *attachDetachController) populateDesiredStateOfWorld(logger klog.Logge
 		return err
 	}
 	for _, pod := range pods {
-		podToAdd := pod
-		adc.podAdd(logger, podToAdd)
-		for _, podVolume := range podToAdd.Spec.Volumes {
-			nodeName := types.NodeName(podToAdd.Spec.NodeName)
+		adc.podAdd(logger, pod)
+		for _, podVolume := range pod.Spec.Volumes {
+			nodeName := types.NodeName(pod.Spec.NodeName)
 			// The volume specs present in the ActualStateOfWorld are nil, let's replace those
 			// with the correct ones found on pods. The present in the ASW with no corresponding
 			// pod will be detached and the spec is irrelevant.
-			volumeSpec, err := util.CreateVolumeSpecWithNodeMigration(logger, podVolume, podToAdd, nodeName, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
+			volumeSpec, err := util.CreateVolumeSpecWithNodeMigration(logger, podVolume, pod, nodeName, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
 			if err != nil {
 				logger.Error(
 					err,
 					"Error creating spec for volume of pod",
-					"pod", klog.KObj(podToAdd),
+					"pod", klog.KObj(pod),
 					"volumeName", podVolume.Name)
 				continue
 			}
@@ -461,7 +460,7 @@ func (adc *attachDetachController) populateDesiredStateOfWorld(logger klog.Logge
 			if err != nil || plugin == nil {
 				logger.V(10).Info(
 					"Skipping volume for pod: it does not implement attacher interface",
-					"pod", klog.KObj(podToAdd),
+					"pod", klog.KObj(pod),
 					"volumeName", podVolume.Name,
 					"err", err)
 				continue
@@ -471,7 +470,7 @@ func (adc *attachDetachController) populateDesiredStateOfWorld(logger klog.Logge
 				logger.Error(
 					err,
 					"Failed to find unique name for volume of pod",
-					"pod", klog.KObj(podToAdd),
+					"pod", klog.KObj(pod),
 					"volumeName", podVolume.Name)
 				continue
 			}

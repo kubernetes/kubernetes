@@ -55,7 +55,7 @@ type server struct {
 	grpc       *grpc.Server
 	rhandler   RegistrationHandler
 	chandler   ClientHandler
-	clients    map[string]Client
+	clients    map[string][]Client
 
 	// lastError records the last runtime error. A server is considered healthy till an actual error occurs.
 	lastError error
@@ -77,7 +77,7 @@ func NewServer(logger klog.Logger, socketPath string, rh RegistrationHandler, ch
 		socketDir:  dir,
 		rhandler:   rh,
 		chandler:   ch,
-		clients:    make(map[string]Client),
+		clients:    make(map[string][]Client),
 	}
 
 	return s, nil
@@ -198,10 +198,12 @@ func (s *server) isVersionCompatibleWithPlugin(versions ...string) bool {
 
 func (s *server) visitClients(visit func(r string, c Client)) {
 	s.mutex.Lock()
-	for r, c := range s.clients {
-		s.mutex.Unlock()
-		visit(r, c)
-		s.mutex.Lock()
+	for r, cs := range s.clients {
+		for _, c := range cs {
+			s.mutex.Unlock()
+			visit(r, c)
+			s.mutex.Lock()
+		}
 	}
 	s.mutex.Unlock()
 }

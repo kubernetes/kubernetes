@@ -196,13 +196,14 @@ func TestBatchBasic(t *testing.T) {
 		// firstOtherNodes is supposed to set only if firstPodScheduledSuccessfully is true.
 		firstOtherNodes framework.SortedScoredNodes
 		// if it's true, the test case behaves as if there is another pod handled by another profile between the first and second pod.
-		skipPod          bool
-		secondPodID      string
-		secondSig        string
-		secondChosenNode string
-		secondOtherNodes framework.SortedScoredNodes
-		expectedHint     string
-		expectedState    *batchState
+		skipPod                    bool
+		secondPodID                string
+		secondPodNominatedNodeName string
+		secondSig                  string
+		secondChosenNode           string
+		secondOtherNodes           framework.SortedScoredNodes
+		expectedHint               string
+		expectedState              *batchState
 	}{
 		{
 			name:                          "a second pod with the same signature gets a hint",
@@ -305,6 +306,19 @@ func TestBatchBasic(t *testing.T) {
 				sortedNodes: newTestNodes([]string{"n2"}),
 			},
 		},
+		{
+			name:                          "a second pod with a nominated node does not get a hint",
+			firstPodID:                    blockingPodID("1"),
+			firstSig:                      "sig",
+			firstChosenNode:               "n3",
+			firstOtherNodes:               newTestNodes([]string{"n1"}),
+			firstPodScheduledSuccessfully: true,
+			secondPodID:                   blockingPodID("2"),
+			secondPodNominatedNodeName:    "n1",
+			secondSig:                     "sig",
+			secondChosenNode:              "n1",
+			expectedHint:                  "",
+		},
 	}
 
 	for _, tt := range tests {
@@ -347,6 +361,9 @@ func TestBatchBasic(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod2",
 					UID:  types.UID(tt.secondPodID),
+				},
+				Status: v1.PodStatus{
+					NominatedNodeName: tt.secondPodNominatedNodeName,
 				},
 			}
 

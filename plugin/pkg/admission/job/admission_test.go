@@ -246,8 +246,8 @@ func TestGangSchedulingParallelism(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t,
 				utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-					features.GenericWorkload:       tc.enableFeatureGate,
-					features.EnableWorkloadWithJob: tc.enableFeatureGate,
+					features.GenericWorkload: tc.enableFeatureGate,
+					features.WorkloadWithJob: tc.enableFeatureGate,
 				})
 
 			p := NewPlugin()

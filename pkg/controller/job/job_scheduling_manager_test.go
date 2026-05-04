@@ -85,8 +85,8 @@ func newControllerWithSchedulingInformers(ctx context.Context, t *testing.T, kub
 	t.Helper()
 	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.36"))
 	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.GenericWorkload:       true,
-		features.EnableWorkloadWithJob: true,
+		features.GenericWorkload: true,
+		features.WorkloadWithJob: true,
 	})
 	sharedInformers := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 	jm, err := newControllerWithClock(ctx,
@@ -113,12 +113,12 @@ func TestShouldManageWorkloadForJob(t *testing.T) {
 	nonIndexed := batch.NonIndexedCompletion
 
 	tests := map[string]struct {
-		enableWorkloadWithJob bool
-		job                   *batch.Job
-		want                  bool
+		workloadWithJob bool
+		job             *batch.Job
+		want            bool
 	}{
 		"eligible: indexed, parallelism=completions>1, no schedulingGroup": {
-			enableWorkloadWithJob: true,
+			workloadWithJob: true,
 			job: &batch.Job{
 				Spec: batch.JobSpec{
 					Parallelism:    ptr.To[int32](4),
@@ -129,7 +129,7 @@ func TestShouldManageWorkloadForJob(t *testing.T) {
 			want: true,
 		},
 		"feature gate disabled": {
-			enableWorkloadWithJob: false,
+			workloadWithJob: false,
 			job: &batch.Job{
 				Spec: batch.JobSpec{
 					Parallelism:    ptr.To[int32](4),
@@ -140,7 +140,7 @@ func TestShouldManageWorkloadForJob(t *testing.T) {
 			want: false,
 		},
 		"parallelism is nil": {
-			enableWorkloadWithJob: true,
+			workloadWithJob: true,
 			job: &batch.Job{
 				Spec: batch.JobSpec{
 					Completions:    ptr.To[int32](4),
@@ -150,7 +150,7 @@ func TestShouldManageWorkloadForJob(t *testing.T) {
 			want: false,
 		},
 		"parallelism=1": {
-			enableWorkloadWithJob: true,
+			workloadWithJob: true,
 			job: &batch.Job{
 				Spec: batch.JobSpec{
 					Parallelism:    ptr.To[int32](1),
@@ -161,7 +161,7 @@ func TestShouldManageWorkloadForJob(t *testing.T) {
 			want: false,
 		},
 		"non-indexed completion mode": {
-			enableWorkloadWithJob: true,
+			workloadWithJob: true,
 			job: &batch.Job{
 				Spec: batch.JobSpec{
 					Parallelism:    ptr.To[int32](4),
@@ -172,7 +172,7 @@ func TestShouldManageWorkloadForJob(t *testing.T) {
 			want: false,
 		},
 		"completions is nil": {
-			enableWorkloadWithJob: true,
+			workloadWithJob: true,
 			job: &batch.Job{
 				Spec: batch.JobSpec{
 					Parallelism:    ptr.To[int32](4),
@@ -182,7 +182,7 @@ func TestShouldManageWorkloadForJob(t *testing.T) {
 			want: false,
 		},
 		"completions != parallelism": {
-			enableWorkloadWithJob: true,
+			workloadWithJob: true,
 			job: &batch.Job{
 				Spec: batch.JobSpec{
 					Parallelism:    ptr.To[int32](4),
@@ -193,7 +193,7 @@ func TestShouldManageWorkloadForJob(t *testing.T) {
 			want: false,
 		},
 		"schedulingGroup already set (opt-out)": {
-			enableWorkloadWithJob: true,
+			workloadWithJob: true,
 			job: &batch.Job{
 				Spec: batch.JobSpec{
 					Parallelism:    ptr.To[int32](4),
@@ -211,7 +211,7 @@ func TestShouldManageWorkloadForJob(t *testing.T) {
 			want: false,
 		},
 		"completionMode is nil": {
-			enableWorkloadWithJob: true,
+			workloadWithJob: true,
 			job: &batch.Job{
 				Spec: batch.JobSpec{
 					Parallelism: ptr.To[int32](4),
@@ -226,8 +226,8 @@ func TestShouldManageWorkloadForJob(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.36"))
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:       tc.enableWorkloadWithJob,
-				features.EnableWorkloadWithJob: tc.enableWorkloadWithJob,
+				features.GenericWorkload: tc.workloadWithJob,
+				features.WorkloadWithJob: tc.workloadWithJob,
 			})
 			got := shouldManageWorkloadForJob(tc.job)
 			if got != tc.want {

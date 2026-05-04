@@ -29,6 +29,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -119,7 +120,7 @@ func findExtendedResourceClaim(pod *v1.Pod, resourceClaims []*resourceapi.Resour
 	for _, c := range resourceClaims {
 		if c.Annotations[resourceapi.ExtendedResourceClaimAnnotation] == "true" {
 			for _, or := range c.OwnerReferences {
-				if or.Name == pod.Name && *or.Controller && or.UID == pod.UID {
+				if or.Name == pod.Name && ptr.Deref(or.Controller, false) && or.UID == pod.UID {
 					return c
 				}
 			}
@@ -312,7 +313,7 @@ func (pl *DynamicResources) deleteClaim(ctx context.Context, claim *resourceapi.
 
 	klog.FromContext(ctx).V(5).Info("Delete", "resourceclaim", klog.KObj(claim))
 	err := pl.clientset.ResourceV1().ResourceClaims(claim.Namespace).Delete(ctx, claim.Name, metav1.DeleteOptions{})
-	if err != nil {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
 	return nil

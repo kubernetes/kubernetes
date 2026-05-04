@@ -5182,7 +5182,7 @@ func createJobControllerWithSharedInformers(tb testing.TB, restConfig *restclien
 
 	var jc *jobcontroller.Controller
 	var err error
-	if feature.DefaultFeatureGate.Enabled(features.EnableWorkloadWithJob) {
+	if feature.DefaultFeatureGate.Enabled(features.WorkloadWithJob) {
 		jc, err = jobcontroller.NewController(ctx, clientSet, informerSet.Core().V1().Pods(), informerSet.Batch().V1().Jobs(),
 			informerSet.Scheduling().V1alpha2().Workloads(),
 			informerSet.Scheduling().V1alpha2().PodGroups())
@@ -5566,8 +5566,8 @@ func TestMutablePodResourcesWithPodReplacementPolicyFailed(t *testing.T) {
 
 func TestJobGangScheduling(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.GenericWorkload:       true,
-		features.EnableWorkloadWithJob: true,
+		features.GenericWorkload: true,
+		features.WorkloadWithJob: true,
 	})
 
 	cases := map[string]struct {

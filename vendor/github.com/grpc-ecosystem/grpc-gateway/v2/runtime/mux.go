@@ -73,6 +73,7 @@ type ServeMux struct {
 	disablePathLengthFallback bool
 	unescapingMode            UnescapingMode
 	writeContentLength        bool
+	disableChunkedEncoding    bool
 }
 
 // ServeMuxOption is an option that can be given to a ServeMux on construction.
@@ -122,6 +123,16 @@ func WithUnescapingMode(mode UnescapingMode) ServeMuxOption {
 func WithMiddlewares(middlewares ...Middleware) ServeMuxOption {
 	return func(serveMux *ServeMux) {
 		serveMux.middlewares = append(serveMux.middlewares, middlewares...)
+	}
+}
+
+// WithDisableChunkedEncoding disables the Transfer-Encoding: chunked header
+// for streaming responses. This is useful for streaming implementations that use
+// Content-Length, which is mutually exclusive with Transfer-Encoding:chunked.
+// Note that this option will not automatically add Content-Length headers, so it should be used with caution.
+func WithDisableChunkedEncoding() ServeMuxOption {
+	return func(mux *ServeMux) {
+		mux.disableChunkedEncoding = true
 	}
 }
 

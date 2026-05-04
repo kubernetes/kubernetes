@@ -39,115 +39,187 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	// type SpecialValidationStruct
-	scheme.AddValidationFunc((*SpecialValidationStruct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_SpecialValidationStruct(ctx, op, nil /* fldPath */, obj.(*SpecialValidationStruct), safe.Cast[*SpecialValidationStruct](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*SpecialValidationStruct)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_SpecialValidationStruct(
+					ctx, op, nil, /* fldPath */
+					obj.(*SpecialValidationStruct),
+					safe.Cast[*SpecialValidationStruct](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type Struct
-	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_Struct(ctx, op, nil /* fldPath */, obj.(*Struct), safe.Cast[*Struct](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*Struct)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_Struct(
+					ctx, op, nil, /* fldPath */
+					obj.(*Struct),
+					safe.Cast[*Struct](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type StructWithValidateFalse
-	scheme.AddValidationFunc((*StructWithValidateFalse)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_StructWithValidateFalse(ctx, op, nil /* fldPath */, obj.(*StructWithValidateFalse), safe.Cast[*StructWithValidateFalse](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*StructWithValidateFalse)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_StructWithValidateFalse(
+					ctx, op, nil, /* fldPath */
+					obj.(*StructWithValidateFalse),
+					safe.Cast[*StructWithValidateFalse](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
 // Validate_SpecialValidationStruct validates an instance of SpecialValidationStruct according
 // to declarative validation rules in the API schema.
-func Validate_SpecialValidationStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SpecialValidationStruct) (errs field.ErrorList) {
+func Validate_SpecialValidationStruct(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *SpecialValidationStruct) (errs field.ErrorList) {
+
 	// field SpecialValidationStruct.TypeMeta has no validation
 
-	// field SpecialValidationStruct.NEQField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *int, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field SpecialValidationStruct.NEQField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
-			errs = append(errs, validate.NEQ(ctx, op, fldPath, obj, oldObj, 5).MarkAlpha()...)
+			if e := validate.NEQ(ctx, op, fldPath, obj, oldObj, 5).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("neqField"), &obj.NEQField, safe.Field(oldObj, func(oldObj *SpecialValidationStruct) *int { return &oldObj.NEQField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *SpecialValidationStruct) *int {
+				return &oldObj.NEQField
+			})
+		errs = append(errs, fn(fldPath.Child("neqField"), &obj.NEQField, oldVal, oldObj != nil)...)
+	}
 
-	// field SpecialValidationStruct.NEQFieldBeta
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *int, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field SpecialValidationStruct.NEQFieldBeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
-			errs = append(errs, validate.NEQ(ctx, op, fldPath, obj, oldObj, 5).MarkBeta()...)
+			if e := validate.NEQ(ctx, op, fldPath, obj, oldObj, 5).MarkBeta(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("neqFieldBeta"), &obj.NEQFieldBeta, safe.Field(oldObj, func(oldObj *SpecialValidationStruct) *int { return &oldObj.NEQFieldBeta }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *SpecialValidationStruct) *int {
+				return &oldObj.NEQFieldBeta
+			})
+		errs = append(errs, fn(fldPath.Child("neqFieldBeta"), &obj.NEQFieldBeta, oldVal, oldObj != nil)...)
+	}
 
-	// field SpecialValidationStruct.ForbiddenField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field SpecialValidationStruct.ForbiddenField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("forbiddenField"), obj.ForbiddenField, safe.Field(oldObj, func(oldObj *SpecialValidationStruct) *string { return oldObj.ForbiddenField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *SpecialValidationStruct) *string {
+				return oldObj.ForbiddenField
+			})
+		errs = append(errs, fn(fldPath.Child("forbiddenField"), obj.ForbiddenField, oldVal, oldObj != nil)...)
+	}
 
-	// field SpecialValidationStruct.ForbiddenFieldBeta
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field SpecialValidationStruct.ForbiddenFieldBeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkBeta(); len(e) != 0 {
+			if e := validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkBeta(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("forbiddenFieldBeta"), obj.ForbiddenFieldBeta, safe.Field(oldObj, func(oldObj *SpecialValidationStruct) *string { return oldObj.ForbiddenFieldBeta }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *SpecialValidationStruct) *string {
+				return oldObj.ForbiddenFieldBeta
+			})
+		errs = append(errs, fn(fldPath.Child("forbiddenFieldBeta"), obj.ForbiddenFieldBeta, oldVal, oldObj != nil)...)
+	}
 
-	// field SpecialValidationStruct.UpdateField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field SpecialValidationStruct.UpdateField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkAlpha(); len(e) != 0 {
+			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -155,18 +227,28 @@ func Validate_SpecialValidationStruct(ctx context.Context, op operation.Operatio
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("updateField"), &obj.UpdateField, safe.Field(oldObj, func(oldObj *SpecialValidationStruct) *string { return &oldObj.UpdateField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *SpecialValidationStruct) *string {
+				return &oldObj.UpdateField
+			})
+		errs = append(errs, fn(fldPath.Child("updateField"), &obj.UpdateField, oldVal, oldObj != nil)...)
+	}
 
-	// field SpecialValidationStruct.UpdateFieldBeta
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field SpecialValidationStruct.UpdateFieldBeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkBeta(); len(e) != 0 {
+			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -174,74 +256,135 @@ func Validate_SpecialValidationStruct(ctx context.Context, op operation.Operatio
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("updateFieldBeta"), &obj.UpdateFieldBeta, safe.Field(oldObj, func(oldObj *SpecialValidationStruct) *string { return &oldObj.UpdateFieldBeta }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *SpecialValidationStruct) *string {
+				return &oldObj.UpdateFieldBeta
+			})
+		errs = append(errs, fn(fldPath.Child("updateFieldBeta"), &obj.UpdateFieldBeta, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }
 
 // Validate_Struct validates an instance of Struct according
 // to declarative validation rules in the API schema.
-func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
+func Validate_Struct(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *Struct) (errs field.ErrorList) {
+
 	// field Struct.TypeMeta has no validation
 
-	// field Struct.IntField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *int, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.IntField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
-			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha()...)
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("intField"), &obj.IntField, safe.Field(oldObj, func(oldObj *Struct) *int { return &oldObj.IntField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *int {
+				return &oldObj.IntField
+			})
+		errs = append(errs, fn(fldPath.Child("intField"), &obj.IntField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.IntFieldBeta
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *int, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.IntFieldBeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
-			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkBeta()...)
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkBeta(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("intFieldBeta"), &obj.IntFieldBeta, safe.Field(oldObj, func(oldObj *Struct) *int { return &oldObj.IntFieldBeta }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *int {
+				return &oldObj.IntFieldBeta
+			})
+		errs = append(errs, fn(fldPath.Child("intFieldBeta"), &obj.IntFieldBeta, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.StringField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.StringField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
-			errs = append(errs, validate.MaxLength(ctx, op, fldPath, obj, oldObj, 5).MarkAlpha()...)
+			if e := validate.MaxLength(ctx, op, fldPath, obj, oldObj, 5).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("stringField"), &obj.StringField, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.StringField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *string {
+				return &oldObj.StringField
+			})
+		errs = append(errs, fn(fldPath.Child("stringField"), &obj.StringField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.StringFieldBeta
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.StringFieldBeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
-			errs = append(errs, validate.MaxLength(ctx, op, fldPath, obj, oldObj, 5).MarkBeta()...)
+			if e := validate.MaxLength(ctx, op, fldPath, obj, oldObj, 5).MarkBeta(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("stringFieldBeta"), &obj.StringFieldBeta, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.StringFieldBeta }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *string {
+				return &oldObj.StringFieldBeta
+			})
+		errs = append(errs, fn(fldPath.Child("stringFieldBeta"), &obj.StringFieldBeta, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.SliceField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.SliceField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 2).MarkAlpha(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 2).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -249,18 +392,28 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("sliceField"), obj.SliceField, safe.Field(oldObj, func(oldObj *Struct) []string { return oldObj.SliceField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) []string {
+				return oldObj.SliceField
+			})
+		errs = append(errs, fn(fldPath.Child("sliceField"), obj.SliceField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.SliceFieldBeta
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.SliceFieldBeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 2).MarkBeta(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 2).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -268,42 +421,76 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("sliceFieldBeta"), obj.SliceFieldBeta, safe.Field(oldObj, func(oldObj *Struct) []string { return oldObj.SliceFieldBeta }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) []string {
+				return oldObj.SliceFieldBeta
+			})
+		errs = append(errs, fn(fldPath.Child("sliceFieldBeta"), obj.SliceFieldBeta, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.UUIDField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.UUIDField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
-			errs = append(errs, validate.UUID(ctx, op, fldPath, obj, oldObj).MarkAlpha()...)
+			if e := validate.UUID(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("uuidField"), &obj.UUIDField, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.UUIDField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *string {
+				return &oldObj.UUIDField
+			})
+		errs = append(errs, fn(fldPath.Child("uuidField"), &obj.UUIDField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.UUIDFieldBeta
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.UUIDFieldBeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
-			errs = append(errs, validate.UUID(ctx, op, fldPath, obj, oldObj).MarkBeta()...)
+			if e := validate.UUID(ctx, op, fldPath, obj, oldObj).MarkBeta(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("uuidFieldBeta"), &obj.UUIDFieldBeta, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.UUIDFieldBeta }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *string {
+				return &oldObj.UUIDFieldBeta
+			})
+		errs = append(errs, fn(fldPath.Child("uuidFieldBeta"), &obj.UUIDFieldBeta, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.ImmutableField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.ImmutableField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -311,18 +498,28 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("immutableField"), &obj.ImmutableField, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.ImmutableField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *string {
+				return &oldObj.ImmutableField
+			})
+		errs = append(errs, fn(fldPath.Child("immutableField"), &obj.ImmutableField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.ImmutableFieldBeta
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.ImmutableFieldBeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkBeta(); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkBeta().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -330,39 +527,72 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("immutableFieldBeta"), &obj.ImmutableFieldBeta, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.ImmutableFieldBeta }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *string {
+				return &oldObj.ImmutableFieldBeta
+			})
+		errs = append(errs, fn(fldPath.Child("immutableFieldBeta"), &obj.ImmutableFieldBeta, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }
 
 // Validate_StructWithValidateFalse validates an instance of StructWithValidateFalse according
 // to declarative validation rules in the API schema.
-func Validate_StructWithValidateFalse(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *StructWithValidateFalse) (errs field.ErrorList) {
+func Validate_StructWithValidateFalse(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *StructWithValidateFalse) (errs field.ErrorList) {
+
 	// field StructWithValidateFalse.TypeMeta has no validation
 
-	// field StructWithValidateFalse.ValidateFalse
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field StructWithValidateFalse.ValidateFalse
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
-			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "always fails").MarkAlpha()...)
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "always fails").MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("validateFalse"), obj.ValidateFalse, safe.Field(oldObj, func(oldObj *StructWithValidateFalse) *string { return oldObj.ValidateFalse }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *StructWithValidateFalse) *string {
+				return oldObj.ValidateFalse
+			})
+		errs = append(errs, fn(fldPath.Child("validateFalse"), obj.ValidateFalse, oldVal, oldObj != nil)...)
+	}
 
-	// field StructWithValidateFalse.ValidateFalseBeta
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field StructWithValidateFalse.ValidateFalseBeta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
-			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "always fails").MarkBeta()...)
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "always fails").MarkBeta(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("validateFalseBeta"), obj.ValidateFalseBeta, safe.Field(oldObj, func(oldObj *StructWithValidateFalse) *string { return oldObj.ValidateFalseBeta }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *StructWithValidateFalse) *string {
+				return oldObj.ValidateFalseBeta
+			})
+		errs = append(errs, fn(fldPath.Child("validateFalseBeta"), obj.ValidateFalseBeta, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }

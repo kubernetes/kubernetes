@@ -13,9 +13,7 @@
 # limitations under the License.
 
 ARG BASEIMAGE
-FROM $BASEIMAGE as build_node_perf_npb_ep
-
-CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
+FROM $BASEIMAGE AS build_node_perf_npb_ep
 
 RUN apt-get update && apt-get install -y libc6-dev g++ bzip2 dpkg-dev build-essential gfortran
 
@@ -31,9 +29,9 @@ RUN sed -i '1i#!/bin/sh' sys/print_header sys/print_instructions
 
 RUN if [ $(arch) != "x86_64" ]; then \
     sed s/-mcmodel=medium//g config/NAS.samples/make.def_gcc > config/make.def; \
-else \
+    else \
     cp config/NAS.samples/make.def_gcc config/make.def; \
-fi
+    fi
 RUN make EP CLASS=D
 
 # Copying the required libraries (shared object files) to a convenient location so that it can be copied into the

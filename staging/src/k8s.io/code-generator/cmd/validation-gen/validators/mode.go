@@ -1,0 +1,501 @@
+/*
+Copyright 2025 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package validators
+
+import (
+	"fmt"
+	"regexp"
+	"slices"
+
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/code-generator/cmd/validation-gen/util"
+	"k8s.io/gengo/v2/codetags"
+	"k8s.io/gengo/v2/parser/tags"
+	"k8s.io/gengo/v2/types"
+)
+
+const (
+	modeDiscriminatorTagName = "k8s:modeDiscriminator"
+	ifModeTagName            = "k8s:ifMode"
+)
+
+// validGroupNameRegex restricts discriminator group names to identifiers that
+// start with a letter and contain only alphanumeric characters and underscores.
+var validGroupNameRegex = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]*$`)
+
+func init() {
+	RegisterTagValidator(&modeDiscriminatorTagValidator{discriminatorDefinitions})
+	RegisterTagValidator(&ifModeTagValidator{discriminatorDefinitions, nil})
+}
+
+// discriminatorDefinitions stores all discriminator definitions found by tag validators.
+// Key is the struct path.
+var discriminatorDefinitions = map[string]discriminatorGroups{}
+
+type discriminatorGroups map[string]*discriminatorGroup
+
+type discriminatorGroup struct {
+	name                string
+	discriminatorMember *types.Member
+	// members maps field names to their rules in this discriminator group.
+	members map[string]*fieldMemberRules
+}
+
+type fieldMemberRules struct {
+	member *types.Member
+	rules  []memberRule
+}
+
+type memberRule struct {
+	value          string
+	validations    Validations
+	stabilityLevel ValidationStabilityLevel
+}
+
+func (mg discriminatorGroups) getOrCreate(name string) *discriminatorGroup {
+	if name == "" {
+		name = "default"
+	}
+	g, ok := mg[name]
+	if !ok {
+		g = &discriminatorGroup{
+			name:    name,
+			members: make(map[string]*fieldMemberRules),
+		}
+		mg[name] = g
+	}
+	return g
+}
+
+type modeDiscriminatorTagValidator struct {
+	shared map[string]discriminatorGroups
+}
+
+func (mdtv *modeDiscriminatorTagValidator) Init(_ Config) {}
+
+func (mdtv *modeDiscriminatorTagValidator) TagName() string {
+	return modeDiscriminatorTagName
+}
+
+func (mdtv *modeDiscriminatorTagValidator) ValidScopes() sets.Set[Scope] {
+	return sets.New(ScopeField)
+}
+
+func (mdtv *modeDiscriminatorTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+	if util.NativeType(context.Type).Kind == types.Pointer {
+		return Validations{}, fmt.Errorf("can only be used on non-pointer types")
+	}
+
+	if t := util.NonPointer(util.NativeType(context.Type)); t.Kind != types.Builtin || (t.Name.Name != "string" && t.Name.Name != "bool") {
+		return Validations{}, fmt.Errorf("can only be used on string or bool types (%s)", rootTypeString(context.Type, t))
+	}
+
+	if mdtv.shared[context.ParentPath.String()] == nil {
+		mdtv.shared[context.ParentPath.String()] = make(discriminatorGroups)
+	}
+	groupName := ""
+	if nameArg, ok := tag.NamedArg("modality"); ok {
+		groupName = nameArg.Value
+	}
+	if groupName != "" && !validGroupNameRegex.MatchString(groupName) {
+		return Validations{}, fmt.Errorf("discriminator group name must match %s, got %q", validGroupNameRegex.String(), groupName)
+	}
+	if groupName == "default" {
+		return Validations{}, fmt.Errorf("discriminator group name %q is reserved", groupName)
+	}
+	group := mdtv.shared[context.ParentPath.String()].getOrCreate(groupName)
+	if group.discriminatorMember != nil && group.discriminatorMember != context.Member {
+		return Validations{}, fmt.Errorf("duplicate discriminator: %q", groupName)
+	}
+	group.discriminatorMember = context.Member
+
+	// configures descriminator metadata, Validations are emitted by  modeDiscriminatorTagValidator.
+	return Validations{}, nil
+}
+
+func (mdtv *modeDiscriminatorTagValidator) Docs() TagDoc {
+	return TagDoc{
+		Tag:            mdtv.TagName(),
+		StabilityLevel: TagStabilityLevelBeta,
+		Scopes:         sets.List(mdtv.ValidScopes()),
+		Description:    "Indicates that this field is a discriminator for state-based validation.",
+		Args: []TagArgDoc{{
+			Name:        "modality",
+			Description: "<string>",
+			Docs:        "the name of the discriminator group, if more than one exists",
+			Type:        codetags.ArgTypeString,
+		}},
+	}
+}
+
+type ifModeTagValidator struct {
+	shared    map[string]discriminatorGroups
+	validator TagValidationExtractor
+}
+
+func (imtv *ifModeTagValidator) Init(cfg Config) {
+	imtv.validator = cfg.TagValidator
+}
+
+func (imtv *ifModeTagValidator) TagName() string {
+	return ifModeTagName
+}
+
+func (imtv *ifModeTagValidator) ValidScopes() sets.Set[Scope] {
+	return sets.New(ScopeField)
+}
+
+func (imtv *ifModeTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+	if tag.ValueTag == nil {
+		return Validations{}, fmt.Errorf("missing required payload")
+	}
+
+	groupName := ""
+	if modeArg, ok := tag.NamedArg("modality"); ok {
+		groupName = modeArg.Value
+	}
+	if groupName == "default" {
+		return Validations{}, fmt.Errorf("discriminator group name %q is reserved", groupName)
+	}
+
+	value := ""
+	if valArg, ok := tag.NamedArg("mode"); ok {
+		value = valArg.Value
+	} else if len(tag.Args) > 0 && tag.Args[0].Name == "" {
+		// Positional argument
+		value = tag.Args[0].Value
+	} else {
+		return Validations{}, fmt.Errorf("missing required mode")
+	}
+
+	if imtv.shared[context.ParentPath.String()] == nil {
+		imtv.shared[context.ParentPath.String()] = make(discriminatorGroups)
+	}
+	group := imtv.shared[context.ParentPath.String()].getOrCreate(groupName)
+
+	fieldName := context.Member.Name
+	if rules, ok := group.members[fieldName]; ok {
+		if rules.member != context.Member {
+			return Validations{}, fmt.Errorf("internal error: member mismatch for field %q", fieldName)
+		}
+	} else {
+		group.members[fieldName] = &fieldMemberRules{
+			member: context.Member,
+		}
+	}
+
+	payloadValidations, err := imtv.validator.ExtractTagValidations(context, *tag.ValueTag)
+	if err != nil {
+		return Validations{}, err
+	}
+
+	group.members[fieldName].rules = append(group.members[fieldName].rules, memberRule{
+		value:          value,
+		validations:    payloadValidations,
+		stabilityLevel: context.StabilityLevel,
+	})
+
+	return Validations{
+		Deferred: []DeferredGen{
+			Deferred(ParentContext, func() (Validations, error) {
+				return getDiscriminatorValidations(imtv.shared, context)
+			}),
+		},
+	}, nil
+}
+
+func (imtv *ifModeTagValidator) Docs() TagDoc {
+	return TagDoc{
+		Tag:            imtv.TagName(),
+		StabilityLevel: TagStabilityLevelBeta,
+		Scopes:         sets.List(imtv.ValidScopes()),
+		Description:    "Indicates that this field's validation depends on a mode discriminator.",
+		Args: []TagArgDoc{{
+			Name:        "", // positional
+			Description: "<string>",
+			Docs:        "the value of the mode discriminator for which this validation applies",
+			Type:        codetags.ArgTypeString,
+		}, {
+			Name:        "modality",
+			Description: "<string>",
+			Docs:        "the name of the discriminator group",
+			Type:        codetags.ArgTypeString,
+		}, {
+			Name:        "mode",
+			Description: "<string>",
+			Docs:        "the mode value for which this validation applies",
+			Type:        codetags.ArgTypeString,
+		}},
+		PayloadsType:     codetags.ValueTypeTag,
+		PayloadsRequired: true,
+	}
+}
+
+func getDiscriminatorValidations(shared map[string]discriminatorGroups, context Context) (Validations, error) {
+	structPath := context.ParentPath.String()
+
+	// Extract the most concrete type possible.
+	if k := util.NonPointer(util.NativeType(context.ParentType)).Kind; k != types.Struct {
+		return Validations{}, nil
+	}
+
+	groups, ok := shared[structPath]
+	if !ok || len(groups) == 0 {
+		return Validations{}, nil
+	}
+	// deleting to ensure we don't process the same struct twice.
+	delete(shared, structPath)
+
+	var result Validations
+
+	// Sort group names for deterministic output
+	groupNames := make([]string, 0, len(groups))
+	for name := range groups {
+		groupNames = append(groupNames, name)
+	}
+	slices.Sort(groupNames)
+
+	for _, gn := range groupNames {
+		group := groups[gn]
+		if group.discriminatorMember == nil {
+			if len(group.members) > 0 {
+				if gn == "default" {
+					return Validations{}, fmt.Errorf("missing discriminator")
+				}
+				return Validations{}, fmt.Errorf("missing discriminator for group %q", gn)
+			}
+			continue
+		}
+		fieldNames := make([]string, 0, len(group.members))
+		for name := range group.members {
+			fieldNames = append(fieldNames, name)
+		}
+		slices.Sort(fieldNames)
+
+		for _, fn := range fieldNames {
+			rules := group.members[fn]
+			v, err := generateMemberFieldValidation(context.ParentType, group, rules)
+			if err != nil {
+				return Validations{}, err
+			}
+			result.Add(v)
+		}
+	}
+
+	return result, nil
+}
+
+func generateMemberFieldValidation(structType *types.Type, group *discriminatorGroup, rules *fieldMemberRules) (Validations, error) {
+	fieldType := rules.member.Type
+
+	// Use the nilable form to handle missing values.
+	nilableFieldType := fieldType
+	fieldExprPrefix := ""
+	if !util.IsNilableType(nilableFieldType) {
+		nilableFieldType = types.PointerTo(nilableFieldType)
+		fieldExprPrefix = "&"
+	}
+
+	// Get the JSON name of the field
+	jsonName := rules.member.Name
+	if jt, ok := tags.LookupJSON(*rules.member); ok {
+		jsonName = jt.Name
+	}
+
+	// Default validation is Forbidden
+	defaultForbidden, err := getForbiddenValidation(fieldType)
+	if err != nil {
+		return Validations{}, err
+	}
+
+	// Prepare DiscriminatedRules
+	// Mark each rule's validation functions with their stability level before
+	// aggregating by value, so that different rules for the same value can
+	// carry different stability levels.
+	rulesByValue := make(map[string]*Validations)
+	var values []string
+	for _, rule := range rules.rules {
+		// Track unique discriminator values in order of first appearance.
+		if _, ok := rulesByValue[rule.value]; !ok {
+			rulesByValue[rule.value] = &Validations{}
+			values = append(values, rule.value)
+		}
+		// Mark each validation function with its stability level before merging.
+		v := rule.validations
+		if rule.stabilityLevel != "" {
+			marked := make([]FunctionGen, len(v.Functions))
+			for i, f := range v.Functions {
+				marked[i] = f.WithStabilityLevel(rule.stabilityLevel)
+			}
+			v.Functions = marked
+		}
+		// Accumulate this rule's validations with others that share the same discriminator value.
+		rulesByValue[rule.value].Add(v)
+	}
+	slices.Sort(values)
+
+	// When all rules share the same stability level, the default-forbidden
+	// (which fires for unrecognized discriminator values) should also be marked
+	// with that level so its errors carry the same stability annotation.
+	if uniformLevel := uniformStabilityLevel(rules.rules); uniformLevel != "" {
+		mwf, ok := defaultForbidden.(MultiWrapperFunction)
+		if !ok {
+			return Validations{}, fmt.Errorf("internal error: defaultForbidden is not a MultiWrapperFunction")
+		}
+		marked := make([]FunctionGen, len(mwf.Functions))
+		for i, f := range mwf.Functions {
+			marked[i] = f.WithStabilityLevel(uniformLevel)
+		}
+		mwf.Functions = marked
+		defaultForbidden = mwf
+	}
+
+	discriminatorType := group.discriminatorMember.Type
+	var discriminatedRules []any
+	for _, val := range values {
+		wrapper := MultiWrapperFunction{
+			Functions: rulesByValue[val].Functions,
+			ObjType:   nilableFieldType,
+		}
+
+		// Convert the string tag value to the appropriate typed Go literal
+		// for the discriminator type.
+		typedValue, err := convertDiscriminatorValue(val, discriminatorType)
+		if err != nil {
+			return Validations{}, fmt.Errorf("invalid discriminator value %q: %w", val, err)
+		}
+
+		discriminatedRules = append(discriminatedRules, StructLiteral{
+			Type:     types.Name{Package: libValidationPkg, Name: "DiscriminatedRule"},
+			TypeArgs: []*types.Type{nilableFieldType, discriminatorType},
+			Fields: []StructLiteralField{
+				{Name: "Value", Value: typedValue},
+				{Name: "Validation", Value: wrapper},
+			},
+		})
+	}
+
+	discriminatedValidator := types.Name{Package: libValidationPkg, Name: "Discriminated"}
+
+	rulesSlice := SliceLiteral{
+		ElementType:     types.Name{Package: libValidationPkg, Name: "DiscriminatedRule"},
+		ElementTypeArgs: []*types.Type{nilableFieldType, discriminatorType},
+		Elements:        discriminatedRules,
+	}
+
+	// getValue extractor
+	getValue := FunctionLiteral{
+		Parameters: []ParamResult{{Name: "obj", Type: types.PointerTo(structType)}},
+		Results:    []ParamResult{{Type: nilableFieldType}},
+		Body:       fmt.Sprintf("return %sobj.%s", fieldExprPrefix, rules.member.Name),
+	}
+
+	// getDiscriminator extractor
+	getDiscriminator := FunctionLiteral{
+		Parameters: []ParamResult{{Name: "obj", Type: types.PointerTo(structType)}},
+		Results:    []ParamResult{{Type: discriminatorType}},
+		Body:       fmt.Sprintf("return obj.%s", group.discriminatorMember.Name),
+	}
+
+	// directComparable is used to determine whether we can use the direct
+	// comparison operator "==" or need to use the semantic DeepEqual when
+	// looking up and comparing correlated list elements for validation ratcheting.
+	var equivArg any
+	if util.IsDirectComparable(util.NonPointer(util.NativeType(fieldType))) {
+		equivArg = Identifier(validateDirectEqualPtr)
+	} else {
+		equivArg = Identifier(validateSemanticDeepEqual)
+	}
+
+	fn := Function(modeDiscriminatorTagName, DefaultFlags, discriminatedValidator,
+		Literal(fmt.Sprintf("%q", jsonName)),
+		getValue,
+		getDiscriminator,
+		equivArg,
+		defaultForbidden,
+		rulesSlice,
+	)
+	// Stability levels are already set on the wrapped validation functions, so
+	// skip the level wrapping in the upstream. Processing the stability level
+	// in the upstream will override the stability levels of the wrapped validators.
+	fn.StabilityLevelSelfManaged = true
+	return Validations{Functions: []FunctionGen{fn}}, nil
+}
+
+// uniformStabilityLevel returns the common stability level if all rules share
+// the same one, or "" if they differ.
+func uniformStabilityLevel(rules []memberRule) ValidationStabilityLevel {
+	level := rules[0].stabilityLevel
+	for i := 1; i < len(rules); i++ {
+		if rules[i].stabilityLevel != level {
+			return ""
+		}
+	}
+	return level
+}
+
+func getForbiddenValidation(t *types.Type) (any, error) {
+	var forbidden types.Name
+	nt := util.NativeType(t)
+	switch nt.Kind {
+	case types.Slice:
+		forbidden = types.Name{Package: libValidationPkg, Name: "ForbiddenSlice"}
+	case types.Map:
+		forbidden = types.Name{Package: libValidationPkg, Name: "ForbiddenMap"}
+	case types.Pointer:
+		forbidden = types.Name{Package: libValidationPkg, Name: "ForbiddenPointer"}
+	case types.Struct:
+		return nil, fmt.Errorf("discriminated member fields of struct type must be pointers")
+	default:
+		forbidden = types.Name{Package: libValidationPkg, Name: "ForbiddenValue"}
+	}
+
+	fg := Function(forbiddenTagName, DefaultFlags, forbidden)
+
+	// Use the nilable form to match standard validation function signatures.
+	wrapperObjType := t
+	if !util.IsNilableType(t) {
+		wrapperObjType = types.PointerTo(t)
+	}
+
+	return MultiWrapperFunction{
+		Functions: []FunctionGen{fg},
+		ObjType:   wrapperObjType,
+	}, nil
+}
+
+// convertDiscriminatorValue converts a string tag value to the appropriate
+// typed Go literal for the given discriminator type.
+func convertDiscriminatorValue(val string, discType *types.Type) (any, error) {
+	nt := util.NonPointer(util.NativeType(discType))
+	if nt.Kind != types.Builtin {
+		return nil, fmt.Errorf("unsupported discriminator type: %s", nt.Name.Name)
+	}
+
+	switch nt.Name.Name {
+	case "string":
+		return val, nil
+	case "bool":
+		b, err := util.ParseBool(val)
+		if err != nil {
+			return nil, fmt.Errorf("cannot parse %q as bool: %w", val, err)
+		}
+		return b, nil
+	default:
+		return nil, fmt.Errorf("unsupported discriminator type: %s", nt.Name.Name)
+	}
+}

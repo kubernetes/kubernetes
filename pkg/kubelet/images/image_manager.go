@@ -356,7 +356,7 @@ func (m *imageManager) pullImage(ctx context.Context, logPrefix string, objRef *
 	startTime := time.Now()
 
 	pullChan := make(chan pullResult)
-	m.puller.pullImage(ctx, imgSpec, pullCredentials, pullChan, podSandboxConfig)
+	go m.puller.pullImage(ctx, imgSpec, pullCredentials, pullChan, podSandboxConfig)
 	imagePullResult := <-pullChan
 	if imagePullResult.err != nil {
 		m.logIt(objRef, v1.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", image, imagePullResult.err), klog.Warning)

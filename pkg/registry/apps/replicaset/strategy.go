@@ -44,12 +44,12 @@ import (
 
 // rsStrategy implements verification logic for ReplicaSets.
 type rsStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating ReplicaSet objects.
-var Strategy = rsStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = rsStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // Make sure we correctly implement the interface.
 var _ = rest.GarbageCollectionDeleteStrategy(Strategy)

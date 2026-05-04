@@ -29,7 +29,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/structured"
 	"k8s.io/kubernetes/pkg/features"
 	perf "k8s.io/kubernetes/test/integration/scheduler_perf"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 func TestMain(m *testing.M) {

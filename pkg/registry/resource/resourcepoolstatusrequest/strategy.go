@@ -19,7 +19,6 @@ package resourcepoolstatusrequest
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -33,12 +32,12 @@ import (
 
 // resourcePoolStatusRequestStrategy implements behavior for ResourcePoolStatusRequest objects
 type resourcePoolStatusRequestStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 var (
-	Strategy       = &resourcePoolStatusRequestStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+	Strategy       = &resourcePoolStatusRequestStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 	StatusStrategy = &resourcePoolStatusRequestStatusStrategy{resourcePoolStatusRequestStrategy: Strategy}
 )
 
@@ -67,8 +66,13 @@ func (*resourcePoolStatusRequestStrategy) PrepareForCreate(ctx context.Context, 
 
 func (*resourcePoolStatusRequestStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	request := obj.(*resource.ResourcePoolStatusRequest)
-	allErrs := validation.ValidateResourcePoolStatusRequest(request)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, nil, allErrs, operation.Create, rest.WithDeclarativeEnforcement())
+	return validation.ValidateResourcePoolStatusRequest(request)
+}
+
+// DeclarativeValidationConfig implements rest.DeclarativeValidationConfigurer to supply declarative
+// validation options to the generic BeforeCreate/BeforeUpdate code path.
+func (*resourcePoolStatusRequestStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	return rest.DeclarativeValidationConfig{DeclarativeEnforcement: true}
 }
 
 func (*resourcePoolStatusRequestStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
@@ -90,8 +94,7 @@ func (*resourcePoolStatusRequestStrategy) PrepareForUpdate(ctx context.Context, 
 }
 
 func (*resourcePoolStatusRequestStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	allErrs := validation.ValidateResourcePoolStatusRequestUpdate(obj.(*resource.ResourcePoolStatusRequest), old.(*resource.ResourcePoolStatusRequest))
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, allErrs, operation.Update, rest.WithDeclarativeEnforcement())
+	return validation.ValidateResourcePoolStatusRequestUpdate(obj.(*resource.ResourcePoolStatusRequest), old.(*resource.ResourcePoolStatusRequest))
 }
 
 func (*resourcePoolStatusRequestStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
@@ -129,8 +132,7 @@ func (*resourcePoolStatusRequestStatusStrategy) PrepareForUpdate(ctx context.Con
 func (r *resourcePoolStatusRequestStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newRequest := obj.(*resource.ResourcePoolStatusRequest)
 	oldRequest := old.(*resource.ResourcePoolStatusRequest)
-	allErrs := validation.ValidateResourcePoolStatusRequestStatusUpdate(newRequest, oldRequest)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, allErrs, operation.Update, rest.WithDeclarativeEnforcement())
+	return validation.ValidateResourcePoolStatusRequestStatusUpdate(newRequest, oldRequest)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

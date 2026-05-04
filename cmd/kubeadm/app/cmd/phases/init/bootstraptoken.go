@@ -71,7 +71,7 @@ func runBootstrapToken(c workflow.RunData) error {
 	if err != nil {
 		return err
 	}
-	kubeconfig, err := data.KubeConfig()
+	kubeconfig, err := data.KubeConfigOriginal()
 	if err != nil {
 		return err
 	}

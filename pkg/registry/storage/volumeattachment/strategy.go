@@ -18,7 +18,7 @@ package volumeattachment
 
 import (
 	"context"
-	"k8s.io/apimachinery/pkg/api/operation"
+
 	"k8s.io/apiserver/pkg/registry/rest"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,13 +35,13 @@ import (
 
 // volumeAttachmentStrategy implements behavior for VolumeAttachment objects
 type volumeAttachmentStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating
 // VolumeAttachment objects via the REST API.
-var Strategy = volumeAttachmentStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = volumeAttachmentStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 func (volumeAttachmentStrategy) NamespaceScoped() bool {
 	return false
@@ -67,8 +67,7 @@ func (volumeAttachmentStrategy) PrepareForCreate(ctx context.Context, obj runtim
 
 func (volumeAttachmentStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	volumeAttachment := obj.(*storage.VolumeAttachment)
-	errs := validation.ValidateVolumeAttachment(volumeAttachment)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, nil, errs, operation.Create)
+	return validation.ValidateVolumeAttachment(volumeAttachment)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -97,8 +96,7 @@ func (volumeAttachmentStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 func (volumeAttachmentStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newVolumeAttachmentObj := obj.(*storage.VolumeAttachment)
 	oldVolumeAttachmentObj := old.(*storage.VolumeAttachment)
-	allErrs := validation.ValidateVolumeAttachmentUpdate(newVolumeAttachmentObj, oldVolumeAttachmentObj)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, allErrs, operation.Update)
+	return validation.ValidateVolumeAttachmentUpdate(newVolumeAttachmentObj, oldVolumeAttachmentObj)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

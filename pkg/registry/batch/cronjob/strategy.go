@@ -23,7 +23,6 @@ import (
 
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
@@ -41,12 +40,12 @@ import (
 
 // cronJobStrategy implements verification logic for Replication Controllers.
 type cronJobStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating CronJob objects.
-var Strategy = cronJobStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = cronJobStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // DefaultGarbageCollectionPolicy returns OrphanDependents for batch/v1beta1 for backwards compatibility,
 // and DeleteDependents for all other versions.
@@ -113,8 +112,7 @@ func (cronJobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Ob
 func (cronJobStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	cronJob := obj.(*batch.CronJob)
 	opts := pod.GetValidationOptionsFromPodTemplate(&cronJob.Spec.JobTemplate.Spec.Template, nil)
-	allErrs := batchvalidation.ValidateCronJobCreate(cronJob, opts)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, nil, allErrs, operation.Create)
+	return batchvalidation.ValidateCronJobCreate(cronJob, opts)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -147,8 +145,7 @@ func (cronJobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obje
 	oldCronJob := old.(*batch.CronJob)
 
 	opts := pod.GetValidationOptionsFromPodTemplate(&newCronJob.Spec.JobTemplate.Spec.Template, &oldCronJob.Spec.JobTemplate.Spec.Template)
-	allErrs := batchvalidation.ValidateCronJobUpdate(newCronJob, oldCronJob, opts)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newCronJob, oldCronJob, allErrs, operation.Update)
+	return batchvalidation.ValidateCronJobUpdate(newCronJob, oldCronJob, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

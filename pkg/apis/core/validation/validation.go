@@ -4499,6 +4499,8 @@ type PodValidationOptions struct {
 	AllowRestartAllContainers bool
 	// Allows container statuses to contain image volume digest
 	AllowImageVolumeWithDigest bool
+	// Allow empty image volume reference for backward compatibility
+	AllowEmptyImageVolumeReference bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -6406,39 +6408,37 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 
 	// Ensure that only CPU and memory resources are mutable for restartable init containers.
 	var newInitContainers []core.Container
-	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
-		for ix, container := range newPodSpecCopy.InitContainers {
-			isRestartable := isRestartableInitContainer(&container)
-			canResize := isRestartable || utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingInitContainers)
-			modifiedContainer := !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix])
+	for ix, container := range newPodSpecCopy.InitContainers {
+		isRestartable := isRestartableInitContainer(&container)
+		canResize := isRestartable || utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingInitContainers)
+		modifiedContainer := !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix])
 
-			if canResize {
-				dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.InitContainers[ix])
-				if !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix]) {
-					// This likely means that the user has made changes to resources other than CPU and memory for sidecar container.
-					errs := field.Forbidden(specPath.Child("initContainers").Index(ix), "only cpu and memory resources for init or sidecar containers are mutable")
-					allErrs = append(allErrs, errs)
-				}
-				if modifiedContainer && !isRestartable {
-					for _, resizePolicy := range container.ResizePolicy {
-						if resizePolicy.RestartPolicy == core.RestartContainer {
-							// TODO: This validation check can eventually be removed in 1.40,
-							// as https://github.com/kubernetes/kubernetes/pull/137458 prohibits
-							// the ability to set RestartContainer resize policy for non-sidecar init containers.
-							errs := field.Forbidden(specPath.Child("initContainers").Index(ix), "non-sidecar init containers with a resize policy of RestartContainer cannot be resized")
-							allErrs = append(allErrs, errs)
-						}
-					}
-				}
-			} else if modifiedContainer { // modified non-resizable init container
-				// This likely means that the user has modified resources of non-sidecar init container.
-				errs := field.Forbidden(specPath, "resources for non-sidecar init containers are immutable")
+		if canResize {
+			dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.InitContainers[ix])
+			if !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix]) {
+				// This likely means that the user has made changes to resources other than CPU and memory for sidecar container.
+				errs := field.Forbidden(specPath.Child("initContainers").Index(ix), "only cpu and memory resources for init or sidecar containers are mutable")
 				allErrs = append(allErrs, errs)
 			}
-			newInitContainers = append(newInitContainers, container)
+			if modifiedContainer && !isRestartable {
+				for _, resizePolicy := range container.ResizePolicy {
+					if resizePolicy.RestartPolicy == core.RestartContainer {
+						// TODO: This validation check can eventually be removed in 1.40,
+						// as https://github.com/kubernetes/kubernetes/pull/137458 prohibits
+						// the ability to set RestartContainer resize policy for non-sidecar init containers.
+						errs := field.Forbidden(specPath.Child("initContainers").Index(ix), "non-sidecar init containers with a resize policy of RestartContainer cannot be resized")
+						allErrs = append(allErrs, errs)
+					}
+				}
+			}
+		} else if modifiedContainer { // modified non-resizable init container
+			// This likely means that the user has modified resources of non-sidecar init container.
+			errs := field.Forbidden(specPath, "resources for non-sidecar init containers are immutable")
+			allErrs = append(allErrs, errs)
 		}
-		newPodSpecCopy.InitContainers = newInitContainers
+		newInitContainers = append(newInitContainers, container)
 	}
+	newPodSpecCopy.InitContainers = newInitContainers
 
 	if len(allErrs) > 0 {
 		return allErrs
@@ -9652,7 +9652,7 @@ func validateLinuxContainerUser(linuxContainerUser *core.LinuxContainerUser, fld
 
 func validateImageVolumeSource(imageVolume *core.ImageVolumeSource, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if opts.ResourceIsPod && len(imageVolume.Reference) == 0 {
+	if !opts.AllowEmptyImageVolumeReference && len(imageVolume.Reference) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("reference"), ""))
 	}
 	allErrs = append(allErrs, validatePullPolicy(imageVolume.PullPolicy, fldPath.Child("pullPolicy"))...)

@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -243,7 +244,9 @@ func TestStrategyCreate(t *testing.T) {
 			})
 
 			Strategy.PrepareForCreate(ctx, workload)
-			if errs := Strategy.Validate(ctx, workload); len(errs) != 0 {
+			errs := Strategy.Validate(ctx, workload)
+			errs = Strategy.ValidateDeclaratively(ctx, workload, nil, errs, operation.Create, Strategy.DeclarativeValidationConfig(ctx, workload, nil))
+			if len(errs) != 0 {
 				if tc.expectValidationError == "" {
 					t.Fatalf("unexpected error(s): %v", errs)
 				}
@@ -539,7 +542,9 @@ func TestStrategyUpdate(t *testing.T) {
 			newWorkload.ResourceVersion = "4"
 
 			Strategy.PrepareForUpdate(ctx, newWorkload, oldWorkload)
-			if errs := Strategy.ValidateUpdate(ctx, newWorkload, oldWorkload); len(errs) != 0 {
+			errs := Strategy.ValidateUpdate(ctx, newWorkload, oldWorkload)
+			errs = Strategy.ValidateDeclaratively(ctx, newWorkload, oldWorkload, errs, operation.Update, Strategy.DeclarativeValidationConfig(ctx, newWorkload, oldWorkload))
+			if len(errs) != 0 {
 				if tc.expectValidationError == "" {
 					t.Fatalf("unexpected error(s): %v", errs)
 				}

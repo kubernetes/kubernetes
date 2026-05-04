@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	clientexec "k8s.io/client-go/util/exec"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/streaming/pkg/httpstream"
 
 	"github.com/onsi/gomega"

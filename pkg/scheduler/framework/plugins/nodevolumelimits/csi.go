@@ -92,16 +92,16 @@ func (pl *CSILimits) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWith
 		// because any new CSINode could make pods that were rejected by CSI volumes schedulable.
 		{Event: fwk.ClusterEvent{Resource: fwk.CSINode, ActionType: fwk.Add}},
 		{Event: fwk.ClusterEvent{Resource: fwk.CSINode, ActionType: fwk.Update}, QueueingHintFn: pl.isSchedulableAfterCSINodeUpdated},
-		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterPodDeleted},
+		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterAssignedPodDeleted},
 		{Event: fwk.ClusterEvent{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.Add}, QueueingHintFn: pl.isSchedulableAfterPVCAdded},
 		{Event: fwk.ClusterEvent{Resource: fwk.VolumeAttachment, ActionType: fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterVolumeAttachmentDeleted},
 	}, nil
 }
 
-func (pl *CSILimits) isSchedulableAfterPodDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+func (pl *CSILimits) isSchedulableAfterAssignedPodDeleted(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	deletedPod, _, err := util.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
-		return fwk.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterPodDeleted: %w", err)
+		return fwk.Queue, fmt.Errorf("unexpected objects in isSchedulableAfterAssignedPodDeleted: %w", err)
 	}
 
 	if len(deletedPod.Spec.Volumes) == 0 {

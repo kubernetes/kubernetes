@@ -64,11 +64,10 @@ var _ = sigDescribe(feature.Windows, "Density", framework.WithSerial(), framewor
 		}
 
 		for _, testArg := range dTests {
-			itArg := testArg
-			desc := fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval", itArg.podsNr, itArg.interval)
+			desc := fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval", testArg.podsNr, testArg.interval)
 			ginkgo.It(desc, func(ctx context.Context) {
-				itArg.createMethod = "batch"
-				runDensityBatchTest(ctx, f, itArg)
+				testArg.createMethod = "batch"
+				runDensityBatchTest(ctx, f, testArg)
 			})
 		}
 	})

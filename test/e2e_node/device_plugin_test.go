@@ -170,7 +170,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			}, f.Timeouts.PodDelete, f.Timeouts.Poll).Should(gomega.Succeed())
 
 			ginkgo.By("Scheduling a sample device plugin pod")
-			dp := getSampleDevicePluginPod(pluginSockDir)
+			dp := getSampleDevicePluginPod(pluginSockDir, "")
 			dptemplate = dp.DeepCopy()
 			devicePluginPod = e2epod.NewPodClient(f).CreateSync(ctx, dp)
 
@@ -191,6 +191,14 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 		})
 
 		ginkgo.AfterEach(func(ctx context.Context) {
+			// Printing devicePluginPod logs for troubleshooting
+			ginkgo.By("Get and print devicePluginPod logs")
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, devicePluginPod.Namespace, devicePluginPod.Name, devicePluginPod.Spec.Containers[0].Name)
+			if err != nil {
+				framework.Logf("failed to get pod logs %v", err)
+			} else {
+				framework.Logf("logs of %s/%s (error: %v): %s", devicePluginPod.Name, devicePluginPod.Spec.Containers[0].Name, err, logs)
+			}
 			ginkgo.By("Deleting the device plugin pod")
 			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 
@@ -662,13 +670,6 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			framework.Logf("Starting the kubelet")
 			restartKubelet(ctx)
 
-			// wait until the kubelet health check will succeed
-			gomega.Eventually(ctx, func() bool {
-				ok := kubeletHealthCheck(kubeletHealthCheckURL)
-				framework.Logf("kubelet health check at %q value=%v", kubeletHealthCheckURL, ok)
-				return ok
-			}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
-
 			framework.Logf("wait for the pod %v to disappear", pod.Name)
 			gomega.Eventually(ctx, func(ctx context.Context) error {
 				err := checkMirrorPodDisappear(ctx, f.ClientSet, pod.Name, pod.Namespace)
@@ -872,6 +873,29 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 			}
 			framework.ExpectNoError(err, "WaitForPodCondition() failed err: %v", err)
 
+			ginkgo.By("making sure all the pods are ready")
+			err = e2epod.WaitForPodCondition(ctx, f.ClientSet, devicePluginPod.Namespace, devicePluginPod.Name, "Ready", 120*time.Second, testutils.PodRunningReady)
+			framework.ExpectNoError(err, "pod %s/%s did not go running", devicePluginPod.Namespace, devicePluginPod.Name)
+			framework.Logf("pod %s/%s running", devicePluginPod.Namespace, devicePluginPod.Name)
+
+			ginkgo.By("Verifying the devicePluginPod handleRegistrationProcess entered twice in the loop before we delete the registration file to trigger manual registration")
+			gomega.Eventually(ctx, func() bool {
+				logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, devicePluginPod.Namespace, devicePluginPod.Name, devicePluginPod.Spec.Containers[0].Name)
+				if err != nil {
+					framework.Logf("error getting logs for pod %q: %v", devicePluginPod.Name, err)
+					return false // Returning false to continue trying
+				}
+				framework.Logf("got pod logs: %v", logs)
+				regex := regexp.MustCompile("Starting watching routine(.?)")
+				matches := regex.Find([]byte(logs))
+				if matches == nil {
+					framework.Logf("handleRegistrationProcess not started for pod %q", devicePluginPod.Name)
+					return false // Returning false to continue trying
+				}
+				framework.Logf("handleRegistrationProcess started: %s", matches)
+				return true
+			}, 60*time.Second, framework.Poll).Should(gomega.BeTrueBecause("expected watching routine"))
+
 			go func() {
 				// Since autoregistration is disabled for the device plugin (as REGISTER_CONTROL_FILE
 				// environment variable is specified), device plugin registration needs to be triggerred
@@ -902,6 +926,15 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 		})
 
 		ginkgo.AfterEach(func(ctx context.Context) {
+			ginkgo.By("Get and print devicePluginPod logs")
+			// Printing the logs form the pod, help to troubleshoot cases when devicePluginPod fails to register device with manual registration
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, devicePluginPod.Namespace, devicePluginPod.Name, devicePluginPod.Spec.Containers[0].Name)
+			if err != nil {
+				framework.Logf("failed to get pod logs %v", err)
+			} else {
+				framework.Logf("logs of %s/%s (error: %v): %s", devicePluginPod.Name, devicePluginPod.Spec.Containers[0].Name, err, logs)
+			}
+
 			ginkgo.By("Deleting the device plugin pod")
 			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 
@@ -967,6 +1000,7 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 
 				err := rs.RemovePodSandbox(ctx, sandbox.Id)
 				framework.ExpectNoError(err)
+				waitForAllContainerRemoval(ctx, sandbox.Metadata.Name, sandbox.Metadata.Namespace)
 			}
 
 			ginkgo.By("restarting the kubelet")
@@ -994,9 +1028,22 @@ func testDevicePluginNodeReboot(f *framework.Framework, pluginSockDir string) {
 			// Hence, we verify that our test pod is NOT present in the podresources response.
 
 			// We need to poll because there's a delay between the pod failing admission and being
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				v1PodResources, err = getV1NodeDevices(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to get node local podresources by accessing the (v1) podresources API endpoint: %w", err)
+				} else {
+					framework.Logf("Local podresources by accessing the (v1) podresources API enpoint: %+v", v1PodResources.PodResources)
+				}
+				if len(v1PodResources.PodResources) != 1 {
+					return fmt.Errorf("expected v1 pod resources to be one, but got resources: %+v", v1PodResources.PodResources)
+				}
+				return nil
+			}, f.Timeouts.PodDelete, f.Timeouts.Poll).Should(gomega.Succeed())
+
 			// removed from the podresources list.
 			gomega.Eventually(ctx, func(ctx context.Context) bool {
-				v1PodResources, err := getV1NodeDevices(ctx)
+				v1PodResources, err = getV1NodeDevices(ctx)
 				if err != nil {
 					framework.Logf("Failed to get node devices: %v, will retry", err)
 					return true // Return true to continue polling on error
@@ -1111,16 +1158,20 @@ func matchContainerDevices(ident string, contDevs []*kubeletpodresourcesv1.Conta
 }
 
 // getSampleDevicePluginPod returns the Sample Device Plugin pod to be used e2e tests.
-func getSampleDevicePluginPod(pluginSockDir string) *v1.Pod {
+func getSampleDevicePluginPod(pluginSockDir string, version string) *v1.Pod {
 	data, err := e2etestfiles.Read(e2enode.SampleDevicePluginDSYAML)
 	if err != nil {
 		framework.Fail(err.Error())
 	}
 
 	ds := readDaemonSetV1OrDie(data)
+	podName := e2enode.SampleDevicePluginName
+	if version != "" {
+		podName = podName + "-" + version
+	}
 	dp := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: e2enode.SampleDevicePluginName,
+			Name: podName,
 		},
 		Spec: ds.Spec.Template.Spec,
 	}
@@ -1131,6 +1182,9 @@ func getSampleDevicePluginPod(pluginSockDir string) *v1.Pod {
 	}
 
 	dp.Spec.Containers[0].Env = append(dp.Spec.Containers[0].Env, v1.EnvVar{Name: "CDI_ENABLED", Value: "1"})
+	if version != "" {
+		dp.Spec.Containers[0].Env = append(dp.Spec.Containers[0].Env, v1.EnvVar{Name: "UNIQUE_NAME", Value: version})
+	}
 
 	return dp
 }

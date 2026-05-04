@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"time"
 
+	coordinationv1 "k8s.io/api/coordination/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/watch"
@@ -375,6 +376,102 @@ var _ = SIGDescribe("GracefulNodeShutdown", framework.WithSerial(), feature.Grac
 				return nil
 			}, nodeStatusUpdateTimeout, pollInterval).Should(gomega.Succeed())
 		})
+
+	})
+
+	f.Context("when gracefully shutting down with an extended shutdown window", func() {
+		const (
+			nodeStatusUpdateTimeout = 30 * time.Second
+			nodeShutdownGracePeriod = 2 * time.Minute
+			nodeLeaseDuration       = 10
+			nodeLeaseCreateTimeout  = 30 * time.Second
+		)
+
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			if initialConfig.FeatureGates == nil {
+				initialConfig.FeatureGates = map[string]bool{}
+			}
+			initialConfig.FeatureGates[string(features.GracefulNodeShutdown)] = true
+			initialConfig.FeatureGates[string(features.GracefulNodeShutdownBasedOnPodPriority)] = false
+			initialConfig.ShutdownGracePeriod = metav1.Duration{Duration: nodeShutdownGracePeriod}
+			initialConfig.ShutdownGracePeriodCriticalPods = metav1.Duration{Duration: 0}
+			// Fix the lease cadence so the test can observe multiple renewals within the shutdown window.
+			initialConfig.NodeLeaseDurationSeconds = nodeLeaseDuration
+		})
+
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			ginkgo.By("Wait for the node to be ready")
+			waitForNodeReady(ctx)
+		})
+
+		ginkgo.AfterEach(func() {
+			ginkgo.By("Emitting Shutdown false signal; cancelling the shutdown")
+			err := emitSignalPrepareForShutdown(false)
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.It("should continue renewing the node lease during graceful shutdown", func(ctx context.Context) {
+			nodeName := getNodeName(ctx, f)
+			leaseClient := f.ClientSet.CoordinationV1().Leases(v1.NamespaceNodeLease)
+
+			ginkgo.By("Waiting for the node lease to exist")
+			var lease *coordinationv1.Lease
+			// Wait long enough for kubelet startup on slower test machines to publish the node lease.
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				var err error
+				lease, err = leaseClient.Get(ctx, nodeName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				return expectNodeLease(lease, nodeName)
+			}, nodeLeaseCreateTimeout, framework.Poll).Should(gomega.Succeed())
+
+			ginkgo.By("Emitting shutdown signal")
+			err := emitSignalPrepareForShutdown(true)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Waiting for graceful shutdown to become active")
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				node, err := f.ClientSet.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if err := expectNodeReadyCondition(node, v1.ConditionFalse, "KubeletNotReady"); err != nil {
+					return fmt.Errorf("graceful shutdown not active yet: %w", err)
+				}
+				return nil
+			}, nodeStatusUpdateTimeout, framework.Poll).Should(gomega.Succeed())
+
+			shutdownLease, err := leaseClient.Get(ctx, nodeName, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			framework.ExpectNoError(expectNodeLease(shutdownLease, nodeName))
+			framework.Logf("Graceful shutdown is active, starting node lease observation at renewTime=%v", shutdownLease.Spec.RenewTime.Time)
+
+			ginkgo.By("Verifying the node lease continues to renew during graceful shutdown")
+			lastRenewTime := shutdownLease.Spec.RenewTime.Time
+			renewalsObserved := 0
+			gomega.Eventually(ctx, func(ctx context.Context) error {
+				newLease, err := leaseClient.Get(ctx, nodeName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				if err := expectNodeLease(newLease, nodeName); err != nil {
+					return err
+				}
+				if newLease.Spec.RenewTime.Time.After(lastRenewTime) {
+					renewalsObserved++
+					framework.Logf("Observed node lease renewal %d/2 during graceful shutdown: %v -> %v", renewalsObserved, lastRenewTime, newLease.Spec.RenewTime.Time)
+					lastRenewTime = newLease.Spec.RenewTime.Time
+				} else {
+					framework.Logf("Node lease renewTime has not advanced yet during graceful shutdown: observed=%d current=%v last=%v", renewalsObserved, newLease.Spec.RenewTime.Time, lastRenewTime)
+				}
+				if renewalsObserved < 2 {
+					return fmt.Errorf("observed %d node lease renewals during graceful shutdown, last renewTime=%v", renewalsObserved, lastRenewTime)
+				}
+				return nil
+			}, nodeShutdownGracePeriod, framework.Poll).Should(gomega.Succeed())
+
+		})
 	})
 
 	framework.Context("when gracefully shutting down with Pod priority", framework.WithFlaky(), func() {
@@ -684,4 +781,38 @@ func isPodReadyToStartConditionSetToFalse(pod *v1.Pod) bool {
 	}
 
 	return readyToStartConditionSetToFalse
+}
+
+func expectNodeLease(lease *coordinationv1.Lease, nodeName string) error {
+	if lease.Spec.HolderIdentity == nil {
+		return fmt.Errorf("Spec.HolderIdentity should not be nil")
+	}
+	if lease.Spec.LeaseDurationSeconds == nil {
+		return fmt.Errorf("Spec.LeaseDurationSeconds should not be nil")
+	}
+	if lease.Spec.RenewTime == nil {
+		return fmt.Errorf("Spec.RenewTime should not be nil")
+	}
+	// Node e2e runs against a single-node test environment, so the lease holder should
+	// always match the only node under test.
+	if *lease.Spec.HolderIdentity != nodeName {
+		return fmt.Errorf("Spec.HolderIdentity (%v) should match the node name (%v)", *lease.Spec.HolderIdentity, nodeName)
+	}
+	return nil
+}
+
+func expectNodeReadyCondition(node *v1.Node, expectedStatus v1.ConditionStatus, expectedReason string) error {
+	for _, condition := range node.Status.Conditions {
+		if condition.Type != v1.NodeReady {
+			continue
+		}
+		if condition.Status != expectedStatus {
+			return fmt.Errorf("NodeReady status=%q, want %q", condition.Status, expectedStatus)
+		}
+		if condition.Reason != expectedReason {
+			return fmt.Errorf("NodeReady reason=%q, want %q", condition.Reason, expectedReason)
+		}
+		return nil
+	}
+	return fmt.Errorf("NodeReady condition not found")
 }

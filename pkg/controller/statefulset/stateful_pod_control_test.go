@@ -462,63 +462,50 @@ func TestStatefulPodControlUpdatePodConflictSuccess(t *testing.T) {
 	}
 }
 
-func TestStatefulPodControlDeletesStatefulPod(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
-	set := newStatefulSet(3)
-	pod := newStatefulSetPod(set, 0)
-	fakeClient := &fake.Clientset{}
-	control := NewStatefulPodControl(fakeClient, nil, nil, recorder, consistency.NewNoopConsistencyStore())
-	fakeClient.AddReactor("delete", "pods", func(action core.Action) (bool, runtime.Object, error) {
-		return true, nil, nil
-	})
-	if err := control.DeleteStatefulPod(set, pod); err != nil {
-		t.Errorf("Error returned on successful delete: %s", err)
+func TestStatefulPodControlDeleteStatefulPod(t *testing.T) {
+	tests := []struct {
+		name          string
+		reactorErr    error
+		wantErr       bool
+		wantEventType string
+	}{
+		{
+			name:          "success",
+			wantEventType: v1.EventTypeNormal,
+		},
+		{
+			name:          "not found",
+			reactorErr:    apierrors.NewNotFound(schema.GroupResource{Resource: "pods"}, "foo-0"),
+			wantEventType: v1.EventTypeNormal,
+		},
+		{
+			name:          "failure",
+			reactorErr:    apierrors.NewInternalError(errors.New("API server down")),
+			wantErr:       true,
+			wantEventType: v1.EventTypeWarning,
+		},
 	}
-	events := collectEvents(recorder.Events)
-	if eventCount := len(events); eventCount != 1 {
-		t.Errorf("delete successful: got %d events, but want 1", eventCount)
-	} else if !strings.Contains(events[0], v1.EventTypeNormal) {
-		t.Errorf("Found unexpected non-normal event %s", events[0])
-	}
-}
-
-func TestStatefulPodControlDeleteStatefulPodNotFound(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
-	set := newStatefulSet(3)
-	pod := newStatefulSetPod(set, 0)
-	fakeClient := &fake.Clientset{}
-	control := NewStatefulPodControl(fakeClient, nil, nil, recorder, consistency.NewNoopConsistencyStore())
-	fakeClient.AddReactor("delete", "pods", func(action core.Action) (bool, runtime.Object, error) {
-		return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), pod.Name)
-	})
-	if err := control.DeleteStatefulPod(set, pod); err != nil {
-		t.Errorf("DeleteStatefulPod returned error for NotFound pod: %s", err)
-	}
-	events := collectEvents(recorder.Events)
-	if eventCount := len(events); eventCount != 1 {
-		t.Errorf("delete not-found: got %d events, but want 1", eventCount)
-	} else if !strings.Contains(events[0], v1.EventTypeNormal) {
-		t.Errorf("Found unexpected non-normal event %s", events[0])
-	}
-}
-
-func TestStatefulPodControlDeleteFailure(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
-	set := newStatefulSet(3)
-	pod := newStatefulSetPod(set, 0)
-	fakeClient := &fake.Clientset{}
-	control := NewStatefulPodControl(fakeClient, nil, nil, recorder, consistency.NewNoopConsistencyStore())
-	fakeClient.AddReactor("delete", "pods", func(action core.Action) (bool, runtime.Object, error) {
-		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
-	})
-	if err := control.DeleteStatefulPod(set, pod); err == nil {
-		t.Error("Failed to return error on failed delete")
-	}
-	events := collectEvents(recorder.Events)
-	if eventCount := len(events); eventCount != 1 {
-		t.Errorf("delete failed: got %d events, but want 1", eventCount)
-	} else if !strings.Contains(events[0], v1.EventTypeWarning) {
-		t.Errorf("Found unexpected non-warning event %s", events[0])
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			recorder := record.NewFakeRecorder(10)
+			set := newStatefulSet(3)
+			pod := newStatefulSetPod(set, 0)
+			fakeClient := &fake.Clientset{}
+			control := NewStatefulPodControl(fakeClient, nil, nil, recorder, consistency.NewNoopConsistencyStore())
+			fakeClient.AddReactor("delete", "pods", func(action core.Action) (bool, runtime.Object, error) {
+				return true, nil, tc.reactorErr
+			})
+			err := control.DeleteStatefulPod(set, pod)
+			if (err != nil) != tc.wantErr {
+				t.Errorf("DeleteStatefulPod() error = %v, wantErr %v", err, tc.wantErr)
+			}
+			events := collectEvents(recorder.Events)
+			if eventCount := len(events); eventCount != 1 {
+				t.Errorf("got %d events, want 1", eventCount)
+			} else if !strings.Contains(events[0], tc.wantEventType) {
+				t.Errorf("got event %q, want %s event type", events[0], tc.wantEventType)
+			}
+		})
 	}
 }
 

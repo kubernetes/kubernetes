@@ -1485,8 +1485,11 @@ metadata:
 			checkOutput(output, requiredStrings)
 
 			// Node
-			// It should be OK to list unschedulable Nodes here.
-			nodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+			// Filter out unschedulable nodes to avoid picking up ephemeral fake nodes
+			// created by other parallel tests (e.g. test/e2e/node/node_lifecycle.go).
+			nodes, err := c.CoreV1().Nodes().List(ctx, metav1.ListOptions{
+				FieldSelector: "spec.unschedulable=false",
+			})
 			framework.ExpectNoError(err)
 			node := nodes.Items[0]
 			output = e2ekubectl.RunKubectlOrDie(ns, "describe", "node", node.Name)

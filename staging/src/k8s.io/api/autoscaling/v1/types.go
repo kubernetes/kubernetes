@@ -92,6 +92,7 @@ type HorizontalPodAutoscalerStatus struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.2
 
 // configuration of a horizontal pod autoscaler.
+// +k8s:supportsSubresource="/status"
 type HorizontalPodAutoscaler struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata

@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/onsi/gomega"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestCleanupErr(t *testing.T) {
@@ -110,14 +109,17 @@ func TestCause(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
+				tCtx := Init(t)
 				ctx, cancel := withTimeout(tt.parentCtx(t), t, tt.timeout, timeoutCause.Error())
 				if tt.cancelCause != "" {
 					cancel(tt.cancelCause)
 				}
 				if tt.expectDeadline != 0 {
 					actualDeadline, ok := ctx.Deadline()
-					if assert.True(t, ok, "should have had a deadline") {
-						assert.Equal(t, tt.expectDeadline, time.Until(actualDeadline), "remaining time till Deadline()")
+					if !ok {
+						tCtx.Error("should have a deadline and hasn't")
+					} else {
+						tCtx.Assert(time.Until(actualDeadline)).To(gomega.Equal(tt.expectDeadline), "remaining time till Deadline()")
 					}
 				}
 				// Unblock background goroutines.
@@ -127,8 +129,16 @@ func TestCause(t *testing.T) {
 				// Now check.
 				actualErr := ctx.Err()
 				actualCause := context.Cause(ctx)
-				assert.Equal(t, tt.expectErr, actualErr, "ctx.Err()")
-				assert.Equal(t, tt.expectCause, actualCause, "context.Cause()")
+				if tt.expectErr == nil {
+					tCtx.Assert(actualErr).To(gomega.Succeed(), "ctx.Err()")
+				} else {
+					tCtx.Assert(actualErr).To(gomega.MatchError(tt.expectErr), "ctx.Err()")
+				}
+				if tt.expectCause == nil {
+					tCtx.Assert(actualCause).To(gomega.Succeed(), "context.Cause()")
+				} else {
+					tCtx.Assert(actualCause).To(gomega.MatchError(tt.expectCause), "context.Cause()")
+				}
 			})
 		})
 	}

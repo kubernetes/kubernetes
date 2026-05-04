@@ -284,7 +284,7 @@ func (p *provisioningTestSuite) DefineTests(driver storageframework.TestDriver, 
 
 	f.It("should provision storage with any volume data source", f.WithSerial(), func(ctx context.Context) {
 		if len(dInfo.InTreePluginName) != 0 {
-			e2eskipper.Skipf("AnyVolumeDataSource feature only works with CSI drivers - skipping")
+			e2eskipper.Skipf("It only works with CSI drivers - skipping")
 		}
 		if pattern.VolMode == v1.PersistentVolumeBlock {
 			e2eskipper.Skipf("Test for Block volumes is not implemented - skipping")

@@ -1127,10 +1127,9 @@ jwt:
 
 func TestValidateOIDCOptions(t *testing.T) {
 	testCases := []struct {
-		name                                  string
-		args                                  []string
-		structuredAuthenticationConfigEnabled bool
-		expectErr                             string
+		name      string
+		args      []string
+		expectErr string
 	}{
 		{
 			name: "issuer url and client id are not set",
@@ -1162,13 +1161,6 @@ func TestValidateOIDCOptions(t *testing.T) {
 				"--oidc-issuer-url=https://testIssuerURL",
 			},
 			expectErr: "",
-		},
-		{
-			name: "authentication-config file, feature gate is not enabled",
-			args: []string{
-				"--authentication-config=configfile",
-			},
-			expectErr: "set --feature-gates=StructuredAuthenticationConfiguration=true to use authentication-config file",
 		},
 		{
 			name: "authentication-config file, --oidc-issuer-url is set",
@@ -1247,8 +1239,7 @@ func TestValidateOIDCOptions(t *testing.T) {
 			args: []string{
 				"--authentication-config=configfile",
 			},
-			expectErr:                             "",
-			structuredAuthenticationConfigEnabled: true,
+			expectErr: "",
 		},
 		{
 			name: "authentication-config file, --oidc-username-claim flag explicitly set with default value should error",
@@ -1263,18 +1254,12 @@ func TestValidateOIDCOptions(t *testing.T) {
 			args: []string{
 				"--authentication-config=configfile",
 			},
-			structuredAuthenticationConfigEnabled: true,
-			expectErr:                             "",
+			expectErr: "",
 		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			if !tt.structuredAuthenticationConfigEnabled {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
-			}
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, tt.structuredAuthenticationConfigEnabled)
-
 			opts := NewBuiltInAuthenticationOptions().WithOIDC()
 			pf := pflag.NewFlagSet("test-builtin-authentication-opts", pflag.ContinueOnError)
 			opts.AddFlags(pf)

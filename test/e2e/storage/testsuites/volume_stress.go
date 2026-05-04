@@ -190,8 +190,7 @@ func (t *volumeStressTestSuite) DefineTests(driver storageframework.TestDriver, 
 		ginkgo.DeferCleanup(cleanup)
 		createPodsAndVolumes(ctx)
 		// Restart pod repeatedly
-		for i := 0; i < l.testOptions.NumPods; i++ {
-			podIndex := i
+		for podIndex := 0; podIndex < l.testOptions.NumPods; podIndex++ {
 			l.wg.Add(1)
 			go func() {
 				defer ginkgo.GinkgoRecover()

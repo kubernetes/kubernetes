@@ -40,43 +40,68 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
 	// type HorizontalPodAutoscaler
-	scheme.AddValidationFunc((*autoscalingv1.HorizontalPodAutoscaler)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_HorizontalPodAutoscaler(ctx, op, nil /* fldPath */, obj.(*autoscalingv1.HorizontalPodAutoscaler), safe.Cast[*autoscalingv1.HorizontalPodAutoscaler](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*autoscalingv1.HorizontalPodAutoscaler)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/", "/status":
+				return Validate_HorizontalPodAutoscaler(
+					ctx, op, nil, /* fldPath */
+					obj.(*autoscalingv1.HorizontalPodAutoscaler),
+					safe.Cast[*autoscalingv1.HorizontalPodAutoscaler](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type Scale
-	scheme.AddValidationFunc((*autoscalingv1.Scale)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/scale":
-			return Validate_Scale(ctx, op, nil /* fldPath */, obj.(*autoscalingv1.Scale), safe.Cast[*autoscalingv1.Scale](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*autoscalingv1.Scale)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/scale":
+				return Validate_Scale(
+					ctx, op, nil, /* fldPath */
+					obj.(*autoscalingv1.Scale),
+					safe.Cast[*autoscalingv1.Scale](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
 // Validate_HorizontalPodAutoscaler validates an instance of HorizontalPodAutoscaler according
 // to declarative validation rules in the API schema.
-func Validate_HorizontalPodAutoscaler(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *autoscalingv1.HorizontalPodAutoscaler) (errs field.ErrorList) {
+func Validate_HorizontalPodAutoscaler(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *autoscalingv1.HorizontalPodAutoscaler) (errs field.ErrorList) {
+
 	// field autoscalingv1.HorizontalPodAutoscaler.TypeMeta has no validation
 	// field autoscalingv1.HorizontalPodAutoscaler.ObjectMeta has no validation
 
-	// field autoscalingv1.HorizontalPodAutoscaler.Spec
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *autoscalingv1.HorizontalPodAutoscalerSpec, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field autoscalingv1.HorizontalPodAutoscaler.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *autoscalingv1.HorizontalPodAutoscalerSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_HorizontalPodAutoscalerSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *autoscalingv1.HorizontalPodAutoscaler) *autoscalingv1.HorizontalPodAutoscalerSpec {
-			return &oldObj.Spec
-		}), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *autoscalingv1.HorizontalPodAutoscaler) *autoscalingv1.HorizontalPodAutoscalerSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
 
 	// field autoscalingv1.HorizontalPodAutoscaler.Status has no validation
 	return errs
@@ -84,52 +109,83 @@ func Validate_HorizontalPodAutoscaler(ctx context.Context, op operation.Operatio
 
 // Validate_HorizontalPodAutoscalerSpec validates an instance of HorizontalPodAutoscalerSpec according
 // to declarative validation rules in the API schema.
-func Validate_HorizontalPodAutoscalerSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *autoscalingv1.HorizontalPodAutoscalerSpec) (errs field.ErrorList) {
+func Validate_HorizontalPodAutoscalerSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *autoscalingv1.HorizontalPodAutoscalerSpec) (errs field.ErrorList) {
+
 	// field autoscalingv1.HorizontalPodAutoscalerSpec.ScaleTargetRef has no validation
 
-	// field autoscalingv1.HorizontalPodAutoscalerSpec.MinReplicas
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *int32, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field autoscalingv1.HorizontalPodAutoscalerSpec.MinReplicas
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int32,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.IfOption(ctx, op, fldPath, obj, oldObj, "HPAScaleToZero", true, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int32) field.ErrorList {
-				return validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)
-			}).MarkAlpha()...)
-			errs = append(errs, validate.IfOption(ctx, op, fldPath, obj, oldObj, "HPAScaleToZero", false, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int32) field.ErrorList {
-				return validate.Minimum(ctx, op, fldPath, obj, oldObj, 1)
-			}).MarkAlpha()...)
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "HPAScaleToZero", true,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int32) field.ErrorList {
+					return validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)
+				}).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "HPAScaleToZero", false,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int32) field.ErrorList {
+					return validate.Minimum(ctx, op, fldPath, obj, oldObj, 1)
+				}).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("minReplicas"), obj.MinReplicas, safe.Field(oldObj, func(oldObj *autoscalingv1.HorizontalPodAutoscalerSpec) *int32 { return oldObj.MinReplicas }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *autoscalingv1.HorizontalPodAutoscalerSpec) *int32 {
+				return oldObj.MinReplicas
+			})
+		errs = append(errs, fn(fldPath.Child("minReplicas"), obj.MinReplicas, oldVal, oldObj != nil)...)
+	}
 
-	// field autoscalingv1.HorizontalPodAutoscalerSpec.MaxReplicas
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *int32, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field autoscalingv1.HorizontalPodAutoscalerSpec.MaxReplicas
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int32,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 1).MarkAlpha()...)
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 1).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("maxReplicas"), &obj.MaxReplicas, safe.Field(oldObj, func(oldObj *autoscalingv1.HorizontalPodAutoscalerSpec) *int32 { return &oldObj.MaxReplicas }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *autoscalingv1.HorizontalPodAutoscalerSpec) *int32 {
+				return &oldObj.MaxReplicas
+			})
+		errs = append(errs, fn(fldPath.Child("maxReplicas"), &obj.MaxReplicas, oldVal, oldObj != nil)...)
+	}
 
 	// field autoscalingv1.HorizontalPodAutoscalerSpec.TargetCPUUtilizationPercentage has no validation
 	return errs
@@ -137,21 +193,34 @@ func Validate_HorizontalPodAutoscalerSpec(ctx context.Context, op operation.Oper
 
 // Validate_Scale validates an instance of Scale according
 // to declarative validation rules in the API schema.
-func Validate_Scale(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *autoscalingv1.Scale) (errs field.ErrorList) {
+func Validate_Scale(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *autoscalingv1.Scale) (errs field.ErrorList) {
+
 	// field autoscalingv1.Scale.TypeMeta has no validation
 	// field autoscalingv1.Scale.ObjectMeta has no validation
 
-	// field autoscalingv1.Scale.Spec
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *autoscalingv1.ScaleSpec, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field autoscalingv1.Scale.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *autoscalingv1.ScaleSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_ScaleSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *autoscalingv1.Scale) *autoscalingv1.ScaleSpec { return &oldObj.Spec }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *autoscalingv1.Scale) *autoscalingv1.ScaleSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
 
 	// field autoscalingv1.Scale.Status has no validation
 	return errs
@@ -159,18 +228,34 @@ func Validate_Scale(ctx context.Context, op operation.Operation, fldPath *field.
 
 // Validate_ScaleSpec validates an instance of ScaleSpec according
 // to declarative validation rules in the API schema.
-func Validate_ScaleSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *autoscalingv1.ScaleSpec) (errs field.ErrorList) {
-	// field autoscalingv1.ScaleSpec.Replicas
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *int32, oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_ScaleSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *autoscalingv1.ScaleSpec) (errs field.ErrorList) {
+
+	{ // field autoscalingv1.ScaleSpec.Replicas
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int32,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// optional value-type fields with zero-value defaults are purely documentation
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
-			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkAlpha()...)
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("replicas"), &obj.Replicas, safe.Field(oldObj, func(oldObj *autoscalingv1.ScaleSpec) *int32 { return &oldObj.Replicas }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *autoscalingv1.ScaleSpec) *int32 {
+				return &oldObj.Replicas
+			})
+		errs = append(errs, fn(fldPath.Child("replicas"), &obj.Replicas, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }

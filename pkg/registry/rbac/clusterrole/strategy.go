@@ -19,7 +19,6 @@ package clusterrole
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/api/operation"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -32,13 +31,13 @@ import (
 
 // strategy implements behavior for ClusterRoles
 type strategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating
 // ClusterRole objects.
-var Strategy = strategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = strategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // Strategy should implement rest.RESTCreateStrategy
 var _ rest.RESTCreateStrategy = Strategy
@@ -76,9 +75,7 @@ func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorLis
 	opts := validation.ClusterRoleValidationOptions{
 		AllowInvalidLabelValueInSelector: false,
 	}
-	allErrs := validation.ValidateClusterRole(clusterRole, opts)
-
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, clusterRole, nil, allErrs, operation.Create)
+	return validation.ValidateClusterRole(clusterRole, opts)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -96,9 +93,7 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 	opts := validation.ClusterRoleValidationOptions{
 		AllowInvalidLabelValueInSelector: hasInvalidLabelValueInLabelSelector(oldObj),
 	}
-	errs := validation.ValidateClusterRoleUpdate(newObj, oldObj, opts)
-
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newObj, oldObj, errs, operation.Update)
+	return validation.ValidateClusterRoleUpdate(newObj, oldObj, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

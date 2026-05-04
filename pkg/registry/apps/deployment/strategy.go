@@ -37,13 +37,13 @@ import (
 
 // deploymentStrategy implements behavior for Deployments.
 type deploymentStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Deployment
 // objects via the REST API.
-var Strategy = deploymentStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = deploymentStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // Make sure we correctly implement the interface.
 var _ = rest.GarbageCollectionDeleteStrategy(Strategy)

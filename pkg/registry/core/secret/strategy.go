@@ -36,13 +36,13 @@ import (
 
 // strategy implements behavior for Secret objects
 type strategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Secret
 // objects via the REST API.
-var Strategy = strategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = strategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 var _ = rest.RESTCreateStrategy(Strategy)
 

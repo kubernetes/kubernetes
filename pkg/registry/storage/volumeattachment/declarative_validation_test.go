@@ -89,7 +89,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs)
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy, tc.expectedErrs)
 		})
 	}
 }
@@ -123,7 +123,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.newInput, &tc.oldInput, Strategy.ValidateUpdate, tc.expectedErrs)
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.newInput, &tc.oldInput, Strategy, tc.expectedErrs)
 		})
 	}
 }

@@ -295,7 +295,7 @@ func (r *crdHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	terminating := apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Terminating)
+	terminating := !crd.DeletionTimestamp.IsZero() || apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Terminating)
 
 	crdInfo, err := r.getOrCreateServingInfoFor(crd.UID, crd.Name)
 	if apierrors.IsNotFound(err) {

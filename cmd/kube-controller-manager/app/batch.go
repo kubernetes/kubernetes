@@ -48,7 +48,7 @@ func newJobController(ctx context.Context, controllerContext ControllerContext, 
 
 	var workloadInformer schedulinginformers.WorkloadInformer
 	var podGroupInformer schedulinginformers.PodGroupInformer
-	if utilfeature.DefaultFeatureGate.Enabled(features.EnableWorkloadWithJob) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithJob) {
 		workloadInformer = controllerContext.InformerFactory.Scheduling().V1alpha2().Workloads()
 		podGroupInformer = controllerContext.InformerFactory.Scheduling().V1alpha2().PodGroups()
 	}

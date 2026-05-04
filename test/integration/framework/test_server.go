@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane"
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 	generatedopenapi "k8s.io/kubernetes/pkg/generated/openapi"
+	"k8s.io/kubernetes/test/e2e/invariants/metrics"
 	"k8s.io/kubernetes/test/utils"
 )
 
@@ -66,6 +67,8 @@ AwEHoUQDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPLX2i8uIp/C/ASqiIGUeeKQtX0
 type TestServerSetup struct {
 	ModifyServerRunOptions func(*options.ServerRunOptions)
 	ModifyServerConfig     func(*controlplane.Config)
+	// DisableInvariantChecks skips the invariant checks at the end of the test.
+	DisableInvariantChecks bool
 }
 
 type TearDownFunc func()
@@ -81,24 +84,6 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 	}
 
 	var errCh chan error
-	tearDownFn := func() {
-		// Calling cancel function is stopping apiserver and cleaning up
-		// after itself, including shutting down its storage layer.
-		cancel()
-
-		// If the apiserver was started, let's wait for it to
-		// shutdown clearly.
-		if errCh != nil {
-			err, ok := <-errCh
-			if ok && err != nil {
-				t.Error(err)
-			}
-		}
-		if err := os.RemoveAll(certDir); err != nil {
-			t.Log(err)
-		}
-	}
-
 	_, defaultServiceClusterIPRange, _ := netutils.ParseCIDRSloppy("10.0.0.0/24")
 	proxySigningKey, err := utils.NewPrivateKey()
 	if err != nil {
@@ -276,6 +261,34 @@ func StartTestServer(ctx context.Context, t testing.TB, setup TestServerSetup) (
 	kubeAPIServerClient, err := client.NewForConfig(kubeAPIServerClientConfig)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	tearDownFn := func() {
+		// Scrape metrics before stopping
+		if !setup.DisableInvariantChecks {
+			if ctx.Err() != nil {
+				t.Logf("Skipping metrics scrape because context is already canceled: %v", ctx.Err())
+			} else {
+				if err := metrics.CheckMetricInvariants(ctx, kubeAPIServerClient, false); err != nil {
+					t.Errorf("Invariant check failed (if the test intentionally breaks metrics/auth, consider setting DisableInvariantChecks: true in TestServerSetup): %v", err)
+				}
+			}
+		}
+		// Calling cancel function is stopping apiserver and cleaning up
+		// after itself, including shutting down its storage layer.
+		cancel()
+
+		// If the apiserver was started, let's wait for it to
+		// shutdown clearly.
+		if errCh != nil {
+			err, ok := <-errCh
+			if ok && err != nil {
+				t.Error(err)
+			}
+		}
+		if err := os.RemoveAll(certDir); err != nil {
+			t.Log(err)
+		}
 	}
 
 	return kubeAPIServerClient, kubeAPIServerClientConfig, tearDownFn

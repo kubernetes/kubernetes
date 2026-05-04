@@ -46,8 +46,29 @@ type ErrorMatcher struct {
 	requireOriginWhenInvalid      bool
 	matchValidationStabilityLevel bool
 	matchSource                   bool
+	matchAncestorShortCircuit     bool
+	matchShortCircuit             bool
 	// normalizationRules holds the pre-compiled regex patterns for path normalization.
 	normalizationRules []NormalizationRule
+}
+
+// isChildPath returns true if child is a descendant path of parent.
+// It avoids false positives like "spec.containers" being a child of "spec.container"
+// by explicitly checking for '.' or '[' path separators.
+func isChildPath(parent, child string) bool {
+	// "" as parent path not supported. It can un-intentionally match with any path.
+	// theoretically system errors can be matched with any path errors.
+	if len(parent) == 0 {
+		return false
+	}
+	if len(child) <= len(parent) {
+		return false
+	}
+	if child[:len(parent)] != parent {
+		return false
+	}
+	sep := child[len(parent)]
+	return sep == '.' || sep == '['
 }
 
 // Matches returns true if the two Error objects match according to the
@@ -56,25 +77,26 @@ type ErrorMatcher struct {
 // to the internal/latest format), while "want" is assumed to already be
 // in the canonical internal API format.
 func (m ErrorMatcher) Matches(want, got *Error) bool {
-	if m.matchType && want.Type != got.Type {
-		return false
+	gotField := got.Field
+	if want.Field != gotField {
+		gotField = m.normalizePath(gotField)
 	}
-	if m.matchField {
-		// Try direct match first (common case)
-		if want.Field != got.Field {
-			// Fields don't match, try normalization if rules are configured.
-			// Only normalize "got" - it may be from an older API version that
-			// needs to be brought up to the internal/latest format that "want"
-			// is already in.
-			if want.Field != m.normalizePath(got.Field) {
-				return false
-			}
+	if m.matchAncestorShortCircuit {
+		if got.ShortCircuit && (isChildPath(gotField, want.Field) || isChildPath(got.Field, want.Field)) {
+			return true
 		}
 	}
 
+	if m.matchType && want.Type != got.Type {
+		return false
+	}
+	if m.matchField && want.Field != gotField {
+		return false
+	}
 	if m.matchValue && !reflect.DeepEqual(want.BadValue, got.BadValue) {
 		return false
 	}
+
 	if m.matchOrigin {
 		if want.Origin != got.Origin {
 			return false
@@ -91,8 +113,10 @@ func (m ErrorMatcher) Matches(want, got *Error) bool {
 	if m.matchValidationStabilityLevel && want.ValidationStabilityLevel != got.ValidationStabilityLevel {
 		return false
 	}
-
 	if m.matchSource && want.FromImperative != got.FromImperative {
+		return false
+	}
+	if m.matchShortCircuit && want.ShortCircuit != got.ShortCircuit {
 		return false
 	}
 
@@ -124,47 +148,51 @@ func (m ErrorMatcher) Render(e *Error) string {
 
 	if m.matchType {
 		comma()
-		buf.WriteString(fmt.Sprintf("Type=%q", e.Type))
+		fmt.Fprintf(&buf, "Type=%q", e.Type)
 	}
 	if m.matchField {
 		comma()
 		if normalized := m.normalizePath(e.Field); normalized != e.Field {
-			buf.WriteString(fmt.Sprintf("Field=%q (aka %q)", normalized, e.Field))
+			fmt.Fprintf(&buf, "Field=%q (aka %q)", normalized, e.Field)
 		} else {
-			buf.WriteString(fmt.Sprintf("Field=%q", e.Field))
+			fmt.Fprintf(&buf, "Field=%q", e.Field)
 		}
 	}
 	if m.matchValue {
 		comma()
 		if s, ok := e.BadValue.(string); ok {
-			buf.WriteString(fmt.Sprintf("Value=%q", s))
+			fmt.Fprintf(&buf, "Value=%q", s)
 		} else {
 			rv := reflect.ValueOf(e.BadValue)
 			if rv.Kind() == reflect.Pointer && !rv.IsNil() {
 				rv = rv.Elem()
 			}
 			if rv.IsValid() && rv.CanInterface() {
-				buf.WriteString(fmt.Sprintf("Value=%v", rv.Interface()))
+				fmt.Fprintf(&buf, "Value=%v", rv.Interface())
 			} else {
-				buf.WriteString(fmt.Sprintf("Value=%v", e.BadValue))
+				fmt.Fprintf(&buf, "Value=%v", e.BadValue)
 			}
 		}
 	}
 	if m.matchOrigin || m.requireOriginWhenInvalid && e.Type == ErrorTypeInvalid {
 		comma()
-		buf.WriteString(fmt.Sprintf("Origin=%q", e.Origin))
+		fmt.Fprintf(&buf, "Origin=%q", e.Origin)
 	}
 	if m.matchDetail != nil {
 		comma()
-		buf.WriteString(fmt.Sprintf("Detail=%q", e.Detail))
+		fmt.Fprintf(&buf, "Detail=%q", e.Detail)
 	}
 	if m.matchValidationStabilityLevel {
 		comma()
-		buf.WriteString(fmt.Sprintf("ValidationStabilityLevel=%s", e.ValidationStabilityLevel))
+		fmt.Fprintf(&buf, "ValidationStabilityLevel=%s", e.ValidationStabilityLevel)
 	}
 	if m.matchSource {
 		comma()
-		buf.WriteString(fmt.Sprintf("FromImperative=%t", e.FromImperative))
+		fmt.Fprintf(&buf, "FromImperative=%t", e.FromImperative)
+	}
+	if m.matchShortCircuit {
+		comma()
+		fmt.Fprintf(&buf, "ShortCircuit=%t", e.ShortCircuit)
 	}
 	return "{" + buf.String() + "}"
 }
@@ -249,6 +277,18 @@ func (m ErrorMatcher) BySource() ErrorMatcher {
 	return m
 }
 
+// MatchAncestorShortCircuit returns a derived ErrorMatcher which also matches when the "got" error short-circuited at an ancestor of the "want" error's field path.
+func (m ErrorMatcher) MatchAncestorShortCircuit() ErrorMatcher {
+	m.matchAncestorShortCircuit = true
+	return m
+}
+
+// MatchShortCircuit returns a derived ErrorMatcher which also matches by the ShortCircuit value.
+func (m ErrorMatcher) MatchShortCircuit() ErrorMatcher {
+	m.matchShortCircuit = true
+	return m
+}
+
 // ByValidationStabilityLevel returns a derived ErrorMatcher which also matches by the validation stability level
 // value of field errors.
 func (m ErrorMatcher) ByValidationStabilityLevel() ErrorMatcher {
@@ -300,9 +340,13 @@ type TestIntf interface {
 // "want" error can match multiple "got" errors, and they will all be consumed.
 // The only exception to this is if the matcher got multiple identical (in every way,
 // even those not being matched on) errors, which is likely to indicate a bug.
+// This doesn't support matchAncestorShortCircuit as it it not needed to be used in the tests.
 func (m ErrorMatcher) Test(tb TestIntf, want, got ErrorList) {
 	tb.Helper()
 
+	if m.matchAncestorShortCircuit {
+		tb.Errorf("matchAncestorShortCircuit is not supported for test")
+	}
 	exactly := m.Exactly() // makes a copy
 
 	// If we ever find an EXACT duplicate error, it's almost certainly a bug

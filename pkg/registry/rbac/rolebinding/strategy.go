@@ -19,7 +19,6 @@ package rolebinding
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -31,13 +30,13 @@ import (
 
 // strategy implements behavior for RoleBindings
 type strategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // strategy is the default logic that applies when creating and updating
 // RoleBinding objects.
-var Strategy = strategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = strategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // Strategy should implement rest.RESTCreateStrategy
 var _ rest.RESTCreateStrategy = Strategy
@@ -72,8 +71,7 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 // Validate validates a new RoleBinding. Validation must check for a correct signature.
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	roleBinding := obj.(*rbac.RoleBinding)
-	allErrs := validation.ValidateRoleBinding(roleBinding)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, roleBinding, nil, allErrs, operation.Create)
+	return validation.ValidateRoleBinding(roleBinding)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -90,9 +88,15 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 	newRoleBinding := obj.(*rbac.RoleBinding)
 	oldRoleBinding := old.(*rbac.RoleBinding)
 
-	allErrs := validation.ValidateRoleBindingUpdate(newRoleBinding, oldRoleBinding)
+	return validation.ValidateRoleBindingUpdate(newRoleBinding, oldRoleBinding)
+}
 
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newRoleBinding, oldRoleBinding, allErrs, operation.Update)
+func (strategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	// Match declarative validation short-circuit errors with handwritten child field errors.
+	// This is required because RoleBinding.RoleRef is immutable.
+	return rest.DeclarativeValidationConfig{
+		ShortCircuitMismatch: true,
+	}
 }
 
 // WarningsOnUpdate returns warnings for the given update.

@@ -627,7 +627,7 @@ func (cache *cacheImpl) GetPod(pod *v1.Pod) (*v1.Pod, error) {
 	return podState.pod, nil
 }
 
-func (cache *cacheImpl) AddNode(logger klog.Logger, node *v1.Node) *framework.NodeInfo {
+func (cache *cacheImpl) AddNode(logger klog.Logger, node *v1.Node) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
@@ -643,10 +643,9 @@ func (cache *cacheImpl) AddNode(logger klog.Logger, node *v1.Node) *framework.No
 	cache.nodeTree.addNode(logger, node)
 	cache.addNodeImageStates(node, n.info)
 	n.info.SetNode(node)
-	return n.info.SnapshotConcrete()
 }
 
-func (cache *cacheImpl) UpdateNode(logger klog.Logger, oldNode, newNode *v1.Node) *framework.NodeInfo {
+func (cache *cacheImpl) UpdateNode(logger klog.Logger, oldNode, newNode *v1.Node) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 	n, ok := cache.nodes[newNode.Name]
@@ -662,7 +661,6 @@ func (cache *cacheImpl) UpdateNode(logger klog.Logger, oldNode, newNode *v1.Node
 	cache.nodeTree.updateNode(logger, oldNode, newNode)
 	cache.addNodeImageStates(newNode, n.info)
 	n.info.SetNode(newNode)
-	return n.info.SnapshotConcrete()
 }
 
 // RemoveNode removes a node from the cache's tree.

@@ -103,6 +103,7 @@ type Scale struct {
 //
 // The StatefulSet guarantees that a given network identity will always
 // map to the same storage identity.
+// +k8s:supportsSubresource="/status"
 type StatefulSet struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
@@ -413,6 +414,7 @@ type StatefulSetList struct {
 // DEPRECATED - This group version of Deployment is deprecated by apps/v1/Deployment. See the release notes for
 // more information.
 // Deployment enables declarative updates for Pods and ReplicaSets.
+// +k8s:supportsSubresource="/status"
 type Deployment struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata.
@@ -821,6 +823,7 @@ type DaemonSetCondition struct {
 // DEPRECATED - This group version of DaemonSet is deprecated by apps/v1/DaemonSet. See the release notes for
 // more information.
 // DaemonSet represents the configuration of a daemon set.
+// +k8s:supportsSubresource="/status"
 type DaemonSet struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -877,6 +880,7 @@ type DaemonSetList struct {
 // DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1/ReplicaSet. See the release notes for
 // more information.
 // ReplicaSet ensures that a specified number of pod replicas are running at any given time.
+// +k8s:supportsSubresource="/status"
 type ReplicaSet struct {
 	metav1.TypeMeta `json:",inline"`
 

@@ -19,9 +19,11 @@ package cp
 import (
 	"archive/tar"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -33,10 +35,13 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/client-go/tools/remotecommand"
 	kexec "k8s.io/kubectl/pkg/cmd/exec"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
@@ -672,6 +677,113 @@ func TestCopyToPod(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCopyFromPod(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	ns := scheme.Codecs.WithoutConversion()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+
+	tf.Client = &fake.RESTClient{
+		GroupVersion:         schema.GroupVersion{Group: "", Version: "v1"},
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			responsePod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-name", Namespace: "pod-ns"},
+				Spec:       v1.PodSpec{Containers: []v1.Container{{Name: "container"}}},
+			}
+			return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, responsePod))))}, nil
+		}),
+	}
+
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+	ioStreams, _, _, _ := genericiooptions.NewTestIOStreams()
+
+	cmd := NewCmdCp(tf, ioStreams)
+
+	destDir, err := os.MkdirTemp("", "test")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer os.RemoveAll(destDir)
+
+	tests := map[string]struct {
+		src             string
+		dest            string
+		podName         string
+		retries         int
+		expectedErr     string
+		expectedCommand string
+	}{
+		"copy from pod to empty path": {
+			src:         "pod-ns/pod-name:/tmp/foo",
+			dest:        "",
+			expectedErr: "filepath can not be empty",
+		},
+		"path without single quotes": {
+			src:             "pod-ns/pod-name:/tmp/foo",
+			dest:            destDir,
+			podName:         "pod-name",
+			expectedCommand: "tar cf - /tmp/foo",
+		},
+		"path with single quotes": {
+			src:             "pod-ns/pod-name:/tmp/path'with'quotes",
+			dest:            destDir,
+			podName:         "pod-name",
+			retries:         1,
+			expectedCommand: `sh -c tar cf - '/tmp/path'\''with'\''quotes' | tail -c+1`,
+		},
+	}
+
+	for name, test := range tests {
+		opts := NewCopyOptions(ioStreams)
+		opts.MaxTries = test.retries
+		if err := opts.Complete(tf, cmd, []string{test.src, test.dest}); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		remoteExec := &testingRemoteExecutor{}
+		opts.Executor = remoteExec
+		t.Run(name, func(t *testing.T) {
+			err := opts.Run()
+			if len(test.expectedErr) > 0 {
+				if err == nil {
+					t.Fatalf("expected error but got none")
+				}
+				if !strings.Contains(err.Error(), test.expectedErr) {
+					t.Errorf("expected error to contain %q, got: %v", test.expectedErr, err)
+				}
+			}
+			if len(test.expectedErr) == 0 && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if !strings.Contains(remoteExec.capturedPath, test.podName) {
+				t.Errorf("missing pod name %q in the captured path: %q", test.podName, remoteExec.capturedPath)
+			}
+			query, err := url.ParseQuery(remoteExec.capturedQuery)
+			if err != nil {
+				t.Errorf("unexpected error parsing captured query: %v", err)
+			}
+			actualQuery := strings.Join(query["command"], " ")
+			if actualQuery != test.expectedCommand {
+				t.Errorf("unexpected command, got %q, expected: %q", actualQuery, test.expectedCommand)
+			}
+		})
+	}
+}
+
+type testingRemoteExecutor struct {
+	capturedPath  string
+	capturedQuery string
+}
+
+func (t *testingRemoteExecutor) Execute(url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
+	return t.ExecuteWithContext(context.Background(), url, config, stdin, stdout, stderr, tty, terminalSizeQueue)
+}
+
+func (t *testingRemoteExecutor) ExecuteWithContext(ctx context.Context, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
+	t.capturedPath = url.Path
+	t.capturedQuery = url.RawQuery
+	return nil
 }
 
 func TestCopyToPodNoPreserve(t *testing.T) {

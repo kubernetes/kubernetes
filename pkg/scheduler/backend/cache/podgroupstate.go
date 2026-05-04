@@ -95,6 +95,10 @@ func (d *podGroupStateData) addPod(pod *v1.Pod) {
 	d.allPods[pod.UID] = pod
 	if pod.Spec.NodeName != "" {
 		d.assignedPods.Insert(pod.UID)
+		// Clear from unscheduled or assumed in case the pod previously existed in the pod group
+		// in a different state, e.g., external binding of a previously-queued pod group member.
+		d.unscheduledPods.Delete(pod.UID)
+		delete(d.assumedPods, pod.UID)
 	} else {
 		d.unscheduledPods.Insert(pod.UID)
 	}

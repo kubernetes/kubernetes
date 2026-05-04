@@ -15,8 +15,6 @@
 ARG BASEIMAGE
 FROM $BASEIMAGE
 
-CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
-
 ADD regression-issue-74839 /regression-issue-74839
 
 ENTRYPOINT ["/regression-issue-74839"]

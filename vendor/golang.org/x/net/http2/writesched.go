@@ -8,6 +8,8 @@ import "fmt"
 
 // WriteScheduler is the interface implemented by HTTP/2 write schedulers.
 // Methods are never called concurrently.
+//
+// Deprecated: User-provided write schedulers are deprecated.
 type WriteScheduler interface {
 	// OpenStream opens a new stream in the write scheduler.
 	// It is illegal to call this with streamID=0 or with a streamID that is
@@ -38,6 +40,8 @@ type WriteScheduler interface {
 }
 
 // OpenStreamOptions specifies extra options for WriteScheduler.OpenStream.
+//
+// Deprecated: User-provided write schedulers are deprecated.
 type OpenStreamOptions struct {
 	// PusherID is zero if the stream was initiated by the client. Otherwise,
 	// PusherID names the stream that pushed the newly opened stream.
@@ -47,6 +51,8 @@ type OpenStreamOptions struct {
 }
 
 // FrameWriteRequest is a request to write a frame.
+//
+// Deprecated: User-provided write schedulers are deprecated.
 type FrameWriteRequest struct {
 	// write is the interface value that does the writing, once the
 	// WriteScheduler has selected this frame to write. The write

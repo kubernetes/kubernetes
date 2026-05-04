@@ -149,8 +149,8 @@ func (pl *NodeDeclaredFeatures) EventsToRegister(_ context.Context) ([]fwk.Clust
 			QueueingHintFn: pl.isSchedulableAfterNodeChange,
 		},
 		{
-			Event:          fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Update},
-			QueueingHintFn: pl.isSchedulableAfterPodUpdate,
+			Event:          fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.Update},
+			QueueingHintFn: pl.isSchedulableAfterTargetPodUpdate,
 		},
 	}, nil
 }
@@ -167,16 +167,12 @@ func getPreFilterState(cycleState fwk.CycleState) (*preFilterState, error) {
 	return s, nil
 }
 
-func (pl *NodeDeclaredFeatures) isSchedulableAfterPodUpdate(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+func (pl *NodeDeclaredFeatures) isSchedulableAfterTargetPodUpdate(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	oldPod, newPod, err := util.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
 		return fwk.Queue, err
 	}
-	// If the pod that was updated is not the target pod, then we don't need to re-evaluate it.
-	if pod.UID != newPod.UID {
-		logger.V(5).Info("the update event is not for targetPod, skipping queueing", "pod", klog.KObj(newPod))
-		return fwk.QueueSkip, nil
-	}
+
 	oldPodInfo := &ndf.PodInfo{Spec: &oldPod.Spec}
 	newPodInfo := &ndf.PodInfo{Spec: &newPod.Spec}
 	oldReqs, err := pl.ndfFramework.InferForPodScheduling(oldPodInfo, pl.version)

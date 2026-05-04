@@ -103,7 +103,7 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 	}
 
 	klog.Infof("Workers: %d", workers)
-	for i := 0; i < workers; i++ {
+	for range workers {
 		klog.Infof("Starting worker")
 		go wait.UntilWithContext(ctx, c.runElectionWorker, time.Second)
 	}

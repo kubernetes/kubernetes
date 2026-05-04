@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -36,7 +37,7 @@ import (
 
 // resourceClaimTemplateStrategy implements behavior for ResourceClaimTemplate objects
 type resourceClaimTemplateStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 	nsClient v1.NamespaceInterface
 }
@@ -44,7 +45,7 @@ type resourceClaimTemplateStrategy struct {
 // NewStrategy is the default logic that applies when creating and updating ResourceClaimTemplate objects.
 func NewStrategy(nsClient v1.NamespaceInterface) *resourceClaimTemplateStrategy {
 	return &resourceClaimTemplateStrategy{
-		legacyscheme.Scheme,
+		rest.DeclarativeValidation{Scheme: legacyscheme.Scheme},
 		names.SimpleNameGenerator,
 		nsClient,
 	}
@@ -63,6 +64,14 @@ func (s *resourceClaimTemplateStrategy) Validate(ctx context.Context, obj runtim
 	resourceClaimTemplate := obj.(*resource.ResourceClaimTemplate)
 	allErrs := resourceutils.AuthorizedForAdmin(ctx, resourceClaimTemplate.Spec.Spec.Devices.Requests, resourceClaimTemplate.Namespace, s.nsClient)
 	return append(allErrs, validation.ValidateResourceClaimTemplate(resourceClaimTemplate)...)
+}
+
+// DeclarativeValidationConfig supplies the same path-normalization rules used
+// by ResourceClaim, so the runtime mismatch comparator can pair v1beta1's
+// flattened request paths (e.g. spec.spec.devices.requests[i].tolerations) with
+// the handwritten paths under .exactly.* without false positives.
+func (*resourceClaimTemplateStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	return rest.DeclarativeValidationConfig{NormalizationRules: validation.ResourceNormalizationRules}
 }
 
 func (*resourceClaimTemplateStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {

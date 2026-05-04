@@ -74,7 +74,7 @@ func TestDeclarativeValidateIPAddress(t *testing.T) {
 						t,
 						ctx,
 						&tc.input,
-						Strategy.Validate,
+						Strategy,
 						tc.expectedErrs,
 					)
 				})
@@ -168,7 +168,7 @@ func TestDeclarativeValidateIPAddressUpdate(t *testing.T) {
 						ctx,
 						&tc.updateObj,
 						&tc.oldObj,
-						Strategy.ValidateUpdate,
+						Strategy,
 						tc.expectedErrs,
 					)
 				})

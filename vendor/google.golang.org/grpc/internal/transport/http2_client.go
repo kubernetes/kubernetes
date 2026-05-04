@@ -871,10 +871,14 @@ func (t *http2Client) NewStream(ctx context.Context, callHdr *CallHdr, handler s
 		}
 		var sz int64
 		for _, f := range hdr.hf {
-			if sz += int64(f.Size()); sz > int64(*t.maxSendHeaderListSize) {
+			sz += int64(f.Size())
+			if sz > int64(*t.maxSendHeaderListSize) {
 				hdrListSizeErr = status.Errorf(codes.Internal, "header list size to send violates the maximum size (%d bytes) set by server", *t.maxSendHeaderListSize)
 				return false
 			}
+		}
+		if sz > int64(upcomingDefaultHeaderListSize) {
+			t.logger.Warningf("Header list size to send (%d bytes) is larger than the upcoming default limit (%d bytes). In a future release, this will be restricted to %d bytes.", sz, upcomingDefaultHeaderListSize, upcomingDefaultHeaderListSize)
 		}
 		return true
 	}

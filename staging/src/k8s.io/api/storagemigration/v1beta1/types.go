@@ -27,6 +27,7 @@ import (
 
 // StorageVersionMigration represents a migration of stored data to the latest
 // storage version.
+// +k8s:supportsSubresource="/status"
 type StorageVersionMigration struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata.

@@ -3665,7 +3665,6 @@ func TestPodResizePrepareForUpdate(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.InPlacePodVerticalScaling: true,
-				features.SidecarContainers:         true,
 			})
 			ctx := context.Background()
 			ResizeStrategy.PrepareForUpdate(ctx, tc.newPod, tc.oldPod)

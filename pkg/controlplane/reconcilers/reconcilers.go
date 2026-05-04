@@ -25,6 +25,10 @@ import (
 
 // EndpointReconciler knows how to reconcile the endpoints for the apiserver service.
 type EndpointReconciler interface {
+	// ValidateIP ensures the given IP address meets any requirements to
+	// successfully call ReconcileEndpoints with this reconciler type.
+	ValidateIP(ip net.IP) error
+
 	// ReconcileEndpoints sets the endpoints for the given apiserver service (ro or rw).
 	// ReconcileEndpoints expects that the endpoints objects it manages will all be
 	// managed only by ReconcileEndpoints; therefore, to understand this, you need only

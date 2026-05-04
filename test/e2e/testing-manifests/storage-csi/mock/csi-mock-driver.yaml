@@ -39,6 +39,7 @@ spec:
             - --v=5
             - --csi-address=/csi/csi.sock
             - --kubelet-registration-path=/var/lib/kubelet/plugins/csi-mock/csi.sock
+            - --http-endpoint=:9809
           env:
             - name: KUBE_NODE_NAME
               valueFrom:
@@ -47,6 +48,18 @@ spec:
                   fieldPath: spec.nodeName
           securityContext:
             privileged: true
+          ports:
+            - containerPort: 9809
+              name: healthz
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 30
+            timeoutSeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3
           volumeMounts:
           - mountPath: /csi
             name: socket-dir

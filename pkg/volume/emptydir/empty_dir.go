@@ -503,7 +503,7 @@ func (ed *emptyDir) TearDownAt(dir string) error {
 	if pathExists, pathErr := mount.PathExists(dir); pathErr != nil {
 		return fmt.Errorf("error checking if path exists: %w", pathErr)
 	} else if !pathExists {
-		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
+		klog.Warningf("Unmount skipped because path does not exist: %v", dir)
 		return nil
 	}
 
@@ -534,7 +534,7 @@ func (ed *emptyDir) teardownDefault(dir string) error {
 		}
 		err := fsquota.ClearQuota(ed.mounter, dir, userNamespacesEnabled)
 		if err != nil {
-			klog.Warningf("Warning: Failed to clear quota on %s: %v", dir, err)
+			klog.Warningf("Failed to clear quota on %s: %v", dir, err)
 		}
 	}
 	// Renaming the directory is not required anymore because the operation executor

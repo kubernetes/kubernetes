@@ -648,7 +648,9 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	// Keep track of how long syncs take.
 	start := time.Now()
 
-	doFullSync := proxier.needFullSync || (time.Since(proxier.lastFullSync) > proxyutil.FullSyncPeriod)
+	doFullSync := proxier.needFullSync ||
+		// Avoid regular full syncs for large clusters.
+		((time.Since(proxier.lastFullSync) > proxyutil.FullSyncPeriod) && !proxier.largeClusterMode)
 
 	defer func() {
 		metrics.SyncProxyRulesLatency.WithLabelValues(string(proxier.ipFamily)).Observe(metrics.SinceInSeconds(start))

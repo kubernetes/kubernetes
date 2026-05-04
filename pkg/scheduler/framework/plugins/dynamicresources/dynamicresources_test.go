@@ -1827,7 +1827,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
-						status: fwk.AsStatus(errors.New(`claim default/my-pod-my-resource: selector #0: CEL runtime error: no such key: ` + string(attrName))),
+						status: fwk.AsStatus(errors.New(`claim default/my-pod-my-resource: selector #0 on device some-driver/worker/instance-1: CEL runtime error: no such key: ` + string(attrName) + `. consider using CEL optional chaining (.? followed by orValue()) or guarding the check with has() for optional fields`)),
 					},
 				},
 			},
@@ -1841,7 +1841,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
-						status: fwk.AsStatus(errors.New(`class my-resource-class: selector #0: CEL runtime error: no such key: ` + string(attrName))),
+						status: fwk.AsStatus(errors.New(`class my-resource-class: selector #0 on device some-driver/worker/instance-1: CEL runtime error: no such key: ` + string(attrName) + `. consider using CEL optional chaining (.? followed by orValue()) or guarding the check with has() for optional fields`)),
 					},
 				},
 			},
@@ -1861,7 +1861,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
-						status: fwk.AsStatus(errors.New(`claim default/my-pod-my-resource: selector #0: CEL runtime error: no such key: ` + string(attrName))),
+						status: fwk.AsStatus(errors.New(`claim default/my-pod-my-resource: selector #0 on device some-driver/worker/instance-1: CEL runtime error: no such key: ` + string(attrName) + `. consider using CEL optional chaining (.? followed by orValue()) or guarding the check with has() for optional fields`)),
 					},
 				},
 			},
@@ -1877,12 +1877,12 @@ func testPlugin(tCtx ktesting.TContext) {
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
-						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `claim default/my-pod-my-resource: selector #0: CEL runtime error: no such key: `+string(attrName)),
+						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `claim default/my-pod-my-resource: selector #0 on device some-driver/worker/instance-1: CEL runtime error: no such key: `+string(attrName)+`. consider using CEL optional chaining (.? followed by orValue()) or guarding the check with has() for optional fields`),
 					},
 				},
 				prescore: result{
 					// This is the error found during Filter.
-					status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `filter node worker: claim default/my-pod-my-resource: selector #0: CEL runtime error: no such key: healthy`),
+					status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `filter node worker: claim default/my-pod-my-resource: selector #0 on device some-driver/worker/instance-1: CEL runtime error: no such key: healthy. consider using CEL optional chaining (.? followed by orValue()) or guarding the check with has() for optional fields`),
 				},
 			},
 		},
@@ -4304,10 +4304,10 @@ func testIsSchedulableAfterClaimChange(tCtx ktesting.TContext) {
 	}
 }
 
-func TestIsSchedulableAfterPodChange(t *testing.T) {
-	testIsSchedulableAfterPodChange(ktesting.Init(t))
+func TestIsSchedulableAfterTargetPodUpdate(t *testing.T) {
+	testIsSchedulableAfterTargetPodUpdate(ktesting.Init(t))
 }
-func testIsSchedulableAfterPodChange(tCtx ktesting.TContext) {
+func testIsSchedulableAfterTargetPodUpdate(tCtx ktesting.TContext) {
 	testcases := map[string]struct {
 		objs     []apiruntime.Object
 		pod      *v1.Pod
@@ -4326,17 +4326,6 @@ func testIsSchedulableAfterPodChange(tCtx ktesting.TContext) {
 			pod:      podWithClaimTemplate,
 			obj:      podWithClaimTemplateInStatus,
 			wantHint: fwk.Queue,
-		},
-		"wrong-pod": {
-			objs: []apiruntime.Object{pendingClaim},
-			pod: func() *v1.Pod {
-				pod := podWithClaimTemplate.DeepCopy()
-				pod.Name += "2"
-				pod.UID += "2" // This is the relevant difference.
-				return pod
-			}(),
-			obj:      podWithClaimTemplateInStatus,
-			wantHint: fwk.QueueSkip,
 		},
 		"missing-claim": {
 			objs:     nil,
@@ -4369,7 +4358,7 @@ func testIsSchedulableAfterPodChange(tCtx ktesting.TContext) {
 				EnableDRAResourceClaimDeviceStatus: true,
 			}
 			testCtx := setup(tCtx, nil, nil, tc.claims, nil, nil, tc.objs, features, false, nil)
-			gotHint, err := testCtx.p.isSchedulableAfterPodChange(tCtx.Logger(), tc.pod, nil, tc.obj)
+			gotHint, err := testCtx.p.isSchedulableAfterTargetPodUpdate(tCtx.Logger(), tc.pod, nil, tc.obj)
 			if tc.wantErr {
 				if err == nil {
 					tCtx.Fatal("want an error, got none")

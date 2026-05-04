@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,11 +40,11 @@ import (
 
 // resourceSliceStrategy implements behavior for ResourceSlice objects
 type resourceSliceStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
-var Strategy = resourceSliceStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = resourceSliceStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 func (resourceSliceStrategy) NamespaceScoped() bool {
 	return false
@@ -60,9 +59,13 @@ func (resourceSliceStrategy) PrepareForCreate(ctx context.Context, obj runtime.O
 
 func (resourceSliceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	slice := obj.(*resource.ResourceSlice)
-	errorList := validation.ValidateResourceSlice(slice)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, slice, nil, errorList, operation.Create, rest.WithNormalizationRules(validation.ResourceNormalizationRules))
+	return validation.ValidateResourceSlice(slice)
+}
 
+// DeclarativeValidationConfig implements rest.DeclarativeValidationConfigurer to supply declarative
+// validation options to the generic BeforeCreate/BeforeUpdate code path.
+func (resourceSliceStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	return rest.DeclarativeValidationConfig{NormalizationRules: validation.ResourceNormalizationRules}
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -98,8 +101,7 @@ func (resourceSliceStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 }
 
 func (resourceSliceStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidateResourceSliceUpdate(obj.(*resource.ResourceSlice), old.(*resource.ResourceSlice))
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, errorList, operation.Update, rest.WithNormalizationRules(validation.ResourceNormalizationRules))
+	return validation.ValidateResourceSliceUpdate(obj.(*resource.ResourceSlice), old.(*resource.ResourceSlice))
 }
 
 // WarningsOnUpdate returns warnings for the given update.

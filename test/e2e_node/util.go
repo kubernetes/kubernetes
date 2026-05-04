@@ -182,6 +182,18 @@ func addAfterEachForCleaningUpPods(f *framework.Framework) {
 	})
 }
 
+func addBeforeEachForCleaningUpPods(f *framework.Framework) {
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		ginkgo.By("Deleting any Pods created by previous test(s) in all namespaces")
+		l, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{})
+		framework.ExpectNoError(err)
+		for _, p := range l.Items {
+			framework.Logf("Deleting pod: %s in %s", p.Name, p.Namespace)
+			e2epod.NewPodClient(f).DeleteSync(ctx, p.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+		}
+	})
+}
+
 func waitForKubeletToStart(ctx context.Context, f *framework.Framework) {
 	// wait until the kubelet health check will succeed
 	gomega.Eventually(ctx, func() bool {

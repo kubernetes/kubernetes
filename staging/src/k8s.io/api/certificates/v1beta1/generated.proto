@@ -282,6 +282,7 @@ message ExtraValue {
 // signer.
 //
 // Kubelets use this API to implement podCertificate projected volumes
+// +k8s:supportsSubresource="/status"
 message PodCertificateRequest {
   // metadata contains the object metadata.
   //

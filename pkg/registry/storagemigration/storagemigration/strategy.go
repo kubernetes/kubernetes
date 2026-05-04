@@ -35,12 +35,12 @@ import (
 
 // strategy implements behavior for ClusterTrustBundles.
 type strategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the create, update, and delete strategy for ClusterTrustBundles.
-var Strategy = strategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = strategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 var _ rest.RESTCreateStrategy = Strategy
 var _ rest.RESTUpdateStrategy = Strategy

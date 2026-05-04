@@ -827,8 +827,7 @@ kubelet_running_pods 2
 		},
 	}
 
-	for _, test := range tests {
-		tc := test
+	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(tc.wants), tc.metricsName); err != nil {
 				t.Fatal(err)

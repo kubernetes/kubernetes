@@ -54,9 +54,9 @@ const (
 //   - completionMode == Indexed
 //   - completions == parallelism
 //   - schedulingGroup is not already set on the pod template
-//   - EnableWorkloadWithJob feature gate is enabled
+//   - WorkloadWithJob feature gate is enabled
 func shouldManageWorkloadForJob(job *batch.Job) bool {
-	if !feature.DefaultFeatureGate.Enabled(features.EnableWorkloadWithJob) {
+	if !feature.DefaultFeatureGate.Enabled(features.WorkloadWithJob) {
 		return false
 	}
 	return jobutil.IsGangSchedulingCandidate(
@@ -401,10 +401,10 @@ func computePodGroupName(workloadName, templateName string) string {
 // and indexers so that changes to those objects re-enqueue the owning Job.
 func (jm *Controller) addSchedulingInformers(logger klog.Logger, workloadInformer schedulinginformers.WorkloadInformer, podGroupInformer schedulinginformers.PodGroupInformer) error {
 	if workloadInformer == nil {
-		return fmt.Errorf("workload informer is required when the feature gate %q is enabled", features.EnableWorkloadWithJob)
+		return fmt.Errorf("workload informer is required when the feature gate %q is enabled", features.WorkloadWithJob)
 	}
 	if podGroupInformer == nil {
-		return fmt.Errorf("pod group informer is required when the feature gate %q is enabled", features.EnableWorkloadWithJob)
+		return fmt.Errorf("pod group informer is required when the feature gate %q is enabled", features.WorkloadWithJob)
 	}
 	if err := workloadInformer.Informer().AddIndexers(cache.Indexers{
 		workloadByJobNameIndexKey: workloadByJobNameIndexFunc,

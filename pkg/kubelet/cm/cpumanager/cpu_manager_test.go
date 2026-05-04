@@ -173,10 +173,6 @@ func (rt mockRuntimeService) UpdateContainerResources(_ context.Context, id stri
 	return rt.err
 }
 
-func (rt mockRuntimeService) Close(_ context.Context) error {
-	return rt.err
-}
-
 type mockPodStatusProvider struct {
 	podStatus v1.PodStatus
 	found     bool

@@ -365,6 +365,7 @@ type ClusterTrustBundleList struct {
 // signer.
 //
 // Kubelets use this API to implement podCertificate projected volumes
+// +k8s:supportsSubresource="/status"
 type PodCertificateRequest struct {
 	metav1.TypeMeta `json:",inline"`
 

@@ -134,6 +134,7 @@ message IPBlock {
 // endpoints defined by a backend. An Ingress can be configured to give services
 // externally-reachable urls, load balance traffic, terminate SSL, offer name
 // based virtual hosting etc.
+// +k8s:supportsSubresource="/status"
 message Ingress {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -630,6 +631,7 @@ message ServiceBackendPort {
 
 // ServiceCIDR defines a range of IP addresses using CIDR format (e.g. 192.168.0.0/24 or 2001:db2::/64).
 // This range is used to allocate ClusterIPs to Service objects.
+// +k8s:supportsSubresource="/status"
 message ServiceCIDR {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata

@@ -160,12 +160,19 @@ type TestKubelet struct {
 	fakeKubeClient       *fake.Clientset
 	fakeMirrorClient     *podtest.FakeMirrorClient
 	fakeClock            *testingclock.FakeClock
+	pluginManagerStopCh  chan struct{}
 	mounter              mount.Interface
 	volumePlugin         *volumetest.FakeVolumePlugin
 }
 
 func (tk *TestKubelet) Cleanup() {
 	if tk.kubelet != nil {
+		if tk.pluginManagerStopCh != nil {
+			close(tk.pluginManagerStopCh)
+			tk.pluginManagerStopCh = nil
+			// Allow the plugin manager goroutines to observe stopCh before TempDir cleanup.
+			time.Sleep(20 * time.Millisecond)
+		}
 		os.RemoveAll(tk.kubelet.rootDirectory)
 		tk.kubelet = nil
 	}
@@ -341,7 +348,6 @@ func newTestKubeletWithImageList(
 		config.NewSourcesReady(func(_ sets.Set[string]) bool { return enableResizing }),
 		kubelet.recorder,
 	)
-	kubelet.allocationManager.SetContainerRuntime(fakeRuntime)
 	volumeStatsAggPeriod := time.Second * 10
 	kubelet.resourceAnalyzer = serverstats.NewResourceAnalyzer(tCtx, kubelet, volumeStatsAggPeriod, kubelet.recorder)
 
@@ -455,6 +461,8 @@ func newTestKubeletWithImageList(
 		kubelet.getPluginsRegistrationDir(), /* sockDir */
 		kubelet.recorder,
 	)
+	pluginManagerStopCh := make(chan struct{})
+	kubelet.pluginManagerStopCh = pluginManagerStopCh
 	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
 
 	// enable active deadline handler
@@ -464,7 +472,17 @@ func newTestKubeletWithImageList(
 	kubelet.AddPodSyncLoopHandler(activeDeadlineHandler)
 	kubelet.AddPodSyncHandler(activeDeadlineHandler)
 	kubelet.kubeletConfiguration.LocalStorageCapacityIsolation = localStorageCapacityIsolation
-	return &TestKubelet{kubelet, fakeRuntime, fakeContainerManager, fakeKubeClient, fakeMirrorClient, fakeClock, nil, plug}
+	return &TestKubelet{
+		kubelet:              kubelet,
+		fakeRuntime:          fakeRuntime,
+		fakeContainerManager: fakeContainerManager,
+		fakeKubeClient:       fakeKubeClient,
+		fakeMirrorClient:     fakeMirrorClient,
+		fakeClock:            fakeClock,
+		pluginManagerStopCh:  pluginManagerStopCh,
+		mounter:              nil,
+		volumePlugin:         plug,
+	}
 }
 
 func newTestPods(count int) []*v1.Pod {
@@ -3646,7 +3664,6 @@ func TestSyncPodSpans(t *testing.T) {
 		kubelet.podStartupLatencyTracker,
 	)
 	assert.NoError(t, err)
-	kubelet.allocationManager.SetContainerRuntime(kubelet.containerRuntime)
 
 	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
 		Containers: []v1.Container{

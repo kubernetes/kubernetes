@@ -5518,13 +5518,13 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			opts: PodValidationOptions{ResourceIsPod: true},
+			opts: PodValidationOptions{},
 			errs: []verr{{
 				etype: field.ErrorTypeRequired,
 				field: "image.reference",
 			}},
 		}, {
-			name: "image volume with empty reference on other object",
+			name: "image volume with empty reference allowed for ratcheting",
 			vol: core.Volume{
 				Name: "image-volume",
 				VolumeSource: core.VolumeSource{
@@ -5534,7 +5534,7 @@ func TestValidateVolumes(t *testing.T) {
 					},
 				},
 			},
-			opts: PodValidationOptions{ResourceIsPod: false},
+			opts: PodValidationOptions{AllowEmptyImageVolumeReference: true},
 		}, {
 			name: "image volume with wrong pullPolicy",
 			vol: core.Volume{
@@ -24895,7 +24895,6 @@ func TestCrossNamespaceSource(t *testing.T) {
 
 	for _, tc := range testCases {
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-			features.AnyVolumeDataSource:            true,
 			features.CrossNamespaceVolumeDataSource: true,
 		})
 		opts := PersistentVolumeClaimSpecValidationOptions{}

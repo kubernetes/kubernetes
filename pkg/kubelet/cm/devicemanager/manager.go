@@ -62,6 +62,8 @@ type ActivePodsFunc func() []*v1.Pod
 type ManagerImpl struct {
 	checkpointdir string
 
+	endpointStore map[string]map[string]*endpointInfo // resourceName -> socketPath -> endpointInfo
+
 	endpoints map[string]endpointInfo // Key is ResourceName
 	mutex     sync.Mutex
 
@@ -149,8 +151,8 @@ func newManagerImpl(logger klog.Logger, socketPath string, topology []cadvisorap
 	}
 
 	manager := &ManagerImpl{
-		endpoints: make(map[string]endpointInfo),
-
+		endpoints:             make(map[string]endpointInfo),
+		endpointStore:         make(map[string]map[string]*endpointInfo),
 		allDevices:            NewResourceDeviceInstances(),
 		healthyDevices:        make(map[string]sets.Set[string]),
 		unhealthyDevices:      make(map[string]sets.Set[string]),
@@ -236,7 +238,17 @@ func (m *ManagerImpl) PluginConnected(ctx context.Context, resourceName string, 
 
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
+	if m.endpointStore == nil {
+		m.endpointStore = make(map[string]map[string]*endpointInfo)
+	}
+	if m.endpointStore[resourceName] == nil {
+		m.endpointStore[resourceName] = make(map[string]*endpointInfo)
+	}
+	if _, exists := m.endpointStore[resourceName][e.socketPath()]; exists {
+		return fmt.Errorf("device plugin already connected: %s", e.socketPath())
+	}
 	m.endpoints[resourceName] = endpointInfo{e, options}
+	m.endpointStore[resourceName][e.socketPath()] = &endpointInfo{e, options}
 
 	logger.V(2).Info("Device plugin connected", "resourceName", resourceName)
 	return nil
@@ -244,15 +256,32 @@ func (m *ManagerImpl) PluginConnected(ctx context.Context, resourceName string, 
 
 // PluginDisconnected is to disconnect a plugin from an endpoint.
 // This is done as part of device plugin deregistration.
-func (m *ManagerImpl) PluginDisconnected(logger klog.Logger, resourceName string) {
+func (m *ManagerImpl) PluginDisconnected(logger klog.Logger, resourceName string, socketPath string) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	if ep, exists := m.endpoints[resourceName]; exists {
-		m.markResourceUnhealthy(logger, resourceName)
-		logger.V(2).Info("Endpoint became unhealthy", "resourceName", resourceName)
+	endpoints, ok := m.endpointStore[resourceName]
+	if !ok {
+		return
+	}
+	ep, exists := endpoints[socketPath]
+	if !exists {
+		return
+	}
+	ep.e.setStopTime(time.Now())
 
-		ep.e.setStopTime(time.Now())
+	last := len(endpoints) == 1
+	if last {
+		delete(m.endpointStore, resourceName)
+		m.markResourceUnhealthy(logger, resourceName)
+		logger.V(2).Info("Last device plugin for this resource disconnected", "resource", resourceName)
+	} else {
+		delete(endpoints, socketPath)
+		// Promote an arbitrary remaining endpoint to the primary endpoints map
+		for _, remainingEp := range endpoints {
+			m.endpoints[resourceName] = *remainingEp
+			break
+		}
 	}
 }
 

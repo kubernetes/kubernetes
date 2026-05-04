@@ -4,5 +4,6 @@ rules:
       - k8s.io/kubernetes/cmd/kube-apiserver
       - k8s.io/kubernetes/pkg
       - k8s.io/kubernetes/plugin
+      - k8s.io/kubernetes/test/e2e/invariants/metrics
       - k8s.io/kubernetes/test/utils
       - k8s.io/kubernetes/third_party

@@ -32,6 +32,7 @@ import (
 // endpoints defined by a backend. An Ingress can be configured to give services
 // externally-reachable urls, load balance traffic, terminate SSL, offer name
 // based virtual hosting etc.
+// +k8s:supportsSubresource="/status"
 type Ingress struct {
 	metav1.TypeMeta `json:",inline"`
 
@@ -500,6 +501,7 @@ type IPAddressList struct {
 
 // ServiceCIDR defines a range of IP addresses using CIDR format (e.g. 192.168.0.0/24 or 2001:db2::/64).
 // This range is used to allocate ClusterIPs to Service objects.
+// +k8s:supportsSubresource="/status"
 type ServiceCIDR struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.

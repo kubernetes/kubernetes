@@ -932,12 +932,12 @@ func shouldOrphanDependents(ctx context.Context, e *Store, accessor metav1.Objec
 	return defaultGCPolicy == rest.OrphanDependents
 }
 
-// shouldDeleteDependents returns true if the finalizer for foreground deletion should be set
+// shouldDeleteDependentsInForeground returns true if the finalizer for foreground deletion should be set
 // updated for FinalizerDeleteDependents. In the order of highest to lowest
 // priority, there are three factors affect whether to add/remove the
 // FinalizerDeleteDependents: options, existing finalizers of the object, and
 // e.DeleteStrategy.DefaultGarbageCollectionPolicy.
-func shouldDeleteDependents(ctx context.Context, e *Store, accessor metav1.Object, options *metav1.DeleteOptions) bool {
+func shouldDeleteDependentsInForeground(ctx context.Context, e *Store, accessor metav1.Object, options *metav1.DeleteOptions) bool {
 	// Get default GC policy from this REST object type
 	if gcStrategy, ok := e.DeleteStrategy.(rest.GarbageCollectionDeleteStrategy); ok && gcStrategy.DefaultGarbageCollectionPolicy(ctx) == rest.Unsupported {
 		// return false to indicate that we should NOT delete in foreground
@@ -986,7 +986,7 @@ func deletionFinalizersForGarbageCollection(ctx context.Context, e *Store, acces
 		return false, []string{}
 	}
 	shouldOrphan := shouldOrphanDependents(ctx, e, accessor, options)
-	shouldDeleteDependentInForeground := shouldDeleteDependents(ctx, e, accessor, options)
+	shouldDeleteInForeground := shouldDeleteDependentsInForeground(ctx, e, accessor, options)
 	newFinalizers := []string{}
 
 	// first remove both finalizers, add them back if needed.
@@ -1000,7 +1000,7 @@ func deletionFinalizersForGarbageCollection(ctx context.Context, e *Store, acces
 	if shouldOrphan {
 		newFinalizers = append(newFinalizers, metav1.FinalizerOrphanDependents)
 	}
-	if shouldDeleteDependentInForeground {
+	if shouldDeleteInForeground {
 		newFinalizers = append(newFinalizers, metav1.FinalizerDeleteDependents)
 	}
 

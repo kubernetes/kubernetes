@@ -29,15 +29,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	klogtesting "k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
 	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 )
-
-// Some of these tests capture log output. Don't reduce the verbosity or they will fail!
-func init() {
-	ktesting.SetDefaultVerbosity(5)
-}
 
 // ClaimInfo test cases
 
@@ -663,20 +658,24 @@ dra_resource_claims_in_use{driver_name="test-driver"} 2
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
+			tCtx := ktesting.Init(t)
+			logger := klogtesting.NewLogger(t, klogtesting.NewConfig(
+				klogtesting.BufferLogs(true),
+				klogtesting.Verbosity(5),
+			))
 			cache, err := newClaimInfoCache(t.TempDir(), "test-checkpoint")
 			for _, claimInfo := range test.initialClaimInfo {
 				cache.add(claimInfo)
 			}
 			require.NoError(t, err)
 			assert.NotNil(t, cache)
-			_ = cache.withLock(tCtx.Logger(), func() error {
+			_ = cache.withLock(logger, func() error {
 				cache.add(test.claimInfo)
 				return nil
 			})
 			assert.True(t, cache.contains(test.claimInfo.ClaimName, test.claimInfo.Namespace))
 			testClaimsInUseMetric(tCtx, cache, test.expectMetrics)
-			logOutput := tCtx.Logger().GetSink().(ktesting.Underlier).GetBuffer()
+			logOutput := logger.GetSink().(ktesting.Underlier).GetBuffer()
 			assert.Equal(t, test.expectLog, logOutput.String())
 		})
 	}
@@ -825,14 +824,18 @@ dra_resource_claims_in_use{driver_name="<any>"} 0
 		},
 	} {
 		t.Run(test.description, func(t *testing.T) {
-			tCtx := ktesting.Init(t, initoption.BufferLogs(true))
-			_ = test.claimInfoCache.withLock(tCtx.Logger(), func() error {
+			tCtx := ktesting.Init(t)
+			logger := klogtesting.NewLogger(t, klogtesting.NewConfig(
+				klogtesting.BufferLogs(true),
+				klogtesting.Verbosity(5),
+			))
+			_ = test.claimInfoCache.withLock(logger, func() error {
 				test.claimInfoCache.delete(claimName, namespace)
 				return nil
 			})
 			assert.False(t, test.claimInfoCache.contains(claimName, namespace))
 			testClaimsInUseMetric(tCtx, test.claimInfoCache, test.expectMetrics)
-			logOutput := tCtx.Logger().GetSink().(ktesting.Underlier).GetBuffer()
+			logOutput := logger.GetSink().(klogtesting.Underlier).GetBuffer()
 			assert.Equal(t, test.expectLog, logOutput.String())
 		})
 	}

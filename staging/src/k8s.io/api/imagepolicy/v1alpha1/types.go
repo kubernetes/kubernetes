@@ -26,6 +26,7 @@ import (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ImageReview checks if the set of images in a pod are allowed.
+// +k8s:supportsSubresource="/status"
 type ImageReview struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.

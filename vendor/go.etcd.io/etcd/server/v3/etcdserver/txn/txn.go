@@ -668,6 +668,10 @@ func IsTxnReadonly(r *pb.TxnRequest) bool {
 }
 
 func CheckTxnAuth(as auth.AuthStore, ai *auth.AuthInfo, rt *pb.TxnRequest) error {
+	return checkTxnPermission(as, ai, rt)
+}
+
+func checkTxnPermission(as auth.AuthStore, ai *auth.AuthInfo, rt *pb.TxnRequest) error {
 	for _, c := range rt.Compare {
 		if err := as.IsRangePermitted(ai, c.Key, c.RangeEnd); err != nil {
 			return err
@@ -713,6 +717,15 @@ func checkTxnReqsPermission(as auth.AuthStore, ai *auth.AuthInfo, reqs []*pb.Req
 			}
 
 			err := as.IsDeleteRangePermitted(ai, tv.RequestDeleteRange.Key, tv.RequestDeleteRange.RangeEnd)
+			if err != nil {
+				return err
+			}
+		case *pb.RequestOp_RequestTxn:
+			if tv.RequestTxn == nil {
+				continue
+			}
+
+			err := checkTxnPermission(as, ai, tv.RequestTxn)
 			if err != nil {
 				return err
 			}

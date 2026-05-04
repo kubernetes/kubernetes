@@ -88,11 +88,18 @@ func TestDeclarativeValidate(t *testing.T) {
 				r.Spec.PoolName = nil
 			}),
 		},
+		"limit nil": {
+			// +k8s:required (standard DV) — pointer is nil
+			input: mkValidRPSR(func(r *resource.ResourcePoolStatusRequest) {
+				r.Spec.Limit = nil
+			}),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec", "limit"), "")},
+		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs)
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy, tc.expectedErrs)
 		})
 	}
 }
@@ -129,7 +136,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, Strategy.ValidateUpdate, tc.expectedErrs)
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, Strategy, tc.expectedErrs)
 		})
 	}
 }
@@ -337,11 +344,29 @@ func TestDeclarativeValidateStatusUpdate(t *testing.T) {
 			})),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("status", "pools").Index(0).Child("generation"), nil, "").WithOrigin("minimum")},
 		},
+		"poolCount nil": {
+			// +k8s:required (standard DV) — pointer is nil
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				s.PoolCount = nil
+			})),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "poolCount"), "")},
+		},
+		"pool zero generation": {
+			// +k8s:required (standard DV) — zero is the zero value for int64
+			oldObj: mkValidRPSRForUpdate(),
+			updateObj: mkValidRPSRForUpdate(withStatus(func(s *resource.ResourcePoolStatusRequestStatus) {
+				pool := mkValidPoolStatus()
+				pool.Generation = 0
+				s.Pools = []resource.PoolStatus{pool}
+			})),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("status", "pools").Index(0).Child("generation"), "")},
+		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, StatusStrategy.ValidateUpdate, tc.expectedErrs)
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, StatusStrategy, tc.expectedErrs)
 		})
 	}
 }

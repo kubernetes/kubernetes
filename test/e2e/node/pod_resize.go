@@ -696,10 +696,13 @@ func doPodResizeSchedulerTests(f *framework.Framework) {
 
 func doPodResizeRetryDeferredTests(f *framework.Framework) {
 	ginkgo.It("pod-resize-retry-deferred-test-1", func(ctx context.Context) {
-		// Deferred resize E2E test case #1:
-		// 	   1. Create pod1 and pod2 and pod3 on node.
-		// 	   2. Resize pod3 to request more cpu than available, verify the resize is deferred.
-		//	   3. Resize pod1 down to make space for pod3, verify pod3's resize has completed.
+		// Deferred resize E2E test case #1 (2-Pod Scenario):
+		//     1. Assume Node CPU is divided into 10 "parts".
+		//     2. Create Pod A (5 parts) and Pod B (3 parts).
+		//     3. Verify remaining free CPU is < 3 parts (cannot fit Pod B's requested increase).
+		//     4. Resize Pod B to 6 parts. Verify the resize is deferred.
+		//     5. Resize Pod A down to 2 parts (frees up exactly 3 parts).
+		//     6. Verify Pod B's deferred resize has now completed successfully.
 
 		podClient := e2epod.NewPodClient(f)
 		nodes, err := e2enode.GetReadySchedulableNodes(ctx, f.ClientSet)
@@ -714,114 +717,105 @@ func doPodResizeRetryDeferredTests(f *framework.Framework) {
 		framework.Logf("Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
 			node.Name, nodeAllocatableCPU.MilliValue(), nodeAvailableCPU.MilliValue())
 
-		testPod1CPUQuantity := resource.NewMilliQuantity(nodeAvailableCPU.MilliValue()/2, resource.DecimalSI)
-		testPod2CPUQuantity := resource.NewMilliQuantity(testPod1CPUQuantity.MilliValue()/2, resource.DecimalSI)
-		framework.Logf("testPod1 initial CPU request is '%dm'", testPod1CPUQuantity.MilliValue())
-		framework.Logf("testPod2 initial CPU request is '%dm'", testPod2CPUQuantity.MilliValue())
+		// Conceptually divide the available CPU into 10 parts.
+		onePartCPU := nodeAvailableCPU.MilliValue() / 10
+		framework.Logf("Node '%s' currently available MilliCPUs = %dm (1 part = %dm)", node.Name, nodeAvailableCPU.MilliValue(), onePartCPU)
 
-		c1 := []podresize.ResizableContainerInfo{
-			{
-				Name:      "c1",
-				Resources: &cgroups.ContainerResources{CPUReq: testPod1CPUQuantity.String(), CPULim: testPod1CPUQuantity.String()},
-			},
+		// Pod A: 5 parts, Pod B: 3 parts
+		podACPU := resource.NewMilliQuantity(onePartCPU*5, resource.DecimalSI)
+		podBCPU := resource.NewMilliQuantity(onePartCPU*3, resource.DecimalSI)
+
+		framework.Logf("Pod A initial CPU request is '%dm'", podACPU.MilliValue())
+		framework.Logf("Pod B initial CPU request is '%dm'", podBCPU.MilliValue())
+
+		cA := []podresize.ResizableContainerInfo{
+			{Name: "ca", Resources: &cgroups.ContainerResources{CPUReq: podACPU.String(), CPULim: podACPU.String()}},
 		}
-		c2 := []podresize.ResizableContainerInfo{
-			{
-				Name:      "c2",
-				Resources: &cgroups.ContainerResources{CPUReq: testPod2CPUQuantity.String(), CPULim: testPod2CPUQuantity.String()},
-			},
+		cB := []podresize.ResizableContainerInfo{
+			{Name: "cb", Resources: &cgroups.ContainerResources{CPUReq: podBCPU.String(), CPULim: podBCPU.String()}},
 		}
+
 		tStamp := strconv.Itoa(time.Now().Nanosecond())
-		testPod1 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod1", tStamp, c1, nil)
-		testPod1 = e2epod.MustMixinRestrictedPodSecurity(testPod1)
-		testPod2 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod2", tStamp, c2, nil)
-		testPod2 = e2epod.MustMixinRestrictedPodSecurity(testPod2)
-		e2epod.SetNodeAffinity(&testPod1.Spec, node.Name)
-		e2epod.SetNodeAffinity(&testPod2.Spec, node.Name)
 
-		ginkgo.By(fmt.Sprintf("Create pod '%s' that fits the node '%s'", testPod1.Name, node.Name))
-		testPod1 = podClient.CreateSync(ctx, testPod1)
-		gomega.Expect(testPod1.Status.Phase).To(gomega.Equal(v1.PodRunning))
-		gomega.Expect(testPod1.Generation).To(gomega.BeEquivalentTo(1))
+		podA := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod-a", tStamp, cA, nil)
+		podA = e2epod.MustMixinRestrictedPodSecurity(podA)
+		e2epod.SetNodeAffinity(&podA.Spec, node.Name)
 
-		ginkgo.By(fmt.Sprintf("Create pod '%s' that fits the node '%s'", testPod2.Name, node.Name))
-		testPod2 = podClient.CreateSync(ctx, testPod2)
-		gomega.Expect(testPod2.Status.Phase).To(gomega.Equal(v1.PodRunning))
-		gomega.Expect(testPod2.Generation).To(gomega.BeEquivalentTo(1))
+		podB := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod-b", tStamp, cB, nil)
+		podB = e2epod.MustMixinRestrictedPodSecurity(podB)
+		e2epod.SetNodeAffinity(&podB.Spec, node.Name)
 
-		nodeAllocatableCPU2, nodeAvailableCPU2, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceCPU)
+		ginkgo.By(fmt.Sprintf("Create Pod A '%s' and Pod B '%s'", podA.Name, podB.Name))
+
+		podA = podClient.CreateSync(ctx, podA)
+		gomega.Expect(podA.Status.Phase).To(gomega.Equal(v1.PodRunning))
+		gomega.Expect(podA.Generation).To(gomega.BeEquivalentTo(1))
+
+		podB = podClient.CreateSync(ctx, podB)
+		gomega.Expect(podB.Status.Phase).To(gomega.Equal(v1.PodRunning))
+		gomega.Expect(podB.Generation).To(gomega.BeEquivalentTo(1))
+
+		ginkgo.By("Verify remaining CPU is less than the 3 parts required for Pod B's resize")
+		_, nodeAvailableCPU2, err := e2enode.GetNodeAllocatableAndAvailableQuantities(ctx, f.ClientSet, &node, v1.ResourceCPU)
 		framework.ExpectNoError(err, "failed to get CPU resources available for allocation")
-		framework.Logf("Node '%s': NodeAllocatable MilliCPUs = %dm. MilliCPUs currently available to allocate = %dm.",
-			node.Name, nodeAllocatableCPU2.MilliValue(), nodeAvailableCPU2.MilliValue())
 
-		testPod3CPUQuantity := resource.NewMilliQuantity(nodeAvailableCPU2.MilliValue()/4, resource.DecimalSI)
-		testPod3CPUQuantityResized := resource.NewMilliQuantity(nodeAvailableCPU2.MilliValue()+testPod1CPUQuantity.MilliValue()/4, resource.DecimalSI)
-		framework.Logf("testPod3 MilliCPUs after resize '%dm'", testPod3CPUQuantityResized.MilliValue())
+		threePartsCPU := onePartCPU * 3
+		framework.Logf("Remaining CPU = %dm. Pod B needs %dm more to resize.", nodeAvailableCPU2.MilliValue(), threePartsCPU)
+		gomega.Expect(nodeAvailableCPU2.MilliValue()).To(gomega.BeNumerically("<", threePartsCPU),
+			"Available CPU should be strictly less than 3 parts to ensure Pod B's resize is deferred")
 
-		testPod1CPUQuantityResizedCPU := resource.NewMilliQuantity(testPod1CPUQuantity.MilliValue()/3, resource.DecimalSI)
-		framework.Logf("testPod1 MilliCPUs after resize '%dm'", testPod1CPUQuantityResizedCPU.MilliValue())
+		// Calculations for Resizing
+		// Pod B: Resize to 6 parts (needs 3 more parts)
+		podBResizedCPU := resource.NewMilliQuantity(onePartCPU*6, resource.DecimalSI)
+		// Pod A: Resize to 2 parts (drops 3 parts, freeing them up)
+		podAResizedCPU := resource.NewMilliQuantity(onePartCPU*2, resource.DecimalSI)
 
-		c3 := []podresize.ResizableContainerInfo{
-			{
-				Name:      "c3",
-				Resources: &cgroups.ContainerResources{CPUReq: testPod3CPUQuantity.String(), CPULim: testPod3CPUQuantity.String()},
-			},
-		}
-		patchTestpod3ToDeferred := fmt.Sprintf(`{
-			"spec": {
-				"containers": [
-					{
-						"name":      "c3",
-						"resources": {"requests": {"cpu": "%dm"},"limits": {"cpu": "%dm"}}
-					}
-				]
-			}
-		}`, testPod3CPUQuantityResized.MilliValue(), testPod3CPUQuantityResized.MilliValue())
-		patchTestpod1ToMakeSpaceForPod3 := fmt.Sprintf(`{
-				"spec": {
-					"containers": [
-						{
-							"name":      "c1",
-							"resources": {"requests": {"cpu": "%dm"},"limits": {"cpu": "%dm"}}
-						}
-					]
-				}
-			}`, testPod1CPUQuantityResizedCPU.MilliValue(), testPod1CPUQuantityResizedCPU.MilliValue())
+		patchPodBToDeferred := fmt.Sprintf(`{
+        	"spec": {
+            	"containers": [
+                	{
+                    	"name":      "cb",
+                    	"resources": {"requests": {"cpu": "%dm"},"limits": {"cpu": "%dm"}}
+                	}
+            	]
+        	}
+    	}`, podBResizedCPU.MilliValue(), podBResizedCPU.MilliValue())
 
-		tStamp = strconv.Itoa(time.Now().Nanosecond())
-		testPod3 := podresize.MakePodWithResizableContainers(f.Namespace.Name, "testpod3", tStamp, c3, nil)
-		testPod3 = e2epod.MustMixinRestrictedPodSecurity(testPod3)
-		e2epod.SetNodeAffinity(&testPod3.Spec, node.Name)
+		patchPodAToMakeSpace := fmt.Sprintf(`{
+        	"spec": {
+           		"containers": [
+                	{
+                    	"name":      "ca",
+                    	"resources": {"requests": {"cpu": "%dm"},"limits": {"cpu": "%dm"}}
+                	}
+            	]
+        	}
+    	}`, podAResizedCPU.MilliValue(), podAResizedCPU.MilliValue())
 
-		ginkgo.By(fmt.Sprintf("Create pod '%s' that fits the node '%s'", testPod3.Name, node.Name))
-		testPod3 = podClient.CreateSync(ctx, testPod3)
-		gomega.Expect(testPod3.Status.Phase).To(gomega.Equal(v1.PodRunning))
-		gomega.Expect(testPod3.Generation).To(gomega.BeEquivalentTo(1))
+		ginkgo.By(fmt.Sprintf("Resize Pod B '%s' to 6 parts (will be deferred due to insufficient CPU)", podB.Name))
+		podB, err = f.ClientSet.CoreV1().Pods(podB.Namespace).Patch(ctx,
+			podB.Name, types.StrategicMergePatchType, []byte(patchPodBToDeferred), metav1.PatchOptions{}, "resize")
+		framework.ExpectNoError(err, "failed to patch Pod B for resize")
+		waitForPodDeferred(ctx, f, podB)
 
-		ginkgo.By(fmt.Sprintf("Resize pod '%s' that cannot fit node due to insufficient CPU", testPod3.Name))
-		testPod3, p3Err := f.ClientSet.CoreV1().Pods(testPod3.Namespace).Patch(ctx,
-			testPod3.Name, types.StrategicMergePatchType, []byte(patchTestpod3ToDeferred), metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(p3Err, "failed to patch pod for resize")
-		waitForPodDeferred(ctx, f, testPod3)
+		ginkgo.By(fmt.Sprintf("Resize Pod A '%s' down to 2 parts, freeing up exactly 3 parts for Pod B", podA.Name))
+		podA, err = f.ClientSet.CoreV1().Pods(podA.Namespace).Patch(ctx,
+			podA.Name, types.StrategicMergePatchType, []byte(patchPodAToMakeSpace), metav1.PatchOptions{}, "resize")
+		framework.ExpectNoError(err, "failed to patch Pod A to free up space")
+		gomega.Expect(podA.Generation).To(gomega.BeEquivalentTo(2))
 
-		ginkgo.By(fmt.Sprintf("Resize pod '%s' to make enough space for pod '%s'", testPod1.Name, testPod3.Name))
-		testPod1, p1Err := f.ClientSet.CoreV1().Pods(testPod1.Namespace).Patch(ctx,
-			testPod1.Name, types.StrategicMergePatchType, []byte(patchTestpod1ToMakeSpaceForPod3), metav1.PatchOptions{}, "resize")
-		framework.ExpectNoError(p1Err, "failed to patch pod for resize")
-		gomega.Expect(testPod1.Generation).To(gomega.BeEquivalentTo(2))
-
-		ginkgo.By(fmt.Sprintf("Verify pod '%s' is resized successfully after pod resize '%s'", testPod3.Name, testPod1.Name))
+		ginkgo.By("Verify Pod B successfully actuates the deferred resize after space is freed")
 		expected := []podresize.ResizableContainerInfo{
 			{
-				Name:      "c3",
-				Resources: &cgroups.ContainerResources{CPUReq: testPod3CPUQuantityResized.String(), CPULim: testPod3CPUQuantityResized.String()},
+				Name:      "cb",
+				Resources: &cgroups.ContainerResources{CPUReq: podBResizedCPU.String(), CPULim: podBResizedCPU.String()},
 			},
 		}
-		resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, testPod3, expected)
-		podresize.ExpectPodResized(ctx, f, resizedPod, expected)
+		resizedPodB := podresize.WaitForPodResizeActuation(ctx, f, podClient, podB, expected)
+		podresize.ExpectPodResized(ctx, f, resizedPodB, expected)
 
-		ginkgo.By("deleting pods")
-		e2epod.DeletePodsWithWait(ctx, f.ClientSet, []*v1.Pod{testPod1, testPod2, testPod3})
+		ginkgo.By("Cleaning up test pods")
+		e2epod.DeletePodsWithWait(ctx, f.ClientSet, []*v1.Pod{podA, podB})
 	})
 
 	ginkgo.It("pod-resize-retry-deferred-test-2", func(ctx context.Context) {

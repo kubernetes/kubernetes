@@ -14,6 +14,8 @@ import (
 const priorityDefaultWeightRFC7540 = 15 // 16 = 15 + 1
 
 // PriorityWriteSchedulerConfig configures a priorityWriteScheduler.
+//
+// Deprecated: User-provided write schedulers are deprecated.
 type PriorityWriteSchedulerConfig struct {
 	// MaxClosedNodesInTree controls the maximum number of closed streams to
 	// retain in the priority tree. Setting this to zero saves a small amount
@@ -55,7 +57,14 @@ type PriorityWriteSchedulerConfig struct {
 // NewPriorityWriteScheduler constructs a WriteScheduler that schedules
 // frames by following HTTP/2 priorities as described in RFC 7540 Section 5.3.
 // If cfg is nil, default options are used.
+//
+// Deprecated: The RFC 7540 write scheduler has known bugs and performance issues,
+// and RFC 7540 prioritization was deprecated in RFC 9113.
 func NewPriorityWriteScheduler(cfg *PriorityWriteSchedulerConfig) WriteScheduler {
+	return newPriorityWriteSchedulerRFC7540(cfg)
+}
+
+func newPriorityWriteSchedulerRFC7540(cfg *PriorityWriteSchedulerConfig) WriteScheduler {
 	if cfg == nil {
 		// For justification of these defaults, see:
 		// https://docs.google.com/document/d/1oLhNg1skaWD4_DtaoCxdSRN5erEXrH-KnLrMwEpOtFY

@@ -346,6 +346,11 @@ func (c CompletedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get listener address: %w", err)
 	}
+
+	if err := c.Extra.EndpointReconcilerConfig.Reconciler.ValidateIP(c.ControlPlane.Generic.PublicAddress); err != nil {
+		return nil, fmt.Errorf("cannot use public IP %s with endpoint reconciler: %w", c.ControlPlane.Generic.PublicAddress.String(), err)
+	}
+
 	kubernetesServiceCtrl := kubernetesservice.New(kubernetesservice.Config{
 		PublicIP: c.ControlPlane.Generic.PublicAddress,
 

@@ -41,7 +41,7 @@ import (
 
 // strategy implements behavior for PodCertificateRequests.
 type Strategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
@@ -51,8 +51,8 @@ var _ rest.RESTDeleteStrategy = (*Strategy)(nil)
 
 func NewStrategy() *Strategy {
 	return &Strategy{
-		ObjectTyper:   legacyscheme.Scheme,
-		NameGenerator: names.SimpleNameGenerator,
+		DeclarativeValidation: rest.DeclarativeValidation{Scheme: legacyscheme.Scheme},
+		NameGenerator:         names.SimpleNameGenerator,
 	}
 }
 

@@ -851,22 +851,6 @@ func TestReplicaCalcScaleUpCMObjectIgnoresUnreadyPods(t *testing.T) {
 	tc.runTest(t)
 }
 
-func TestReplicaCalcScaleUpCMExternal(t *testing.T) {
-	tc := replicaCalcTestCase{
-		currentReplicas:  1,
-		expectedReplicas: 2,
-		metric: &metricInfo{
-			name:          "qps",
-			levels:        []int64{8600},
-			targetUsage:   4400,
-			expectedUsage: 8600,
-			selector:      &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
-			metricType:    podMetric,
-		},
-	}
-	tc.runTest(t)
-}
-
 func TestReplicaCalcScaleUpCMExternalIgnoresUnreadyPods(t *testing.T) {
 	tc := replicaCalcTestCase{
 		currentReplicas:  3,
@@ -879,21 +863,6 @@ func TestReplicaCalcScaleUpCMExternalIgnoresUnreadyPods(t *testing.T) {
 			expectedUsage: 8600,
 			selector:      &metav1.LabelSelector{MatchLabels: map[string]string{"label": "value"}},
 			metricType:    externalMetric,
-		},
-	}
-	tc.runTest(t)
-}
-
-func TestReplicaCalcScaleUpCMExternalNoLabels(t *testing.T) {
-	tc := replicaCalcTestCase{
-		currentReplicas:  1,
-		expectedReplicas: 2,
-		metric: &metricInfo{
-			name:          "qps",
-			levels:        []int64{8600},
-			targetUsage:   4400,
-			expectedUsage: 8600,
-			metricType:    podMetric,
 		},
 	}
 	tc.runTest(t)

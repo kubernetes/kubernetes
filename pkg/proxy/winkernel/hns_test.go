@@ -94,7 +94,7 @@ func TestGetAllEndpointsByNetwork(t *testing.T) {
 		t.Error(err)
 	}
 
-	mapEndpointsInfo, err := hns.getAllEndpointsByNetwork(Network.Name)
+	mapEndpointsInfo, _, err := hns.getAllEndpointsByNetwork(Network.Name)
 	if err != nil {
 		t.Error(err)
 	}
@@ -156,24 +156,25 @@ func TestGetAllEndpointsByNetworkWithDupEP(t *testing.T) {
 		t.Error(err)
 	}
 
-	mapEndpointsInfo, err := hns.getAllEndpointsByNetwork(Network.Name)
+	mapEndpointsInfo, remoteEPsWithDupIP, err := hns.getAllEndpointsByNetwork(Network.Name)
 	if err != nil {
 		t.Error(err)
 	}
+	hns.deleteAllRemoteEndpointsWithDupIP(remoteEPsWithDupIP)
 	endpointIpv4, ipv4EpPresent := mapEndpointsInfo[ipv4Config.IpAddress]
 	assert.True(t, ipv4EpPresent, "IPV4 endpoint is missing in Dualstack mode")
 	assert.Equal(t, endpointIpv4.ip, epIpAddress, "IPV4 IP is missing in Dualstack mode")
-	assert.Equal(t, endpointIpv4.hnsID, remoteEndpoint.Id, "HNS ID is not matching with remote endpoint")
+	assert.Equal(t, endpointIpv4.hnsID, dupLocalEndpoint.Id, "HNS ID is not matching with local endpoint")
 
 	endpointIpv6, ipv6EpPresent := mapEndpointsInfo[ipv6Config.IpAddress]
 	assert.True(t, ipv6EpPresent, "IPV6 endpoint is missing in Dualstack mode")
 	assert.Equal(t, endpointIpv6.ip, epIpv6Address, "IPV6 IP is missing in Dualstack mode")
-	assert.Equal(t, endpointIpv6.hnsID, remoteEndpoint.Id, "HNS ID is not matching with remote endpoint")
+	assert.Equal(t, endpointIpv6.hnsID, dupLocalEndpoint.Id, "HNS ID is not matching with local endpoint")
 
-	err = hns.hcn.DeleteEndpoint(remoteEndpoint)
-	if err != nil {
-		t.Error(err)
-	}
+	remoteEpExists, _ := hns.hcn.GetEndpointByID(remoteEndpoint.Id)
+	assert.Nil(t, remoteEpExists, "Remote endpoint with duplicate IP should have been deleted")
+
+	// Clean up the duplicate local endpoint
 	err = hns.hcn.DeleteEndpoint(dupLocalEndpoint)
 	if err != nil {
 		t.Error(err)

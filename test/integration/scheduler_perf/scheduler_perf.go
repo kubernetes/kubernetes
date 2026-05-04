@@ -34,7 +34,6 @@ import (
 	"time"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/component-base/featuregate"
@@ -54,7 +53,7 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/kubernetes/test/utils/ktesting/initoption"
 	"sigs.k8s.io/yaml"
 )
@@ -144,24 +143,21 @@ var (
 					Values: metrics.ExtensionPoints,
 				},
 			},
-		},
-	}
-
-	qHintMetrics = map[string][]*labelValues{
-		"scheduler_queueing_hint_execution_duration_seconds": {
-			{
-				Label:  pluginLabelName,
-				Values: PluginNames,
+			"scheduler_queueing_hint_execution_duration_seconds": {
+				{
+					Label:  pluginLabelName,
+					Values: PluginNames,
+				},
+				{
+					Label:  eventLabelName,
+					Values: schedframework.AllClusterEventLabels(),
+				},
 			},
-			{
-				Label:  eventLabelName,
-				Values: schedframework.AllClusterEventLabels(),
-			},
-		},
-		"scheduler_event_handling_duration_seconds": {
-			{
-				Label:  eventLabelName,
-				Values: schedframework.AllClusterEventLabels(),
+			"scheduler_event_handling_duration_seconds": {
+				{
+					Label:  eventLabelName,
+					Values: schedframework.AllClusterEventLabels(),
+				},
 			},
 		},
 	}
@@ -230,18 +226,6 @@ func InitTests() error {
 
 	logs.InitLogs()
 	return logsapi.ValidateAndApply(LoggingConfig, LoggingFeatureGate)
-}
-
-func registerQHintMetrics() {
-	for k, v := range qHintMetrics {
-		defaultMetricsCollectorConfig.Metrics[k] = v
-	}
-}
-
-func unregisterQHintMetrics() {
-	for k := range qHintMetrics {
-		delete(defaultMetricsCollectorConfig.Metrics, k)
-	}
 }
 
 // testCase defines a set of test cases that intends to test the performance of
@@ -624,7 +608,7 @@ func initTestOutput(tb testing.TB) io.Writer {
 
 var specialFilenameChars = regexp.MustCompile(`[^a-zA-Z0-9-_]`)
 
-func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feature]bool, workload *Workload, opts *schedulerPerfOptions) (*scheduler.Scheduler, informers.SharedInformerFactory, ktesting.TContext) {
+func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feature]bool, workload *Workload, opts *schedulerPerfOptions) (*scheduler.Scheduler, informers.SharedInformerFactory, <-chan struct{}, ktesting.TContext) {
 	tCtx := ktesting.Init(t, initoption.PerTestOutput(UseTestingLog))
 	artifacts, doArtifacts := os.LookupEnv("ARTIFACTS")
 	if !UseTestingLog && doArtifacts {
@@ -692,11 +676,7 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 	// quit *before* restoring klog settings.
 	framework.GoleakCheck(t)
 
-	// We need to set emulation version for QueueingHints feature gate, which is locked at 1.34.
-	// Only emulate v1.33 when QueueingHints is explicitly disabled.
-	if qhEnabled, exists := featureGates[features.SchedulerQueueingHints]; exists && !qhEnabled {
-		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
-	} else if _, found := featureGates[features.OpportunisticBatching]; !found {
+	if _, found := featureGates[features.OpportunisticBatching]; !found {
 		if featureGates == nil {
 			featureGates = map[featuregate.Feature]bool{}
 		}
@@ -726,13 +706,6 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 	// 30 minutes should be plenty enough even for the 5000-node tests.
 	timeout := 30 * time.Minute
 	tCtx = tCtx.WithTimeout(timeout, fmt.Sprintf("timed out after the %s per-test timeout", timeout))
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
-		registerQHintMetrics()
-		t.Cleanup(func() {
-			unregisterQHintMetrics()
-		})
-	}
 
 	return setupClusterForWorkload(tCtx, tc.SchedulerConfigPath, featureGates, opts)
 }
@@ -820,7 +793,7 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 					fixJSONOutput(b)
 
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
-					scheduler, informerFactory, tCtx := setupTestCase(b, tc, featureGates, w, opts)
+					scheduler, informerFactory, schedulerDone, tCtx := setupTestCase(b, tc, featureGates, w, opts)
 
 					err := w.isValid(tc.MetricsCollectorConfig)
 					if err != nil {
@@ -863,12 +836,14 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 						}
 					}
 
-					if featureGates[features.SchedulerQueueingHints] {
-						// In any case, we should make sure InFlightEvents is empty after running the scenario.
-						if err = checkEmptyInFlightEvents(); err != nil {
-							tCtx.Errorf("%s: %s", w.Name, err)
-						}
+					// In any case, we should make sure InFlightEvents is empty after running the scenario.
+					if err = checkEmptyInFlightEvents(); err != nil {
+						tCtx.Errorf("%s: %s", w.Name, err)
 					}
+
+					tCtx.Cancel("workload is done")
+					// Wait for the scheduler to stop to avoid data races when resetting metrics.
+					<-schedulerDone
 
 					// Reset metrics to prevent metrics generated in current workload gets
 					// carried over to the next workload.
@@ -942,7 +917,7 @@ func RunIntegrationPerfScheduling(t *testing.T, configFile string, options ...Sc
 						t.Skipf("disabled by label filter %q", TestSchedulingLabelFilter)
 					}
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
-					scheduler, informerFactory, tCtx := setupTestCase(t, tc, featureGates, w, opts)
+					scheduler, informerFactory, schedulerDone, tCtx := setupTestCase(t, tc, featureGates, w, opts)
 					err := w.isValid(tc.MetricsCollectorConfig)
 					if err != nil {
 						t.Fatalf("workload %s is not valid: %v", w.Name, err)
@@ -953,12 +928,14 @@ func RunIntegrationPerfScheduling(t *testing.T, configFile string, options ...Sc
 						tCtx.Fatalf("Error running workload %s: %s", w.Name, err)
 					}
 
-					if featureGates[features.SchedulerQueueingHints] {
-						// In any case, we should make sure InFlightEvents is empty after running the scenario.
-						if err = checkEmptyInFlightEvents(); err != nil {
-							tCtx.Errorf("%s: %s", w.Name, err)
-						}
+					// In any case, we should make sure InFlightEvents is empty after running the scenario.
+					if err = checkEmptyInFlightEvents(); err != nil {
+						tCtx.Errorf("%s: %s", w.Name, err)
 					}
+
+					tCtx.Cancel("workload is done")
+					// Wait for the scheduler to stop to avoid data races when resetting metrics.
+					<-schedulerDone
 
 					// Reset metrics to prevent metrics generated in current workload gets
 					// carried over to the next workload.
@@ -1008,7 +985,7 @@ func unrollWorkloadTemplate(tb ktesting.TB, wt []op, w *Workload) []op {
 	return unrolled
 }
 
-func setupClusterForWorkload(tCtx ktesting.TContext, configPath string, featureGates map[featuregate.Feature]bool, opts *schedulerPerfOptions) (*scheduler.Scheduler, informers.SharedInformerFactory, ktesting.TContext) {
+func setupClusterForWorkload(tCtx ktesting.TContext, configPath string, featureGates map[featuregate.Feature]bool, opts *schedulerPerfOptions) (*scheduler.Scheduler, informers.SharedInformerFactory, <-chan struct{}, ktesting.TContext) {
 	var cfg *config.KubeSchedulerConfiguration
 	var err error
 	if configPath != "" {

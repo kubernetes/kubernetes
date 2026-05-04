@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"google.golang.org/grpc"
@@ -485,20 +486,28 @@ func (p *RemoteRuntime) GetContainerEvents(req *runtimeapi.GetEventsRequest, ces
 		return err
 	}
 
+	ctx, cancel := context.WithCancel(ces.Context())
+	defer cancel()
+
 	// Capacity of the channel for receiving pod lifecycle events. This number
 	// is a bit arbitrary and may be adjusted in the future.
 	plegChannelCapacity := 1000
 	containerEventsResponseCh := make(chan *runtimeapi.ContainerEventResponse, plegChannelCapacity)
-	defer close(containerEventsResponseCh)
-
-	if err := p.runtimeService.GetContainerEvents(context.Background(), containerEventsResponseCh, nil); err != nil {
-		return err
-	}
+	errCh := make(chan error, 1)
+	go func() {
+		defer close(containerEventsResponseCh)
+		errCh <- p.runtimeService.GetContainerEvents(ctx, containerEventsResponseCh, nil)
+	}()
 
 	for event := range containerEventsResponseCh {
 		if err := ces.Send(event); err != nil {
+			cancel()
 			return status.Errorf(codes.Unknown, "Failed to send event: %v", err)
 		}
+	}
+
+	if err := <-errCh; err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, io.EOF) {
+		return err
 	}
 
 	return nil

@@ -103,6 +103,32 @@ func TestDeclarativeValidate(t *testing.T) {
 					input: mkDeviceClass(tweakConfig(32)),
 				},
 
+				// spec.config[*].opaque.driver
+				"valid opaque driver, lowercase": {
+					input: mkDeviceClass(tweakConfigOpaqueDriver("dra.example.com")),
+				},
+				"valid opaque driver, max length": {
+					input: mkDeviceClass(tweakConfigOpaqueDriver(strings.Repeat("a", 63))),
+				},
+				"invalid opaque driver, empty": {
+					input: mkDeviceClass(tweakConfigOpaqueDriver("")),
+					expectedErrs: field.ErrorList{
+						field.Required(field.NewPath("spec", "config").Index(0).Child("opaque", "driver"), "").MarkAlpha(),
+					},
+				},
+				"invalid opaque driver, too long": {
+					input: mkDeviceClass(tweakConfigOpaqueDriver(strings.Repeat("a", 64))),
+					expectedErrs: field.ErrorList{
+						field.TooLong(field.NewPath("spec", "config").Index(0).Child("opaque", "driver"), "", 63).WithOrigin("maxLength").MarkAlpha(),
+					},
+				},
+				"invalid opaque driver, invalid character": {
+					input: mkDeviceClass(tweakConfigOpaqueDriver("dra_example.com")),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "config").Index(0).Child("opaque", "driver"), "dra_example.com", "").WithOrigin("format=k8s-long-name-caseless").MarkAlpha(),
+					},
+				},
+
 				// ExtendedResourceName
 				"valid extended resource name": {
 					input: mkDeviceClass(tweakExtendedResourceName("example.com/my-resource")),
@@ -142,7 +168,7 @@ func TestDeclarativeValidate(t *testing.T) {
 
 			for k, tc := range testCases {
 				t.Run(k, func(t *testing.T) {
-					apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, strategy.Validate, tc.expectedErrs)
+					apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, strategy, tc.expectedErrs)
 				})
 			}
 		})
@@ -247,7 +273,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 				t.Run(k, func(t *testing.T) {
 					tc.old.ResourceVersion = "1"
 					tc.update.ResourceVersion = "1"
-					apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, strategy.ValidateUpdate, tc.expectedErrs)
+					apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, strategy, tc.expectedErrs)
 				})
 			}
 		})
@@ -323,6 +349,21 @@ func tweakConfig(count int) func(*resource.DeviceClass) {
 					},
 				},
 			})
+		}
+	}
+}
+
+func tweakConfigOpaqueDriver(driver string) func(*resource.DeviceClass) {
+	return func(dc *resource.DeviceClass) {
+		dc.Spec.Config = []resource.DeviceClassConfiguration{
+			{
+				DeviceConfiguration: resource.DeviceConfiguration{
+					Opaque: &resource.OpaqueDeviceConfiguration{
+						Driver:     driver,
+						Parameters: runtime.RawExtension{Raw: []byte(`{"key":"value"}`)},
+					},
+				},
+			},
 		}
 	}
 }

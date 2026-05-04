@@ -43,6 +43,7 @@ type JobTemplateSpec struct {
 // +k8s:prerelease-lifecycle-gen:replacement=batch,v1,CronJob
 
 // CronJob represents the configuration of a single cron job.
+// +k8s:supportsSubresource="/status"
 type CronJob struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.

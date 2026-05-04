@@ -18,6 +18,7 @@ package resourceslice
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -118,6 +119,23 @@ func TestDeclarativeValidate(t *testing.T) {
 				},
 				"valid: device attribute list of strings": {
 					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_strings", resource.DeviceAttribute{StringValues: []string{"a", "b", "c"}})),
+				},
+				"valid: device attribute list of strings at max bytes": {
+					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_strings", resource.DeviceAttribute{
+						// The tag literal is 64, which must stay aligned with DeviceAttributeMaxValueLength.
+						// "é" is two bytes in UTF-8, so repeating it max/2 times verifies the exact maxBytes boundary.
+						StringValues: []string{strings.Repeat("é", resource.DeviceAttributeMaxValueLength/2)},
+					})),
+				},
+				"invalid: device attribute list of strings with too-long item": {
+					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_strings", resource.DeviceAttribute{
+						// The tag literal is 64, which must stay aligned with DeviceAttributeMaxValueLength.
+						// "é" is two bytes in UTF-8, so max/2+1 repeats exceeds the maxBytes boundary.
+						StringValues: []string{strings.Repeat("é", resource.DeviceAttributeMaxValueLength/2+1)},
+					})),
+					expectedErrs: field.ErrorList{
+						field.TooLong(field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_strings").Child("strings").Index(0), "", resource.DeviceAttributeMaxValueLength).WithOrigin("maxBytes").MarkAlpha(),
+					},
 				},
 				"valid: device attribute list of versions": {
 					input: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_versions", resource.DeviceAttribute{VersionValues: []string{"1.2.3", "2.3.4"}})),
@@ -224,6 +242,12 @@ func TestDeclarativeValidate(t *testing.T) {
 				"valid: shared counter key": {
 					input: mkResourceSliceWithSharedCounters(tweakSharedCounter(counters("valid-key"))),
 				},
+				"invalid: shared counters empty": {
+					input: mkResourceSliceWithSharedCounters(tweakSharedCounter(nil)),
+					expectedErrs: field.ErrorList{
+						field.Required(field.NewPath("spec", "sharedCounters").Index(0).Child("counters"), "").MarkAlpha(),
+					},
+				},
 				// spec.devices.consumesCounters.counters
 				"invalid: device counter key with uppercase": {
 					input: mkResourceSliceWithDevices(tweakDeviceCounter(counters("InvalidKey"))),
@@ -234,13 +258,19 @@ func TestDeclarativeValidate(t *testing.T) {
 				"valid: device counter key": {
 					input: mkResourceSliceWithDevices(tweakDeviceCounter(counters("valid-key"))),
 				},
+				"invalid: device counters empty": {
+					input: mkResourceSliceWithDevices(tweakDeviceCounter(nil)),
+					expectedErrs: field.ErrorList{
+						field.Required(field.NewPath("spec", "devices").Index(0).Child("consumesCounters").Index(0).Child("counters"), "").MarkAlpha(),
+					},
+				},
 				// TODO: Add more test cases
 			}
 
 			for k, tc := range testCases {
 				t.Run(k, func(t *testing.T) {
 					apitesting.VerifyValidationEquivalence(
-						t, ctx, &tc.input, strategy.Validate, tc.expectedErrs,
+						t, ctx, &tc.input, strategy, tc.expectedErrs,
 						apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...),
 						apitesting.WithIgnoreObjectConversionErrors(),
 					)
@@ -333,6 +363,25 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 					update: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/empty", resource.DeviceAttribute{})),
 					expectedErrs: field.ErrorList{
 						field.Invalid(field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/empty"), "", "").WithOrigin("union").MarkAlpha(),
+					},
+				},
+				"valid update: device attribute list of strings at max bytes": {
+					old: mkResourceSliceWithDevices(),
+					update: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_strings", resource.DeviceAttribute{
+						// The tag literal is 64, which must stay aligned with DeviceAttributeMaxValueLength.
+						// "é" is two bytes in UTF-8, so repeating it max/2 times verifies the exact maxBytes boundary.
+						StringValues: []string{strings.Repeat("é", resource.DeviceAttributeMaxValueLength/2)},
+					})),
+				},
+				"invalid update: device attribute list of strings with too-long item": {
+					old: mkResourceSliceWithDevices(),
+					update: mkResourceSliceWithDevices(tweakDeviceAttribute("test.io/list_of_strings", resource.DeviceAttribute{
+						// The tag literal is 64, which must stay aligned with DeviceAttributeMaxValueLength.
+						// "é" is two bytes in UTF-8, so max/2+1 repeats exceeds the maxBytes boundary.
+						StringValues: []string{strings.Repeat("é", resource.DeviceAttributeMaxValueLength/2+1)},
+					})),
+					expectedErrs: field.ErrorList{
+						field.TooLong(field.NewPath("spec", "devices").Index(0).Child("attributes").Key("test.io/list_of_strings").Child("strings").Index(0), "", resource.DeviceAttributeMaxValueLength).WithOrigin("maxBytes").MarkAlpha(),
 					},
 				},
 				// spec.sharedCounters
@@ -459,7 +508,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 				t.Run(k, func(t *testing.T) {
 					tc.old.ResourceVersion = "1"
 					tc.update.ResourceVersion = "1"
-					apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, strategy.ValidateUpdate, tc.expectedErrs, apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...))
+					apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, strategy, tc.expectedErrs, apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...))
 				})
 			}
 		})

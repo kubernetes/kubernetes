@@ -174,6 +174,7 @@ const (
 // +k8s:prerelease-lifecycle-gen:introduced=1.21
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
+// +k8s:supportsSubresource="/status"
 type PodDisruptionBudget struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.

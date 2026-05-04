@@ -399,15 +399,15 @@ func statefulSetHistory(
 	namespace, name string) (*appsv1.StatefulSet, []*appsv1.ControllerRevision, error) {
 	sts, err := apps.StatefulSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to retrieve Statefulset %s: %s", name, err.Error())
+		return nil, nil, fmt.Errorf("failed to retrieve StatefulSet %s: %w", name, err)
 	}
 	selector, err := metav1.LabelSelectorAsSelector(sts.Spec.Selector)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create selector for StatefulSet %s: %s", name, err.Error())
+		return nil, nil, fmt.Errorf("failed to create selector for StatefulSet %s: %w", name, err)
 	}
 	accessor, err := meta.Accessor(sts)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to obtain accessor for StatefulSet %s: %s", name, err.Error())
+		return nil, nil, fmt.Errorf("failed to obtain accessor for StatefulSet %s: %w", name, err)
 	}
 	history, err := controlledHistoryV1(apps, namespace, selector, accessor)
 	if err != nil {

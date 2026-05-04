@@ -178,6 +178,12 @@ func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, pod *v1.P
 		return false
 	}
 
+	// Pods with a nominated node should bypass opportunistic batching.
+	if pod.Status.NominatedNodeName != "" {
+		b.logUnusableState(logger, cycleCount, metrics.BatchFlushPodNominated)
+		return false
+	}
+
 	// If the new pod is incompatible with the current state, throw the state away.
 	if signature == nil || !bytes.Equal(signature, b.state.signature) {
 		b.logUnusableState(logger, cycleCount, metrics.BatchFlushPodIncompatible)

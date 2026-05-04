@@ -66,6 +66,7 @@ const (
 // +k8s:prerelease-lifecycle-gen:introduced=1.2
 
 // Job represents the configuration of a single job.
+// +k8s:supportsSubresource="/status"
 type Job struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -677,6 +678,7 @@ type JobTemplateSpec struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.21
 
 // CronJob represents the configuration of a single cron job.
+// +k8s:supportsSubresource="/status"
 type CronJob struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.

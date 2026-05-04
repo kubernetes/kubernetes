@@ -482,6 +482,7 @@ func (s *Server) InstallAuthNotRequiredHandlers(ctx context.Context) {
 
 	s.addMetricsBucketMatcher("pods")
 	ws := new(restful.WebService)
+	ws.Filter(GETOnlyRestfulFilter())
 	ws.
 		Path(podsPath).
 		Produces(restful.MIME_JSON)
@@ -636,6 +637,7 @@ func (s *Server) InstallAuthRequiredHandlers(ctx context.Context) {
 
 	s.addMetricsBucketMatcher("containerLogs")
 	ws = new(restful.WebService)
+	ws.Filter(GETOnlyRestfulFilter())
 	ws.
 		Path("/containerLogs")
 	ws.Route(ws.GET("/{podNamespace}/{podID}/{containerName}").
@@ -649,6 +651,7 @@ func (s *Server) InstallAuthRequiredHandlers(ctx context.Context) {
 	// The /runningpods endpoint is used for testing only.
 	s.addMetricsBucketMatcher("runningpods")
 	ws = new(restful.WebService)
+	ws.Filter(GETOnlyRestfulFilter())
 	ws.
 		Path(runningPodsPath).
 		Produces(restful.MIME_JSON)
@@ -699,6 +702,7 @@ func (s *Server) InstallSystemLogHandler(enableSystemLogHandler bool, enableSyst
 	s.addMetricsBucketMatcher("logs")
 	if enableSystemLogHandler {
 		ws := new(restful.WebService)
+		ws.Filter(GETOnlyRestfulFilter())
 		ws.Path(logsPath)
 		ws.Route(ws.GET("").
 			To(s.getLogs).
@@ -770,6 +774,7 @@ func (s *Server) InstallProfilingHandler(enableProfilingLogHandler bool, enableC
 
 	// Setup pprof handlers.
 	ws := new(restful.WebService).Path(pprofBasePath)
+	ws.Filter(GETOnlyRestfulFilter())
 	ws.Route(ws.GET("/{subpath:*}").To(handlePprofEndpoint)).Doc("pprof endpoint")
 	s.restfulCont.Add(ws)
 
@@ -931,6 +936,32 @@ func (s *Server) getRunningPods(request *restful.Request, response *restful.Resp
 // getLogs handles logs requests against the Kubelet.
 func (s *Server) getLogs(request *restful.Request, response *restful.Response) {
 	s.host.ServeLogs(response, request.Request)
+}
+
+// GETOnlyRestfulFilter allows only GET. Use on WebServices that register read-only
+// kubelet APIs.
+func GETOnlyRestfulFilter() restful.FilterFunction {
+	return AllowedMethodsRestfulFilter(http.MethodGet)
+}
+
+// AllowedMethodsRestfulFilter returns a restful.FilterFunction that rejects requests
+// whose HTTP method is not listed in allowed. It responds with 405 Method Not Allowed
+// and an Allow header listing the permitted methods (RFC 9110).
+func AllowedMethodsRestfulFilter(allowed ...string) restful.FilterFunction {
+	allowedSet := make(map[string]struct{}, len(allowed))
+	for _, m := range allowed {
+		allowedSet[m] = struct{}{}
+	}
+	allowHeader := strings.Join(allowed, ", ")
+
+	return func(req *restful.Request, resp *restful.Response, chain *restful.FilterChain) {
+		if _, ok := allowedSet[req.Request.Method]; ok {
+			chain.ProcessFilter(req, resp)
+			return
+		}
+		resp.Header().Set("Allow", allowHeader)
+		_ = resp.WriteErrorString(http.StatusMethodNotAllowed, "Method Not Allowed")
+	}
 }
 
 type execRequestParams struct {

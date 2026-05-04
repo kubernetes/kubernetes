@@ -246,25 +246,15 @@ func (pl *DynamicResources) EventsToRegister(_ context.Context) ([]fwk.ClusterEv
 	if !pl.enabled {
 		return nil, nil
 	}
-	// A resource might depend on node labels for topology filtering.
-	// A new or updated node may make pods schedulable.
-	//
-	// A note about UpdateNodeTaint event:
-	// Ideally, it's supposed to register only Add | UpdateNodeLabel because UpdateNodeTaint will never change the result from this plugin.
-	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
-	// See: https://github.com/kubernetes/kubernetes/issues/109437
-	nodeActionType := fwk.Add | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint | fwk.UpdateNodeAllocatable
-	if pl.fts.EnableSchedulingQueueHint {
-		// When QHint is enabled, the problematic preCheck is already removed, and we can remove UpdateNodeTaint.
-		nodeActionType = fwk.Add | fwk.UpdateNodeLabel | fwk.UpdateNodeAllocatable
-	}
 
 	events := []fwk.ClusterEventWithHint{
-		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}},
+		// A resource might depend on node labels for topology filtering.
+		// A new or updated node may make pods schedulable.
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeLabel | fwk.UpdateNodeAllocatable}},
 		// Allocation is tracked in ResourceClaims, so any changes may make the pods schedulable.
 		{Event: fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: pl.isSchedulableAfterClaimChange},
 		// Adding the ResourceClaim name to the pod status makes pods waiting for their ResourceClaim schedulable.
-		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.UpdatePodGeneratedResourceClaim}, QueueingHintFn: pl.isSchedulableAfterPodChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodGeneratedResourceClaim}, QueueingHintFn: pl.isSchedulableAfterTargetPodUpdate},
 		// A pod might be waiting for a class to get created or modified.
 		{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.Add | fwk.Update}},
 		// Adding or updating a ResourceSlice might make a pod schedulable because new resources became available.
@@ -353,19 +343,14 @@ func (pl *DynamicResources) isSchedulableAfterClaimChange(logger klog.Logger, po
 	return fwk.Queue, nil
 }
 
-// isSchedulableAfterPodChange is invoked for update pod events reported by
+// isSchedulableAfterTargetPodUpdate is invoked for update pod events reported by
 // an informer. It checks whether that change adds the ResourceClaim(s) that the
 // pod has been waiting for.
-func (pl *DynamicResources) isSchedulableAfterPodChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+func (pl *DynamicResources) isSchedulableAfterTargetPodUpdate(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	_, modifiedPod, err := schedutil.As[*v1.Pod](nil, newObj)
 	if err != nil {
 		// Shouldn't happen.
-		return fwk.Queue, fmt.Errorf("unexpected object in isSchedulableAfterClaimChange: %w", err)
-	}
-
-	if pod.UID != modifiedPod.UID {
-		logger.V(7).Info("pod is not schedulable after change in other pod", "pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
-		return fwk.QueueSkip, nil
+		return fwk.Queue, fmt.Errorf("unexpected object in isSchedulableAfterTargetPodUpdate: %w", err)
 	}
 
 	if err := pl.foreachPodResourceClaim(modifiedPod, nil); err != nil {

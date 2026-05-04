@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
@@ -33,12 +34,12 @@ import (
 
 // deviceTaintRuleStrategy implements behavior for DeviceTaintRule objects
 type deviceTaintRuleStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 var (
-	Strategy       = &deviceTaintRuleStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+	Strategy       = &deviceTaintRuleStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 	StatusStrategy = &deviceTaintRuleStatusStrategy{deviceTaintRuleStrategy: Strategy}
 )
 

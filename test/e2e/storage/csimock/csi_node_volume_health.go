@@ -89,8 +89,7 @@ var _ = utils.SIGDescribe("CSI Mock Node Volume Health", framework.WithFeatureGa
 				nodeAbnormalVolumeCondition: true,
 			},
 		}
-		for _, t := range tests {
-			test := t
+		for _, test := range tests {
 			ginkgo.It(test.name, func(ctx context.Context) {
 				m.init(ctx, testParameters{
 					registerDriver:            true,

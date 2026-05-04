@@ -74,18 +74,27 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
 // ShutdownFunc represents the function handle to be called, typically in a defer handler, to shutdown a running module
 type ShutdownFunc func()
 
-// StartScheduler configures and starts a scheduler given a handle to the clientSet interface
-// and event broadcaster. It returns the running scheduler and podInformer. Background goroutines
-// will keep running until the context is canceled.
+// StartScheduler is a wrapper around StartSchedulerWithDone for backward compatibility.
 func StartScheduler(tCtx ktesting.TContext, cfg *kubeschedulerconfig.KubeSchedulerConfiguration, outOfTreePluginRegistry frameworkruntime.Registry) (*scheduler.Scheduler, informers.SharedInformerFactory) {
+	sched, informerFactory, _ := StartSchedulerWithDone(tCtx, cfg, outOfTreePluginRegistry)
+	return sched, informerFactory
+}
+
+// StartSchedulerWithDone configures and starts a scheduler. Background goroutines
+// will keep running until the context is canceled. It returns the running scheduler,
+// the informer factory, and a channel that is closed when the scheduler goroutine
+// actually exits. Callers can use this channel to ensure the scheduler has fully
+// stopped before performing operations that might race with it (e.g., resetting
+// global metrics).
+func StartSchedulerWithDone(tCtx ktesting.TContext, cfg *kubeschedulerconfig.KubeSchedulerConfiguration, outOfTreePluginRegistry frameworkruntime.Registry) (*scheduler.Scheduler, informers.SharedInformerFactory, <-chan struct{}) {
 	clientSet := tCtx.Client()
 	informerFactory := scheduler.NewInformerFactory(clientSet, 0)
 	evtBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
@@ -121,9 +130,13 @@ func StartScheduler(tCtx ktesting.TContext, cfg *kubeschedulerconfig.KubeSchedul
 	err = sched.WaitForHandlersSync(tCtx)
 	tCtx.ExpectNoError(err, "waiting for handlers to sync")
 	logger.V(3).Info("Handlers synced")
-	go sched.Run(tCtx)
+	done := make(chan struct{})
+	go func() {
+		sched.Run(tCtx)
+		close(done)
+	}()
 
-	return sched, informerFactory
+	return sched, informerFactory, done
 }
 
 // CreateResourceClaimController creates a ResourceClaim controller and returns a blocking run function.

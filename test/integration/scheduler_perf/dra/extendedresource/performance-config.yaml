@@ -97,6 +97,7 @@
       maxClaimsPerNode: 10
   - name: 5000pods_500nodes
     labels: [performance]
+    threshold: 120
     params:
       classes: 25
       nodesWithDRA: 500
@@ -142,6 +143,7 @@
       maxClaimsPerNode: 10
   - name: 5000pods_500nodes
     labels: [performance]
+    threshold: 130
     params:
       classes: 50
       nodesWithDRA: 500
@@ -187,6 +189,7 @@
       maxClaimsPerNode: 10
   - name: 5000pods_500nodes
     labels: [performance]
+    threshold: 130
     params:
       classes: 25
       nodesWithDRA: 500

@@ -50,12 +50,12 @@ import (
 
 // jobStrategy implements verification logic for Replication Controllers.
 type jobStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Replication Controller objects.
-var Strategy = jobStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = jobStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // DefaultGarbageCollectionPolicy returns OrphanDependents for batch/v1 for backwards compatibility,
 // and DeleteDependents for all other versions.

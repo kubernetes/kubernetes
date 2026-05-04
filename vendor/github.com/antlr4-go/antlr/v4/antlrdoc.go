@@ -17,9 +17,9 @@ ANTLR4 that it is compatible with (I.E. uses the /v4 path).
 However, this was found to be problematic, as it meant that with the runtime embedded so far underneath the root
 of the repo, the `go get` and related commands could not properly resolve the location of the go runtime source code.
 This meant that the reference to the runtime in your `go.mod` file would refer to the correct source code, but would not
-list the release tag such as @4.12.0 - this was confusing, to say the least.
+list the release tag such as @4.13.1 - this was confusing, to say the least.
 
-As of 4.12.1, the runtime is now available as a go module in its own repo, and can be imported as `github.com/antlr4-go/antlr`
+As of 4.13.0, the runtime is now available as a go module in its own repo, and can be imported as `github.com/antlr4-go/antlr`
 (the go get command should also be used with this path). See the main documentation for the ANTLR4 project for more information,
 which is available at [ANTLR docs]. The documentation for using the Go runtime is available at [Go runtime docs].
 
@@ -49,7 +49,7 @@ Here is a general/recommended template for an ANTLR based recognizer in Go:
 	.
 	├── parser
 	│     ├── mygrammar.g4
-	│     ├── antlr-4.12.1-complete.jar
+	│     ├── antlr-4.13.1-complete.jar
 	│     ├── generate.go
 	│     └── generate.sh
 	├── parsing   - generated code goes here
@@ -71,7 +71,7 @@ And the generate.sh file will look similar to this:
 
 	#!/bin/sh
 
-	alias antlr4='java -Xmx500M -cp "./antlr4-4.12.1-complete.jar:$CLASSPATH" org.antlr.v4.Tool'
+	alias antlr4='java -Xmx500M -cp "./antlr4-4.13.1-complete.jar:$CLASSPATH" org.antlr.v4.Tool'
 	antlr4 -Dlanguage=Go -no-visitor -package parsing *.g4
 
 depending on whether you want visitors or listeners or any other ANTLR options. Not that another option here

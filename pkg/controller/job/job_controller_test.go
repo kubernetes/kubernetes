@@ -8108,26 +8108,26 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 		existingWorkload *schedulingv1alpha2.Workload
 		existingPodGroup *schedulingv1alpha2.PodGroup
 
-		enableWorkloadWithJob bool
+		workloadWithJob bool
 
 		wantSchedulingGroupName string
 		wantPodGroupOwnerRef    bool
 		wantCreations           int32
 	}{
 		"gang-eligible job with PodGroup: pods get schedulingGroup and ownerRef": {
-			job:                   gangJob,
-			enableWorkloadWithJob: true,
-			existingWorkload:      gangWorkload,
-			existingPodGroup:      gangPodGroup,
+			job:              gangJob,
+			workloadWithJob:  true,
+			existingWorkload: gangWorkload,
+			existingPodGroup: gangPodGroup,
 
 			wantSchedulingGroupName: gangPodGroup.Name,
 			wantPodGroupOwnerRef:    true,
 			wantCreations:           4,
 		},
 		"non-eligible job: no schedulingGroup on pods": {
-			job:                   newJob(2, 5, 6, batch.NonIndexedCompletion),
-			enableWorkloadWithJob: true,
-			wantCreations:         2,
+			job:             newJob(2, 5, 6, batch.NonIndexedCompletion),
+			workloadWithJob: true,
+			wantCreations:   2,
 		},
 		"job with pre-existing schedulingGroup: preserved without PodGroup ownerRef": {
 			job: func() *batch.Job {
@@ -8138,7 +8138,7 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 				}
 				return j
 			}(),
-			enableWorkloadWithJob:   true,
+			workloadWithJob:         true,
 			wantSchedulingGroupName: "external-pg",
 			wantCreations:           4,
 		},
@@ -8149,7 +8149,7 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 				j.Spec.Suspend = ptr.To(true)
 				return j
 			}(),
-			enableWorkloadWithJob: true,
+			workloadWithJob: true,
 			existingWorkload: func() *schedulingv1alpha2.Workload {
 				j := newGangSchedulingJob("suspended-job", 4)
 				return makeWorkload(j)
@@ -8184,8 +8184,8 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 			// TODO: this will be removed in 1.38.
 			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.36"))
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:       tc.enableWorkloadWithJob,
-				features.EnableWorkloadWithJob: tc.enableWorkloadWithJob,
+				features.GenericWorkload: tc.workloadWithJob,
+				features.WorkloadWithJob: tc.workloadWithJob,
 			})
 
 			jm, sharedInformers := newControllerFromClient(ctx, t, clientSet, controller.NoResyncPeriodFunc)

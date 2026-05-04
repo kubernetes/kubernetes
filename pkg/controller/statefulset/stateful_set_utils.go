@@ -74,12 +74,6 @@ func getParentNameAndOrdinal(pod *v1.Pod) (string, int) {
 	return parent, ordinal
 }
 
-// getParentName gets the name of pod's parent StatefulSet. If pod has not parent, the empty string is returned.
-func getParentName(pod *v1.Pod) string {
-	parent, _ := getParentNameAndOrdinal(pod)
-	return parent
-}
-
 // getOrdinal gets pod's ordinal. If pod has no ordinal, -1 is returned.
 func getOrdinal(pod *v1.Pod) int {
 	_, ordinal := getParentNameAndOrdinal(pod)
@@ -121,7 +115,8 @@ func getPersistentVolumeClaimName(set *apps.StatefulSet, claim *v1.PersistentVol
 
 // isMemberOf tests if pod is a member of set.
 func isMemberOf(set *apps.StatefulSet, pod *v1.Pod) bool {
-	return getParentName(pod) == set.Name
+	parent, _ := getParentNameAndOrdinal(pod)
+	return parent == set.Name
 }
 
 // identityMatches returns true if pod has a valid identity and network identity for a member of set.
@@ -472,14 +467,9 @@ func isPending(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodPending
 }
 
-// isFailed returns true if pod has a Phase of PodFailed
-func isFailed(pod *v1.Pod) bool {
-	return pod.Status.Phase == v1.PodFailed
-}
-
-// isSucceeded returns true if pod has a Phase of PodSucceeded
-func isSucceeded(pod *v1.Pod) bool {
-	return pod.Status.Phase == v1.PodSucceeded
+// isTerminalPhase returns true if pod has a Phase of PodFailed or PodSucceeded.
+func isTerminalPhase(pod *v1.Pod) bool {
+	return pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded
 }
 
 // isTerminating returns true if pod's DeletionTimestamp has been set

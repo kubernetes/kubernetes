@@ -51,7 +51,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 type KubeComponentName string
@@ -342,10 +342,6 @@ type ModifyOptions struct {
 
 	// FileByComponent overrides BinDir for those components which are specified here.
 	FileByComponent map[KubeComponentName]string
-
-	// Upgrade determines whether the apiserver gets updated first (upgrade)
-	// or last (downgrade).
-	Upgrade bool
 }
 
 func (m ModifyOptions) GetComponentFile(component KubeComponentName) string {
@@ -373,24 +369,19 @@ func (c *Cluster) Modify(tCtx ktesting.TContext, state string, options ModifyOpt
 		FileByComponent: make(map[KubeComponentName]string),
 	}
 
-	restore.Upgrade = !options.Upgrade
-	components := slices.Clone(KubeClusterComponents)
-	if !options.Upgrade {
-		slices.Reverse(components)
-	}
-	for _, component := range components {
-		c.modifyComponent(tCtx, state, options, component, &restore)
-	}
-	return restore
-}
-
-func (c *Cluster) modifyComponent(tCtx ktesting.TContext, state string, options ModifyOptions, component KubeComponentName, restore *ModifyOptions) {
-	tCtx.Helper()
-	tCtx = tCtx.WithStep(fmt.Sprintf("modify %s", component))
-
 	// We could also do things like turning feature gates on or off.
 	// For now we only support replacing the file.
-	if fileName := options.GetComponentFile(component); fileName != "" {
+	updated := make(map[KubeComponentName]*Cmd)
+
+	// Phase 1: stop all components that need modification in reverse order
+	// so that dependent components (KCM, scheduler) are stopped before the
+	// apiserver they depend on.
+	for _, component := range slices.Backward(KubeClusterComponents) {
+		fileName := options.GetComponentFile(component)
+		if fileName == "" {
+			continue
+		}
+		tCtx := tCtx.WithStep(fmt.Sprintf("stop %s", component))
 		cmd, ok := c.running[component]
 		if !ok {
 			tCtx.Fatal("not running")
@@ -418,9 +409,19 @@ func (c *Cluster) modifyComponent(tCtx ktesting.TContext, state string, options 
 		cmd.Name = string(component) + "-" + state
 		cmd.CommandLine = cmdLine
 		cmd.LogFile = path.Join(c.dir, fmt.Sprintf("%s-%s.log", component, state))
-
-		c.runComponentWithRetry(tCtx, component, cmd)
+		updated[component] = cmd
 	}
+
+	// Phase 2: start all stopped components in the standard startup order
+	// (apiserver first) so that each component starts against a fully-ready
+	// apiserver.
+	for _, component := range KubeClusterComponents {
+		if cmd, ok := updated[component]; ok {
+			c.runComponentWithRetry(tCtx, component, cmd)
+		}
+	}
+
+	return restore
 }
 
 func (c *Cluster) runComponentWithRetry(tCtx ktesting.TContext, component KubeComponentName, cmd *Cmd) {
@@ -462,17 +463,34 @@ func (c *Cluster) checkReadiness(tCtx ktesting.TContext, cmd *Cmd) {
 	tCtx = tCtx.WithRESTConfig(restConfig)
 	tCtx = tCtx.WithStep(fmt.Sprintf("wait for %s readiness", cmd.Name))
 
+	// For the apiserver we use the admin client certificate with the cluster CA.
+	tlsConfig, err := restclient.TLSConfigFor(restConfig)
+	if err != nil {
+		tCtx.Fatalf("get TLS config for readiness check: %v", err)
+	}
+
+	// The kubelet requires client authentication for /healthz. Use the admin client
+	// certificate with InsecureSkipVerify because the kubelet uses a self-signed cert.
+	tlsConfigWithClientCert := tlsConfig.Clone()
+	tlsConfigWithClientCert.InsecureSkipVerify = true
+
+	// For other components we can skip TLS verification because they use self-signed certs.
+	insecureTLSConfig := &tls.Config{InsecureSkipVerify: true}
+
 	switch {
 	case strings.HasPrefix(cmd.Name, string(KubeAPIServer)):
-		c.checkHealthz(tCtx, cmd, "https", c.settings["API_HOST_IP"], c.settings["API_SECURE_PORT"])
+		c.checkReadyz(tCtx, cmd, "https", c.settings["API_HOST_IP"], c.settings["API_SECURE_PORT"], tlsConfig)
 	case strings.HasPrefix(cmd.Name, string(KubeScheduler)):
-		c.checkHealthz(tCtx, cmd, "https", c.settings["API_HOST_IP"], c.settings["SCHEDULER_SECURE_PORT"])
+		c.checkReadyz(tCtx, cmd, "https", c.settings["API_HOST_IP"], c.settings["SCHEDULER_SECURE_PORT"], insecureTLSConfig)
 	case strings.HasPrefix(cmd.Name, string(KubeControllerManager)):
-		c.checkHealthz(tCtx, cmd, "https", c.settings["API_HOST_IP"], c.settings["KCM_SECURE_PORT"])
+		// TODO: switch to /readyz once it is implemented and available in all tested releases.
+		c.checkHealthz(tCtx, cmd, "https", c.settings["API_HOST_IP"], c.settings["KCM_SECURE_PORT"], insecureTLSConfig)
 	case strings.HasPrefix(cmd.Name, string(KubeProxy)):
-		c.checkHealthz(tCtx, cmd, "http" /* not an error! */, c.settings["API_HOST_IP"], c.settings["PROXY_HEALTHZ_PORT"])
+		// TODO: switch to /readyz once it is implemented and available in all tested releases.
+		c.checkHealthz(tCtx, cmd, "http" /* not an error! */, c.settings["API_HOST_IP"], c.settings["PROXY_HEALTHZ_PORT"], insecureTLSConfig)
 	case strings.HasPrefix(cmd.Name, string(Kubelet)):
-		c.checkHealthz(tCtx, cmd, "https", c.settings["KUBELET_HOST"], c.settings["KUBELET_PORT"])
+		// TODO: switch to /readyz once it is implemented and available in all tested releases.
+		c.checkHealthz(tCtx, cmd, "https", c.settings["KUBELET_HOST"], c.settings["KUBELET_PORT"], tlsConfigWithClientCert)
 
 		// Also wait for the node to be ready.
 		tCtx.WithStep("wait for node ready").Eventually(func(tCtx ktesting.TContext) (*corev1.NodeList, error) {
@@ -484,22 +502,25 @@ func (c *Cluster) checkReadiness(tCtx ktesting.TContext, cmd *Cmd) {
 	}
 }
 
-func (c *Cluster) checkHealthz(tCtx ktesting.TContext, cmd *Cmd, method, hostIP, port string) {
-	url := fmt.Sprintf("%s://%s:%s/healthz", method, hostIP, port)
-	tCtx.WithStep(fmt.Sprintf("check health %s", url)).Eventually(func(tCtx ktesting.TContext) error {
+func (c *Cluster) checkHealthz(tCtx ktesting.TContext, cmd *Cmd, scheme, hostIP, port string, tlsConfig *tls.Config) {
+	c.checkEndpoint(tCtx, cmd, scheme, hostIP, port, "/healthz", tlsConfig)
+}
+
+func (c *Cluster) checkReadyz(tCtx ktesting.TContext, cmd *Cmd, scheme, hostIP, port string, tlsConfig *tls.Config) {
+	c.checkEndpoint(tCtx, cmd, scheme, hostIP, port, "/readyz", tlsConfig)
+}
+
+func (c *Cluster) checkEndpoint(tCtx ktesting.TContext, cmd *Cmd, scheme, hostIP, port, path string, tlsConfig *tls.Config) {
+	url := fmt.Sprintf("%s://%s:%s%s", scheme, hostIP, port, path)
+	tCtx.WithStep(fmt.Sprintf("check %s", url)).Eventually(func(tCtx ktesting.TContext) error {
 		if !cmd.Running() {
 			return gomega.StopTrying(fmt.Sprintf("%s stopped unexpectedly", cmd.Name))
 		}
-		// Like kube::util::wait_for_url in local-up-cluster.sh we use https,
-		// but don't check the certificate.
 		req, err := http.NewRequestWithContext(tCtx, http.MethodGet, url, nil)
 		if err != nil {
 			return fmt.Errorf("create request: %w", err)
 		}
-		tr := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-		client := &http.Client{Transport: tr}
+		client := &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}}
 		resp, err := client.Do(req)
 		if err != nil {
 			return fmt.Errorf("get %s: %w", url, err)
@@ -507,9 +528,11 @@ func (c *Cluster) checkHealthz(tCtx ktesting.TContext, cmd *Cmd, method, hostIP,
 		if err := resp.Body.Close(); err != nil {
 			return fmt.Errorf("close GET response: %w", err)
 		}
-		// Any response is fine, we just need to get here. In practice, we get a 403 Forbidden.
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("%s returned %d, waiting for 200", url, resp.StatusCode)
+		}
 		return nil
-	}).Should(gomega.Succeed(), fmt.Sprintf("HTTP GET %s", url))
+	}).WithPolling(time.Second).Should(gomega.Succeed(), fmt.Sprintf("HTTP GET %s", url))
 }
 
 func dumpProcesses(tCtx ktesting.TContext) {

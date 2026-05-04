@@ -359,7 +359,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				features.GangScheduling:                  tc.enableWorkloadAwarePreemption,
 				features.WorkloadAwarePreemption:         tc.enableWorkloadAwarePreemption,
 			})
-			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs, apitesting.WithMinEmulationVersion(version.MustParse("1.36")))
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy, tc.expectedErrs, apitesting.WithMinEmulationVersion(version.MustParse("1.36")))
 		})
 	}
 }
@@ -605,7 +605,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				IsResourceRequest: true,
 				Verb:              "update",
 			})
-			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, Strategy.ValidateUpdate, tc.expectedErrs, apitesting.WithMinEmulationVersion(version.MustParse("1.36")))
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, Strategy, tc.expectedErrs, apitesting.WithMinEmulationVersion(version.MustParse("1.36")))
 		})
 	}
 }

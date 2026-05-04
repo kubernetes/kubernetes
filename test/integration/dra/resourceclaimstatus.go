@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	resourceapiac "k8s.io/client-go/applyconfigurations/resource/v1"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 // testResourceClaimDeviceStatus creates a ResourceClaim with an invalid device (not allocated device)

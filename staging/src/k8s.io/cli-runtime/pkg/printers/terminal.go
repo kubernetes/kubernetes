@@ -29,9 +29,21 @@ import (
 // characters to avoid terminal escape character attacks (issue #101695).
 var terminalEscaper = strings.NewReplacer("\x1b", "^[", "\r", "\\r")
 
+// cellSpecialChars is the set of characters that require special handling
+// when printing table cell values: break characters (\f, \n, \r) cause
+// truncation, and \x1b (ESC) requires escaping. Used as the fast-path
+// gate in both WriteEscaped and appendCellValue (tableprinter.go).
+const cellSpecialChars = "\f\n\r\x1b"
+
 // WriteEscaped replaces unsafe terminal characters with replacement strings
 // and writes them to the given writer.
 func WriteEscaped(writer io.Writer, output string) error {
+	// Fast path: if the string contains no characters that need escaping,
+	// write it directly without going through the Replacer.
+	if !strings.ContainsAny(output, cellSpecialChars) {
+		_, err := io.WriteString(writer, output)
+		return err
+	}
 	_, err := terminalEscaper.WriteString(writer, output)
 	return err
 }

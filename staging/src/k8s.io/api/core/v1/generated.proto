@@ -2557,6 +2557,7 @@ message NFSVolumeSource {
 
 // Namespace provides a scope for Names.
 // Use of multiple namespaces is optional.
+// +k8s:supportsSubresource="/status"
 message Namespace {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -2634,6 +2635,8 @@ message NamespaceStatus {
 
 // Node is a worker node in Kubernetes.
 // Each node will have a unique identifier in the cache (i.e. in etcd).
+// +k8s:supportsSubresource="/status"
+// +k8s:supportsSubresource="/proxy"
 message Node {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -3135,6 +3138,7 @@ message ObjectReference {
 // PersistentVolume (PV) is a storage resource provisioned by an administrator.
 // It is analogous to a node.
 // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes
+// +k8s:supportsSubresource="/status"
 message PersistentVolume {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -3156,6 +3160,7 @@ message PersistentVolume {
 }
 
 // PersistentVolumeClaim is a user's request for and claim to a persistent volume
+// +k8s:supportsSubresource="/status"
 message PersistentVolumeClaim {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -3256,8 +3261,8 @@ message PersistentVolumeClaimSpec {
   // * An existing PVC (PersistentVolumeClaim)
   // If the provisioner or an external controller can support the specified data source,
   // it will create a new volume based on the contents of the specified data source.
-  // When the AnyVolumeDataSource feature gate is enabled, dataSource contents will be copied to dataSourceRef,
-  // and dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified.
+  // dataSource contents will be copied to dataSourceRef, and dataSourceRef contents will be
+  // copied to dataSource when dataSourceRef.namespace is not specified.
   // If the namespace is specified, then dataSourceRef will not be copied to dataSource.
   // +optional
   optional TypedLocalObjectReference dataSource = 7;
@@ -3283,7 +3288,6 @@ message PersistentVolumeClaimSpec {
   //   specified.
   // * While dataSource only allows local objects, dataSourceRef allows objects
   //   in any namespaces.
-  // (Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.
   // (Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.
   // +optional
   optional TypedObjectReference dataSourceRef = 8;
@@ -3676,6 +3680,8 @@ message PhotonPersistentDiskVolumeSource {
 
 // Pod is a collection of containers that can run on a host. This resource is created
 // by clients and scheduled onto hosts.
+// +k8s:supportsSubresource="/status"
+// +k8s:supportsSubresource="/ephemeralcontainers"
 message Pod {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -5549,6 +5555,7 @@ message ResourceHealth {
 }
 
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
+// +k8s:supportsSubresource="/status"
 message ResourceQuota {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -6076,6 +6083,8 @@ message SerializedReference {
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
 // (for example 3306) that the proxy listens on, and the selector that determines which pods
 // will answer requests sent through the proxy.
+// +k8s:supportsSubresource="/status"
+// +k8s:supportsSubresource="/proxy"
 message Service {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata

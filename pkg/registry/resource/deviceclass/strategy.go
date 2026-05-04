@@ -20,7 +20,6 @@ import (
 	"context"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -34,11 +33,11 @@ import (
 
 // deviceClassStrategy implements behavior for DeviceClass objects
 type deviceClassStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
-var Strategy = deviceClassStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = deviceClassStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 func (deviceClassStrategy) NamespaceScoped() bool {
 	return false
@@ -52,9 +51,7 @@ func (deviceClassStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obj
 
 func (deviceClassStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	deviceClass := obj.(*resource.DeviceClass)
-	errorList := validation.ValidateDeviceClass(deviceClass)
-
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, deviceClass, nil, errorList, operation.Create)
+	return validation.ValidateDeviceClass(deviceClass)
 }
 
 func (deviceClassStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
@@ -83,8 +80,7 @@ func (deviceClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 func (deviceClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newClass := obj.(*resource.DeviceClass)
 	oldClass := old.(*resource.DeviceClass)
-	errorList := validation.ValidateDeviceClassUpdate(newClass, oldClass)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newClass, oldClass, errorList, operation.Update)
+	return validation.ValidateDeviceClassUpdate(newClass, oldClass)
 }
 
 func (deviceClassStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {

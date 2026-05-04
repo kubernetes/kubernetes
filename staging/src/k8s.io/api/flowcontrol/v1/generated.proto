@@ -72,6 +72,7 @@ message FlowDistinguisherMethod {
 
 // FlowSchema defines the schema of a group of flows. Note that a flow is made up of a set of inbound API requests with
 // similar attributes and is identified by a pair of strings: the name of the FlowSchema and a "flow distinguisher".
+// +k8s:supportsSubresource="/status"
 message FlowSchema {
   // `metadata` is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -180,15 +181,14 @@ message LimitResponse {
   // Required.
   // +unionDiscriminator
   // +k8s:alpha(since: "1.36")=+k8s:required
-  // +k8s:alpha(since: "1.36")=+k8s:discriminator
+  // +k8s:alpha(since: "1.36")=+k8s:modeDiscriminator
   optional string type = 1;
 
   // `queuing` holds the configuration parameters for queuing.
   // This field may be non-empty only if `type` is `"Queue"`.
   // +optional
   // +k8s:alpha(since: "1.36")=+k8s:optional
-  // +k8s:alpha(since: "1.36")=+k8s:member("Queue")=+k8s:required
-  // +k8s:alpha(since: "1.36")=+k8s:member("Reject")=+k8s:forbidden
+  // +k8s:alpha(since: "1.36")=+k8s:ifMode("Queue")=+k8s:required
   optional QueuingConfiguration queuing = 2;
 }
 
@@ -303,6 +303,7 @@ message PolicyRulesWithSubjects {
 }
 
 // PriorityLevelConfiguration represents the configuration of a priority level.
+// +k8s:supportsSubresource="/status"
 message PriorityLevelConfiguration {
   // `metadata` is the standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -373,15 +374,14 @@ message PriorityLevelConfigurationSpec {
   // Required.
   // +unionDiscriminator
   // +k8s:alpha(since: "1.36")=+k8s:required
-  // +k8s:alpha(since: "1.36")=+k8s:discriminator
+  // +k8s:alpha(since: "1.36")=+k8s:modeDiscriminator
   optional string type = 1;
 
   // `limited` specifies how requests are handled for a Limited priority level.
   // This field must be non-empty if and only if `type` is `"Limited"`.
   // +optional
   // +k8s:alpha(since: "1.36")=+k8s:optional
-  // +k8s:alpha(since: "1.36")=+k8s:member("Limited")=+k8s:required
-  // +k8s:alpha(since: "1.36")=+k8s:member("Exempt")=+k8s:forbidden
+  // +k8s:alpha(since: "1.36")=+k8s:ifMode("Limited")=+k8s:required
   optional LimitedPriorityLevelConfiguration limited = 2;
 
   // `exempt` specifies how requests are handled for an exempt priority level.
@@ -391,8 +391,7 @@ message PriorityLevelConfigurationSpec {
   // for `ExemptPriorityLevelConfiguration` apply.
   // +optional
   // +k8s:alpha(since: "1.36")=+k8s:optional
-  // +k8s:alpha(since: "1.36")=+k8s:member("Exempt")=+k8s:optional
-  // +k8s:alpha(since: "1.36")=+k8s:member("Limited")=+k8s:forbidden
+  // +k8s:alpha(since: "1.36")=+k8s:ifMode("Exempt")=+k8s:optional
   optional ExemptPriorityLevelConfiguration exempt = 3;
 }
 

@@ -142,6 +142,7 @@ message ExternalMetricStatus {
 }
 
 // configuration of a horizontal pod autoscaler.
+// +k8s:supportsSubresource="/status"
 message HorizontalPodAutoscaler {
   // Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional

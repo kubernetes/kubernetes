@@ -41,7 +41,7 @@ type CELDeviceSelector struct {
 	//  - driver (string): the name of the driver which defines this device.
 	//  - attributes (map[string]object): the device's attributes, grouped by prefix
 	//    (e.g. device.attributes["dra.example.com"] evaluates to an object with all
-	//    of the attributes which were prefixed by "dra.example.com".
+	//    of the attributes which were prefixed by "dra.example.com").
 	//  - capacity (map[string]object): the device's capacities, grouped by prefix.
 	//
 	// Example: Consider a device with driver="dra.example.com", which exposes
@@ -71,6 +71,15 @@ type CELDeviceSelector struct {
 	//
 	// A robust expression should check for the existence of attributes
 	// before referencing them.
+	//
+	// Common errors:
+	// - "no such key": Use optional chaining (.? followed by orValue())
+	//   or guarding the check with has() for optional fields.
+	//   See CEL Optional Types for details:
+	//   https://pkg.go.dev/github.com/google/cel-go@v0.17.4/cel#OptionalTypes
+	//
+	// For more CEL expression syntax and examples, see:
+	// https://kubernetes.io/docs/reference/using-api/cel/
 	//
 	// For ease of use, the cel.bind() function is enabled, and can be used
 	// to simplify expressions that access multiple attributes with the
@@ -140,7 +149,7 @@ type DeviceTaint struct {
 	// Consumers must treat unknown effects like None.
 	//
 	// +required
-	// +k8s:required
+	// +k8s:alpha(since: "1.36")=+k8s:required
 	Effect DeviceTaintEffect `json:"effect" protobuf:"bytes,3,name=effect,casttype=DeviceTaintEffect"`
 
 	// ^^^^
@@ -179,7 +188,7 @@ type DeviceTaint struct {
 }
 
 // +enum
-// +k8s:enum
+// +k8s:alpha(since: "1.36")=+k8s:enum
 type DeviceTaintEffect string
 
 const (
@@ -203,6 +212,7 @@ const (
 // DeviceTaintRule adds one taint to all devices which match the selector.
 // This has the same effect as if the taint was specified directly
 // in the ResourceSlice by the DRA driver.
+// +k8s:supportsSubresource="/status"
 type DeviceTaintRule struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata
@@ -453,9 +463,7 @@ type ResourcePoolStatusRequestStatus struct {
 	// +optional
 	// +k8s:optional
 	// +listType=map
-	// +k8s:listType=map
 	// +listMapKey=type
-	// +k8s:listMapKey=type
 	// +patchStrategy=merge
 	// +patchMergeKey=type
 	// +k8s:maxItems=10

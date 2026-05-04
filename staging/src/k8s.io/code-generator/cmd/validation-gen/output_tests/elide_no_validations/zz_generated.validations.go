@@ -38,38 +38,65 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	// type T1
-	scheme.AddValidationFunc((*T1)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_T1(ctx, op, nil /* fldPath */, obj.(*T1), safe.Cast[*T1](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*T1)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_T1(
+					ctx, op, nil, /* fldPath */
+					obj.(*T1),
+					safe.Cast[*T1](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
 // Validate_HasFieldVal validates an instance of HasFieldVal according
 // to declarative validation rules in the API schema.
-func Validate_HasFieldVal(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *HasFieldVal) (errs field.ErrorList) {
-	// field HasFieldVal.S
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_HasFieldVal(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *HasFieldVal) (errs field.ErrorList) {
+
+	{ // field HasFieldVal.S
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
-			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field HasFieldVal.S")...)
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field HasFieldVal.S"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("s"), &obj.S, safe.Field(oldObj, func(oldObj *HasFieldVal) *string { return &oldObj.S }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *HasFieldVal) *string {
+				return &oldObj.S
+			})
+		errs = append(errs, fn(fldPath.Child("s"), &obj.S, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }
 
 // Validate_HasTypeVal validates an instance of HasTypeVal according
 // to declarative validation rules in the API schema.
-func Validate_HasTypeVal(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *HasTypeVal) (errs field.ErrorList) {
-	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type HasTypeVal")...)
+func Validate_HasTypeVal(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *HasTypeVal) (errs field.ErrorList) {
+
+	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type HasTypeVal"); len(e) != 0 {
+		errs = append(errs, e...)
+	}
 
 	// field HasTypeVal.S has no validation
 	return errs
@@ -77,46 +104,81 @@ func Validate_HasTypeVal(ctx context.Context, op operation.Operation, fldPath *f
 
 // Validate_T1 validates an instance of T1 according
 // to declarative validation rules in the API schema.
-func Validate_T1(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *T1) (errs field.ErrorList) {
+func Validate_T1(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *T1) (errs field.ErrorList) {
+
 	// field T1.TypeMeta has no validation
 
-	// field T1.HasTypeVal
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *HasTypeVal, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field T1.HasTypeVal
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *HasTypeVal,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_HasTypeVal(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("hasTypeVal"), &obj.HasTypeVal, safe.Field(oldObj, func(oldObj *T1) *HasTypeVal { return &oldObj.HasTypeVal }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *T1) *HasTypeVal {
+				return &oldObj.HasTypeVal
+			})
+		errs = append(errs, fn(fldPath.Child("hasTypeVal"), &obj.HasTypeVal, oldVal, oldObj != nil)...)
+	}
 
-	// field T1.HasFieldVal
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *HasFieldVal, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field T1.HasFieldVal
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *HasFieldVal,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_HasFieldVal(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("hasFieldVal"), &obj.HasFieldVal, safe.Field(oldObj, func(oldObj *T1) *HasFieldVal { return &oldObj.HasFieldVal }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *T1) *HasFieldVal {
+				return &oldObj.HasFieldVal
+			})
+		errs = append(errs, fn(fldPath.Child("hasFieldVal"), &obj.HasFieldVal, oldVal, oldObj != nil)...)
+	}
 
 	// field T1.HasNoVal has no validation
 
-	// field T1.HasNoValFieldVal
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *HasNoVal, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field T1.HasNoValFieldVal
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *HasNoVal,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
-			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T1.HasNoValFieldVal")...)
+			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T1.HasNoValFieldVal"); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("hasNoValFieldVal"), &obj.HasNoValFieldVal, safe.Field(oldObj, func(oldObj *T1) *HasNoVal { return &oldObj.HasNoValFieldVal }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *T1) *HasNoVal {
+				return &oldObj.HasNoValFieldVal
+			})
+		errs = append(errs, fn(fldPath.Child("hasNoValFieldVal"), &obj.HasNoValFieldVal, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }

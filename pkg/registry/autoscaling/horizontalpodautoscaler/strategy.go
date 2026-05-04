@@ -19,7 +19,7 @@ package horizontalpodautoscaler
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/api/operation"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -34,13 +34,13 @@ import (
 
 // autoscalerStrategy implements behavior for HorizontalPodAutoscalers
 type autoscalerStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating HorizontalPodAutoscaler
 // objects via the REST API.
-var Strategy = autoscalerStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = autoscalerStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // NamespaceScoped is true for autoscaler.
 func (autoscalerStrategy) NamespaceScoped() bool {
@@ -69,6 +69,11 @@ func (autoscalerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 	// create cannot set status
 	newHPA.Status = autoscaling.HorizontalPodAutoscalerStatus{}
 
+	// Feature gated in case someone is setting the generation themselves, they can opt out of this for 1 release
+	if utilfeature.DefaultFeatureGate.Enabled(features.HPAGeneration) {
+		newHPA.Generation = 1
+	}
+
 	dropDisabledFields(newHPA, nil)
 }
 
@@ -76,12 +81,27 @@ func (autoscalerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 func (autoscalerStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	autoscaler := obj.(*autoscaling.HorizontalPodAutoscaler)
 	opts := validationOptionsForHorizontalPodAutoscaler(autoscaler, nil)
-	allErrs := validation.ValidateHorizontalPodAutoscaler(autoscaler, opts)
+	return validation.ValidateHorizontalPodAutoscaler(autoscaler, opts)
+}
+
+// DeclarativeValidationConfig implements rest.DeclarativeValidationConfigurer to supply declarative
+// validation options.
+func (autoscalerStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
 	var options []string
-	if utilfeature.DefaultFeatureGate.Enabled(features.HPAScaleToZero) {
+	// Pass HPAScaleToZero when the gate is enabled, OR (on update) when the
+	// existing object already has MinReplicas == 0.
+	enableScaleToZero := utilfeature.DefaultFeatureGate.Enabled(features.HPAScaleToZero)
+	if !enableScaleToZero && oldObj != nil {
+		if oldHPA, ok := oldObj.(*autoscaling.HorizontalPodAutoscaler); ok {
+			if oldHPA.Spec.MinReplicas != nil && *oldHPA.Spec.MinReplicas == 0 {
+				enableScaleToZero = true
+			}
+		}
+	}
+	if enableScaleToZero {
 		options = append(options, "HPAScaleToZero")
 	}
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, autoscaler, nil, allErrs, operation.Create, rest.WithOptions(options))
+	return rest.DeclarativeValidationConfig{Options: options}
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -106,6 +126,12 @@ func (autoscalerStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 	newHPA.Status = oldHPA.Status
 
 	dropDisabledFields(newHPA, oldHPA)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.HPAGeneration) {
+		if !apiequality.Semantic.DeepEqual(newHPA.Spec, oldHPA.Spec) {
+			newHPA.Generation = oldHPA.Generation + 1
+		}
+	}
 }
 
 // ValidateUpdate is the default update validation for an end user.
@@ -113,13 +139,7 @@ func (autoscalerStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.O
 	newHPA := obj.(*autoscaling.HorizontalPodAutoscaler)
 	oldHPA := old.(*autoscaling.HorizontalPodAutoscaler)
 	opts := validationOptionsForHorizontalPodAutoscaler(newHPA, oldHPA)
-	errs := validation.ValidateHorizontalPodAutoscalerUpdate(newHPA, oldHPA, opts)
-	var options []string
-	oldHasZeroMinReplicas := oldHPA.Spec.MinReplicas != nil && *oldHPA.Spec.MinReplicas == 0
-	if utilfeature.DefaultFeatureGate.Enabled(features.HPAScaleToZero) || oldHasZeroMinReplicas {
-		options = append(options, "HPAScaleToZero")
-	}
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newHPA, oldHPA, errs, operation.Update, rest.WithOptions(options))
+	return validation.ValidateHorizontalPodAutoscalerUpdate(newHPA, oldHPA, opts)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

@@ -341,7 +341,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				features.GangScheduling:                  tc.enableWorkloadAwarePreemption,
 				features.WorkloadAwarePreemption:         tc.enableWorkloadAwarePreemption,
 			})
-			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, strategy.Validate, tc.expectedErrs, apitesting.WithMinEmulationVersion(version.MustParse("1.36")))
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, strategy, tc.expectedErrs, apitesting.WithMinEmulationVersion(version.MustParse("1.36")))
 		})
 	}
 }
@@ -566,7 +566,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				features.WorkloadAwarePreemption:         tc.enableWorkloadAwarePreemption,
 			})
 			strategy := NewStrategy()
-			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, strategy.ValidateUpdate, tc.expectedErrs, apitesting.WithMinEmulationVersion(version.MustParse("1.36")))
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, strategy, tc.expectedErrs, apitesting.WithMinEmulationVersion(version.MustParse("1.36")))
 		})
 	}
 }
@@ -689,7 +689,7 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
 			strategy := NewStatusStrategy(NewStrategy())
-			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, strategy.ValidateUpdate, tc.expectedErrs)
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, strategy, tc.expectedErrs)
 		})
 	}
 }

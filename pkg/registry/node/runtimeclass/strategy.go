@@ -18,7 +18,6 @@ package runtimeclass
 
 import (
 	"context"
-	"k8s.io/apimachinery/pkg/api/operation"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -32,12 +31,12 @@ import (
 
 // strategy implements verification logic for RuntimeClass.
 type strategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating RuntimeClass objects.
-var Strategy = strategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = strategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // Strategy should implement rest.RESTCreateStrategy
 var _ rest.RESTCreateStrategy = Strategy
@@ -71,9 +70,13 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 // Validate validates a new RuntimeClass. Validation must check for a correct signature.
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	runtimeClass := obj.(*node.RuntimeClass)
-	allErrs := validation.ValidateRuntimeClass(runtimeClass)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, runtimeClass, nil, allErrs, operation.Create, rest.WithNormalizationRules(validation.NodeNormalizationRules))
+	return validation.ValidateRuntimeClass(runtimeClass)
+}
 
+// DeclarativeValidationConfig implements rest.DeclarativeValidationConfigurer to supply declarative
+// validation options to the generic BeforeCreate/BeforeUpdate code path.
+func (strategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	return rest.DeclarativeValidationConfig{NormalizationRules: validation.NodeNormalizationRules}
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -91,8 +94,7 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 	newObj := obj.(*node.RuntimeClass)
 	errorList := validation.ValidateRuntimeClass(newObj)
 	errorList = append(errorList, validation.ValidateRuntimeClassUpdate(newObj, old.(*node.RuntimeClass))...)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newObj, old, errorList, operation.Update, rest.WithNormalizationRules(validation.NodeNormalizationRules))
-
+	return errorList
 }
 
 // WarningsOnUpdate returns warnings for the given update.

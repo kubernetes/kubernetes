@@ -43,9 +43,6 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	apiservercel "k8s.io/apiserver/pkg/cel"
 	"k8s.io/apiserver/pkg/cel/environment"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	pointer "k8s.io/utils/ptr"
 )
 
@@ -197,7 +194,6 @@ func TestCondition(t *testing.T) {
 		authorizer       authorizer.Authorizer
 		testPerCallLimit uint64
 		namespaceObject  *corev1.Namespace
-		enableSelectors  bool
 
 		compatibilityVersion *version.Version
 		envType              environment.Type
@@ -501,38 +497,6 @@ func TestCondition(t *testing.T) {
 			}),
 		},
 		{
-			name: "test authorizer error using fieldSelector with 1.30 compatibility",
-			validations: []ExpressionAccessor{
-				&testCondition{
-					Expression: "authorizer.group('apps').resource('deployments').fieldSelector('foo=bar').labelSelector('apple=banana').subresource('status').namespace('test').name('backend').check('create').allowed()",
-				},
-			},
-			attributes: newValidAttribute(&podObject, false),
-			results: []EvaluationResult{
-				{
-					Error: fmt.Errorf("fieldSelector"),
-				},
-			},
-			authorizer: newAuthzAllowMatch(authorizer.AttributesRecord{
-				ResourceRequest: true,
-				APIGroup:        "apps",
-				Resource:        "deployments",
-				Subresource:     "status",
-				Namespace:       "test",
-				Name:            "backend",
-				Verb:            "create",
-				APIVersion:      "*",
-				FieldSelectorRequirements: fields.Requirements{
-					{Operator: "=", Field: "foo", Value: "bar"},
-				},
-				LabelSelectorRequirements: labels.Requirements{
-					*simpleLabelSelector,
-				},
-			}),
-			enableSelectors:      false,
-			compatibilityVersion: v130,
-		},
-		{
 			name: "test authorizer allow resource check with all fields",
 			validations: []ExpressionAccessor{
 				&testCondition{
@@ -561,7 +525,6 @@ func TestCondition(t *testing.T) {
 					*simpleLabelSelector,
 				},
 			}),
-			enableSelectors:      true,
 			compatibilityVersion: v131,
 		},
 		{
@@ -589,33 +552,6 @@ func TestCondition(t *testing.T) {
 				FieldSelectorParsingErr: errors.New("invalid selector: 'foo badoperator bar'; can't understand 'foo badoperator bar'"),
 				LabelSelectorParsingErr: errors.New("unable to parse requirement: found 'badoperator', expected: in, notin, =, ==, !=, gt, lt"),
 			}),
-			enableSelectors:      true,
-			compatibilityVersion: v131,
-		},
-		{
-			name: "test authorizer allow resource check with all fields, without gate",
-			validations: []ExpressionAccessor{
-				&testCondition{
-					Expression: "authorizer.group('apps').resource('deployments').fieldSelector('foo=bar').labelSelector('apple=banana').subresource('status').namespace('test').name('backend').check('create').allowed()",
-				},
-			},
-			attributes: newValidAttribute(&podObject, false),
-			results: []EvaluationResult{
-				{
-					Error: fmt.Errorf("fieldSelector"),
-				},
-			},
-			authorizer: newAuthzAllowMatch(authorizer.AttributesRecord{
-				ResourceRequest: true,
-				APIGroup:        "apps",
-				Resource:        "deployments",
-				Subresource:     "status",
-				Namespace:       "test",
-				Name:            "backend",
-				Verb:            "create",
-				APIVersion:      "*",
-			}),
-			enableSelectors:      false,
 			compatibilityVersion: v131,
 		},
 		{
@@ -919,10 +855,6 @@ func TestCondition(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			environment.DisableBaseEnvSetCachingForTests()
-			if !tc.enableSelectors {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AuthorizeWithSelectors, false)
-			}
 
 			if tc.testPerCallLimit == 0 {
 				tc.testPerCallLimit = celconfig.PerCallLimit

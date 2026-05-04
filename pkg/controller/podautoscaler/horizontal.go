@@ -1481,6 +1481,10 @@ func (a *HorizontalController) setStatus(hpa *autoscalingv2.HorizontalPodAutosca
 		Conditions:      hpa.Status.Conditions,
 	}
 
+	statusObservedGeneration := hpa.Generation
+	if utilfeature.DefaultFeatureGate.Enabled(features.HPAGeneration) {
+		hpa.Status.ObservedGeneration = &statusObservedGeneration
+	}
 	if rescale {
 		now := metav1.NewTime(time.Now())
 		hpa.Status.LastScaleTime = &now

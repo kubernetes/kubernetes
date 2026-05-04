@@ -185,27 +185,27 @@ func TestControllerRoleVerbsConsistency(t *testing.T) {
 
 func TestJobControllerSchedulingRules(t *testing.T) {
 	cases := []struct {
-		name                  string
-		enableWorkloadWithJob bool
-		wantSchedulingRules   bool
+		name                string
+		workloadWithJob     bool
+		wantSchedulingRules bool
 	}{
 		{
-			name:                  "feature gate disabled",
-			enableWorkloadWithJob: false,
-			wantSchedulingRules:   false,
+			name:                "feature gate disabled",
+			workloadWithJob:     false,
+			wantSchedulingRules: false,
 		},
 		{
-			name:                  "feature gate enabled",
-			enableWorkloadWithJob: true,
-			wantSchedulingRules:   true,
+			name:                "feature gate enabled",
+			workloadWithJob:     true,
+			wantSchedulingRules: true,
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.GenericWorkload:       tc.enableWorkloadWithJob,
-				features.EnableWorkloadWithJob: tc.enableWorkloadWithJob,
+				features.GenericWorkload: tc.workloadWithJob,
+				features.WorkloadWithJob: tc.workloadWithJob,
 			})
 			got := hasSchedulingRules(ControllerRoles())
 			if got != tc.wantSchedulingRules {

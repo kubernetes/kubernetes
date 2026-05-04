@@ -19,7 +19,6 @@ package ipaddress
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -31,7 +30,7 @@ import (
 
 // ipAddressStrategy implements verification logic for Replication.
 type ipAddressStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
@@ -43,7 +42,7 @@ func (noopNameGenerator) GenerateName(base string) string {
 }
 
 // Strategy is the default logic that applies when creating and updating Replication IPAddress objects.
-var Strategy = ipAddressStrategy{legacyscheme.Scheme, noopNameGenerator{}}
+var Strategy = ipAddressStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, noopNameGenerator{}}
 
 // Strategy should implement rest.RESTCreateStrategy
 var _ rest.RESTCreateStrategy = Strategy
@@ -73,8 +72,7 @@ func (ipAddressStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 // Validate validates a new IPAddress.
 func (ipAddressStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	ipAddress := obj.(*networking.IPAddress)
-	err := validation.ValidateIPAddress(ipAddress)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, ipAddress, nil, err, operation.Create)
+	return validation.ValidateIPAddress(ipAddress)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -92,7 +90,7 @@ func (ipAddressStrategy) ValidateUpdate(ctx context.Context, new, old runtime.Ob
 	oldIPAddress := old.(*networking.IPAddress)
 	errList := validation.ValidateIPAddress(newIPAddress)
 	errList = append(errList, validation.ValidateIPAddressUpdate(newIPAddress, oldIPAddress)...)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newIPAddress, oldIPAddress, errList, operation.Update)
+	return errList
 }
 
 // AllowUnconditionalUpdate is the default update policy for IPAddress objects.

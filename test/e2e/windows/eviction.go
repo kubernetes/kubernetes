@@ -90,7 +90,7 @@ var _ = sigDescribe(feature.Windows, "Eviction", framework.WithSerial(), framewo
 				break
 			}
 		}
-
+		//lint:ignore SA5011 If node == nil we are already skipping test.
 		if node == nil {
 			e2eskipper.Skipf("No Windows nodes with hard memory-pressure eviction found")
 		}

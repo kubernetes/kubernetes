@@ -27,12 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 )
 
@@ -107,10 +103,9 @@ func TestAuthorizationAttributesFrom(t *testing.T) {
 		spec authorizationapi.SubjectAccessReviewSpec
 	}
 	tests := []struct {
-		name                        string
-		args                        args
-		want                        authorizer.AttributesRecord
-		enableAuthorizationSelector bool
+		name string
+		args args
+		want authorizer.AttributesRecord
 	}{
 		{
 			name: "nonresource",
@@ -192,23 +187,6 @@ func TestAuthorizationAttributesFrom(t *testing.T) {
 			},
 		},
 		{
-			name: "field: ignore when featuregate off",
-			args: args{
-				spec: authorizationapi.SubjectAccessReviewSpec{
-					ResourceAttributes: &authorizationapi.ResourceAttributes{
-						FieldSelector: &authorizationapi.FieldSelectorAttributes{
-							RawSelector: "foo=bar",
-						},
-					},
-				},
-			},
-			want: authorizer.AttributesRecord{
-				User:            &user.DefaultInfo{},
-				ResourceRequest: true,
-				APIVersion:      "*",
-			},
-		},
-		{
 			name: "field: raw selector",
 			args: args{
 				spec: authorizationapi.SubjectAccessReviewSpec{
@@ -227,7 +205,6 @@ func TestAuthorizationAttributesFrom(t *testing.T) {
 					{Operator: "=", Field: "foo", Value: "bar"},
 				},
 			},
-			enableAuthorizationSelector: true,
 		},
 		{
 			name: "field: raw selector error",
@@ -246,7 +223,6 @@ func TestAuthorizationAttributesFrom(t *testing.T) {
 				APIVersion:              "*",
 				FieldSelectorParsingErr: errors.New("invalid selector: '&foo'; can't understand '&foo'"),
 			},
-			enableAuthorizationSelector: true,
 		},
 		{
 			name: "field: requirements",
@@ -279,7 +255,6 @@ func TestAuthorizationAttributesFrom(t *testing.T) {
 					{Operator: "!=", Field: "two", Value: "banana"},
 				},
 			},
-			enableAuthorizationSelector: true,
 		},
 		{
 			name: "field: requirements too many values",
@@ -304,7 +279,6 @@ func TestAuthorizationAttributesFrom(t *testing.T) {
 				APIVersion:              "*",
 				FieldSelectorParsingErr: utilerrors.NewAggregate([]error{errors.New("fieldSelectors do not yet support multiple values")}),
 			},
-			enableAuthorizationSelector: true,
 		},
 		{
 			name: "field: requirements missing in value",
@@ -329,7 +303,6 @@ func TestAuthorizationAttributesFrom(t *testing.T) {
 				APIVersion:              "*",
 				FieldSelectorParsingErr: utilerrors.NewAggregate([]error{errors.New("fieldSelectors in must have one value")}),
 			},
-			enableAuthorizationSelector: true,
 		},
 		{
 			name: "field: requirements missing notin value",
@@ -354,7 +327,6 @@ func TestAuthorizationAttributesFrom(t *testing.T) {
 				APIVersion:              "*",
 				FieldSelectorParsingErr: utilerrors.NewAggregate([]error{errors.New("fieldSelectors not in must have one value")}),
 			},
-			enableAuthorizationSelector: true,
 		},
 		{
 			name: "field: requirements exists",
@@ -379,7 +351,6 @@ func TestAuthorizationAttributesFrom(t *testing.T) {
 				APIVersion:              "*",
 				FieldSelectorParsingErr: utilerrors.NewAggregate([]error{errors.New("fieldSelectors do not yet support Exists")}),
 			},
-			enableAuthorizationSelector: true,
 		},
 		{
 			name: "field: requirements DoesNotExist",
@@ -404,7 +375,6 @@ func TestAuthorizationAttributesFrom(t *testing.T) {
 				APIVersion:              "*",
 				FieldSelectorParsingErr: utilerrors.NewAggregate([]error{errors.New("fieldSelectors do not yet support DoesNotExist")}),
 			},
-			enableAuthorizationSelector: true,
 		},
 		{
 			name: "field: requirements bad operator",
@@ -429,26 +399,8 @@ func TestAuthorizationAttributesFrom(t *testing.T) {
 				APIVersion:              "*",
 				FieldSelectorParsingErr: utilerrors.NewAggregate([]error{errors.New("\"bad\" is not a valid field selector operator")}),
 			},
-			enableAuthorizationSelector: true,
 		},
 
-		{
-			name: "label: ignore when featuregate off",
-			args: args{
-				spec: authorizationapi.SubjectAccessReviewSpec{
-					ResourceAttributes: &authorizationapi.ResourceAttributes{
-						LabelSelector: &authorizationapi.LabelSelectorAttributes{
-							RawSelector: "foo=bar",
-						},
-					},
-				},
-			},
-			want: authorizer.AttributesRecord{
-				User:            &user.DefaultInfo{},
-				ResourceRequest: true,
-				APIVersion:      "*",
-			},
-		},
 		{
 			name: "label: raw selector",
 			args: args{
@@ -468,7 +420,6 @@ func TestAuthorizationAttributesFrom(t *testing.T) {
 					mustRequirement("foo", "=", []string{"bar"}),
 				},
 			},
-			enableAuthorizationSelector: true,
 		},
 		{
 			name: "label: raw selector error",
@@ -487,7 +438,6 @@ func TestAuthorizationAttributesFrom(t *testing.T) {
 				APIVersion:              "*",
 				LabelSelectorParsingErr: errors.New("unable to parse requirement: <nil>: Invalid value: \"&foo\": name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')"),
 			},
-			enableAuthorizationSelector: true,
 		},
 		{
 			name: "label: requirements",
@@ -520,7 +470,6 @@ func TestAuthorizationAttributesFrom(t *testing.T) {
 					mustRequirement("two", "notin", []string{"banana"}),
 				},
 			},
-			enableAuthorizationSelector: true,
 		},
 		{
 			name: "label: requirements multiple values",
@@ -553,7 +502,6 @@ func TestAuthorizationAttributesFrom(t *testing.T) {
 					mustRequirement("two", "notin", []string{"carrot", "donut"}),
 				},
 			},
-			enableAuthorizationSelector: true,
 		},
 		{
 			name: "label: requirements exists",
@@ -580,7 +528,6 @@ func TestAuthorizationAttributesFrom(t *testing.T) {
 					mustRequirement("one", "exists", nil),
 				},
 			},
-			enableAuthorizationSelector: true,
 		},
 		{
 			name: "label: requirements DoesNotExist",
@@ -607,7 +554,6 @@ func TestAuthorizationAttributesFrom(t *testing.T) {
 					mustRequirement("one", "!", nil),
 				},
 			},
-			enableAuthorizationSelector: true,
 		},
 		{
 			name: "label: requirements bad operator",
@@ -632,16 +578,10 @@ func TestAuthorizationAttributesFrom(t *testing.T) {
 				APIVersion:              "*",
 				LabelSelectorParsingErr: utilerrors.NewAggregate([]error{errors.New("\"bad\" is not a valid label selector operator")}),
 			},
-			enableAuthorizationSelector: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if !tt.enableAuthorizationSelector {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.AuthorizeWithSelectors, false)
-			}
-
 			if got := AuthorizationAttributesFrom(tt.args.spec); !reflect.DeepEqual(got, tt.want) {
 				if got.LabelSelectorParsingErr != nil {
 					t.Logf("labelSelectorErr=%q", got.LabelSelectorParsingErr)

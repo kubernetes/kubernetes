@@ -21,7 +21,6 @@ import (
 
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 
-	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -36,14 +35,14 @@ import (
 
 // podGroupStrategy implements behavior for PodGroup objects.
 type podGroupStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // NewStrategy is the default logic that applies when creating and updating PodGroup objects.
 func NewStrategy() *podGroupStrategy {
 	return &podGroupStrategy{
-		legacyscheme.Scheme,
+		rest.DeclarativeValidation{Scheme: legacyscheme.Scheme},
 		names.SimpleNameGenerator,
 	}
 }
@@ -73,7 +72,10 @@ func (*podGroupStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 
 func (*podGroupStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	podGroup := obj.(*scheduling.PodGroup)
-	allErrs := validation.ValidatePodGroup(podGroup)
+	return validation.ValidatePodGroup(podGroup)
+}
+
+func (*podGroupStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
 	opts := []string{}
 	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
 		opts = append(opts, string(features.TopologyAwareWorkloadScheduling))
@@ -84,7 +86,7 @@ func (*podGroupStrategy) Validate(ctx context.Context, obj runtime.Object) field
 	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
 		opts = append(opts, string(features.WorkloadAwarePreemption))
 	}
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, nil, allErrs, operation.Create, rest.WithDeclarativeEnforcement(), rest.WithOptions(opts))
+	return rest.DeclarativeValidationConfig{Options: opts, DeclarativeEnforcement: true}
 }
 
 func (*podGroupStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
@@ -107,22 +109,7 @@ func (*podGroupStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 func (*podGroupStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newPodGroup := obj.(*scheduling.PodGroup)
 	oldPodGroup := old.(*scheduling.PodGroup)
-	allErrs := validation.ValidatePodGroupUpdate(newPodGroup, oldPodGroup)
-	opts := []string{}
-	// Declarative validation will always allow fields to remain unchanged, so if any
-	// of the fields which are covered by these gates are set, we will not re-validate them
-	// (even if the gates are disabled) as long as they do not change values. If a gate
-	// is disabled, they will not be allowed to change values.
-	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareWorkloadScheduling) {
-		opts = append(opts, string(features.TopologyAwareWorkloadScheduling))
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims) {
-		opts = append(opts, string(features.DRAWorkloadResourceClaims))
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
-		opts = append(opts, string(features.WorkloadAwarePreemption))
-	}
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newPodGroup, oldPodGroup, allErrs, operation.Update, rest.WithDeclarativeEnforcement(), rest.WithOptions(opts))
+	return validation.ValidatePodGroupUpdate(newPodGroup, oldPodGroup)
 }
 
 func (*podGroupStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
@@ -166,8 +153,7 @@ func (*podGroupStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old ru
 func (r *podGroupStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newPodGroup := obj.(*scheduling.PodGroup)
 	oldPodGroup := old.(*scheduling.PodGroup)
-	errs := validation.ValidatePodGroupStatusUpdate(newPodGroup, oldPodGroup)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newPodGroup, oldPodGroup, errs, operation.Update, rest.WithDeclarativeEnforcement())
+	return validation.ValidatePodGroupStatusUpdate(newPodGroup, oldPodGroup)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

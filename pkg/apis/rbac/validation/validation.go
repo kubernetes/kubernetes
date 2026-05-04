@@ -139,7 +139,6 @@ func ValidateRoleBinding(roleBinding *rbac.RoleBinding) field.ErrorList {
 	case "Role", "ClusterRole":
 	default:
 		allErrs = append(allErrs, field.NotSupported(field.NewPath("roleRef", "kind"), roleBinding.RoleRef.Kind, []string{"Role", "ClusterRole"}))
-
 	}
 
 	if len(roleBinding.RoleRef.Name) == 0 {
@@ -162,9 +161,7 @@ func ValidateRoleBindingUpdate(roleBinding *rbac.RoleBinding, oldRoleBinding *rb
 	allErrs := ValidateRoleBinding(roleBinding)
 	allErrs = append(allErrs, validation.ValidateObjectMetaUpdate(&roleBinding.ObjectMeta, &oldRoleBinding.ObjectMeta, field.NewPath("metadata"))...)
 
-	if oldRoleBinding.RoleRef != roleBinding.RoleRef {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("roleRef"), roleBinding.RoleRef, "cannot change roleRef"))
-	}
+	allErrs = append(allErrs, validation.ValidateImmutableField(roleBinding.RoleRef, oldRoleBinding.RoleRef, field.NewPath("roleRef")).WithOrigin("immutable").MarkAlpha().MarkCoveredByDeclarative()...)
 
 	return allErrs
 }
@@ -183,7 +180,6 @@ func ValidateClusterRoleBinding(roleBinding *rbac.ClusterRoleBinding) field.Erro
 	case "ClusterRole":
 	default:
 		allErrs = append(allErrs, field.NotSupported(field.NewPath("roleRef", "kind"), roleBinding.RoleRef.Kind, []string{"ClusterRole"}))
-
 	}
 
 	if len(roleBinding.RoleRef.Name) == 0 {

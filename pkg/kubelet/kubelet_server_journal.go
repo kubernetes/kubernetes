@@ -63,6 +63,13 @@ type journalServer struct{}
 // to journalctl on the current system. It supports content-encoding of
 // gzip to reduce total content size.
 func (journalServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet && req.Method != http.MethodPost {
+		// Only GET and POST are supported for journal log queries.
+		w.Header().Set("Allow", "GET, POST")
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
 	var out io.Writer = w
 
 	nlq, errs := newNodeLogQuery(req.URL.Query())

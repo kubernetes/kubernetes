@@ -52,20 +52,13 @@ var (
 	nodeActionTypes = []fwk.ActionType{fwk.UpdateNodeAllocatable, fwk.UpdateNodeLabel, fwk.UpdateNodeTaint, fwk.UpdateNodeCondition, fwk.UpdateNodeAnnotation}
 )
 
-// Constants for GVKs.
-const (
-	// These assignedPod and unschedulablePod are internal resources that are used to represent the type of Pod.
-	// We don't expose them to the plugins deliberately because we don't publish Pod events with unschedulable Pods in the first place.
-	assignedPod      fwk.EventResource = "AssignedPod"
-	unschedulablePod fwk.EventResource = "UnschedulablePod"
-)
-
 var (
 	// allResources is a list of all resources.
 	allResources = []fwk.EventResource{
 		fwk.Pod,
-		assignedPod,
-		unschedulablePod,
+		fwk.AssignedPod,
+		fwk.UnscheduledPod,
+		fwk.TargetPod,
 		fwk.Node,
 		fwk.PersistentVolume,
 		fwk.PersistentVolumeClaim,
@@ -129,9 +122,8 @@ func matchEventResources(r, resource fwk.EventResource) bool {
 	return r == fwk.WildCard ||
 		// Exact match
 		r == resource ||
-		// Pod matches assignedPod and unschedulablePod.
-		// (assignedPod and unschedulablePod aren't exposed and hence only used for incoming events and never used in EventsToRegister)
-		r == fwk.Pod && (resource == assignedPod || resource == unschedulablePod)
+		// Pod matches any of these: AssignedPod, UnscheduledPod, TargetPod.
+		r == fwk.Pod && (resource == fwk.AssignedPod || resource == fwk.UnscheduledPod || resource == fwk.TargetPod)
 }
 
 func MatchAnyClusterEvent(ce fwk.ClusterEvent, incomingEvents []fwk.ClusterEvent) bool {
@@ -145,7 +137,9 @@ func MatchAnyClusterEvent(ce fwk.ClusterEvent, incomingEvents []fwk.ClusterEvent
 
 func UnrollWildCardResource() []fwk.ClusterEventWithHint {
 	events := []fwk.ClusterEventWithHint{
-		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.All}},
+		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.All}},
+		{Event: fwk.ClusterEvent{Resource: fwk.UnscheduledPod, ActionType: fwk.All}},
+		{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.All}},
 		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.All}},
 		{Event: fwk.ClusterEvent{Resource: fwk.PersistentVolume, ActionType: fwk.All}},
 		{Event: fwk.ClusterEvent{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.All}},
@@ -160,6 +154,17 @@ func UnrollWildCardResource() []fwk.ClusterEventWithHint {
 		events = append(events, fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.All}})
 	}
 	return events
+}
+
+// UnrollPodEvent splits the cluster event with the resource Pod into three cluster events
+// with resources AssignedPod, UnscheduledPod, and TargetPod.
+// It assumes that event.Resource == fwk.Pod.
+func UnrollPodEvent(event fwk.ClusterEvent) []fwk.ClusterEvent {
+	return []fwk.ClusterEvent{
+		{Resource: fwk.AssignedPod, ActionType: event.ActionType},
+		{Resource: fwk.UnscheduledPod, ActionType: event.ActionType},
+		{Resource: fwk.TargetPod, ActionType: event.ActionType},
+	}
 }
 
 // NodeInfo is node level aggregated information.

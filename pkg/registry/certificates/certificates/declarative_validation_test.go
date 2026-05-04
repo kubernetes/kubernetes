@@ -26,9 +26,9 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -36,11 +36,6 @@ import (
 )
 
 var apiVersions = []string{"v1", "v1beta1"}
-
-type validationStrategy interface {
-	Validate(ctx context.Context, obj runtime.Object) field.ErrorList
-	ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList
-}
 
 func TestDeclarativeValidateForDeclarative(t *testing.T) {
 	for _, apiVersion := range apiVersions {
@@ -90,7 +85,7 @@ func testDeclarativeValidateForDeclarative(t *testing.T, apiVersion string) {
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
-			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs)
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy, tc.expectedErrs)
 		})
 	}
 }
@@ -188,7 +183,7 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 		for _, subresource := range tc.subresources {
 			t.Run(k+" subresource="+subresource, func(t *testing.T) {
 				ctx := createContextForSubresource(apiVersion, subresource)
-				var strategy validationStrategy
+				var strategy rest.RESTUpdateStrategy
 				switch subresource {
 				case "/":
 					strategy = Strategy
@@ -200,7 +195,7 @@ func testValidateUpdateForDeclarative(t *testing.T, apiVersion string) {
 
 				tc.old.ResourceVersion = "1"
 				tc.update.ResourceVersion = "1"
-				apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, strategy.ValidateUpdate, tc.expectedErrs)
+				apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, strategy, tc.expectedErrs)
 			})
 		}
 	}

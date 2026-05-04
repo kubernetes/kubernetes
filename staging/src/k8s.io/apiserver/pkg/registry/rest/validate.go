@@ -34,57 +34,73 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// ValidationConfig defines how a declarative validation request may be configured.
-type ValidationConfig func(*validationConfigOption)
+// DeclarativeValidationStrategy defines how a strategy may opt-in to declarative validation.
+//
+// When strategies implements ValidateDeclaratively and handwritten validation (Validate / ValidateUpdate),
+// the errors of both are merged and migration checks are performed.
+type DeclarativeValidationStrategy interface {
+	// ValidateDeclaratively runs declarative validation, merges the declarative validation errors with any
+	// validationErrs returned from the strategy's Validate / ValidateUpdate functions (which implement hand-written validation)
+	// and performs migration checks.
+	ValidateDeclaratively(ctx context.Context, obj, oldObj runtime.Object, validationErrs field.ErrorList, opType operation.Type, config DeclarativeValidationConfig) field.ErrorList
 
-// WithOptions sets the validation options.
-// Options should contain any validation options that the declarative validation
-// tags expect. These often correspond to feature gates.
-func WithOptions(options []string) ValidationConfig {
-	return func(config *validationConfigOption) {
-		config.options = options
-	}
+	// DeclarativeValidationConfig configures declarative validation for a single request.
+	DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) DeclarativeValidationConfig
 }
 
-// WithSubresourceMapper sets the subresource mapper for validation.
-// This should be used when registering validation for polymorphic subresources like /scale.
+// DeclarativeValidation is an implementation of DeclarativeValidationStrategy that
+// provides a convenient way for a strategy to opt-in to declarative validation.
 //
-// For example, the deployments/scale subresource mapper might map from:
+// For example:
 //
-//	group: apps, version: v1, subresource=scale
+//		type podStrategy struct {
+//		  rest.DeclarativeValidation
+//		  names.NameGenerator
+//		}
+//	    var Strategy = podStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 //
-// to a target of:
-//
-//	group: autoscaling, version: v1, kind=Scale
-//
-// When set, the group version in the requestInfo of the ctx provided to a declarative validation
-// request will be passed to the subresource mapper to find the group version kind of the subresource.
-// Declarative validation will then convert the object to the subresource group version kind and validate it.
-//
-// Note that the target of the mapping contains no subresource part since the mapper is expected to
-// map to the group version kind of the subresource.
-func WithSubresourceMapper(subresourceMapper GroupVersionKindProvider) ValidationConfig {
-	return func(config *validationConfigOption) {
-		config.subresourceGVKMapper = subresourceMapper
-	}
+// Once a strategy opts-in this way, any generated declarative validation code is run automatically.
+type DeclarativeValidation struct {
+	*runtime.Scheme
 }
 
-// WithNormalizationRules sets the normalization rules for validation.
-func WithNormalizationRules(rules []field.NormalizationRule) ValidationConfig {
-	return func(config *validationConfigOption) {
-		config.normalizationRules = rules
+func (d DeclarativeValidation) ValidateDeclaratively(ctx context.Context, obj, oldObj runtime.Object, validationErrs field.ErrorList, opType operation.Type, config DeclarativeValidationConfig) field.ErrorList {
+	if d.Scheme == nil {
+		validationErrs = append(validationErrs, field.InternalError(nil, fmt.Errorf("cannot validate declaratively without a scheme")))
+		return validationErrs
 	}
+	return ValidateDeclarativelyWithMigrationChecks(ctx, d.Scheme, obj, oldObj, validationErrs, opType, config)
 }
 
-// WithDeclarativeEnforcement marks the validation configuration to indicate that it includes
-// declarative validations that should follow the fine-grained Validation Lifecycle.
-// When set, declarative validation is always executed regardless of feature gates.
-// Authority is determined by individual tag prefixes (+k8s:alpha, +k8s:beta) and the
-// DeclarativeValidationBeta safety switch.
-func WithDeclarativeEnforcement() ValidationConfig {
-	return func(config *validationConfigOption) {
-		config.declarativeEnforcement = true
-	}
+func (d DeclarativeValidation) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) DeclarativeValidationConfig {
+	// The zero value of DeclarativeValidationConfig is the default.
+	return DeclarativeValidationConfig{}
+}
+
+// DeclarativeValidationConfig holds configuration for declarative validation.
+// Strategies that need to customize declarative validation behavior implement
+// DeclarativeValidationConfigurer and return this struct.
+type DeclarativeValidationConfig struct {
+	// Options contains validation options that declarative validation tags
+	// expect. These often correspond to feature gates.
+	Options []string
+
+	// DeclarativeEnforcement indicates that declarative validations should
+	// follow the fine-grained Validation Lifecycle. When set, declarative
+	// validation is always executed regardless of feature gates.
+	DeclarativeEnforcement bool
+
+	// NormalizationRules are applied to field paths when comparing
+	// handwritten and declarative validation errors.
+	NormalizationRules []field.NormalizationRule
+
+	// SubresourceGVKMapper maps a subresource request to the GVK of the
+	// subresource type for polymorphic subresources like /scale.
+	SubresourceGVKMapper GroupVersionKindProvider
+
+	// ShortCircuitMismatch allows a short-circuit declarative validation error for a field
+	// to match with any handwritten validation error on its subfields.
+	ShortCircuitMismatch bool
 }
 
 type allDeclarativeEnforcedKeyType struct{}
@@ -100,13 +116,12 @@ func WithAllDeclarativeEnforcedForTest(ctx context.Context) context.Context {
 	return context.WithValue(ctx, allDeclarativeEnforcedKey, true)
 }
 
-type validationConfigOption struct {
-	opType                 operation.Type
-	options                []string
-	subresourceGVKMapper   GroupVersionKindProvider
-	validationIdentifier   string
-	normalizationRules     []field.NormalizationRule
-	declarativeEnforcement bool
+// ValidationConfigOption is the internal configuration used by
+// ValidateDeclarativelyWithMigrationChecks. It is exported for use in tests.
+type ValidationConfigOption struct {
+	OpType               operation.Type
+	ValidationIdentifier string
+	DeclarativeValidationConfig
 }
 
 // validateDeclaratively validates obj and oldObj against declarative
@@ -121,9 +136,9 @@ type validationConfigOption struct {
 // Returns a field.ErrorList containing any validation errors. An internal error
 // is included if requestInfo is missing from the context or if version
 // conversion fails.
-func validateDeclaratively(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *validationConfigOption) field.ErrorList {
+func validateDeclaratively(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *ValidationConfigOption) field.ErrorList {
 	// Find versionedGroupVersion, which identifies the API version to use for declarative validation.
-	versionedGroupVersion, subresources, err := requestInfo(ctx, o.subresourceGVKMapper)
+	versionedGroupVersion, subresources, err := requestInfo(ctx, o.SubresourceGVKMapper)
 	if err != nil {
 		return field.ErrorList{field.InternalError(nil, err)}
 	}
@@ -133,17 +148,17 @@ func validateDeclaratively(ctx context.Context, scheme *runtime.Scheme, obj, old
 	}
 	var versionedOldObj runtime.Object
 
-	switch o.opType {
+	switch o.OpType {
 	case operation.Create:
-		return scheme.Validate(ctx, o.options, versionedObj, subresources...)
+		return scheme.Validate(ctx, o.Options, versionedObj, subresources...)
 	case operation.Update:
 		versionedOldObj, err = scheme.ConvertToVersion(oldObj, versionedGroupVersion)
 		if err != nil {
 			return field.ErrorList{field.InternalError(nil, fmt.Errorf("unexpected error converting to versioned type: %w", err))}
 		}
-		return scheme.ValidateUpdate(ctx, o.options, versionedObj, versionedOldObj, subresources...)
+		return scheme.ValidateUpdate(ctx, o.Options, versionedObj, versionedOldObj, subresources...)
 	default:
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("unknown operation type: %v", o.opType))}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("unknown operation type: %v", o.OpType))}
 	}
 }
 
@@ -179,9 +194,9 @@ func parseSubresourcePath(subresourcePath string) ([]string, error) {
 
 // compareDeclarativeErrorsAndEmitMismatches checks for mismatches between imperative and declarative validation
 // and logs + emits metrics when inconsistencies are found
-func compareDeclarativeErrorsAndEmitMismatches(ctx context.Context, imperativeErrs, declarativeErrs field.ErrorList, enforced bool, validationIdentifier string, normalizationRules []field.NormalizationRule) {
+func compareDeclarativeErrorsAndEmitMismatches(ctx context.Context, imperativeErrs, declarativeErrs field.ErrorList, validationIdentifier string, enforced bool, opts ValidationConfigOption) {
 	logger := klog.FromContext(ctx)
-	mismatchDetails := gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs, enforced, normalizationRules)
+	mismatchDetails := gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs, enforced, opts)
 	for _, detail := range mismatchDetails {
 		// Log information about the mismatch using contextual logger
 		logger.Error(nil, detail)
@@ -193,7 +208,7 @@ func compareDeclarativeErrorsAndEmitMismatches(ctx context.Context, imperativeEr
 
 // gatherDeclarativeValidationMismatches compares imperative and declarative validation errors
 // and returns detailed information about any mismatches found. Errors are compared via type, field, and origin
-func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field.ErrorList, enforced bool, normalizationRules []field.NormalizationRule) []string {
+func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field.ErrorList, enforced bool, opts ValidationConfigOption) []string {
 	var mismatchDetails []string
 	// short circuit here to minimize allocs for usual case of 0 validation errors
 	if len(imperativeErrs) == 0 && len(declarativeErrs) == 0 {
@@ -210,7 +225,8 @@ func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field
 		defaultRecommendation = disableBetaMsg
 	}
 
-	fuzzyMatcher := field.ErrorMatcher{}.ByType().ByOrigin().RequireOriginWhenInvalid().ByFieldNormalized(normalizationRules)
+	fuzzyMatcher := field.ErrorMatcher{}.ByType().ByOrigin().RequireOriginWhenInvalid().ByFieldNormalized(opts.NormalizationRules)
+	fuzzyMatcherWithShortCircuit := fuzzyMatcher.MatchAncestorShortCircuit()
 
 	// Dedupe imperative errors using the fuzzy matcher (type, field, and origin) as they are
 	// not intended and come from (buggy) duplicate validation calls.
@@ -231,16 +247,13 @@ func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field
 	}
 	imperativeErrs = dedupedImperativeErrs
 
-	// Create a copy of declarative errors to track remaining ones
-	remaining := make(field.ErrorList, len(declarativeErrs))
-	copy(remaining, declarativeErrs)
+	matchedDeclarative := make([]bool, len(declarativeErrs))
 
 	// Match each "covered" imperative error to declarative errors.
 	// We use a fuzzy matching approach to find corresponding declarative errors
 	// for each imperative error marked as CoveredByDeclarative.
-	// As matches are found, they're removed from the 'remaining' list.
-	// They are removed from `remaining` with a "1:many" mapping: for a given
-	// imperative error we mark as matched all matching declarative errors
+	// They are matched with a "many:many" mapping: an imperative error can match multiple
+	// declarative errors, and a declarative error can match multiple imperative errors.
 	// This allows us to:
 	// 1. Detect imperative errors that should have matching declarative errors but don't
 	// 2. Identify extra declarative errors with no imperative counterpart
@@ -250,14 +263,21 @@ func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field
 			continue
 		}
 
-		tmp := make(field.ErrorList, 0, len(remaining))
 		matchCount := 0
 
-		for _, dErr := range remaining {
+		for dIdx, dErr := range declarativeErrs {
 			if fuzzyMatcher.Matches(iErr, dErr) {
 				matchCount++
-			} else {
-				tmp = append(tmp, dErr)
+				matchedDeclarative[dIdx] = true
+			}
+		}
+		// see if the error matches with a short circuited DV error.
+		if opts.ShortCircuitMismatch && matchCount == 0 {
+			for _, dErr := range declarativeErrs {
+				if fuzzyMatcherWithShortCircuit.Matches(iErr, dErr) {
+					matchCount++
+					break
+				}
 			}
 		}
 
@@ -267,7 +287,6 @@ func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field
 			if iErr.IsAlpha() {
 				rec = authoritativeMsg
 			}
-
 			mismatchDetails = append(mismatchDetails,
 				fmt.Sprintf(
 					"Unexpected difference between hand written validation and declarative validation error results, unmatched error(s) found %s. "+
@@ -277,12 +296,13 @@ func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field
 				),
 			)
 		}
-
-		remaining = tmp
 	}
 
 	// Any remaining unmatched declarative errors are considered "extra"
-	for _, dErr := range remaining {
+	for dIdx, dErr := range declarativeErrs {
+		if matchedDeclarative[dIdx] {
+			continue
+		}
 		rec := defaultRecommendation
 		// If the declarative error is Alpha, it is never enforced (shadowed), so HV is authoritative.
 		if dErr.IsAlpha() {
@@ -326,14 +346,11 @@ func createDeclarativeValidationPanicHandler(ctx context.Context, errs *field.Er
 // panicSafeValidateFunc wraps an validation function with panic recovery logic.
 // The returned function will execute the wrapped function and handle any panics by
 // incrementing the panic metric, and logging an error message
-// if shouldFail=false, and adding a validation error if shouldFail=true.
 func panicSafeValidateFunc(
-	validateFunc func(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *validationConfigOption) field.ErrorList,
-	shouldFail bool, validationIdentifier string,
-) func(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *validationConfigOption) field.ErrorList {
-	return func(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *validationConfigOption) (errs field.ErrorList) {
-		defer createDeclarativeValidationPanicHandler(ctx, &errs, shouldFail, validationIdentifier)()
-
+	validateFunc func(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *ValidationConfigOption) field.ErrorList,
+) func(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *ValidationConfigOption) field.ErrorList {
+	return func(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *ValidationConfigOption) (errs field.ErrorList) {
+		defer createDeclarativeValidationPanicHandler(ctx, &errs, o.DeclarativeEnforcement, o.ValidationIdentifier)()
 		return validateFunc(ctx, scheme, obj, oldObj, o)
 	}
 }
@@ -387,7 +404,7 @@ func metricIdentifier(ctx context.Context, scheme *runtime.Scheme, obj runtime.O
 //
 // For testing purposes, WithAllDeclarativeEnforcedForTest can be used to enforce all declarative validations
 // regardless of feature gates and filter all covered handwritten validations.
-func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, errs field.ErrorList, opType operation.Type, configOpts ...ValidationConfig) field.ErrorList {
+func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, errs field.ErrorList, opType operation.Type, config DeclarativeValidationConfig) field.ErrorList {
 	declarativeValidationEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation)
 	betaEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidationBeta)
 	// allDeclarativeEnforced indicates that we should check all declarative errors for testing purposes.
@@ -401,22 +418,20 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 	}
 
 	// Directly create the config and call the core validation logic.
-	cfg := &validationConfigOption{
-		opType:               opType,
-		validationIdentifier: validationIdentifier,
-	}
-	for _, opt := range configOpts {
-		opt(cfg)
+	cfg := &ValidationConfigOption{
+		OpType:                      opType,
+		ValidationIdentifier:        validationIdentifier,
+		DeclarativeValidationConfig: config,
 	}
 
 	// Short-circuit if neither DeclarativeValidation is enabled nor the object is explicitly configured for declarative enforcement.
-	if !declarativeValidationEnabled && !cfg.declarativeEnforcement && !allDeclarativeEnforced {
+	if !declarativeValidationEnabled && !cfg.DeclarativeEnforcement && !allDeclarativeEnforced {
 		return errs
 	}
 
 	// Call the panic-safe wrapper with the real validation function.
 	// We should fail if validation is enforced.
-	declarativeErrs := panicSafeValidateFunc(validateDeclaratively, cfg.declarativeEnforcement, cfg.validationIdentifier)(ctx, scheme, obj, oldObj, cfg)
+	declarativeErrs := panicSafeValidateFunc(validateDeclaratively)(ctx, scheme, obj, oldObj, cfg)
 
 	if declarativeValidationEnabled {
 		// Log mismatches.
@@ -424,7 +439,7 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 		// and may not have handwritten counterparts (e.g., in new APIs).
 		// We only mismatch check Alpha and Beta errors in this mode.
 		mismatchCandidateErrs := declarativeErrs
-		if cfg.declarativeEnforcement {
+		if cfg.DeclarativeEnforcement {
 			mismatchCandidateErrs = nil
 			for _, err := range declarativeErrs {
 				if err.IsAlpha() || err.IsBeta() {
@@ -434,10 +449,10 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 		}
 
 		// We pass betaEnabled (and enforcement) as the takeover flag to avoid changing logic elsewhere for now.
-		compareDeclarativeErrorsAndEmitMismatches(ctx, errs, mismatchCandidateErrs, cfg.declarativeEnforcement && betaEnabled, validationIdentifier, cfg.normalizationRules)
+		compareDeclarativeErrorsAndEmitMismatches(ctx, errs, mismatchCandidateErrs, validationIdentifier, cfg.DeclarativeEnforcement && betaEnabled, *cfg)
 	}
 
-	if !cfg.declarativeEnforcement && !allDeclarativeEnforced {
+	if !cfg.DeclarativeEnforcement && !allDeclarativeEnforced {
 		// If enforcement is not enabled, we shadow declarative errors with hand-written ones, so we return early here.
 		return errs
 	}

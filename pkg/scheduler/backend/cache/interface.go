@@ -89,12 +89,10 @@ type Cache interface {
 	IsAssumedPod(pod *v1.Pod) (bool, error)
 
 	// AddNode adds overall information about node.
-	// It returns a clone of added NodeInfo object.
-	AddNode(logger klog.Logger, node *v1.Node) *framework.NodeInfo
+	AddNode(logger klog.Logger, node *v1.Node)
 
 	// UpdateNode updates overall information about node.
-	// It returns a clone of updated NodeInfo object.
-	UpdateNode(logger klog.Logger, oldNode, newNode *v1.Node) *framework.NodeInfo
+	UpdateNode(logger klog.Logger, oldNode, newNode *v1.Node)
 
 	// RemoveNode removes overall information about node.
 	RemoveNode(logger klog.Logger, node *v1.Node) error

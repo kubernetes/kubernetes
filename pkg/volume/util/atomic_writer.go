@@ -190,7 +190,7 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection, setPerms func(su
 		// (5)
 		tsDir, err := w.newTimestampDir()
 		if err != nil {
-			klog.V(4).Infof("%s: error creating new ts data directory: %v", w.logContext, err)
+			klog.Errorf("%s: error creating new ts data directory: %v", w.logContext, err)
 			return err
 		}
 		tsDirName := filepath.Base(tsDir)

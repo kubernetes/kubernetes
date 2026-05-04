@@ -39,6 +39,7 @@ import (
 	_ "github.com/google/cadvisor/fs/overlay/install"
 	_ "github.com/google/cadvisor/fs/tmpfs/install"
 	_ "github.com/google/cadvisor/fs/vfs/install"
+	_ "github.com/google/cadvisor/fs/zfs/install"
 
 	"github.com/google/cadvisor/cache/memory"
 	cadvisormetrics "github.com/google/cadvisor/container"

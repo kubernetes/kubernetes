@@ -112,6 +112,19 @@ func tempRemoveImagePulledRecord(f *framework.Framework, imageID *string) {
 		// wait for the kubelet to create the record
 		err := wait.PollUntilContextTimeout(ctx, time.Second, 5*time.Second, true, func(_ context.Context) (bool, error) {
 			if _, err := os.Stat(origPath); err != nil {
+				f.Logf("failed to stat file %q: %v", origPath, err)
+				dirEntries, err := os.ReadDir(pulledRecordsDir)
+				if err != nil {
+					f.Logf("failed to read directory contents for %q: %v", pulledRecordsDir, err)
+					return false, nil
+				}
+				files := map[string]string{}
+				for _, entry := range dirEntries {
+					entryPath := filepath.Join(pulledRecordsDir, entry.Name())
+					content, _ := os.ReadFile(entryPath)
+					files[entryPath] = string(content)
+				}
+				f.Logf("contents of %q: %v", pulledRecordsDir, files)
 				return false, nil
 			}
 			return true, nil

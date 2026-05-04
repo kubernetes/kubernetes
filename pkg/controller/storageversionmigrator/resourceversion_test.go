@@ -481,6 +481,14 @@ func filterListWatchActions(actions []kubetesting.Action) []kubetesting.Action {
 	return filteredActions
 }
 
+type testRESTMapper struct {
+	meta.RESTMapper
+}
+
+func (m *testRESTMapper) Reset() {
+	meta.MaybeResetRESTMapper(m.RESTMapper)
+}
+
 // newTestRVController creates a new ResourceVersionController for testing.
 func newTestRVController(
 	kubeClient kubernetes.Interface,
@@ -497,7 +505,7 @@ func newTestRVController(
 		metadataClient:  metadataClient,
 		svmListers:      svmInformer.Lister(),
 		svmSynced:       func() bool { return true },
-		mapper:          mapper,
+		mapper:          &testRESTMapper{mapper},
 	}
 	return rvController
 }

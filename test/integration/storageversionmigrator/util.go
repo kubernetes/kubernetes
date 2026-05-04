@@ -800,9 +800,7 @@ func (svm *svmTest) waitForCRDUpdate(
 	err := wait.PollUntilContextTimeout(
 		ctx,
 		500*time.Millisecond,
-		// CRD discovery and storage-version reporting can lag well beyond 1 minute
-		// on contended CI nodes while the apiextensions controllers converge.
-		2*time.Minute,
+		time.Second*60,
 		true,
 		func(ctx context.Context) (bool, error) {
 			apiGroups, _, err := svm.discoveryClient.ServerGroupsAndResources()
@@ -1190,17 +1188,20 @@ func (svm *svmTest) createChaos(ctx context.Context, t *testing.T) {
 
 	noFailT := ignoreFailures{} // these create and delete requests are not coordinated with the rest of the test and can fail
 
-	const workers = 10
+	const workers = 5
 	wg.Add(workers)
 	for i := range workers {
 		go func() {
 			defer wg.Done()
 
+			ticker := time.NewTicker(100 * time.Millisecond) // 10 ops/sec
+			defer ticker.Stop()
+
 			for {
 				select {
 				case <-ctx.Done():
 					return
-				default:
+				case <-ticker.C:
 				}
 
 				_ = svm.createCR(ctx, noFailT, "chaos-cr-"+strconv.Itoa(i), "v1")

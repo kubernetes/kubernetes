@@ -516,6 +516,366 @@ func TestParseInt(t *testing.T) {
 	}
 }
 
+func TestParseSignedInt(t *testing.T) {
+	type testcase struct {
+		name          string
+		in            string
+		bitSize       int
+		expectedOut   int64
+		expectedError bool
+	}
+
+	testcases := []testcase{
+		// --- int32 valid boundaries ---
+		{
+			name:        "int32 exact minimum boundary",
+			in:          "-2147483648",
+			bitSize:     32,
+			expectedOut: -2147483648,
+		},
+		{
+			name:        "int32 exact maximum boundary",
+			in:          "2147483647",
+			bitSize:     32,
+			expectedOut: 2147483647,
+		},
+		{
+			name:        "int32 zero",
+			in:          "0",
+			bitSize:     32,
+			expectedOut: 0,
+		},
+		{
+			name:        "int32 positive value",
+			in:          "100",
+			bitSize:     32,
+			expectedOut: 100,
+		},
+		{
+			name:        "int32 negative value",
+			in:          "-1",
+			bitSize:     32,
+			expectedOut: -1,
+		},
+		// --- int32 overflow ---
+		{
+			name:          "int32 one below minimum overflows",
+			in:            "-2147483649",
+			bitSize:       32,
+			expectedError: true,
+		},
+		{
+			name:          "int32 one above maximum overflows",
+			in:            "2147483648",
+			bitSize:       32,
+			expectedError: true,
+		},
+		{
+			name:        "int64 accepts value that overflows int32",
+			in:          "2147483648",
+			bitSize:     64,
+			expectedOut: 2147483648,
+		},
+		// --- int64 valid boundaries ---
+		{
+			name:        "int64 exact minimum boundary",
+			in:          "-9223372036854775808",
+			bitSize:     64,
+			expectedOut: -9223372036854775808,
+		},
+		{
+			name:        "int64 exact maximum boundary",
+			in:          "9223372036854775807",
+			bitSize:     64,
+			expectedOut: 9223372036854775807,
+		},
+		// --- int64 overflow ---
+		{
+			name:          "int64 one above maximum overflows",
+			in:            "9223372036854775808",
+			bitSize:       64,
+			expectedError: true,
+		},
+		{
+			name:          "int64 one below minimum overflows",
+			in:            "-9223372036854775809",
+			bitSize:       64,
+			expectedError: true,
+		},
+		// --- int16 boundaries ---
+		{
+			name:        "int16 exact minimum boundary",
+			in:          "-32768",
+			bitSize:     16,
+			expectedOut: -32768,
+		},
+		{
+			name:        "int16 exact maximum boundary",
+			in:          "32767",
+			bitSize:     16,
+			expectedOut: 32767,
+		},
+		{
+			name:          "int16 one above maximum overflows",
+			in:            "32768",
+			bitSize:       16,
+			expectedError: true,
+		},
+		{
+			name:          "int16 one below minimum overflows",
+			in:            "-32769",
+			bitSize:       16,
+			expectedError: true,
+		},
+		// --- int8 boundaries ---
+		{
+			name:        "int8 exact minimum boundary",
+			in:          "-128",
+			bitSize:     8,
+			expectedOut: -128,
+		},
+		{
+			name:        "int8 exact maximum boundary",
+			in:          "127",
+			bitSize:     8,
+			expectedOut: 127,
+		},
+		{
+			name:          "int8 one above maximum overflows",
+			in:            "128",
+			bitSize:       8,
+			expectedError: true,
+		},
+		{
+			name:          "int8 one below minimum overflows",
+			in:            "-129",
+			bitSize:       8,
+			expectedError: true,
+		},
+		// --- canonical form rejection ---
+		{
+			name:          "leading zeros rejected",
+			in:            "0100",
+			bitSize:       32,
+			expectedError: true,
+		},
+		{
+			name:          "unary plus rejected",
+			in:            "+1",
+			bitSize:       32,
+			expectedError: true,
+		},
+		{
+			name:          "octal notation rejected",
+			in:            "0o77",
+			bitSize:       32,
+			expectedError: true,
+		},
+		{
+			name:          "hex notation rejected",
+			in:            "0xFF",
+			bitSize:       32,
+			expectedError: true,
+		},
+		{
+			name:          "empty string rejected",
+			in:            "",
+			bitSize:       32,
+			expectedError: true,
+		},
+		{
+			name:          "non-numeric string rejected",
+			in:            "abc",
+			bitSize:       32,
+			expectedError: true,
+		},
+		{
+			name:          "floating point rejected",
+			in:            "1.5",
+			bitSize:       32,
+			expectedError: true,
+		},
+		{
+			name:          "whitespace rejected",
+			in:            " 1",
+			bitSize:       32,
+			expectedError: true,
+		},
+		{
+			name:          "negative zero canonical form rejected",
+			in:            "-0",
+			bitSize:       32,
+			expectedError: true,
+		},
+		{
+			name:          "unknown bit size returns error",
+			in:            "1",
+			bitSize:       7,
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			out, err := ParseSignedInt(tc.in, tc.bitSize)
+			switch {
+			case tc.expectedError && err == nil:
+				t.Errorf("expected an error for input %q with bitSize %d but did not receive one (got %d)", tc.in, tc.bitSize, out)
+			case !tc.expectedError && err != nil:
+				t.Errorf("received an unexpected error for input %q with bitSize %d: %v", tc.in, tc.bitSize, err)
+			}
+
+			if out != tc.expectedOut {
+				t.Errorf("expected output %d but got %d", tc.expectedOut, out)
+			}
+		})
+	}
+}
+
+func TestParseUnsignedInt(t *testing.T) {
+	type testcase struct {
+		name          string
+		in            string
+		bitSize       int
+		expectedOut   uint64
+		expectedError bool
+	}
+
+	testcases := []testcase{
+		// --- uint64 valid boundaries ---
+		{
+			name:        "uint64 maximum boundary",
+			in:          "18446744073709551615",
+			bitSize:     64,
+			expectedOut: 18446744073709551615,
+		},
+		{
+			name:        "uint64 zero",
+			in:          "0",
+			bitSize:     64,
+			expectedOut: 0,
+		},
+		// --- uint64 overflow ---
+		{
+			name:          "uint64 one above maximum overflows",
+			in:            "18446744073709551616",
+			bitSize:       64,
+			expectedError: true,
+		},
+		// --- uint32 valid boundaries ---
+		{
+			name:        "uint32 maximum boundary",
+			in:          "4294967295",
+			bitSize:     32,
+			expectedOut: 4294967295,
+		},
+		{
+			name:        "uint32 zero",
+			in:          "0",
+			bitSize:     32,
+			expectedOut: 0,
+		},
+		{
+			name:          "uint32 one above maximum overflows",
+			in:            "4294967296",
+			bitSize:       32,
+			expectedError: true,
+		},
+		// --- uint16 valid boundaries ---
+		{
+			name:        "uint16 maximum boundary",
+			in:          "65535",
+			bitSize:     16,
+			expectedOut: 65535,
+		},
+		{
+			name:          "uint16 one above maximum overflows",
+			in:            "65536",
+			bitSize:       16,
+			expectedError: true,
+		},
+		// --- uint8 valid boundaries ---
+		{
+			name:        "uint8 maximum boundary",
+			in:          "255",
+			bitSize:     8,
+			expectedOut: 255,
+		},
+		{
+			name:          "uint8 one above maximum overflows",
+			in:            "256",
+			bitSize:       8,
+			expectedError: true,
+		},
+		// --- negative values rejected for unsigned ---
+		{
+			name:          "negative value rejected",
+			in:            "-1",
+			bitSize:       64,
+			expectedError: true,
+		},
+		{
+			name:        "uint64 accepts value that overflows uint32",
+			in:          "4294967296",
+			bitSize:     64,
+			expectedOut: 4294967296,
+		},
+		// --- canonical form rejection ---
+		{
+			name:          "leading zeros rejected",
+			in:            "0100",
+			bitSize:       32,
+			expectedError: true,
+		},
+		{
+			name:          "unary plus rejected",
+			in:            "+1",
+			bitSize:       32,
+			expectedError: true,
+		},
+		{
+			name:          "empty string rejected",
+			in:            "",
+			bitSize:       64,
+			expectedError: true,
+		},
+		{
+			name:          "hex notation rejected",
+			in:            "0xFF",
+			bitSize:       32,
+			expectedError: true,
+		},
+		{
+			name:          "floating point rejected",
+			in:            "1.0",
+			bitSize:       32,
+			expectedError: true,
+		},
+		{
+			name:          "unknown bit size returns error",
+			in:            "1",
+			bitSize:       7,
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			out, err := ParseUnsignedInt(tc.in, tc.bitSize)
+			switch {
+			case tc.expectedError && err == nil:
+				t.Errorf("expected an error for input %q with bitSize %d but did not receive one (got %d)", tc.in, tc.bitSize, out)
+			case !tc.expectedError && err != nil:
+				t.Errorf("received an unexpected error for input %q with bitSize %d: %v", tc.in, tc.bitSize, err)
+			}
+
+			if out != tc.expectedOut {
+				t.Errorf("expected output %d but got %d", tc.expectedOut, out)
+			}
+		})
+	}
+}
+
 func TestParseBool(t *testing.T) {
 	type testcase struct {
 		name          string

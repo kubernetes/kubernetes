@@ -46,6 +46,7 @@ const (
 //
 // The StatefulSet guarantees that a given network identity will always
 // map to the same storage identity.
+// +k8s:supportsSubresource="/status"
 type StatefulSet struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -359,6 +360,7 @@ type StatefulSetList struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.9
 
 // Deployment enables declarative updates for Pods and ReplicaSets.
+// +k8s:supportsSubresource="/status"
 type Deployment struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -762,6 +764,7 @@ type DaemonSetCondition struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.9
 
 // DaemonSet represents the configuration of a daemon set.
+// +k8s:supportsSubresource="/status"
 type DaemonSet struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -813,6 +816,7 @@ type DaemonSetList struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.9
 
 // ReplicaSet ensures that a specified number of pod replicas are running at any given time.
+// +k8s:supportsSubresource="/status"
 type ReplicaSet struct {
 	metav1.TypeMeta `json:",inline"`
 

@@ -300,7 +300,7 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 		rbacv1helpers.NewRule("list", "watch", "create", "delete", "patch").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 		eventsRule(),
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.EnableWorkloadWithJob) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadWithJob) {
 		jobControllerRules = append(jobControllerRules,
 			rbacv1helpers.NewRule("get", "list", "watch", "create").Groups(schedulingGroup).Resources("workloads", "podgroups").RuleOrDie(),
 		)

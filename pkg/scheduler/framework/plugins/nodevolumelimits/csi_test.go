@@ -730,9 +730,9 @@ func TestCSILimitsQHint(t *testing.T) {
 				translator:           csitrans.New(),
 			}
 			logger, _ := ktesting.NewTestContext(t)
-			qhint, err := p.isSchedulableAfterPodDeleted(logger, test.newPod, test.deletedPod, nil)
+			qhint, err := p.isSchedulableAfterAssignedPodDeleted(logger, test.newPod, test.deletedPod, nil)
 			if err != nil {
-				t.Errorf("isSchedulableAfterPodDeleted failed: %v", err)
+				t.Errorf("isSchedulableAfterAssignedPodDeleted failed: %v", err)
 			}
 			if qhint != test.wantQHint {
 				t.Errorf("QHint does not match: %v, want: %v", qhint, test.wantQHint)

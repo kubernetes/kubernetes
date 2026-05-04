@@ -18,6 +18,7 @@ package util
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 
 	"k8s.io/gengo/v2/parser/tags"
@@ -135,6 +136,80 @@ func ParseInt(val string) (int, error) {
 	}
 
 	return intVal, nil
+}
+
+// ParseSignedInt strictly parses a signed integer from a string input and
+// validates that the result fits within the specified bit size. The bitSize
+// parameter should be 8, 16, 32, or 64, corresponding to the target Go type.
+// Values outside the representable range for the target type are rejected at
+// parse time with a descriptive error.
+func ParseSignedInt(val string, bitSize int) (int64, error) {
+	intVal, err := strconv.ParseInt(val, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("parsing %q as int: %w", val, err)
+	}
+
+	// Verify canonical form: reject leading zeros, unary plus, etc.
+	strVal := strconv.FormatInt(intVal, 10)
+	if strVal != val {
+		return 0, fmt.Errorf("%q is not a valid int value", val)
+	}
+
+	// Validate the parsed value fits in the target type's range.
+	var minVal, maxVal int64
+	switch bitSize {
+	case 8:
+		minVal, maxVal = math.MinInt8, math.MaxInt8
+	case 16:
+		minVal, maxVal = math.MinInt16, math.MaxInt16
+	case 32:
+		minVal, maxVal = math.MinInt32, math.MaxInt32
+	case 64:
+		minVal, maxVal = math.MinInt64, math.MaxInt64
+	default:
+		return 0, fmt.Errorf("unsupported bitSize %d; must be 8, 16, 32, or 64", bitSize)
+	}
+	if intVal < minVal || intVal > maxVal {
+		return 0, fmt.Errorf("value %d does not fit in int%d (range [%d, %d])", intVal, bitSize, minVal, maxVal)
+	}
+
+	return intVal, nil
+}
+
+// ParseUnsignedInt strictly parses an unsigned integer from a string input and
+// validates that the result fits within the specified bit size. The bitSize
+// parameter should be 8, 16, 32, or 64, corresponding to the target Go type.
+func ParseUnsignedInt(val string, bitSize int) (uint64, error) {
+	uintVal, err := strconv.ParseUint(val, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("parsing %q as uint: %w", val, err)
+	}
+
+	// Verify canonical form: reject leading zeros, unary plus, etc.
+	strVal := strconv.FormatUint(uintVal, 10)
+	if strVal != val {
+		return 0, fmt.Errorf("%q is not a valid uint value", val)
+	}
+
+	// Validate the parsed value fits in the target type's range.
+	var maxVal uint64
+	switch bitSize {
+	case 8:
+		maxVal = math.MaxUint8
+	case 16:
+		maxVal = math.MaxUint16
+	case 32:
+		maxVal = math.MaxUint32
+	case 64:
+		maxVal = math.MaxUint64
+	default:
+		return 0, fmt.Errorf("unsupported bitSize %d; must be 8, 16, 32, or 64", bitSize)
+	}
+	if uintVal > maxVal {
+		return 0, fmt.Errorf("value %d does not fit in uint%d (range [0, %d])", uintVal, bitSize, maxVal)
+	}
+
+	return uintVal, nil
 }
 
 // ParseBool strictly parses a bool from a string input,

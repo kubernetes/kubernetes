@@ -1334,7 +1334,7 @@ done`}
 			Should(gomega.HaveField("Status", gomega.BeEquivalentTo(batchv1.JobStatus{})))
 	})
 
-	framework.It("containers restarted by container restart policy should not trigger PodFailurePolicy", framework.WithFeature("ContainerRestartRules"), framework.WithFeatureGate(features.ContainerRestartRules), func(ctx context.Context) {
+	framework.It("containers restarted by container restart policy should not trigger PodFailurePolicy", framework.WithNodeConformance(), framework.WithFeatureGate(features.ContainerRestartRules), func(ctx context.Context) {
 		parallelism := int32(1)
 		completions := int32(1)
 		backoffLimit := int32(1)
@@ -1381,7 +1381,7 @@ done`}
 
 	framework.It("should create Workload and PodGroup for gang-eligible Job",
 		framework.WithFeatureGate(features.GenericWorkload),
-		framework.WithFeatureGate(features.EnableWorkloadWithJob),
+		framework.WithFeatureGate(features.WorkloadWithJob),
 		func(ctx context.Context) {
 			parallelism := int32(4)
 			completions := int32(4)

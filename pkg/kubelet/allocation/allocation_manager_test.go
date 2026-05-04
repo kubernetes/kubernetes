@@ -2445,7 +2445,6 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 		config.NewSourcesReady(func(_ sets.Set[string]) bool { return true }),
 		record.NewFakeRecorder(20),
 	)
-	allocationManager.SetContainerRuntime(runtime)
 
 	getNode := func(context.Context, bool) (*v1.Node, error) {
 		return &v1.Node{

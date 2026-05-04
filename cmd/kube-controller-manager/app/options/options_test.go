@@ -114,7 +114,6 @@ var args = []string{
 	"--concurrent-cron-job-syncs=10",
 	"--concurrent-replicaset-syncs=10",
 	"--concurrent-resource-quota-syncs=10",
-	"--concurrent-service-syncs=2",
 	"--concurrent-serviceaccount-token-syncs=10",
 	"--concurrent_rc_syncs=10",
 	"--concurrent-validating-admission-policy-status-syncs=9",
@@ -231,11 +230,6 @@ func TestAddFlags(t *testing.T) {
 					Name:            "gce",
 					CloudConfigFile: "/cloud-config",
 				},
-			},
-		},
-		ServiceController: &cpoptions.ServiceControllerOptions{
-			ServiceControllerConfiguration: &serviceconfig.ServiceControllerConfiguration{
-				ConcurrentServiceSyncs: 2,
 			},
 		},
 		AttachDetachController: &AttachDetachControllerOptions{
@@ -604,9 +598,7 @@ func TestApplyTo(t *testing.T) {
 					CloudConfigFile: "/cloud-config",
 				},
 			},
-			ServiceController: serviceconfig.ServiceControllerConfiguration{
-				ConcurrentServiceSyncs: 2,
-			},
+			ServiceController: serviceconfig.ServiceControllerConfiguration{},
 			AttachDetachController: attachdetachconfig.AttachDetachControllerConfiguration{
 				ReconcilerSyncLoopPeriod:          metav1.Duration{Duration: 30 * time.Second},
 				DisableAttachDetachReconcilerSync: true,

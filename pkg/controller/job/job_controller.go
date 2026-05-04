@@ -207,7 +207,7 @@ var (
 
 // NewController creates a new Job controller that keeps the relevant pods
 // in sync with their corresponding Job objects.
-// workloadInformer and podGroupInformer may be nil when the EnableWorkloadWithJob
+// workloadInformer and podGroupInformer may be nil when the WorkloadWithJob
 // feature gate is disabled; they are required when the gate is enabled.
 func NewController(ctx context.Context, kubeClient clientset.Interface,
 	podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer,
@@ -312,7 +312,7 @@ func newControllerWithClock(ctx context.Context, kubeClient clientset.Interface,
 	jm.patchJobHandler = jm.patchJob
 	jm.syncHandler = jm.syncJob
 
-	if feature.DefaultFeatureGate.Enabled(features.EnableWorkloadWithJob) {
+	if feature.DefaultFeatureGate.Enabled(features.WorkloadWithJob) {
 		if err := jm.addSchedulingInformers(logger, workloadInformer, podGroupInformer); err != nil {
 			return nil, err
 		}
@@ -344,7 +344,7 @@ func (jm *Controller) Run(ctx context.Context, workers int) {
 	}()
 
 	syncFuncs := []cache.InformerSynced{jm.podStoreSynced, jm.jobStoreSynced}
-	if feature.DefaultFeatureGate.Enabled(features.EnableWorkloadWithJob) {
+	if feature.DefaultFeatureGate.Enabled(features.WorkloadWithJob) {
 		syncFuncs = append(syncFuncs, jm.workloadStoreSynced, jm.podGroupStoreSynced)
 	}
 	if !cache.WaitForNamedCacheSyncWithContext(ctx, syncFuncs...) {

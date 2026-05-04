@@ -24,8 +24,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
@@ -708,22 +706,20 @@ func (a resourceCheckVal) Authorize(ctx context.Context, verb string) ref.Val {
 		User:            a.groupCheck.authorizer.userInfo,
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AuthorizeWithSelectors) {
-		if len(a.fieldSelector) > 0 {
-			selector, err := fields.ParseSelector(a.fieldSelector)
-			if err != nil {
-				attr.FieldSelectorRequirements, attr.FieldSelectorParsingErr = nil, err
-			} else {
-				attr.FieldSelectorRequirements, attr.FieldSelectorParsingErr = selector.Requirements(), nil
-			}
+	if len(a.fieldSelector) > 0 {
+		selector, err := fields.ParseSelector(a.fieldSelector)
+		if err != nil {
+			attr.FieldSelectorRequirements, attr.FieldSelectorParsingErr = nil, err
+		} else {
+			attr.FieldSelectorRequirements, attr.FieldSelectorParsingErr = selector.Requirements(), nil
 		}
-		if len(a.labelSelector) > 0 {
-			requirements, err := labels.ParseToRequirements(a.labelSelector)
-			if err != nil {
-				attr.LabelSelectorRequirements, attr.LabelSelectorParsingErr = nil, err
-			} else {
-				attr.LabelSelectorRequirements, attr.LabelSelectorParsingErr = requirements, nil
-			}
+	}
+	if len(a.labelSelector) > 0 {
+		requirements, err := labels.ParseToRequirements(a.labelSelector)
+		if err != nil {
+			attr.LabelSelectorRequirements, attr.LabelSelectorParsingErr = nil, err
+		} else {
+			attr.LabelSelectorRequirements, attr.LabelSelectorParsingErr = requirements, nil
 		}
 	}
 

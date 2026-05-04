@@ -26,6 +26,14 @@ import (
 	"k8s.io/utils/cpuset"
 )
 
+func makeRange(min, max int) []int {
+	a := make([]int, max-min+1)
+	for i := range a {
+		a[i] = min + i
+	}
+	return a
+}
+
 func TestComputeCPUSet(t *testing.T) {
 	affinities := []winstats.GroupAffinity{
 		{Mask: 0b1010, Group: 0}, // CPUs 1 and 3 in Group 0
@@ -145,6 +153,24 @@ func TestComputeFinalCpuSet(t *testing.T) {
 			allocatedCPUs:   cpuset.New(),
 			allNumaNodeCPUs: nil,
 			expectedCPUSet:  nil,
+		},
+		{
+			name:          "Multi-group NUMA: memory manager selects NUMA node spanning 2 groups",
+			allocatedCPUs: cpuset.New(),
+			allNumaNodeCPUs: []winstats.GroupAffinity{
+				{Mask: 0xFFFFFFFFFFFFFFFF, Group: 0}, // CPUs 0-63
+				{Mask: 0xFFFFFFFFFFFFFFFF, Group: 1}, // CPUs 64-127
+			},
+			expectedCPUSet: sets.New[int](makeRange(0, 127)...),
+		},
+		{
+			name:          "Multi-group NUMA: CPU manager CPUs in group 0, NUMA spans groups 0 and 1",
+			allocatedCPUs: cpuset.New(0, 1, 2, 3),
+			allNumaNodeCPUs: []winstats.GroupAffinity{
+				{Mask: 0xFFFFFFFFFFFFFFFF, Group: 0}, // CPUs 0-63
+				{Mask: 0xFFFFFFFFFFFFFFFF, Group: 1}, // CPUs 64-127
+			},
+			expectedCPUSet: sets.New[int](0, 1, 2, 3),
 		},
 	}
 

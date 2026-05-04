@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	apiserverfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -58,13 +59,13 @@ import (
 
 // podStrategy implements behavior for Pods
 type podStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Pod
 // objects via the REST API.
-var Strategy = podStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = podStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // NamespaceScoped is true for pods.
 func (podStrategy) NamespaceScoped() bool {
@@ -384,9 +385,7 @@ func dropNonResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
 	metav1.ResetObjectMetaForStatus(&newPod.ObjectMeta, &oldPod.ObjectMeta)
 
 	newPod.Spec.Containers = containers
-	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
-		newPod.Spec.InitContainers = initContainers
-	}
+	newPod.Spec.InitContainers = initContainers
 
 	return newPod
 }

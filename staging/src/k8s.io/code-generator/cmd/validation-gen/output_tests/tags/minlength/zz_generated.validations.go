@@ -38,217 +38,347 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	// type Struct
-	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_Struct(ctx, op, nil /* fldPath */, obj.(*Struct), safe.Cast[*Struct](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*Struct)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_Struct(
+					ctx, op, nil, /* fldPath */
+					obj.(*Struct),
+					safe.Cast[*Struct](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
 // Validate_Min10Type validates an instance of Min10Type according
 // to declarative validation rules in the API schema.
-func Validate_Min10Type(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Min10Type) (errs field.ErrorList) {
-	errs = append(errs, validate.MinLength(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha()...)
+func Validate_Min10Type(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *Min10Type) (errs field.ErrorList) {
+
+	if e := validate.MinLength(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha(); len(e) != 0 {
+		errs = append(errs, e...)
+	}
 
 	return errs
 }
 
 // Validate_Min2Type validates an instance of Min2Type according
 // to declarative validation rules in the API schema.
-func Validate_Min2Type(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Min2Type) (errs field.ErrorList) {
-	errs = append(errs, validate.MinLength(ctx, op, fldPath, obj, oldObj, 2).MarkAlpha()...)
+func Validate_Min2Type(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *Min2Type) (errs field.ErrorList) {
+
+	if e := validate.MinLength(ctx, op, fldPath, obj, oldObj, 2).MarkAlpha(); len(e) != 0 {
+		errs = append(errs, e...)
+	}
 
 	return errs
 }
 
 // Validate_Struct validates an instance of Struct according
 // to declarative validation rules in the API schema.
-func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
+func Validate_Struct(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *Struct) (errs field.ErrorList) {
+
 	// field Struct.TypeMeta has no validation
 
-	// field Struct.Min0PtrField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.Min0PtrField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("min0PtrField"), obj.Min0PtrField, safe.Field(oldObj, func(oldObj *Struct) *string { return oldObj.Min0PtrField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *string {
+				return oldObj.Min0PtrField
+			})
+		errs = append(errs, fn(fldPath.Child("min0PtrField"), obj.Min0PtrField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.Min2Field
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.Min2Field
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.MinLength(ctx, op, fldPath, obj, oldObj, 2).MarkAlpha()...)
+			if e := validate.MinLength(ctx, op, fldPath, obj, oldObj, 2).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("min2Field"), &obj.Min2Field, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.Min2Field }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *string {
+				return &oldObj.Min2Field
+			})
+		errs = append(errs, fn(fldPath.Child("min2Field"), &obj.Min2Field, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.Min2PtrField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.Min2PtrField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.MinLength(ctx, op, fldPath, obj, oldObj, 2).MarkAlpha()...)
+			if e := validate.MinLength(ctx, op, fldPath, obj, oldObj, 2).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("min2PtrField"), obj.Min2PtrField, safe.Field(oldObj, func(oldObj *Struct) *string { return oldObj.Min2PtrField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *string {
+				return oldObj.Min2PtrField
+			})
+		errs = append(errs, fn(fldPath.Child("min2PtrField"), obj.Min2PtrField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.Min10Field
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.Min10Field
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.MinLength(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha()...)
+			if e := validate.MinLength(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("min10Field"), &obj.Min10Field, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.Min10Field }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *string {
+				return &oldObj.Min10Field
+			})
+		errs = append(errs, fn(fldPath.Child("min10Field"), &obj.Min10Field, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.Min10PtrField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.Min10PtrField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.MinLength(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha()...)
+			if e := validate.MinLength(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("min10PtrField"), obj.Min10PtrField, safe.Field(oldObj, func(oldObj *Struct) *string { return oldObj.Min10PtrField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *string {
+				return oldObj.Min10PtrField
+			})
+		errs = append(errs, fn(fldPath.Child("min10PtrField"), obj.Min10PtrField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.Min2UnvalidatedTypedefField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *UnvalidatedStringType, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.Min2UnvalidatedTypedefField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *UnvalidatedStringType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.MinLength(ctx, op, fldPath, obj, oldObj, 2).MarkAlpha()...)
+			if e := validate.MinLength(ctx, op, fldPath, obj, oldObj, 2).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("min2UnvalidatedTypedefField"), &obj.Min2UnvalidatedTypedefField, safe.Field(oldObj, func(oldObj *Struct) *UnvalidatedStringType { return &oldObj.Min2UnvalidatedTypedefField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *UnvalidatedStringType {
+				return &oldObj.Min2UnvalidatedTypedefField
+			})
+		errs = append(errs, fn(fldPath.Child("min2UnvalidatedTypedefField"), &obj.Min2UnvalidatedTypedefField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.Min2UnvalidatedTypedefPtrField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *UnvalidatedStringType, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.Min2UnvalidatedTypedefPtrField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *UnvalidatedStringType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.MinLength(ctx, op, fldPath, obj, oldObj, 2).MarkAlpha()...)
+			if e := validate.MinLength(ctx, op, fldPath, obj, oldObj, 2).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("min2UnvalidatedTypedefPtrField"), obj.Min2UnvalidatedTypedefPtrField, safe.Field(oldObj, func(oldObj *Struct) *UnvalidatedStringType { return oldObj.Min2UnvalidatedTypedefPtrField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *UnvalidatedStringType {
+				return oldObj.Min2UnvalidatedTypedefPtrField
+			})
+		errs = append(errs, fn(fldPath.Child("min2UnvalidatedTypedefPtrField"), obj.Min2UnvalidatedTypedefPtrField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.Min10UnvalidatedTypedefField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *UnvalidatedStringType, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.Min10UnvalidatedTypedefField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *UnvalidatedStringType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.MinLength(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha()...)
+			if e := validate.MinLength(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("min10UnvalidatedTypedefField"), &obj.Min10UnvalidatedTypedefField, safe.Field(oldObj, func(oldObj *Struct) *UnvalidatedStringType { return &oldObj.Min10UnvalidatedTypedefField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *UnvalidatedStringType {
+				return &oldObj.Min10UnvalidatedTypedefField
+			})
+		errs = append(errs, fn(fldPath.Child("min10UnvalidatedTypedefField"), &obj.Min10UnvalidatedTypedefField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.Min10UnvalidatedTypedefPtrField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *UnvalidatedStringType, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.Min10UnvalidatedTypedefPtrField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *UnvalidatedStringType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.MinLength(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha()...)
+			if e := validate.MinLength(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("min10UnvalidatedTypedefPtrField"), obj.Min10UnvalidatedTypedefPtrField, safe.Field(oldObj, func(oldObj *Struct) *UnvalidatedStringType { return oldObj.Min10UnvalidatedTypedefPtrField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *UnvalidatedStringType {
+				return oldObj.Min10UnvalidatedTypedefPtrField
+			})
+		errs = append(errs, fn(fldPath.Child("min10UnvalidatedTypedefPtrField"), obj.Min10UnvalidatedTypedefPtrField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.Min2ValidatedTypedefField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *Min2Type, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.Min2ValidatedTypedefField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *Min2Type,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -257,18 +387,28 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			// call the type's validation function
 			errs = append(errs, Validate_Min2Type(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("min2ValidatedTypedefField"), &obj.Min2ValidatedTypedefField, safe.Field(oldObj, func(oldObj *Struct) *Min2Type { return &oldObj.Min2ValidatedTypedefField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *Min2Type {
+				return &oldObj.Min2ValidatedTypedefField
+			})
+		errs = append(errs, fn(fldPath.Child("min2ValidatedTypedefField"), &obj.Min2ValidatedTypedefField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.Min2ValidatedTypedefPtrField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *Min2Type, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.Min2ValidatedTypedefPtrField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *Min2Type,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -277,18 +417,28 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			// call the type's validation function
 			errs = append(errs, Validate_Min2Type(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("min2ValidatedTypedefPtrField"), obj.Min2ValidatedTypedefPtrField, safe.Field(oldObj, func(oldObj *Struct) *Min2Type { return oldObj.Min2ValidatedTypedefPtrField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *Min2Type {
+				return oldObj.Min2ValidatedTypedefPtrField
+			})
+		errs = append(errs, fn(fldPath.Child("min2ValidatedTypedefPtrField"), obj.Min2ValidatedTypedefPtrField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.Min10ValidatedTypedefField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *Min10Type, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.Min10ValidatedTypedefField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *Min10Type,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -297,18 +447,28 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			// call the type's validation function
 			errs = append(errs, Validate_Min10Type(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("min10ValidatedTypedefField"), &obj.Min10ValidatedTypedefField, safe.Field(oldObj, func(oldObj *Struct) *Min10Type { return &oldObj.Min10ValidatedTypedefField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *Min10Type {
+				return &oldObj.Min10ValidatedTypedefField
+			})
+		errs = append(errs, fn(fldPath.Child("min10ValidatedTypedefField"), &obj.Min10ValidatedTypedefField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.Min10ValidatedTypedefPtrField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *Min10Type, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.Min10ValidatedTypedefPtrField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *Min10Type,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -317,45 +477,75 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 			// call the type's validation function
 			errs = append(errs, Validate_Min10Type(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("min10ValidatedTypedefPtrField"), obj.Min10ValidatedTypedefPtrField, safe.Field(oldObj, func(oldObj *Struct) *Min10Type { return oldObj.Min10ValidatedTypedefPtrField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *Min10Type {
+				return oldObj.Min10ValidatedTypedefPtrField
+			})
+		errs = append(errs, fn(fldPath.Child("min10ValidatedTypedefPtrField"), obj.Min10ValidatedTypedefPtrField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.Min2UnvalidatedStringAliasField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.Min2UnvalidatedStringAliasField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.MinLength(ctx, op, fldPath, obj, oldObj, 2).MarkAlpha()...)
+			if e := validate.MinLength(ctx, op, fldPath, obj, oldObj, 2).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("min2UnvalidatedStringAliasField"), &obj.Min2UnvalidatedStringAliasField, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.Min2UnvalidatedStringAliasField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *string {
+				return &oldObj.Min2UnvalidatedStringAliasField
+			})
+		errs = append(errs, fn(fldPath.Child("min2UnvalidatedStringAliasField"), &obj.Min2UnvalidatedStringAliasField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.Min2UnvalidatedStringAliasPtrField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.Min2UnvalidatedStringAliasPtrField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.MinLength(ctx, op, fldPath, obj, oldObj, 2).MarkAlpha()...)
+			if e := validate.MinLength(ctx, op, fldPath, obj, oldObj, 2).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("min2UnvalidatedStringAliasPtrField"), obj.Min2UnvalidatedStringAliasPtrField, safe.Field(oldObj, func(oldObj *Struct) *string { return oldObj.Min2UnvalidatedStringAliasPtrField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *string {
+				return oldObj.Min2UnvalidatedStringAliasPtrField
+			})
+		errs = append(errs, fn(fldPath.Child("min2UnvalidatedStringAliasPtrField"), obj.Min2UnvalidatedStringAliasPtrField, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }

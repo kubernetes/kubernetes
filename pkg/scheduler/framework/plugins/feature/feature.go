@@ -43,8 +43,6 @@ type Features struct {
 	EnableNodeInclusionPolicyInPodTopologySpread  bool
 	EnableMatchLabelKeysInPodTopologySpread       bool
 	EnableInPlacePodVerticalScaling               bool
-	EnableSidecarContainers                       bool
-	EnableSchedulingQueueHint                     bool
 	EnableAsyncPreemption                         bool
 	EnablePodLevelResources                       bool
 	EnableStorageCapacityScoring                  bool
@@ -76,8 +74,6 @@ func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features
 		EnableNodeInclusionPolicyInPodTopologySpread:  featureGate.Enabled(features.NodeInclusionPolicyInPodTopologySpread),
 		EnableMatchLabelKeysInPodTopologySpread:       featureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
 		EnableInPlacePodVerticalScaling:               featureGate.Enabled(features.InPlacePodVerticalScaling),
-		EnableSidecarContainers:                       featureGate.Enabled(features.SidecarContainers),
-		EnableSchedulingQueueHint:                     featureGate.Enabled(features.SchedulerQueueingHints),
 		EnableAsyncPreemption:                         featureGate.Enabled(features.SchedulerAsyncPreemption),
 		EnablePodLevelResources:                       featureGate.Enabled(features.PodLevelResources),
 		EnableDRAPartitionableDevices:                 featureGate.Enabled(features.DRAPartitionableDevices),

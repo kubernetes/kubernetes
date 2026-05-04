@@ -502,7 +502,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
-			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs, apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...))
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy, tc.expectedErrs, apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...))
 		})
 	}
 }
@@ -820,7 +820,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 		t.Run(k, func(t *testing.T) {
 			tc.old.ResourceVersion = "1"
 			tc.update.ResourceVersion = "2"
-			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, Strategy.ValidateUpdate, tc.expectedErrs, apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...))
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, Strategy, tc.expectedErrs, apitesting.WithNormalizationRules(validation.ResourceNormalizationRules...))
 		})
 	}
 }
@@ -850,6 +850,8 @@ func testValidateStatusUpdateForDeclarative(t *testing.T, apiVersion string) {
 	poolPath := field.NewPath("status", "allocation", "devices", "results").Index(0).Child("pool")
 	configSourcePath := field.NewPath("status", "allocation", "devices", "config").Index(0).Child("source")
 	driverPath := field.NewPath("status", "allocation", "devices", "results").Index(0).Child("driver")
+	configOpaqueDriverPath := field.NewPath("status", "allocation", "devices", "config").Index(0).Child("opaque", "driver")
+	resultTolerationPath := field.NewPath("status", "allocation", "devices", "results").Index(0).Child("tolerations").Index(0)
 
 	testCases := map[string]struct {
 		old          resource.ResourceClaim
@@ -1152,6 +1154,79 @@ func testValidateStatusUpdateForDeclarative(t *testing.T, apiVersion string) {
 				field.NotSupported(configSourcePath, resource.AllocationConfigSource("invalid"), []string{string(resource.AllocationConfigSourceClaim), string(resource.AllocationConfigSourceClass)}).MarkCoveredByDeclarative().MarkAlpha(),
 			},
 		},
+		// .Status.Allocation.Devices.Config[%d].Opaque.Driver
+		"valid status.allocation.devices.config opaque driver, lowercase": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusAllocationConfigOpaqueDriver("dra.example.com")),
+		},
+		"valid status.allocation.devices.config opaque driver, max length": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusAllocationConfigOpaqueDriver(strings.Repeat("a", 63))),
+		},
+		"invalid status.allocation.devices.config opaque driver, empty": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusAllocationConfigOpaqueDriver("")),
+			expectedErrs: field.ErrorList{
+				field.Required(configOpaqueDriverPath, "").MarkAlpha(),
+			},
+		},
+		"invalid status.allocation.devices.config opaque driver, too long": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusAllocationConfigOpaqueDriver(strings.Repeat("a", 64))),
+			expectedErrs: field.ErrorList{
+				field.TooLong(configOpaqueDriverPath, "", 63).WithOrigin("maxLength").MarkAlpha(),
+			},
+		},
+		"invalid status.allocation.devices.config opaque driver, invalid character": {
+			old:    mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusAllocationConfigOpaqueDriver("dra_example.com")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(configOpaqueDriverPath, "dra_example.com", "").WithOrigin("format=k8s-long-name-caseless").MarkAlpha(),
+			},
+		},
+		// .Status.Allocation.Devices.Results[%d].Tolerations
+		"valid status.allocation.devices.results tolerations": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusAllocationResultTolerations([]resource.DeviceToleration{
+				{Key: "valid-key", Operator: resource.DeviceTolerationOpExists, Effect: resource.DeviceTaintEffectNoSchedule},
+			})),
+		},
+		"invalid status.allocation.devices.results toleration, bad key": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusAllocationResultTolerations([]resource.DeviceToleration{
+				{Key: "invalid_key!", Operator: resource.DeviceTolerationOpExists, Effect: resource.DeviceTaintEffectNoSchedule},
+			})),
+			expectedErrs: field.ErrorList{
+				field.Invalid(resultTolerationPath.Child("key"), "invalid_key!", "").WithOrigin("format=k8s-label-key").MarkAlpha(),
+			},
+		},
+		"invalid status.allocation.devices.results toleration, empty operator": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusAllocationResultTolerations([]resource.DeviceToleration{
+				{Key: "key", Value: "value", Effect: resource.DeviceTaintEffectNoSchedule, Operator: ""},
+			})),
+			expectedErrs: field.ErrorList{
+				field.Required(resultTolerationPath.Child("operator"), "").MarkAlpha(),
+			},
+		},
+		"invalid status.allocation.devices.results toleration, bad operator": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusAllocationResultTolerations([]resource.DeviceToleration{
+				{Key: "key", Operator: "InvalidOp", Value: "value", Effect: resource.DeviceTaintEffectNoSchedule},
+			})),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(resultTolerationPath.Child("operator"), resource.DeviceTolerationOperator("InvalidOp"), []string{"Equal", "Exists"}).MarkAlpha(),
+			},
+		},
+		"invalid status.allocation.devices.results toleration, bad effect": {
+			old: mkValidResourceClaim(),
+			update: mkResourceClaimWithStatus(tweakStatusAllocationResultTolerations([]resource.DeviceToleration{
+				{Key: "key", Operator: resource.DeviceTolerationOpEqual, Value: "value", Effect: "InvalidEffect"},
+			})),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(resultTolerationPath.Child("effect"), resource.DeviceTaintEffect("InvalidEffect"), []string{"NoExecute", "NoSchedule"}).MarkAlpha(),
+			},
+		},
 		// .Status.Devices
 		"valid devices: without share Id": {
 			old: mkValidResourceClaim(),
@@ -1437,7 +1512,7 @@ func testValidateStatusUpdateForDeclarative(t *testing.T, apiVersion string) {
 		t.Run(k, func(t *testing.T) {
 			tc.old.ObjectMeta.ResourceVersion = "1"
 			tc.update.ObjectMeta.ResourceVersion = "1"
-			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, strategy.ValidateUpdate, tc.expectedErrs, apitesting.WithSubResources("status"))
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, strategy, tc.expectedErrs, apitesting.WithSubResources("status"))
 		})
 	}
 }
@@ -1738,6 +1813,37 @@ func addStatusAllocationResult(obj resource.ResourceClaim) resource.ResourceClai
 			})
 	}
 	return obj
+}
+
+func tweakStatusAllocationConfigOpaqueDriver(driver string) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if rc.Status.Allocation == nil {
+			rc.Status.Allocation = &resource.AllocationResult{}
+		}
+		rc.Status.Allocation.Devices.Config = []resource.DeviceAllocationConfiguration{
+			{
+				Source:   resource.AllocationConfigSourceClaim,
+				Requests: []string{"req-0"},
+				DeviceConfiguration: resource.DeviceConfiguration{
+					Opaque: &resource.OpaqueDeviceConfiguration{
+						Driver:     driver,
+						Parameters: runtime.RawExtension{Raw: []byte(`{"key":"value"}`)},
+					},
+				},
+			},
+		}
+	}
+}
+
+func tweakStatusAllocationResultTolerations(tolerations []resource.DeviceToleration) func(rc *resource.ResourceClaim) {
+	return func(rc *resource.ResourceClaim) {
+		if rc.Status.Allocation == nil {
+			return
+		}
+		for i := range rc.Status.Allocation.Devices.Results {
+			rc.Status.Allocation.Devices.Results[i].Tolerations = tolerations
+		}
+	}
 }
 
 func tweakStatusAllocationConfigSource(source resource.AllocationConfigSource) func(rc *resource.ResourceClaim) {

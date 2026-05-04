@@ -352,7 +352,6 @@ func (c *monitorCollector) CollectWithStability(ch chan<- compbasemetrics.Metric
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		metrics, err := m.Monitor(ctx)
 		cancel()
-		m.Close()
 		if err != nil {
 			klog.InfoS("Failed to get storage metrics", "storage_cluster_id", storageClusterID, "err", err)
 			continue

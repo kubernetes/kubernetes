@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -268,7 +269,9 @@ func TestStrategyCreate(t *testing.T) {
 
 			strategy := NewStrategy()
 			strategy.PrepareForCreate(ctx, podGroup)
-			if errs := strategy.Validate(ctx, podGroup); len(errs) != 0 {
+			errs := strategy.Validate(ctx, podGroup)
+			errs = strategy.ValidateDeclaratively(ctx, podGroup, nil, errs, operation.Create, strategy.DeclarativeValidationConfig(ctx, podGroup, nil))
+			if len(errs) != 0 {
 				if tc.expectValidationError == "" {
 					t.Fatalf("unexpected error(s): %v", errs)
 				}
@@ -458,7 +461,9 @@ func TestStrategyUpdate(t *testing.T) {
 
 			strategy := NewStrategy()
 			strategy.PrepareForUpdate(ctx, newPodGroup, podGroup)
-			if errs := strategy.ValidateUpdate(ctx, newPodGroup, podGroup); len(errs) != 0 {
+			errs := strategy.ValidateUpdate(ctx, newPodGroup, podGroup)
+			errs = strategy.ValidateDeclaratively(ctx, newPodGroup, podGroup, errs, operation.Update, strategy.DeclarativeValidationConfig(ctx, newPodGroup, podGroup))
+			if len(errs) != 0 {
 				if tc.expectValidationError == "" {
 					t.Fatalf("unexpected error(s): %v", errs)
 				}

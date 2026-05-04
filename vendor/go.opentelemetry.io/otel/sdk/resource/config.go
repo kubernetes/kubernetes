@@ -193,3 +193,11 @@ func WithContainer() Option {
 func WithContainerID() Option {
 	return WithDetectors(cgroupContainerIDDetector{})
 }
+
+// WithService adds all the Service attributes to the configured Resource.
+func WithService() Option {
+	return WithDetectors(
+		defaultServiceInstanceIDDetector{},
+		defaultServiceNameDetector{},
+	)
+}

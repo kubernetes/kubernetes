@@ -181,10 +181,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local", func() {
 		}
 	})
 
-	for tempTestVolType := range setupLocalVolumeMap {
-
-		// New variable required for ginkgo test closures
-		testVolType := tempTestVolType
+	for testVolType := range setupLocalVolumeMap {
 		args := []interface{}{fmt.Sprintf("[Volume type: %s]", testVolType)}
 		if testVolType == GCELocalSSDVolumeType {
 			args = append(args, framework.WithSerial())

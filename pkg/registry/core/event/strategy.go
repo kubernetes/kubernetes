@@ -36,13 +36,13 @@ import (
 )
 
 type eventStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating
 // Event objects via the REST API.
-var Strategy = eventStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = eventStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 func (eventStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.GarbageCollectionPolicy {
 	return rest.Unsupported

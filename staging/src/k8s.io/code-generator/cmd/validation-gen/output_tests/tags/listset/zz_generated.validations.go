@@ -39,39 +39,60 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	// type ImmutableStruct
-	scheme.AddValidationFunc((*ImmutableStruct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_ImmutableStruct(ctx, op, nil /* fldPath */, obj.(*ImmutableStruct), safe.Cast[*ImmutableStruct](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*ImmutableStruct)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_ImmutableStruct(
+					ctx, op, nil, /* fldPath */
+					obj.(*ImmutableStruct),
+					safe.Cast[*ImmutableStruct](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type Struct
-	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_Struct(ctx, op, nil /* fldPath */, obj.(*Struct), safe.Cast[*Struct](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*Struct)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_Struct(
+					ctx, op, nil, /* fldPath */
+					obj.(*Struct),
+					safe.Cast[*Struct](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
 // Validate_ImmutableStruct validates an instance of ImmutableStruct according
 // to declarative validation rules in the API schema.
-func Validate_ImmutableStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ImmutableStruct) (errs field.ErrorList) {
+func Validate_ImmutableStruct(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *ImmutableStruct) (errs field.ErrorList) {
+
 	// field ImmutableStruct.TypeMeta has no validation
 
-	// field ImmutableStruct.SliceComparableField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []ComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field ImmutableStruct.SliceComparableField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []ComparableStruct,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, validate.Immutable); len(e) != 0 {
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -79,18 +100,28 @@ func Validate_ImmutableStruct(ctx context.Context, op operation.Operation, fldPa
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("sliceComparableField"), obj.SliceComparableField, safe.Field(oldObj, func(oldObj *ImmutableStruct) []ComparableStruct { return oldObj.SliceComparableField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *ImmutableStruct) []ComparableStruct {
+				return oldObj.SliceComparableField
+			})
+		errs = append(errs, fn(fldPath.Child("sliceComparableField"), obj.SliceComparableField, oldVal, oldObj != nil)...)
+	}
 
-	// field ImmutableStruct.SliceSetComparableField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []ComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field ImmutableStruct.SliceSetComparableField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []ComparableStruct,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil, validate.Immutable); len(e) != 0 {
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -98,20 +129,32 @@ func Validate_ImmutableStruct(ctx context.Context, op operation.Operation, fldPa
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual)...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("sliceSetComparableField"), obj.SliceSetComparableField, safe.Field(oldObj, func(oldObj *ImmutableStruct) []ComparableStruct { return oldObj.SliceSetComparableField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *ImmutableStruct) []ComparableStruct {
+				return oldObj.SliceSetComparableField
+			})
+		errs = append(errs, fn(fldPath.Child("sliceSetComparableField"), obj.SliceSetComparableField, oldVal, oldObj != nil)...)
+	}
 
-	// field ImmutableStruct.SliceNonComparableField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []NonComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field ImmutableStruct.SliceNonComparableField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []NonComparableStruct,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, validate.Immutable); len(e) != 0 {
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -119,58 +162,28 @@ func Validate_ImmutableStruct(ctx context.Context, op operation.Operation, fldPa
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("sliceNonComparableField"), obj.SliceNonComparableField, safe.Field(oldObj, func(oldObj *ImmutableStruct) []NonComparableStruct { return oldObj.SliceNonComparableField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *ImmutableStruct) []NonComparableStruct {
+				return oldObj.SliceNonComparableField
+			})
+		errs = append(errs, fn(fldPath.Child("sliceNonComparableField"), obj.SliceNonComparableField, oldVal, oldObj != nil)...)
+	}
 
-	// field ImmutableStruct.SliceSetNonComparableField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []NonComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field ImmutableStruct.SliceSetNonComparableField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []NonComparableStruct,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil, validate.Immutable); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			// lists with set semantics require unique values
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual)...)
-			return
-		}(fldPath.Child("sliceSetNonComparableField"), obj.SliceSetNonComparableField, safe.Field(oldObj, func(oldObj *ImmutableStruct) []NonComparableStruct { return oldObj.SliceSetNonComparableField }), oldObj != nil)...)
-
-	// field ImmutableStruct.SlicePrimitiveField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []int, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, validate.Immutable); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			return
-		}(fldPath.Child("slicePrimitiveField"), obj.SlicePrimitiveField, safe.Field(oldObj, func(oldObj *ImmutableStruct) []int { return oldObj.SlicePrimitiveField }), oldObj != nil)...)
-
-	// field ImmutableStruct.SliceSetPrimitiveField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []int, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil, validate.Immutable); len(e) != 0 {
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -178,20 +191,61 @@ func Validate_ImmutableStruct(ctx context.Context, op operation.Operation, fldPa
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual)...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("sliceSetPrimitiveField"), obj.SliceSetPrimitiveField, safe.Field(oldObj, func(oldObj *ImmutableStruct) []int { return oldObj.SliceSetPrimitiveField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *ImmutableStruct) []NonComparableStruct {
+				return oldObj.SliceSetNonComparableField
+			})
+		errs = append(errs, fn(fldPath.Child("sliceSetNonComparableField"), obj.SliceSetNonComparableField, oldVal, oldObj != nil)...)
+	}
 
-	// field ImmutableStruct.SliceSetFalselyComparableField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []FalselyComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field ImmutableStruct.SlicePrimitiveField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []int,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil, validate.Immutable); len(e) != 0 {
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *ImmutableStruct) []int {
+				return oldObj.SlicePrimitiveField
+			})
+		errs = append(errs, fn(fldPath.Child("slicePrimitiveField"), obj.SlicePrimitiveField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field ImmutableStruct.SliceSetPrimitiveField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []int,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -199,82 +253,186 @@ func Validate_ImmutableStruct(ctx context.Context, op operation.Operation, fldPa
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual)...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("sliceSetFalselyComparableField"), obj.SliceSetFalselyComparableField, safe.Field(oldObj, func(oldObj *ImmutableStruct) []FalselyComparableStruct { return oldObj.SliceSetFalselyComparableField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *ImmutableStruct) []int {
+				return oldObj.SliceSetPrimitiveField
+			})
+		errs = append(errs, fn(fldPath.Child("sliceSetPrimitiveField"), obj.SliceSetPrimitiveField, oldVal, oldObj != nil)...)
+	}
+
+	{ // field ImmutableStruct.SliceSetFalselyComparableField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []FalselyComparableStruct,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with set semantics require unique values
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *ImmutableStruct) []FalselyComparableStruct {
+				return oldObj.SliceSetFalselyComparableField
+			})
+		errs = append(errs, fn(fldPath.Child("sliceSetFalselyComparableField"), obj.SliceSetFalselyComparableField, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }
 
 // Validate_Struct validates an instance of Struct according
 // to declarative validation rules in the API schema.
-func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
+func Validate_Struct(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *Struct) (errs field.ErrorList) {
+
 	// field Struct.TypeMeta has no validation
 
-	// field Struct.SliceStringField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.SliceStringField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			// lists with set semantics require unique values
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual)...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("sliceStringField"), obj.SliceStringField, safe.Field(oldObj, func(oldObj *Struct) []string { return oldObj.SliceStringField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) []string {
+				return oldObj.SliceStringField
+			})
+		errs = append(errs, fn(fldPath.Child("sliceStringField"), obj.SliceStringField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.SliceIntField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []int, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.SliceIntField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []int,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			// lists with set semantics require unique values
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual)...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("sliceIntField"), obj.SliceIntField, safe.Field(oldObj, func(oldObj *Struct) []int { return oldObj.SliceIntField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) []int {
+				return oldObj.SliceIntField
+			})
+		errs = append(errs, fn(fldPath.Child("sliceIntField"), obj.SliceIntField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.SliceComparableField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []ComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.SliceComparableField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []ComparableStruct,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			// lists with set semantics require unique values
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual)...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("sliceComparableField"), obj.SliceComparableField, safe.Field(oldObj, func(oldObj *Struct) []ComparableStruct { return oldObj.SliceComparableField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) []ComparableStruct {
+				return oldObj.SliceComparableField
+			})
+		errs = append(errs, fn(fldPath.Child("sliceComparableField"), obj.SliceComparableField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.SliceNonComparableField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []NonComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.SliceNonComparableField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []NonComparableStruct,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			// lists with set semantics require unique values
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual)...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("sliceNonComparableField"), obj.SliceNonComparableField, safe.Field(oldObj, func(oldObj *Struct) []NonComparableStruct { return oldObj.SliceNonComparableField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) []NonComparableStruct {
+				return oldObj.SliceNonComparableField
+			})
+		errs = append(errs, fn(fldPath.Child("sliceNonComparableField"), obj.SliceNonComparableField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.SliceFalselyComparableField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []FalselyComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.SliceFalselyComparableField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []FalselyComparableStruct,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			// lists with set semantics require unique values
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual)...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("sliceFalselyComparableField"), obj.SliceFalselyComparableField, safe.Field(oldObj, func(oldObj *Struct) []FalselyComparableStruct { return oldObj.SliceFalselyComparableField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) []FalselyComparableStruct {
+				return oldObj.SliceFalselyComparableField
+			})
+		errs = append(errs, fn(fldPath.Child("sliceFalselyComparableField"), obj.SliceFalselyComparableField, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }

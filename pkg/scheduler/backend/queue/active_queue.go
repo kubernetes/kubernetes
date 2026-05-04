@@ -216,9 +216,6 @@ type activeQueue struct {
 	// It is mainly used to let Pop() exit its control loop while waiting for an item.
 	closed bool
 
-	// isSchedulingQueueHintEnabled indicates whether the feature gate for the scheduling queue is enabled.
-	isSchedulingQueueHintEnabled bool
-
 	metricsRecorder *metrics.MetricAsyncRecorder
 
 	// backoffQPopper is used to pop from backoffQ when activeQ is empty.
@@ -226,14 +223,13 @@ type activeQueue struct {
 	backoffQPopper backoffQPopper
 }
 
-func newActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], isSchedulingQueueHintEnabled bool, metricRecorder *metrics.MetricAsyncRecorder, backoffQPopper backoffQPopper) *activeQueue {
+func newActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], metricRecorder *metrics.MetricAsyncRecorder, backoffQPopper backoffQPopper) *activeQueue {
 	aq := &activeQueue{
-		queue:                        queue,
-		inFlightPods:                 make(map[types.UID]*list.Element),
-		inFlightEvents:               list.New(),
-		isSchedulingQueueHintEnabled: isSchedulingQueueHintEnabled,
-		metricsRecorder:              metricRecorder,
-		backoffQPopper:               backoffQPopper,
+		queue:           queue,
+		inFlightPods:    make(map[types.UID]*list.Element),
+		inFlightEvents:  list.New(),
+		metricsRecorder: metricRecorder,
+		backoffQPopper:  backoffQPopper,
 	}
 	aq.cond.L = &aq.lock
 	aq.unlockedQueue = newUnlockedActiveQueue(queue, aq.inFlightPods, aq.inFlightEvents, metricRecorder)
@@ -281,16 +277,14 @@ func (aq *activeQueue) movePodToInFlight(pInfo *framework.QueuedPodInfo) error {
 func (aq *activeQueue) unlockedMovePodToInFlight(pInfo *framework.QueuedPodInfo) error {
 	pInfo.Attempts++
 	// In flight, no concurrent events yet.
-	if aq.isSchedulingQueueHintEnabled {
-		// If the pod is already in the map, we shouldn't overwrite the inFlightPods otherwise it'd lead to a memory leak.
-		// https://github.com/kubernetes/kubernetes/pull/127016
-		if _, ok := aq.inFlightPods[pInfo.Pod.UID]; ok {
-			return fmt.Errorf("the same pod is tracked in multiple places in the scheduler: %s", klog.KObj(pInfo.Pod))
-		}
-
-		aq.metricsRecorder.ObserveInFlightEventsAsync(metrics.PodPoppedInFlightEvent, 1, false)
-		aq.inFlightPods[pInfo.Pod.UID] = aq.inFlightEvents.PushBack(pInfo.Pod)
+	// If the pod is already in the map, we shouldn't overwrite the inFlightPods otherwise it'd lead to a memory leak.
+	// https://github.com/kubernetes/kubernetes/pull/127016
+	if _, ok := aq.inFlightPods[pInfo.Pod.UID]; ok {
+		return fmt.Errorf("the same pod is tracked in multiple places in the scheduler: %s", klog.KObj(pInfo.Pod))
 	}
+
+	aq.metricsRecorder.ObserveInFlightEventsAsync(metrics.PodPoppedInFlightEvent, 1, false)
+	aq.inFlightPods[pInfo.Pod.UID] = aq.inFlightEvents.PushBack(pInfo.Pod)
 	aq.schedCycle++
 
 	// Update metrics for unschedulable plugins.

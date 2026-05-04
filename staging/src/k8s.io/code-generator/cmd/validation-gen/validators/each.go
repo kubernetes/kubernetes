@@ -66,10 +66,6 @@ func (eachValTagValidator) ValidScopes() sets.Set[Scope] {
 	return listTagsValidScopes
 }
 
-// LateTagValidator indicates that this validator has to run AFTER the listType
-// and listMapKey tags.
-func (eachValTagValidator) LateTagValidator() {}
-
 var (
 	validateEachSliceVal   = types.Name{Package: libValidationPkg, Name: "EachSliceVal"}
 	validateEachMapVal     = types.Name{Package: libValidationPkg, Name: "EachMapVal"}
@@ -92,6 +88,7 @@ func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag
 		Path:           context.Path.Key("(vals)"),
 		Member:         nil, // NA for list/map values
 		ParentPath:     context.Path,
+		ParentType:     context.Type,
 		StabilityLevel: context.StabilityLevel,
 	}
 	switch nt.Kind {
@@ -105,18 +102,37 @@ func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag
 	if tag.ValueTag == nil {
 		return Validations{}, fmt.Errorf("missing validation tag")
 	}
-	if validations, err := evtv.validator.ExtractTagValidations(elemContext, *tag.ValueTag); err != nil {
+
+	validations, err := evtv.validator.ExtractTagValidations(elemContext, *tag.ValueTag)
+	if err != nil {
 		return Validations{}, err
-	} else {
-		if validations.Empty() && !validations.OpaqueKeyType && !validations.OpaqueValType && !validations.OpaqueType {
-			return Validations{}, fmt.Errorf("no validation functions found")
-		}
-		if len(validations.Variables) > 0 {
-			return Validations{}, fmt.Errorf("variable generation is not supported")
-		}
-		// Pass the real (possibly alias) type.
-		return evtv.getValidations(context.Path, t, validations)
 	}
+
+	if len(validations.Variables) > 0 {
+		return Validations{}, fmt.Errorf("variable generation is not supported")
+	}
+
+	result := Validations{
+		OpaqueValType: validations.OpaqueType, // Map element opacity to collection value opacity
+	}
+	result.Comments = append(result.Comments, validations.Comments...)
+
+	if len(validations.Functions) > 0 {
+		// We defer this because we want listType and listMapKey to compute list keys first.
+		result.AddDeferred(Deferred(ThisContext, func() (Validations, error) {
+			return evtv.getValidations(context.Path, t, Validations{Functions: validations.Functions})
+		}))
+	}
+
+	if len(validations.Deferred) > 0 {
+		return Validations{}, fmt.Errorf("nested deferred validations are not supported for eachVal value")
+	}
+
+	if result.Empty() && !result.OpaqueValType {
+		return Validations{}, fmt.Errorf("no validation functions found")
+	}
+
+	return result, nil
 }
 
 // t is expected to be the top-most type of the list or map. For example, if
@@ -146,8 +162,6 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 	result := Validations{}
 	result.OpaqueValType = validations.OpaqueType
 
-	// This type is a "late" validator, so it runs after all the keys are
-	// registered.  See LateTagValidator() above.
 	listMetadata := evtv.byPath[fldPath.String()]
 	if listMetadata == nil {
 		// If we don't have metadata for this field, we might have it for the
@@ -196,8 +210,8 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 	for _, vfn := range validations.Functions {
 		comm := vfn.Comments
 		vfn.Comments = nil
-		f := Function(eachValTagName, vfn.Flags, validateEachSliceVal, matchArg, equivArg, WrapperFunction{vfn, nt.Elem}).WithComments(comm...)
-		result.AddFunction(f)
+		vfn = Function(eachValTagName, vfn.Flags, validateEachSliceVal, matchArg, equivArg, WrapperFunction{Function: vfn, ObjType: nt.Elem}).WithComments(comm...)
+		result.AddFunction(vfn)
 	}
 
 	return result, nil
@@ -217,8 +231,8 @@ func (evtv eachValTagValidator) getMapValidations(t *types.Type, validations Val
 	for _, vfn := range validations.Functions {
 		comm := vfn.Comments
 		vfn.Comments = nil
-		f := Function(eachValTagName, vfn.Flags, validateEachMapVal, equivArg, WrapperFunction{vfn, nt.Elem}).WithComments(comm...)
-		result.AddFunction(f)
+		vfn = Function(eachValTagName, vfn.Flags, validateEachMapVal, equivArg, WrapperFunction{Function: vfn, ObjType: nt.Elem}).WithComments(comm...)
+		result.AddFunction(vfn)
 	}
 
 	return result, nil
@@ -274,6 +288,7 @@ func (ektv eachKeyTagValidator) GetValidations(context Context, tag codetags.Tag
 		Path:           context.Path.Key("(keys)"),
 		Member:         nil, // NA for map keys
 		ParentPath:     context.Path,
+		ParentType:     context.Type,
 		StabilityLevel: context.StabilityLevel,
 	}
 

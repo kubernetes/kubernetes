@@ -160,6 +160,7 @@ message RoleBinding {
   // If the RoleRef cannot be resolved, the Authorizer must return an error.
   // This field is immutable.
   // +required
+  // +k8s:alpha(since:"1.37")=+k8s:immutable
   optional RoleRef roleRef = 3;
 }
 

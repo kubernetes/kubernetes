@@ -295,6 +295,24 @@ func Test_convertWinApiToCadvisorApi(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name:                 "multi-group NUMA node (128 cpus across 2 groups)",
+			buffer:               createProcessorRelationships(makeRange(0, 127)),
+			expectedNumOfCores:   1,
+			expectedNumOfSockets: 1,
+			expectedNodes: []cadvisorapi.Node{
+				{
+					Id: 0,
+					Cores: []cadvisorapi.Core{
+						{
+							Id:      1,
+							Threads: makeRange(0, 127),
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name:                 "buffer to small",
 			buffer:               createProcessorRelationships([]int{0, 64})[:48],
 			expectedNumOfCores:   1,

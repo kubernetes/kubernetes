@@ -389,25 +389,23 @@ func authorizeUnsafeDelete(ctx context.Context, attr admission.Attributes, authz
 	}
 	// TODO: can't use ResourceAttributesFrom from k8s.io/kubernetes/pkg/registry/authorization/util
 	// due to prevent staging --> k8s.io/kubernetes dep issue
-	if utilfeature.DefaultFeatureGate.Enabled(features.AuthorizeWithSelectors) {
-		if len(requestInfo.FieldSelector) > 0 {
-			fieldSelector, err := fields.ParseSelector(requestInfo.FieldSelector)
-			if err != nil {
-				record.FieldSelectorRequirements, record.FieldSelectorParsingErr = nil, err
-			} else {
-				if requirements := fieldSelector.Requirements(); len(requirements) > 0 {
-					record.FieldSelectorRequirements, record.FieldSelectorParsingErr = fieldSelector.Requirements(), nil
-				}
+	if len(requestInfo.FieldSelector) > 0 {
+		fieldSelector, err := fields.ParseSelector(requestInfo.FieldSelector)
+		if err != nil {
+			record.FieldSelectorRequirements, record.FieldSelectorParsingErr = nil, err
+		} else {
+			if requirements := fieldSelector.Requirements(); len(requirements) > 0 {
+				record.FieldSelectorRequirements, record.FieldSelectorParsingErr = fieldSelector.Requirements(), nil
 			}
 		}
-		if len(requestInfo.LabelSelector) > 0 {
-			labelSelector, err := labels.Parse(requestInfo.LabelSelector)
-			if err != nil {
-				record.LabelSelectorRequirements, record.LabelSelectorParsingErr = nil, err
-			} else {
-				if requirements, _ /*selectable*/ := labelSelector.Requirements(); len(requirements) > 0 {
-					record.LabelSelectorRequirements, record.LabelSelectorParsingErr = requirements, nil
-				}
+	}
+	if len(requestInfo.LabelSelector) > 0 {
+		labelSelector, err := labels.Parse(requestInfo.LabelSelector)
+		if err != nil {
+			record.LabelSelectorRequirements, record.LabelSelectorParsingErr = nil, err
+		} else {
+			if requirements, _ /*selectable*/ := labelSelector.Requirements(); len(requirements) > 0 {
+				record.LabelSelectorRequirements, record.LabelSelectorParsingErr = requirements, nil
 			}
 		}
 	}

@@ -31,6 +31,7 @@ import (
 // HorizontalPodAutoscaler is the configuration for a horizontal pod
 // autoscaler, which automatically manages the replica count of any resource
 // implementing the scale subresource based on the metrics specified.
+// +k8s:supportsSubresource="/status"
 type HorizontalPodAutoscaler struct {
 	metav1.TypeMeta `json:",inline"`
 	// metadata is the standard object metadata.

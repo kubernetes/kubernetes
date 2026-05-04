@@ -29,16 +29,6 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    featureGates:
-      SchedulerQueueingHints: false
-    labels: [integration-test, short]
-    params:
-      initNodes: 5
-      initPods: 5
-      measurePods: 10
-  - name: 5Nodes_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
     labels: [integration-test, short]
     params:
       initNodes: 5
@@ -55,19 +45,8 @@
       initPods: 5000
       measurePods: 1000
   - name: 5000Nodes_10000Pods
-    featureGates:
-      SchedulerQueueingHints: false
     labels: [performance]
-    threshold: 260
-    params:
-      initNodes: 5000
-      initPods: 1000
-      measurePods: 10000
-  - name: 5000Nodes_10000Pods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 260
+    threshold: 790
     params:
       initNodes: 5000
       initPods: 1000
@@ -88,16 +67,6 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    featureGates:
-      SchedulerQueueingHints: false
-    labels: [integration-test, short]
-    params:
-      initNodes: 5
-      initPods: 5
-      measurePods: 10
-  - name: 5Nodes_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
     labels: [integration-test, short]
     params:
       initNodes: 5
@@ -115,19 +84,8 @@
       initPods: 5000
       measurePods: 1000
   - name: 5000Nodes_2000Pods
-    featureGates:
-      SchedulerQueueingHints: false
     labels: [performance]
-    threshold: 90
-    params:
-      initNodes: 5000
-      initPods: 1000
-      measurePods: 2000
-  - name: 5000Nodes_2000Pods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 90
+    threshold: 290
     params:
       initNodes: 5000
       initPods: 1000
@@ -157,16 +115,6 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    featureGates:
-      SchedulerQueueingHints: false
-    labels: [integration-test, short]
-    params:
-      initNodes: 5
-      initPods: 5
-      measurePods: 10
-  - name: 5Nodes_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
     labels: [integration-test, short]
     params:
       initNodes: 5
@@ -184,19 +132,8 @@
       initPods: 5000
       measurePods: 1000
   - name: 5000Nodes_5000Pods
-    featureGates:
-      SchedulerQueueingHints: false
     labels: [performance]
-    threshold: 35
-    params:
-      initNodes: 5000
-      initPods: 5000
-      measurePods: 5000
-  - name: 5000Nodes_5000Pods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 35
+    threshold: 100
     params:
       initNodes: 5000
       initPods: 5000
@@ -224,16 +161,6 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    featureGates:
-      SchedulerQueueingHints: false
-    labels: [integration-test, short]
-    params:
-      initNodes: 5
-      initPods: 5
-      measurePods: 10
-  - name: 5Nodes_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
     labels: [integration-test, short]
     params:
       initNodes: 5
@@ -251,19 +178,8 @@
       initPods: 5000
       measurePods: 1000
   - name: 5000Nodes_5000Pods
-    featureGates:
-      SchedulerQueueingHints: false
     labels: [performance]
-    threshold: 48
-    params:
-      initNodes: 5000
-      initPods: 5000
-      measurePods: 5000
-  - name: 5000Nodes_5000Pods_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
-    labels: [performance]
-    threshold: 48
+    threshold: 100
     params:
       initNodes: 5000
       initPods: 5000
@@ -284,32 +200,12 @@
     collectMetrics: true
   workloads:
   - name: 5Nodes
-    featureGates:
-      SchedulerQueueingHints: false
-    labels: [integration-test, short]
-    params:
-      initNodes: 5
-      initPods: 20
-      measurePods: 5
-  - name: 5Nodes_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
     labels: [integration-test, short]
     params:
       initNodes: 5
       initPods: 20
       measurePods: 5
   - name: 1000Nodes
-    featureGates:
-      SchedulerQueueingHints: false
-    labels: [performance, short]
-    params:
-      initNodes: 1000
-      initPods: 4000
-      measurePods: 1000
-  - name: 1000Nodes_QueueingHintsEnabled
-    featureGates:
-      SchedulerQueueingHints: true
     labels: [performance, short]
     params:
       initNodes: 1000

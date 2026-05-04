@@ -59,6 +59,12 @@ type Error struct {
 	// FromImperative denotes these errors are originating from  the hand written validations.
 	FromImperative bool
 
+	// ShortCircuit denotes that this error prevents further validation of the current field's children.
+	ShortCircuit bool
+
+	// ShortCircuitedInDeclarative denotes this error is covered by declarative validation. But not returned by declarative validation due to a short circuiting behavior for the current input.
+	ShortCircuitedInDeclarative bool
+
 	// ValidationStabilityLevel denotes the validation stability level of the declarative validation from this error is returned. This should be used in the declarative validations only.
 	ValidationStabilityLevel ValidationStabilityLevel
 }
@@ -545,6 +551,12 @@ func (e *Error) MarkAlpha() *Error {
 	return e
 }
 
+// MarkShortCircuitedInDV marks that this error is not returned by declarative validations, because DV returns before running the current validation. Handwritten validations still return it.
+func (e *Error) MarkShortCircuitedInDV() *Error {
+	e.ShortCircuitedInDeclarative = true
+	return e
+}
+
 // MarkAlpha marks the errors as alpha validation errors.
 func (list ErrorList) MarkAlpha() ErrorList {
 	for _, err := range list {
@@ -575,6 +587,14 @@ func (e *Error) MarkFromImperative() *Error {
 func (list ErrorList) MarkFromImperative() ErrorList {
 	for _, err := range list {
 		err.FromImperative = true
+	}
+	return list
+}
+
+// MarkShortCircuit marks the errors as short-circuit errors.
+func (list ErrorList) MarkShortCircuit() ErrorList {
+	for _, err := range list {
+		err.ShortCircuit = true
 	}
 	return list
 }

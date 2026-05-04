@@ -30,6 +30,7 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 option go_package = "k8s.io/api/batch/v1";
 
 // CronJob represents the configuration of a single cron job.
+// +k8s:supportsSubresource="/status"
 message CronJob {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -127,6 +128,7 @@ message CronJobStatus {
 }
 
 // Job represents the configuration of a single job.
+// +k8s:supportsSubresource="/status"
 message Job {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata

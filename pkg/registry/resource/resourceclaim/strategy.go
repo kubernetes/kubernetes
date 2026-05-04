@@ -22,7 +22,6 @@ import (
 
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 
-	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -49,7 +48,7 @@ import (
 
 // resourceclaimStrategy implements behavior for ResourceClaim objects
 type resourceclaimStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 	nsClient   v1.NamespaceInterface
 	authorizer authorizer.Authorizer
@@ -58,7 +57,7 @@ type resourceclaimStrategy struct {
 // NewStrategy is the default logic that applies when creating and updating ResourceClaim objects.
 func NewStrategy(nsClient v1.NamespaceInterface, authorizer authorizer.Authorizer) *resourceclaimStrategy {
 	return &resourceclaimStrategy{
-		legacyscheme.Scheme,
+		rest.DeclarativeValidation{Scheme: legacyscheme.Scheme},
 		names.SimpleNameGenerator,
 		nsClient,
 		authorizer,
@@ -104,7 +103,23 @@ func (s *resourceclaimStrategy) Validate(ctx context.Context, obj runtime.Object
 
 	allErrs := resourceutils.AuthorizedForAdmin(ctx, claim.Spec.Devices.Requests, claim.Namespace, s.nsClient)
 	allErrs = append(allErrs, validation.ValidateResourceClaim(claim)...)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, claim, nil, allErrs, operation.Create, rest.WithNormalizationRules(validation.ResourceNormalizationRules))
+	return allErrs
+}
+
+// DeclarativeValidationConfig implements rest.DeclarativeValidationConfigurer to supply declarative
+// validation options to the generic BeforeCreate/BeforeUpdate code path.
+//
+// TODO: Behavior drift introduced when wiring declarative validation
+// universally: the status substrategy embeds *resourceclaimStrategy and now
+// inherits this method, so status updates pick up
+// WithNormalizationRules(ResourceNormalizationRules). Previously the
+// pre-migration inline declarative-validation call on the status subresource
+// did NOT pass normalization rules. The change is additive (mismatch
+// comparisons are stricter on status updates) but should be reviewed; if the
+// status subresource should not use these rules, override
+// ValidationConfig on resourceclaimStatusStrategy.
+func (*resourceclaimStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	return rest.DeclarativeValidationConfig{NormalizationRules: validation.ResourceNormalizationRules}
 }
 
 func (*resourceclaimStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
@@ -130,8 +145,7 @@ func (s *resourceclaimStrategy) ValidateUpdate(ctx context.Context, obj, old run
 	newClaim := obj.(*resource.ResourceClaim)
 	oldClaim := old.(*resource.ResourceClaim)
 	// AuthorizedForAdmin isn't needed here because the spec is immutable.
-	errorList := validation.ValidateResourceClaimUpdate(newClaim, oldClaim)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newClaim, oldClaim, errorList, operation.Update, rest.WithNormalizationRules(validation.ResourceNormalizationRules))
+	return validation.ValidateResourceClaimUpdate(newClaim, oldClaim)
 }
 
 func (*resourceclaimStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
@@ -209,7 +223,7 @@ func (r *resourceclaimStatusStrategy) ValidateUpdate(ctx context.Context, obj, o
 		}
 	}
 	errs = append(errs, validation.ValidateResourceClaimStatusUpdate(newClaim, oldClaim)...)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newClaim, oldClaim, errs, operation.Update)
+	return errs
 }
 
 // WarningsOnUpdate returns warnings for the given update.

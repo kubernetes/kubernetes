@@ -216,7 +216,7 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterA
 			}
 			tearDownErr := unmounter.TearDown()
 			if tearDownErr != nil {
-				klog.Errorf("error tearing down volume %s with : %v", s.volName, tearDownErr)
+				klog.Errorf("error tearing down volume %s: %v", s.volName, tearDownErr)
 			}
 		}
 	}()

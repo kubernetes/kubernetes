@@ -39,90 +39,165 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	// type AtomicSliceStruct
-	scheme.AddValidationFunc((*AtomicSliceStruct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_AtomicSliceStruct(ctx, op, nil /* fldPath */, obj.(*AtomicSliceStruct), safe.Cast[*AtomicSliceStruct](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*AtomicSliceStruct)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_AtomicSliceStruct(
+					ctx, op, nil, /* fldPath */
+					obj.(*AtomicSliceStruct),
+					safe.Cast[*AtomicSliceStruct](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
 // Validate_AtomicSliceStruct validates an instance of AtomicSliceStruct according
 // to declarative validation rules in the API schema.
-func Validate_AtomicSliceStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *AtomicSliceStruct) (errs field.ErrorList) {
+func Validate_AtomicSliceStruct(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *AtomicSliceStruct) (errs field.ErrorList) {
+
 	// field AtomicSliceStruct.TypeMeta has no validation
 
-	// field AtomicSliceStruct.Standard
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []int, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field AtomicSliceStruct.Standard
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []int,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
-				return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10)
-			})...)
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
+					return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10)
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("standard"), obj.Standard, safe.Field(oldObj, func(oldObj *AtomicSliceStruct) []int { return oldObj.Standard }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *AtomicSliceStruct) []int {
+				return oldObj.Standard
+			})
+		errs = append(errs, fn(fldPath.Child("standard"), obj.Standard, oldVal, oldObj != nil)...)
+	}
 
-	// field AtomicSliceStruct.Alpha
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []int, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field AtomicSliceStruct.Alpha
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []int,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
-				return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10)
-			}).MarkAlpha()...)
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
+					return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10)
+				}).MarkAlpha(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("Alpha"), obj.Alpha, safe.Field(oldObj, func(oldObj *AtomicSliceStruct) []int { return oldObj.Alpha }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *AtomicSliceStruct) []int {
+				return oldObj.Alpha
+			})
+		errs = append(errs, fn(fldPath.Child("Alpha"), obj.Alpha, oldVal, oldObj != nil)...)
+	}
 
-	// field AtomicSliceStruct.Beta
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []int, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field AtomicSliceStruct.Beta
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []int,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
-				return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10)
-			}).MarkBeta()...)
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
+					return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10)
+				}).MarkBeta(); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("Beta"), obj.Beta, safe.Field(oldObj, func(oldObj *AtomicSliceStruct) []int { return oldObj.Beta }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *AtomicSliceStruct) []int {
+				return oldObj.Beta
+			})
+		errs = append(errs, fn(fldPath.Child("Beta"), obj.Beta, oldVal, oldObj != nil)...)
+	}
 
-	// field AtomicSliceStruct.AlphaValidation
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []int, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field AtomicSliceStruct.AlphaValidation
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []int,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
-				return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha()
-			})...)
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
+					return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkAlpha()
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("AlphaValidation"), obj.AlphaValidation, safe.Field(oldObj, func(oldObj *AtomicSliceStruct) []int { return oldObj.AlphaValidation }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *AtomicSliceStruct) []int {
+				return oldObj.AlphaValidation
+			})
+		errs = append(errs, fn(fldPath.Child("AlphaValidation"), obj.AlphaValidation, oldVal, oldObj != nil)...)
+	}
 
-	// field AtomicSliceStruct.BetaValidation
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []int, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field AtomicSliceStruct.BetaValidation
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []int,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
-				return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkBeta()
-			})...)
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
+					return validate.Minimum(ctx, op, fldPath, obj, oldObj, 10).MarkBeta()
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("BetaValidation"), obj.BetaValidation, safe.Field(oldObj, func(oldObj *AtomicSliceStruct) []int { return oldObj.BetaValidation }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *AtomicSliceStruct) []int {
+				return oldObj.BetaValidation
+			})
+		errs = append(errs, fn(fldPath.Child("BetaValidation"), obj.BetaValidation, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }

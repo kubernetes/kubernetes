@@ -22,8 +22,10 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"maps"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -34,7 +36,7 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/klog/v2"
 	testutils "k8s.io/kubernetes/test/utils"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 )
@@ -54,6 +56,9 @@ type createAny struct {
 	// Count determines how many objects get created. Defaults to 1 if unset.
 	Count      *int
 	CountParam string
+	// Params to be passed to the template.
+	// Values with `$` prefix will be resolved to the workload parameters.
+	TemplateParams map[string]any
 }
 
 var _ runnableOp = &createAny{}
@@ -79,6 +84,13 @@ func (c createAny) patchParams(w *Workload) (realOp, error) {
 		}
 		c.Count = ptr.To(count)
 	}
+	if len(c.TemplateParams) > 0 {
+		var err error
+		c.TemplateParams, err = resolveTemplateParams(c.TemplateParams, w)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return &c, c.isValid(false)
 }
 
@@ -95,7 +107,11 @@ func (c *createAny) run(tCtx ktesting.TContext) {
 		count = *c.Count
 	}
 	for index := 0; index < count; index++ {
-		c.create(tCtx, map[string]any{"Index": index, "Count": count})
+		env := make(map[string]any)
+		maps.Copy(env, c.TemplateParams)
+		env["Index"] = index
+		env["Count"] = count
+		c.create(tCtx, env)
 	}
 }
 
@@ -202,6 +218,9 @@ type createNodesOp struct {
 	NodeAllocatableStrategy  *testutils.NodeAllocatableStrategy
 	LabelNodePrepareStrategy *testutils.LabelNodePrepareStrategy
 	UniqueNodeLabelStrategy  *testutils.UniqueNodeLabelStrategy
+	// Params to be passed to the template.
+	// Values with `$` prefix will be resolved to the workload parameters.
+	TemplateParams map[string]any
 }
 
 func (cno *createNodesOp) isValid(allowParameterization bool) error {
@@ -216,9 +235,15 @@ func (*createNodesOp) collectsMetrics() bool {
 }
 
 func (cno createNodesOp) patchParams(w *Workload) (realOp, error) {
+	var err error
 	if cno.CountParam != "" {
-		var err error
 		cno.Count, err = w.Params.get(cno.CountParam[1:])
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(cno.TemplateParams) > 0 {
+		cno.TemplateParams, err = resolveTemplateParams(cno.TemplateParams, w)
 		if err != nil {
 			return nil, err
 		}
@@ -317,6 +342,9 @@ type createPodsOp struct {
 	// Optional
 	PersistentVolumeTemplatePath      *string
 	PersistentVolumeClaimTemplatePath *string
+	// Params to be passed to the template.
+	// Values with `$` prefix will be resolved to the workload parameters.
+	TemplateParams map[string]any
 }
 
 func (cpo *createPodsOp) isValid(allowParameterization bool) error {
@@ -343,8 +371,8 @@ func (cpo *createPodsOp) collectsMetrics() bool {
 }
 
 func (cpo createPodsOp) patchParams(w *Workload) (realOp, error) {
+	var err error
 	if cpo.CountParam != "" {
-		var err error
 		cpo.Count, err = w.Params.get(cpo.CountParam[1:])
 		if err != nil {
 			return nil, err
@@ -360,8 +388,13 @@ func (cpo createPodsOp) patchParams(w *Workload) (realOp, error) {
 		}
 	}
 	if cpo.SteadyStateParam != "" {
-		var err error
 		cpo.SteadyState, err = getParam[bool](w.Params, cpo.SteadyStateParam[1:])
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(cpo.TemplateParams) > 0 {
+		cpo.TemplateParams, err = resolveTemplateParams(cpo.TemplateParams, w)
 		if err != nil {
 			return nil, err
 		}
@@ -617,6 +650,26 @@ func (*stopCollectingMetricsOp) collectsMetrics() bool {
 
 func (scm stopCollectingMetricsOp) patchParams(_ *Workload) (realOp, error) {
 	return &scm, nil
+}
+
+// resolveTemplateParams resolves the template parameters using the workload parameters.
+func resolveTemplateParams(templateParams map[string]any, w *Workload) (map[string]any, error) {
+	if len(templateParams) == 0 {
+		return templateParams, nil
+	}
+	resolved := maps.Clone(templateParams)
+	for k, v := range resolved {
+		if s, ok := v.(string); ok && strings.HasPrefix(s, "$") {
+			paramKey := s[1:]
+			if val, found := w.Params.params[paramKey]; found {
+				w.Params.isUsed[paramKey] = true
+				resolved[k] = val
+				continue
+			}
+			return nil, fmt.Errorf("parameter %q not found", paramKey)
+		}
+	}
+	return resolved, nil
 }
 
 func getTemplateFuncs() template.FuncMap {

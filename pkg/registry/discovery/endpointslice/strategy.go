@@ -24,7 +24,6 @@ import (
 	discoveryv1 "k8s.io/api/discovery/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -46,12 +45,12 @@ import (
 
 // endpointSliceStrategy implements verification logic for Replication.
 type endpointSliceStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Replication EndpointSlice objects.
-var Strategy = endpointSliceStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = endpointSliceStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 // NamespaceScoped returns true because all EndpointSlices need to be within a namespace.
 func (endpointSliceStrategy) NamespaceScoped() bool {
@@ -93,8 +92,7 @@ func (endpointSliceStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 // Validate validates a new EndpointSlice.
 func (endpointSliceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	endpointSlice := obj.(*discovery.EndpointSlice)
-	allErrs := validation.ValidateEndpointSliceCreate(endpointSlice)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, endpointSlice, nil, allErrs, operation.Create)
+	return validation.ValidateEndpointSliceCreate(endpointSlice)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -122,8 +120,7 @@ func (endpointSliceStrategy) AllowCreateOnUpdate() bool {
 func (endpointSliceStrategy) ValidateUpdate(ctx context.Context, new, old runtime.Object) field.ErrorList {
 	newEPS := new.(*discovery.EndpointSlice)
 	oldEPS := old.(*discovery.EndpointSlice)
-	allErrs := validation.ValidateEndpointSliceUpdate(newEPS, oldEPS)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newEPS, oldEPS, allErrs, operation.Update)
+	return validation.ValidateEndpointSliceUpdate(newEPS, oldEPS)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

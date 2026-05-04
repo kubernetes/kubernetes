@@ -81,6 +81,7 @@ const (
 // +k8s:prerelease-lifecycle-gen:introduced=1.26
 
 // ValidatingAdmissionPolicy describes the definition of an admission validation policy that accepts or rejects an object without changing it.
+// +k8s:supportsSubresource="/status"
 type ValidatingAdmissionPolicy struct {
 	metav1.TypeMeta `json:",inline"`
 	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.

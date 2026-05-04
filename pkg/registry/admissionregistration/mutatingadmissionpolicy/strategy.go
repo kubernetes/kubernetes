@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -34,7 +35,7 @@ import (
 
 // mutatingAdmissionPolicyStrategy implements verification logic for MutatingAdmissionPolicy.
 type mutatingAdmissionPolicyStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 	authorizer       authorizer.Authorizer
 	resourceResolver resolver.ResourceResolver
@@ -43,10 +44,10 @@ type mutatingAdmissionPolicyStrategy struct {
 // NewStrategy is the default logic that applies when creating and updating MutatingAdmissionPolicy objects.
 func NewStrategy(authorizer authorizer.Authorizer, resourceResolver resolver.ResourceResolver) *mutatingAdmissionPolicyStrategy {
 	return &mutatingAdmissionPolicyStrategy{
-		ObjectTyper:      legacyscheme.Scheme,
-		NameGenerator:    names.SimpleNameGenerator,
-		authorizer:       authorizer,
-		resourceResolver: resourceResolver,
+		DeclarativeValidation: rest.DeclarativeValidation{Scheme: legacyscheme.Scheme},
+		NameGenerator:         names.SimpleNameGenerator,
+		authorizer:            authorizer,
+		resourceResolver:      resourceResolver,
 	}
 }
 

@@ -421,13 +421,11 @@ func TestServeLogs(t *testing.T) {
 	defer fw.testHTTPServer.Close()
 
 	content := string(`<pre><a href="kubelet.log">kubelet.log</a><a href="google.log">google.log</a></pre>`)
-
 	fw.fakeKubelet.logFunc = func(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Header().Add("Content-Type", "text/html")
 		w.Write([]byte(content))
 	}
-
 	resp, err := http.Get(fw.testHTTPServer.URL + "/logs/")
 	if err != nil {
 		t.Fatalf("Got error GETing: %v", err)
@@ -442,6 +440,38 @@ func TestServeLogs(t *testing.T) {
 	result := string(body)
 	if !strings.Contains(result, "kubelet.log") || !strings.Contains(result, "google.log") {
 		t.Errorf("Received wrong data: %s", result)
+	}
+
+}
+
+func TestGETOnlyEndpointsRejectPostWithAllowHeader(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fw := newServerTest(tCtx)
+	defer fw.testHTTPServer.Close()
+
+	tests := []struct {
+		name string
+		path string
+	}{
+		{name: "pods", path: "/pods/"},
+		{name: "containerLogs", path: "/containerLogs/default/mypod/mycontainer"},
+		{name: "runningpods", path: "/runningpods/"},
+		{name: "logs", path: "/logs/"},
+		{name: "pprof", path: "/debug/pprof/profile?seconds=1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodPost, fw.testHTTPServer.URL+tt.path, nil)
+			require.NoError(t, err)
+
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			defer resp.Body.Close() //nolint:errcheck
+
+			assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
+			assert.Equal(t, http.MethodGet, resp.Header.Get("Allow"))
+		})
 	}
 }
 
