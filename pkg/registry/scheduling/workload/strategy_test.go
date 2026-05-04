@@ -67,7 +67,7 @@ func TestWorkloadStrategy(t *testing.T) {
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("Workload must be namespace scoped")
 	}
-	if Strategy.AllowCreateOnUpdate() {
+	if Strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("Workload should not allow create on update")
 	}
 }

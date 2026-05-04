@@ -284,12 +284,12 @@ func generateSelector(obj *batch.Job) {
 func (jobStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (jobStrategy) AllowUnconditionalUpdate() bool {
+func (jobStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 
 // AllowCreateOnUpdate is false for jobs; this means a POST is needed to create one.
-func (jobStrategy) AllowCreateOnUpdate() bool {
+func (jobStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 

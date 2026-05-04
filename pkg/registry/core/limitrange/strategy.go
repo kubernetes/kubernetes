@@ -66,7 +66,7 @@ func (limitrangeStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Obje
 func (limitrangeStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (limitrangeStrategy) AllowCreateOnUpdate() bool {
+func (limitrangeStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return true
 }
 
@@ -80,6 +80,6 @@ func (limitrangeStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime
 	return nil
 }
 
-func (limitrangeStrategy) AllowUnconditionalUpdate() bool {
+func (limitrangeStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }

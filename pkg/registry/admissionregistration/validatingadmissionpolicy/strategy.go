@@ -112,7 +112,7 @@ func (v *validatingAdmissionPolicyStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for validatingAdmissionPolicy; this means you may not create one with a PUT request.
-func (v *validatingAdmissionPolicyStrategy) AllowCreateOnUpdate() bool {
+func (v *validatingAdmissionPolicyStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -138,7 +138,7 @@ func (v *validatingAdmissionPolicyStrategy) WarningsOnUpdate(ctx context.Context
 
 // AllowUnconditionalUpdate is the default update policy for validatingAdmissionPolicy objects. Status update should
 // only be allowed if version match.
-func (v *validatingAdmissionPolicyStrategy) AllowUnconditionalUpdate() bool {
+func (v *validatingAdmissionPolicyStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 

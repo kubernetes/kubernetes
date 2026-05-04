@@ -109,12 +109,12 @@ func (priorityLevelConfigurationStrategy) WarningsOnCreate(ctx context.Context, 
 func (priorityLevelConfigurationStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (priorityLevelConfigurationStrategy) AllowUnconditionalUpdate() bool {
+func (priorityLevelConfigurationStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 
 // AllowCreateOnUpdate is false for priority-level-configurations; this means a POST is needed to create one.
-func (priorityLevelConfigurationStrategy) AllowCreateOnUpdate() bool {
+func (priorityLevelConfigurationStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 

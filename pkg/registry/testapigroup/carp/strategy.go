@@ -85,7 +85,7 @@ func (*carpStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) [
 func (*carpStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (*carpStrategy) AllowCreateOnUpdate() bool {
+func (*carpStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -103,7 +103,7 @@ func (*carpStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Obje
 	return nil
 }
 
-func (*carpStrategy) AllowUnconditionalUpdate() bool {
+func (*carpStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

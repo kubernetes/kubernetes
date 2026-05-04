@@ -113,7 +113,7 @@ func (v *mutatingAdmissionPolicyBindingStrategy) Canonicalize(obj runtime.Object
 }
 
 // AllowCreateOnUpdate is false for MutatingAdmissionPolicyBinding; this means you may not create one with a PUT request.
-func (v *mutatingAdmissionPolicyBindingStrategy) AllowCreateOnUpdate() bool {
+func (v *mutatingAdmissionPolicyBindingStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -139,6 +139,6 @@ func (v *mutatingAdmissionPolicyBindingStrategy) WarningsOnUpdate(ctx context.Co
 
 // AllowUnconditionalUpdate is the default update policy for MutatingAdmissionPolicyBinding objects. Status update should
 // only be allowed if version match.
-func (v *mutatingAdmissionPolicyBindingStrategy) AllowUnconditionalUpdate() bool {
+func (v *mutatingAdmissionPolicyBindingStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }

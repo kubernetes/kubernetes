@@ -129,7 +129,7 @@ func (*resourceclaimStrategy) WarningsOnCreate(ctx context.Context, obj runtime.
 func (*resourceclaimStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (*resourceclaimStrategy) AllowCreateOnUpdate() bool {
+func (*resourceclaimStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -152,7 +152,7 @@ func (*resourceclaimStrategy) WarningsOnUpdate(ctx context.Context, obj, old run
 	return nil
 }
 
-func (*resourceclaimStrategy) AllowUnconditionalUpdate() bool {
+func (*resourceclaimStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

@@ -146,7 +146,7 @@ func (rcStrategy) Canonicalize(obj runtime.Object) {
 
 // AllowCreateOnUpdate is false for replication controllers; this means a POST is
 // needed to create one.
-func (rcStrategy) AllowCreateOnUpdate() bool {
+func (rcStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -189,7 +189,7 @@ func (rcStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object)
 	return warnings
 }
 
-func (rcStrategy) AllowUnconditionalUpdate() bool {
+func (rcStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

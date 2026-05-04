@@ -95,7 +95,7 @@ func (*podGroupStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Objec
 
 func (*podGroupStrategy) Canonicalize(obj runtime.Object) {}
 
-func (*podGroupStrategy) AllowCreateOnUpdate() bool {
+func (*podGroupStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -116,7 +116,7 @@ func (*podGroupStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.
 	return nil
 }
 
-func (*podGroupStrategy) AllowUnconditionalUpdate() bool {
+func (*podGroupStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

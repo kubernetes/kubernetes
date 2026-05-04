@@ -76,7 +76,7 @@ func (s *Strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []s
 
 func (s *Strategy) Canonicalize(obj runtime.Object) {}
 
-func (s *Strategy) AllowCreateOnUpdate() bool {
+func (s *Strategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -96,7 +96,7 @@ func (s *Strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object
 	return nil
 }
 
-func (s *Strategy) AllowUnconditionalUpdate() bool {
+func (s *Strategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 

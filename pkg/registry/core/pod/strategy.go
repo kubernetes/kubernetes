@@ -134,7 +134,7 @@ func (podStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for pods.
-func (podStrategy) AllowCreateOnUpdate() bool {
+func (podStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -156,7 +156,7 @@ func (podStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object
 }
 
 // AllowUnconditionalUpdate allows pods to be overwritten
-func (podStrategy) AllowUnconditionalUpdate() bool {
+func (podStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

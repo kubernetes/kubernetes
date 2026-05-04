@@ -86,7 +86,7 @@ func TestStrategy(t *testing.T) {
 	if !strategy.NamespaceScoped() {
 		t.Errorf("PodGroup must be namespace scoped")
 	}
-	if strategy.AllowCreateOnUpdate() {
+	if strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("PodGroup should not allow create on update")
 	}
 }

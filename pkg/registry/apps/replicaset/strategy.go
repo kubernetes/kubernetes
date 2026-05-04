@@ -132,7 +132,7 @@ func (rsStrategy) Canonicalize(obj runtime.Object) {
 
 // AllowCreateOnUpdate is false for ReplicaSets; this means a POST is
 // needed to create one.
-func (rsStrategy) AllowCreateOnUpdate() bool {
+func (rsStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -156,7 +156,7 @@ func (rsStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object)
 	return warnings
 }
 
-func (rsStrategy) AllowUnconditionalUpdate() bool {
+func (rsStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

@@ -109,9 +109,13 @@ type testRESTStrategy struct {
 	allowUnconditionalUpdate bool
 }
 
-func (t *testRESTStrategy) NamespaceScoped() bool          { return t.namespaceScoped }
-func (t *testRESTStrategy) AllowCreateOnUpdate() bool      { return t.allowCreateOnUpdate }
-func (t *testRESTStrategy) AllowUnconditionalUpdate() bool { return t.allowUnconditionalUpdate }
+func (t *testRESTStrategy) NamespaceScoped() bool { return t.namespaceScoped }
+func (t *testRESTStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
+	return t.allowCreateOnUpdate
+}
+func (t *testRESTStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+	return t.allowUnconditionalUpdate
+}
 
 func (t *testRESTStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	metaObj, err := meta.Accessor(obj)

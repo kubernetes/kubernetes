@@ -114,7 +114,7 @@ func (autoscalerStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for autoscalers.
-func (autoscalerStrategy) AllowCreateOnUpdate() bool {
+func (autoscalerStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -147,7 +147,7 @@ func (autoscalerStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime
 	return nil
 }
 
-func (autoscalerStrategy) AllowUnconditionalUpdate() bool {
+func (autoscalerStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

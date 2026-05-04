@@ -68,7 +68,7 @@ func (endpointsStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is true for endpoints.
-func (endpointsStrategy) AllowCreateOnUpdate() bool {
+func (endpointsStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return true
 }
 
@@ -82,7 +82,7 @@ func (endpointsStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.
 	return endpointsWarnings(obj.(*api.Endpoints))
 }
 
-func (endpointsStrategy) AllowUnconditionalUpdate() bool {
+func (endpointsStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

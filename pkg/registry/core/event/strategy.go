@@ -71,7 +71,7 @@ func (eventStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) [
 func (eventStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (eventStrategy) AllowCreateOnUpdate() bool {
+func (eventStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return true
 }
 
@@ -87,7 +87,7 @@ func (eventStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Obje
 	return nil
 }
 
-func (eventStrategy) AllowUnconditionalUpdate() bool {
+func (eventStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

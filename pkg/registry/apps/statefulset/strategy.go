@@ -151,7 +151,7 @@ func (statefulSetStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for StatefulSet; this means POST is needed to create one.
-func (statefulSetStrategy) AllowCreateOnUpdate() bool {
+func (statefulSetStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -183,7 +183,7 @@ func (statefulSetStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtim
 }
 
 // AllowUnconditionalUpdate is the default update policy for StatefulSet objects.
-func (statefulSetStrategy) AllowUnconditionalUpdate() bool {
+func (statefulSetStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 
