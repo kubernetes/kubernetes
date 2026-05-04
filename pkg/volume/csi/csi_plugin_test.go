@@ -1560,7 +1560,7 @@ func TestIsResourceExhaustError(t *testing.T) {
 // succeeds and the volume follows the normal unmount path.
 func TestPluginConstructVolumeSpecFallsBackToGlobalMount(t *testing.T) {
 	plug, tmpDir := newTestPlugin(t, nil)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	const (
 		specVolID = "orphaned-pv"
