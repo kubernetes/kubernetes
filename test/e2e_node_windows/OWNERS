@@ -1,0 +1,23 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+options:
+  # make root approval non-recursive
+  no_parent_owners: true
+approvers:
+  # from sig-testing, make tree-wide changes to test code
+  - aojea
+  - bentheelder
+  - pohly
+  # from sig-node, as a backup for kubelet changes that require minor updates in this folder
+  - sig-node-approvers
+  # from sig-windows
+  - marosset
+  - claudiubelu
+  - aravindhp
+  - zylxjtu
+reviewers:
+  - marosset
+  - claudiubelu
+  - aravindhp
+  - zylxjtu
+labels:
+  - sig/windows
