@@ -244,7 +244,10 @@ func (dp *DevicePlugin) RegisterDevicePlugin(ctx context.Context, uniqueName, re
 	}
 
 	ginkgo.By("Register the device plugin with the kubelet")
-	_, err = client.Register(ctx, reqt)
+	registerCtx, registerCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer registerCancel()
+	// Register the device plugin with the kubelet
+	_, err = client.Register(registerCtx, reqt, grpc.WaitForReady(true))
 	if err != nil {
 		return err
 	}
