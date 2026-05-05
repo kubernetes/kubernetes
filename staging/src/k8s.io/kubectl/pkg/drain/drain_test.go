@@ -17,10 +17,10 @@ limitations under the License.
 package drain
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"reflect"
@@ -481,9 +481,8 @@ func TestDeleteOrEvictWithDryRunServer(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			var buf bytes.Buffer
 			h := &Helper{
-				Out:                &buf,
+				Out:                io.Discard,
 				GracePeriodSeconds: 10,
 				DisableEviction:    tc.disableEviction,
 				DryRunStrategy:     cmdutil.DryRunServer,
