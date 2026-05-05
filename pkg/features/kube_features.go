@@ -1124,8 +1124,8 @@ const (
 	// co-ordinate better with cluster-autoscaler for storage limits.
 	VolumeLimitScaling featuregate.Feature = "VolumeLimitScaling"
 
-	// owner: @jsafrane
-	// kep: https://kep.k8s.io/0000-volume-reconstruction-fallback
+	// owner: @cniackz
+	// kep: https://kep.k8s.io/6058
 	//
 	// On kubelet restart, when reconstructing a CSI volume from disk,
 	// fall back to reading vol_data.json from the global mount directory
