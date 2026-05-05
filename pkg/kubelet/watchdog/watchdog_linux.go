@@ -148,7 +148,7 @@ func (hc *healthChecker) Start(ctx context.Context) {
 		err := wait.ExponentialBackoffWithContext(ctx, hc.retryBackoff, func(_ context.Context) (bool, error) {
 			ack, err := hc.watchdog.SdNotify(false)
 			if err != nil {
-				logger.V(5).Info("Failed to notify systemd watchdog, retrying", "error", err)
+				logger.Error(err, "Failed to notify systemd watchdog, retrying")
 				return false, nil
 			}
 			if !ack {
