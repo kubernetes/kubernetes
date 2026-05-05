@@ -385,6 +385,35 @@ func TestServeHTTP(t *testing.T) {
 	}
 }
 
+func TestOriginalHostForwarding(t *testing.T) {
+	var gotForwardedHost string
+	backendHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotForwardedHost = r.Header.Get("X-Forwarded-Host")
+		w.WriteHeader(http.StatusOK)
+	})
+	backendServer := httptest.NewServer(backendHandler)
+	defer backendServer.Close()
+
+	backendURL, _ := url.Parse(backendServer.URL)
+	responder := &fakeResponder{t: t}
+
+	proxyHandler := NewUpgradeAwareHandler(backendURL, nil, true, false, responder)
+	proxyHandler.OriginalHost = "foo.com:6443"
+
+	proxyServer := httptest.NewServer(proxyHandler)
+	defer proxyServer.Close()
+
+	resp, err := http.Get(proxyServer.URL + "/some/path")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	resp.Body.Close()
+
+	if gotForwardedHost != "foo.com:6443" {
+		t.Errorf("X-Forwarded-Host = %q, want %q", gotForwardedHost, "foo.com:6443")
+	}
+}
+
 type RoundTripperFunc func(req *http.Request) (*http.Response, error)
 
 func (fn RoundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
