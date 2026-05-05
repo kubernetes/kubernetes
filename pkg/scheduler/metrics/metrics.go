@@ -23,7 +23,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
-	controllermetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
+	resourceclaimmetrics "k8s.io/dynamic-resource-allocation/resourceclaim/metrics"
 	"k8s.io/kubernetes/pkg/features"
 	volumebindingmetrics "k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding/metrics"
 )
@@ -168,7 +168,7 @@ var (
 
 	// The below is only available when the DRAExtendedResource feature gate is enabled.
 	// This is the same metric that also gets recorded in the kube-controller-manager.
-	ResourceClaimCreatesTotal = controllermetrics.ResourceClaimCreate
+	ResourceClaimCreatesTotal = resourceclaimmetrics.ResourceClaimCreate
 
 	podGroupScheduleAttempts           *metrics.CounterVec
 	podGroupSchedulingLatency          *metrics.HistogramVec
@@ -202,7 +202,7 @@ func Register() {
 			)
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
-			controllermetrics.RegisterResourceClaimCreate()
+			resourceclaimmetrics.RegisterMetrics()
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 			RegisterMetrics(

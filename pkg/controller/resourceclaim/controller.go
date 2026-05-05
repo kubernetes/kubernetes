@@ -52,9 +52,10 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
+	resourceclaimmetrics "k8s.io/dynamic-resource-allocation/resourceclaim/metrics"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	resourceclaimmetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
+	controllermetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
 	"k8s.io/utils/ptr"
 )
 
@@ -187,7 +188,8 @@ func NewController(
 		deletedObjects: newUIDCache(maxUIDCacheEntries),
 	}
 
-	resourceclaimmetrics.RegisterMetrics(newCustomCollector(ec.claimLister, getAdminAccessMetricLabel, logger))
+	resourceclaimmetrics.RegisterMetrics()
+	controllermetrics.RegisterMetrics(newCustomCollector(ec.claimLister, getAdminAccessMetricLabel, logger))
 
 	if _, err := podInformer.Informer().AddEventHandlerWithOptions(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -1768,11 +1770,11 @@ type customCollector struct {
 var _ metrics.StableCollector = &customCollector{}
 
 func (collector *customCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
-	ch <- resourceclaimmetrics.NumResourceClaimsDesc
+	ch <- controllermetrics.NumResourceClaimsDesc
 }
 
 func (collector *customCollector) CollectWithStability(ch chan<- metrics.Metric) {
-	rcMetrics := make(map[resourceclaimmetrics.NumResourceClaimLabels]int)
+	rcMetrics := make(map[controllermetrics.NumResourceClaimLabels]int)
 	rcList, err := collector.rcLister.List(labels.Everything())
 	if err != nil {
 		collector.logger.Error(err, "failed to list resource claims for metrics collection")
@@ -1791,11 +1793,11 @@ func (collector *customCollector) CollectWithStability(ch chan<- metrics.Metric)
 		} else if val, ok := rc.Annotations[resourceapi.PodResourceClaimAnnotation]; ok && val != "" {
 			source = "resource_claim_template"
 		}
-		rcMetrics[resourceclaimmetrics.NumResourceClaimLabels{Allocated: allocated, AdminAccess: adminAccess, Source: source}]++
+		rcMetrics[controllermetrics.NumResourceClaimLabels{Allocated: allocated, AdminAccess: adminAccess, Source: source}]++
 	}
 	for rcLabels, count := range rcMetrics {
 		ch <- metrics.NewLazyConstMetric(
-			resourceclaimmetrics.NumResourceClaimsDesc,
+			controllermetrics.NumResourceClaimsDesc,
 			metrics.GaugeValue,
 			float64(count),
 			rcLabels.Allocated,
