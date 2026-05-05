@@ -104,7 +104,7 @@ type Manager interface {
 	HasPendingResizes() bool
 
 	// RetryPendingResizes retries all pending resizes.
-	RetryPendingResizes(trigger string)
+	RetryPendingResizes(ctx context.Context, trigger string)
 }
 
 type manager struct {
@@ -115,7 +115,7 @@ type manager struct {
 	sourcesReady  config.SourcesReady
 
 	ticker         *time.Ticker
-	triggerPodSync func(pod *v1.Pod)
+	triggerPodSync func(context.Context, *v1.Pod)
 	getActivePods  func() []*v1.Pod
 	getPodByUID    func(types.UID) (*v1.Pod, bool)
 
@@ -127,7 +127,7 @@ type manager struct {
 
 func NewManager(checkpointDirectory string,
 	statusManager status.Manager,
-	triggerPodSync func(pod *v1.Pod),
+	triggerPodSync func(context.Context, *v1.Pod),
 	getActivePods func() []*v1.Pod,
 	getPodByUID func(types.UID) (*v1.Pod, bool),
 	sourcesReady config.SourcesReady,
@@ -171,7 +171,7 @@ func newStateImpl(logger klog.Logger, checkpointDirectory, checkpointName string
 // For testing purposes only!
 func NewInMemoryManager(
 	statusManager status.Manager,
-	triggerPodSync func(pod *v1.Pod),
+	triggerPodSync func(context.Context, *v1.Pod),
 	getActivePods func() []*v1.Pod,
 	getPodByUID func(types.UID) (*v1.Pod, bool),
 	sourcesReady config.SourcesReady,
@@ -199,7 +199,7 @@ func (m *manager) Run(ctx context.Context) {
 		for {
 			select {
 			case <-m.ticker.C:
-				successfulResizes := m.retryPendingResizes(logger, triggerReasonPeriodic)
+				successfulResizes := m.retryPendingResizes(ctx, triggerReasonPeriodic)
 				for _, po := range successfulResizes {
 					logger.Info("Successfully retried resize after timeout", "pod", klog.KObj(po))
 				}
@@ -211,14 +211,12 @@ func (m *manager) Run(ctx context.Context) {
 	}()
 }
 
-func (m *manager) RetryPendingResizes(trigger string) {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
-	m.retryPendingResizes(logger, trigger)
+func (m *manager) RetryPendingResizes(ctx context.Context, trigger string) {
+	m.retryPendingResizes(ctx, trigger)
 }
 
-func (m *manager) retryPendingResizes(logger klog.Logger, trigger string) []*v1.Pod {
+func (m *manager) retryPendingResizes(ctx context.Context, trigger string) []*v1.Pod {
+	logger := klog.FromContext(ctx)
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()
 
@@ -265,7 +263,7 @@ func (m *manager) retryPendingResizes(logger klog.Logger, trigger string) []*v1.
 		// If the pod resize status has changed, we need to update the pod status.
 		newResizeStatus := m.statusManager.GetPodResizeConditions(uid)
 		if resizeAllocated || !apiequality.Semantic.DeepEqual(oldResizeStatus, newResizeStatus) {
-			m.triggerPodSync(pod)
+			m.triggerPodSync(ctx, pod)
 		}
 	}
 
