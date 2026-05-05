@@ -45,6 +45,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
 	statusutil "k8s.io/kubernetes/pkg/util/pod"
+	"k8s.io/utils/clock"
 )
 
 // A wrapper around v1.PodStatus that includes a version to enforce that stale pod statuses are
@@ -81,6 +82,13 @@ type manager struct {
 
 	podStartupLatencyHelper PodStartupLatencyStateHelper
 	notifiers               []PodUpdateNotifier
+
+	// podStatusDeferrals tracks the expiration time of delayed status updates.
+	// Guarded by podStatusesLock.
+	podStatusDeferrals map[types.UID]time.Time
+
+	// clock is used to schedule defers and calculate durations
+	clock clock.Clock
 }
 
 type podResizeConditions struct {
@@ -206,7 +214,28 @@ type Manager interface {
 	BackfillPodResizeConditions(pods []*v1.Pod)
 }
 
-const syncPeriod = 10 * time.Second
+const (
+	syncPeriod = 10 * time.Second
+
+	// initContainerStatusDeferralWindow is the maximum duration the StatusManager
+	// will delay syncing an init container's "Running" state to the API server.
+	//
+	// This acts as a Status Coalescing buffer to reduce API load and etcd churn.
+	// If an init container transitions from Waiting -> Running -> Terminated
+	// extremely fast, we want to batch those states into a single "Terminated" update.
+	//
+	// Furthermore, because the Kubelet drives execution from its local cache, it can
+	// progress through multiple fast init containers while this window is active.
+	// If multiple init containers start and finish within this same window, their
+	// entire lifecycles are batched together into a single API server patch.
+	//
+	// We use 2 seconds as the threshold. If a container executes under this limit,
+	// we short-circuit and only send the final state. If it stays Running for longer
+	// than 2 seconds, this window expires and we forcefully flush the "Running" state
+	// to the API server to maintain observability (preventing "Ghost" containers that
+	// hide silent failures or delay controller signals).
+	initContainerStatusDeferralWindow = 2 * time.Second
+)
 
 // NewManager returns a functional Manager.
 func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeletionSafety PodDeletionSafetyProvider, podStartupLatencyHelper PodStartupLatencyStateHelper) Manager {
@@ -219,7 +248,72 @@ func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeleti
 		apiStatusVersions:       make(map[kubetypes.MirrorPodUID]uint64),
 		podDeletionSafety:       podDeletionSafety,
 		podStartupLatencyHelper: podStartupLatencyHelper,
+		podStatusDeferrals:      make(map[types.UID]time.Time),
+		clock:                   clock.RealClock{},
 	}
+}
+
+// isEligibleForDeferral determines if a pod status update can be safely delayed.
+//
+// To reduce API server load, we coalesce the "Running" and "Terminated" states
+// of fast-executing init containers into a single update.
+//
+// Rules for deferral:
+//  1. We ONLY begin a new deferral window if an init container just transitioned to Running.
+//  2. We preserve an existing deferral window as long as the pod is still in the happy-path
+//     initialization phase (all terminated init containers exited with 0, and no main
+//     containers have started yet). This allows batching multiple fast init containers.
+//  3. We immediately abort deferral (returning false) if any init container fails (ExitCode != 0),
+//     if the pod transitions out of Pending, or if a main container starts.
+func (m *manager) isEligibleForDeferral(oldStatus, newStatus *v1.PodStatus, hasActiveDeferral bool) bool {
+	// If the pod is no longer pending, initialization is over. We cannot defer.
+	if newStatus.Phase != v1.PodPending {
+		return false
+	}
+
+	// 1. Check for failure states. If any init container failed, we must flush
+	// immediately so the control plane can observe the crash loop or failure.
+	for i := range newStatus.InitContainerStatuses {
+		state := newStatus.InitContainerStatuses[i].State
+		if state.Terminated != nil && state.Terminated.ExitCode != 0 {
+			return false
+		}
+	}
+
+	// 2. Check if main containers have started. Once main containers are running,
+	// initialization is over and we should not delay their status.
+	for i := range newStatus.ContainerStatuses {
+		if newStatus.ContainerStatuses[i].State.Running != nil {
+			return false
+		}
+	}
+
+	// 3. If we already have an active deferral running, and we haven't hit any of the
+	// failure conditions above, we can continue to defer the update. This allows
+	// MULTIPLE fast init containers to be batched together in a single deferral window.
+	if hasActiveDeferral {
+		return true
+	}
+
+	// 4. If we don't have an active deferral, we only start one if an init container
+	// just transitioned from Waiting -> Running. We don't want to start a new deferral
+	// for arbitrary label changes or pod deletion events.
+	for i := range newStatus.InitContainerStatuses {
+		newInit := &newStatus.InitContainerStatuses[i]
+		var oldInit *v1.ContainerStatus
+		if oldStatus != nil && i < len(oldStatus.InitContainerStatuses) {
+			oldInit = &oldStatus.InitContainerStatuses[i]
+		}
+
+		wasRunning := oldInit != nil && oldInit.State.Running != nil
+		isRunning := newInit.State.Running != nil
+
+		if !wasRunning && isRunning {
+			return true
+		}
+	}
+
+	return false
 }
 
 // isPodStatusByKubeletEqual returns true if the given pod statuses are equal, ignoring
@@ -645,6 +739,8 @@ func (m *manager) TerminatePod(logger klog.Logger, pod *v1.Pod) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 
+	delete(m.podStatusDeferrals, pod.UID)
+
 	// ensure that all containers have a terminated state - because we do not know whether the container
 	// was successful, always report an error
 	oldStatus := &pod.Status
@@ -985,12 +1081,33 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 	// so we track the time from the first status update until we retire it to
 	// the API.
 	if cachedStatus.at.IsZero() {
-		newStatus.at = time.Now()
+		newStatus.at = m.clock.Now()
 	} else {
 		newStatus.at = cachedStatus.at
 	}
 
+	_, hasActiveDeferral := m.podStatusDeferrals[pod.UID]
+	shouldDefer := m.isEligibleForDeferral(&oldStatus, &status, hasActiveDeferral)
+
 	m.podStatuses[pod.UID] = newStatus
+
+	if shouldDefer {
+		if !hasActiveDeferral {
+			m.podStatusDeferrals[pod.UID] = m.clock.Now().Add(initContainerStatusDeferralWindow)
+
+			// Spawn a lightweight timer to wake up the syncBatch loop if nothing else does
+			timer := m.clock.NewTimer(initContainerStatusDeferralWindow)
+			go func() {
+				<-timer.C()
+				select {
+				case m.podStatusChannel <- struct{}{}:
+				default:
+				}
+			}()
+		}
+	} else {
+		delete(m.podStatusDeferrals, pod.UID)
+	}
 
 	select {
 	case m.podStatusChannel <- struct{}{}:
@@ -1115,6 +1232,14 @@ func (m *manager) syncBatch(ctx context.Context, all bool) int {
 
 			// if a new status update has been delivered, trigger an update, otherwise the
 			// pod can wait for the next bulk check (which performs reconciliation as well)
+
+			if expiration, deferred := m.podStatusDeferrals[uid]; deferred {
+				if m.clock.Now().Before(expiration) {
+					// The deferral window hasn't expired yet. Skip syncing this pod.
+					continue
+				}
+			}
+
 			if !all {
 				if m.apiStatusVersions[uidOfStatus] >= status.version {
 					continue
