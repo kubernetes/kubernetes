@@ -971,7 +971,7 @@ func TestEnsureAdminClusterRoleBinding(t *testing.T) {
 				}
 			}
 
-			client, err := EnsureAdminClusterRoleBinding(dir, ensureRBACFunc)
+			client, err := EnsureAdminClusterRoleBinding(dir, &kubeadmapi.APIEndpoint{}, ensureRBACFunc)
 			if (err != nil) != tc.expectedError {
 				t.Fatalf("expected error: %v, got: %v, error: %v", err != nil, tc.expectedError, err)
 			}
