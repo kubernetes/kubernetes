@@ -70,8 +70,8 @@ github.com/chai2010/gettext-go/po
 # github.com/container-storage-interface/spec v1.9.0
 ## explicit; go 1.18
 github.com/container-storage-interface/spec/lib/go/csi
-# github.com/containerd/containerd/api v1.10.0
-## explicit; go 1.23.0
+# github.com/containerd/containerd/api v1.11.0
+## explicit; go 1.24.0
 github.com/containerd/containerd/api/services/containers/v1
 github.com/containerd/containerd/api/services/tasks/v1
 github.com/containerd/containerd/api/services/version/v1
@@ -88,8 +88,8 @@ github.com/containerd/errdefs/pkg/internal/types
 # github.com/containerd/log v0.1.0
 ## explicit; go 1.20
 github.com/containerd/log
-# github.com/containerd/ttrpc v1.2.7
-## explicit; go 1.19
+# github.com/containerd/ttrpc v1.2.8
+## explicit; go 1.22
 github.com/containerd/ttrpc
 # github.com/containerd/typeurl/v2 v2.2.3
 ## explicit; go 1.21
@@ -383,8 +383,8 @@ github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus
 # github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3
 ## explicit; go 1.23.0
 github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors
-# github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0
-## explicit; go 1.24.0
+# github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0
+## explicit; go 1.25.0
 github.com/grpc-ecosystem/grpc-gateway/v2/internal/httprule
 github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options
 github.com/grpc-ecosystem/grpc-gateway/v2/runtime
@@ -775,8 +775,6 @@ go.opentelemetry.io/otel/sdk/trace
 go.opentelemetry.io/otel/sdk/trace/internal/env
 go.opentelemetry.io/otel/sdk/trace/internal/observ
 go.opentelemetry.io/otel/sdk/trace/tracetest
-# go.opentelemetry.io/otel/sdk/metric v1.43.0
-## explicit; go 1.25.0
 # go.opentelemetry.io/otel/trace v1.43.0
 ## explicit; go 1.25.0
 go.opentelemetry.io/otel/trace
@@ -943,18 +941,18 @@ golang.org/x/tools/internal/typesinternal
 golang.org/x/tools/internal/versions
 # golang.org/x/tools/go/expect v0.1.1-deprecated
 ## explicit; go 1.23.0
-# google.golang.org/genproto/googleapis/api v0.0.0-20260401024825-9d38bb4040a9
+# google.golang.org/genproto/googleapis/api v0.0.0-20260414002931-afd174a4e478
 ## explicit; go 1.25.0
 google.golang.org/genproto/googleapis/api
 google.golang.org/genproto/googleapis/api/annotations
 google.golang.org/genproto/googleapis/api/expr/v1alpha1
 google.golang.org/genproto/googleapis/api/httpbody
-# google.golang.org/genproto/googleapis/rpc v0.0.0-20260406210006-6f92a3bedf2d
+# google.golang.org/genproto/googleapis/rpc v0.0.0-20260414002931-afd174a4e478
 ## explicit; go 1.25.0
 google.golang.org/genproto/googleapis/rpc/errdetails
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.80.0
-## explicit; go 1.24.0
+# google.golang.org/grpc v1.81.0
+## explicit; go 1.25.0
 google.golang.org/grpc
 google.golang.org/grpc/attributes
 google.golang.org/grpc/backoff
@@ -1010,6 +1008,7 @@ google.golang.org/grpc/internal/status
 google.golang.org/grpc/internal/syscall
 google.golang.org/grpc/internal/transport
 google.golang.org/grpc/internal/transport/networktype
+google.golang.org/grpc/internal/transport/readyreader
 google.golang.org/grpc/keepalive
 google.golang.org/grpc/mem
 google.golang.org/grpc/metadata

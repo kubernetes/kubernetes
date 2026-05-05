@@ -53,6 +53,10 @@ type Buffer interface {
 	Free()
 	// Len returns the Buffer's size.
 	Len() int
+	// Slice returns a new Buffer that is a view into this buffer's data
+	// from [start:end). The buffer is not modified. Panics if the buffer
+	// has been freed or if start/end are out of bounds.
+	Slice(start, end int) Buffer
 
 	split(n int) (left, right Buffer)
 	read(buf []byte) (int, Buffer)
@@ -180,6 +184,32 @@ func (b *buffer) Len() int {
 	return len(b.ReadOnlyData())
 }
 
+func (b *buffer) Slice(start, end int) Buffer {
+	if b.rootBuf == nil {
+		panic("Cannot slice freed buffer")
+	}
+
+	data := b.data[start:end] // access the data to check slice bounds
+
+	if len(data) == 0 {
+		return emptyBuffer{}
+	}
+	if len(data) == len(b.data) {
+		b.Ref()
+		return b
+	}
+	// We are creating a new reference (view) to a portion of the root buffer's
+	// data. Therefore, we must increment the reference count of the root buffer
+	// to ensure the underlying data is not freed while this view is still in
+	// use.
+	b.rootBuf.Ref()
+	s := newBuffer()
+	s.data = data
+	s.rootBuf = b.rootBuf
+	s.refs.Store(1)
+	return s
+}
+
 func (b *buffer) split(n int) (Buffer, Buffer) {
 	if b.rootBuf == nil || b.rootBuf.refs.Add(1) <= 1 {
 		panic("Cannot split freed buffer")
@@ -240,6 +270,13 @@ func (e emptyBuffer) Len() int {
 	return 0
 }
 
+func (e emptyBuffer) Slice(start, end int) Buffer {
+	if start != 0 || end != 0 {
+		panic(fmt.Sprintf("slice bounds out of range [%d:%d] with length 0", start, end))
+	}
+	return e
+}
+
 func (e emptyBuffer) split(int) (left, right Buffer) {
 	return e, e
 }
@@ -263,6 +300,9 @@ func (s SliceBuffer) Free() {}
 
 // Len is a noop implementation of Len.
 func (s SliceBuffer) Len() int { return len(s) }
+
+// Slice returns a new SliceBuffer that is a view into the receiver from [start:end).
+func (s SliceBuffer) Slice(start, end int) Buffer { return s[start:end] }
 
 func (s SliceBuffer) split(n int) (left, right Buffer) {
 	return s[:n], s[n:]

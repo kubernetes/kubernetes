@@ -155,7 +155,6 @@
       ],
       "github.com/golang/protobuf": [
         "github.com/container-storage-interface/spec",
-        "github.com/containerd/containerd/api",
         "github.com/containerd/ttrpc",
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
         "go.etcd.io/etcd/api/v3",

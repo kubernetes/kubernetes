@@ -1,6 +1,8 @@
+//go:build !linux
+
 /*
  *
- * Copyright 2018 gRPC authors.
+ * Copyright 2026 gRPC authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +18,18 @@
  *
  */
 
-package grpc
+package readyreader
 
-// Version is the current grpc version.
-const Version = "1.81.0"
+func isRawConnSupported() bool {
+	return false
+}
+
+// sysRead is not implemented. Support can be added in the future if necessary.
+func sysRead(uintptr, []byte) (int, error) {
+	panic("RawConn functionality is not implemented for non-unix platforms.")
+}
+
+// wouldBlock is not implemented. Support can be added in the future if necessary.
+func wouldBlock(error) bool {
+	panic("RawConn functionality is not implemented for non-unix platforms.")
+}
