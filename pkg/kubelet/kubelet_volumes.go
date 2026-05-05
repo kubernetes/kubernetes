@@ -245,10 +245,10 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(logger klog.Logger, pods []*v1.Pod, ru
 		}
 
 		// Rmdir the pod dir, which should be empty if everything above was successful
-		logger.V(3).Info("Orphaned pod found, removing", "podUID", uid, "path", podDir)
+		logger.V(3).Info("Orphaned pod found, removing", "podUID", uid)
 		if err := syscall.Rmdir(podDir); err != nil {
 			cleanupFailed = true
-			logger.Error(err, "Failed to remove orphaned pod dir", "podUID", uid, "path", podDir)
+			logger.Error(err, "Failed to remove orphaned pod dir", "podUID", uid)
 			orphanRemovalErrors = append(orphanRemovalErrors, fmt.Errorf("orphaned pod %q found, but error occurred when trying to remove the pod directory: %v", uid, err))
 		}
 		if cleanupFailed {
