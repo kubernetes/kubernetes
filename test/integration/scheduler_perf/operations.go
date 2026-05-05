@@ -349,9 +349,19 @@ type createPodsOp struct {
 	// Params to be passed to the template.
 	// Values with `$` prefix will be resolved to the workload parameters.
 	TemplateParams map[string]any
+	// SignatureBatchSize defines how many subsequent pods have the same "signature" label.
+	// If positive, every SignatureBatchSize pods will have a "signature" label with value "signature-label-<index/batchSize>".
+	// If not specified, it defaults to 1 (each pod has a unique signature).
+	// Optional
+	SignatureBatchSize int
+	// Template parameter for SignatureBatchSize.
+	SignatureBatchSizeParam string
 }
 
 func (cpo *createPodsOp) isValid(allowParameterization bool) error {
+	if !isValidCount(allowParameterization, cpo.SignatureBatchSize, cpo.SignatureBatchSizeParam) {
+		return fmt.Errorf("invalid SignatureBatchSize=%d / SignatureBatchSizeParam=%q", cpo.SignatureBatchSize, cpo.SignatureBatchSizeParam)
+	}
 	if !isValidCount(allowParameterization, cpo.Count, cpo.CountParam) {
 		return fmt.Errorf("invalid Count=%d / CountParam=%q", cpo.Count, cpo.CountParam)
 	}
@@ -391,6 +401,17 @@ func (cpo createPodsOp) patchParams(w *Workload) (realOp, error) {
 			return nil, err
 		}
 		cpo.Count *= multiplier
+	}
+	if cpo.SignatureBatchSizeParam != "" {
+		paramKey := cpo.SignatureBatchSizeParam[1:]
+		signatureBatchSize, err := w.Params.get(paramKey)
+		if err != nil {
+			return nil, err
+		}
+		cpo.SignatureBatchSize = signatureBatchSize
+	}
+	if cpo.SignatureBatchSize == 0 {
+		cpo.SignatureBatchSize = 1
 	}
 	if cpo.DurationParam != "" {
 		durationStr, err := getParam[string](w.Params, cpo.DurationParam[1:])

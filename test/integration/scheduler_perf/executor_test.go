@@ -396,6 +396,69 @@ func TestRunOp(t *testing.T) {
 					}),
 			},
 		},
+		{
+
+			name: "Create Pods with Signature Labels from File",
+			op: &createPodsOp{
+				Opcode: createPodsOpcode,
+				Count:  3,
+				PodTemplatePath: createObjTemplateFile(t,
+					&v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "custom-pod-{{.Index}}",
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Name:  "container",
+									Image: "pause",
+								},
+							},
+						},
+					}),
+				SkipWaitToCompletion: true,
+				SignatureBatchSize:   2,
+			},
+			verifyFuncs: []verifyFunc{
+				verifyCount(3),
+				verifyPodSignature(2),
+			},
+		},
+		{
+			name: "Create Pods with Signature Labels from File (unset SignatureBatchSize)",
+			op: &createPodsOp{
+				Opcode: createPodsOpcode,
+				Count:  3,
+				PodTemplatePath: createObjTemplateFile(t,
+					&v1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "custom-pod-{{.Index}}",
+						},
+						Spec: v1.PodSpec{
+							Containers: []v1.Container{
+								{
+									Name:  "container",
+									Image: "pause",
+								},
+							},
+						},
+					}),
+				SkipWaitToCompletion: true,
+			},
+			verifyFuncs: []verifyFunc{
+				verifyCount(3),
+				verifyPodSignature(1),
+			},
+		},
+		{
+			name: "Create Pods with Invalid SignatureBatchSize",
+			op: &createPodsOp{
+				Opcode:             createPodsOpcode,
+				Count:              1,
+				SignatureBatchSize: -1,
+			},
+			expectedFailure: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -421,19 +484,21 @@ func TestRunOp(t *testing.T) {
 
 			opToRun := tt.op
 			opIndex := 0
-			if tt.workload != nil {
-				if patchable, ok := tt.op.(interface {
-					patchParams(w *Workload) (realOp, error)
-				}); ok {
-					patchedOp, err := patchable.patchParams(tt.workload)
-					if err != nil {
-						t.Fatalf("Failed to patch params: %v", err)
-					}
-					opToRun = patchedOp
-				}
+			w := tt.workload
+			if w == nil {
+				w = &Workload{}
 			}
 
-			err := exec.runOp(tCtx, opToRun, opIndex)
+			var err error
+			if patchable, ok := tt.op.(interface {
+				patchParams(w *Workload) (realOp, error)
+			}); ok {
+				opToRun, err = patchable.patchParams(w)
+			}
+
+			if err == nil {
+				err = exec.runOp(tCtx, opToRun, opIndex)
+			}
 
 			if tt.expectedFailure {
 				if err == nil {
@@ -484,6 +549,29 @@ func verifyCount(expectedCount int) verifyFunc {
 			}
 		default:
 			return fmt.Errorf("verifyCount doesn't support this operation type: %T", op)
+		}
+		return nil
+	}
+}
+
+func verifyPodSignature(batchSize int) verifyFunc {
+	return func(t *testing.T, tCtx ktesting.TContext, op realOp, opIndex int) error {
+		pods, err := tCtx.Client().CoreV1().Pods(metav1.NamespaceAll).List(tCtx, metav1.ListOptions{})
+		if err != nil {
+			return err
+		}
+		if len(pods.Items) == 0 {
+			return fmt.Errorf("no pods found")
+		}
+		for i, pod := range pods.Items {
+			val, ok := pod.Labels["signature"]
+			if !ok {
+				return fmt.Errorf("pod %s missing signature label", pod.Name)
+			}
+			expected := fmt.Sprintf("signature-label-%d", i/batchSize)
+			if val != expected {
+				return fmt.Errorf("pod %d: unexpected signature: got %q, want %q", i, val, expected)
+			}
 		}
 		return nil
 	}

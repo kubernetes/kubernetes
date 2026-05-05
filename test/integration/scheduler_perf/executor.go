@@ -880,7 +880,7 @@ func waitUntilPodsScheduledInNamespace(tCtx ktesting.TContext, podInformer corei
 func getPodStrategy(cpo *createPodsOp) (testutils.TestPodCreateStrategy, error) {
 	podTemplate := testutils.StaticPodTemplate(makeBasePod())
 	if cpo.PodTemplatePath != nil {
-		podTemplate = podTemplateWithParams{path: *cpo.PodTemplatePath, params: cpo.TemplateParams}
+		podTemplate = podTemplateWithParams{path: *cpo.PodTemplatePath, params: cpo.TemplateParams, batchSize: cpo.SignatureBatchSize}
 	}
 	if cpo.PersistentVolumeClaimTemplatePath == nil {
 		return testutils.NewCustomCreatePodStrategy(podTemplate), nil
@@ -915,8 +915,9 @@ func (n nodeTemplateWithParams) GetNodeTemplate(index, count int) (*v1.Node, err
 }
 
 type podTemplateWithParams struct {
-	path   string
-	params map[string]any
+	path      string
+	params    map[string]any
+	batchSize int
 }
 
 func (p podTemplateWithParams) GetPodTemplate(index, count int) (*v1.Pod, error) {
@@ -928,6 +929,12 @@ func (p podTemplateWithParams) GetPodTemplate(index, count int) (*v1.Pod, error)
 	if err := getSpecFromTextTemplateFile(p.path, env, podSpec); err != nil {
 		return nil, fmt.Errorf("parsing Pod: %w", err)
 	}
+
+	if podSpec.Labels == nil {
+		podSpec.Labels = make(map[string]string)
+	}
+	podSpec.Labels["signature"] = fmt.Sprintf("signature-label-%d", index/p.batchSize)
+
 	return podSpec, nil
 }
 
