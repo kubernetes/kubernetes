@@ -380,13 +380,10 @@ func (d *Helper) evictPods(pods []corev1.Pod, evictionGroupVersion schema.GroupV
 
 	numPods := len(pods)
 	for doneCount < numPods {
-		select {
-		case err := <-returnCh:
-			doneCount++
-			if err != nil {
-				errors = append(errors, err)
-			}
+		if err := <-returnCh; err != nil {
+			errors = append(errors, err)
 		}
+		doneCount++
 	}
 
 	return utilerrors.NewAggregate(errors)
