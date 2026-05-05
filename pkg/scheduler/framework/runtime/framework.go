@@ -1342,55 +1342,133 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleStat
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.Score, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 	allNodePluginScores := make([]fwk.NodePluginScores, len(nodes))
-	numPlugins := len(f.scorePlugins)
-	plugins := make([]fwk.ScorePlugin, 0, numPlugins)
-	pluginToNodeScores := make(map[string]fwk.NodeScoreList, numPlugins)
-	for _, pl := range f.scorePlugins {
-		if state.GetSkipScorePlugins().Has(pl.Name()) {
-			continue
+	plugins := f.filterScorePlugins(state)
+	if len(plugins) == 0 {
+		for i, nodeInfo := range nodes {
+			allNodePluginScores[i] = fwk.NodePluginScores{
+				Name:      nodeInfo.Node().Name,
+				RawScores: make([]fwk.PluginScore, 0),
+				Scores:    make([]fwk.PluginScore, 0),
+			}
 		}
-		plugins = append(plugins, pl)
+		return allNodePluginScores, nil
+	}
+
+	pluginToNodeScores := make(map[string]fwk.NodeScoreList, len(plugins))
+	for _, pl := range plugins {
 		pluginToNodeScores[pl.Name()] = make(fwk.NodeScoreList, len(nodes))
 	}
+
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	errCh := parallelize.NewResultChannel[error]()
 
-	if len(plugins) > 0 {
-		logger := klog.FromContext(ctx)
-		verboseLogs := logger.V(4).Enabled()
-		if verboseLogs {
-			logger = klog.LoggerWithName(logger, "Score")
+	if l := klog.FromContext(ctx); l.V(4).Enabled() {
+		ctx = klog.NewContext(ctx, klog.LoggerWithName(l, "Score"))
+	}
+	// Run Score method for each node in parallel.
+	f.Parallelizer().Until(ctx, len(nodes), func(index int) {
+		nodeInfo := nodes[index]
+		nodeName := nodeInfo.Node().Name
+		nodeCtx := ctx
+		if l := klog.FromContext(nodeCtx); l.V(4).Enabled() {
+			nodeCtx = klog.NewContext(nodeCtx,
+				klog.LoggerWithValues(l, "node", klog.ObjectRef{Name: nodeName}),
+			)
 		}
-		// Run Score method for each node in parallel.
-		f.Parallelizer().Until(ctx, len(nodes), func(index int) {
-			nodeInfo := nodes[index]
-			nodeName := nodeInfo.Node().Name
-			logger := logger
-			if verboseLogs {
-				logger = klog.LoggerWithValues(logger, "node", klog.ObjectRef{Name: nodeName})
-			}
-			for _, pl := range plugins {
-				ctx := ctx
-				if verboseLogs {
-					logger := klog.LoggerWithName(logger, pl.Name())
-					ctx = klog.NewContext(ctx, logger)
-				}
-				s, status := f.runScorePlugin(ctx, pl, state, pod, nodeInfo)
-				if !status.IsSuccess() {
-					err := fmt.Errorf("plugin %q failed with: %w", pl.Name(), status.AsError())
-					errCh.SendWithCancel(err, cancel)
-					return
-				}
-				pluginToNodeScores[pl.Name()][index] = fwk.NodeScore{
-					Name:  nodeName,
-					Score: s,
-				}
-			}
-		}, metrics.Score)
-		if err := errCh.Receive(); err != nil {
-			return nil, fwk.AsStatus(fmt.Errorf("running Score plugins: %w", err))
+		rawScores, status := f.runRawScorePlugins(nodeCtx, state, pod, nodeInfo, plugins)
+		if !status.IsSuccess() {
+			errCh.SendWithCancel(status.AsError(), cancel)
+			return
 		}
+		allNodePluginScores[index] = fwk.NodePluginScores{
+			Name:      nodeName,
+			RawScores: rawScores,
+		}
+		for _, rawScore := range rawScores {
+			pluginToNodeScores[rawScore.Name][index] = fwk.NodeScore{
+				Name:  nodeName,
+				Score: rawScore.Score,
+			}
+		}
+	}, metrics.Score)
+	if err := errCh.Receive(); err != nil {
+		return nil, fwk.AsStatus(fmt.Errorf("running Score plugins: %w", err))
+	}
+
+	status = f.normalizeScores(ctx, state, pod, plugins, allNodePluginScores, pluginToNodeScores)
+	if !status.IsSuccess() {
+		return nil, status
+	}
+	return allNodePluginScores, nil
+}
+
+func (f *frameworkImpl) RunRawScorePlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) ([]fwk.PluginScore, *fwk.Status) {
+	plugins := f.filterScorePlugins(state)
+	if len(plugins) == 0 {
+		return nil, nil
+	}
+	return f.runRawScorePlugins(ctx, state, pod, nodeInfo, plugins)
+}
+
+func (f *frameworkImpl) runRawScorePlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod,
+	nodeInfo fwk.NodeInfo, plugins []fwk.ScorePlugin) ([]fwk.PluginScore, *fwk.Status) {
+	scores := make([]fwk.PluginScore, 0, len(plugins))
+	for _, pl := range plugins {
+		plCtx := ctx
+		if l := klog.FromContext(ctx); l.V(4).Enabled() {
+			plCtx = klog.NewContext(ctx, klog.LoggerWithName(l, pl.Name()))
+		}
+		score, status := f.runScorePlugin(plCtx, pl, state, pod, nodeInfo)
+		if !status.IsSuccess() {
+			return nil, fwk.AsStatus(fmt.Errorf("plugin %q failed with: %w", pl.Name(), status.AsError()))
+		}
+		scores = append(scores, fwk.PluginScore{Name: pl.Name(), Score: score})
+	}
+	return scores, nil
+}
+
+func (f *frameworkImpl) NormalizeScores(ctx context.Context, state fwk.CycleState, pod *v1.Pod,
+	scores []fwk.NodePluginScores) *fwk.Status {
+	plugins := f.filterScorePlugins(state)
+	if len(plugins) == 0 {
+		for i := range scores {
+			scores[i].Scores = make([]fwk.PluginScore, 0)
+			scores[i].TotalScore = 0
+		}
+		return nil
+	}
+	pluginToNodeScores := make(map[string]fwk.NodeScoreList, len(plugins))
+	for _, pl := range plugins {
+		pluginToNodeScores[pl.Name()] = make(fwk.NodeScoreList, len(scores))
+	}
+
+	for i, nodeScore := range scores {
+		for _, rawScore := range nodeScore.RawScores {
+			if nodeScoreList, ok := pluginToNodeScores[rawScore.Name]; ok {
+				nodeScoreList[i] = fwk.NodeScore{
+					Name:  nodeScore.Name,
+					Score: rawScore.Score,
+				}
+			}
+		}
+	}
+
+	return f.normalizeScores(ctx, state, pod, plugins, scores, pluginToNodeScores)
+}
+
+func (f *frameworkImpl) normalizeScores(ctx context.Context, state fwk.CycleState, pod *v1.Pod,
+	plugins []fwk.ScorePlugin, scores []fwk.NodePluginScores, pluginToNodeScores map[string]fwk.NodeScoreList) *fwk.Status {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	errCh := parallelize.NewResultChannel[error]()
+
+	// Pre-resolve per-plugin data into slices to avoid map lookups.
+	nodeScoreLists := make([]fwk.NodeScoreList, len(plugins))
+	weights := make([]int, len(plugins))
+	for i, pl := range plugins {
+		nodeScoreLists[i] = pluginToNodeScores[pl.Name()]
+		weights[i] = f.scorePluginWeight[pl.Name()]
 	}
 
 	// Run NormalizeScore method for each ScorePlugin in parallel.
@@ -1399,8 +1477,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleStat
 		if pl.ScoreExtensions() == nil {
 			return
 		}
-		nodeScoreList := pluginToNodeScores[pl.Name()]
-		status := f.runScoreExtension(ctx, pl, state, pod, nodeScoreList)
+		status := f.runScoreExtension(ctx, pl, state, pod, nodeScoreLists[index])
 		if !status.IsSuccess() {
 			err := fmt.Errorf("plugin %q failed with: %w", pl.Name(), status.AsError())
 			errCh.SendWithCancel(err, cancel)
@@ -1408,41 +1485,44 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleStat
 		}
 	}, metrics.Score)
 	if err := errCh.Receive(); err != nil {
-		return nil, fwk.AsStatus(fmt.Errorf("running Normalize on Score plugins: %w", err))
+		return fwk.AsStatus(fmt.Errorf("running Normalize on Score plugins: %w", err))
 	}
 
-	// Apply score weight for each ScorePlugin in parallel,
-	// and then, build allNodePluginScores.
-	f.Parallelizer().Until(ctx, len(nodes), func(index int) {
-		nodePluginScores := fwk.NodePluginScores{
-			Name:   nodes[index].Node().Name,
-			Scores: make([]fwk.PluginScore, len(plugins)),
-		}
-
+	// Apply score weight for each ScorePlugin in parallel.
+	f.Parallelizer().Until(ctx, len(scores), func(index int) {
+		nodePluginScores := make([]fwk.PluginScore, len(plugins))
+		var totalScore int64
 		for i, pl := range plugins {
-			weight := f.scorePluginWeight[pl.Name()]
-			nodeScoreList := pluginToNodeScores[pl.Name()]
-			score := nodeScoreList[index].Score
+			score := nodeScoreLists[i][index].Score
 
 			if score > fwk.MaxNodeScore || score < fwk.MinNodeScore {
-				err := fmt.Errorf("plugin %q returns an invalid score %v, it should in the range of [%v, %v] after normalizing", pl.Name(), score, fwk.MinNodeScore, fwk.MaxNodeScore)
+				err := fmt.Errorf("plugin %q returns an invalid score %v, it should in the range of [%v, %v] after normalizing",
+					pl.Name(), score, fwk.MinNodeScore, fwk.MaxNodeScore)
 				errCh.SendWithCancel(err, cancel)
 				return
 			}
-			weightedScore := score * int64(weight)
-			nodePluginScores.Scores[i] = fwk.PluginScore{
-				Name:  pl.Name(),
-				Score: weightedScore,
-			}
-			nodePluginScores.TotalScore += weightedScore
+			weightedScore := score * int64(weights[i])
+			nodePluginScores[i] = fwk.PluginScore{Name: pl.Name(), Score: weightedScore}
+			totalScore += weightedScore
 		}
-		allNodePluginScores[index] = nodePluginScores
+		scores[index].Scores = nodePluginScores
+		scores[index].TotalScore = totalScore
 	}, metrics.Score)
 	if err := errCh.Receive(); err != nil {
-		return nil, fwk.AsStatus(fmt.Errorf("applying score defaultWeights on Score plugins: %w", err))
+		return fwk.AsStatus(fmt.Errorf("applying score defaultWeights on Score plugins: %w", err))
 	}
 
-	return allNodePluginScores, nil
+	return nil
+}
+
+func (f *frameworkImpl) filterScorePlugins(state fwk.CycleState) []fwk.ScorePlugin {
+	plugins := make([]fwk.ScorePlugin, 0, len(f.scorePlugins))
+	for _, pl := range f.scorePlugins {
+		if !state.GetSkipScorePlugins().Has(pl.Name()) {
+			plugins = append(plugins, pl)
+		}
+	}
+	return plugins
 }
 
 func (f *frameworkImpl) runScorePlugin(ctx context.Context, pl fwk.ScorePlugin, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) (int64, *fwk.Status) {

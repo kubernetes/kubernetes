@@ -1395,12 +1395,14 @@ func TestRunScorePlugins(t *testing.T) {
 			plugins: buildScoreConfigDefaultWeights(),
 			want: []fwk.NodePluginScores{
 				{
-					Name:   "node1",
-					Scores: []fwk.PluginScore{},
+					Name:      "node1",
+					RawScores: []fwk.PluginScore{},
+					Scores:    []fwk.PluginScore{},
 				},
 				{
-					Name:   "node2",
-					Scores: []fwk.PluginScore{},
+					Name:      "node2",
+					RawScores: []fwk.PluginScore{},
+					Scores:    []fwk.PluginScore{},
 				},
 			},
 		},
@@ -1419,6 +1421,12 @@ func TestRunScorePlugins(t *testing.T) {
 			want: []fwk.NodePluginScores{
 				{
 					Name: "node1",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 1,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  scorePlugin1,
@@ -1429,6 +1437,12 @@ func TestRunScorePlugins(t *testing.T) {
 				},
 				{
 					Name: "node2",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 1,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  scorePlugin1,
@@ -1451,10 +1465,17 @@ func TestRunScorePlugins(t *testing.T) {
 					},
 				},
 			},
-			// scoreWithNormalizePlugin1 Score returns 10, but NormalizeScore overrides to 5, weight=1, so want=5
+			// scoreWithNormalizePlugin1 Score returns 10, NormalizeScore overrides to 5, weight=1.
+			// RawScores captures pre-NormalizeScore (10), Scores captures post-normalize post-weighting (5*1=5).
 			want: []fwk.NodePluginScores{
 				{
 					Name: "node1",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  scoreWithNormalizePlugin1,
+							Score: 10,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  scoreWithNormalizePlugin1,
@@ -1465,6 +1486,12 @@ func TestRunScorePlugins(t *testing.T) {
 				},
 				{
 					Name: "node2",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  scoreWithNormalizePlugin1,
+							Score: 10,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  scoreWithNormalizePlugin1,
@@ -1498,12 +1525,26 @@ func TestRunScorePlugins(t *testing.T) {
 					},
 				},
 			},
-			// scorePlugin1 Score returns 1, weight =1, so want=1.
-			// scoreWithNormalizePlugin1 Score returns 3, but NormalizeScore overrides to 4, weight=1, so want=4.
-			// scoreWithNormalizePlugin2 Score returns 4, but NormalizeScore overrides to 5, weight=2, so want=10.
+			// scorePlugin1: Score=1, weight=1 → RawScores=1, Scores=1.
+			// scoreWithNormalizePlugin1: Score=3, NormalizeScore→4, weight=1 → RawScores=3, Scores=4.
+			// scoreWithNormalizePlugin2: Score=4, NormalizeScore→5, weight=2 → RawScores=4, Scores=10.
 			want: []fwk.NodePluginScores{
 				{
 					Name: "node1",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 1,
+						},
+						{
+							Name:  scoreWithNormalizePlugin1,
+							Score: 3,
+						},
+						{
+							Name:  scoreWithNormalizePlugin2,
+							Score: 4,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  scorePlugin1,
@@ -1522,6 +1563,20 @@ func TestRunScorePlugins(t *testing.T) {
 				},
 				{
 					Name: "node2",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 1,
+						},
+						{
+							Name:  scoreWithNormalizePlugin1,
+							Score: 3,
+						},
+						{
+							Name:  scoreWithNormalizePlugin2,
+							Score: 4,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  scorePlugin1,
@@ -1640,10 +1695,16 @@ func TestRunScorePlugins(t *testing.T) {
 					},
 				},
 			},
-			// scorePlugin1 Score returns 1, weight=3, so want=3.
+			// scorePlugin1 Score returns 1, weight=3, so Scores=3, RawScores=1.
 			want: []fwk.NodePluginScores{
 				{
 					Name: "node1",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 1,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  scorePlugin1,
@@ -1654,6 +1715,12 @@ func TestRunScorePlugins(t *testing.T) {
 				},
 				{
 					Name: "node2",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 1,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  scorePlugin1,
@@ -1685,6 +1752,12 @@ func TestRunScorePlugins(t *testing.T) {
 			want: []fwk.NodePluginScores{
 				{
 					Name: "node1",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 1,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  scorePlugin1,
@@ -1695,6 +1768,12 @@ func TestRunScorePlugins(t *testing.T) {
 				},
 				{
 					Name: "node2",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 1,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  scorePlugin1,
@@ -1719,12 +1798,14 @@ func TestRunScorePlugins(t *testing.T) {
 			skippedPlugins: sets.New(scorePlugin1),
 			want: []fwk.NodePluginScores{
 				{
-					Name:   "node1",
-					Scores: []fwk.PluginScore{},
+					Name:      "node1",
+					RawScores: []fwk.PluginScore{},
+					Scores:    []fwk.PluginScore{},
 				},
 				{
-					Name:   "node2",
-					Scores: []fwk.PluginScore{},
+					Name:      "node2",
+					RawScores: []fwk.PluginScore{},
+					Scores:    []fwk.PluginScore{},
 				},
 			},
 		},
@@ -1735,12 +1816,14 @@ func TestRunScorePlugins(t *testing.T) {
 			skippedPlugins: sets.New(scorePlugin1, "score-plugin-unknown"),
 			want: []fwk.NodePluginScores{
 				{
-					Name:   "node1",
-					Scores: []fwk.PluginScore{},
+					Name:      "node1",
+					RawScores: []fwk.PluginScore{},
+					Scores:    []fwk.PluginScore{},
 				},
 				{
-					Name:   "node2",
-					Scores: []fwk.PluginScore{},
+					Name:      "node2",
+					RawScores: []fwk.PluginScore{},
+					Scores:    []fwk.PluginScore{},
 				},
 			},
 		},
@@ -1780,6 +1863,491 @@ func TestRunScorePlugins(t *testing.T) {
 			}
 			if diff := cmp.Diff(tt.want, res); diff != "" {
 				t.Errorf("Score map after RunScorePlugin (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestRunRawScorePlugins(t *testing.T) {
+	tests := []struct {
+		name          string
+		plugins       *config.Plugins
+		pluginConfigs []config.PluginConfig
+		skippedPlugin string
+		want          []fwk.PluginScore
+		err           bool
+	}{
+		{
+			name:    "no score plugins",
+			plugins: buildScoreConfigDefaultWeights(),
+			want:    nil,
+		},
+		{
+			name:    "single plugin returns raw score without weighting",
+			plugins: buildScoreConfigDefaultWeights(scorePlugin1),
+			pluginConfigs: []config.PluginConfig{
+				{
+					Name: scorePlugin1,
+					Args: &runtime.Unknown{Raw: []byte(`{ "scoreRes": 5 }`)}},
+			},
+			want: []fwk.PluginScore{
+				{
+					Name:  scorePlugin1,
+					Score: 5,
+				},
+			},
+		},
+		{
+			name:    "NormalizeScore is not run, only raw Score is returned",
+			plugins: buildScoreConfigDefaultWeights(scoreWithNormalizePlugin1),
+			pluginConfigs: []config.PluginConfig{
+				{
+					Name: scoreWithNormalizePlugin1,
+					Args: &runtime.Unknown{Raw: []byte(`{ "scoreRes": 7, "normalizeRes": 99 }`)},
+				},
+			},
+			want: []fwk.PluginScore{{Name: scoreWithNormalizePlugin1, Score: 7}},
+		},
+		{
+			name:    "multiple plugins, scores are not weighted",
+			plugins: buildScoreConfigDefaultWeights(scorePlugin1, scoreWithNormalizePlugin1),
+			pluginConfigs: []config.PluginConfig{
+				{
+					Name: scorePlugin1,
+					Args: &runtime.Unknown{Raw: []byte(`{ "scoreRes": 3 }`)},
+				},
+				{
+					Name: scoreWithNormalizePlugin1,
+					Args: &runtime.Unknown{Raw: []byte(`{ "scoreRes": 4, "normalizeRes": 99 }`)},
+				},
+			},
+			want: []fwk.PluginScore{
+				{
+					Name:  scorePlugin1,
+					Score: 3,
+				},
+				{
+					Name:  scoreWithNormalizePlugin1,
+					Score: 4,
+				},
+			},
+		},
+		{
+			name:    "score fails",
+			plugins: buildScoreConfigDefaultWeights(scorePlugin1),
+			pluginConfigs: []config.PluginConfig{
+				{
+					Name: scorePlugin1,
+					Args: &runtime.Unknown{Raw: []byte(`{ "scoreStatus": 1 }`)},
+				},
+			},
+			err: true,
+		},
+		{
+			name:    "skipped plugin is excluded from results",
+			plugins: buildScoreConfigDefaultWeights(scorePlugin1, scoreWithNormalizePlugin1),
+			pluginConfigs: []config.PluginConfig{
+				{
+					Name: scorePlugin1,
+					Args: &runtime.Unknown{Raw: []byte(`{ "scoreRes": 2 }`)},
+				},
+				{
+					Name: scoreWithNormalizePlugin1,
+					Args: &runtime.Unknown{Raw: []byte(`{ "scoreStatus": 1 }`)},
+				},
+			},
+			skippedPlugin: scoreWithNormalizePlugin1,
+			want: []fwk.PluginScore{
+				{
+					Name:  scorePlugin1,
+					Score: 2,
+				},
+			},
+		},
+		{
+			name:          "all plugins skipped",
+			plugins:       buildScoreConfigDefaultWeights(scorePlugin1),
+			skippedPlugin: scorePlugin1,
+			want:          nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			profile := config.KubeSchedulerProfile{
+				Plugins:      tt.plugins,
+				PluginConfig: tt.pluginConfigs,
+			}
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			f, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile)
+			if err != nil {
+				t.Fatalf("Failed to create framework for testing: %v", err)
+			}
+			defer func() { _ = f.Close() }()
+
+			state := framework.NewCycleState()
+			if tt.skippedPlugin != "" {
+				state.SetSkipScorePlugins(sets.New(tt.skippedPlugin))
+			}
+			got, status := f.RunRawScorePlugins(ctx, state, pod, BuildNodeInfos([]*v1.Node{node})[0])
+
+			if tt.err {
+				if status.IsSuccess() {
+					t.Errorf("expected error status, got success")
+				}
+				return
+			}
+			if !status.IsSuccess() {
+				t.Errorf("unexpected error: %v", status)
+			}
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("RunRawScorePlugins (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestNormalizeScores(t *testing.T) {
+	tests := []struct {
+		name          string
+		plugins       *config.Plugins
+		pluginConfigs []config.PluginConfig
+		skippedPlugin string
+		inputScores   []fwk.NodePluginScores
+		want          []fwk.NodePluginScores
+		err           bool
+	}{
+		{
+			name:    "single plugin without NormalizeScore",
+			plugins: buildScoreConfigDefaultWeights(scorePlugin1),
+			inputScores: []fwk.NodePluginScores{
+				{
+					Name: nodeName,
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 5,
+						},
+					},
+				},
+			},
+			want: []fwk.NodePluginScores{
+				{
+					Name: nodeName,
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 5,
+						},
+					},
+					Scores: []fwk.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 5,
+						},
+					},
+					TotalScore: 5,
+				},
+			},
+		},
+		{
+			name:    "NormalizeScore overrides raw score",
+			plugins: buildScoreConfigDefaultWeights(scoreWithNormalizePlugin1),
+			pluginConfigs: []config.PluginConfig{
+				{
+					Name: scoreWithNormalizePlugin1,
+					Args: &runtime.Unknown{Raw: []byte(`{ "scoreRes": 7, "normalizeRes": 20 }`)},
+				},
+			},
+			inputScores: []fwk.NodePluginScores{
+				{
+					Name: nodeName,
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  scoreWithNormalizePlugin1,
+							Score: 7,
+						},
+					},
+				},
+			},
+			want: []fwk.NodePluginScores{
+				{
+					Name: nodeName,
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  scoreWithNormalizePlugin1,
+							Score: 7,
+						},
+					},
+					Scores: []fwk.PluginScore{
+						{
+							Name:  scoreWithNormalizePlugin1,
+							Score: 20,
+						},
+					},
+					TotalScore: 20,
+				},
+			},
+		},
+		{
+			name:    "weight is applied to normalized score",
+			plugins: buildScoreConfigDefaultWeights(scoreWithNormalizePlugin2),
+			pluginConfigs: []config.PluginConfig{
+				{
+					Name: scoreWithNormalizePlugin2,
+					Args: &runtime.Unknown{Raw: []byte(`{ "normalizeRes": 10 }`)},
+				},
+			},
+			inputScores: []fwk.NodePluginScores{
+				{
+					Name: nodeName,
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  scoreWithNormalizePlugin2,
+							Score: 5,
+						},
+					},
+				},
+			},
+			// scoreWithNormalizePlugin2 has weight=2, normalizeRes=10 → weighted score=20.
+			want: []fwk.NodePluginScores{
+				{
+					Name: nodeName,
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  scoreWithNormalizePlugin2,
+							Score: 5,
+						},
+					},
+					Scores: []fwk.PluginScore{
+						{
+							Name:  scoreWithNormalizePlugin2,
+							Score: 20,
+						},
+					},
+					TotalScore: 20,
+				},
+			},
+		},
+		{
+			name:    "multiple plugins across multiple nodes",
+			plugins: buildScoreConfigDefaultWeights(scorePlugin1, scoreWithNormalizePlugin1),
+			pluginConfigs: []config.PluginConfig{
+				{
+					Name: scoreWithNormalizePlugin1,
+					Args: &runtime.Unknown{Raw: []byte(`{ "normalizeRes": 8 }`)},
+				},
+			},
+			inputScores: []fwk.NodePluginScores{
+				{
+					Name: "node1",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 3,
+						},
+						{
+							Name:  scoreWithNormalizePlugin1,
+							Score: 7,
+						},
+					},
+				},
+				{
+					Name: "node2",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 5,
+						},
+						{
+							Name:  scoreWithNormalizePlugin1,
+							Score: 2,
+						},
+					},
+				},
+			},
+			// scorePlugin1: no NormalizeScore, raw scores preserved per node.
+			// scoreWithNormalizePlugin1: NormalizeScore sets all nodes to 8.
+			want: []fwk.NodePluginScores{
+				{
+					Name: "node1",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 3,
+						},
+						{
+							Name:  scoreWithNormalizePlugin1,
+							Score: 7,
+						},
+					},
+					Scores: []fwk.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 3,
+						},
+						{
+							Name:  scoreWithNormalizePlugin1,
+							Score: 8,
+						},
+					},
+					TotalScore: 11,
+				},
+				{
+					Name: "node2",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 5,
+						},
+						{
+							Name:  scoreWithNormalizePlugin1,
+							Score: 2,
+						},
+					},
+					Scores: []fwk.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 5,
+						},
+						{
+							Name:  scoreWithNormalizePlugin1,
+							Score: 8,
+						},
+					},
+					TotalScore: 13,
+				},
+			},
+		},
+		{
+			name:          "no active plugins zeroes scores and TotalScore",
+			plugins:       buildScoreConfigDefaultWeights(scorePlugin1),
+			skippedPlugin: scorePlugin1,
+			inputScores: []fwk.NodePluginScores{
+				{
+					Name: nodeName,
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 5,
+						},
+					},
+				},
+			},
+			want: []fwk.NodePluginScores{
+				{
+					Name: nodeName,
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 5,
+						},
+					},
+					Scores: []fwk.PluginScore{},
+				},
+			},
+		},
+		{
+			name:    "unknown plugin name in RawScores is ignored",
+			plugins: buildScoreConfigDefaultWeights(scorePlugin1),
+			inputScores: []fwk.NodePluginScores{
+				{
+					Name: nodeName,
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 5,
+						},
+						{
+							Name:  "unknown-plugin",
+							Score: 99,
+						},
+					},
+				},
+			},
+			want: []fwk.NodePluginScores{
+				{
+					Name: nodeName,
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 5,
+						},
+						{
+							Name:  "unknown-plugin",
+							Score: 99,
+						},
+					},
+					Scores: []fwk.PluginScore{
+						{
+							Name:  scorePlugin1,
+							Score: 5,
+						},
+					},
+					TotalScore: 5,
+				},
+			},
+		},
+		{
+			name:    "normalize fails",
+			plugins: buildScoreConfigDefaultWeights(scoreWithNormalizePlugin1),
+			pluginConfigs: []config.PluginConfig{
+				{
+					Name: scoreWithNormalizePlugin1,
+					Args: &runtime.Unknown{Raw: []byte(`{ "normalizeStatus": 1 }`)},
+				},
+			},
+			inputScores: []fwk.NodePluginScores{
+				{
+					Name: nodeName,
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  scoreWithNormalizePlugin1,
+							Score: 3,
+						},
+					},
+				},
+			},
+			err: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			profile := config.KubeSchedulerProfile{
+				Plugins:      tt.plugins,
+				PluginConfig: tt.pluginConfigs,
+			}
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			f, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile)
+			if err != nil {
+				t.Fatalf("Failed to create framework for testing: %v", err)
+			}
+			defer func() { _ = f.Close() }()
+
+			state := framework.NewCycleState()
+			if tt.skippedPlugin != "" {
+				state.SetSkipScorePlugins(sets.New(tt.skippedPlugin))
+			}
+
+			scores := tt.inputScores
+			status := f.NormalizeScores(ctx, state, pod, scores)
+
+			if tt.err {
+				if status.IsSuccess() {
+					t.Errorf("expected error status, got success")
+				}
+				return
+			}
+			if !status.IsSuccess() {
+				t.Errorf("unexpected error: %v", status)
+			}
+			if diff := cmp.Diff(tt.want, scores); diff != "" {
+				t.Errorf("NormalizeScores (-want,+got):\n%s", diff)
 			}
 		})
 	}

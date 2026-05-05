@@ -4027,6 +4027,16 @@ func Test_prioritizeNodes(t *testing.T) {
 			want: []fwk.NodePluginScores{
 				{
 					Name: "node1",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 0,
+						},
+						{
+							Name:  "Node2Prioritizer",
+							Score: 10,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "Node2Prioritizer",
@@ -4041,6 +4051,16 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node2",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 0,
+						},
+						{
+							Name:  "Node2Prioritizer",
+							Score: 100,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "Node2Prioritizer",
@@ -4089,8 +4109,13 @@ func Test_prioritizeNodes(t *testing.T) {
 			want: []fwk.NodePluginScores{
 				{
 					Name: "node1",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 0,
+						},
+					},
 					Scores: []fwk.PluginScore{
-
 						{
 							Name:  "FakeExtender1",
 							Score: 300,
@@ -4108,6 +4133,12 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node2",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 0,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "FakeExtender1",
@@ -4144,6 +4175,16 @@ func Test_prioritizeNodes(t *testing.T) {
 			want: []fwk.NodePluginScores{
 				{
 					Name: "node1",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 0,
+						},
+						{
+							Name:  "Node2Prioritizer",
+							Score: 10,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "Node2Prioritizer",
@@ -4158,6 +4199,16 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node2",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "NodeResourcesBalancedAllocation",
+							Score: 0,
+						},
+						{
+							Name:  "Node2Prioritizer",
+							Score: 100,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "Node2Prioritizer",
@@ -4186,8 +4237,8 @@ func Test_prioritizeNodes(t *testing.T) {
 			},
 			extenders: nil,
 			want: []fwk.NodePluginScores{
-				{Name: "node1", Scores: []fwk.PluginScore{}},
-				{Name: "node2", Scores: []fwk.PluginScore{}},
+				{Name: "node1", RawScores: []fwk.PluginScore{}, Scores: []fwk.PluginScore{}},
+				{Name: "node2", RawScores: []fwk.PluginScore{}, Scores: []fwk.PluginScore{}},
 			},
 		},
 		{
@@ -4215,6 +4266,12 @@ func Test_prioritizeNodes(t *testing.T) {
 			want: []fwk.NodePluginScores{
 				{
 					Name: "node1",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "ImageLocality",
+							Score: 5,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "ImageLocality",
@@ -4225,6 +4282,12 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node2",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "ImageLocality",
+							Score: 5,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "ImageLocality",
@@ -4235,6 +4298,12 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node3",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "ImageLocality",
+							Score: 5,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "ImageLocality",
@@ -4269,6 +4338,12 @@ func Test_prioritizeNodes(t *testing.T) {
 			want: []fwk.NodePluginScores{
 				{
 					Name: "node1",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "ImageLocality",
+							Score: 18,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "ImageLocality",
@@ -4279,6 +4354,12 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node2",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "ImageLocality",
+							Score: 18,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "ImageLocality",
@@ -4289,6 +4370,12 @@ func Test_prioritizeNodes(t *testing.T) {
 				},
 				{
 					Name: "node3",
+					RawScores: []fwk.PluginScore{
+						{
+							Name:  "ImageLocality",
+							Score: 0,
+						},
+					},
 					Scores: []fwk.PluginScore{
 						{
 							Name:  "ImageLocality",

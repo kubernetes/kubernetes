@@ -222,6 +222,14 @@ type Framework interface {
 	// StoreScheduleResults stores the results after we have sorted and filtered nodes.
 	StoreScheduleResults(ctx context.Context, signature fwk.PodSignature, hintedNode, chosenNode string, otherNodes SortedScoredNodes, cycleCount int64)
 
+	// RunRawScorePlugins runs only the Score() phase of each active scoring plugin for a single node,
+	// without NormalizeScore or weighting and returns pre-NormalizeScore values.
+	RunRawScorePlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) ([]fwk.PluginScore, *fwk.Status)
+
+	// NormalizeScores runs NormalizeScore() and applies weights for the given nodes, using
+	// their RawScores as input. It updates Scores and TotalScore in-place on each NodePluginScores.
+	NormalizeScores(ctx context.Context, state fwk.CycleState, pod *v1.Pod, scores []fwk.NodePluginScores) *fwk.Status
+
 	// RunPlacementGeneratePlugins runs the set of configured PlacementGenerate plugins.
 	// It returns the combined list of generated Placements.
 	RunPlacementGeneratePlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, nodes []fwk.NodeInfo) ([]*fwk.Placement, *fwk.Status)
