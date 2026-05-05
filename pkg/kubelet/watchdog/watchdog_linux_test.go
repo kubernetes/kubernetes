@@ -36,19 +36,28 @@ func init() {
 
 // Mock syncLoopHealthChecker
 type mockSyncLoopHealthChecker struct {
-	healthCheckErr error
+	healthCheckErr   error
+	healthCheckDelay time.Duration
 }
 
 func (m *mockSyncLoopHealthChecker) SyncLoopHealthCheck(ctx context.Context) error {
+	if m.healthCheckDelay > 0 {
+		select {
+		case <-time.After(m.healthCheckDelay):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 	return m.healthCheckErr
 }
 
 // Mock WatchdogClient
 type mockWatchdogClient struct {
-	enabledVal time.Duration
-	enabledErr error
-	notifyAck  bool
-	notifyErr  error
+	enabledVal  time.Duration
+	enabledErr  error
+	notifyAck   bool
+	notifyErr   error
+	notifyDelay time.Duration
 }
 
 func (m *mockWatchdogClient) SdWatchdogEnabled(unsetEnvironment bool) (time.Duration, error) {
@@ -56,6 +65,9 @@ func (m *mockWatchdogClient) SdWatchdogEnabled(unsetEnvironment bool) (time.Dura
 }
 
 func (m *mockWatchdogClient) SdNotify(unsetEnvironment bool) (bool, error) {
+	if m.notifyDelay > 0 {
+		time.Sleep(m.notifyDelay)
+	}
 	return m.notifyAck, m.notifyErr
 }
 
@@ -98,13 +110,15 @@ func TestNewHealthChecker(t *testing.T) {
 func TestHealthCheckerStart(t *testing.T) {
 	// Test cases
 	tests := []struct {
-		name           string
-		enabledVal     time.Duration
-		noCheckers     bool
-		healthCheckErr error
-		notifyAck      bool
-		notifyErr      error
-		expectedLogs   []string
+		name             string
+		enabledVal       time.Duration
+		noCheckers       bool
+		healthCheckErr   error
+		healthCheckDelay time.Duration
+		notifyAck        bool
+		notifyErr        error
+		notifyDelay      time.Duration
+		expectedLogs     []string
 	}{
 		{
 			name:           "Watchdog enabled and notify succeeds",
@@ -147,6 +161,27 @@ func TestHealthCheckerStart(t *testing.T) {
 			expectedLogs: []string{
 				"Starting systemd watchdog with interval", "Watchdog plugin notified"},
 		},
+		{
+			name:             "Watchdog enabled and health check times out",
+			enabledVal:       interval,
+			healthCheckErr:   nil,
+			healthCheckDelay: 2 * time.Second, // hc.interval/2 is 1s, so this will time out
+			notifyAck:        true,
+			notifyErr:        nil,
+			expectedLogs:     []string{"Starting systemd watchdog with interval", "Do not notify watchdog this iteration as the kubelet is reportedly not healthy", "context deadline exceeded"},
+		},
+		{
+			name:        "Watchdog enabled and SdNotify times out",
+			enabledVal:  interval,
+			notifyAck:   true,
+			notifyErr:   nil,
+			notifyDelay: 2 * time.Second, // hc.interval/2 is 1s, so this will time out
+			expectedLogs: []string{
+				"Starting systemd watchdog with interval",
+				"Systemd watchdog notification timed out",
+				"Failed to notify watchdog",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -159,9 +194,10 @@ func TestHealthCheckerStart(t *testing.T) {
 
 			// Mock SdWatchdogEnabled to return a valid value
 			mockClient := &mockWatchdogClient{
-				enabledVal: tt.enabledVal,
-				notifyAck:  tt.notifyAck,
-				notifyErr:  tt.notifyErr,
+				enabledVal:  tt.enabledVal,
+				notifyAck:   tt.notifyAck,
+				notifyErr:   tt.notifyErr,
+				notifyDelay: tt.notifyDelay,
 			}
 
 			// Create a healthChecker
@@ -170,7 +206,10 @@ func TestHealthCheckerStart(t *testing.T) {
 				t.Fatalf("NewHealthChecker() failed: %v", err)
 			}
 			if !tt.noCheckers {
-				hc.SetHealthCheckers(&mockSyncLoopHealthChecker{healthCheckErr: tt.healthCheckErr}, nil)
+				hc.SetHealthCheckers(&mockSyncLoopHealthChecker{
+					healthCheckErr:   tt.healthCheckErr,
+					healthCheckDelay: tt.healthCheckDelay,
+				}, nil)
 			}
 
 			// Start the health checker
