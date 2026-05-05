@@ -612,7 +612,7 @@ func TestPodGroupScheduling(t *testing.T) {
 					},
 				}
 
-				if err := stepsframework.RunSteps(testCtx, ns, append(commonSteps, tt.steps...)); err != nil {
+				if err := stepsframework.RunSteps(testCtx, t, ns, append(commonSteps, tt.steps...)); err != nil {
 					t.Fatal(err)
 				}
 			})

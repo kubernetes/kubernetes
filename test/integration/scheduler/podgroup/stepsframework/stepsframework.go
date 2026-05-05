@@ -19,6 +19,7 @@ package podgroup
 import (
 	"context"
 	"fmt"
+	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -28,8 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
-	framework "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/backend/queue"
 	testutils "k8s.io/kubernetes/test/integration/util"
 )
@@ -56,31 +55,26 @@ type VerifyAssignedInOneDomain struct {
 	TopologyKey string
 }
 
-type VerifyMockPostFilterPluginCalled struct {
-	Called int
-	Mock   *MockPostFilterPlugin
-}
-
-// 	 Step is allowing us to create a test in a more readable way.
-
-// 		We can create test as a flow of steps, each step is an operation that will be performed on the cluster.
-// 		Every Step should have a Name, that is used to identify the step and one operation.
-// 		Step framework will perform only first operation it will enounter in a given step.
-
-// 		For example, this will only create workload but will not wait for it to be ready:
-// 		Step {
-// 			Name: "Create and wait for workload to be ready",
-// 			CreateWorkloads: []*schedulingapi.Workload{
-// 				st.MakeWorkload().Name("workload").
-// 					PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(3).Obj()).
-// 					Obj(),
-// 			},
-// 			WaitForWorkloadReady: "workload",
-// 		}
-
-// 		When all steps are defined, we can run the test by iterating over the steps using the RunSteps function.
-
-//	For example:
+// Step is allowing us to create a test in a more readable way.
+// We can create test as a flow of steps, each step is an operation that will be performed on the cluster.
+// Every Step should have a Name, that is used to identify the step and one operation.
+// Step framework will perform only first operation it will enounter in a given step.
+//
+// For example, this will only create podGroup but will create workload:
+//
+//	Step {
+//		Name: "Create and wait for workload to be ready",
+//		CreateWorkloads: []*schedulingapi.Workload{
+//			st.MakeWorkload().Name("workload").
+//				PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(3).Obj()).
+//				Obj(),
+//		},
+//		CreatePodGroup: gangPodGroup,
+//	}
+//
+// When all steps are defined, we can run the test by iterating over the steps using the RunSteps function.
+//
+// For example:
 //
 // ns := testCtx.NS.Name
 //
@@ -119,7 +113,7 @@ type VerifyMockPostFilterPluginCalled struct {
 //			},
 //		}
 //
-// runSteps(t, ns, steps)
+// runSteps(tCtx, ns, steps)
 type Step struct {
 	// Name of the step, used to identify the step. Should be in every step.
 	// Used to describe the step in the test output.
@@ -150,20 +144,6 @@ type Step struct {
 	VerifyAssignments *VerifyAssignments
 	// VerifyAssignedInOneDomain is use to verify that the pods are assigned to nodes in the same domain.
 	VerifyAssignedInOneDomain *VerifyAssignedInOneDomain
-}
-
-// MockPostFilterPlugin is a custom PostFilter plugin that just counts invocations.
-type MockPostFilterPlugin struct {
-	count int
-}
-
-func (m *MockPostFilterPlugin) Name() string {
-	return "MockPostFilter"
-}
-
-func (m *MockPostFilterPlugin) PostFilter(ctx context.Context, state framework.CycleState, pod *v1.Pod, filteredNodeStatusMap framework.NodeToStatusReader) (*framework.PostFilterResult, *framework.Status) {
-	m.count++
-	return nil, framework.NewStatus(framework.Unschedulable)
 }
 
 func podInUnschedulablePods(queue queue.SchedulingQueue, podName string) bool {
@@ -417,14 +397,14 @@ func verifyAssignedInOneDomain(testCtx *testutils.TestContext, ns string, verify
 }
 
 // RunSteps executes steps in the given order. It executes only first encountered operation in step.
-// If there is no operation in the step, it will skip the step.
+// If there is no operation in the step, it will return an error.
 // If there is an error in any step, it will stop and return the error.
-func RunSteps(testCtx *testutils.TestContext, ns string, steps []Step) error {
+func RunSteps(testCtx *testutils.TestContext, t *testing.T, ns string, steps []Step) error {
 	for i, step := range steps {
-		klog.FromContext(testCtx.Ctx).V(3).Info("Executing step", "step", i, "name", step.Name)
 		if step.Name == "" {
 			return fmt.Errorf("step name cannot be empty")
 		}
+		t.Log("Executing step", "step", i, "name", step.Name)
 		var err error
 		switch {
 		case step.CreateNodes != nil:

@@ -1347,8 +1347,9 @@ func runTestScenario(t *testing.T, tt scenario, gangSchedulingEnabled bool) {
 		{
 			Name:            "Creating workload",
 			CreateWorkloads: []*schedulingapi.Workload{workload},
-		}}
-	if err := stepsframework.RunSteps(testCtx, ns, append(workloadStep, tt.steps...)); err != nil {
+		},
+	}
+	if err := stepsframework.RunSteps(testCtx, t, ns, append(workloadStep, tt.steps...)); err != nil {
 		t.Fatal(err)
 	}
 }
