@@ -3228,7 +3228,7 @@ func (kl *Kubelet) LatestLoopEntryTime() time.Time {
 }
 
 // SyncLoopHealthCheck checks if kubelet's sync loop that updates containers is working.
-func (kl *Kubelet) SyncLoopHealthCheck(req *http.Request) error {
+func (kl *Kubelet) SyncLoopHealthCheck(ctx context.Context) error {
 	duration := kl.resyncInterval * 2
 	minDuration := time.Minute * 5
 	if duration < minDuration {

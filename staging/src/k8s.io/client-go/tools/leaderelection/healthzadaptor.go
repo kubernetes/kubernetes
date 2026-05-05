@@ -17,7 +17,7 @@ limitations under the License.
 package leaderelection
 
 import (
-	"net/http"
+	"context"
 	"sync"
 	"time"
 )
@@ -42,7 +42,7 @@ func (l *HealthzAdaptor) Name() string {
 
 // Check is called by the healthz endpoint handler.
 // It fails (returns an error) if we own the lease but had not been able to renew it.
-func (l *HealthzAdaptor) Check(req *http.Request) error {
+func (l *HealthzAdaptor) Check(ctx context.Context) error {
 	l.pointerLock.Lock()
 	defer l.pointerLock.Unlock()
 	if l.le == nil {

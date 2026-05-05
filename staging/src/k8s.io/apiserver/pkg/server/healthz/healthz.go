@@ -40,7 +40,7 @@ const DefaultHealthzPath = "/healthz"
 // HealthChecker is a named healthz checker.
 type HealthChecker interface {
 	Name() string
-	Check(req *http.Request) error
+	Check(ctx context.Context) error
 }
 
 type GroupedHealthChecker interface {
@@ -59,7 +59,7 @@ func (ping) Name() string {
 }
 
 // PingHealthz is a health check that returns true.
-func (ping) Check(_ *http.Request) error {
+func (ping) Check(_ context.Context) error {
 	return nil
 }
 
@@ -75,7 +75,7 @@ func (l *log) Name() string {
 	return "log"
 }
 
-func (l *log) Check(_ *http.Request) error {
+func (l *log) Check(_ context.Context) error {
 	l.startOnce.Do(func() {
 		l.lastVerified.Store(time.Now())
 		go wait.Forever(func() {
@@ -126,7 +126,7 @@ func (s *shutdown) Name() string {
 	return "shutdown"
 }
 
-func (s *shutdown) Check(req *http.Request) error {
+func (s *shutdown) Check(_ context.Context) error {
 	select {
 	case <-s.stopCh:
 		return fmt.Errorf("process is shutting down")
@@ -135,7 +135,7 @@ func (s *shutdown) Check(req *http.Request) error {
 	return nil
 }
 
-func (i *informerSync) Check(_ *http.Request) error {
+func (i *informerSync) Check(_ context.Context) error {
 	stopCh := make(chan struct{})
 	// Close stopCh to force checking if informers are synced now.
 	close(stopCh)
@@ -152,12 +152,12 @@ func (i *informerSync) Check(_ *http.Request) error {
 }
 
 // NamedCheck returns a healthz checker for the given name and function.
-func NamedCheck(name string, check func(r *http.Request) error) HealthChecker {
+func NamedCheck(name string, check func(ctx context.Context) error) HealthChecker {
 	return &healthzCheck{name, check}
 }
 
 // NamedGroupedCheck returns a healthz checker for the given name and function.
-func NamedGroupedCheck(name string, groupName string, check func(r *http.Request) error) HealthChecker {
+func NamedGroupedCheck(name string, groupName string, check func(ctx context.Context) error) HealthChecker {
 	return &groupedHealthzCheck{
 		groupName:     groupName,
 		HealthChecker: &healthzCheck{name, check},
@@ -232,7 +232,7 @@ type mux interface {
 // healthzCheck implements HealthChecker on an arbitrary name and check function.
 type healthzCheck struct {
 	name  string
-	check func(r *http.Request) error
+	check func(ctx context.Context) error
 }
 
 var _ HealthChecker = &healthzCheck{}
@@ -241,8 +241,8 @@ func (c *healthzCheck) Name() string {
 	return c.name
 }
 
-func (c *healthzCheck) Check(r *http.Request) error {
-	return c.check(r)
+func (c *healthzCheck) Check(ctx context.Context) error {
+	return c.check(ctx)
 }
 
 type groupedHealthzCheck struct {
@@ -288,7 +288,7 @@ func handleRootHealth(name string, firstTimeHealthy func(), checks ...HealthChec
 				fmt.Fprintf(&individualCheckOutput, "[+]%s excluded with %s: ok\n", check.Name(), check.GroupName())
 				continue
 			}
-			if err := check.Check(r); err != nil {
+			if err := check.Check(r.Context()); err != nil {
 				slis.ObserveHealthcheck(context.Background(), check.Name(), name, slis.Error)
 				// don't include the error since this endpoint is public.  If someone wants more detail
 				// they should have explicit permission to the detailed checks.
@@ -332,9 +332,9 @@ func handleRootHealth(name string, firstTimeHealthy func(), checks ...HealthChec
 }
 
 // adaptCheckToHandler returns an http.HandlerFunc that serves the provided checks.
-func adaptCheckToHandler(c func(r *http.Request) error) http.HandlerFunc {
+func adaptCheckToHandler(c func(ctx context.Context) error) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		err := c(r)
+		err := c(r.Context())
 		if err != nil {
 			http.Error(w, fmt.Sprintf("internal server error: %v", err), http.StatusInternalServerError)
 		} else {

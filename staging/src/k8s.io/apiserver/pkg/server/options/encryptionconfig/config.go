@@ -178,12 +178,12 @@ func (k kmsHealthChecker) Name() string {
 	return kmsReloadHealthCheckName
 }
 
-func (k kmsHealthChecker) Check(req *http.Request) error {
+func (k kmsHealthChecker) Check(ctx context.Context) error {
 	var errs []error
 
 	for i := range k {
 		checker := k[i]
-		if err := checker.Check(req); err != nil {
+		if err := checker.Check(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", checker.Name(), err))
 		}
 	}
@@ -192,14 +192,14 @@ func (k kmsHealthChecker) Check(req *http.Request) error {
 }
 
 func (h *kmsPluginProbe) toHealthzCheck(idx int) healthz.HealthChecker {
-	return healthz.NamedCheck(fmt.Sprintf("kms-provider-%d", idx), func(r *http.Request) error {
+	return healthz.NamedCheck(fmt.Sprintf("kms-provider-%d", idx), func(ctx context.Context) error {
 		return h.check()
 	})
 }
 
 func (h *kmsv2PluginProbe) toHealthzCheck(idx int) healthz.HealthChecker {
-	return healthz.NamedCheck(fmt.Sprintf("kms-provider-%d", idx), func(r *http.Request) error {
-		return h.check(r.Context())
+	return healthz.NamedCheck(fmt.Sprintf("kms-provider-%d", idx), func(ctx context.Context) error {
+		return h.check(ctx)
 	})
 }
 

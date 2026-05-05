@@ -19,8 +19,8 @@ limitations under the License.
 package watchdog
 
 import (
+	"context"
 	"errors"
-	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -39,7 +39,7 @@ type mockSyncLoopHealthChecker struct {
 	healthCheckErr error
 }
 
-func (m *mockSyncLoopHealthChecker) SyncLoopHealthCheck(req *http.Request) error {
+func (m *mockSyncLoopHealthChecker) SyncLoopHealthCheck(ctx context.Context) error {
 	return m.healthCheckErr
 }
 

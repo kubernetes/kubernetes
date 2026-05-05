@@ -166,7 +166,7 @@ func (hc *healthChecker) Start(ctx context.Context) {
 
 func (hc *healthChecker) doCheck() error {
 	for _, hc := range hc.getHealthCheckers() {
-		if err := hc.Check(nil); err != nil {
+		if err := hc.Check(context.TODO()); err != nil {
 			return fmt.Errorf("checker %s failed: %w", hc.Name(), err)
 		}
 	}

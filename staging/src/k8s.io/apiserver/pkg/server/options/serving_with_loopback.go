@@ -17,8 +17,8 @@ limitations under the License.
 package options
 
 import (
+	"context"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/google/uuid"
@@ -118,7 +118,7 @@ func (s *SecureServingOptionsWithLoopback) ApplyToConfig(cfg *server.Config) err
 // liveness probes to be used to automatically restart the apiserver.
 func (s *SecureServingOptionsWithLoopback) addLoopbackServingCertificateHealthCheck(healthCheckAdder HealthzLivezHealthChecksAdder) {
 	expirationDate := s.clock.Now().Add(maxAge)
-	check := healthz.NamedCheck("loopback-serving-certificate", func(r *http.Request) error {
+	check := healthz.NamedCheck("loopback-serving-certificate", func(_ context.Context) error {
 		if s.clock.Now().After(expirationDate) {
 			return LoopbackCertificateExpiredError{}
 		}
