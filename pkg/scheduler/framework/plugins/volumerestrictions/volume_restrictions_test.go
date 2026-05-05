@@ -25,13 +25,16 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2/ktesting"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/backend/cache"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -104,6 +107,7 @@ func TestGCEDiskConflicts(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
+			metrics.InitMetrics()
 			p := newPlugin(ctx, t)
 			cycleState := framework.NewCycleState()
 			_, preFilterGotStatus := p.(fwk.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod, nil)
@@ -466,6 +470,7 @@ func TestAccessModeConflicts(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			metrics.InitMetrics()
 			_, ctx := ktesting.NewTestContext(t)
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
@@ -779,6 +784,105 @@ func Test_isSchedulableAfterPersistentVolumeClaimChange(t *testing.T) {
 
 			if diff := cmp.Diff(tc.expectedHint, actualHint); diff != "" {
 				t.Errorf("Unexpected QueueingHint (-want, +got): %s", diff)
+			}
+		})
+	}
+}
+
+func TestLazyPVCRefCountPreFilter(t *testing.T) {
+	testCases := []struct {
+		name                     string
+		nodes                    []*framework.NodeInfo
+		pvcs                     sets.Set[string]
+		pod                      *v1.Pod
+		expectedConflictingCount int
+	}{
+		{
+			name: "normal pre-filtering should work - single pvcs",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "ns-1"},
+			},
+			nodes: []*framework.NodeInfo{
+				{
+					PVCRefCounts: map[string]int{
+						"ns-1/pvc-1": 1,
+					},
+				},
+			},
+			pvcs:                     sets.New("pvc-1"),
+			expectedConflictingCount: 1,
+		},
+		{
+			name: "normal pre-filtering should work - two pvcs",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "ns-1"},
+			},
+			nodes: []*framework.NodeInfo{
+				{
+					PVCRefCounts: map[string]int{
+						"ns-1/pvc-1": 1,
+						"ns-1/pvc-2": 1,
+					},
+				},
+			},
+			pvcs:                     sets.New("pvc-1", "pvc-2"),
+			expectedConflictingCount: 2,
+		},
+		{
+			name: "normal pre-filtering should work - two nodes",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "ns-1"},
+			},
+			nodes: []*framework.NodeInfo{
+				{
+					PVCRefCounts: map[string]int{
+						"ns-1/pvc-1": 1,
+					},
+				},
+				{
+					PVCRefCounts: map[string]int{
+						"ns-1/pvc-1": 1,
+					},
+				},
+			},
+			pvcs:                     sets.New("pvc-1"),
+			expectedConflictingCount: 2,
+		},
+		{
+			name: "normal pre-filtering should work - not overlapping",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "ns-1"},
+			},
+			nodes: []*framework.NodeInfo{
+				{
+					PVCRefCounts: map[string]int{
+						"ns-1/pvc-1": 1,
+						"ns-1/pvc-2": 1,
+					},
+				},
+			},
+			pvcs:                     sets.New("pvc-3"),
+			expectedConflictingCount: 0,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			metrics.InitMetrics()
+			ctx, cancel := context.WithCancel(context.TODO())
+			defer cancel()
+			vp := &VolumeRestrictions{
+				parallelizer: parallelize.NewParallelizer(10),
+			}
+			fwkNodes := make([]fwk.NodeInfo, len(tc.nodes))
+			for i, node := range tc.nodes {
+				fwkNodes[i] = node
+			}
+			state, err := vp.calPreFilterState(ctx, tc.pod, fwkNodes, tc.pvcs)
+			if err != nil {
+				t.Fail()
+			}
+			if s := cmp.Diff(state.conflictingPVCRefCount, tc.expectedConflictingCount); len(s) > 0 {
+				t.Errorf("Unexpected value: %v", s)
 			}
 		})
 	}

@@ -242,18 +242,6 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 			if (len(existing.PodsWithRequiredAntiAffinity) > 0) != (len(clone.PodsWithRequiredAntiAffinity) > 0) {
 				updateNodesHavePodsWithRequiredAntiAffinity = true
 			}
-			if !updateUsedPVCSet {
-				if len(existing.PVCRefCounts) != len(clone.PVCRefCounts) {
-					updateUsedPVCSet = true
-				} else {
-					for pvcKey := range clone.PVCRefCounts {
-						if _, found := existing.PVCRefCounts[pvcKey]; !found {
-							updateUsedPVCSet = true
-							break
-						}
-					}
-				}
-			}
 			// We need to preserve the original pointer of the NodeInfo struct since it
 			// is used in the NodeInfoList, which we may not update.
 			*existing = *clone
@@ -335,9 +323,6 @@ func (cache *cacheImpl) updateNodeInfoSnapshotList(logger klog.Logger, snapshot 
 				if len(nodeInfo.PodsWithRequiredAntiAffinity) > 0 {
 					snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = append(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList, nodeInfo)
 				}
-				for key := range nodeInfo.PVCRefCounts {
-					snapshot.usedPVCSet.Insert(key)
-				}
 			} else {
 				utilruntime.HandleErrorWithLogger(logger, nil, "Node exists in nodeTree but not in NodeInfoMap, this should not happen", "node", klog.KRef("", nodeName))
 			}
@@ -349,9 +334,6 @@ func (cache *cacheImpl) updateNodeInfoSnapshotList(logger klog.Logger, snapshot 
 			}
 			if len(nodeInfo.GetPodsWithRequiredAntiAffinity()) > 0 {
 				snapshot.havePodsWithRequiredAntiAffinityNodeInfoList = append(snapshot.havePodsWithRequiredAntiAffinityNodeInfoList, nodeInfo)
-			}
-			for key := range nodeInfo.GetPVCRefCounts() {
-				snapshot.usedPVCSet.Insert(key)
 			}
 		}
 	}
