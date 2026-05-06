@@ -34,6 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/testfiles"
+	sigsyaml "sigs.k8s.io/yaml"
 )
 
 // Constants for common values
@@ -55,7 +57,12 @@ const (
 	SnapshotMetadataServiceAPIVersion = SnapshotMetadataServiceGroup + "/" + SnapshotMetadataServiceVersion
 	SnapshotMetadataServiceKind       = "SnapshotMetadataService"
 	SnapshotMetadataServiceResource   = "snapshotmetadataservices"
+	SnapshotMetadataCRDName           = "snapshotmetadataservices.cbt.storage.k8s.io"
 )
+
+// snapshotMetadataCRDManifest is the path to the SnapshotMetadataService CRD manifest
+// embedded via test/e2e/testing-manifests/embed.go.
+const snapshotMetadataCRDManifest = "test/e2e/testing-manifests/storage-csi/external-snapshot-metadata/cbt.storage.k8s.io_snapshotmetadataservices.yaml"
 
 // generateCA creates a self-signed CA certificate and private key using RSA.
 func generateCA() (*x509.Certificate, *rsa.PrivateKey, error) {
@@ -217,8 +224,22 @@ func createSnapshotMetdataServiceCR(ctx context.Context, f *framework.Framework,
 }
 
 // CreateSnapshotMetadataResources sets up the snapshot metadata resources.
-// CRD creation is handled separately by the test runner script.
 func CreateSnapshotMetadataResources(ctx context.Context, f *framework.Framework, driverName, driverNamespace string) error {
+	ginkgo.By("Applying SnapshotMetadataService CRD")
+	crdYAML, err := testfiles.Read(snapshotMetadataCRDManifest)
+	if err != nil {
+		return fmt.Errorf("failed to read SnapshotMetadataService CRD manifest: %w", err)
+	}
+	var objMap map[string]interface{}
+	if err := sigsyaml.Unmarshal(crdYAML, &objMap); err != nil {
+		return fmt.Errorf("failed to parse SnapshotMetadataService CRD: %w", err)
+	}
+	crdObj := &unstructured.Unstructured{Object: objMap}
+	crdGVR := schema.GroupVersionResource{Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinitions"}
+	if _, err := f.DynamicClient.Resource(crdGVR).Create(ctx, crdObj, metav1.CreateOptions{}); err != nil {
+		return fmt.Errorf("failed to create SnapshotMetadataService CRD: %w", err)
+	}
+
 	caCert, caPrivateKey, err := generateCA()
 	if err != nil {
 		return fmt.Errorf("failed to generate CA certificate: %w", err)
@@ -247,6 +268,12 @@ func CreateSnapshotMetadataResources(ctx context.Context, f *framework.Framework
 // CleanupSnapshotMetadataResources cleans up the snapshot metadata resources.
 func CleanupSnapshotMetadataResources(ctx context.Context, f *framework.Framework, driverName, driverNamespace string) error {
 	ginkgo.By("Cleaning up snapshot metadata resources")
+
+	// Delete SnapshotMetadataService CRD
+	crdGVR := schema.GroupVersionResource{Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinitions"}
+	if err := f.DynamicClient.Resource(crdGVR).Delete(ctx, SnapshotMetadataCRDName, metav1.DeleteOptions{}); err != nil {
+		framework.Logf("Warning: failed to delete SnapshotMetadataService CRD: %v", err)
+	}
 
 	// Delete SnapshotMetadataService CR
 	gvr := schema.GroupVersionResource{
