@@ -181,13 +181,18 @@ linters:
       # optionalfields - Ignore optionalfields issues for existing API group
       # TODO: For each existing API group, we aim to remove it over time.
       - text: "optionalfields: field .* should (?:be a pointer|have the omitempty tag)\\."
-        path: "staging/src/k8s.io/api/(admission|admissionregistration|apps|authentication|authorization|autoscaling|batch|certificates|coordination|core|events|extensions|flowcontrol|imagepolicy|networking|policy|rbac|resource|scheduling|storage)"
+        path: "staging/src/k8s.io/api/(admission|admissionregistration|apps|authentication|authorization|autoscaling|batch|certificates|core|events|extensions|flowcontrol|imagepolicy|networking|policy|rbac|resource|scheduling|storage)"
       
       # optionalfields - Ignore existing issues for apiserverinternal API group
       - text: "optionalfields: field StorageVersionCondition.(ObservedGeneration|LastTransitionTime) should be a pointer."
         path: "staging/src/k8s.io/api/apiserverinternal/v1alpha1/types.go"
       - text: "optionalfields: field StorageVersion.(Spec|Status) should (?:be a pointer|have the omitempty tag)\\."
         path: "staging/src/k8s.io/api/apiserverinternal/v1alpha1/types.go"
+      # optionalfields - Ignore existing issues for coordination API group
+      - text: "optionalfields: field Lease.Spec should be a pointer."
+        path: "staging/src/k8s.io/api/coordination/(v1|v1beta1)/types.go"
+      - text: "optionalfields: field LeaseCandidateSpec.EmulationVersion should be a pointer."
+        path: "staging/src/k8s.io/api/coordination/(v1beta1|v1alpha2)/types.go"
       
       # Pre-existing issues from the conflictmarkers linter
       # The Error field in some older API types is marked as both optional and required.
