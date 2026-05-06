@@ -89,6 +89,13 @@ type HorizontalPodAutoscalerSpec struct {
 	// If not set, the default HPAScalingRules for scale up and scale down are used.
 	// +optional
 	Behavior *HorizontalPodAutoscalerBehavior `json:"behavior,omitempty" protobuf:"bytes,5,opt,name=behavior"`
+
+	// syncPeriodSeconds is the period in seconds between each sync (reconciliation)
+	// of this autoscaler. If not set, the global controller default
+	// (--horizontal-pod-autoscaler-sync-period) is used.
+	// Must be greater than zero and less than or equal to 3600 (one hour).
+	// +optional
+	SyncPeriodSeconds *int32 `json:"syncPeriodSeconds,omitempty" protobuf:"varint,6,opt,name=syncPeriodSeconds"`
 }
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.

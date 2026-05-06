@@ -48,6 +48,11 @@ type HorizontalPodAutoscalerSpecApplyConfiguration struct {
 	// in both Up and Down directions (scaleUp and scaleDown fields respectively).
 	// If not set, the default HPAScalingRules for scale up and scale down are used.
 	Behavior *HorizontalPodAutoscalerBehaviorApplyConfiguration `json:"behavior,omitempty"`
+	// syncPeriodSeconds is the period in seconds between each sync (reconciliation)
+	// of this autoscaler. If not set, the global controller default
+	// (--horizontal-pod-autoscaler-sync-period) is used.
+	// Must be greater than zero and less than or equal to 3600 (one hour).
+	SyncPeriodSeconds *int32 `json:"syncPeriodSeconds,omitempty"`
 }
 
 // HorizontalPodAutoscalerSpecApplyConfiguration constructs a declarative configuration of the HorizontalPodAutoscalerSpec type for use with
@@ -98,5 +103,13 @@ func (b *HorizontalPodAutoscalerSpecApplyConfiguration) WithMetrics(values ...*M
 // If called multiple times, the Behavior field is set to the value of the last call.
 func (b *HorizontalPodAutoscalerSpecApplyConfiguration) WithBehavior(value *HorizontalPodAutoscalerBehaviorApplyConfiguration) *HorizontalPodAutoscalerSpecApplyConfiguration {
 	b.Behavior = value
+	return b
+}
+
+// WithSyncPeriodSeconds sets the SyncPeriodSeconds field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the SyncPeriodSeconds field is set to the value of the last call.
+func (b *HorizontalPodAutoscalerSpecApplyConfiguration) WithSyncPeriodSeconds(value int32) *HorizontalPodAutoscalerSpecApplyConfiguration {
+	b.SyncPeriodSeconds = &value
 	return b
 }

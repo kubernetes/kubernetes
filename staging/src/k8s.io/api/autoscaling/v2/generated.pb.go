@@ -606,6 +606,11 @@ func (m *HorizontalPodAutoscalerSpec) MarshalToSizedBuffer(dAtA []byte) (int, er
 	_ = i
 	var l int
 	_ = l
+	if m.SyncPeriodSeconds != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.SyncPeriodSeconds))
+		i--
+		dAtA[i] = 0x30
+	}
 	if m.Behavior != nil {
 		{
 			size, err := m.Behavior.MarshalToSizedBuffer(dAtA[:i])
@@ -1531,6 +1536,9 @@ func (m *HorizontalPodAutoscalerSpec) Size() (n int) {
 		l = m.Behavior.Size()
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	if m.SyncPeriodSeconds != nil {
+		n += 1 + sovGenerated(uint64(*m.SyncPeriodSeconds))
+	}
 	return n
 }
 
@@ -1927,6 +1935,7 @@ func (this *HorizontalPodAutoscalerSpec) String() string {
 		`MaxReplicas:` + fmt.Sprintf("%v", this.MaxReplicas) + `,`,
 		`Metrics:` + repeatedStringForMetrics + `,`,
 		`Behavior:` + strings.Replace(this.Behavior.String(), "HorizontalPodAutoscalerBehavior", "HorizontalPodAutoscalerBehavior", 1) + `,`,
+		`SyncPeriodSeconds:` + valueToStringGenerated(this.SyncPeriodSeconds) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -3833,6 +3842,26 @@ func (m *HorizontalPodAutoscalerSpec) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 6:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SyncPeriodSeconds", wireType)
+			}
+			var v int32
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.SyncPeriodSeconds = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])

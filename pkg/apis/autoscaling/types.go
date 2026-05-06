@@ -106,6 +106,13 @@ type HorizontalPodAutoscalerSpec struct {
 	// If not set, the default HPAScalingRules for scale up and scale down are used.
 	// +optional
 	Behavior *HorizontalPodAutoscalerBehavior
+
+	// syncPeriodSeconds is the period in seconds between each sync (reconciliation)
+	// of this autoscaler. If not set, the global controller default
+	// (--horizontal-pod-autoscaler-sync-period) is used.
+	// Must be greater than zero and less than or equal to 3600 (one hour).
+	// +optional
+	SyncPeriodSeconds *int32
 }
 
 // HorizontalPodAutoscalerBehavior configures a scaling behavior for Up and Down direction

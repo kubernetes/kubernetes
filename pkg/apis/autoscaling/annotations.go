@@ -44,3 +44,7 @@ const ToleranceScaleDownAnnotation = "autoscaling.alpha.kubernetes.io/scale-down
 // ToleranceScaleUpAnnotation is the annotation which holds the HPA tolerance specs
 // when converting the `ScaleUp.Tolerance` field from autoscaling/v2
 const ToleranceScaleUpAnnotation = "autoscaling.alpha.kubernetes.io/scale-up-tolerance"
+
+// SyncPeriodSecondsAnnotation is the annotation which holds the per-HPA sync period
+// when converting the `SyncPeriodSeconds` field from autoscaling/v2
+const SyncPeriodSecondsAnnotation = "autoscaling.alpha.kubernetes.io/sync-period-seconds"

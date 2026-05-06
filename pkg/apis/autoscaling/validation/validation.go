@@ -34,6 +34,8 @@ const (
 	MaxPeriodSeconds int32 = 1800
 	// MaxStabilizationWindowSeconds is the largest allowed stabilization window (in seconds)
 	MaxStabilizationWindowSeconds int32 = 3600
+	// MaxSyncPeriodSeconds is the largest allowed per-HPA sync period (in seconds)
+	MaxSyncPeriodSeconds int32 = 3600
 )
 
 // ValidateScale validates a Scale and returns an ErrorList with any errors.
@@ -75,6 +77,15 @@ func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAut
 	}
 	if refErrs := validateBehavior(autoscaler.Behavior, fldPath.Child("behavior"), opts); len(refErrs) > 0 {
 		allErrs = append(allErrs, refErrs...)
+	}
+	if autoscaler.SyncPeriodSeconds != nil {
+		if *autoscaler.SyncPeriodSeconds <= 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("syncPeriodSeconds"), *autoscaler.SyncPeriodSeconds, "must be greater than zero"))
+		}
+		if *autoscaler.SyncPeriodSeconds > MaxSyncPeriodSeconds {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("syncPeriodSeconds"), *autoscaler.SyncPeriodSeconds,
+				fmt.Sprintf("must be less than or equal to %v", MaxSyncPeriodSeconds)))
+		}
 	}
 	return allErrs
 }

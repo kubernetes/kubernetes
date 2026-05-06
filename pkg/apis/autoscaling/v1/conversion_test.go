@@ -20,8 +20,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -185,4 +187,85 @@ func TestConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v1_HorizontalPodAuto
 			assert.Equal(t, tt.args.expectOut, tt.args.out)
 		})
 	}
+}
+
+func TestSyncPeriodSeconds_RoundTripV1(t *testing.T) {
+	hpaInternal := &autoscaling.HorizontalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-hpa",
+			Namespace: "default",
+		},
+		Spec: autoscaling.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Kind: "Deployment",
+				Name: "my-deployment",
+			},
+			MinReplicas:       ptr.To[int32](1),
+			MaxReplicas:       3,
+			SyncPeriodSeconds: ptr.To[int32](45),
+			Metrics: []autoscaling.MetricSpec{
+				{
+					Type: autoscaling.ResourceMetricSourceType,
+					Resource: &autoscaling.ResourceMetricSource{
+						Name: api.ResourceCPU,
+						Target: autoscaling.MetricTarget{
+							Type:               autoscaling.UtilizationMetricType,
+							AverageUtilization: ptr.To[int32](80),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	hpaV1 := &autoscalingv1.HorizontalPodAutoscaler{}
+	err := Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(hpaInternal, hpaV1, nil)
+	require.NoError(t, err, "Conversion to v1 should not fail")
+	assert.Equal(t, "45", hpaV1.Annotations[autoscaling.SyncPeriodSecondsAnnotation],
+		"SyncPeriodSeconds should be serialized in annotation")
+
+	roundTripped := &autoscaling.HorizontalPodAutoscaler{}
+	err = Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(hpaV1, roundTripped, nil)
+	require.NoError(t, err, "Conversion back to internal should not fail")
+	if assert.NotNil(t, roundTripped.Spec.SyncPeriodSeconds, "SyncPeriodSeconds should survive v1 round-trip") {
+		assert.Equal(t, int32(45), *roundTripped.Spec.SyncPeriodSeconds)
+	}
+
+	_, hasSyncPeriod := roundTripped.Annotations[autoscaling.SyncPeriodSecondsAnnotation]
+	assert.False(t, hasSyncPeriod, "Round-trip annotation should be dropped after conversion to internal")
+}
+
+func TestSyncPeriodSeconds_NilNotSerialized(t *testing.T) {
+	hpaInternal := &autoscaling.HorizontalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "my-hpa",
+			Namespace: "default",
+		},
+		Spec: autoscaling.HorizontalPodAutoscalerSpec{
+			ScaleTargetRef: autoscaling.CrossVersionObjectReference{
+				Kind: "Deployment",
+				Name: "my-deployment",
+			},
+			MinReplicas: ptr.To[int32](1),
+			MaxReplicas: 3,
+			Metrics: []autoscaling.MetricSpec{
+				{
+					Type: autoscaling.ResourceMetricSourceType,
+					Resource: &autoscaling.ResourceMetricSource{
+						Name: api.ResourceCPU,
+						Target: autoscaling.MetricTarget{
+							Type:               autoscaling.UtilizationMetricType,
+							AverageUtilization: ptr.To[int32](80),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	hpaV1 := &autoscalingv1.HorizontalPodAutoscaler{}
+	err := Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(hpaInternal, hpaV1, nil)
+	require.NoError(t, err)
+	_, hasSyncPeriod := hpaV1.Annotations[autoscaling.SyncPeriodSecondsAnnotation]
+	assert.False(t, hasSyncPeriod, "Nil SyncPeriodSeconds should not produce an annotation")
 }

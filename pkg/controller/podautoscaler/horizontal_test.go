@@ -122,6 +122,7 @@ type testCase struct {
 	initialReplicas int32
 	scaleUpRules    *autoscalingv2.HPAScalingRules
 	scaleDownRules  *autoscalingv2.HPAScalingRules
+	syncPeriod      *int32
 
 	// CPU target utilization as a percentage of the requested resources.
 	CPUTarget                    int32
@@ -251,9 +252,10 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 					Name:       tc.resource.name,
 					APIVersion: tc.resource.apiVersion,
 				},
-				MinReplicas: &tc.minReplicas,
-				MaxReplicas: tc.maxReplicas,
-				Behavior:    behavior,
+				MinReplicas:       &tc.minReplicas,
+				MaxReplicas:       tc.maxReplicas,
+				Behavior:          behavior,
+				SyncPeriodSeconds: tc.syncPeriod,
 			},
 			Status: autoscalingv2.HorizontalPodAutoscalerStatus{
 				CurrentReplicas: tc.specReplicas,
@@ -5833,5 +5835,47 @@ func TestBuildQuantity(t *testing.T) {
 					q.String(), q.Format)
 			}
 		})
+	}
+}
+
+func TestSyncPeriodSeconds_SetOnReconcile(t *testing.T) {
+	tc := testCase{
+		minReplicas:             1,
+		maxReplicas:             5,
+		specReplicas:            3,
+		statusReplicas:          3,
+		expectedDesiredReplicas: 3,
+		CPUTarget:               50,
+		reportedLevels:          []uint64{500, 500, 500},
+		reportedCPURequests:     []resource.Quantity{resource.MustParse("1"), resource.MustParse("1"), resource.MustParse("1")},
+		useMetricsAPI:           true,
+		syncPeriod:              ptr.To(int32(60)),
+		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.AbleToScale,
+			Status: v1.ConditionTrue,
+			Reason: "ReadyForNewScale",
+		}),
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
+	}
+
+	key := "test-namespace/test-hpa"
+	hpaController, informerFactory := tc.setupController(t)
+	defaultInterval := hpaController.resyncPeriod
+
+	if got := hpaController.rateLimiter.When(key); got != defaultInterval {
+		t.Errorf("before reconcile: When(%q) = %v, want default %v", key, got, defaultInterval)
+	}
+
+	tc.runTestWithController(t, hpaController, informerFactory)
+
+	if got := hpaController.rateLimiter.When(key); got != 60*time.Second {
+		t.Errorf("after reconcile: When(%q) = %v, want %v", key, got, 60*time.Second)
 	}
 }

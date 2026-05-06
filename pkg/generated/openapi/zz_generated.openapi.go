@@ -15986,6 +15986,13 @@ func schema_k8sio_api_autoscaling_v2_HorizontalPodAutoscalerSpec(ref common.Refe
 							Ref:         ref(autoscalingv2.HorizontalPodAutoscalerBehavior{}.OpenAPIModelName()),
 						},
 					},
+					"syncPeriodSeconds": {
+						SchemaProps: spec.SchemaProps{
+							Description: "syncPeriodSeconds is the period in seconds between each sync (reconciliation) of this autoscaler. If not set, the global controller default (--horizontal-pod-autoscaler-sync-period) is used. Must be greater than zero and less than or equal to 3600 (one hour).",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 				},
 				Required: []string{"scaleTargetRef", "maxReplicas"},
 			},

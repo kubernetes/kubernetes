@@ -289,6 +289,11 @@ func (in *HorizontalPodAutoscalerSpec) DeepCopyInto(out *HorizontalPodAutoscaler
 		*out = new(HorizontalPodAutoscalerBehavior)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.SyncPeriodSeconds != nil {
+		in, out := &in.SyncPeriodSeconds, &out.SyncPeriodSeconds
+		*out = new(int32)
+		**out = **in
+	}
 	return
 }
 

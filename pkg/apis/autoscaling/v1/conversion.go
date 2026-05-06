@@ -18,6 +18,7 @@ package v1
 
 import (
 	"encoding/json"
+	"strconv"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 
@@ -363,6 +364,14 @@ func Convert_autoscaling_HorizontalPodAutoscaler_To_v1_HorizontalPodAutoscaler(i
 		out.Annotations[autoscaling.BehaviorSpecsAnnotation] = string(behaviorEnc)
 	}
 
+	if in.Spec.SyncPeriodSeconds != nil {
+		if !copiedAnnotations {
+			copiedAnnotations = true
+			out.Annotations = autoscaling.DeepCopyStringMap(out.Annotations)
+		}
+		out.Annotations[autoscaling.SyncPeriodSecondsAnnotation] = strconv.FormatInt(int64(*in.Spec.SyncPeriodSeconds), 10)
+	}
+
 	if len(in.Status.Conditions) > 0 {
 		currentConditionsEnc, err := json.Marshal(currentConditions)
 		if err != nil {
@@ -407,6 +416,13 @@ func Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(i
 		var behavior autoscaling.HorizontalPodAutoscalerBehavior
 		if err := json.Unmarshal([]byte(behaviorEnc), &behavior); err == nil && behavior != (autoscaling.HorizontalPodAutoscalerBehavior{}) {
 			out.Spec.Behavior = &behavior
+		}
+	}
+
+	if syncPeriodStr, hasSyncPeriod := out.Annotations[autoscaling.SyncPeriodSecondsAnnotation]; hasSyncPeriod {
+		if parsed, err := strconv.ParseInt(syncPeriodStr, 10, 32); err == nil {
+			val := int32(parsed)
+			out.Spec.SyncPeriodSeconds = &val
 		}
 	}
 
