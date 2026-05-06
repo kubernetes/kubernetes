@@ -846,7 +846,7 @@ func structToUnstructured(sv, dv reflect.Value) error {
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 			realMap[fieldInfo.name] = fv.Int()
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			val, err := uintToUnstructuredHelper(sv.Uint())
+			val, err := uintToUnstructuredHelper(fv.Uint())
 			if err != nil {
 				return err
 			}
