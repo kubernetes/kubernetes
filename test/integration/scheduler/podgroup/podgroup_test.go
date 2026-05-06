@@ -60,7 +60,7 @@ func TestPodGroupScheduling(t *testing.T) {
 	otherGangPodGroup := st.MakePodGroup().Name("pg2").TemplateRef("t", "other-workload").
 		Priority(100).MinCount(3).Obj()
 
-	basicPodGroup := st.MakePodGroup().Name("pg1").TemplateRef("t2", "workload").BasicPolicy().Obj()
+	basicPodGroup := st.MakePodGroup().Name("pg1").TemplateRef("t2", "workload").Priority(100).BasicPolicy().Obj()
 
 	p1 := st.MakePod().Name("p1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Container("image").
 		PodGroupName("pg1").Priority(100).Obj()
@@ -109,10 +109,10 @@ func TestPodGroupScheduling(t *testing.T) {
 		PodGroupName("pg2").Priority(100).Obj()
 
 	tests := []struct {
-		name                          string
-		enableWorkloadAwarePreemption bool
-		requiresTAS                   bool
-		steps                         []stepsframework.Step
+		name                                  string
+		enableWorkloadAwarePreemption         bool
+		enableTopologyAwareWorkloadScheduling []bool
+		steps                                 []stepsframework.Step
 	}{
 		{
 			name: "gang schedules when pod group and resources are available",
@@ -437,7 +437,9 @@ func TestPodGroupScheduling(t *testing.T) {
 			},
 		},
 		{
-			name: "basic group schedules with workload-aware preemption",
+			name:                                  "basic group schedules with workload-aware preemption",
+			enableTopologyAwareWorkloadScheduling: []bool{false},
+			enableWorkloadAwarePreemption:         true,
 			steps: []stepsframework.Step{
 				{
 					Name:       "Create a low priority pod taking all resources",
@@ -526,8 +528,8 @@ func TestPodGroupScheduling(t *testing.T) {
 			},
 		},
 		{
-			name:        "tas gang with constraint does not use pod by pod preemption",
-			requiresTAS: true,
+			name:                                  "tas gang with constraint does not use pod by pod preemption",
+			enableTopologyAwareWorkloadScheduling: []bool{true},
 			steps: []stepsframework.Step{
 				{
 					Name:       "Create very low and low priority pods that take up all node resources",
@@ -552,9 +554,9 @@ func TestPodGroupScheduling(t *testing.T) {
 			},
 		},
 		{
-			name:                          "tas gang with constraint does not use workload preemption",
-			enableWorkloadAwarePreemption: true,
-			requiresTAS:                   true,
+			name:                                  "tas gang with constraint does not use workload preemption",
+			enableWorkloadAwarePreemption:         true,
+			enableTopologyAwareWorkloadScheduling: []bool{true},
 			steps: []stepsframework.Step{
 				{
 					Name:       "Create very low and low priority pods that take up all node resources",
@@ -581,11 +583,11 @@ func TestPodGroupScheduling(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		runWithTasFlagSettings := []bool{true, false}
-		for _, tasEnabled := range runWithTasFlagSettings {
-			if tt.requiresTAS && !tasEnabled {
-				continue
-			}
+		tasEnabledValues := tt.enableTopologyAwareWorkloadScheduling
+		if len(tasEnabledValues) == 0 {
+			tasEnabledValues = []bool{true, false}
+		}
+		for _, tasEnabled := range tasEnabledValues {
 			t.Run(fmt.Sprintf("%s (TopologyAwareWorkloadScheduling enabled: %v)", tt.name, tasEnabled), func(t *testing.T) {
 				featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 					features.GenericWorkload:                 true,
