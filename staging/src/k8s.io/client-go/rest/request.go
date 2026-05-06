@@ -43,6 +43,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/watch"
+	clientfeatures "k8s.io/client-go/features"
 	restclientwatch "k8s.io/client-go/rest/watch"
 	"k8s.io/client-go/tools/metrics"
 	"k8s.io/client-go/util/flowcontrol"
@@ -842,11 +843,17 @@ func (r *Request) newStreamWatcher(ctx context.Context, resp *http.Response) (wa
 	handleWarnings(ctx, resp.Header, r.warningHandler)
 
 	frameReader := framer.NewFrameReader(resp.Body)
-	watchEventDecoder := streaming.NewDecoder(frameReader, streamingSerializer)
+	var watchDecoder watch.Decoder
+	if clientfeatures.FeatureGates().Enabled(clientfeatures.ConcurrentWatchObjectDecode) {
+		watchDecoder = restclientwatch.NewFrameDecoder(frameReader, streamingSerializer, objectDecoder)
+	} else {
+		watchEventDecoder := streaming.NewDecoder(frameReader, streamingSerializer)
+		watchDecoder = restclientwatch.NewDecoder(watchEventDecoder, objectDecoder)
+	}
 
 	return watch.NewStreamWatcherWithLogger(
 		klog.FromContext(ctx),
-		restclientwatch.NewDecoder(watchEventDecoder, objectDecoder),
+		watchDecoder,
 		// use 500 to indicate that the cause of the error is unknown - other error codes
 		// are more specific to HTTP interactions, and set a reason
 		errors.NewClientErrorReporter(http.StatusInternalServerError, r.verb, "ClientWatchDecoding"),
