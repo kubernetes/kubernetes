@@ -19,6 +19,8 @@ package apicalls
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -86,6 +88,29 @@ func TestPodStatusPatchCall_IsNoOp(t *testing.T) {
 			nominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node-b", NominatingMode: fwk.ModeOverride},
 			want:           false,
 		},
+		{
+			name:           "Not no-op when any of multiple conditions differ",
+			pod:            podWithNode,
+			conditions:     []*v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionFalse}, {Type: v1.PodInitialized, Status: v1.ConditionTrue}},
+			nominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node-a", NominatingMode: fwk.ModeOverride},
+			want:           false,
+		},
+		{
+			name: "No-op when multiple conditions all match",
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{UID: "uid"},
+				Status: v1.PodStatus{
+					NominatedNodeName: "node-a",
+					Conditions: []v1.PodCondition{
+						{Type: v1.PodScheduled, Status: v1.ConditionFalse},
+						{Type: v1.PodInitialized, Status: v1.ConditionTrue},
+					},
+				},
+			},
+			conditions:     []*v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionFalse}, {Type: v1.PodInitialized, Status: v1.ConditionTrue}},
+			nominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node-a", NominatingMode: fwk.ModeOverride},
+			want:           true,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -144,11 +169,31 @@ func TestPodStatusPatchCall_Merge(t *testing.T) {
 		if err := newCall.Merge(oldCall); err != nil {
 			t.Fatalf("Unexpected error returned by Merge(): %v", err)
 		}
-		if newCall.newConditions[0].Type != v1.PodScheduled || newCall.newConditions[0].Status != v1.ConditionTrue {
-			t.Errorf("Expected PodScheduled condition, but got: %v", newCall.newConditions)
+		expectedConditions := []*v1.PodCondition{
+			{Type: v1.PodScheduled, Status: v1.ConditionTrue},
+			{Type: v1.PodInitialized, Status: v1.ConditionTrue},
 		}
-		if newCall.newConditions[1].Type != v1.PodInitialized || newCall.newConditions[1].Status != v1.ConditionTrue {
-			t.Errorf("Expected PodScheduled condition, but got: %v", newCall.newConditions)
+		if diff := cmp.Diff(expectedConditions, newCall.newConditions); diff != "" {
+			t.Errorf("Unexpected conditions after merging (-want,+got):\n%s", diff)
+		}
+	})
+
+	t.Run("Merges condition from old call that new call doesn't have", func(t *testing.T) {
+		oldCall := NewPodStatusPatchCall(pod, []*v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionFalse}},
+			&fwk.NominatingInfo{NominatingMode: fwk.ModeNoop},
+		)
+		newCall := NewPodStatusPatchCall(pod, []*v1.PodCondition{{Type: v1.PodInitialized, Status: v1.ConditionTrue}},
+			&fwk.NominatingInfo{NominatingMode: fwk.ModeNoop})
+
+		if err := newCall.Merge(oldCall); err != nil {
+			t.Fatalf("Unexpected error returned by Merge(): %v", err)
+		}
+		expectedConditions := []*v1.PodCondition{
+			{Type: v1.PodInitialized, Status: v1.ConditionTrue},
+			{Type: v1.PodScheduled, Status: v1.ConditionFalse},
+		}
+		if diff := cmp.Diff(expectedConditions, newCall.newConditions); diff != "" {
+			t.Errorf("Unexpected conditions after merging (-want,+got):\n%s", diff)
 		}
 	})
 }
@@ -213,17 +258,17 @@ func TestPodStatusPatchCall_Sync(t *testing.T) {
 
 func TestSyncStatus(t *testing.T) {
 	tests := []struct {
-		name                    string
-		podStatusBefore         *v1.PodStatus
-		conditions              []*v1.PodCondition
-		nominatingInfo          *fwk.NominatingInfo
-		expectedResult          bool
-		expectedNominatedNode   string
-		expectedConditionStatus map[v1.PodConditionType]v1.ConditionStatus
+		name                  string
+		oldPodStatus          *v1.PodStatus
+		conditions            []*v1.PodCondition
+		nominatingInfo        *fwk.NominatingInfo
+		expectUpdated         bool
+		expectedNominatedNode string
+		expectedConditions    []v1.PodCondition
 	}{
 		{
 			name: "No changes needed - empty conditions and same node name",
-			podStatusBefore: &v1.PodStatus{
+			oldPodStatus: &v1.PodStatus{
 				NominatedNodeName: "node-a",
 				Conditions: []v1.PodCondition{
 					{
@@ -232,15 +277,15 @@ func TestSyncStatus(t *testing.T) {
 					},
 				},
 			},
-			conditions:              nil,
-			nominatingInfo:          &fwk.NominatingInfo{NominatedNodeName: "node-a", NominatingMode: fwk.ModeOverride},
-			expectedResult:          false,
-			expectedNominatedNode:   "node-a",                                                                       // should remain unchanged
-			expectedConditionStatus: map[v1.PodConditionType]v1.ConditionStatus{v1.PodScheduled: v1.ConditionFalse}, // should remain unchanged
+			conditions:            nil,
+			nominatingInfo:        &fwk.NominatingInfo{NominatedNodeName: "node-a", NominatingMode: fwk.ModeOverride},
+			expectUpdated:         false,
+			expectedNominatedNode: "node-a",
+			expectedConditions:    []v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionFalse}},
 		},
 		{
 			name: "Condition needs update",
-			podStatusBefore: &v1.PodStatus{
+			oldPodStatus: &v1.PodStatus{
 				NominatedNodeName: "node-a",
 				Conditions: []v1.PodCondition{
 					{
@@ -249,15 +294,15 @@ func TestSyncStatus(t *testing.T) {
 					},
 				},
 			},
-			conditions:              []*v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionTrue}},
-			nominatingInfo:          &fwk.NominatingInfo{NominatedNodeName: "node-a", NominatingMode: fwk.ModeNoop},
-			expectedResult:          true,
-			expectedNominatedNode:   "node-a",                                                                      // should remain unchanged
-			expectedConditionStatus: map[v1.PodConditionType]v1.ConditionStatus{v1.PodScheduled: v1.ConditionTrue}, // should be updated
+			conditions:            []*v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionTrue}},
+			nominatingInfo:        &fwk.NominatingInfo{NominatedNodeName: "node-a", NominatingMode: fwk.ModeNoop},
+			expectUpdated:         true,
+			expectedNominatedNode: "node-a",
+			expectedConditions:    []v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionTrue}},
 		},
 		{
 			name: "Nominated node name needs update",
-			podStatusBefore: &v1.PodStatus{
+			oldPodStatus: &v1.PodStatus{
 				NominatedNodeName: "node-a",
 				Conditions: []v1.PodCondition{
 					{
@@ -266,15 +311,15 @@ func TestSyncStatus(t *testing.T) {
 					},
 				},
 			},
-			conditions:              nil,
-			nominatingInfo:          &fwk.NominatingInfo{NominatedNodeName: "node-b", NominatingMode: fwk.ModeOverride},
-			expectedResult:          true,
-			expectedNominatedNode:   "node-b",                                                                       // should be updated
-			expectedConditionStatus: map[v1.PodConditionType]v1.ConditionStatus{v1.PodScheduled: v1.ConditionFalse}, // should remain unchanged
+			conditions:            nil,
+			nominatingInfo:        &fwk.NominatingInfo{NominatedNodeName: "node-b", NominatingMode: fwk.ModeOverride},
+			expectUpdated:         true,
+			expectedNominatedNode: "node-b",
+			expectedConditions:    []v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionFalse}},
 		},
 		{
 			name: "Both condition and node name need update",
-			podStatusBefore: &v1.PodStatus{
+			oldPodStatus: &v1.PodStatus{
 				NominatedNodeName: "node-a",
 				Conditions: []v1.PodCondition{
 					{
@@ -283,29 +328,29 @@ func TestSyncStatus(t *testing.T) {
 					},
 				},
 			},
-			conditions:              []*v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionTrue}},
-			nominatingInfo:          &fwk.NominatingInfo{NominatedNodeName: "node-b", NominatingMode: fwk.ModeOverride},
-			expectedResult:          true,
-			expectedNominatedNode:   "node-b",                                                                      // should be updated
-			expectedConditionStatus: map[v1.PodConditionType]v1.ConditionStatus{v1.PodScheduled: v1.ConditionTrue}, // should be updated
+			conditions:            []*v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionTrue}},
+			nominatingInfo:        &fwk.NominatingInfo{NominatedNodeName: "node-b", NominatingMode: fwk.ModeOverride},
+			expectUpdated:         true,
+			expectedNominatedNode: "node-b",
+			expectedConditions:    []v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionTrue}},
 		},
 		{
 			name: "Multiple conditions need update",
-			podStatusBefore: &v1.PodStatus{
+			oldPodStatus: &v1.PodStatus{
 				NominatedNodeName: "node-original",
 			},
 			conditions: []*v1.PodCondition{
 				{Type: v1.PodScheduled, Status: v1.ConditionTrue},
 				{Type: v1.ContainersReady, Status: v1.ConditionFalse},
 			},
-			nominatingInfo:          &fwk.NominatingInfo{NominatedNodeName: "node-a", NominatingMode: fwk.ModeNoop},
-			expectedResult:          true,
-			expectedNominatedNode:   "node-original",                                                                                                      // should remain unchanged because ModeNoop
-			expectedConditionStatus: map[v1.PodConditionType]v1.ConditionStatus{v1.PodScheduled: v1.ConditionTrue, v1.ContainersReady: v1.ConditionFalse}, // should be updated
+			nominatingInfo:        &fwk.NominatingInfo{NominatedNodeName: "node-a", NominatingMode: fwk.ModeNoop},
+			expectUpdated:         true,
+			expectedNominatedNode: "node-original",
+			expectedConditions:    []v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionTrue}, {Type: v1.ContainersReady, Status: v1.ConditionFalse}},
 		},
 		{
 			name: "No-op nominating mode with different node name",
-			podStatusBefore: &v1.PodStatus{
+			oldPodStatus: &v1.PodStatus{
 				NominatedNodeName: "node-a",
 				Conditions: []v1.PodCondition{
 					{
@@ -314,40 +359,26 @@ func TestSyncStatus(t *testing.T) {
 					},
 				},
 			},
-			conditions:              nil,
-			nominatingInfo:          &fwk.NominatingInfo{NominatedNodeName: "node-b", NominatingMode: fwk.ModeNoop},
-			expectedResult:          false,
-			expectedNominatedNode:   "node-a",                                                                       // should remain unchanged
-			expectedConditionStatus: map[v1.PodConditionType]v1.ConditionStatus{v1.PodScheduled: v1.ConditionFalse}, // should remain unchanged
+			conditions:            nil,
+			nominatingInfo:        &fwk.NominatingInfo{NominatedNodeName: "node-b", NominatingMode: fwk.ModeNoop},
+			expectUpdated:         false,
+			expectedNominatedNode: "node-a",
+			expectedConditions:    []v1.PodCondition{{Type: v1.PodScheduled, Status: v1.ConditionFalse}},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			podStatus := test.podStatusBefore.DeepCopy()
+			podStatus := test.oldPodStatus.DeepCopy()
 			result := syncStatus(podStatus, test.conditions, test.nominatingInfo)
-			if result != test.expectedResult {
-				t.Errorf("Expected syncStatus to return %v, but got %v", test.expectedResult, result)
+			if result != test.expectUpdated {
+				t.Errorf("Expected syncStatus to return %v, but got %v", test.expectUpdated, result)
 			}
-			// Check if the nominated node name was updated correctly
 			if podStatus.NominatedNodeName != test.expectedNominatedNode {
 				t.Errorf("Expected NominatedNodeName to be %s, but got %s", test.expectedNominatedNode, podStatus.NominatedNodeName)
 			}
-			// Check if the conditions were updated correctly
-			for expectedType, expectedStatus := range test.expectedConditionStatus {
-				found := false
-				for _, condition := range podStatus.Conditions {
-					if condition.Type == expectedType {
-						found = true
-						if condition.Status != expectedStatus {
-							t.Errorf("Expected condition %s to have status %s, but got %s", expectedType, expectedStatus, condition.Status)
-						}
-						break
-					}
-				}
-				if !found {
-					t.Errorf("Expected condition %s not found in pod status", expectedType)
-				}
+			if diff := cmp.Diff(test.expectedConditions, podStatus.Conditions, cmpopts.IgnoreFields(v1.PodCondition{}, "LastTransitionTime", "LastProbeTime")); diff != "" {
+				t.Errorf("Unexpected conditions (-want,+got):\n%s", diff)
 			}
 		})
 	}

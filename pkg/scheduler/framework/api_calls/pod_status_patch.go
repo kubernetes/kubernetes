@@ -126,20 +126,20 @@ func (psuc *PodStatusPatchCall) Sync(obj metav1.Object) (metav1.Object, error) {
 		return obj, fmt.Errorf("unexpected error: object of type %T is not of type *v1.Pod", obj)
 	}
 
-	var newConditions []*v1.PodCondition
 	psuc.lock.Lock()
 	if !psuc.executed {
 		// Set podStatus only if the call execution haven't started yet,
 		// because otherwise it's irrelevant and might race.
 		psuc.podStatus = pod.Status.DeepCopy()
 	}
+	newConditions := make([]*v1.PodCondition, 0, len(psuc.newConditions))
 	for _, condition := range psuc.newConditions {
 		newConditions = append(newConditions, condition.DeepCopy())
 	}
 	psuc.lock.Unlock()
 
 	podCopy := pod.DeepCopy()
-	// Sync status to have the condition and nominatingInfo applied on a podStatusCopy.
+	// Sync status to have the condition and nominatingInfo applied on a podCopy.
 	anySynced := syncStatus(&podCopy.Status, newConditions, psuc.nominatingInfo)
 	if !anySynced {
 		return pod, nil
