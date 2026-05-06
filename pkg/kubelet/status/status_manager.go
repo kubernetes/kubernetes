@@ -264,7 +264,8 @@ func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeleti
 //     initialization phase (all terminated init containers exited with 0, and no main
 //     containers have started yet). This allows batching multiple fast init containers.
 //  3. We immediately abort deferral (returning false) if any init container fails (ExitCode != 0),
-//     if the pod transitions out of Pending, or if a main container starts.
+//     if the pod transitions out of Pending, if a main container starts, or if ALL
+//     init containers have successfully completed (reaching the Initialized state).
 func (m *manager) isEligibleForDeferral(oldStatus, newStatus *v1.PodStatus, hasActiveDeferral bool) bool {
 	// If the pod is no longer pending, initialization is over. We cannot defer.
 	if newStatus.Phase != v1.PodPending {
@@ -288,14 +289,28 @@ func (m *manager) isEligibleForDeferral(oldStatus, newStatus *v1.PodStatus, hasA
 		}
 	}
 
-	// 3. If we already have an active deferral running, and we haven't hit any of the
+	// 3. Check if ALL init containers have completed successfully. If they have,
+	// the pod has reached the "Initialized" milestone, which should be flushed
+	// immediately to unblock external controllers waiting for initialization.
+	allInitTerminated := len(newStatus.InitContainerStatuses) > 0
+	for i := range newStatus.InitContainerStatuses {
+		if newStatus.InitContainerStatuses[i].State.Terminated == nil {
+			allInitTerminated = false
+			break
+		}
+	}
+	if allInitTerminated {
+		return false
+	}
+
+	// 4. If we already have an active deferral running, and we haven't hit any of the
 	// failure conditions above, we can continue to defer the update. This allows
 	// MULTIPLE fast init containers to be batched together in a single deferral window.
 	if hasActiveDeferral {
 		return true
 	}
 
-	// 4. If we don't have an active deferral, we only start one if an init container
+	// 5. If we don't have an active deferral, we only start one if an init container
 	// just transitioned from Waiting -> Running. We don't want to start a new deferral
 	// for arbitrary label changes or pod deletion events.
 	for i := range newStatus.InitContainerStatuses {

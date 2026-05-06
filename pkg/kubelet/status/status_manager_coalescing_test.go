@@ -86,17 +86,15 @@ func TestInitContainerStatusCoalescing(t *testing.T) {
 		t.Errorf("Expected 0 updates due to continued deferral, got %d", numUpdates)
 	}
 
-	// 5. Init2 terminates successfully (should remain deferred)
+	// 5. Init2 terminates successfully (Init phase over, must flush immediately)
 	status.InitContainerStatuses[1].State = v1.ContainerState{
 		Terminated: &v1.ContainerStateTerminated{ExitCode: 0},
 	}
 	manager.SetPodStatus(logger, pod, status)
 
-	if numUpdates := manager.consumeUpdates(ctx); numUpdates != 0 {
-		t.Errorf("Expected 0 updates due to continued deferral, got %d", numUpdates)
-	}
+	verifyUpdates(t, manager, 1)
 
-	// 6. Main container starts Running (Init phase over, must flush immediately)
+	// 6. Main container starts Running
 	status.ContainerStatuses[0].State = v1.ContainerState{
 		Running: &v1.ContainerStateRunning{StartedAt: metav1.Now()},
 	}
@@ -107,10 +105,11 @@ func TestInitContainerStatusCoalescing(t *testing.T) {
 
 	// Check actions to see what was sent:
 	// 1 GET and 1 PATCH for the initial Waiting state.
-	// 1 GET and 1 PATCH for the final Running state (which coalesced init1 and init2).
+	// 1 GET and 1 PATCH for the final Init state (which coalesced init1 running/terminated and init2 running).
+	// 1 GET and 1 PATCH for the main container running state.
 	actions := fakeClient.Actions()
-	if len(actions) != 4 {
-		t.Errorf("Expected 4 actions, got %d", len(actions))
+	if len(actions) != 6 {
+		t.Errorf("Expected 6 actions, got %d", len(actions))
 	}
 }
 
@@ -159,11 +158,22 @@ func TestIsEligibleForDeferral(t *testing.T) {
 			newStatus: &v1.PodStatus{
 				Phase: v1.PodPending,
 				InitContainerStatuses: []v1.ContainerStatus{
-					{State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{ExitCode: 0}}},
+					{State: v1.ContainerState{Running: &v1.ContainerStateRunning{}}},
 				},
 			},
 			hasActiveDeferral: true,
 			expected:          true,
+		},
+		{
+			name: "All init containers completed",
+			newStatus: &v1.PodStatus{
+				Phase: v1.PodPending,
+				InitContainerStatuses: []v1.ContainerStatus{
+					{State: v1.ContainerState{Terminated: &v1.ContainerStateTerminated{ExitCode: 0}}},
+				},
+			},
+			hasActiveDeferral: true,
+			expected:          false,
 		},
 		{
 			name: "No active deferral, init container waiting to running",
@@ -377,4 +387,38 @@ func TestInitContainerStatusCoalescing_TimerExpiration(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return manager.consumeUpdates(ctx) == 1
 	}, 5*time.Second, 10*time.Millisecond, "Expected 1 update after timer expiration")
+}
+
+func TestInitContainerStatusCoalescing_AllInitComplete(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	fakeClient := &clientgofake.Clientset{}
+	manager := newTestManager(fakeClient)
+
+	pod := getTestPod()
+	pod.Spec.InitContainers = []v1.Container{{Name: "init1"}}
+
+	status := v1.PodStatus{
+		Phase: v1.PodPending,
+		InitContainerStatuses: []v1.ContainerStatus{
+			{Name: "init1", State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}},
+		},
+	}
+	manager.SetPodStatus(logger, pod, status)
+	verifyUpdates(t, manager, 1)
+
+	// Start Running
+	status.InitContainerStatuses[0].State = v1.ContainerState{
+		Running: &v1.ContainerStateRunning{StartedAt: metav1.Now()},
+	}
+	manager.SetPodStatus(logger, pod, status)
+	if numUpdates := manager.consumeUpdates(ctx); numUpdates != 0 {
+		t.Fatalf("Expected deferral, got %d updates", numUpdates)
+	}
+
+	// Terminate successfully (This is the LAST init container, so it should flush immediately!)
+	status.InitContainerStatuses[0].State = v1.ContainerState{
+		Terminated: &v1.ContainerStateTerminated{ExitCode: 0},
+	}
+	manager.SetPodStatus(logger, pod, status)
+	verifyUpdates(t, manager, 1)
 }
