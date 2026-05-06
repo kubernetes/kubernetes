@@ -114,7 +114,7 @@ func (runner *runner) GetVirtualServers() ([]*VirtualServer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get IPVS services: %w", err)
 	}
-	vss := make([]*VirtualServer, 0)
+	vss := make([]*VirtualServer, 0, len(ipvsSvcs))
 	for _, ipvsSvc := range ipvsSvcs {
 		vs, err := toVirtualServer(ipvsSvc)
 		if err != nil {
@@ -188,7 +188,7 @@ func (runner *runner) GetRealServers(vs *VirtualServer) ([]*RealServer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get IPVS destination for service: %w", err)
 	}
-	rss := make([]*RealServer, 0)
+	rss := make([]*RealServer, 0, len(dsts))
 	for _, dst := range dsts {
 		dst, err := toRealServer(dst)
 		// TODO: aggregate errors?
