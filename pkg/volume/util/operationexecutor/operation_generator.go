@@ -1649,7 +1649,7 @@ func (og *operationGenerator) GenerateExpandAndRecoverVolumeFunc(
 	}, nil
 }
 
-// Deprecated: This function should not called by any controller code in future and should be removed
+// Deprecated: This function should not be called by any controller code in future and should be removed
 // from kubernetes code
 func (og *operationGenerator) expandAndRecoverFunction(resizeOpts inTreeResizeOpts) inTreeResizeResponse {
 	pvc := resizeOpts.pvc
