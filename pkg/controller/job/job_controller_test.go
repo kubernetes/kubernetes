@@ -1247,10 +1247,7 @@ func TestControllerSyncJob(t *testing.T) {
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
-			if !tc.jobSuccessPolicy {
-				// TODO: this will be removed in 1.36.
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
-			} else if !tc.jobPodReplacementPolicy {
+			if !tc.jobPodReplacementPolicy {
 				// TODO: this will be removed in 1.37.
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.33"))
 			}
@@ -2436,10 +2433,6 @@ func TestTrackJobStatusAndRemoveFinalizers(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			if !tc.enableJobBackoffLimitPerIndex || !tc.enableJobSuccessPolicy {
-				// TODO: this will be removed in 1.36
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
-			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, feature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.JobBackoffLimitPerIndex: tc.enableJobBackoffLimitPerIndex,
 				features.JobSuccessPolicy:        tc.enableJobSuccessPolicy,
@@ -5193,10 +5186,7 @@ func TestSyncJobWithJobSuccessPolicy(t *testing.T) {
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			if !tc.enableBackoffLimitPerIndex || !tc.enableJobSuccessPolicy {
-				// TODO: this will be removed in 1.36
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
-			} else if !tc.enableJobManagedBy {
+			if !tc.enableJobManagedBy {
 				// TODO: this will be remove in 1.38
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.34"))
 			}
@@ -5880,10 +5870,7 @@ func TestSyncJobWithJobBackoffLimitPerIndex(t *testing.T) {
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			if !tc.enableJobBackoffLimitPerIndex {
-				// TODO: this will be removed in 1.36
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
-			} else if !tc.enableJobPodReplacementPolicy {
+			if !tc.enableJobPodReplacementPolicy {
 				// TODO: this will be removed in 1.37.
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.33"))
 			} else if !tc.enableJobManagedBy {
