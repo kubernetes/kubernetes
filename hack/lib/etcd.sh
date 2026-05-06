@@ -16,7 +16,7 @@
 
 # A set of helpers for starting/running etcd for tests
 
-ETCD_VERSION=${ETCD_VERSION:-3.6.10}
+ETCD_VERSION=${ETCD_VERSION:-$(grep -oP "etcd_version',\s*'\K[0-9.]+" "${KUBE_ROOT}/cluster/gce/manifests/etcd.manifest" 2>/dev/null || echo "3.6.10")}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
 # This is intentionally not called ETCD_LOG_LEVEL:
@@ -28,9 +28,13 @@ export KUBE_INTEGRATION_ETCD_URL="http://${ETCD_HOST}:${ETCD_PORT}"
 kube::etcd::validate() {
   # validate if in path
   command -v etcd >/dev/null || {
-    kube::log::usage "etcd must be in your PATH"
-    kube::log::info "You can use 'hack/install-etcd.sh' to install a copy in third_party/."
-    exit 1
+    if [[ -f "${KUBE_ROOT}/third_party/etcd/etcd" ]]; then
+      export PATH="${KUBE_ROOT}/third_party/etcd:${PATH}"
+      hash etcd
+    else
+      kube::log::usage "etcd must be in your PATH"
+      exit 1
+    fi
   }
 
   # validate etcd port is free
@@ -168,17 +172,20 @@ kube::etcd::install() {
       return 0 # already installed
     fi
 
+    local github_base_url="https://github.com/etcd-io/etcd/releases/download/v${ETCD_VERSION}"
+    local gcs_base_url="https://storage.googleapis.com/etcd/v${ETCD_VERSION}"
+
     if [[ ${os} == "darwin" ]]; then
       download_file="etcd-v${ETCD_VERSION}-${os}-${arch}.zip"
-      url="https://github.com/etcd-io/etcd/releases/download/v${ETCD_VERSION}/${download_file}"
-      kube::util::download_file "${url}" "${download_file}"
+      kube::util::download_file "${github_base_url}/${download_file}" "${download_file}" || \
+        kube::util::download_file "${gcs_base_url}/${download_file}" "${download_file}"
       unzip -o "${download_file}"
       ln -fns "etcd-v${ETCD_VERSION}-${os}-${arch}" etcd
       rm "${download_file}"
     elif [[ ${os} == "linux" ]]; then
-      url="https://github.com/etcd-io/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-${os}-${arch}.tar.gz"
       download_file="etcd-v${ETCD_VERSION}-${os}-${arch}.tar.gz"
-      kube::util::download_file "${url}" "${download_file}"
+      kube::util::download_file "${github_base_url}/${download_file}" "${download_file}" || \
+        kube::util::download_file "${gcs_base_url}/${download_file}" "${download_file}"
       tar xzf "${download_file}"
       ln -fns "etcd-v${ETCD_VERSION}-${os}-${arch}" etcd
       rm "${download_file}"
