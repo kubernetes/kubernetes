@@ -433,6 +433,7 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowRestartAllContainers:                               utilfeature.DefaultFeatureGate.Enabled(features.RestartAllContainersOnContainerExits),
 		AllowImageVolumeWithDigest:                              utilfeature.DefaultFeatureGate.Enabled(features.ImageVolumeWithDigest),
 		AllowExistingRestartContainerForNonSidecarInitContainer: hasRestartContainerForNonSidecarInitContainer(oldPodSpec),
+		AllowSysAdminWhenPrivilegeEscalationFalse:               false,
 	}
 
 	// If old spec uses relaxed validation or enabled the RelaxedEnvironmentVariableValidation feature gate,
@@ -489,6 +490,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 
 		// If old spec already had an image volume with empty reference, allow it
 		opts.AllowEmptyImageVolumeReference = hasEmptyImageVolumeReference(oldPodSpec)
+
+		opts.AllowSysAdminWhenPrivilegeEscalationFalse = useAllowSysAdminWhenPrivilegeEscalationFalse(oldPodSpec)
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
@@ -573,18 +576,8 @@ func useAllowEnvFilesValidation(oldPodSpec *api.PodSpec) bool {
 		return false
 	}
 
-	for _, container := range oldPodSpec.Containers {
-		if hasEnvFileKeyRef(container.Env) {
-			return true
-		}
-	}
-	for _, container := range oldPodSpec.InitContainers {
-		if hasEnvFileKeyRef(container.Env) {
-			return true
-		}
-	}
-	for _, container := range oldPodSpec.EphemeralContainers {
-		if hasEnvFileKeyRef(container.Env) {
+	for c := range ContainerIter(oldPodSpec, AllContainers) {
+		if hasEnvFileKeyRef(c.Env) {
 			return true
 		}
 	}
@@ -595,6 +588,38 @@ func useAllowEnvFilesValidation(oldPodSpec *api.PodSpec) bool {
 func hasEnvFileKeyRef(envs []api.EnvVar) bool {
 	for _, env := range envs {
 		if env.ValueFrom != nil && env.ValueFrom.FileKeyRef != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func useAllowSysAdminWhenPrivilegeEscalationFalse(oldPodSpec *api.PodSpec) bool {
+	if oldPodSpec == nil {
+		return false
+	}
+
+	for c := range ContainerIter(oldPodSpec, AllContainers) {
+		if hasSysAdminAndPrivilegeEscalationFalse(c.SecurityContext) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func hasSysAdminAndPrivilegeEscalationFalse(sc *api.SecurityContext) bool {
+	if sc == nil {
+		return false
+	}
+	if sc.AllowPrivilegeEscalation != nil && *sc.AllowPrivilegeEscalation {
+		return false
+	}
+	if sc.Capabilities == nil {
+		return false
+	}
+	for _, c := range sc.Capabilities.Add {
+		if string(c) == "CAP_SYS_ADMIN" {
 			return true
 		}
 	}
