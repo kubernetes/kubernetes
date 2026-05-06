@@ -35,8 +35,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilnettesting "k8s.io/apimachinery/pkg/util/net/testing"
 	"k8s.io/client-go/kubernetes"
-	kastesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	kastesting "k8s.io/kubernetes/test/integration/kubeapiservertesting"
 	"k8s.io/kubernetes/test/utils/fakedns"
 )
 

@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	commonutils "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
+	e2etestfiles "k8s.io/kubernetes/testutils/testfiles"
 )
 
 // PodFromManifest reads a .json/yaml file and returns the pod in it.

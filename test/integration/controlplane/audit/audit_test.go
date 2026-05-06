@@ -42,9 +42,9 @@ import (
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	utiltesting "k8s.io/client-go/util/testing"
-	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils"
+	"k8s.io/kubernetes/test/integration/kubeapiservertesting"
+	utils "k8s.io/kubernetes/testutils"
 
 	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 )

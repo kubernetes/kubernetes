@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/test/utils"
+	utils "k8s.io/kubernetes/testutils"
 
 	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"

@@ -36,9 +36,9 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kube-openapi/pkg/handler3"
 	"k8s.io/kube-openapi/pkg/spec3"
-	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	apiservertesting "k8s.io/kubernetes/test/integration/kubeapiservertesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 	"sigs.k8s.io/yaml"
 )
 

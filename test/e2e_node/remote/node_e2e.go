@@ -29,7 +29,7 @@ import (
 
 	"k8s.io/kubernetes/test/e2e_node/builder"
 	"k8s.io/kubernetes/test/e2e_node/system"
-	"k8s.io/kubernetes/test/utils"
+	utils "k8s.io/kubernetes/testutils"
 )
 
 // NodeE2ERemote contains the specific functions in the node e2e test suite.

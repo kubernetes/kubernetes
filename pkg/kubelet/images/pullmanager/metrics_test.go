@@ -32,7 +32,7 @@ import (
 	metricstestutil "k8s.io/component-base/metrics/testutil"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 )
 
 func TestFSPullRecordsMetrics(t *testing.T) {

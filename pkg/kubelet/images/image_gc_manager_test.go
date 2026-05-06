@@ -37,7 +37,7 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	stats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 	statstest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
 	"k8s.io/utils/ptr"
 )

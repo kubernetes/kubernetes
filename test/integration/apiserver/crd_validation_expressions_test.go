@@ -32,8 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/client-go/dynamic"
-	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	apiservertesting "k8s.io/kubernetes/test/integration/kubeapiservertesting"
 )
 
 // TestCustomResourceValidators tests x-kubernetes-validations compile and validate as expected when the feature gate

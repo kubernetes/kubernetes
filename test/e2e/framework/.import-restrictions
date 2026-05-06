@@ -28,7 +28,7 @@ rules:
     allowedPrefixes: [ "" ]
 
   # some of the shared test helpers (but not E2E sub-packages!)
-  - selectorRegexp: ^k8s[.]io/kubernetes/test/(e2e/framework/internal/|utils)
+  - selectorRegexp: ^k8s[.]io/kubernetes/(test/e2e/framework/internal|testutils|test/utils)/
     allowedPrefixes: [ "" ]
 
   # Third party deps

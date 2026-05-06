@@ -117,6 +117,8 @@ github.com/coreos/go-systemd/v22/util
 # github.com/cpuguy83/go-md2man/v2 v2.0.6
 ## explicit; go 1.12
 github.com/cpuguy83/go-md2man/v2/md2man
+# github.com/creack/pty v1.1.24
+## explicit; go 1.18
 # github.com/cyphar/filepath-securejoin v0.6.1
 ## explicit; go 1.18
 github.com/cyphar/filepath-securejoin
@@ -392,7 +394,7 @@ github.com/grpc-ecosystem/grpc-gateway/v2/utilities
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
-# github.com/ishidawataru/sctp v0.0.0-20250521072954-ae8eb7fa7995
+# github.com/ishidawataru/sctp v0.0.0-20250829011129-4b890084db30
 ## explicit; go 1.12
 github.com/ishidawataru/sctp
 # github.com/jonboulle/clockwork v0.5.0
@@ -476,7 +478,7 @@ github.com/onsi/ginkgo/v2/internal/reporters
 github.com/onsi/ginkgo/v2/internal/testingtproxy
 github.com/onsi/ginkgo/v2/reporters
 github.com/onsi/ginkgo/v2/types
-# github.com/onsi/gomega v1.39.1
+# github.com/onsi/gomega v1.40.0
 ## explicit; go 1.24.0
 github.com/onsi/gomega
 github.com/onsi/gomega/format
@@ -1197,6 +1199,8 @@ k8s.io/kube-openapi/pkg/validation/validate
 # k8s.io/kubectl v0.0.0 => ./staging/src/k8s.io/kubectl
 ## explicit; go 1.26.0
 # k8s.io/kubelet v0.0.0 => ./staging/src/k8s.io/kubelet
+## explicit; go 1.26.0
+# k8s.io/kubernetes v0.0.0-00010101000000-000000000000 => .
 ## explicit; go 1.26.0
 # k8s.io/metrics v0.0.0 => ./staging/src/k8s.io/metrics
 ## explicit; go 1.26.0

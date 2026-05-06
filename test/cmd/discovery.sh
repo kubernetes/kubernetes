@@ -224,8 +224,8 @@ run_resource_aliasing_tests() {
 
   create_and_use_new_namespace
   kube::log::status "Testing resource aliasing"
-  kubectl create -f test/e2e/testing-manifests/statefulset/cassandra/controller.yaml "${kube_flags[@]}"
-  kubectl create -f test/e2e/testing-manifests/statefulset/cassandra/service.yaml "${kube_flags[@]}"
+  kubectl create -f testutils/testing-manifests/statefulset/cassandra/controller.yaml "${kube_flags[@]}"
+  kubectl create -f testutils/testing-manifests/statefulset/cassandra/service.yaml "${kube_flags[@]}"
 
   object="all -l app=cassandra"
   request="{{range.items}}{{range .metadata.labels}}{{.}}:{{end}}{{end}}"

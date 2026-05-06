@@ -213,6 +213,7 @@ kube::log::status "go.mod: go work use" >&11
   go work edit -go "${go_directive_value}" -godebug "${godebug_directive_value}"
   # Re-add use directives
   go work use .
+  go work use test
   for repo in $(kube::util::list_staging_repos); do
     go work use "./staging/src/k8s.io/${repo}"
   done

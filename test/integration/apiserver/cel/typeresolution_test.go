@@ -49,10 +49,10 @@ import (
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/utils/ptr"
 
-	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/test/integration/framework"
+	apiservertesting "k8s.io/kubernetes/test/integration/kubeapiservertesting"
 )
 
 func TestTypeResolver(t *testing.T) {

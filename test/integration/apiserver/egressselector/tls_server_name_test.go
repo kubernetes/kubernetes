@@ -34,10 +34,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
-	kubeapiserverapptesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
-	testutils "k8s.io/kubernetes/test/utils"
+	kubeapiserverapptesting "k8s.io/kubernetes/test/integration/kubeapiservertesting"
 	utilsoidc "k8s.io/kubernetes/test/utils/oidc"
+	"k8s.io/kubernetes/testutils"
 )
 
 func generateTestCerts(t *testing.T, tempDir, serverName string) (caCertPath, serverCertPath, serverKeyPath, clientCertPath, clientKeyPath string) {

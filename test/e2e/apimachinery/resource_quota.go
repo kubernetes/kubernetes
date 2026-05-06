@@ -54,8 +54,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/utils/crd"
-	imageutils "k8s.io/kubernetes/test/utils/image"
-	"k8s.io/kubernetes/test/utils/ktesting/format"
+	imageutils "k8s.io/kubernetes/testutils/image"
+	"k8s.io/kubernetes/testutils/ktesting/format"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
 

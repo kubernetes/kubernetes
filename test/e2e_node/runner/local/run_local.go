@@ -27,7 +27,7 @@ import (
 
 	"k8s.io/kubernetes/test/e2e_node/builder"
 	"k8s.io/kubernetes/test/e2e_node/system"
-	"k8s.io/kubernetes/test/utils"
+	utils "k8s.io/kubernetes/testutils"
 
 	"k8s.io/klog/v2"
 )

@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	_ "k8s.io/kubernetes/test/utils/ktesting/format" // Register YAML formatting.
+	_ "k8s.io/kubernetes/testutils/ktesting/format" // Register YAML formatting.
 )
 
 func TestGomegaFormatObject(t *testing.T) {

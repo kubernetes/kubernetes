@@ -311,7 +311,7 @@ run_pod_tests() {
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl create -f test/fixtures/doc-yaml/admin/limitrange/valid-pod.yaml "${kube_flags[@]}"
-  kubectl create -f test/e2e/testing-manifests/kubectl/agnhost-primary-pod.yaml "${kube_flags[@]}"
+  kubectl create -f testutils/testing-manifests/kubectl/agnhost-primary-pod.yaml "${kube_flags[@]}"
   # Post-condition: valid-pod and agnhost-primary PODs are created
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'agnhost-primary:valid-pod:'
 
@@ -988,7 +988,7 @@ run_service_tests() {
   # Pre-condition: Only the default kubernetes services exist
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
   # Command
-  kubectl create -f test/e2e/testing-manifests/guestbook/redis-master-service.yaml "${kube_flags[@]}"
+  kubectl create -f testutils/testing-manifests/guestbook/redis-master-service.yaml "${kube_flags[@]}"
   # Post-condition: redis-master service exists
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:redis-master:'
   # Describe command should print detailed information
@@ -1015,14 +1015,14 @@ run_service_tests() {
   kube::test::get_object_assert 'services redis-master' "{{range${service_selector_field:?}}}{{.}}:{{end}}" "redis:master:backend:"
 
   # Set selector of a local file without talking to the server
-  kubectl set selector -f test/e2e/testing-manifests/guestbook/redis-master-service.yaml role=padawan --local -o yaml "${kube_flags[@]}"
-  kubectl set selector -f test/e2e/testing-manifests/guestbook/redis-master-service.yaml role=padawan --dry-run=client -o yaml "${kube_flags[@]}"
+  kubectl set selector -f testutils/testing-manifests/guestbook/redis-master-service.yaml role=padawan --local -o yaml "${kube_flags[@]}"
+  kubectl set selector -f testutils/testing-manifests/guestbook/redis-master-service.yaml role=padawan --dry-run=client -o yaml "${kube_flags[@]}"
   # Set command to change the selector.
-  kubectl set selector -f test/e2e/testing-manifests/guestbook/redis-master-service.yaml role=padawan
+  kubectl set selector -f testutils/testing-manifests/guestbook/redis-master-service.yaml role=padawan
   # prove role=padawan
   kube::test::get_object_assert 'services redis-master' "{{range$service_selector_field}}{{.}}:{{end}}" "padawan:"
   # Set command to reset the selector back to the original one.
-  kubectl set selector -f test/e2e/testing-manifests/guestbook/redis-master-service.yaml app=redis,role=master,tier=backend
+  kubectl set selector -f testutils/testing-manifests/guestbook/redis-master-service.yaml app=redis,role=master,tier=backend
   # prove role=master
   kube::test::get_object_assert 'services redis-master' "{{range$service_selector_field}}{{.}}:{{end}}" "redis:master:backend:"
   # Show dry-run works on running selector
@@ -1105,8 +1105,8 @@ __EOF__
   # Pre-condition: Only the default kubernetes services exist
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
   # Command
-  kubectl create -f test/e2e/testing-manifests/guestbook/redis-master-service.yaml "${kube_flags[@]}"
-  kubectl create -f test/e2e/testing-manifests/guestbook/redis-slave-service.yaml "${kube_flags[@]}"
+  kubectl create -f testutils/testing-manifests/guestbook/redis-master-service.yaml "${kube_flags[@]}"
+  kubectl create -f testutils/testing-manifests/guestbook/redis-slave-service.yaml "${kube_flags[@]}"
   # Post-condition: redis-master and redis-slave services are created
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:redis-master:redis-slave:'
 
@@ -1270,8 +1270,8 @@ run_rc_tests() {
   kubectl delete rc frontend "${kube_flags[@]}"
 
   ### Scale multiple replication controllers
-  kubectl create -f test/e2e/testing-manifests/guestbook/legacy/redis-master-controller.yaml "${kube_flags[@]}"
-  kubectl create -f test/e2e/testing-manifests/guestbook/legacy/redis-slave-controller.yaml "${kube_flags[@]}"
+  kubectl create -f testutils/testing-manifests/guestbook/legacy/redis-master-controller.yaml "${kube_flags[@]}"
+  kubectl create -f testutils/testing-manifests/guestbook/legacy/redis-slave-controller.yaml "${kube_flags[@]}"
   # Command dry-run client
   output_message=$(kubectl scale rc/redis-master rc/redis-slave --replicas=4 --dry-run=client "${kube_flags[@]}")
   # Post-condition dry-run client: 1 replicas each
@@ -1413,7 +1413,7 @@ run_rc_tests() {
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
   kubectl create -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}"
-  kubectl create -f test/e2e/testing-manifests/guestbook/legacy/redis-slave-controller.yaml "${kube_flags[@]}"
+  kubectl create -f testutils/testing-manifests/guestbook/legacy/redis-slave-controller.yaml "${kube_flags[@]}"
   # Post-condition: frontend and redis-slave
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" 'frontend:redis-slave:'
 

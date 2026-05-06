@@ -53,8 +53,8 @@ import (
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
-	"k8s.io/kubernetes/test/utils/ktesting/initoption"
+	"k8s.io/kubernetes/testutils/client-go/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting/initoption"
 	"sigs.k8s.io/yaml"
 )
 

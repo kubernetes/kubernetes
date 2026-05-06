@@ -33,8 +33,8 @@ import (
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
-	testutils "k8s.io/kubernetes/test/utils"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
+	"k8s.io/kubernetes/testutils"
+	"k8s.io/kubernetes/testutils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 )
 

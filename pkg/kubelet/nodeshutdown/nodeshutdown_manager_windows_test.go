@@ -40,7 +40,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
-	testutilsktesting "k8s.io/kubernetes/test/utils/ktesting"
+	testutilsktesting "k8s.io/kubernetes/testutils/ktesting"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 )

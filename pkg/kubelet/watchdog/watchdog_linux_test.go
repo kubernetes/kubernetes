@@ -25,8 +25,8 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/test/utils/ktesting"
-	"k8s.io/kubernetes/test/utils/ktesting/initoption"
+	"k8s.io/kubernetes/testutils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting/initoption"
 )
 
 // Some of these tests capture log output. Don't reduce the verbosity or they will fail!

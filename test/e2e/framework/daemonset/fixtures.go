@@ -19,6 +19,7 @@ package daemonset
 import (
 	"context"
 	"fmt"
+
 	"k8s.io/klog/v2"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -28,7 +29,7 @@ import (
 	"k8s.io/kubectl/pkg/util/podutils"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/utils/ktesting/format"
+	"k8s.io/kubernetes/testutils/ktesting/format"
 )
 
 func NewDaemonSet(dsName, image string, labels map[string]string, volumes []v1.Volume, mounts []v1.VolumeMount, ports []v1.ContainerPort, args ...string) *appsv1.DaemonSet {

@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	klogtesting "k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/kubelet/cm/dra/state"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 )
 
 // ClaimInfo test cases

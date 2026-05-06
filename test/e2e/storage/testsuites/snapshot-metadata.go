@@ -124,7 +124,7 @@ func createBackupClientResources(ctx context.Context, f *framework.Framework) {
 	ginkgo.By("creating backup client resources")
 	// create from manifest
 	backupClientManifests := []string{
-		"test/e2e/testing-manifests/storage-csi/external-snapshot-metadata/backup-client-rbac.yaml",
+		"testutils/testing-manifests/storage-csi/external-snapshot-metadata/backup-client-rbac.yaml",
 	}
 	err := storageutils.CreateFromManifests(ctx, f, f.Namespace,
 		func(item interface{}) error { return nil },

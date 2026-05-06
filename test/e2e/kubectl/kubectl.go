@@ -77,11 +77,11 @@ import (
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/scheduling"
-	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/crd"
-	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/kubernetes/testutils"
+	imageutils "k8s.io/kubernetes/testutils/image"
+	e2etestfiles "k8s.io/kubernetes/testutils/testfiles"
 	admissionapi "k8s.io/pod-security-admission/api"
 	uexec "k8s.io/utils/exec"
 	"k8s.io/utils/ptr"
@@ -103,7 +103,7 @@ const (
 	pausePodName               = "pause"
 	busyboxPodSelector         = "app=busybox1"
 	busyboxPodName             = "busybox1"
-	kubeCtlManifestPath        = "test/e2e/testing-manifests/kubectl"
+	kubeCtlManifestPath        = "testutils/testing-manifests/kubectl"
 	agnhostControllerFilename  = "agnhost-primary-controller.json.in"
 	agnhostServiceFilename     = "agnhost-primary-service.json"
 	agnhostDeployment1Filename = "agnhost-deployment1.yaml.in"
@@ -387,7 +387,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 	ginkgo.Describe("Guestbook application", func() {
 		forEachGBFile := func(run func(s string)) {
-			guestbookRoot := "test/e2e/testing-manifests/guestbook"
+			guestbookRoot := "testutils/testing-manifests/guestbook"
 			for _, gbAppFile := range []string{
 				"agnhost-replica-service.yaml",
 				"agnhost-primary-service.yaml",

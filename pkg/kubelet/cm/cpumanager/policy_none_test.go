@@ -19,7 +19,7 @@ package cpumanager
 import (
 	"testing"
 
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/utils/cpuset"

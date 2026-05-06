@@ -40,12 +40,12 @@ import (
 	"k8s.io/utils/ptr"
 
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/test/integration/authutil"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils"
+	apiservertesting "k8s.io/kubernetes/test/integration/kubeapiservertesting"
+	utils "k8s.io/kubernetes/testutils"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

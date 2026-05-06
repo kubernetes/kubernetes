@@ -38,9 +38,9 @@ import (
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	ccmservertesting "k8s.io/cloud-provider/app/testing"
 	fakecloud "k8s.io/cloud-provider/fake"
-	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/integration/kubeapiservertesting"
 )
 
 func Test_RemoveExternalCloudProviderTaint(t *testing.T) {

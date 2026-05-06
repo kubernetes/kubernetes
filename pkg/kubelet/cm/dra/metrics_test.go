@@ -20,7 +20,7 @@ import (
 	"strings"
 
 	"k8s.io/component-base/metrics/testutil"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/testutils/ktesting"
 )
 
 func testClaimsInUseMetric(tCtx ktesting.TContext, claimInfoCache *claimInfoCache, expectedMetric string) {

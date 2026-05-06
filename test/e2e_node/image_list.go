@@ -34,8 +34,8 @@ import (
 	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
-	imageutils "k8s.io/kubernetes/test/utils/image"
+	imageutils "k8s.io/kubernetes/testutils/image"
+	e2etestfiles "k8s.io/kubernetes/testutils/testfiles"
 )
 
 const (

@@ -33,7 +33,7 @@ import (
 	"k8s.io/client-go/util/retry"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	testutils "k8s.io/kubernetes/test/utils"
+	"k8s.io/kubernetes/testutils"
 )
 
 const (
