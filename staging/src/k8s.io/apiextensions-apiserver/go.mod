@@ -20,7 +20,7 @@ require (
 	go.etcd.io/etcd/client/v3 v3.6.11
 	go.opentelemetry.io/otel v1.43.0
 	go.opentelemetry.io/otel/trace v1.43.0
-	go.yaml.in/yaml/v2 v2.4.3
+	go.yaml.in/yaml/v2 v2.4.4
 	golang.org/x/sync v0.20.0
 	golang.org/x/text v0.36.0
 	google.golang.org/grpc v1.81.0
