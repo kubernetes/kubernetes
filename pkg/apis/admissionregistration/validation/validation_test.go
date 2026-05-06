@@ -21,6 +21,9 @@ import (
 	"strings"
 	"testing"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+
 	"github.com/google/cel-go/cel"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,6 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/cel/environment"
 	"k8s.io/apiserver/pkg/cel/library"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -47,6 +51,181 @@ func newValidatingWebhookConfiguration(hooks []admissionregistration.ValidatingW
 		},
 		Webhooks: hooks,
 	}
+}
+
+func TestAdmissionRegistrationFinalizerNameValidation(t *testing.T) {
+	testcases := []struct {
+		name       string
+		enableGate bool
+		validate   func([]string) field.ErrorList
+		wantErr    bool
+	}{
+		{
+			name:       "validating webhook gate enabled rejects unqualified custom finalizer",
+			enableGate: true,
+			validate: func(finalizers []string) field.ErrorList {
+				return ValidateValidatingWebhookConfiguration(&admissionregistration.ValidatingWebhookConfiguration{
+					ObjectMeta: metav1.ObjectMeta{Name: "validating-webhook", Finalizers: finalizers},
+				})
+			},
+			wantErr: true,
+		},
+		{
+			name:       "mutating webhook gate enabled rejects unqualified custom finalizer",
+			enableGate: true,
+			validate: func(finalizers []string) field.ErrorList {
+				return ValidateMutatingWebhookConfiguration(&admissionregistration.MutatingWebhookConfiguration{
+					ObjectMeta: metav1.ObjectMeta{Name: "mutating-webhook", Finalizers: finalizers},
+				})
+			},
+			wantErr: true,
+		},
+		{
+			name:       "validating admission policy gate enabled rejects unqualified custom finalizer",
+			enableGate: true,
+			validate: func(finalizers []string) field.ErrorList {
+				return ValidateValidatingAdmissionPolicy(&admissionregistration.ValidatingAdmissionPolicy{
+					ObjectMeta: metav1.ObjectMeta{Name: "validating-policy", Finalizers: finalizers},
+				})
+			},
+			wantErr: true,
+		},
+		{
+			name:       "validating admission policy binding gate enabled rejects unqualified custom finalizer",
+			enableGate: true,
+			validate: func(finalizers []string) field.ErrorList {
+				return ValidateValidatingAdmissionPolicyBinding(&admissionregistration.ValidatingAdmissionPolicyBinding{
+					ObjectMeta: metav1.ObjectMeta{Name: "validating-policy-binding", Finalizers: finalizers},
+				})
+			},
+			wantErr: true,
+		},
+		{
+			name:       "mutating admission policy gate enabled rejects unqualified custom finalizer",
+			enableGate: true,
+			validate: func(finalizers []string) field.ErrorList {
+				return ValidateMutatingAdmissionPolicy(&admissionregistration.MutatingAdmissionPolicy{
+					ObjectMeta: metav1.ObjectMeta{Name: "mutating-policy", Finalizers: finalizers},
+				})
+			},
+			wantErr: true,
+		},
+		{
+			name:       "mutating admission policy binding gate enabled rejects unqualified custom finalizer",
+			enableGate: true,
+			validate: func(finalizers []string) field.ErrorList {
+				return ValidateMutatingAdmissionPolicyBinding(&admissionregistration.MutatingAdmissionPolicyBinding{
+					ObjectMeta: metav1.ObjectMeta{Name: "mutating-policy-binding", Finalizers: finalizers},
+				})
+			},
+			wantErr: true,
+		},
+		{
+			name:       "gate disabled allows unqualified custom finalizer",
+			enableGate: false,
+			validate: func(finalizers []string) field.ErrorList {
+				return ValidateValidatingWebhookConfiguration(&admissionregistration.ValidatingWebhookConfiguration{
+					ObjectMeta: metav1.ObjectMeta{Name: "validating-webhook", Finalizers: finalizers},
+				})
+			},
+		},
+		{
+			name:       "gate enabled allows domain qualified custom finalizer",
+			enableGate: true,
+			validate: func(finalizers []string) field.ErrorList {
+				return ValidateValidatingWebhookConfiguration(&admissionregistration.ValidatingWebhookConfiguration{
+					ObjectMeta: metav1.ObjectMeta{Name: "validating-webhook", Finalizers: finalizers},
+				})
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictFinalizerNameValidation, tc.enableGate)
+
+			finalizers := []string{"my-custom-finalizer"}
+			if !tc.wantErr {
+				if tc.enableGate {
+					finalizers = []string{"example.com/my-finalizer"}
+				}
+			}
+
+			errs := tc.validate(finalizers)
+			if tc.wantErr && len(errs) == 0 {
+				t.Fatalf("expected error, got none")
+			}
+			if !tc.wantErr && hasFinalizerNameError(errs) {
+				t.Fatalf("expected no finalizer name error, got %v", errs)
+			}
+		})
+	}
+}
+
+func TestAdmissionRegistrationFinalizerNameUpdateRatcheting(t *testing.T) {
+	testcases := []struct {
+		name          string
+		enableGate    bool
+		oldFinalizers []string
+		newFinalizers []string
+		wantErr       bool
+	}{
+		{
+			name:          "gate enabled allows unchanged invalid finalizer",
+			enableGate:    true,
+			oldFinalizers: []string{"my-custom-finalizer"},
+			newFinalizers: []string{"my-custom-finalizer"},
+		},
+		{
+			name:          "gate enabled rejects newly added invalid finalizer",
+			enableGate:    true,
+			oldFinalizers: []string{"example.com/existing"},
+			newFinalizers: []string{"example.com/existing", "my-custom-finalizer"},
+			wantErr:       true,
+		},
+		{
+			name:          "gate disabled allows newly added invalid finalizer",
+			enableGate:    false,
+			oldFinalizers: []string{"example.com/existing"},
+			newFinalizers: []string{"example.com/existing", "my-custom-finalizer"},
+		},
+		{
+			name:          "gate enabled allows newly added domain qualified finalizer",
+			enableGate:    true,
+			oldFinalizers: []string{"example.com/existing"},
+			newFinalizers: []string{"example.com/existing", "example.com/new"},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictFinalizerNameValidation, tc.enableGate)
+
+			oldConfig := &admissionregistration.ValidatingWebhookConfiguration{
+				ObjectMeta: metav1.ObjectMeta{Name: "validating-webhook", Finalizers: tc.oldFinalizers},
+			}
+			newConfig := &admissionregistration.ValidatingWebhookConfiguration{
+				ObjectMeta: metav1.ObjectMeta{Name: "validating-webhook", Finalizers: tc.newFinalizers},
+			}
+
+			errs := ValidateValidatingWebhookConfigurationUpdate(newConfig, oldConfig)
+			if tc.wantErr && !hasFinalizerNameError(errs) {
+				t.Fatalf("expected finalizer name error, got %v", errs)
+			}
+			if !tc.wantErr && hasFinalizerNameError(errs) {
+				t.Fatalf("expected no finalizer name error, got %v", errs)
+			}
+		})
+	}
+}
+
+func hasFinalizerNameError(errs field.ErrorList) bool {
+	for _, err := range errs {
+		if strings.Contains(err.Error(), "name is neither a standard finalizer name nor is it fully qualified") {
+			return true
+		}
+	}
+	return false
 }
 
 func TestValidateValidatingWebhookConfiguration(t *testing.T) {

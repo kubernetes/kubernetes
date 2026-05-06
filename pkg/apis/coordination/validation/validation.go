@@ -24,9 +24,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/validation"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 
 	"k8s.io/kubernetes/pkg/apis/coordination"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 var validLeaseStrategies = []coordination.CoordinatedLeaseStrategy{coordination.OldestEmulationVersion}
@@ -34,6 +36,9 @@ var validLeaseStrategies = []coordination.CoordinatedLeaseStrategy{coordination.
 // ValidateLease validates a Lease.
 func ValidateLease(lease *coordination.Lease) field.ErrorList {
 	allErrs := validation.ValidateObjectMeta(&lease.ObjectMeta, true, validation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	if utilfeature.DefaultFeatureGate.Enabled(features.StrictFinalizerNameValidation) {
+		allErrs = append(allErrs, validation.ValidateFinalizersWithQualifiedNames(lease.Finalizers, field.NewPath("metadata", "finalizers"))...)
+	}
 	allErrs = append(allErrs, ValidateLeaseSpec(&lease.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
@@ -41,6 +46,9 @@ func ValidateLease(lease *coordination.Lease) field.ErrorList {
 // ValidateLeaseUpdate validates an update of Lease object.
 func ValidateLeaseUpdate(lease, oldLease *coordination.Lease) field.ErrorList {
 	allErrs := validation.ValidateObjectMetaUpdate(&lease.ObjectMeta, &oldLease.ObjectMeta, field.NewPath("metadata"))
+	if utilfeature.DefaultFeatureGate.Enabled(features.StrictFinalizerNameValidation) {
+		allErrs = append(allErrs, validation.ValidateNoNewInvalidQualifiedFinalizers(lease.Finalizers, oldLease.Finalizers, field.NewPath("metadata", "finalizers"))...)
+	}
 	allErrs = append(allErrs, ValidateLeaseSpec(&lease.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
@@ -70,6 +78,9 @@ func ValidateLeaseSpec(spec *coordination.LeaseSpec, fldPath *field.Path) field.
 // ValidateLeaseCandidate validates a LeaseCandidate.
 func ValidateLeaseCandidate(lease *coordination.LeaseCandidate) field.ErrorList {
 	allErrs := validation.ValidateObjectMeta(&lease.ObjectMeta, true, ValidLeaseCandidateName, field.NewPath("metadata"))
+	if utilfeature.DefaultFeatureGate.Enabled(features.StrictFinalizerNameValidation) {
+		allErrs = append(allErrs, validation.ValidateFinalizersWithQualifiedNames(lease.Finalizers, field.NewPath("metadata", "finalizers"))...)
+	}
 	allErrs = append(allErrs, ValidateLeaseCandidateSpec(&lease.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
@@ -88,6 +99,9 @@ func ValidateLeaseCandidateSpecUpdate(leaseCandidateSpec, oldLeaseCandidateSpec 
 // ValidateLeaseCandidateUpdate validates an update of LeaseCandidate object.
 func ValidateLeaseCandidateUpdate(leaseCandidate, oldLeaseCandidate *coordination.LeaseCandidate) field.ErrorList {
 	allErrs := validation.ValidateObjectMetaUpdate(&leaseCandidate.ObjectMeta, &oldLeaseCandidate.ObjectMeta, field.NewPath("metadata"))
+	if utilfeature.DefaultFeatureGate.Enabled(features.StrictFinalizerNameValidation) {
+		allErrs = append(allErrs, validation.ValidateNoNewInvalidQualifiedFinalizers(leaseCandidate.Finalizers, oldLeaseCandidate.Finalizers, field.NewPath("metadata", "finalizers"))...)
+	}
 	allErrs = append(allErrs, ValidateLeaseCandidateSpec(&leaseCandidate.Spec, field.NewPath("spec"))...)
 	allErrs = append(allErrs, ValidateLeaseCandidateSpecUpdate(&leaseCandidate.Spec, &oldLeaseCandidate.Spec)...)
 	return allErrs

@@ -117,6 +117,64 @@ func ValidateFinalizerName(stringValue string, fldPath *field.Path) field.ErrorL
 	return allErrs
 }
 
+var standardFinalizerNames = sets.NewString(
+	"kubernetes",
+	metav1.FinalizerOrphanDependents,
+	metav1.FinalizerDeleteDependents,
+)
+
+// isStandardFinalizerName checks if the input string is a standard finalizer name.
+func isStandardFinalizerName(str string) bool {
+	return standardFinalizerNames.Has(str)
+}
+
+// ValidateFinalizerNameStandardOrQualified validates that finalizer names without
+// a domain prefix are standard Kubernetes finalizer names.
+func ValidateFinalizerNameStandardOrQualified(stringValue string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if !strings.Contains(stringValue, "/") && !isStandardFinalizerName(stringValue) {
+		allErrs = append(allErrs, field.Invalid(fldPath, stringValue, "name is neither a standard finalizer name nor is it fully qualified"))
+	}
+	return allErrs
+}
+
+// ValidateQualifiedFinalizerName validates finalizer names using the stricter
+// Kubernetes finalizer naming rule. Finalizers without a domain prefix must be
+// one of the standard Kubernetes finalizer names.
+func ValidateQualifiedFinalizerName(stringValue string, fldPath *field.Path) field.ErrorList {
+	allErrs := ValidateFinalizerName(stringValue, fldPath)
+	allErrs = append(allErrs, ValidateFinalizerNameStandardOrQualified(stringValue, fldPath)...)
+	return allErrs
+}
+
+// ValidateFinalizersWithQualifiedNames validates finalizer names using the stricter
+// Kubernetes finalizer naming rule. Finalizers without a domain prefix must be
+// one of the standard Kubernetes finalizer names.
+func ValidateFinalizersWithQualifiedNames(finalizers []string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, finalizer := range finalizers {
+		allErrs = append(allErrs, ValidateFinalizerNameStandardOrQualified(finalizer, fldPath.Index(i))...)
+	}
+	return allErrs
+}
+
+// ValidateNoNewInvalidQualifiedFinalizers validates that newly added finalizers
+// satisfy the stricter Kubernetes finalizer naming rule. Existing invalid
+// finalizers are allowed to remain unchanged.
+func ValidateNoNewInvalidQualifiedFinalizers(newFinalizers, oldFinalizers []string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	oldFinalizersSet := sets.NewString(oldFinalizers...)
+
+	for i, finalizer := range newFinalizers {
+		if oldFinalizersSet.Has(finalizer) {
+			continue
+		}
+		allErrs = append(allErrs, ValidateQualifiedFinalizerName(finalizer, fldPath.Index(i))...)
+	}
+
+	return allErrs
+}
+
 // ValidateNoNewFinalizers validates the new finalizers has no new finalizers compare to old finalizers.
 func ValidateNoNewFinalizers(newFinalizers []string, oldFinalizers []string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}

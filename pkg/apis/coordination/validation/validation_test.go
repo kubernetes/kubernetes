@@ -21,7 +21,10 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/coordination"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
@@ -35,6 +38,165 @@ func TestValidateLease(t *testing.T) {
 	errs := ValidateLease(lease)
 	if len(errs) != 2 {
 		t.Errorf("unexpected list of errors: %#v", errs.ToAggregate().Error())
+	}
+}
+
+func TestValidateLeaseFinalizerNames(t *testing.T) {
+	testcases := map[string]struct {
+		enableGate bool
+		finalizers []string
+		wantErr    bool
+	}{
+		"gate enabled rejects unqualified custom finalizer": {
+			enableGate: true,
+			finalizers: []string{"my-custom-finalizer"},
+			wantErr:    true,
+		},
+		"gate disabled allows unqualified custom finalizer": {
+			enableGate: false,
+			finalizers: []string{"my-custom-finalizer"},
+		},
+		"gate enabled allows standard finalizer": {
+			enableGate: true,
+			finalizers: []string{metav1.FinalizerDeleteDependents},
+		},
+		"gate enabled allows domain qualified finalizer": {
+			enableGate: true,
+			finalizers: []string{"example.com/my-finalizer"},
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictFinalizerNameValidation, tc.enableGate)
+
+			lease := &coordination.Lease{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "sample-lease",
+					Namespace:  "default",
+					Finalizers: tc.finalizers,
+				},
+			}
+
+			errs := ValidateLease(lease)
+			if tc.wantErr && len(errs) == 0 {
+				t.Fatalf("expected error, got none")
+			}
+			if !tc.wantErr && len(errs) != 0 {
+				t.Fatalf("expected no error, got %v", errs)
+			}
+		})
+	}
+}
+
+func TestValidateLeaseUpdateFinalizerNameRatcheting(t *testing.T) {
+	testcases := map[string]struct {
+		enableGate    bool
+		oldFinalizers []string
+		newFinalizers []string
+		wantErr       bool
+	}{
+		"gate enabled allows unchanged invalid finalizer": {
+			enableGate:    true,
+			oldFinalizers: []string{"my-custom-finalizer"},
+			newFinalizers: []string{"my-custom-finalizer"},
+		},
+		"gate enabled rejects newly added invalid finalizer": {
+			enableGate:    true,
+			oldFinalizers: []string{"example.com/existing"},
+			newFinalizers: []string{"example.com/existing", "my-custom-finalizer"},
+			wantErr:       true,
+		},
+		"gate disabled allows newly added invalid finalizer": {
+			enableGate:    false,
+			oldFinalizers: []string{"example.com/existing"},
+			newFinalizers: []string{"example.com/existing", "my-custom-finalizer"},
+		},
+		"gate enabled allows newly added domain qualified finalizer": {
+			enableGate:    true,
+			oldFinalizers: []string{"example.com/existing"},
+			newFinalizers: []string{"example.com/existing", "example.com/new"},
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictFinalizerNameValidation, tc.enableGate)
+
+			oldLease := &coordination.Lease{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "sample-lease",
+					Namespace:  "default",
+					Finalizers: tc.oldFinalizers,
+				},
+			}
+			newLease := &coordination.Lease{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "sample-lease",
+					Namespace:       "default",
+					ResourceVersion: "2",
+					Finalizers:      tc.newFinalizers,
+				},
+			}
+
+			errs := ValidateLeaseUpdate(newLease, oldLease)
+			if tc.wantErr && len(errs) == 0 {
+				t.Fatalf("expected error, got none")
+			}
+			if !tc.wantErr && len(errs) != 0 {
+				t.Fatalf("expected no error, got %v", errs)
+			}
+		})
+	}
+}
+
+func TestValidateLeaseCandidateFinalizerNames(t *testing.T) {
+	testcases := map[string]struct {
+		enableGate bool
+		finalizers []string
+		wantErr    bool
+	}{
+		"gate enabled rejects unqualified custom finalizer": {
+			enableGate: true,
+			finalizers: []string{"my-custom-finalizer"},
+			wantErr:    true,
+		},
+		"gate disabled allows unqualified custom finalizer": {
+			enableGate: false,
+			finalizers: []string{"my-custom-finalizer"},
+		},
+		"gate enabled allows domain qualified finalizer": {
+			enableGate: true,
+			finalizers: []string{"example.com/my-finalizer"},
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StrictFinalizerNameValidation, tc.enableGate)
+
+			leaseCandidate := &coordination.LeaseCandidate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "sample-lease.candidate",
+					Namespace:  "default",
+					Finalizers: tc.finalizers,
+				},
+				Spec: coordination.LeaseCandidateSpec{
+					LeaseName:        "sample-lease",
+					BinaryVersion:    "1.30.0",
+					EmulationVersion: "1.30.0",
+					Strategy:         coordination.OldestEmulationVersion,
+				},
+			}
+
+			errs := ValidateLeaseCandidate(leaseCandidate)
+			if tc.wantErr && len(errs) == 0 {
+				t.Fatalf("expected error, got none")
+			}
+			if !tc.wantErr && len(errs) != 0 {
+				t.Fatalf("expected no error, got %v", errs)
+			}
+		})
 	}
 }
 

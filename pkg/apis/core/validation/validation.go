@@ -415,7 +415,7 @@ func ValidateObjectMetaWithOpts(meta *metav1.ObjectMeta, isNamespaced bool, name
 	allErrs := apimachineryvalidation.ValidateObjectMetaWithOpts(meta, isNamespaced, nameFn, fldPath)
 	// run additional checks for the finalizer name
 	for i := range meta.Finalizers {
-		allErrs = append(allErrs, validateKubeFinalizerName(string(meta.Finalizers[i]), fldPath.Child("finalizers").Index(i))...)
+		allErrs = append(allErrs, apimachineryvalidation.ValidateFinalizerNameStandardOrQualified(string(meta.Finalizers[i]), fldPath.Child("finalizers").Index(i))...)
 	}
 	return allErrs
 }
@@ -427,7 +427,7 @@ func ValidateObjectMeta(meta *metav1.ObjectMeta, requiresNamespace bool, nameFn 
 	allErrs := apimachineryvalidation.ValidateObjectMeta(meta, requiresNamespace, apimachineryvalidation.ValidateNameFunc(nameFn), fldPath)
 	// run additional checks for the finalizer name
 	for i := range meta.Finalizers {
-		allErrs = append(allErrs, validateKubeFinalizerName(string(meta.Finalizers[i]), fldPath.Child("finalizers").Index(i))...)
+		allErrs = append(allErrs, apimachineryvalidation.ValidateFinalizerNameStandardOrQualified(string(meta.Finalizers[i]), fldPath.Child("finalizers").Index(i))...)
 	}
 	return allErrs
 }
@@ -437,7 +437,7 @@ func ValidateObjectMetaUpdate(newMeta, oldMeta *metav1.ObjectMeta, fldPath *fiel
 	allErrs := apimachineryvalidation.ValidateObjectMetaUpdate(newMeta, oldMeta, fldPath)
 	// run additional checks for the finalizer name
 	for i := range newMeta.Finalizers {
-		allErrs = append(allErrs, validateKubeFinalizerName(string(newMeta.Finalizers[i]), fldPath.Child("finalizers").Index(i))...)
+		allErrs = append(allErrs, apimachineryvalidation.ValidateFinalizerNameStandardOrQualified(string(newMeta.Finalizers[i]), fldPath.Child("finalizers").Index(i))...)
 	}
 
 	return allErrs
@@ -8284,21 +8284,7 @@ func ValidateNamespace(namespace *core.Namespace) field.ErrorList {
 
 // Validate finalizer names
 func validateFinalizerName(stringValue string, fldPath *field.Path) field.ErrorList {
-	allErrs := apimachineryvalidation.ValidateFinalizerName(stringValue, fldPath)
-	allErrs = append(allErrs, validateKubeFinalizerName(stringValue, fldPath)...)
-	return allErrs
-}
-
-// validateKubeFinalizerName checks for "standard" names of legacy finalizer
-func validateKubeFinalizerName(stringValue string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if len(strings.Split(stringValue, "/")) == 1 {
-		if !helper.IsStandardFinalizerName(stringValue) {
-			return append(allErrs, field.Invalid(fldPath, stringValue, "name is neither a standard finalizer name nor is it fully qualified"))
-		}
-	}
-
-	return allErrs
+	return apimachineryvalidation.ValidateQualifiedFinalizerName(stringValue, fldPath)
 }
 
 // ValidateNamespaceUpdate tests to make sure a namespace update can be applied.

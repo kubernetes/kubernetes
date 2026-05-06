@@ -17,13 +17,16 @@ limitations under the License.
 package validation
 
 import (
+	"regexp"
+
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/core"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/node"
-	"regexp"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // Define normalization rules to handle field name differences across API versions
@@ -38,6 +41,9 @@ var NodeNormalizationRules = []field.NormalizationRule{
 // ValidateRuntimeClass validates the RuntimeClass
 func ValidateRuntimeClass(rc *node.RuntimeClass) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&rc.ObjectMeta, false, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	if utilfeature.DefaultFeatureGate.Enabled(features.StrictFinalizerNameValidation) {
+		allErrs = append(allErrs, apivalidation.ValidateFinalizersWithQualifiedNames(rc.Finalizers, field.NewPath("metadata", "finalizers"))...)
+	}
 	if rc.Handler == "" {
 		allErrs = append(allErrs, field.Required(field.NewPath("handler"), "")).MarkCoveredByDeclarative()
 	} else {
@@ -59,6 +65,9 @@ func ValidateRuntimeClass(rc *node.RuntimeClass) field.ErrorList {
 // ValidateRuntimeClassUpdate validates an update to the object
 func ValidateRuntimeClassUpdate(new, old *node.RuntimeClass) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&new.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))
+	if utilfeature.DefaultFeatureGate.Enabled(features.StrictFinalizerNameValidation) {
+		allErrs = append(allErrs, apivalidation.ValidateNoNewInvalidQualifiedFinalizers(new.Finalizers, old.Finalizers, field.NewPath("metadata", "finalizers"))...)
+	}
 
 	allErrs = append(allErrs, apivalidation.ValidateImmutableField(new.Handler, old.Handler, field.NewPath("handler"))...).MarkCoveredByDeclarative().WithOrigin("immutable")
 

@@ -1037,6 +1037,12 @@ const (
 	// Enables support for the StorageVersionMigrator controller.
 	StorageVersionMigrator featuregate.Feature = "StorageVersionMigrator"
 
+	// owner: @kubernetes/sig-api-machinery
+	//
+	// Requires finalizer names in API objects to either be standard Kubernetes
+	// finalizer names or domain-qualified custom finalizer names.
+	StrictFinalizerNameValidation featuregate.Feature = "StrictFinalizerNameValidation"
+
 	// owner: @danwinship
 	// kep: https://kep.k8s.io/4858
 	//
@@ -1930,6 +1936,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Beta},
 	},
 
+	StrictFinalizerNameValidation: {
+		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	StrictIPCIDRValidation: {
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
@@ -2531,6 +2541,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	StorageNamespaceIndex: {},
 
 	StorageVersionMigrator: {},
+
+	StrictFinalizerNameValidation: {},
 
 	StrictIPCIDRValidation: {},
 
