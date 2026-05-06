@@ -1119,6 +1119,8 @@ func (dsc *DaemonSetsController) syncNodes(ctx context.Context, ds *apps.DaemonS
 	for i := 0; i < deleteDiff; i++ {
 		go func(ix int) {
 			defer deleteWait.Done()
+			// TODO: Consider using ResourceVersion preconditions to ensure we don't delete a pod that has
+			// been modified since our last cached read.
 			if err := dsc.podControl.DeletePod(ctx, ds.Namespace, podsToDelete[ix], ds, metav1.DeleteOptions{}); err != nil {
 				// We are cleaning up an expectation that this delete will be observed,
 				// since any failure to delete the pod means that we will never observe
