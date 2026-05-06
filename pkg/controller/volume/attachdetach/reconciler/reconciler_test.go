@@ -1276,7 +1276,7 @@ func Test_Run_OneVolumeDetachOnUnhealthyNodeWithForceDetachOnUnmountDisabled(t *
 	testForceDetachMetric(t, int(initialForceDetachCountTimeout), metrics.ForceDetachReasonTimeout)
 }
 
-func Test_ReportMultiAttachError(t *testing.T) {
+func Test_ReportWaitingOnDetach(t *testing.T) {
 	type nodeWithPods struct {
 		name     k8stypes.NodeName
 		podNames []string
@@ -1291,7 +1291,7 @@ func Test_ReportMultiAttachError(t *testing.T) {
 			[]nodeWithPods{
 				{"node1", []string{"ns1/pod1"}},
 			},
-			[]string{"Warning FailedAttachVolume Multi-Attach error for volume \"volume-name\" Volume is already exclusively attached to one node and can't be attached to another"},
+			[]string{"Warning FailedAttachVolume Waiting for detach for volume \"volume-name\" Volume is already exclusively attached to one node, waiting on detach before it can be attached to another node"},
 		},
 		{
 			"pods in the same namespace use the volume",
@@ -1299,7 +1299,7 @@ func Test_ReportMultiAttachError(t *testing.T) {
 				{"node1", []string{"ns1/pod1"}},
 				{"node2", []string{"ns1/pod2"}},
 			},
-			[]string{"Warning FailedAttachVolume Multi-Attach error for volume \"volume-name\" Volume is already used by pod(s) pod2"},
+			[]string{"Warning FailedAttachVolume Waiting for detach for volume \"volume-name\" Volume is already used by pod(s) pod2"},
 		},
 		{
 			"pods in another namespace use the volume",
@@ -1307,7 +1307,7 @@ func Test_ReportMultiAttachError(t *testing.T) {
 				{"node1", []string{"ns1/pod1"}},
 				{"node2", []string{"ns2/pod2"}},
 			},
-			[]string{"Warning FailedAttachVolume Multi-Attach error for volume \"volume-name\" Volume is already used by 1 pod(s) in different namespaces"},
+			[]string{"Warning FailedAttachVolume Waiting for detach for volume \"volume-name\" Volume is already used by 1 pod(s) in different namespaces"},
 		},
 		{
 			"pods both in the same and another namespace use the volume",
@@ -1316,7 +1316,7 @@ func Test_ReportMultiAttachError(t *testing.T) {
 				{"node2", []string{"ns2/pod2"}},
 				{"node3", []string{"ns1/pod3"}},
 			},
-			[]string{"Warning FailedAttachVolume Multi-Attach error for volume \"volume-name\" Volume is already used by pod(s) pod3 and 1 pod(s) in different namespaces"},
+			[]string{"Warning FailedAttachVolume Waiting for detach for volume \"volume-name\" Volume is already used by pod(s) pod3 and 1 pod(s) in different namespaces"},
 		},
 	}
 
