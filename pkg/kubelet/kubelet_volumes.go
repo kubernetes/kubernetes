@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/removeall"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/mount-utils"
 )
 
 // ListVolumesForPod returns a map of the mounted volumes for the given pod.
@@ -144,10 +145,8 @@ func (kl *Kubelet) removeOrphanedPodVolumeDirs(logger klog.Logger, uid types.UID
 	if len(subpathVolumePaths) > 0 {
 		for _, subpathVolumePath := range subpathVolumePaths {
 			// Remove both files and empty directories here, as the subpath may have been a bind-mount of a file or a directory.
-			if err := os.Remove(subpathVolumePath); err != nil {
-				orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("orphaned pod %q found, but failed to remove subpath at path %v: %w", uid, subpathVolumePath, err))
-			} else {
-				klog.InfoS("Cleaned up orphaned volume subpath from pod", "podUID", uid, "path", subpathVolumePath)
+			if err := cleanupSubpathVolumePath(subpathVolumePath, kl.mounter, uid); err != nil {
+				orphanVolumeErrors = append(orphanVolumeErrors, err)
 			}
 		}
 	}
@@ -162,6 +161,25 @@ func (kl *Kubelet) removeOrphanedPodVolumeDirs(logger klog.Logger, uid types.UID
 	}
 
 	return orphanVolumeErrors
+}
+
+func cleanupSubpathVolumePath(subpathVolumePath string, mounter mount.Interface, uid types.UID) error {
+	var err error
+
+	if err = os.Remove(subpathVolumePath); err == nil {
+		klog.InfoS("Cleaned up orphaned volume subpath from pod", "podUID", uid, "path", subpathVolumePath)
+		return nil
+	}
+
+	// If subpathVolumePath cannot be deleted because it is still mounted, attempt to unmount it first.
+	// This is required for hostPath volumes when pods are force-deleted while the kubelet is down,
+	// as the volume manager cannot reconstruct orphaned pods' hostPath volumes, so it cannot automatically tear down such volumes.
+	if err = mount.CleanupMountPoint(subpathVolumePath, mounter, true); err == nil {
+		klog.InfoS("Cleaned up orphaned volume subpath from pod after cleanup mount point", "podUID", uid, "path", subpathVolumePath)
+		return nil
+	}
+
+	return fmt.Errorf("orphaned pod %q found, but failed to remove subpath at path %v: %w", uid, subpathVolumePath, err)
 }
 
 // cleanupOrphanedPodDirs removes the volumes of pods that should not be
