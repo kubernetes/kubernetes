@@ -24,8 +24,10 @@ const indentPerLevel = 3
 // recursiveFieldsPrinter recursively prints all the fields for a given
 // schema.
 type recursiveFieldsPrinter struct {
-	Writer *Formatter
-	Error  error
+	Writer   *Formatter
+	Error    error
+	MaxDepth int
+	Depth    int
 }
 
 var _ proto.SchemaVisitor = &recursiveFieldsPrinter{}
@@ -43,8 +45,13 @@ func (f *recursiveFieldsPrinter) VisitKind(k *proto.Kind) {
 	for _, key := range k.Keys() {
 		v := k.Fields[key]
 		f.Writer.Write("%s\t<%s>", key, GetTypeName(v))
+		if f.MaxDepth > 0 && f.Depth >= f.MaxDepth {
+			continue
+		}
 		subFields := &recursiveFieldsPrinter{
-			Writer: f.Writer.Indent(indentPerLevel),
+			Writer:   f.Writer.Indent(indentPerLevel),
+			MaxDepth: f.MaxDepth,
+			Depth:    f.Depth + 1,
 		}
 		if err := subFields.PrintFields(v); err != nil {
 			f.Error = err

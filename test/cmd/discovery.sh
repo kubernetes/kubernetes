@@ -471,6 +471,9 @@ __EOF__
   output_message=$(kubectl explain mock-resource --recursive)
   kube::test::if_has_string "${output_message}" 'FIELDS:'
 
+  output_message=$(kubectl explain mock-resource --max-depth=2)
+  kube::test::if_has_string "${output_message}" 'FIELDS:'
+
   # Cleanup
   kubectl delete crd mock-resources.test.com
 

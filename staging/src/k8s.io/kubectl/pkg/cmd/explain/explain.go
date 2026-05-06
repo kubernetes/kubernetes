@@ -73,6 +73,7 @@ type ExplainFlags struct {
 	APIVersion   string
 	OutputFormat string
 	Recursive    bool
+	MaxDepth     int
 
 	genericiooptions.IOStreams
 }
@@ -87,9 +88,10 @@ func NewExplainFlags(streams genericiooptions.IOStreams) *ExplainFlags {
 
 // AddFlags registers flags for a cli
 func (flags *ExplainFlags) AddFlags(cmd *cobra.Command) {
-	cmd.Flags().BoolVarP(&flags.Recursive, "recursive", "R", flags.Recursive, "Print the fields of fields (Currently only 1 level deep)")
+	cmd.Flags().BoolVarP(&flags.Recursive, "recursive", "R", flags.Recursive, "Print the fields of fields. Use --max-depth to cap the recursion depth.")
 	cmd.Flags().StringVar(&flags.APIVersion, "api-version", flags.APIVersion, "Get different explanations for particular API version (API group/version)")
 	cmd.Flags().StringVarP(&flags.OutputFormat, "output", "o", plaintextTemplateName, "Format in which to render the schema (plaintext, plaintext-openapiv2)")
+	cmd.Flags().IntVar(&flags.MaxDepth, "max-depth", flags.MaxDepth, "Maximum recursion depth when printing nested fields. 0 means no limit. Implies --recursive when greater than 0.")
 }
 
 // ToOptions converts from CLI inputs to runtime input
@@ -111,6 +113,7 @@ func (flags *ExplainFlags) ToOptions(f cmdutil.Factory, parent string, args []st
 		Recursive:    flags.Recursive,
 		APIVersion:   flags.APIVersion,
 		OutputFormat: flags.OutputFormat,
+		MaxDepth:     flags.MaxDepth,
 
 		CmdParent: parent,
 		args:      args,
@@ -119,6 +122,10 @@ func (flags *ExplainFlags) ToOptions(f cmdutil.Factory, parent string, args []st
 		openAPIGetter: f,
 
 		OpenAPIV3Client: openAPIV3Client,
+	}
+
+	if o.MaxDepth > 0 {
+		o.Recursive = true
 	}
 
 	return o, nil
@@ -154,6 +161,7 @@ type ExplainOptions struct {
 	APIVersion string
 	// Name of the template to use with the openapiv3 template renderer.
 	OutputFormat string
+	MaxDepth     int
 
 	CmdParent string
 	args      []string
@@ -171,6 +179,9 @@ func (o *ExplainOptions) Validate() error {
 	}
 	if len(o.args) > 1 {
 		return fmt.Errorf("We accept only this format: explain RESOURCE\n")
+	}
+	if o.MaxDepth < 0 {
+		return fmt.Errorf("--max-depth must be non-negative")
 	}
 
 	return nil
@@ -224,6 +235,7 @@ func (o *ExplainOptions) Run() error {
 			o.OpenAPIV3Client,
 			fullySpecifiedGVR,
 			o.Recursive,
+			o.MaxDepth,
 			o.OutputFormat,
 		)
 	}
@@ -260,5 +272,5 @@ func (o *ExplainOptions) renderOpenAPIV2(
 		return fmt.Errorf("couldn't find resource for %q", gvk)
 	}
 
-	return explain.PrintModelDescription(fieldsPath, o.Out, schema, gvk, o.Recursive)
+	return explain.PrintModelDescription(fieldsPath, o.Out, schema, gvk, o.Recursive, o.MaxDepth)
 }

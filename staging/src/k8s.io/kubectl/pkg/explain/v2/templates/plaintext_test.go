@@ -81,6 +81,51 @@ var (
 		delete(paths, "/apis/batch/v1/namespaces/{namespace}/cronjobs/{name}")
 		return res
 	}()
+
+	nestedWidgetGVR = schema.GroupVersionResource{
+		Group:    "example.com",
+		Version:  "v1",
+		Resource: "widgets",
+	}
+
+	nestedWidgetOpenAPI map[string]interface{} = map[string]interface{}{
+		"paths": map[string]interface{}{
+			"/apis/example.com/v1/widgets": map[string]interface{}{
+				"get": map[string]interface{}{
+					"x-kubernetes-group-version-kind": map[string]interface{}{
+						"group":   "example.com",
+						"version": "v1",
+						"kind":    "Widget",
+					},
+				},
+			},
+		},
+		"components": map[string]interface{}{
+			"schemas": map[string]interface{}{
+				"com.example.v1.Widget": map[string]interface{}{
+					"type": "object",
+					"x-kubernetes-group-version-kind": []map[string]interface{}{
+						{"group": "example.com", "version": "v1", "kind": "Widget"},
+					},
+					"properties": map[string]interface{}{
+						"name": map[string]interface{}{"type": "string"},
+						"meta": map[string]interface{}{
+							"type": "object",
+							"properties": map[string]interface{}{
+								"id": map[string]interface{}{"type": "string"},
+								"tags": map[string]interface{}{
+									"type": "object",
+									"properties": map[string]interface{}{
+										"key": map[string]interface{}{"type": "string"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 )
 
 type testCase struct {
@@ -121,6 +166,15 @@ type checkEquals string
 func (c checkEquals) doCheck(output string, err error) error {
 	if output != string(c) {
 		return fmt.Errorf("output is not equal to expectation:\n%v", cmp.Diff(string(c), output))
+	}
+	return nil
+}
+
+type checkNotContains string
+
+func (c checkNotContains) doCheck(output string, err error) error {
+	if strings.Contains(output, string(c)) {
+		return fmt.Errorf("expected output not to contain '%v' but it did:\n%v", string(c), output)
 	}
 	return nil
 }
@@ -985,6 +1039,39 @@ func TestPlaintext(t *testing.T) {
 				checkContains("Widget naming conventions"),
 				checkContains("URL: https://example.com/docs/naming"),
 				checkContains("size of the widget"),
+			},
+		},
+		{
+			Name: "MaxDepthOneStopsAtTopLevelFields",
+			Context: v2.TemplateContext{
+				Document:  nestedWidgetOpenAPI,
+				GVR:       nestedWidgetGVR,
+				FieldPath: nil,
+				Recursive: true,
+				MaxDepth:  1,
+			},
+			Checks: []check{
+				checkContains("meta\t<Object>"),
+				checkContains("name\t<string>"),
+				checkNotContains("id\t<string>"),
+				checkNotContains("tags\t<Object>"),
+				checkNotContains("key\t<string>"),
+			},
+		},
+		{
+			Name: "MaxDepthTwoExpandsOneLevelDeeper",
+			Context: v2.TemplateContext{
+				Document:  nestedWidgetOpenAPI,
+				GVR:       nestedWidgetGVR,
+				FieldPath: nil,
+				Recursive: true,
+				MaxDepth:  2,
+			},
+			Checks: []check{
+				checkContains("meta\t<Object>"),
+				checkContains("id\t<string>"),
+				checkContains("tags\t<Object>"),
+				checkNotContains("key\t<string>"),
 			},
 		},
 	}

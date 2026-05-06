@@ -99,3 +99,59 @@ field2	<Object>
 		t.Errorf("Got:\n%v\nWant:\n%v\n", buf.String(), want)
 	}
 }
+
+func TestRecursiveFieldsMaxDepth(t *testing.T) {
+	resources := tst.NewFakeResources("test-recursive-swagger.json")
+	s := resources.LookupResource(schema.GroupVersionKind{
+		Group:   "",
+		Version: "v2",
+		Kind:    "OneKind",
+	})
+	if s == nil {
+		t.Fatal("Couldn't find schema v2.OneKind")
+	}
+
+	tests := []struct {
+		name     string
+		maxDepth int
+		want     string
+	}{
+		{
+			name:     "depth 1 prints only top-level fields",
+			maxDepth: 1,
+			want: `field1	<Object>
+field2	<Object>
+`,
+		},
+		{
+			name:     "depth 2 prints two levels of nesting",
+			maxDepth: 2,
+			want: `field1	<Object>
+   referencefield	<Object>
+   referencesarray	<[]Object>
+field2	<Object>
+   reference	<Object>
+   string	<string>
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			schemaForField, err := LookupSchemaForField(s, []string{})
+			if err != nil {
+				t.Fatalf("Invalid path %v: %v", []string{}, err)
+			}
+
+			var buf bytes.Buffer
+			f := Formatter{Writer: &buf, Wrap: 80}
+			builder := fieldsPrinterBuilder{Recursive: true, MaxDepth: tt.maxDepth}
+			if err := builder.BuildFieldsPrinter(&f).PrintFields(schemaForField); err != nil {
+				t.Fatalf("Failed to print fields: %v", err)
+			}
+			if got := buf.String(); got != tt.want {
+				t.Errorf("Got:\n%v\nWant:\n%v\n", got, tt.want)
+			}
+		})
+	}
+}

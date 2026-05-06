@@ -80,6 +80,41 @@ func TestExplainInvalidArgs(t *testing.T) {
 	}
 }
 
+func TestExplainMaxDepth(t *testing.T) {
+	tf := cmdtesting.NewTestFactory()
+	defer tf.Cleanup()
+
+	t.Run("negative max-depth fails validation", func(t *testing.T) {
+		flags := explain.NewExplainFlags(genericiooptions.NewTestIOStreamsDiscard())
+		flags.MaxDepth = -1
+
+		opts, err := flags.ToOptions(tf, "kubectl", []string{"pods"})
+		if err != nil {
+			t.Fatalf("unexpected error %v", err)
+		}
+		err = opts.Validate()
+		if err == nil || err.Error() != "--max-depth must be non-negative" {
+			t.Errorf("expected validation error for negative max-depth, got: %v", err)
+		}
+	})
+
+	t.Run("max-depth greater than zero implies recursive", func(t *testing.T) {
+		flags := explain.NewExplainFlags(genericiooptions.NewTestIOStreamsDiscard())
+		flags.MaxDepth = 2
+
+		opts, err := flags.ToOptions(tf, "kubectl", []string{"pods"})
+		if err != nil {
+			t.Fatalf("unexpected error %v", err)
+		}
+		if !opts.Recursive {
+			t.Errorf("expected --max-depth>0 to imply --recursive, got Recursive=false")
+		}
+		if opts.MaxDepth != 2 {
+			t.Errorf("expected MaxDepth=2, got %d", opts.MaxDepth)
+		}
+	})
+}
+
 func TestExplainNotExistResource(t *testing.T) {
 	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
