@@ -76,6 +76,12 @@ var (
 	ErrPostStartHook = errors.New("PostStartHookError")
 )
 
+// restartCountLogFileRegex matches container log file names of the form
+// "<restartCount>.log" or "<restartCount>.log.<rotation-suffix>". Compiled
+// once at package init since calcRestartCountByLogDir is called for every
+// container restart-count check.
+var restartCountLogFileRegex = regexp.MustCompile(`^(\d+)\.log(\..*)?`)
+
 // recordContainerEvent should be used by the runtime manager for all container related events.
 // it has sanity checks to ensure that we do not write events that can abuse our masters.
 // in particular, it ensures that a containerID never appears in an event message as that
@@ -150,7 +156,6 @@ func calcRestartCountByLogDir(path string) (int, error) {
 		return 0, nil
 	}
 	restartCount := 0
-	restartCountLogFileRegex := regexp.MustCompile(`^(\d+)\.log(\..*)?`)
 	for _, file := range files {
 		if file.IsDir() {
 			continue
