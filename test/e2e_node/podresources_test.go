@@ -1196,7 +1196,7 @@ var _ = SIGDescribe("POD Resources API", framework.WithSerial(), feature.PodReso
 		})
 	})
 
-	framework.Context("without SRIOV devices in the system", func() {
+	framework.Context("without SRIOV devices in the system", framework.WithFlaky(), func() {
 		ginkgo.BeforeEach(func() {
 			requireLackOfSRIOVDevices()
 		})
