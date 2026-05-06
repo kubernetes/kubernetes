@@ -38,6 +38,12 @@ type TB interface {
 	Fatalf(format string, args ...any)
 }
 
+type TBM interface {
+	TB
+	Helper()
+	Cleanup(func())
+}
+
 // MetricFamily is a type alias which enables writing gatherers in tests
 // without importing prometheus directly (https://github.com/kubernetes/kubernetes/issues/99876).
 type MetricFamily = dto.MetricFamily
@@ -265,4 +271,11 @@ func AssertGaugeValue(t TB, metricName string, labels map[string]string, want fl
 		}
 	}
 	t.Fatalf("metric %s with labels %v not found", metricName, labels)
+}
+
+func SetupMetrics(t TBM, register func()) {
+	t.Helper()
+	register()
+	legacyregistry.Reset()
+	t.Cleanup(legacyregistry.Reset)
 }

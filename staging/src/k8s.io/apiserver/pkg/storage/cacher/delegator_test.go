@@ -30,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/apis/example"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/cacher/metrics"
+	metricstestutil "k8s.io/component-base/metrics/testutil"
 
 	cachertesting "k8s.io/apiserver/pkg/storage/cacher/testing"
 )
@@ -47,6 +49,7 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 		expectDigest     storageDigest
 		expectErr        bool
 		expectConsistent bool
+		expectMetric     map[string]string
 	}{
 		{
 			desc:             "not ready",
@@ -54,6 +57,9 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 			resourceVersion:  "1",
 			expectErr:        true,
 			expectConsistent: true,
+			expectMetric: map[string]string{
+				"status": "success",
+			},
 		},
 		{
 			desc:            "empty",
@@ -65,6 +71,9 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				EtcdDigest:      "cbf29ce484222325",
 			},
 			expectConsistent: true,
+			expectMetric: map[string]string{
+				"status": "success",
+			},
 		},
 		{
 			desc:            "with one element equal",
@@ -82,6 +91,9 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				EtcdDigest:      "86bf3a5e80d1c5cb",
 			},
 			expectConsistent: true,
+			expectMetric: map[string]string{
+				"status": "success",
+			},
 		},
 		{
 			desc:            "namespace changes digest",
@@ -104,6 +116,9 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				},
 			},
 			expectConsistent: false,
+			expectMetric: map[string]string{
+				"status": "failure",
+			},
 		},
 		{
 			desc:            "name changes digest",
@@ -126,6 +141,9 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				},
 			},
 			expectConsistent: false,
+			expectMetric: map[string]string{
+				"status": "failure",
+			},
 		},
 		{
 			desc:            "resourceVersion changes digest",
@@ -148,6 +166,9 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				},
 			},
 			expectConsistent: false,
+			expectMetric: map[string]string{
+				"status": "failure",
+			},
 		},
 		{
 			desc:            "watch missed write event",
@@ -171,6 +192,9 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				},
 			},
 			expectConsistent: false,
+			expectMetric: map[string]string{
+				"status": "failure",
+			},
 		},
 		{
 			desc:            "watch missed delete event",
@@ -194,11 +218,15 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 				},
 			},
 			expectConsistent: false,
+			expectMetric: map[string]string{
+				"status": "failure",
+			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
+			metricstestutil.SetupMetrics(t, metrics.Register)
 			etcd := &cachertesting.MockStorage{
 				GetListFn: func(_ context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 					if key != tc.expectListKey {
@@ -253,6 +281,8 @@ func TestConsistencyCheckerDigest(t *testing.T) {
 			if cacher.Consistent != tc.expectConsistent {
 				t.Errorf("Expect: %+v Got: %+v", tc.expectConsistent, cacher.Consistent)
 			}
+
+			metricstestutil.AssertVectorCount(t, "apiserver_storage_consistency_checks_total", tc.expectMetric, 1)
 		})
 	}
 }

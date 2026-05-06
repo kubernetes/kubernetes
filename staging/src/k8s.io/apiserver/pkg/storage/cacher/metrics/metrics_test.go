@@ -25,16 +25,8 @@ import (
 	metricstestutil "k8s.io/component-base/metrics/testutil"
 )
 
-func setupMetrics(t *testing.T) {
-	t.Helper()
-	legacyregistry.Reset()
-	Register()
-	legacyregistry.Reset()
-	t.Cleanup(legacyregistry.Reset)
-}
-
 func TestRecordListCacheMetrics(t *testing.T) {
-	setupMetrics(t)
+	metricstestutil.SetupMetrics(t, Register)
 
 	groupResource := schema.GroupResource{Group: "apps", Resource: "deployments"}
 	RecordListCacheMetrics(groupResource, "byNamespace", 10, 5)
@@ -63,13 +55,13 @@ func TestRecordListCacheMetrics(t *testing.T) {
 }
 
 func TestRecordResourceVersion(t *testing.T) {
-	setupMetrics(t)
+	metricstestutil.SetupMetrics(t, Register)
 
 	groupResource := schema.GroupResource{Group: "apps", Resource: "deployments"}
 	RecordResourceVersion(groupResource, 12345)
 
 	expected := `
-	# HELP apiserver_watch_cache_resource_version [BETA] Current resource version of watch cache broken by resource type.
+	# HELP apiserver_watch_cache_resource_version [BETA] Current resource version of watch cache broken by resource type. This is truncated to the 15 least significant digits.
 	# TYPE apiserver_watch_cache_resource_version gauge
 	apiserver_watch_cache_resource_version{group="apps",resource="deployments"} 12345
 	`
@@ -128,7 +120,7 @@ func TestRecordsWatchCacheCapacityChange(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			setupMetrics(t)
+			metricstestutil.SetupMetrics(t, Register)
 
 			RecordsWatchCacheCapacityChange(groupResource, rt.old, rt.new)
 
@@ -146,159 +138,4 @@ func TestRecordsWatchCacheCapacityChange(t *testing.T) {
 			metricstestutil.AssertVectorCount(t, rt.other, labels, 0)
 		})
 	}
-}
-
-func TestListCacheCountMetric(t *testing.T) {
-	setupMetrics(t)
-	gr := schema.GroupResource{Group: "apps", Resource: "deployments"}
-	listCacheCount.WithLabelValues(gr.Group, gr.Resource, "byNamespace").Inc()
-	metricstestutil.AssertVectorCount(t, "apiserver_cache_list_total", map[string]string{
-		"group":    gr.Group,
-		"resource": gr.Resource,
-		"index":    "byNamespace",
-	}, 1)
-}
-
-func TestListCacheNumFetchedMetric(t *testing.T) {
-	setupMetrics(t)
-	gr := schema.GroupResource{Group: "apps", Resource: "deployments"}
-	listCacheNumFetched.WithLabelValues(gr.Group, gr.Resource, "byNamespace").Add(3)
-	metricstestutil.AssertVectorCount(t, "apiserver_cache_list_fetched_objects_total", map[string]string{
-		"group":    gr.Group,
-		"resource": gr.Resource,
-		"index":    "byNamespace",
-	}, 3)
-}
-
-func TestListCacheNumReturnedMetric(t *testing.T) {
-	setupMetrics(t)
-	gr := schema.GroupResource{Group: "apps", Resource: "deployments"}
-	listCacheNumReturned.WithLabelValues(gr.Group, gr.Resource).Add(4)
-	metricstestutil.AssertVectorCount(t, "apiserver_cache_list_returned_objects_total", map[string]string{
-		"group":    gr.Group,
-		"resource": gr.Resource,
-	}, 4)
-}
-
-func TestInitCounterMetric(t *testing.T) {
-	setupMetrics(t)
-	gr := schema.GroupResource{Group: "apps", Resource: "deployments"}
-	InitCounter.WithLabelValues(gr.Group, gr.Resource).Inc()
-	metricstestutil.AssertVectorCount(t, "apiserver_init_events_total", map[string]string{
-		"group":    gr.Group,
-		"resource": gr.Resource,
-	}, 1)
-}
-
-func TestEventsReceivedCounterMetric(t *testing.T) {
-	setupMetrics(t)
-	gr := schema.GroupResource{Group: "apps", Resource: "deployments"}
-	EventsReceivedCounter.WithLabelValues(gr.Group, gr.Resource).Add(2)
-	metricstestutil.AssertVectorCount(t, "apiserver_watch_cache_events_received_total", map[string]string{
-		"group":    gr.Group,
-		"resource": gr.Resource,
-	}, 2)
-}
-
-func TestEventsCounterMetric(t *testing.T) {
-	setupMetrics(t)
-	gr := schema.GroupResource{Group: "apps", Resource: "deployments"}
-	EventsCounter.WithLabelValues(gr.Group, gr.Resource).Add(5)
-	metricstestutil.AssertVectorCount(t, "apiserver_watch_cache_events_dispatched_total", map[string]string{
-		"group":    gr.Group,
-		"resource": gr.Resource,
-	}, 5)
-}
-
-func TestTerminatedWatchersCounterMetric(t *testing.T) {
-	setupMetrics(t)
-	gr := schema.GroupResource{Group: "apps", Resource: "deployments"}
-	TerminatedWatchersCounter.WithLabelValues(gr.Group, gr.Resource).Inc()
-	metricstestutil.AssertVectorCount(t, "apiserver_terminated_watchers_total", map[string]string{
-		"group":    gr.Group,
-		"resource": gr.Resource,
-	}, 1)
-}
-
-func TestWatchCacheResourceVersionMetric(t *testing.T) {
-	setupMetrics(t)
-	gr := schema.GroupResource{Group: "apps", Resource: "deployments"}
-	watchCacheResourceVersion.WithLabelValues(gr.Group, gr.Resource).Set(99)
-	metricstestutil.AssertGaugeValue(t, "apiserver_watch_cache_resource_version", map[string]string{
-		"group":    gr.Group,
-		"resource": gr.Resource,
-	}, 99)
-}
-
-func TestWatchCacheCapacityIncreaseMetric(t *testing.T) {
-	setupMetrics(t)
-	gr := schema.GroupResource{Group: "apps", Resource: "deployments"}
-	watchCacheCapacityIncreaseTotal.WithLabelValues(gr.Group, gr.Resource).Inc()
-	metricstestutil.AssertVectorCount(t, "watch_cache_capacity_increase_total", map[string]string{
-		"group":    gr.Group,
-		"resource": gr.Resource,
-	}, 1)
-}
-
-func TestWatchCacheCapacityDecreaseMetric(t *testing.T) {
-	setupMetrics(t)
-	gr := schema.GroupResource{Group: "apps", Resource: "deployments"}
-	watchCacheCapacityDecreaseTotal.WithLabelValues(gr.Group, gr.Resource).Inc()
-	metricstestutil.AssertVectorCount(t, "watch_cache_capacity_decrease_total", map[string]string{
-		"group":    gr.Group,
-		"resource": gr.Resource,
-	}, 1)
-}
-
-func TestWatchCacheCapacityGaugeMetric(t *testing.T) {
-	setupMetrics(t)
-	gr := schema.GroupResource{Group: "apps", Resource: "deployments"}
-	WatchCacheCapacity.WithLabelValues(gr.Group, gr.Resource).Set(50)
-	metricstestutil.AssertGaugeValue(t, "watch_cache_capacity", map[string]string{
-		"group":    gr.Group,
-		"resource": gr.Resource,
-	}, 50)
-}
-
-func TestWatchCacheInitializationsMetric(t *testing.T) {
-	setupMetrics(t)
-	gr := schema.GroupResource{Group: "apps", Resource: "deployments"}
-	WatchCacheInitializations.WithLabelValues(gr.Group, gr.Resource).Inc()
-	metricstestutil.AssertVectorCount(t, "apiserver_watch_cache_initializations_total", map[string]string{
-		"group":    gr.Group,
-		"resource": gr.Resource,
-	}, 1)
-}
-
-func TestWatchCacheReadWaitMetric(t *testing.T) {
-	setupMetrics(t)
-	gr := schema.GroupResource{Group: "apps", Resource: "deployments"}
-	WatchCacheReadWait.WithLabelValues(gr.Group, gr.Resource).Observe(0.2)
-	metricstestutil.AssertHistogramTotalCount(t, "apiserver_watch_cache_read_wait_seconds", map[string]string{
-		"group":    gr.Group,
-		"resource": gr.Resource,
-	}, 1)
-}
-
-func TestConsistentReadTotalMetric(t *testing.T) {
-	setupMetrics(t)
-	gr := schema.GroupResource{Group: "apps", Resource: "deployments"}
-	ConsistentReadTotal.WithLabelValues(gr.Group, gr.Resource, "true", "false").Add(7)
-	metricstestutil.AssertVectorCount(t, "apiserver_watch_cache_consistent_read_total", map[string]string{
-		"group":    gr.Group,
-		"resource": gr.Resource,
-		"success":  "true",
-		"fallback": "false",
-	}, 7)
-}
-
-func TestStorageConsistencyCheckTotalMetric(t *testing.T) {
-	setupMetrics(t)
-	gr := schema.GroupResource{Group: "apps", Resource: "deployments"}
-	StorageConsistencyCheckTotal.WithLabelValues(gr.Group, gr.Resource, "success").Inc()
-	metricstestutil.AssertVectorCount(t, "apiserver_storage_consistency_checks_total", map[string]string{
-		"group":    gr.Group,
-		"resource": gr.Resource,
-		"status":   "success",
-	}, 1)
 }

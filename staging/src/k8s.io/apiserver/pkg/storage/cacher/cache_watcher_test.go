@@ -34,9 +34,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	"k8s.io/apiserver/pkg/storage/cacher/store"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/client-go/tools/cache"
+	metricstestutil "k8s.io/component-base/metrics/testutil"
 	testingclock "k8s.io/utils/clock/testing"
 
 	cachertesting "k8s.io/apiserver/pkg/storage/cacher/testing"
@@ -291,6 +293,7 @@ func TestCacheWatcherStoppedOnDestroy(t *testing.T) {
 }
 
 func TestResourceVersionAfterInitEvents(t *testing.T) {
+	metricstestutil.SetupMetrics(t, metrics.Register)
 	const numObjects = 10
 	store := cache.NewIndexer(store.ElementKey, store.ElementIndexers(nil))
 
@@ -341,6 +344,8 @@ func TestResourceVersionAfterInitEvents(t *testing.T) {
 	}
 
 	wg.Wait()
+
+	metricstestutil.AssertVectorCount(t, "apiserver_init_events_total", map[string]string{"resource": "pods"}, numObjects)
 }
 
 func TestTimeBucketWatchersBasic(t *testing.T) {
@@ -477,6 +482,7 @@ func TestCacheWatcherDrainingRequestedButNotDrained(t *testing.T) {
 // TestCacheWatcherDrainingNoBookmarkAfterResourceVersionReceived verifies if the watcher will be stopped
 // when adding an item times out and the bookmarkAfterResourceVersion hasn't been received
 func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionReceived(t *testing.T) {
+	metricstestutil.SetupMetrics(t, metrics.Register)
 	var lock sync.RWMutex
 	var w *cacheWatcher
 	count := 0
@@ -524,6 +530,7 @@ func TestCacheWatcherDrainingNoBookmarkAfterResourceVersionReceived(t *testing.T
 	if !w.stopped {
 		t.Fatal("expected the watcher to be stopped but it wasn't")
 	}
+	metricstestutil.AssertVectorCount(t, "apiserver_terminated_watchers_total", map[string]string{"resource": "pods"}, 1)
 }
 
 // TestCacheWatcherDrainingNoBookmarkAfterResourceVersionSent checks if the watcher's input
