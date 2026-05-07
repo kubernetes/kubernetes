@@ -29,6 +29,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/code-generator/cmd/validation-gen/validators"
+	"k8s.io/code-generator/pkg/apidefinitions"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
@@ -96,6 +97,8 @@ type Args struct {
 	// fields apiVersion, kind, path, errorType, origin (use "*" to wildcard
 	// kind/path/errorType/origin) plus a required reason.
 	TestAllowlist string
+
+	apidefinitions.LintArgs
 }
 
 // AddFlags add the generator flags to the flag set.
@@ -114,6 +117,7 @@ func (args *Args) AddFlags(fs *pflag.FlagSet) {
 		"prefix prepended to every emitted test fixture filename; useful for marking files via a linguist-generated gitattributes pattern (e.g. \"zz_generated.\")")
 	fs.StringVar(&args.TestAllowlist, "test-allowlist", "",
 		"path to a YAML config file of rule-level filters to exclude from coverage fixture generation; only meaningful with --test-output-root")
+	apidefinitions.AddFlags(&args.LintArgs, fs)
 }
 
 // Validate checks the given arguments.
@@ -128,6 +132,9 @@ func (args *Args) Validate() error {
 		return fmt.Errorf("--test-output-file-prefix is only meaningful with --test-output-root")
 	}
 
+	if err := apidefinitions.ValidateFlags(args.LintRules); err != nil {
+		return err
+	}
 	return nil
 }
 

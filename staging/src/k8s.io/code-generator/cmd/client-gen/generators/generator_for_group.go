@@ -17,15 +17,15 @@ limitations under the License.
 package generators
 
 import (
+	"errors"
 	"io"
 	"path"
 
-	genutil "k8s.io/code-generator/pkg/util"
+	"k8s.io/code-generator/cmd/client-gen/generators/util"
+	"k8s.io/code-generator/pkg/apidefinitions"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
-
-	"k8s.io/code-generator/cmd/client-gen/generators/util"
 )
 
 // genGroup produces a file for a group client, e.g. ExtensionsClient for the extension group.
@@ -73,12 +73,12 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	// allow user to define a group name that's different from the one parsed from the directory.
 	p := c.Universe.Package(g.inputPackage)
 	groupName := g.group
-	override, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{"groupName"}, p.Comments)
-	if err != nil {
+	override, err := apidefinitions.GroupNameForPackage(p.Comments)
+	if err != nil && !errors.Is(err, apidefinitions.ErrGroupUndeclared) {
 		return err
 	}
-	if values, ok := override["groupName"]; ok {
-		groupName = values[0]
+	if err == nil {
+		groupName = override
 	}
 
 	apiPath := `"` + g.apiPath + `"`

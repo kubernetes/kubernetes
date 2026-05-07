@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	"k8s.io/code-generator/cmd/conversion-gen/args"
+	"k8s.io/code-generator/pkg/apidefinitions"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
@@ -43,9 +44,6 @@ const (
 	// e.g. "+k8s:conversion-gen:explicit-from=net/url.Values" in the type comment
 	// will result in generating conversion from net/url.Values.
 	explicitFromTagName = "k8s:conversion-gen:explicit-from"
-	// e.g., "+k8s:conversion-gen-external-types=<type-pkg>" in doc.go, where
-	// <type-pkg> is the relative path to the package the types are defined in.
-	externalTypesTagName = "k8s:conversion-gen-external-types"
 )
 
 func extractTagValues(tagName string, comments []string) ([]string, error) {
@@ -70,10 +68,6 @@ func extractTag(comments []string) ([]string, error) {
 
 func extractExplicitFromTag(comments []string) ([]string, error) {
 	return extractTagValues(explicitFromTagName, comments)
-}
-
-func extractExternalTypesTag(comments []string) ([]string, error) {
-	return extractTagValues(externalTypesTagName, comments)
 }
 
 func isCopyOnly(comments []string) (bool, error) {
@@ -223,7 +217,12 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	targets := []generator.Target{}
+	var idOpts []apidefinitions.Option
+	if len(args.LintRules) > 0 {
+		idOpts = append(idOpts, apidefinitions.WithLintRules(args.LintRules...))
+	}
+
+	targetList := []generator.Target{}
 
 	// Accumulate pre-existing conversion functions.
 	// TODO: This is too ad-hoc.  We need a better way.
@@ -243,54 +242,36 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 	otherPkgs := make([]string, 0, len(context.Inputs))
 	pkgToPeers := map[string][]string{}
 	pkgToExternal := map[string]string{}
-	for _, i := range context.Inputs {
-		klog.V(3).Infof("pre-processing pkg %q", i)
 
+	for _, i := range context.Inputs {
+		klog.V(3).Infof("considering pkg %q", i)
 		pkg := context.Universe[i]
 
-		// Only generate conversions for packages which explicitly request it
-		// by specifying one or more "+k8s:conversion-gen=<peer-pkg>"
-		// in their doc.go file.
-		peerPkgs, err := extractTag(pkg.Comments)
-		if peerPkgs == nil {
+		info, err := apidefinitions.Identify(pkg, apidefinitions.Conversion, idOpts...)
+		if err != nil {
+			klog.Fatal(err)
+		}
+		if !info.ShouldGenerate() {
 			klog.V(3).Infof("  no tag")
 			continue
 		}
-		if err != nil {
-			klog.Errorf("failed to extract tag %s", err)
-			continue
-		}
-		klog.V(3).Infof("  tags: %q", peerPkgs)
-		if len(peerPkgs) == 1 && peerPkgs[0] == "false" {
-			// If a single +k8s:conversion-gen=false tag is defined, we still want
-			// the generator to fire for this package for explicit conversions, but
-			// we are clearing the peerPkgs to not generate any standard conversions.
-			peerPkgs = nil
-		} else {
-			// Save peers for each input
-			pkgToPeers[i] = peerPkgs
-		}
-		otherPkgs = append(otherPkgs, peerPkgs...)
-		// Keep this one for further processing.
 		filteredInputs = append(filteredInputs, i)
 
-		// if the external types are not in the same package where the
-		// conversion functions to be generated
-		externalTypesValues, err := extractExternalTypesTag(pkg.Comments)
-		if err != nil {
-			klog.Fatalf("Failed to extract external types tag for package %q: %v", i, err)
+		// Sole +k8s:conversion-gen=false: emit only the package's
+		// hand-written conversions, no peer-driven standard conversions.
+		if !info.IsExplicitOnly() {
+			peerPkgs := info.PeerPackages()
+			klog.V(3).Infof("  peers: %q", peerPkgs)
+			pkgToPeers[i] = peerPkgs
+			otherPkgs = append(otherPkgs, peerPkgs...)
 		}
-		if externalTypesValues != nil {
-			if len(externalTypesValues) != 1 {
-				klog.Fatalf("  expect only one value for %q tag, got: %q", externalTypesTagName, externalTypesValues)
-			}
-			externalTypes := externalTypesValues[0]
-			klog.V(3).Infof("  external types tags: %q", externalTypes)
+
+		externalTypes := info.ExternalTypes()
+		if externalTypes != i {
+			klog.V(3).Infof("  external types: %q", externalTypes)
 			otherPkgs = append(otherPkgs, externalTypes)
-			pkgToExternal[i] = externalTypes
-		} else {
-			pkgToExternal[i] = i
 		}
+		pkgToExternal[i] = externalTypes
 	}
 
 	// Make sure explicit peer-packages are added.
@@ -346,7 +327,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 			unsafeEquality = noEquality{}
 		}
 
-		targets = append(targets,
+		targetList = append(targetList,
 			&generator.SimpleTarget{
 				PkgName:       path.Base(pkg.Path),
 				PkgPath:       pkg.Path,
@@ -377,7 +358,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		memoryEquivalentTypes.Skip(k.inType, k.outType)
 	}
 
-	return targets
+	return targetList
 }
 
 type equalMemoryTypes map[conversionPair]bool
