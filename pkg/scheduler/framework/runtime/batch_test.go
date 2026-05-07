@@ -170,14 +170,22 @@ type testSortedScoredNodes struct {
 
 var _ framework.SortedScoredNodes = &testSortedScoredNodes{}
 
-func (t *testSortedScoredNodes) Pop() string {
-	ret := t.Nodes[0]
+func (t *testSortedScoredNodes) Pop() fwk.NodePluginScores {
+	ret := fwk.NodePluginScores{Name: t.Nodes[0]}
 	t.Nodes = t.Nodes[1:]
 	return ret
 }
 
 func (t *testSortedScoredNodes) Len() int {
 	return len(t.Nodes)
+}
+
+func (t *testSortedScoredNodes) List() []fwk.NodePluginScores {
+	result := make([]fwk.NodePluginScores, len(t.Nodes))
+	for i, name := range t.Nodes {
+		result[i] = fwk.NodePluginScores{Name: name}
+	}
+	return result
 }
 
 func newTestNodes(n []string) *testSortedScoredNodes {

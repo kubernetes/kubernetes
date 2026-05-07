@@ -2715,11 +2715,10 @@ func Test_SelectHost(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var err error
-			var scoreList = []fwk.NodePluginScores{}
-			h := newSortedNodeScores(test.list)
+			var scoreList []fwk.NodePluginScores
+			h := framework.NewSortedScoredNodes(test.list)
 			for range len(test.list) {
-				gotNode := h.PopScore()
-				scoreList = append(scoreList, gotNode)
+				scoreList = append(scoreList, h.Pop())
 			}
 			if !errors.Is(err, test.wantError) {
 				t.Fatalf("unexpected error is returned from selectHost: got: %v want: %v", err, test.wantError)
