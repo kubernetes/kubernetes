@@ -96,11 +96,19 @@ func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, strin
 	bindPathTarget := getSubpathBindTarget(subpath)
 	isMount, err := mounter.IsMountPoint(bindPathTarget)
 	if err != nil {
-		if !os.IsNotExist(err) {
-			return false, "", fmt.Errorf("error checking path %s for mount: %s", bindPathTarget, err)
+		if os.IsNotExist(err) {
+			// Ignore ErrorNotExist: the file/directory will be created below if it does not exist yet.
+			isMount = false
+		} else if mount.IsCorruptedMnt(err) {
+			// The mount point is corrupted, attempt to recover by re-creating it.
+			klog.Warningf("Detected corrupted mount at %s (error: %v), unmounting", bindPathTarget, err)
+			if unmountErr := mounter.Unmount(bindPathTarget); unmountErr != nil {
+				return false, "", fmt.Errorf("error unmounting corrupted mount %s: %w", bindPathTarget, unmountErr)
+			}
+			isMount = false
+		} else {
+			return false, "", fmt.Errorf("error checking path %s for mount: %w", bindPathTarget, err)
 		}
-		// Ignore ErrorNotExist: the file/directory will be created below if it does not exist yet.
-		isMount = false
 	}
 	if isMount {
 		// It's already mounted, so check if it's bind-mounted to the same path
