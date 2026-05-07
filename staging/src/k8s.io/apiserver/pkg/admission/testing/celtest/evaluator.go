@@ -18,8 +18,13 @@ limitations under the License.
 // admission CEL expressions in Go without a running API server. It supports
 // ValidatingAdmissionPolicy, MutatingAdmissionPolicy, and webhook
 // matchConditions. The evaluator uses the same CEL environment and compiler
-// that the API server uses at runtime, ensuring compilation and evaluation
-// parity.
+// that the API server uses at runtime, ensuring compilation parity.
+//
+// EvalAdmission and EvalMutation evaluate validations and mutations
+// regardless of any MatchConditions on the policy; gating is not enforced
+// implicitly. Call EvalMatchConditions (or EvalMatchCondition) separately to
+// assert that a request would have been admitted by the policy's match
+// conditions before its rules ran.
 package celtest
 
 import (
@@ -100,8 +105,8 @@ const PerCallLimit = celconfig.PerCallLimit
 // Variable is a named CEL expression that can be referenced by other expressions
 // as "variables.<name>".
 type Variable struct {
-	Name       string `yaml:"name"`
-	Expression string `yaml:"expression"`
+	Name       string
+	Expression string
 }
 
 // Validation is a single validation rule consisting of a boolean CEL expression,
@@ -604,7 +609,9 @@ func (e *Evaluator) EvalAuditAnnotation(policy *AdmissionPolicy, selector AuditA
 		if annotation.Path != selector.Path {
 			continue
 		}
-		return e.evaluateMutating(state.compiler, state.decls, stringOrNullExpressionAccessor(annotation.ValueExpression), state.inputs)
+		optionalVars := auditAnnotationOptionalBindings(state.inputs)
+		value, _, err := e.evaluateMutatingWithBindings(state.compiler, state.decls, stringOrNullExpressionAccessor(annotation.ValueExpression), state.inputs, optionalVars, e.runtimeCELCostBudget())
+		return value, err
 	}
 
 	return nil, fmt.Errorf("audit annotation %q not found in policy", selector.Path)
@@ -669,7 +676,7 @@ func (e *Evaluator) evalAuditAnnotationsWithInputs(compiler *admissioncel.Compos
 	}
 
 	budget := e.runtimeCELCostBudget()
-	optionalVars := admissioncel.OptionalVariableBindings{VersionedParams: evalInputs.optionalVars.VersionedParams}
+	optionalVars := auditAnnotationOptionalBindings(evalInputs)
 	evaluations, remaining, err := conditionEvaluator.ForInput(context.Background(), evalInputs.versionedAttr, evalInputs.request, optionalVars, evalInputs.namespace, budget)
 	result.Cost = budgetCost(budget, remaining)
 	if err != nil {
@@ -778,6 +785,13 @@ func messageExpressionOptionalBindings(evalInputs *evaluationInputs) admissionce
 	return admissioncel.OptionalVariableBindings{VersionedParams: evalInputs.optionalVars.VersionedParams}
 }
 
+// auditAnnotationOptionalBindings returns the runtime binding shape used to
+// evaluate audit-annotation valueExpressions: params are bound, authorizer is
+// stripped.
+func auditAnnotationOptionalBindings(evalInputs *evaluationInputs) admissioncel.OptionalVariableBindings {
+	return admissioncel.OptionalVariableBindings{VersionedParams: evalInputs.optionalVars.VersionedParams}
+}
+
 func (e *Evaluator) optionalDeclarations(policy *AdmissionPolicy) admissioncel.OptionalVariableDeclarations {
 	hasParams := true
 	if policy != nil && policy.hasParamsSet {
@@ -853,8 +867,9 @@ func ParseAdmissionPolicy(yamlContent string) (*AdmissionPolicy, error) {
 }
 
 // ParseAdmissionPolicyFile reads and parses a YAML file into an AdmissionPolicy.
-// The path is cleaned but not otherwise restricted. Callers are responsible for
-// ensuring the path points to a trusted file — do not pass unsanitised user input.
+// The path is passed unchanged to os.ReadFile and is not sanitized; callers
+// are responsible for ensuring it points to a trusted file and must not pass
+// unsanitised user input.
 func ParseAdmissionPolicyFile(path string) (*AdmissionPolicy, error) {
 	return parseAdmissionPolicyFile(path)
 }
@@ -868,8 +883,9 @@ func ParseAdmissionInput(yamlContent string) (*AdmissionInput, error) {
 }
 
 // ParseAdmissionInputFile reads and parses a YAML file into an AdmissionInput.
-// The path is cleaned but not otherwise restricted. Callers are responsible for
-// ensuring the path points to a trusted file - do not pass unsanitised user input.
+// The path is passed unchanged to os.ReadFile and is not sanitized; callers
+// are responsible for ensuring it points to a trusted file and must not pass
+// unsanitised user input.
 func ParseAdmissionInputFile(path string) (*AdmissionInput, error) {
 	return parseAdmissionInputFile(path)
 }

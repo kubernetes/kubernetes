@@ -18,11 +18,11 @@ package celtest
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/google/cel-go/cel"
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -352,35 +352,18 @@ func defaultObjectGVK() schema.GroupVersionKind {
 	return schema.GroupVersionKind{Version: "v1", Kind: "Object"}
 }
 
-// defaultResourceForGVK derives a resource name from a GVK by lowercasing the
-// kind and applying simple English pluralization rules. This covers common
-// Kubernetes kinds (Pod→pods, Ingress→ingresses, NetworkPolicy→networkpolicies)
-// but is not exhaustive. Supply an explicit Request.Resource for non-standard plurals.
+// defaultResourceForGVK derives a resource name from a GVK by delegating to
+// meta.UnsafeGuessKindToResource, which is the same heuristic the rest of
+// Kubernetes uses (e.g., Endpoints→endpoints, NetworkPolicy→networkpolicies).
+// The guess is not exhaustive; supply an explicit Request.Resource for
+// non-standard plurals or for plural-equals-singular kinds outside the
+// known unpluralized set.
 func defaultResourceForGVK(gvk schema.GroupVersionKind) schema.GroupVersionResource {
-	resource := strings.ToLower(gvk.Kind)
-	if resource == "" {
-		resource = "objects"
-	} else {
-		resource = pluralizeResource(resource)
+	if gvk.Kind == "" {
+		return schema.GroupVersionResource{Group: gvk.Group, Version: gvk.Version, Resource: "objects"}
 	}
-	return schema.GroupVersionResource{Group: gvk.Group, Version: gvk.Version, Resource: resource}
-}
-
-// pluralizeResource applies simple English pluralization for Kubernetes resource
-// names. It handles sibilant endings (-s, -x, -z, -ch, -sh → +es) and
-// consonant+y → -ies, which covers the vast majority of built-in kinds.
-func pluralizeResource(s string) string {
-	if strings.HasSuffix(s, "s") || strings.HasSuffix(s, "x") || strings.HasSuffix(s, "z") ||
-		strings.HasSuffix(s, "ch") || strings.HasSuffix(s, "sh") {
-		return s + "es"
-	}
-	if strings.HasSuffix(s, "y") && len(s) > 1 {
-		c := s[len(s)-2]
-		if c != 'a' && c != 'e' && c != 'i' && c != 'o' && c != 'u' {
-			return s[:len(s)-1] + "ies"
-		}
-	}
-	return s + "s"
+	plural, _ := meta.UnsafeGuessKindToResource(gvk)
+	return plural
 }
 
 func schemaGVKFromMeta(gvk metav1.GroupVersionKind) schema.GroupVersionKind {

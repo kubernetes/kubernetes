@@ -281,6 +281,9 @@ func parseAdmissionInput(data []byte) (*AdmissionInput, error) {
 		return nil, fmt.Errorf("parsing admission input YAML: %w", err)
 	}
 
+	if file.Namespace != nil && file.NamespaceObject != nil {
+		return nil, fmt.Errorf("admission input may set either namespace or namespaceObject, not both")
+	}
 	namespace := file.Namespace
 	if namespace == nil {
 		namespace = file.NamespaceObject

@@ -17,7 +17,10 @@ limitations under the License.
 package celtest
 
 import (
+	"context"
 	"testing"
+
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
 func TestEvalAuditAnnotations(t *testing.T) {
@@ -121,5 +124,52 @@ func TestEvalAuditAnnotations_RejectsPatchTypes(t *testing.T) {
 	}
 	if _, err := e.EvalAuditAnnotation(policy, AuditAnnotationSelector{Path: "spec.auditAnnotations[0]"}, input); err == nil {
 		t.Fatal("expected single audit annotation evaluation to reject mutation patch types")
+	}
+}
+
+// TestEvalAuditAnnotation_StripsAuthorizerBinding asserts that both the bulk
+// EvalAuditAnnotations and the singular EvalAuditAnnotation paths.
+func TestEvalAuditAnnotation_StripsAuthorizerBinding(t *testing.T) {
+	e, err := NewEvaluator()
+	if err != nil {
+		t.Fatalf("NewEvaluator() error: %v", err)
+	}
+
+	allowAll := authorizer.AuthorizerFunc(func(_ context.Context, _ authorizer.Attributes) (authorizer.Decision, string, error) {
+		return authorizer.DecisionAllow, "", nil
+	})
+
+	policy := &AdmissionPolicy{
+		AuditAnnotations: []AuditAnnotation{
+			{
+				Path:            "spec.auditAnnotations[0]",
+				Key:             "auth",
+				ValueExpression: "authorizer.requestResource.check('get').allowed() ? 'allowed' : 'denied'",
+			},
+		},
+	}
+	input := &AdmissionInput{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata":   map[string]interface{}{"name": "audit-pod"},
+		},
+		Authorizer: allowAll,
+	}
+
+	bulkResult, err := e.EvalAuditAnnotations(policy, input)
+	if err != nil {
+		t.Fatalf("EvalAuditAnnotations() error: %v", err)
+	}
+	if len(bulkResult.Annotations) != 1 {
+		t.Fatalf("got %d annotations, want 1", len(bulkResult.Annotations))
+	}
+	if bulkResult.Annotations[0].Error == nil {
+		t.Fatalf("EvalAuditAnnotations: expected runtime error from stripped authorizer binding, got value %#v", bulkResult.Annotations[0].Value)
+	}
+
+	value, singularErr := e.EvalAuditAnnotation(policy, AuditAnnotationSelector{Path: "spec.auditAnnotations[0]"}, input)
+	if singularErr == nil {
+		t.Fatalf("EvalAuditAnnotation: expected runtime error from stripped authorizer binding, got value %#v", value)
 	}
 }

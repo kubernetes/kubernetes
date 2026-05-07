@@ -267,7 +267,7 @@ func TestDefaultResourceForGVK(t *testing.T) {
 		{kind: "NetworkPolicy", wantRes: "networkpolicies"},
 		{kind: "DaemonSet", wantRes: "daemonsets"},
 		{kind: "ConfigMap", wantRes: "configmaps"},
-		{kind: "Endpoints", wantRes: "endpointses"}, // naive but consistent for sibilant ending
+		{kind: "Endpoints", wantRes: "endpoints"}, // honored by the unpluralized-suffix list in apimachinery meta
 		{kind: "", wantRes: "objects"},
 	}
 	for _, tt := range tests {
