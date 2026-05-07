@@ -202,6 +202,7 @@ function codegen::deepcopy() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
+        --lint-rules=known-tags-only,require-explicit-disablement \
         "${tag_pkgs[@]}" \
         "$@"
 
@@ -325,6 +326,7 @@ function codegen::prerelease() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
+        --lint-rules=known-tags-only,require-explicit-disablement \
         "${tag_pkgs[@]}" \
         "$@"
 
@@ -389,6 +391,7 @@ function codegen::defaults() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
+        --lint-rules=known-tags-only,require-explicit-disablement \
         "${tag_pkgs[@]}" \
         "$@"
 
@@ -468,6 +471,7 @@ function codegen::validation() {
         --test-output-root "test/declarative_validation" \
         --test-output-file-prefix "${GENERATED_FILE_PREFIX}" \
         --test-allowlist "test/declarative_validation/coverage-allowlist.yaml" \
+        --lint-rules=known-tags-only,require-explicit-disablement \
         $(printf -- " --readonly-pkg %s" "${readonly_pkgs[@]}") \
         "${tag_pkgs[@]}" \
         "$@"
@@ -544,6 +548,7 @@ function codegen::conversions() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
+        --lint-rules=known-tags-only,require-explicit-disablement \
         $(printf -- " --extra-peer-dirs %s" "${extra_peer_pkgs[@]}") \
         "${tag_pkgs[@]}" \
         "$@"
@@ -599,6 +604,7 @@ function codegen::register() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
+        --lint-rules=known-tags-only,require-explicit-disablement \
         "${tag_pkgs[@]}" \
         "$@"
 
