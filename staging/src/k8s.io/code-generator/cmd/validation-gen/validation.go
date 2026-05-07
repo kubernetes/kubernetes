@@ -49,7 +49,7 @@ func mkPkgNames(pkg string, names ...string) []types.Name {
 var (
 	fieldPkg            = "k8s.io/apimachinery/pkg/util/validation/field"
 	fieldPkgSymbols     = mkPkgNames(fieldPkg, "ErrorList", "InternalError", "Path")
-	fmtPkgSymbols       = mkPkgNames("fmt", "Errorf")
+	fmtPkgSymbols       = mkPkgNames("fmt", "Errorf", "Fprintln")
 	safePkg             = "k8s.io/apimachinery/pkg/api/safe"
 	safePkgSymbols      = mkPkgNames(safePkg, "Field", "Cast", "Value")
 	operationPkg        = "k8s.io/apimachinery/pkg/api/operation"

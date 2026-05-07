@@ -23,6 +23,7 @@ import (
 	"slices"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/code-generator/cmd/validation-gen/validators"
 	"k8s.io/gengo/v2"
@@ -319,6 +320,10 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 	// Create a linter to collect errors as we go.
 	linter := newLinter(lintRules(validator)...)
 
+	// groupKindReports accumulates Reports across every input, keyed by
+	// GroupKind so testTargets emits exactly one SimpleTarget per Kind.
+	groupKindReports := map[schema.GroupKind][]*report{}
+
 	// Build a cache of type->callNode for every type we need.
 	for _, input := range context.Inputs {
 		klog.V(2).InfoS("processing", "pkg", input)
@@ -433,7 +438,19 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 					return generators
 				},
 			})
+
+		// Accumulate per-Kind rules; testTargets emits after the loop.
+		if args.TestOutputRoot != "" {
+			collectReports(typesPkg, rootTypes, td, groupKindReports)
+		}
 	}
+
+	// Emit per-Kind coverage test targets. No-op when --test-output-root is empty.
+	allowlist, err := loadAllowlist(args.TestAllowlist)
+	if err != nil {
+		klog.Fatalf("loading allowlist: %v", err)
+	}
+	targets = append(targets, testTargets(args.TestOutputRoot, args.TestOutputFilePrefix, groupKindReports, allowlist, boilerplate)...)
 
 	if len(linter.lintErrors) > 0 {
 		buf := strings.Builder{}
