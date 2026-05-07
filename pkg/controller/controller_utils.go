@@ -228,7 +228,9 @@ func (exp *ControlleeExpectations) isExpired() bool {
 
 // SetExpectations registers new expectations for the given controller. Forgets existing expectations.
 func (r *ControllerExpectations) SetExpectations(logger klog.Logger, controllerKey string, add, del int) error {
-	exp := &ControlleeExpectations{add: int64(add), del: int64(del), key: controllerKey, timestamp: clock.RealClock{}.Now()}
+	exp := &ControlleeExpectations{key: controllerKey, timestamp: clock.RealClock{}.Now()}
+	exp.add.Store(int64(add))
+	exp.del.Store(int64(del))
 	logger.V(4).Info("Setting expectations", "expectations", exp)
 	return r.Add(exp)
 }
@@ -273,27 +275,27 @@ func (r *ControllerExpectations) DeletionObserved(logger klog.Logger, controller
 type ControlleeExpectations struct {
 	// Important: Since these two int64 fields are using sync/atomic, they have to be at the top of the struct due to a bug on 32-bit platforms
 	// See: https://golang.org/pkg/sync/atomic/ for more information
-	add       int64
-	del       int64
+	add       atomic.Int64
+	del       atomic.Int64
 	key       string
 	timestamp time.Time
 }
 
 // Add increments the add and del counters.
 func (e *ControlleeExpectations) Add(add, del int64) {
-	atomic.AddInt64(&e.add, add)
-	atomic.AddInt64(&e.del, del)
+	e.add.Add(add)
+	e.del.Add(del)
 }
 
 // Fulfilled returns true if this expectation has been fulfilled.
 func (e *ControlleeExpectations) Fulfilled() bool {
 	// TODO: think about why this line being atomic doesn't matter
-	return atomic.LoadInt64(&e.add) <= 0 && atomic.LoadInt64(&e.del) <= 0
+	return e.add.Load() <= 0 && e.del.Load() <= 0
 }
 
 // GetExpectations returns the add and del expectations of the controllee.
 func (e *ControlleeExpectations) GetExpectations() (int64, int64) {
-	return atomic.LoadInt64(&e.add), atomic.LoadInt64(&e.del)
+	return e.add.Load(), e.del.Load()
 }
 
 // MarshalLog makes a thread-safe copy of the values of the expectations that
@@ -304,8 +306,8 @@ func (e *ControlleeExpectations) MarshalLog() interface{} {
 		del int64
 		key string
 	}{
-		add: atomic.LoadInt64(&e.add),
-		del: atomic.LoadInt64(&e.del),
+		add: e.add.Load(),
+		del: e.del.Load(),
 		key: e.key,
 	}
 }

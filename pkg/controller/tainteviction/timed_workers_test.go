@@ -29,11 +29,11 @@ import (
 
 func TestExecute(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
-	testVal := int32(0)
+	var testVal atomic.Int32
 	wg := sync.WaitGroup{}
 	wg.Add(5)
 	queue := CreateWorkerQueue(func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
-		atomic.AddInt32(&testVal, 1)
+		testVal.Add(1)
 		wg.Done()
 		return nil
 	})
@@ -44,7 +44,7 @@ func TestExecute(t *testing.T) {
 	queue.AddWork(ctx, NewWorkArgs("4", "4"), now, now)
 	queue.AddWork(ctx, NewWorkArgs("5", "5"), now, now)
 	wg.Wait()
-	lastVal := atomic.LoadInt32(&testVal)
+	lastVal := testVal.Load()
 	if lastVal != 5 {
 		t.Errorf("Expected testVal = 5, got %v", lastVal)
 	}
@@ -52,11 +52,11 @@ func TestExecute(t *testing.T) {
 
 func TestExecuteDelayed(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
-	testVal := int32(0)
+	var testVal atomic.Int32
 	wg := sync.WaitGroup{}
 	wg.Add(5)
 	queue := CreateWorkerQueue(func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
-		atomic.AddInt32(&testVal, 1)
+		testVal.Add(1)
 		wg.Done()
 		return nil
 	})
@@ -76,7 +76,7 @@ func TestExecuteDelayed(t *testing.T) {
 	queue.AddWork(ctx, NewWorkArgs("5", "5"), now, then)
 	fakeClock.Step(11 * time.Second)
 	wg.Wait()
-	lastVal := atomic.LoadInt32(&testVal)
+	lastVal := testVal.Load()
 	if lastVal != 5 {
 		t.Errorf("Expected testVal = 5, got %v", lastVal)
 	}
@@ -84,11 +84,11 @@ func TestExecuteDelayed(t *testing.T) {
 
 func TestCancel(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
-	testVal := int32(0)
+	var testVal atomic.Int32
 	wg := sync.WaitGroup{}
 	wg.Add(3)
 	queue := CreateWorkerQueue(func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
-		atomic.AddInt32(&testVal, 1)
+		testVal.Add(1)
 		wg.Done()
 		return nil
 	})
@@ -110,7 +110,7 @@ func TestCancel(t *testing.T) {
 	queue.CancelWork(logger, NewWorkArgs("4", "4").KeyFromWorkArgs())
 	fakeClock.Step(11 * time.Second)
 	wg.Wait()
-	lastVal := atomic.LoadInt32(&testVal)
+	lastVal := testVal.Load()
 	if lastVal != 3 {
 		t.Errorf("Expected testVal = 3, got %v", lastVal)
 	}
@@ -118,11 +118,11 @@ func TestCancel(t *testing.T) {
 
 func TestCancelAndRead(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
-	testVal := int32(0)
+	var testVal atomic.Int32
 	wg := sync.WaitGroup{}
 	wg.Add(4)
 	queue := CreateWorkerQueue(func(ctx context.Context, fireAt time.Time, args *WorkArgs) error {
-		atomic.AddInt32(&testVal, 1)
+		testVal.Add(1)
 		wg.Done()
 		return nil
 	})
@@ -145,7 +145,7 @@ func TestCancelAndRead(t *testing.T) {
 	queue.AddWork(ctx, NewWorkArgs("2", "2"), now, then)
 	fakeClock.Step(11 * time.Second)
 	wg.Wait()
-	lastVal := atomic.LoadInt32(&testVal)
+	lastVal := testVal.Load()
 	if lastVal != 4 {
 		t.Errorf("Expected testVal = 4, got %v", lastVal)
 	}

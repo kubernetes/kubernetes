@@ -208,7 +208,7 @@ func newFakePod(httpServer bool) (*fakePod, error) {
 			mu.Lock()
 			defer mu.Unlock()
 			if _, ok := visitors[r.RemoteAddr]; !ok {
-				atomic.AddInt64(&f.numConnection, 1)
+				f.numConnection.Add(1)
 				visitors[r.RemoteAddr] = struct{}{}
 			}
 		}))
@@ -220,7 +220,7 @@ func newFakePod(httpServer bool) (*fakePod, error) {
 					// exit when the listener is closed
 					return
 				}
-				atomic.AddInt64(&f.numConnection, 1)
+				f.numConnection.Add(1)
 				// handle request but not block
 				go func(c net.Conn) {
 					defer c.Close()
@@ -240,7 +240,7 @@ func newFakePod(httpServer bool) (*fakePod, error) {
 
 type fakePod struct {
 	ln            net.Listener
-	numConnection int64
+	numConnection atomic.Int64
 	http          bool
 }
 
@@ -270,5 +270,5 @@ func (f *fakePod) stop() {
 }
 
 func (f *fakePod) connections() int {
-	return int(atomic.LoadInt64(&f.numConnection))
+	return int(f.numConnection.Load())
 }

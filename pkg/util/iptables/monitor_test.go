@@ -192,7 +192,7 @@ func TestIPTablesMonitor(t *testing.T) {
 	mfe := newMonitorFakeExec()
 	ipt := newInternal(mfe, ProtocolIPv4, "", "")
 
-	var reloads uint32
+	var reloads atomic.Uint32
 	stopCh := make(chan struct{})
 
 	canary := Chain("MONITOR-TEST-CANARY")
@@ -201,7 +201,7 @@ func TestIPTablesMonitor(t *testing.T) {
 		if !ensureNoChains(mfe) {
 			t.Errorf("reload called while canaries still exist")
 		}
-		atomic.AddUint32(&reloads, 1)
+		reloads.Add(1)
 	}, 100*time.Millisecond, stopCh)
 
 	// Monitor should create canary chains quickly
@@ -272,7 +272,7 @@ func TestIPTablesMonitor(t *testing.T) {
 		if !ensureNoChains(mfe) {
 			t.Errorf("reload called while canaries still exist")
 		}
-		atomic.AddUint32(&reloads, 1)
+		reloads.Add(1)
 	}, 100*time.Millisecond, stopCh)
 
 	// Monitor should not have created canaries yet
@@ -314,25 +314,25 @@ func ensureNoChains(mfe *monitorFakeExec) bool {
 		mfe.tables["nat"].Len() == 0
 }
 
-func waitForReloads(reloads *uint32, expected uint32) error {
-	if atomic.LoadUint32(reloads) < expected {
+func waitForReloads(reloads *atomic.Uint32, expected uint32) error {
+	if reloads.Load() < expected {
 		utilwait.PollImmediate(100*time.Millisecond, time.Second, func() (bool, error) {
-			return atomic.LoadUint32(reloads) >= expected, nil
+			return reloads.Load() >= expected, nil
 		})
 	}
-	got := atomic.LoadUint32(reloads)
+	got := reloads.Load()
 	if got != expected {
 		return fmt.Errorf("expected %d, got %d", expected, got)
 	}
 	return nil
 }
 
-func waitForNoReload(reloads *uint32, expected uint32) error {
+func waitForNoReload(reloads *atomic.Uint32, expected uint32) error {
 	utilwait.PollImmediate(50*time.Millisecond, 250*time.Millisecond, func() (bool, error) {
-		return atomic.LoadUint32(reloads) > expected, nil
+		return reloads.Load() > expected, nil
 	})
 
-	got := atomic.LoadUint32(reloads)
+	got := reloads.Load()
 	if got != expected {
 		return fmt.Errorf("expected %d, got %d", expected, got)
 	}

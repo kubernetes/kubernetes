@@ -80,7 +80,7 @@ func (pl FakePreFilterAndFilterPlugin) Name() string {
 // FakeFilterPlugin is a test filter plugin to record how many times its Filter() function have
 // been called, and it returns different 'Code' depending on its internal 'failedNodeReturnCodeMap'.
 type FakeFilterPlugin struct {
-	NumFilterCalled         int32
+	NumFilterCalled         atomic.Int32
 	FailedNodeReturnCodeMap map[string]fwk.Code
 }
 
@@ -91,7 +91,7 @@ func (pl *FakeFilterPlugin) Name() string {
 
 // Filter invoked at the filter extension point.
 func (pl *FakeFilterPlugin) Filter(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
-	atomic.AddInt32(&pl.NumFilterCalled, 1)
+	pl.NumFilterCalled.Add(1)
 
 	if returnCode, ok := pl.FailedNodeReturnCodeMap[nodeInfo.Node().Name]; ok {
 		return fwk.NewStatus(returnCode, fmt.Sprintf("injecting failure for pod %v", pod.Name))
