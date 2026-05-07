@@ -55,7 +55,6 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
 	nodetopology "k8s.io/component-helpers/node/topology"
-	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	"k8s.io/kubernetes/pkg/controller/tainteviction"
@@ -143,33 +142,6 @@ const (
 	// This constant will be removed upon graduation of the SeparateTaintEvictionController feature.
 	taintEvictionController = "taint-eviction-controller"
 )
-
-// labelReconcileInfo lists Node labels to reconcile, and how to reconcile them.
-// primaryKey and secondaryKey are keys of labels to reconcile.
-//   - If both keys exist, but their values don't match. Use the value from the
-//     primaryKey as the source of truth to reconcile.
-//   - If ensureSecondaryExists is true, and the secondaryKey does not
-//     exist, secondaryKey will be added with the value of the primaryKey.
-var labelReconcileInfo = []struct {
-	primaryKey            string
-	secondaryKey          string
-	ensureSecondaryExists bool
-}{
-	{
-		// Reconcile the beta and the stable OS label using the stable label as the source of truth.
-		// TODO(#89477): no earlier than 1.22: drop the beta labels if they differ from the GA labels
-		primaryKey:            v1.LabelOSStable,
-		secondaryKey:          kubeletapis.LabelOS,
-		ensureSecondaryExists: true,
-	},
-	{
-		// Reconcile the beta and the stable arch label using the stable label as the source of truth.
-		// TODO(#89477): no earlier than 1.22: drop the beta labels if they differ from the GA labels
-		primaryKey:            v1.LabelArchStable,
-		secondaryKey:          kubeletapis.LabelArch,
-		ensureSecondaryExists: true,
-	},
-}
 
 type nodeHealthData struct {
 	probeTimestamp           metav1.Time
@@ -407,7 +379,6 @@ func NewNodeLifecycleController(
 		nc.taintManager = tm
 	}
 
-	logger.Info("Controller will reconcile labels")
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: controllerutil.CreateAddNodeHandler(func(node *v1.Node) error {
 			nc.nodeUpdateQueue.Add(node.Name)
@@ -525,12 +496,6 @@ func (nc *Controller) doNodeProcessingPassWorker(ctx context.Context) {
 		if err := nc.doNoScheduleTaintingPass(ctx, nodeName); err != nil {
 			logger.Error(err, "Failed to taint NoSchedule on node, requeue it", "node", klog.KRef("", nodeName))
 			// TODO(k82cn): Add nodeName back to the queue
-		}
-		// TODO: re-evaluate whether there are any labels that need to be
-		// reconcile in 1.19. Remove this function if it's no longer necessary.
-		if err := nc.reconcileNodeLabels(ctx, nodeName); err != nil {
-			logger.Error(err, "Failed to reconcile labels for node, requeue it", "node", klog.KRef("", nodeName))
-			// TODO(yujuhong): Add nodeName back to the queue
 		}
 		nc.nodeUpdateQueue.Done(nodeName)
 	}
@@ -1349,51 +1314,4 @@ func (nc *Controller) ComputeZoneState(nodeReadyConditions []*v1.NodeCondition) 
 	default:
 		return notReadyNodes, stateNormal
 	}
-}
-
-// reconcileNodeLabels reconciles node labels.
-func (nc *Controller) reconcileNodeLabels(ctx context.Context, nodeName string) error {
-	node, err := nc.nodeLister.Get(nodeName)
-	if err != nil {
-		// If node not found, just ignore it.
-		if apierrors.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}
-
-	if node.Labels == nil {
-		// Nothing to reconcile.
-		return nil
-	}
-
-	labelsToUpdate := map[string]string{}
-	for _, r := range labelReconcileInfo {
-		primaryValue, primaryExists := node.Labels[r.primaryKey]
-		secondaryValue, secondaryExists := node.Labels[r.secondaryKey]
-
-		if !primaryExists {
-			// The primary label key does not exist. This should not happen
-			// within our supported version skew range, when no external
-			// components/factors modifying the node object. Ignore this case.
-			continue
-		}
-		if secondaryExists && primaryValue != secondaryValue {
-			// Secondary label exists, but not consistent with the primary
-			// label. Need to reconcile.
-			labelsToUpdate[r.secondaryKey] = primaryValue
-
-		} else if !secondaryExists && r.ensureSecondaryExists {
-			// Apply secondary label based on primary label.
-			labelsToUpdate[r.secondaryKey] = primaryValue
-		}
-	}
-
-	if len(labelsToUpdate) == 0 {
-		return nil
-	}
-	if !controllerutil.AddOrUpdateLabelsOnNode(ctx, nc.kubeClient, labelsToUpdate, node) {
-		return fmt.Errorf("failed update labels for node %+v", node)
-	}
-	return nil
 }

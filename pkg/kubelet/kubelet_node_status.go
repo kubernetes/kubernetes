@@ -38,7 +38,6 @@ import (
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
-	kubeletapis "k8s.io/kubelet/pkg/apis"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -241,8 +240,6 @@ func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool 
 		v1.LabelOSStable,
 		v1.LabelArchStable,
 		v1.LabelWindowsBuild,
-		kubeletapis.LabelOS,
-		kubeletapis.LabelArch,
 	}
 
 	needsUpdate := false
@@ -306,11 +303,9 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: string(kl.nodeName),
 			Labels: map[string]string{
-				v1.LabelHostname:      kl.hostname,
-				v1.LabelOSStable:      goruntime.GOOS,
-				v1.LabelArchStable:    goruntime.GOARCH,
-				kubeletapis.LabelOS:   goruntime.GOOS,
-				kubeletapis.LabelArch: goruntime.GOARCH,
+				v1.LabelHostname:   kl.hostname,
+				v1.LabelOSStable:   goruntime.GOOS,
+				v1.LabelArchStable: goruntime.GOARCH,
 			},
 		},
 	}

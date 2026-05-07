@@ -54,7 +54,6 @@ import (
 	core "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/version"
-	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/features"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -1348,8 +1347,6 @@ func TestRegisterWithApiServer(t *testing.T) {
 					v1.LabelHostname:      testKubeletHostname,
 					v1.LabelOSStable:      goruntime.GOOS,
 					v1.LabelArchStable:    goruntime.GOARCH,
-					kubeletapis.LabelOS:   goruntime.GOOS,
-					kubeletapis.LabelArch: goruntime.GOARCH,
 				},
 			},
 		}, nil
@@ -1407,8 +1404,6 @@ func TestTryRegisterWithApiServer(t *testing.T) {
 					v1.LabelHostname:      testKubeletHostname,
 					v1.LabelOSStable:      goruntime.GOOS,
 					v1.LabelArchStable:    goruntime.GOARCH,
-					kubeletapis.LabelOS:   goruntime.GOOS,
-					kubeletapis.LabelArch: goruntime.GOARCH,
 				},
 			},
 		}

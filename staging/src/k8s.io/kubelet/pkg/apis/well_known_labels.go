@@ -23,15 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
-const (
-	// LabelOS is a label to indicate the operating system of the node.
-	// The OS labels are promoted to GA in 1.14. kubelet applies GA labels and stop applying the beta OS labels in Kubernetes 1.19.
-	LabelOS = "beta.kubernetes.io/os"
-	// LabelArch is a label to indicate the architecture of the node.
-	// The Arch labels are promoted to GA in 1.14. kubelet applies GA labels and stop applying the beta Arch labels in Kubernetes 1.19.
-	LabelArch = "beta.kubernetes.io/arch"
-)
-
 var kubeletLabels = sets.NewString(
 	v1.LabelHostname,
 	v1.LabelTopologyZone,
@@ -42,9 +33,6 @@ var kubeletLabels = sets.NewString(
 	v1.LabelInstanceTypeStable,
 	v1.LabelOSStable,
 	v1.LabelArchStable,
-
-	LabelOS,
-	LabelArch,
 )
 
 var kubeletLabelNamespaces = sets.NewString(

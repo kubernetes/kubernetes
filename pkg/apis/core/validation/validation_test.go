@@ -44,8 +44,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures/features"
-	kubeletapis "k8s.io/kubelet/pkg/apis"
-	podtest "k8s.io/kubernetes/pkg/api/pod/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
@@ -1314,43 +1312,43 @@ func TestValidateVolumeNodeAffinityUpdate(t *testing.T) {
 		},
 		"affinity-os-beta-label-unchanged": {
 			isExpectedFailure: false,
-			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelOS, "bar")),
-			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelOS, "bar")),
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("beta.kubernetes.io/os", "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("beta.kubernetes.io/os", "bar")),
 		},
 		"affinity-os-beta-label-to-GA": {
 			isExpectedFailure: false,
-			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelOS, "bar")),
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("beta.kubernetes.io/os", "bar")),
 			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelOSStable, "bar")),
 		},
 		"affinity-os-beta-label-to-non-GA": {
 			isExpectedFailure: true,
-			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelOS, "bar")),
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("beta.kubernetes.io/os", "bar")),
 			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
 		},
 		"affinity-os-GA-label-changed": {
 			isExpectedFailure: true,
 			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelOSStable, "bar")),
-			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelOS, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("beta.kubernetes.io/os", "bar")),
 		},
 		"affinity-arch-beta-label-unchanged": {
 			isExpectedFailure: false,
-			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelArch, "bar")),
-			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelArch, "bar")),
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("beta.kubernetes.io/arch", "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("beta.kubernetes.io/arch", "bar")),
 		},
 		"affinity-arch-beta-label-to-GA": {
 			isExpectedFailure: false,
-			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelArch, "bar")),
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("beta.kubernetes.io/arch", "bar")),
 			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelArchStable, "bar")),
 		},
 		"affinity-arch-beta-label-to-non-GA": {
 			isExpectedFailure: true,
-			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelArch, "bar")),
+			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("beta.kubernetes.io/arch", "bar")),
 			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("foo", "bar")),
 		},
 		"affinity-arch-GA-label-changed": {
 			isExpectedFailure: true,
 			oldPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(v1.LabelArchStable, "bar")),
-			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity(kubeletapis.LabelArch, "bar")),
+			newPV:             testVolumeWithNodeAffinity(simpleVolumeNodeAffinity("beta.kubernetes.io/arch", "bar")),
 		},
 		"affinity-instanceType-beta-label-unchanged": {
 			isExpectedFailure: false,
@@ -1380,8 +1378,8 @@ func TestValidateVolumeNodeAffinityUpdate(t *testing.T) {
 				topologyPair{v1.LabelFailureDomainBetaZone, "bar"},
 				topologyPair{v1.LabelFailureDomainBetaRegion, "bar"},
 			}, {
-				topologyPair{kubeletapis.LabelOS, "bar"},
-				topologyPair{kubeletapis.LabelArch, "bar"},
+				topologyPair{"beta.kubernetes.io/os", "bar"},
+				topologyPair{"beta.kubernetes.io/arch", "bar"},
 				topologyPair{v1.LabelInstanceType, "bar"},
 			},
 			})),
@@ -1391,7 +1389,7 @@ func TestValidateVolumeNodeAffinityUpdate(t *testing.T) {
 				topologyPair{v1.LabelTopologyZone, "bar"},
 				topologyPair{v1.LabelFailureDomainBetaRegion, "bar"},
 			}, {
-				topologyPair{kubeletapis.LabelOS, "bar"},
+				topologyPair{"beta.kubernetes.io/os", "bar"},
 				topologyPair{v1.LabelArchStable, "bar"},
 				topologyPair{v1.LabelInstanceTypeStable, "bar"},
 			},
@@ -1441,8 +1439,8 @@ func TestValidateVolumeNodeAffinityUpdate(t *testing.T) {
 				topologyPair{v1.LabelFailureDomainBetaZone, "bar"},
 				topologyPair{v1.LabelFailureDomainBetaRegion, "bar"},
 			}, {
-				topologyPair{kubeletapis.LabelOS, "bar"},
-				topologyPair{kubeletapis.LabelArch, "bar"},
+				topologyPair{"beta.kubernetes.io/os", "bar"},
+				topologyPair{"beta.kubernetes.io/arch", "bar"},
 				topologyPair{v1.LabelInstanceType, "bar"},
 			},
 			})),

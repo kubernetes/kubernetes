@@ -55,7 +55,6 @@ import (
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
 	resourcehelper "k8s.io/component-helpers/resource"
 	schedulinghelper "k8s.io/component-helpers/scheduling/corev1"
-	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 
 	apiservice "k8s.io/kubernetes/pkg/api/service"
@@ -9379,8 +9378,8 @@ func ValidatePodAffinityTermSelector(podAffinityTerm core.PodAffinityTerm, allow
 var betaToGALabel = map[string]string{
 	v1.LabelFailureDomainBetaZone:   v1.LabelTopologyZone,
 	v1.LabelFailureDomainBetaRegion: v1.LabelTopologyRegion,
-	kubeletapis.LabelOS:             v1.LabelOSStable,
-	kubeletapis.LabelArch:           v1.LabelArchStable,
+	"beta.kubernetes.io/os":             v1.LabelOSStable,
+	"beta.kubernetes.io/arch":           v1.LabelArchStable,
 	v1.LabelInstanceType:            v1.LabelInstanceTypeStable,
 }
 
