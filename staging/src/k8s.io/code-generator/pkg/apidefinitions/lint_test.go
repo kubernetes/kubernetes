@@ -68,11 +68,11 @@ func TestLintRules(t *testing.T) {
 	}{
 		{
 			name: "linting off: typo'd -gen passes",
-			pkg:  pkg("test/pkg", "+k8s:converison-gen=value"),
+			pkg:  pkg("test/pkg", "+k8s:conversion-x-gen=value"),
 		},
 		{
 			name: "linting off: foreign +k8s:*-gen alongside ours passes",
-			pkg:  pkg("test/pkg", "+k8s:my-custom-gen=value", "+k8s:conversion-gen=k8s.io/api/foo"),
+			pkg:  pkg("test/pkg", "+k8s:my-custom-gen=value", "+k8s:conversion-x-gen=k8s.io/api/foo"),
 		},
 		{
 			name: "linting off: missing universals on InternalVersion passes",
@@ -108,9 +108,9 @@ func TestLintRules(t *testing.T) {
 		},
 		{
 			name:    "known-tags: typo'd generator fails",
-			pkg:     pkg("test/pkg", "+k8s:converison-gen=value"),
+			pkg:     pkg("test/pkg", "+k8s:conversion-x-gen=value"),
 			rules:   []string{LintRuleKnownTagsOnly},
-			wantErr: "+k8s:converison-gen",
+			wantErr: "+k8s:conversion-x-gen",
 		},
 		{
 			name:    "known-tags: foreign +k8s:*-gen fails",
@@ -195,15 +195,15 @@ func TestLintRules(t *testing.T) {
 		{
 			name: "composed: known-tags fires on typo even with explicit-disablement on",
 			pkg: pkgWithTypeMeta("k8s.io/api/apps/v1", ",inline",
-				"+k8s:deepcopy-gen=package", "+k8s:converison-gen=value"),
+				"+k8s:deepcopy-gen=package", "+k8s:conversion-x-gen=value"),
 			rules:   []string{LintRuleKnownTagsOnly, LintRuleExplicitDisablement},
-			wantErr: "+k8s:converison-gen",
+			wantErr: "+k8s:conversion-x-gen",
 		},
 		{
 			name:    "unknown rule name fails",
 			pkg:     pkg("test/pkg"),
 			rules:   []string{"future-rule"},
-			wantErr: "Unrecognized lint-rule: future-rule",
+			wantErr: "unrecognized lint-rule: future-rule",
 		},
 		{
 			name:  "empty rule list passes",

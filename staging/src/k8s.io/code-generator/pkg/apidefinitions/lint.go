@@ -39,7 +39,7 @@ const (
 	// either be enabled API definition packages where the
 	// generator is typically needed, or that a tag is used
 	// to disable the generator explicitly.
-	// When set, this prevents generators from being accidently
+	// When set, this prevents generators from being accidentally
 	// omitted in API definition packages where they are typically
 	// needed.
 	LintRuleExplicitDisablement = "require-explicit-disablement"
@@ -80,7 +80,7 @@ func AddFlags(args *LintArgs, fs *pflag.FlagSet) {
 func ValidateFlags(lintRules []string) error {
 	for _, rule := range lintRules {
 		if !slices.Contains(allLintRules, rule) {
-			return fmt.Errorf("Unrecognized rule in --lint-rules: %s", rule)
+			return fmt.Errorf("unrecognized rule in --lint-rules: %s", rule)
 		}
 	}
 	return nil
@@ -98,7 +98,7 @@ func applyLintRules(st *identifyState, pkg *types.Package) error {
 				return err
 			}
 		default:
-			return fmt.Errorf("Unrecognized lint-rule: %s", rule)
+			return fmt.Errorf("unrecognized lint-rule: %s", rule)
 		}
 	}
 	return nil

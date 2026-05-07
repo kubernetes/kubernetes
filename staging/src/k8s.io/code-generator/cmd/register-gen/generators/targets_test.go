@@ -153,7 +153,9 @@ func TestGetTargets(t *testing.T) {
 					if err != nil {
 						t.Fatalf("creating register.go for pkg[%d]: %v", i, err)
 					}
-					f.Close()
+					if err := f.Close(); err != nil {
+						t.Fatalf("closing register.go for pkg[%d]: %v", i, err)
+					}
 				}
 				p := universe.Package(ps.path)
 				p.Name = filepath.Base(ps.path)

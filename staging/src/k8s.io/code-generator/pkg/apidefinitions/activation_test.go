@@ -146,9 +146,9 @@ func TestIdentify(t *testing.T) {
 			name: "typo in known generator name fails validation",
 			spec: Conversion,
 			comments: []string{
-				"+k8s:converison-gen=k8s.io/api/foo",
+				"+k8s:conversion-x-gen=k8s.io/api/foo",
 			},
-			wantErr: "+k8s:converison-gen",
+			wantErr: "+k8s:conversion--gen",
 		},
 		{
 			name: "non-generator +k8s: tag passes validation untouched",
