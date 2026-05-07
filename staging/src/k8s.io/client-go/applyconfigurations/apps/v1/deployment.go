@@ -33,12 +33,12 @@ import (
 // Deployment enables declarative updates for Pods and ReplicaSets.
 type DeploymentApplyConfiguration struct {
 	metav1.TypeMetaApplyConfiguration `json:",inline"`
-	// Standard object's metadata.
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// Specification of the desired behavior of the Deployment.
+	// spec defines the desired behavior of the Deployment.
 	Spec *DeploymentSpecApplyConfiguration `json:"spec,omitempty"`
-	// Most recently observed status of the Deployment.
+	// status is the most recently observed status of the Deployment.
 	Status *DeploymentStatusApplyConfiguration `json:"status,omitempty"`
 }
 

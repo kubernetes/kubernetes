@@ -27,9 +27,9 @@ import (
 //
 // Spec to control the desired behavior of daemon set rolling update.
 type RollingUpdateDaemonSetApplyConfiguration struct {
-	// The maximum number of DaemonSet pods that can be unavailable during the
-	// update. Value can be an absolute number (ex: 5) or a percentage of total
-	// number of DaemonSet pods at the start of the update (ex: 10%). Absolute
+	// maxUnavailable is the maximum number of DaemonSet pods that can be unavailable
+	// during the update. Value can be an absolute number (ex: 5) or a percentage of
+	// total number of DaemonSet pods at the start of the update (ex: 10%). Absolute
 	// number is calculated from percentage by rounding up.
 	// This cannot be 0 if MaxSurge is 0
 	// Default value is 1.
@@ -42,10 +42,10 @@ type RollingUpdateDaemonSetApplyConfiguration struct {
 	// 70% of original number of DaemonSet pods are available at all times during
 	// the update.
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
-	// The maximum number of nodes with an existing available DaemonSet pod that
-	// can have an updated DaemonSet pod during during an update.
+	// maxSurge is the maximum number of nodes with an existing available DaemonSet pod that
+	// can have an updated DaemonSet pod during an update.
 	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
-	// This can not be 0 if MaxUnavailable is 0.
+	// This cannot be 0 if MaxUnavailable is 0.
 	// Absolute number is calculated from percentage by rounding up to a minimum of 1.
 	// Default value is 0.
 	// Example: when this is set to 30%, at most 30% of the total number of nodes
