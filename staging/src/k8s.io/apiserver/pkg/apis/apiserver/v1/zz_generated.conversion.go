@@ -417,6 +417,7 @@ func Convert_apiserver_AnonymousAuthConfig_To_v1_AnonymousAuthConfig(in *apiserv
 }
 
 func autoConvert_v1_AuthenticationConfiguration_To_apiserver_AuthenticationConfiguration(in *AuthenticationConfiguration, out *apiserver.AuthenticationConfiguration, s conversion.Scope) error {
+	out.UserValidationRules = *(*[]apiserver.UserValidationRule)(unsafe.Pointer(&in.UserValidationRules))
 	if in.JWT != nil {
 		in, out := &in.JWT, &out.JWT
 		*out = make([]apiserver.JWTAuthenticator, len(*in))
@@ -438,6 +439,7 @@ func Convert_v1_AuthenticationConfiguration_To_apiserver_AuthenticationConfigura
 }
 
 func autoConvert_apiserver_AuthenticationConfiguration_To_v1_AuthenticationConfiguration(in *apiserver.AuthenticationConfiguration, out *AuthenticationConfiguration, s conversion.Scope) error {
+	out.UserValidationRules = *(*[]UserValidationRule)(unsafe.Pointer(&in.UserValidationRules))
 	if in.JWT != nil {
 		in, out := &in.JWT, &out.JWT
 		*out = make([]JWTAuthenticator, len(*in))
