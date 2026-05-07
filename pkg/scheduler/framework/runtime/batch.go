@@ -87,7 +87,7 @@ func (b *OpportunisticBatch) GetNodeHint(ctx context.Context, pod *v1.Pod, signa
 
 	// Otherwise, pop the head of the list in our state and return it as
 	// a hint. Also record it in our data to compare on storage.
-	hint = b.state.sortedNodes.Pop()
+	hint = b.state.sortedNodes.Pop().Name
 	logger.V(3).Info("OpportunisticBatch provided node hint",
 		"profile", b.handle.ProfileName(), "pod", klog.KObj(pod), "cycleCount", cycleCount, "hint", hint,
 		"remainingNodes", b.state.sortedNodes.Len())
