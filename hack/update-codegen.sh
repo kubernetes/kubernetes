@@ -465,6 +465,9 @@ function codegen::validation() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
+        --test-output-root "test/declarative_validation" \
+        --test-output-file-prefix "${GENERATED_FILE_PREFIX}" \
+        --test-allowlist "test/declarative_validation/coverage-allowlist.yaml" \
         $(printf -- " --readonly-pkg %s" "${readonly_pkgs[@]}") \
         "${tag_pkgs[@]}" \
         "$@"
