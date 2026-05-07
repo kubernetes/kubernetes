@@ -22,3 +22,5 @@ require (
 )
 
 replace k8s.io/kms => ../../../../kms
+
+replace k8s.io/utils => github.com/dims/utils v0.0.0-20260507142452-97e4b88801e3

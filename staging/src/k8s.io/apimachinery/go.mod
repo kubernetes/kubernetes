@@ -22,7 +22,7 @@ require (
 	k8s.io/klog/v2 v2.140.0
 	k8s.io/kube-openapi v0.0.0-20260502001324-b7f5293f4787
 	k8s.io/streaming v0.0.0
-	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
+	k8s.io/utils v0.0.0-20260507142452-97e4b88801e3
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730
 	sigs.k8s.io/randfill v1.0.0
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.2
@@ -61,4 +61,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace k8s.io/streaming => ../streaming
+replace (
+	k8s.io/streaming => ../streaming
+	k8s.io/utils => github.com/dims/utils v0.0.0-20260507142452-97e4b88801e3
+)

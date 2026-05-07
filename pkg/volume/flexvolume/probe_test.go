@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fsnotify/fsnotify"
+	"k8s.io/utils/fswatch"
 	"github.com/stretchr/testify/assert"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/pkg/volume"
@@ -86,8 +86,8 @@ func TestProberAddRemoveDriver(t *testing.T) {
 	driverPath := filepath.Join(pluginDir, driverName2)
 	executablePath := filepath.Join(driverPath, driverName2)
 	installDriver(driverName2, fs)
-	watcher.TriggerEvent(fsnotify.Create, driverPath)
-	watcher.TriggerEvent(fsnotify.Create, executablePath)
+	watcher.TriggerEvent(fswatch.Create, driverPath)
+	watcher.TriggerEvent(fswatch.Create, executablePath)
 
 	// Act
 	events, err = prober.Probe()
@@ -109,7 +109,7 @@ func TestProberAddRemoveDriver(t *testing.T) {
 	// Call probe after a non-driver file is added in a subdirectory. should return 1 event.
 	fp := filepath.Join(driverPath, "dummyfile")
 	fs.Create(fp)
-	watcher.TriggerEvent(fsnotify.Create, fp)
+	watcher.TriggerEvent(fswatch.Create, fp)
 
 	// Act
 	events, err = prober.Probe()
@@ -129,7 +129,7 @@ func TestProberAddRemoveDriver(t *testing.T) {
 	// Call probe after a subdirectory is added in a driver directory. should return 1 event.
 	subdirPath := filepath.Join(driverPath, "subdir")
 	fs.Create(subdirPath)
-	watcher.TriggerEvent(fsnotify.Create, subdirPath)
+	watcher.TriggerEvent(fswatch.Create, subdirPath)
 
 	// Act
 	events, err = prober.Probe()
@@ -148,7 +148,7 @@ func TestProberAddRemoveDriver(t *testing.T) {
 
 	// Call probe after a subdirectory is removed in a driver directory. should return 1 event.
 	fs.Remove(subdirPath)
-	watcher.TriggerEvent(fsnotify.Remove, subdirPath)
+	watcher.TriggerEvent(fswatch.Remove, subdirPath)
 
 	// Act
 	events, err = prober.Probe()
@@ -168,8 +168,8 @@ func TestProberAddRemoveDriver(t *testing.T) {
 	// Call probe after a driver executable and driver directory is remove. should return 1 event.
 	fs.Remove(executablePath)
 	fs.Remove(driverPath)
-	watcher.TriggerEvent(fsnotify.Remove, executablePath)
-	watcher.TriggerEvent(fsnotify.Remove, driverPath)
+	watcher.TriggerEvent(fswatch.Remove, executablePath)
+	watcher.TriggerEvent(fswatch.Remove, driverPath)
 	// Act and Assert: 1 ProbeRemove event
 	events, err = prober.Probe()
 	assert.Len(t, events, 1)
@@ -209,9 +209,9 @@ func TestRemovePluginDir(t *testing.T) {
 	driverPath, fs, watcher, _ := initTestEnvironment(t)
 	err := fs.RemoveAll(pluginDir)
 	assert.NoError(t, err)
-	watcher.TriggerEvent(fsnotify.Remove, filepath.Join(driverPath, driverName))
-	watcher.TriggerEvent(fsnotify.Remove, driverPath)
-	watcher.TriggerEvent(fsnotify.Remove, pluginDir)
+	watcher.TriggerEvent(fswatch.Remove, filepath.Join(driverPath, driverName))
+	watcher.TriggerEvent(fswatch.Remove, driverPath)
+	watcher.TriggerEvent(fswatch.Remove, pluginDir)
 
 	// Act: The handler triggered by the above events should have already handled the event appropriately.
 
@@ -235,7 +235,7 @@ func TestNestedDriverDir(t *testing.T) {
 	testDriverName := "testDriverName"
 	testDriverPath := filepath.Join(pluginDir, testDriverName)
 	fs.MkdirAll(testDriverPath, 0777)
-	watcher.TriggerEvent(fsnotify.Create, testDriverPath)
+	watcher.TriggerEvent(fswatch.Create, testDriverPath)
 	// Assert
 	assert.Len(t, watcher.watches, 3) // 2 from initial setup, 1 from new watch.
 	assertPathSuffix(t, testDriverPath, watcher.watches[len(watcher.watches)-1])
@@ -246,7 +246,7 @@ func TestNestedDriverDir(t *testing.T) {
 		subdirName := "subdirName"
 		subdirPath := filepath.Join(basePath, subdirName)
 		fs.MkdirAll(subdirPath, 0777)
-		watcher.TriggerEvent(fsnotify.Create, subdirPath)
+		watcher.TriggerEvent(fswatch.Create, subdirPath)
 		// Assert
 		assert.Len(t, watcher.watches, 4+i) // 3 + newly added
 		assertPathSuffix(t, subdirPath, watcher.watches[len(watcher.watches)-1])
@@ -264,8 +264,8 @@ func TestProberMultipleEvents(t *testing.T) {
 		newDriver := fmt.Sprintf("multi-event-driver%d", 1)
 		installDriver(newDriver, fs)
 		driverPath := filepath.Join(pluginDir, newDriver)
-		watcher.TriggerEvent(fsnotify.Create, driverPath)
-		watcher.TriggerEvent(fsnotify.Create, filepath.Join(driverPath, newDriver))
+		watcher.TriggerEvent(fswatch.Create, driverPath)
+		watcher.TriggerEvent(fswatch.Create, filepath.Join(driverPath, newDriver))
 	}
 
 	// Act
@@ -315,7 +315,7 @@ func TestProberSuccessAndError(t *testing.T) {
 
 	installDriver(errorDriverName, fs)
 	driverPath := filepath.Join(pluginDir, errorDriverName)
-	watcher.TriggerEvent(fsnotify.Create, filepath.Join(driverPath, errorDriverName))
+	watcher.TriggerEvent(fswatch.Create, filepath.Join(driverPath, errorDriverName))
 
 	// Act
 	events, err := prober.Probe()

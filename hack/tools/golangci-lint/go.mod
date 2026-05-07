@@ -216,10 +216,12 @@ require (
 	honnef.co/go/tools v0.7.0 // indirect
 	k8s.io/apimachinery v0.32.3 // indirect
 	k8s.io/gengo/v2 v2.0.0-20250922181213-ec3ebc5fd46b // indirect
-	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 // indirect
+	k8s.io/utils v0.0.0-20260507142452-97e4b88801e3 // indirect
 	mvdan.cc/gofumpt v0.9.2 // indirect
 	mvdan.cc/unparam v0.0.0-20251027182757-5beb8c8f8f15 // indirect
 	sigs.k8s.io/kube-api-linter v0.0.0-20260114104534-18147eee9c49 // indirect
 	sigs.k8s.io/logtools v0.10.1 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
+
+replace k8s.io/utils => github.com/dims/utils v0.0.0-20260507142452-97e4b88801e3

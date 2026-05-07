@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
+	"k8s.io/utils/fswatch"
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -306,8 +306,8 @@ func (o *Options) initWatcher() error {
 	return nil
 }
 
-func (o *Options) eventHandler(ent fsnotify.Event) {
-	if ent.Has(fsnotify.Write) || ent.Has(fsnotify.Rename) {
+func (o *Options) eventHandler(ent fswatch.Event) {
+	if ent.Has(fswatch.Write) || ent.Has(fswatch.Rename) {
 		// error out when ConfigFile is updated
 		o.errCh <- fmt.Errorf("content of the proxy server's configuration file was updated")
 		return

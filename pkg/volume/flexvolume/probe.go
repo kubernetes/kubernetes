@@ -24,7 +24,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/fsnotify/fsnotify"
+	"k8s.io/utils/fswatch"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog/v2"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
@@ -151,7 +151,7 @@ func (prober *flexVolumeProber) newProbeEvent(driverDirName string, op volume.Pr
 	return probeEvent, nil
 }
 
-func (prober *flexVolumeProber) handleWatchEvent(event fsnotify.Event) error {
+func (prober *flexVolumeProber) handleWatchEvent(event fswatch.Event) error {
 	// event.Name is the watched path.
 	if filepath.Base(event.Name)[0] == '.' {
 		// Ignore files beginning with '.'
@@ -172,7 +172,7 @@ func (prober *flexVolumeProber) handleWatchEvent(event fsnotify.Event) error {
 	if eventPathAbs == pluginDirAbs {
 		// If the Flexvolume plugin directory is removed, need to recreate it
 		// in order to keep it under watch.
-		if event.Has(fsnotify.Remove) {
+		if event.Has(fswatch.Remove) {
 			if err := prober.createPluginDir(); err != nil {
 				return err
 			}
@@ -184,7 +184,7 @@ func (prober *flexVolumeProber) handleWatchEvent(event fsnotify.Event) error {
 	}
 
 	// watch newly added subdirectories inside a driver directory
-	if event.Has(fsnotify.Create) {
+	if event.Has(fswatch.Create) {
 		if err := prober.addWatchRecursive(eventPathAbs); err != nil {
 			return err
 		}
@@ -200,7 +200,7 @@ func (prober *flexVolumeProber) handleWatchEvent(event fsnotify.Event) error {
 		driverDirName := strings.Split(eventRelPathToPluginDir, string(os.PathSeparator))[0]
 		driverDirAbs := filepath.Join(pluginDirAbs, driverDirName)
 		// executable is removed, will trigger ProbeRemove event
-		if event.Has(fsnotify.Remove) && (eventRelPathToPluginDir == getExecutablePathRel(driverDirName) || parentPathAbs == pluginDirAbs) {
+		if event.Has(fswatch.Remove) && (eventRelPathToPluginDir == getExecutablePathRel(driverDirName) || parentPathAbs == pluginDirAbs) {
 			prober.updateEventsMap(driverDirAbs, volume.ProbeRemove)
 		} else {
 			prober.updateEventsMap(driverDirAbs, volume.ProbeAddOrUpdate)
@@ -249,7 +249,7 @@ func (prober *flexVolumeProber) addWatchRecursive(filename string) error {
 // Creates a new filesystem watcher and adds watches for the plugin directory
 // and all of its subdirectories.
 func (prober *flexVolumeProber) initWatcher() error {
-	err := prober.watcher.Init(func(event fsnotify.Event) {
+	err := prober.watcher.Init(func(event fswatch.Event) {
 		if err := prober.handleWatchEvent(event); err != nil {
 			klog.Errorf("Flexvolume prober watch: %s", err)
 		}

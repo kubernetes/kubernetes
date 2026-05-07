@@ -35,3 +35,5 @@ replace k8s.io/api => ../../../staging/src/k8s.io/api
 replace k8s.io/component-base => ../../../staging/src/k8s.io/component-base
 
 replace k8s.io/kubernetes => ../../../
+
+replace k8s.io/utils => github.com/dims/utils v0.0.0-20260507142452-97e4b88801e3

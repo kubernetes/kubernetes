@@ -26,13 +26,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
-	"k8s.io/client-go/util/cert"
-
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/fswatch"
 )
 
 // FileRefreshDuration is exposed so that integration tests can crank up the reload speed.
@@ -178,9 +177,9 @@ func (c *DynamicFileCAContent) watchCAFile(stopCh <-chan struct{}) error {
 	// Trigger a check here to ensure the content will be checked periodically even if the following watch fails.
 	c.queue.Add(workItemKey)
 
-	w, err := fsnotify.NewWatcher()
+	w, err := fswatch.NewWatcher()
 	if err != nil {
-		return fmt.Errorf("error creating fsnotify watcher: %v", err)
+		return fmt.Errorf("error creating fswatch watcher: %w", err)
 	}
 	defer w.Close()
 
@@ -192,12 +191,12 @@ func (c *DynamicFileCAContent) watchCAFile(stopCh <-chan struct{}) error {
 
 	for {
 		select {
-		case e := <-w.Events:
+		case e := <-w.Events():
 			if err := c.handleWatchEvent(e, w); err != nil {
 				return err
 			}
-		case err := <-w.Errors:
-			return fmt.Errorf("received fsnotify error: %v", err)
+		case err := <-w.Errors():
+			return fmt.Errorf("received fswatch error: %w", err)
 		case <-stopCh:
 			return nil
 		}
@@ -205,13 +204,13 @@ func (c *DynamicFileCAContent) watchCAFile(stopCh <-chan struct{}) error {
 }
 
 // handleWatchEvent triggers reloading the CA file, and restarts a new watch if it's a Remove or Rename event.
-func (c *DynamicFileCAContent) handleWatchEvent(e fsnotify.Event, w *fsnotify.Watcher) error {
+func (c *DynamicFileCAContent) handleWatchEvent(e fswatch.Event, w *fswatch.Watcher) error {
 	// This should be executed after restarting the watch (if applicable) to ensure no file event will be missing.
 	defer c.queue.Add(workItemKey)
-	if !e.Has(fsnotify.Remove) && !e.Has(fsnotify.Rename) {
+	if !e.Has(fswatch.Remove) && !e.Has(fswatch.Rename) {
 		return nil
 	}
-	if err := w.Remove(c.filename); err != nil && !errors.Is(err, fsnotify.ErrNonExistentWatch) {
+	if err := w.Remove(c.filename); err != nil && !errors.Is(err, fswatch.ErrNonExistentWatch) {
 		klog.InfoS("Failed to remove file watch, it may have been deleted", "file", c.filename, "err", err)
 	}
 	if err := w.Add(c.filename); err != nil {

@@ -22,12 +22,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/utils/fswatch"
 )
 
 func TestGetStat(t *testing.T) {
-	event := fsnotify.Event{Name: "name", Op: fsnotify.Create}
+	event := fswatch.Event{Name: "name", Op: fswatch.Create}
 	fi, err := getStat(event)
 	fiExpected, errExpected := os.Stat(event.Name)
 

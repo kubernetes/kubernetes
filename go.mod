@@ -25,7 +25,6 @@ require (
 	github.com/distribution/reference v0.6.0
 	github.com/docker/go-units v0.5.0
 	github.com/emicklei/go-restful/v3 v3.13.0
-	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-logr/logr v1.4.3
 	github.com/go-openapi/jsonreference v0.21.4
 	github.com/godbus/dbus/v5 v5.2.2
@@ -115,7 +114,7 @@ require (
 	k8s.io/sample-apiserver v0.0.0
 	k8s.io/streaming v0.0.0
 	k8s.io/system-validators v1.12.1
-	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
+	k8s.io/utils v0.0.0-20260507142452-97e4b88801e3
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730
 	sigs.k8s.io/knftables v0.0.21
 	sigs.k8s.io/randfill v1.0.0
@@ -149,6 +148,7 @@ require (
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect
 	github.com/fatih/camelcase v1.0.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
+	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.1 // indirect
 	github.com/go-errors/errors v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -260,4 +260,5 @@ replace (
 	k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
 	k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
 	k8s.io/streaming => ./staging/src/k8s.io/streaming
+	k8s.io/utils => github.com/dims/utils v0.0.0-20260507142452-97e4b88801e3
 )

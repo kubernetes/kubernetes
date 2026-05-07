@@ -19,7 +19,7 @@ package flexvolume
 import (
 	"context"
 
-	"github.com/fsnotify/fsnotify"
+	"k8s.io/utils/fswatch"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
 
@@ -50,6 +50,6 @@ func (w *fakeWatcher) AddWatch(path string) error {
 }
 
 // Triggers a mock filesystem event.
-func (w *fakeWatcher) TriggerEvent(op fsnotify.Op, filename string) {
-	w.eventHandler(fsnotify.Event{Op: op, Name: filename})
+func (w *fakeWatcher) TriggerEvent(op fswatch.Op, filename string) {
+	w.eventHandler(fswatch.Event{Op: op, Name: filename})
 }

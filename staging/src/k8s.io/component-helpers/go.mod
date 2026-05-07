@@ -11,7 +11,7 @@ require (
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
 	k8s.io/klog/v2 v2.140.0
-	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
+	k8s.io/utils v0.0.0-20260507142452-97e4b88801e3
 )
 
 require (
@@ -64,4 +64,5 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
 	k8s.io/streaming => ../streaming
+	k8s.io/utils => github.com/dims/utils v0.0.0-20260507142452-97e4b88801e3
 )

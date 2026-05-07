@@ -24,12 +24,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
-
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/fswatch"
 )
 
 // DynamicCertKeyPairContent provides a CertKeyContentProvider that can dynamically react to new file content
@@ -152,9 +151,9 @@ func (c *DynamicCertKeyPairContent) watchCertKeyFile(stopCh <-chan struct{}) err
 	// Trigger a check here to ensure the content will be checked periodically even if the following watch fails.
 	c.queue.Add(workItemKey)
 
-	w, err := fsnotify.NewWatcher()
+	w, err := fswatch.NewWatcher()
 	if err != nil {
-		return fmt.Errorf("error creating fsnotify watcher: %v", err)
+		return fmt.Errorf("error creating fswatch watcher: %w", err)
 	}
 	defer w.Close()
 
@@ -169,12 +168,12 @@ func (c *DynamicCertKeyPairContent) watchCertKeyFile(stopCh <-chan struct{}) err
 
 	for {
 		select {
-		case e := <-w.Events:
+		case e := <-w.Events():
 			if err := c.handleWatchEvent(e, w); err != nil {
 				return err
 			}
-		case err := <-w.Errors:
-			return fmt.Errorf("received fsnotify error: %v", err)
+		case err := <-w.Errors():
+			return fmt.Errorf("received fswatch error: %w", err)
 		case <-stopCh:
 			return nil
 		}
@@ -185,10 +184,10 @@ func (c *DynamicCertKeyPairContent) watchCertKeyFile(stopCh <-chan struct{}) err
 // If one file is updated before the other, the loadCertKeyPair method will catch the mismatch and will not apply the
 // change. When an event of the other file is received, it will trigger reloading the files again and the new content
 // will be loaded and used.
-func (c *DynamicCertKeyPairContent) handleWatchEvent(e fsnotify.Event, w *fsnotify.Watcher) error {
+func (c *DynamicCertKeyPairContent) handleWatchEvent(e fswatch.Event, w *fswatch.Watcher) error {
 	// This should be executed after restarting the watch (if applicable) to ensure no file event will be missing.
 	defer c.queue.Add(workItemKey)
-	if !e.Has(fsnotify.Remove) && !e.Has(fsnotify.Rename) {
+	if !e.Has(fswatch.Remove) && !e.Has(fswatch.Rename) {
 		return nil
 	}
 	if err := w.Remove(e.Name); err != nil {

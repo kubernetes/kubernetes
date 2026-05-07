@@ -25,12 +25,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/klog/v2"
-
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/klog/v2"
+	"k8s.io/utils/fswatch"
 )
 
 const (
@@ -75,7 +74,7 @@ func (s *sourceFile) doWatch(logger klog.Logger) error {
 		return &retryableError{"path does not exist, ignoring"}
 	}
 
-	w, err := fsnotify.NewWatcher()
+	w, err := fswatch.NewWatcher()
 	if err != nil {
 		return fmt.Errorf("unable to create inotify: %v", err)
 	}
@@ -88,17 +87,17 @@ func (s *sourceFile) doWatch(logger klog.Logger) error {
 
 	for {
 		select {
-		case event := <-w.Events:
+		case event := <-w.Events():
 			if err = s.produceWatchEvent(logger, &event); err != nil {
 				return fmt.Errorf("error while processing inotify event (%+v): %v", event, err)
 			}
-		case err = <-w.Errors:
+		case err = <-w.Errors():
 			return fmt.Errorf("error while watching %q: %v", s.path, err)
 		}
 	}
 }
 
-func (s *sourceFile) produceWatchEvent(logger klog.Logger, e *fsnotify.Event) error {
+func (s *sourceFile) produceWatchEvent(logger klog.Logger, e *fswatch.Event) error {
 	// Ignore file start with dots
 	if strings.HasPrefix(filepath.Base(e.Name), ".") {
 		logger.V(4).Info("Ignored pod manifest, because it starts with dots", "eventName", e.Name)
@@ -106,15 +105,15 @@ func (s *sourceFile) produceWatchEvent(logger klog.Logger, e *fsnotify.Event) er
 	}
 	var eventType podEventType
 	switch {
-	case (e.Op & fsnotify.Create) > 0:
+	case (e.Op & fswatch.Create) > 0:
 		eventType = podAdd
-	case (e.Op & fsnotify.Write) > 0:
+	case (e.Op & fswatch.Write) > 0:
 		eventType = podModify
-	case (e.Op & fsnotify.Chmod) > 0:
+	case (e.Op & fswatch.Chmod) > 0:
 		eventType = podModify
-	case (e.Op & fsnotify.Remove) > 0:
+	case (e.Op & fswatch.Remove) > 0:
 		eventType = podDelete
-	case (e.Op & fsnotify.Rename) > 0:
+	case (e.Op & fswatch.Rename) > 0:
 		eventType = podDelete
 	default:
 		// Ignore rest events

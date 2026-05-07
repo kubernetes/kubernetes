@@ -25,7 +25,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
+	"k8s.io/utils/fswatch"
 	"k8s.io/klog/v2"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	plugin "k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/plugin/v1beta1"
@@ -150,7 +150,7 @@ func main() {
 
 		logger.Info("Registration process will be managed explicitly", "triggerPath", triggerPath, "triggerEntry", registerControlFile)
 
-		watcher, err := fsnotify.NewWatcher()
+		watcher, err := fswatch.NewWatcher()
 		if err != nil {
 			logger.Error(err, "Watcher creation failed")
 			panic(err)
@@ -202,17 +202,17 @@ func main() {
 	}
 }
 
-func handleRegistrationProcess(logger klog.Logger, registerControlFile string, dpStub *plugin.Stub, watcher *fsnotify.Watcher, updateCh chan<- bool) {
+func handleRegistrationProcess(logger klog.Logger, registerControlFile string, dpStub *plugin.Stub, watcher *fswatch.Watcher, updateCh chan<- bool) {
 	logger.Info("Starting watching routine")
 	for {
 		logger.Info("handleRegistrationProcess for loop")
 		select {
-		case event, ok := <-watcher.Events:
+		case event, ok := <-watcher.Events():
 			if !ok {
 				return
 			}
 			logger.Info("Received event", "name", event.Name, "operation", event.Op)
-			if event.Op&fsnotify.Remove == fsnotify.Remove {
+			if event.Op&fswatch.Remove == fswatch.Remove {
 				if event.Name == registerControlFile {
 					logger.Info("Expected delete", "name", event.Name, "operation", event.Op)
 					updateCh <- true
@@ -220,7 +220,7 @@ func handleRegistrationProcess(logger klog.Logger, registerControlFile string, d
 				}
 				logger.Info("Spurious delete", "name", event.Name, "operation", event.Op)
 			}
-		case err, ok := <-watcher.Errors:
+		case err, ok := <-watcher.Errors():
 			if !ok {
 				return
 			}

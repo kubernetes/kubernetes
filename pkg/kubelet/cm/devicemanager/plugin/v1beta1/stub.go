@@ -24,7 +24,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -32,6 +31,7 @@ import (
 	"k8s.io/klog/v2"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	watcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
+	"k8s.io/utils/fswatch"
 )
 
 // Stub implementation for DevicePlugin.
@@ -60,7 +60,7 @@ type Stub struct {
 	registrationStatus chan watcherapi.RegistrationStatus // for testing
 	endpoint           string                             // for testing
 
-	kubeletRestartWatcher *fsnotify.Watcher
+	kubeletRestartWatcher *fswatch.Watcher
 
 	pluginapi.UnsafeDevicePluginServer
 	watcherapi.UnsafeRegistrationServer
@@ -94,7 +94,7 @@ func defaultRegisterControlFunc() bool {
 // NewDevicePluginStub returns an initialized DevicePlugin Stub.
 func NewDevicePluginStub(logger klog.Logger, devs []*pluginapi.Device, socket string, name string, preStartContainerFlag bool, getPreferredAllocationFlag bool) *Stub {
 
-	watcher, err := fsnotify.NewWatcher()
+	watcher, err := fswatch.NewWatcher()
 	if err != nil {
 		logger.Error(err, "Watcher creation failed")
 		panic(err)
@@ -221,8 +221,8 @@ func (m *Stub) Watch(ctx context.Context, kubeletEndpoint, resourceName, pluginS
 		// Detect a kubelet restart by watching for a newly created
 		// 'pluginapi.KubeletSocket' file. When this occurs, restart
 		// the device plugin server
-		case event := <-m.kubeletRestartWatcher.Events:
-			if event.Name == kubeletEndpoint && event.Op&fsnotify.Create == fsnotify.Create {
+		case event := <-m.kubeletRestartWatcher.Events():
+			if event.Name == kubeletEndpoint && event.Op&fswatch.Create == fswatch.Create {
 				logger.Info("inotify: file created, restarting", "kubeletEndpoint", kubeletEndpoint)
 				var lastErr error
 
@@ -249,7 +249,7 @@ func (m *Stub) Watch(ctx context.Context, kubeletEndpoint, resourceName, pluginS
 			}
 
 		// Watch for any other fs errors and log them.
-		case err := <-m.kubeletRestartWatcher.Errors:
+		case err := <-m.kubeletRestartWatcher.Errors():
 			logger.Error(err, "inotify error")
 		}
 	}

@@ -92,6 +92,8 @@ github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/dims/utils v0.0.0-20260507142452-97e4b88801e3 h1:X1Vo5cSQpvLTktyIEkC0aMFv5SLLy45+ZiqPNIFrusI=
+github.com/dims/utils v0.0.0-20260507142452-97e4b88801e3/go.mod h1:RVj2YrFuOfb7DvNmtXwKIB7qqj6cGCIgAhpMQg4O/dU=
 github.com/distribution/reference v0.6.0 h1:0IXCQ5g4/QMHHkarYzh5l+u8T3t73zM5QvfrDyIgxBk=
 github.com/distribution/reference v0.6.0/go.mod h1:BbU0aIcezP1/5jX/8MP0YiH4SdvB5Y4f/wlDRiLyi3E=
 github.com/docker/go-connections v0.6.0 h1:LlMG9azAe1TqfR7sO+NJttz1gy6KO7VJBh+pMmjSD94=
@@ -514,8 +516,6 @@ k8s.io/kube-openapi v0.0.0-20260502001324-b7f5293f4787 h1:kHv8PETbPIVHfqKBYwTNNS
 k8s.io/kube-openapi v0.0.0-20260502001324-b7f5293f4787/go.mod h1:Cyq7UE0QtGe+Zo+/6XFrxiS4Mq0tLyQEONkFzSkfp9o=
 k8s.io/system-validators v1.12.1 h1:AY1+COTLJN/Sj0w9QzH1H0yvyF3Kl6CguMnh32WlcUU=
 k8s.io/system-validators v1.12.1/go.mod h1:awfSS706v9R12VC7u7K89FKfqVy44G+E0L1A0FX9Wmw=
-k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2 h1:AZYQSJemyQB5eRxqcPky+/7EdBj0xi3g0ZcxxJ7vbWU=
-k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2/go.mod h1:xDxuJ0whA3d0I4mf/C4ppKHxXynQ+fxnkmQH0vTHnuk=
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.34.0 h1:hSfpvjjTQXQY2Fol2CS0QHMNs/WI1MOSGzCm1KhM5ec=
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.34.0/go.mod h1:Ve9uj1L+deCXFrPOk1LpFXqTg7LCFzFso6PA48q/XZw=
 sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 h1:IpInykpT6ceI+QxKBbEflcR5EXP7sU1kvOlxwZh5txg=

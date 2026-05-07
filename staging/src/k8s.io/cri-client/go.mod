@@ -8,7 +8,6 @@ godebug default=go1.26
 
 require (
 	github.com/Microsoft/go-winio v0.6.2
-	github.com/fsnotify/fsnotify v1.9.0
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.68.0
 	go.opentelemetry.io/otel v1.43.0
@@ -19,12 +18,13 @@ require (
 	k8s.io/component-base v0.0.0
 	k8s.io/cri-api v0.0.0
 	k8s.io/klog/v2 v2.140.0
-	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
+	k8s.io/utils v0.0.0-20260507142452-97e4b88801e3
 )
 
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
@@ -44,4 +44,5 @@ replace (
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
 	k8s.io/cri-api => ../cri-api
+	k8s.io/utils => github.com/dims/utils v0.0.0-20260507142452-97e4b88801e3
 )

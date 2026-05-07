@@ -29,9 +29,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"k8s.io/utils/fswatch"
 
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -318,7 +318,7 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 	// Start parsing the logs.
 	r := bufio.NewReader(f)
 	// Do not create watcher here because it is not needed if `Follow` is false.
-	var watcher *fsnotify.Watcher
+	var watcher *fswatch.Watcher
 	var parse parseFunc
 	var stop bool
 	isNewLine := true
@@ -351,7 +351,7 @@ func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, r
 				}
 				if watcher == nil {
 					// Initialize the watcher if it has not been initialized yet.
-					if watcher, err = fsnotify.NewWatcher(); err != nil {
+					if watcher, err = fswatch.NewWatcher(); err != nil {
 						return fmt.Errorf("failed to create fsnotify watcher: %v", err)
 					}
 					defer watcher.Close()
@@ -458,7 +458,7 @@ func isContainerRunning(ctx context.Context, id string, r internalapi.RuntimeSer
 // waitLogs wait for the next log write. It returns two booleans and an error. The first boolean
 // indicates whether a new log is found; the second boolean if the log file was recreated;
 // the error is error happens during waiting new logs.
-func waitLogs(ctx context.Context, id string, logName string, w *fsnotify.Watcher, runtimeService internalapi.RuntimeService) (bool, bool, error) {
+func waitLogs(ctx context.Context, id string, logName string, w *fswatch.Watcher, runtimeService internalapi.RuntimeService) (bool, bool, error) {
 	logger := klog.FromContext(ctx)
 	// no need to wait if the pod is not running
 	if running, err := isContainerRunning(ctx, id, runtimeService); !running {
@@ -469,16 +469,16 @@ func waitLogs(ctx context.Context, id string, logName string, w *fsnotify.Watche
 		select {
 		case <-ctx.Done():
 			return false, false, fmt.Errorf("context cancelled")
-		case e := <-w.Events:
+		case e := <-w.Events():
 			switch e.Op {
-			case fsnotify.Write, fsnotify.Rename, fsnotify.Remove, fsnotify.Chmod:
+			case fswatch.Write, fswatch.Rename, fswatch.Remove, fswatch.Chmod:
 				return true, false, nil
-			case fsnotify.Create:
+			case fswatch.Create:
 				return true, filepath.Base(e.Name) == logName, nil
 			default:
 				logger.Error(nil, "Received unexpected fsnotify event, retrying", "event", e)
 			}
-		case err := <-w.Errors:
+		case err := <-w.Errors():
 			logger.Error(err, "Received fsnotify watch error, retrying unless no more retries left", "retries", errRetry)
 			if errRetry == 0 {
 				return false, false, err

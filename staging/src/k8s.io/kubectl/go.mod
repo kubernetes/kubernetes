@@ -40,7 +40,7 @@ require (
 	k8s.io/kube-openapi v0.0.0-20260502001324-b7f5293f4787
 	k8s.io/metrics v0.0.0
 	k8s.io/streaming v0.0.0
-	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
+	k8s.io/utils v0.0.0-20260507142452-97e4b88801e3
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730
 	sigs.k8s.io/kustomize/kustomize/v5 v5.8.1
 	sigs.k8s.io/kustomize/kyaml v0.21.1
@@ -113,4 +113,5 @@ replace (
 	k8s.io/component-helpers => ../component-helpers
 	k8s.io/metrics => ../metrics
 	k8s.io/streaming => ../streaming
+	k8s.io/utils => github.com/dims/utils v0.0.0-20260507142452-97e4b88801e3
 )

@@ -19,12 +19,13 @@ limitations under the License.
 package pluginwatcher
 
 import (
-	"github.com/fsnotify/fsnotify"
-	"k8s.io/kubernetes/pkg/kubelet/util"
 	"os"
+
+	"k8s.io/kubernetes/pkg/kubelet/util"
+	"k8s.io/utils/fswatch"
 )
 
-func getStat(event fsnotify.Event) (os.FileInfo, error) {
+func getStat(event fswatch.Event) (os.FileInfo, error) {
 	fi, err := os.Stat(event.Name)
 	// TODO: This is a workaround for Windows 20H2 issue for os.Stat(). Please see
 	// microsoft/Windows-Containers#97 for details.

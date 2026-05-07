@@ -19,10 +19,10 @@ package filesystem
 import (
 	"context"
 
-	"github.com/fsnotify/fsnotify"
+	"k8s.io/utils/fswatch"
 )
 
-// FSWatcher is a callback-based filesystem watcher abstraction for fsnotify.
+// FSWatcher is a callback-based filesystem watcher abstraction for fswatch.
 type FSWatcher interface {
 	// Initializes the watcher with the given watch handlers.
 	// Called before all other methods.
@@ -37,14 +37,14 @@ type FSWatcher interface {
 	AddWatch(path string) error
 }
 
-// FSEventHandler is called when a fsnotify event occurs.
-type FSEventHandler func(event fsnotify.Event)
+// FSEventHandler is called when a filesystem event occurs.
+type FSEventHandler func(event fswatch.Event)
 
-// FSErrorHandler is called when a fsnotify error occurs.
+// FSErrorHandler is called when the underlying watcher reports an error.
 type FSErrorHandler func(err error)
 
 type fsnotifyWatcher struct {
-	watcher      *fsnotify.Watcher
+	watcher      *fswatch.Watcher
 	eventHandler FSEventHandler
 	errorHandler FSErrorHandler
 }
@@ -52,7 +52,7 @@ type fsnotifyWatcher struct {
 var _ FSWatcher = &fsnotifyWatcher{}
 
 // NewFsnotifyWatcher returns an implementation of FSWatcher that continuously listens for
-// fsnotify events and calls the event handler as soon as an event is received.
+// filesystem events and calls the event handler as soon as an event is received.
 func NewFsnotifyWatcher() FSWatcher {
 	return &fsnotifyWatcher{}
 }
@@ -63,7 +63,7 @@ func (w *fsnotifyWatcher) AddWatch(path string) error {
 
 func (w *fsnotifyWatcher) Init(eventHandler FSEventHandler, errorHandler FSErrorHandler) error {
 	var err error
-	w.watcher, err = fsnotify.NewWatcher()
+	w.watcher, err = fswatch.NewWatcher()
 	if err != nil {
 		return err
 	}
@@ -75,16 +75,16 @@ func (w *fsnotifyWatcher) Init(eventHandler FSEventHandler, errorHandler FSError
 
 func (w *fsnotifyWatcher) Run(ctx context.Context) {
 	go func() {
-		defer w.watcher.Close()
+		defer func() { _ = w.watcher.Close() }()
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case event := <-w.watcher.Events:
+			case event := <-w.watcher.Events():
 				if w.eventHandler != nil {
 					w.eventHandler(event)
 				}
-			case err := <-w.watcher.Errors:
+			case err := <-w.watcher.Errors():
 				if w.errorHandler != nil {
 					w.errorHandler(err)
 				}

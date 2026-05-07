@@ -1,7 +1,5 @@
-//go:build !windows
-
 /*
-Copyright 2023 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,18 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package pluginwatcher
-
-import (
-	"os"
-
-	"k8s.io/utils/fswatch"
-)
-
-func getStat(event fswatch.Event) (os.FileInfo, error) {
-	return os.Stat(event.Name)
-}
-
-func getSocketPath(socketPath string) string {
-	return socketPath
-}
+// Package fswatch is a small cross-platform filesystem watcher used by
+// Kubernetes to remove direct fsnotify dependencies from the Linux
+// build closure. The Linux implementation uses raw inotify; non-Linux
+// platforms wrap fsnotify.
+package fswatch

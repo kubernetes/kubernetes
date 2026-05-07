@@ -22,12 +22,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/utils/fswatch"
 )
 
 func TestGetStatWindows(t *testing.T) {
-	event := fsnotify.Event{Name: "name", Op: fsnotify.Create}
+	event := fswatch.Event{Name: "name", Op: fswatch.Create}
 	fi, err := getStat(event)
 	fiExpected, errExpected := os.Stat(event.Name)
 	// TODO: This is a workaround for Windows 20H2 issue for os.Stat(). Please see

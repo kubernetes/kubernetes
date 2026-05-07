@@ -22,19 +22,19 @@ import (
 	"os"
 	"strings"
 
-	"github.com/fsnotify/fsnotify"
 	"k8s.io/klog/v2"
 
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
+	"k8s.io/utils/fswatch"
 )
 
 // Watcher is the plugin watcher
 type Watcher struct {
 	path                string
 	fs                  utilfs.Filesystem
-	fsWatcher           *fsnotify.Watcher
+	fsWatcher           *fswatch.Watcher
 	desiredStateOfWorld cache.DesiredStateOfWorld
 }
 
@@ -58,7 +58,7 @@ func (w *Watcher) Start(ctx context.Context, stopCh <-chan struct{}) error {
 		return err
 	}
 
-	fsWatcher, err := fsnotify.NewWatcher()
+	fsWatcher, err := fswatch.NewWatcher()
 	if err != nil {
 		return fmt.Errorf("failed to start plugin fsWatcher, err: %v", err)
 	}
@@ -69,21 +69,21 @@ func (w *Watcher) Start(ctx context.Context, stopCh <-chan struct{}) error {
 		logger.Error(err, "Failed to traverse plugin socket path", "path", w.path)
 	}
 
-	go func(fsWatcher *fsnotify.Watcher) {
+	go func(fsWatcher *fswatch.Watcher) {
 		for {
 			select {
-			case event := <-fsWatcher.Events:
+			case event := <-fsWatcher.Events():
 				//TODO: Handle errors by taking corrective measures
-				if event.Has(fsnotify.Create) {
+				if event.Has(fswatch.Create) {
 					err := w.handleCreateEvent(ctx, event)
 					if err != nil {
 						logger.Error(err, "Error when handling create event", "event", event)
 					}
-				} else if event.Has(fsnotify.Remove) {
+				} else if event.Has(fswatch.Remove) {
 					w.handleDeleteEvent(ctx, event)
 				}
 				continue
-			case err := <-fsWatcher.Errors:
+			case err := <-fsWatcher.Errors():
 				if err != nil {
 					logger.Error(err, "FsWatcher received error")
 				}
@@ -141,9 +141,9 @@ func (w *Watcher) traversePluginDir(ctx context.Context, dir string) error {
 				return fmt.Errorf("failed to watch %s, err: %v", path, err)
 			}
 		} else if isSocket, _ := util.IsUnixDomainSocket(path); isSocket {
-			event := fsnotify.Event{
+			event := fswatch.Event{
 				Name: path,
-				Op:   fsnotify.Create,
+				Op:   fswatch.Create,
 			}
 			//TODO: Handle errors by taking corrective measures
 			if err := w.handleCreateEvent(ctx, event); err != nil {
@@ -160,7 +160,7 @@ func (w *Watcher) traversePluginDir(ctx context.Context, dir string) error {
 // Handle filesystem notify event.
 // Files names:
 // - MUST NOT start with a '.'
-func (w *Watcher) handleCreateEvent(ctx context.Context, event fsnotify.Event) error {
+func (w *Watcher) handleCreateEvent(ctx context.Context, event fswatch.Event) error {
 	logger := klog.FromContext(ctx)
 	logger.V(6).Info("Handling create event", "event", event)
 
@@ -206,7 +206,7 @@ func (w *Watcher) handlePluginRegistration(ctx context.Context, socketPath strin
 	return nil
 }
 
-func (w *Watcher) handleDeleteEvent(ctx context.Context, event fsnotify.Event) {
+func (w *Watcher) handleDeleteEvent(ctx context.Context, event fswatch.Event) {
 	logger := klog.FromContext(ctx)
 	logger.V(6).Info("Handling delete event", "event", event)
 

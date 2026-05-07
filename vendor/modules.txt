@@ -1210,7 +1210,7 @@ k8s.io/kube-openapi/pkg/validation/validate
 # k8s.io/system-validators v1.12.1
 ## explicit; go 1.16
 k8s.io/system-validators/validators
-# k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
+# k8s.io/utils v0.0.0-20260507142452-97e4b88801e3 => github.com/dims/utils v0.0.0-20260507142452-97e4b88801e3
 ## explicit; go 1.23
 k8s.io/utils/buffer
 k8s.io/utils/clock
@@ -1219,6 +1219,7 @@ k8s.io/utils/cpuset
 k8s.io/utils/dump
 k8s.io/utils/exec
 k8s.io/utils/exec/testing
+k8s.io/utils/fswatch
 k8s.io/utils/inotify
 k8s.io/utils/integer
 k8s.io/utils/internal/third_party/forked/golang/golang-lru
@@ -1341,3 +1342,4 @@ sigs.k8s.io/structured-merge-diff/v6/value
 ## explicit; go 1.22
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/kyaml
+# k8s.io/utils => github.com/dims/utils v0.0.0-20260507142452-97e4b88801e3
