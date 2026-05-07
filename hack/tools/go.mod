@@ -10,7 +10,7 @@ require (
 )
 
 require (
-	github.com/aojea/sloppy-netparser v0.0.0-20210819225411-1b3bd8b3b975 // indirect
+	github.com/aojea/sloppy-netparser v0.0.0-20210819230639-a7bbdb117ea5 // indirect
 	github.com/bitfield/gotestdox v0.2.2 // indirect
 	github.com/brunoga/deep v1.2.4 // indirect
 	github.com/cespare/prettybench v0.0.0-20150116022406-03b8cfe5406c // indirect
