@@ -4,6 +4,10 @@
       "github.com/google/cel-go": {
         "version": "v0.27.0",
         "reason": "pin to v0.27.0 to fix context cancellation test failures, see #138334"
+      },
+      "github.com/fsnotify/fsnotify": {
+        "version": "v1.9.0",
+        "reason": "pin to v1.9.0 until we figure out what the future of fsnotify library is, see #138812"
       }
     },
     "unwantedModules": {
