@@ -191,7 +191,7 @@ func TestCondition(t *testing.T) {
 		validations      []ExpressionAccessor
 		results          []EvaluationResult
 		hasParamKind     bool
-		authorizer       authorizer.Authorizer
+		authorizer       authorizer.UnconditionalAuthorizer
 		testPerCallLimit uint64
 		namespaceObject  *corev1.Namespace
 
@@ -937,7 +937,7 @@ func TestRuntimeCELCostBudget(t *testing.T) {
 		params                   runtime.Object
 		validations              []ExpressionAccessor
 		hasParamKind             bool
-		authorizer               authorizer.Authorizer
+		authorizer               authorizer.UnconditionalAuthorizer
 		testRuntimeCELCostBudget int64
 		exceedBudget             bool
 		expectRemainingBudget    *int64

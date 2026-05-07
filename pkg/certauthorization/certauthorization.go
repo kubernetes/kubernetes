@@ -31,7 +31,7 @@ import (
 // it will also perform an authorization check against {domain portion}/*, for example
 // `kubernetes.io/*`. This allows an entity to be granted permission to 'verb' on all
 // signerNames with a given 'domain portion'.
-func IsAuthorizedForSignerName(ctx context.Context, authz authorizer.Authorizer, info user.Info, verb, signerName string) bool {
+func IsAuthorizedForSignerName(ctx context.Context, authz authorizer.UnconditionalAuthorizer, info user.Info, verb, signerName string) bool {
 	// First check if the user has explicit permission to 'verb' for the given signerName.
 	attr := buildAttributes(info, verb, signerName)
 	decision, reason, err := authz.Authorize(ctx, attr)

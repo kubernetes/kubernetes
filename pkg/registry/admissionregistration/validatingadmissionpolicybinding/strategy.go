@@ -18,6 +18,7 @@ package validatingadmissionpolicybinding
 
 import (
 	"context"
+
 	"k8s.io/apiserver/pkg/registry/rest"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -37,7 +38,7 @@ import (
 type validatingAdmissionPolicyBindingStrategy struct {
 	rest.DeclarativeValidation
 	names.NameGenerator
-	authorizer       authorizer.Authorizer
+	authorizer       authorizer.UnconditionalAuthorizer
 	policyGetter     PolicyGetter
 	resourceResolver resolver.ResourceResolver
 }
@@ -53,7 +54,7 @@ type PolicyGetter interface {
 }
 
 // NewStrategy is the default logic that applies when creating and updating ValidatingAdmissionPolicyBinding objects.
-func NewStrategy(authorizer authorizer.Authorizer, policyGetter PolicyGetter, resourceResolver resolver.ResourceResolver) *validatingAdmissionPolicyBindingStrategy {
+func NewStrategy(authorizer authorizer.UnconditionalAuthorizer, policyGetter PolicyGetter, resourceResolver resolver.ResourceResolver) *validatingAdmissionPolicyBindingStrategy {
 	return &validatingAdmissionPolicyBindingStrategy{
 		DeclarativeValidation: rest.DeclarativeValidation{Scheme: legacyscheme.Scheme},
 		NameGenerator:         names.SimpleNameGenerator,

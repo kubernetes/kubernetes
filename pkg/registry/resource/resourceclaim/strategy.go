@@ -51,11 +51,11 @@ type resourceclaimStrategy struct {
 	rest.DeclarativeValidation
 	names.NameGenerator
 	nsClient   v1.NamespaceInterface
-	authorizer authorizer.Authorizer
+	authorizer authorizer.UnconditionalAuthorizer
 }
 
 // NewStrategy is the default logic that applies when creating and updating ResourceClaim objects.
-func NewStrategy(nsClient v1.NamespaceInterface, authorizer authorizer.Authorizer) *resourceclaimStrategy {
+func NewStrategy(nsClient v1.NamespaceInterface, authorizer authorizer.UnconditionalAuthorizer) *resourceclaimStrategy {
 	return &resourceclaimStrategy{
 		rest.DeclarativeValidation{Scheme: legacyscheme.Scheme},
 		names.SimpleNameGenerator,

@@ -345,7 +345,7 @@ func TestStatusValidateUpdate(t *testing.T) {
 	testCases := []struct {
 		desc                 string
 		oldPCR, newPCR       *certificates.PodCertificateRequest
-		authz                authorizer.Authorizer
+		authz                authorizer.UnconditionalAuthorizer
 		wantValidationErrors field.ErrorList
 	}{
 		{

@@ -37,7 +37,7 @@ import (
 type mutatingAdmissionPolicyBindingStrategy struct {
 	rest.DeclarativeValidation
 	names.NameGenerator
-	authorizer       authorizer.Authorizer
+	authorizer       authorizer.UnconditionalAuthorizer
 	policyGetter     PolicyGetter
 	resourceResolver resolver.ResourceResolver
 }
@@ -49,7 +49,7 @@ type PolicyGetter interface {
 }
 
 // NewStrategy is the default logic that applies when creating and updating MutatingAdmissionPolicyBinding objects.
-func NewStrategy(authorizer authorizer.Authorizer, policyGetter PolicyGetter, resourceResolver resolver.ResourceResolver) *mutatingAdmissionPolicyBindingStrategy {
+func NewStrategy(authorizer authorizer.UnconditionalAuthorizer, policyGetter PolicyGetter, resourceResolver resolver.ResourceResolver) *mutatingAdmissionPolicyBindingStrategy {
 	return &mutatingAdmissionPolicyBindingStrategy{
 		DeclarativeValidation: rest.DeclarativeValidation{Scheme: legacyscheme.Scheme},
 		NameGenerator:         names.SimpleNameGenerator,

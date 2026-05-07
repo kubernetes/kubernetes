@@ -50,7 +50,7 @@ func setupTest(
 		mutating.NewMutatingAdmissionPolicyAccessor,
 		mutating.NewMutatingAdmissionPolicyBindingAccessor,
 		compiler,
-		func(a authorizer.Authorizer, m *matching.Matcher, i kubernetes.Interface) generic.Dispatcher[mutating.PolicyHook] {
+		func(a authorizer.UnconditionalAuthorizer, m *matching.Matcher, i kubernetes.Interface) generic.Dispatcher[mutating.PolicyHook] {
 			// Use embedded schemas rather than discovery schemas
 			return mutating.NewDispatcher(a, m, patch.NewTypeConverterManager(nil, openapitest.NewEmbeddedFileClient()))
 		},

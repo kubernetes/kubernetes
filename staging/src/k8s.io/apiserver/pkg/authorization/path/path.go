@@ -27,7 +27,7 @@ import (
 
 // NewAuthorizer returns an authorizer which accepts a given set of paths.
 // Each path is either a fully matching path or it ends in * in case a prefix match is done. A leading / is optional.
-func NewAuthorizer(alwaysAllowPaths []string) (authorizer.Authorizer, error) {
+func NewAuthorizer(alwaysAllowPaths []string) (authorizer.UnconditionalAuthorizer, error) {
 	var prefixes []string
 	paths := sets.NewString()
 	for _, p := range alwaysAllowPaths {

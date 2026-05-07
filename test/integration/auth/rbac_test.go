@@ -95,7 +95,7 @@ func (getter *testRESTOptionsGetter) GetRESTOptions(resource schema.GroupResourc
 	return generic.RESTOptions{StorageConfig: storageConfig, Decorator: generic.UndecoratedStorage, ResourcePrefix: resource.Resource}, nil
 }
 
-func newRBACAuthorizer(t *testing.T, config *controlplane.Config) (authorizer.Authorizer, func()) {
+func newRBACAuthorizer(t *testing.T, config *controlplane.Config) (authorizer.UnconditionalAuthorizer, func()) {
 	optsGetter := &testRESTOptionsGetter{config}
 	roleRest, err := rolestore.NewREST(optsGetter)
 	if err != nil {
@@ -566,7 +566,7 @@ func TestRBAC(t *testing.T) {
 					// Append our custom test authenticator
 					config.ControlPlane.Generic.Authentication.Authenticator = unionauthn.New(config.ControlPlane.Generic.Authentication.Authenticator, authenticator)
 					// Append our custom test authorizer
-					var rbacAuthz authorizer.Authorizer
+					var rbacAuthz authorizer.UnconditionalAuthorizer
 					rbacAuthz, tearDownAuthorizerFn = newRBACAuthorizer(t, config)
 					config.ControlPlane.Generic.Authorization.Authorizer = unionauthz.New(config.ControlPlane.Generic.Authorization.Authorizer, rbacAuthz)
 				},
@@ -972,7 +972,7 @@ func TestRBACContextContamination(t *testing.T) {
 			tearDownAuthorizerFn()
 		}
 	}()
-	var rbacAuthz authorizer.Authorizer
+	var rbacAuthz authorizer.UnconditionalAuthorizer
 	_, kubeConfig, tearDownFn := framework.StartTestServer(context.Background(), t, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.

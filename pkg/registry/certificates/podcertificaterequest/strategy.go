@@ -103,11 +103,11 @@ func (s *Strategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 // StatusStrategy is the strategy for the status subresource.
 type StatusStrategy struct {
 	*Strategy
-	authorizer authorizer.Authorizer
+	authorizer authorizer.UnconditionalAuthorizer
 	clock      clock.PassiveClock
 }
 
-func NewStatusStrategy(strategy *Strategy, authorizer authorizer.Authorizer, clock clock.PassiveClock) *StatusStrategy {
+func NewStatusStrategy(strategy *Strategy, authorizer authorizer.UnconditionalAuthorizer, clock clock.PassiveClock) *StatusStrategy {
 	return &StatusStrategy{
 		Strategy:   strategy,
 		authorizer: authorizer,

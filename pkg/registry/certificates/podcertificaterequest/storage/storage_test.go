@@ -54,7 +54,7 @@ func (f *fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes)
 	return f.decision, f.reason, f.err
 }
 
-func newStorage(t *testing.T, authz authorizer.Authorizer, clock clock.PassiveClock) (*REST, *StatusREST, *etcd3testing.EtcdTestServer) {
+func newStorage(t *testing.T, authz authorizer.UnconditionalAuthorizer, clock clock.PassiveClock) (*REST, *StatusREST, *etcd3testing.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorageForResource(t, certificates.SchemeGroupVersion.WithResource("podcertificaterequests").GroupResource())
 	restOptions := generic.RESTOptions{
 		StorageConfig:           etcdStorage,

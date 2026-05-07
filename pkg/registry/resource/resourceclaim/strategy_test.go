@@ -1020,7 +1020,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 	testcases := map[string]struct {
 		oldObj                        *resource.ResourceClaim
 		newObj                        *resource.ResourceClaim
-		authz                         authorizer.Authorizer
+		authz                         authorizer.UnconditionalAuthorizer
 		ctxOverride                   func(context.Context) context.Context // if set, transforms the default ctx
 		adminAccess                   bool
 		deviceStatusFeatureGate       bool

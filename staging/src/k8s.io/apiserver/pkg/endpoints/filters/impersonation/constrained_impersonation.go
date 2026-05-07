@@ -43,7 +43,7 @@ import (
 // At a high level, constrained impersonation uses multiple authorization checks to allow for the granular
 // expression of impersonation access.  For example, a service account may be authorized to impersonate the
 // node that it is associated with but only when listing pods.  See the linked KEP for further details.
-func WithConstrainedImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.NegotiatedSerializer) http.Handler {
+func WithConstrainedImpersonation(handler http.Handler, a authorizer.UnconditionalAuthorizer, s runtime.NegotiatedSerializer) http.Handler {
 	metrics.RegisterMetrics()
 
 	ma := &metricsAuthorizer{
@@ -188,7 +188,7 @@ type impersonationModesTracker struct {
 	idxCache *modeIndexCache
 }
 
-func newImpersonationModesTracker(a authorizer.Authorizer) *impersonationModesTracker {
+func newImpersonationModesTracker(a authorizer.UnconditionalAuthorizer) *impersonationModesTracker {
 	loggingAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, attributes authorizer.Attributes) (authorizer.Decision, string, error) {
 		decision, reason, err := a.Authorize(ctx, attributes)
 		// build a detailed log of the authorization
@@ -275,8 +275,10 @@ func (t *impersonationModesTracker) getImpersonatedUser(ctx context.Context, wan
 	return nil, errors.New("all impersonation modes failed")
 }
 
+var _ = authorizer.Authorizer(&metricsAuthorizer{})
+
 type metricsAuthorizer struct {
-	delegate                authorizer.Authorizer
+	delegate                authorizer.UnconditionalAuthorizer
 	recordAuthorizationCall func(mode, decision string, duration time.Duration)
 }
 

@@ -100,12 +100,12 @@ type legacyProvider struct {
 	primaryServiceClusterIPAllocator ipallocator.Interface
 	serviceClusterIPAllocators       map[api.IPFamily]ipallocator.Interface
 	serviceNodePortAllocator         *portallocator.PortAllocator
-	authorizer                       authorizer.Authorizer
+	authorizer                       authorizer.UnconditionalAuthorizer
 
 	startServiceNodePortsRepair, startServiceClusterIPRepair func(onFirstSuccess func(), stopCh chan struct{})
 }
 
-func New(c Config, authorizer authorizer.Authorizer) (*legacyProvider, error) {
+func New(c Config, authorizer authorizer.UnconditionalAuthorizer) (*legacyProvider, error) {
 	rangeRegistries, serviceClusterIPAllocator, serviceIPAllocators, serviceNodePortAllocator, err := c.newServiceIPAllocators()
 	if err != nil {
 		return nil, err

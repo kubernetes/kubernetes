@@ -37,12 +37,12 @@ import (
 type mutatingAdmissionPolicyStrategy struct {
 	rest.DeclarativeValidation
 	names.NameGenerator
-	authorizer       authorizer.Authorizer
+	authorizer       authorizer.UnconditionalAuthorizer
 	resourceResolver resolver.ResourceResolver
 }
 
 // NewStrategy is the default logic that applies when creating and updating MutatingAdmissionPolicy objects.
-func NewStrategy(authorizer authorizer.Authorizer, resourceResolver resolver.ResourceResolver) *mutatingAdmissionPolicyStrategy {
+func NewStrategy(authorizer authorizer.UnconditionalAuthorizer, resourceResolver resolver.ResourceResolver) *mutatingAdmissionPolicyStrategy {
 	return &mutatingAdmissionPolicyStrategy{
 		DeclarativeValidation: rest.DeclarativeValidation{Scheme: legacyscheme.Scheme},
 		NameGenerator:         names.SimpleNameGenerator,

@@ -48,7 +48,7 @@ type DelegatingAuthorizerConfig struct {
 	WebhookRetryBackoff *wait.Backoff
 }
 
-func (c DelegatingAuthorizerConfig) New() (authorizer.Authorizer, error) {
+func (c DelegatingAuthorizerConfig) New() (authorizer.UnconditionalAuthorizer, error) {
 	if c.WebhookRetryBackoff == nil {
 		return nil, errors.New("retry backoff parameters for delegating authorization webhook has not been specified")
 	}
