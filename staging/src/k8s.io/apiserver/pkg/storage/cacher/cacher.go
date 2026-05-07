@@ -501,6 +501,7 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 	err = c.reflector.ListAndWatch(stopChannel)
 	if err != nil {
 		klog.Errorf("cacher (%v): unexpected ListAndWatch error: %v; reinitializing...", c.groupResource.String(), err)
+		metrics.WatchCacheInitializationErrors.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Inc()
 	}
 }
 
