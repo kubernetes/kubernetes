@@ -169,6 +169,43 @@ func BenchmarkPodCBORWatchStreamEncode(b *testing.B) {
 	benchmarkPodWatchStreamEncode(b, k8sruntime.ContentTypeCBOR)
 }
 
+func BenchmarkPodJSONWatchStreamFrameRead(b *testing.B) {
+	const eventsPerWatch = 100
+	for _, targetSize := range podProtobufBenchmarkSizes {
+		b.Run(fmt.Sprintf("pod_json_size=%dKB/events=%d", targetSize>>10, eventsPerWatch), func(b *testing.B) {
+			pod := makePodForResponseBody(b, targetSize, k8sruntime.ContentTypeJSON)
+			streamBody := makePodWatchStreamBody(b, pod, eventsPerWatch, k8sruntime.ContentTypeJSON)
+			readBuffer := make([]byte, len(streamBody)/eventsPerWatch+4096)
+			info := serializerInfoForBenchmark(b, k8sruntime.ContentTypeJSON)
+
+			b.ReportAllocs()
+			b.SetBytes(int64(len(streamBody)))
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				reader := info.StreamSerializer.Framer.NewFrameReader(io.NopCloser(bytes.NewReader(streamBody)))
+				seen := 0
+				for seen < eventsPerWatch {
+					n, err := reader.Read(readBuffer)
+					if err == io.ErrShortBuffer {
+						continue
+					}
+					if err != nil {
+						b.Fatalf("failed reading JSON watch frame %d/%d: %v", seen+1, eventsPerWatch, err)
+					}
+					benchmarkBytes = readBuffer[:n]
+					seen++
+				}
+				if err := reader.Close(); err != nil {
+					b.Fatalf("failed closing JSON watch frame reader: %v", err)
+				}
+			}
+			b.ReportMetric(float64(b.Elapsed().Nanoseconds())/float64(b.N*eventsPerWatch), "ns/event")
+			b.ReportMetric(float64(len(streamBody))/1024/float64(eventsPerWatch), "json_KB/event")
+			b.ReportMetric(float64(b.N*eventsPerWatch)/b.Elapsed().Seconds(), "pods/s")
+		})
+	}
+}
+
 func benchmarkPodWatchStreamEncode(b *testing.B, contentType string) {
 	const eventsPerWatch = 100
 	for _, targetSize := range podProtobufBenchmarkSizes {
