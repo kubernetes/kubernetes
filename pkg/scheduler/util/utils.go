@@ -98,7 +98,21 @@ func MoreImportantPod(pod1, pod2 *v1.Pod) bool {
 // Retriable defines the retriable errors during a scheduling cycle.
 func Retriable(err error) bool {
 	return apierrors.IsInternalError(err) || apierrors.IsServiceUnavailable(err) ||
-		apierrors.IsConflict(err) || net.IsConnectionRefused(err)
+		net.IsConnectionRefused(err)
+}
+
+// RetriableWithConflict defines the retriable errors during a scheduling cycle, including conflicts.
+func RetriableWithConflict(err error) bool {
+	return Retriable(err) || apierrors.IsConflict(err)
+}
+
+// BindPod binds a pod to a node with retry.
+func BindPod(ctx context.Context, cs kubernetes.Interface, binding *v1.Binding) error {
+	bindFn := func() error {
+		return cs.CoreV1().Pods(binding.Namespace).Bind(ctx, binding, metav1.CreateOptions{})
+	}
+
+	return retry.OnError(retry.DefaultBackoff, Retriable, bindFn)
 }
 
 // PatchPodStatus calculates the delta bytes change from <old.Status> to <newStatus>,
@@ -135,7 +149,7 @@ func PatchPodStatus(ctx context.Context, cs kubernetes.Interface, name string, n
 		return err
 	}
 
-	return retry.OnError(retry.DefaultBackoff, Retriable, patchFn)
+	return retry.OnError(retry.DefaultBackoff, RetriableWithConflict, patchFn)
 }
 
 // PatchPodGroupStatus calculates the delta bytes change from <old.Status> to <newStatus>,
@@ -174,7 +188,7 @@ func PatchPodGroupStatus(ctx context.Context, cs kubernetes.Interface, name stri
 		return err
 	}
 
-	return retry.OnError(retry.DefaultBackoff, Retriable, patchFn)
+	return retry.OnError(retry.DefaultBackoff, RetriableWithConflict, patchFn)
 }
 
 // DeletePod deletes the given <pod> from API server
