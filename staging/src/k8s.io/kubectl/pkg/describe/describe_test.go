@@ -1617,6 +1617,22 @@ func TestDescribeContainers(t *testing.T) {
 			},
 			expectedElements: []string{"test", "State", "Waiting", "Ready", "True", "Restart Count", "7", "Image", "image", "Reason", "potato"},
 		},
+		// Waiting state with Message.
+		{
+			container: corev1.Container{Name: "test", Image: "image"},
+			status: corev1.ContainerStatus{
+				Name: "test",
+				State: corev1.ContainerState{
+					Waiting: &corev1.ContainerStateWaiting{
+						Reason:  "ImagePullBackOff",
+						Message: `Back-off pulling image "nginx:nope"`,
+					},
+				},
+				Ready:        false,
+				RestartCount: 7,
+			},
+			expectedElements: []string{"test", "State", "Waiting", "Ready", "False", "Restart Count", "7", "Image", "image", "Reason", "ImagePullBackOff", "Message", "nginx:nope"},
+		},
 		// Terminated state.
 		{
 			container: corev1.Container{Name: "test", Image: "image"},
