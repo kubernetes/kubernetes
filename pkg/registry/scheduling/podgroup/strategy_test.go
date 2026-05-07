@@ -28,6 +28,9 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	// Side-effect import: registers PodGroup with legacyscheme.Scheme so
+	// the ConvertToVersion calls below resolve the type.
+	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
 	"k8s.io/kubernetes/pkg/features"
 )
 
