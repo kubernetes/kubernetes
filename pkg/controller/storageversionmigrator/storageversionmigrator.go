@@ -308,13 +308,6 @@ func (svmc *SVMController) runMigration(ctx context.Context, gvr schema.GroupVer
 
 		typeMeta := typeMetaUIDRV{}
 		typeMeta.APIVersion, typeMeta.Kind = gvk.ToAPIVersionAndKind()
-		// set UID so that when a resource gets deleted, we get an "uid mismatch"
-		// conflict error instead of trying to create it.
-		typeMeta.UID = accessor.GetUID()
-		// set RV so that when a resources gets updated or deleted+recreated, we get an "object has been modified"
-		// conflict error.  we do not actually need to do anything special for the updated case because if RV
-		// was not set, it would just result in no-op request.  but for the deleted+recreated case, if RV is
-		// not set but UID is set, we would get an immutable field validation error.  hence we must set both.
 		typeMeta.ResourceVersion = accessor.GetResourceVersion()
 		data, err := json.Marshal(typeMeta)
 		if err != nil {
@@ -325,18 +318,18 @@ func (svmc *SVMController) runMigration(ctx context.Context, gvr schema.GroupVer
 			Namespace(accessor.GetNamespace()).
 			Patch(ctx,
 				accessor.GetName(),
-				types.ApplyPatchType,
+				types.MergePatchType,
 				data,
 				metav1.PatchOptions{
 					FieldManager: svmc.controllerName,
 				},
 			)
 
-		// in case of conflict, we can stop processing migration for that resource because it has either been
+		// in case of conflict or not found error, we can stop processing migration for that resource because it has either been
 		// - updated, meaning that migration has already been performed
 		// - deleted, meaning that migration is not needed
 		// - deleted and recreated, meaning that migration has already been performed
-		if apierrors.IsConflict(errPatch) {
+		if apierrors.IsConflict(errPatch) || apierrors.IsNotFound(errPatch) {
 			logger.V(6).Info("Resource ignored due to conflict", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "err", errPatch)
 			continue
 		}
@@ -382,11 +375,10 @@ func (svmc *SVMController) failMigration(ctx context.Context, toBeProcessedSVM *
 }
 
 type typeMetaUIDRV struct {
-	metav1.TypeMeta    `json:",inline"`
-	objectMetaUIDandRV `json:"metadata,omitempty"`
+	metav1.TypeMeta `json:",inline"`
+	objectRV        `json:"metadata,omitempty"`
 }
 
-type objectMetaUIDandRV struct {
-	UID             types.UID `json:"uid,omitempty"`
-	ResourceVersion string    `json:"resourceVersion,omitempty"`
+type objectRV struct {
+	ResourceVersion string `json:"resourceVersion,omitempty"`
 }

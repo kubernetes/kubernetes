@@ -579,9 +579,8 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			},
 			Rules: []rbacv1.PolicyRule{
 				// need list to get current RV for any resource
-				// need patch for SSA of any resource
-				// need create because SSA of a deleted resource will be interpreted as a create request, these always fail with a conflict error because UID is set
-				rbacv1helpers.NewRule("list", "create", "patch").Groups("*").Resources("*").RuleOrDie(),
+				// need patch for any resource to perform migration
+				rbacv1helpers.NewRule("list", "patch").Groups("*").Resources("*").RuleOrDie(),
 				rbacv1helpers.NewRule("get").Groups("apiextensions.k8s.io").Resources("customresourcedefinitions").RuleOrDie(),
 				rbacv1helpers.NewRule("patch").Groups("apiextensions.k8s.io").Resources("customresourcedefinitions/status").RuleOrDie(),
 				rbacv1helpers.NewRule("update").Groups(storageVersionMigrationGroup).Resources("storageversionmigrations/status").RuleOrDie(),
