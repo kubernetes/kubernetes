@@ -58,7 +58,7 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	gotest.tools/gotestsum v1.12.0 // indirect
+	gotest.tools/gotestsum v1.13.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
 
