@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
@@ -81,7 +82,8 @@ func (maxLengthTagValidator) GetValidations(context Context, tag codetags.Tag) (
 	if intVal < 0 {
 		return result, fmt.Errorf("must be greater than or equal to zero")
 	}
-	result.AddFunction(Function(maxLengthTagName, DefaultFlags, maxLengthValidator, intVal))
+	result.AddFunction(Function(maxLengthTagName, DefaultFlags, maxLengthValidator, intVal).
+		WithEmits(Emission{field.ErrorTypeTooLong, "maxLength", ""}))
 	return result, nil
 }
 
@@ -134,7 +136,8 @@ func (maxBytesTagValidator) GetValidations(context Context, tag codetags.Tag) (V
 	if intVal < 0 {
 		return result, fmt.Errorf("must be greater than or equal to zero")
 	}
-	result.AddFunction(Function(maxBytesTagName, DefaultFlags, maxBytesValidator, intVal))
+	result.AddFunction(Function(maxBytesTagName, DefaultFlags, maxBytesValidator, intVal).
+		WithEmits(Emission{field.ErrorTypeTooLong, "maxBytes", ""}))
 	return result, nil
 }
 
@@ -191,7 +194,8 @@ func (minItemsTagValidator) GetValidations(context Context, tag codetags.Tag) (V
 	if intVal < 0 {
 		return result, fmt.Errorf("must be greater than or equal to zero")
 	}
-	result.AddFunction(Function(minItemsTagName, DefaultFlags, minItemsValidator, intVal))
+	result.AddFunction(Function(minItemsTagName, DefaultFlags, minItemsValidator, intVal).
+		WithEmits(Emission{field.ErrorTypeTooFew, "minItems", ""}))
 	return result, nil
 }
 
@@ -252,7 +256,8 @@ func (minPropertiesTagValidator) GetValidations(context Context, tag codetags.Ta
 	if intVal > 100000 {
 		return result, fmt.Errorf("must be less than or equal to 100000")
 	}
-	result.AddFunction(Function(minPropertiesTagName, DefaultFlags, minPropertiesValidator, intVal))
+	result.AddFunction(Function(minPropertiesTagName, DefaultFlags, minPropertiesValidator, intVal).
+		WithEmits(Emission{field.ErrorTypeTooFew, "minProperties", ""}))
 	return result, nil
 }
 
@@ -308,7 +313,8 @@ func (maxItemsTagValidator) GetValidations(context Context, tag codetags.Tag) (V
 		return result, fmt.Errorf("must be greater than or equal to zero")
 	}
 	// Note: maxItems short-circuits other validations for safety.
-	result.AddFunction(Function(maxItemsTagName, ShortCircuit, maxItemsValidator, intVal))
+	result.AddFunction(Function(maxItemsTagName, ShortCircuit, maxItemsValidator, intVal).
+		WithEmits(Emission{field.ErrorTypeTooMany, "maxItems", ""}))
 	return result, nil
 }
 
@@ -370,7 +376,8 @@ func (maxPropertiesTagValidator) GetValidations(context Context, tag codetags.Ta
 		return result, fmt.Errorf("must be less than or equal to 100000")
 	}
 	// Note: maxProperties short-circuits other validations.
-	result.AddFunction(Function(maxPropertiesTagName, ShortCircuit, maxPropertiesValidator, intVal))
+	result.AddFunction(Function(maxPropertiesTagName, ShortCircuit, maxPropertiesValidator, intVal).
+		WithEmits(Emission{field.ErrorTypeTooMany, "maxProperties", ""}))
 	return result, nil
 }
 
@@ -424,13 +431,15 @@ func (minimumTagValidator) GetValidations(context Context, tag codetags.Tag) (Va
 		if err != nil {
 			return result, fmt.Errorf("failed to parse tag payload: %w", err)
 		}
-		result.AddFunction(Function(minimumTagName, DefaultFlags, minimumValidator, uintVal))
+		result.AddFunction(Function(minimumTagName, DefaultFlags, minimumValidator, uintVal).
+			WithEmits(Emission{field.ErrorTypeInvalid, "minimum", ""}))
 	} else {
 		intVal, err := util.ParseSignedInt(tag.Value, bitSize)
 		if err != nil {
 			return result, fmt.Errorf("failed to parse tag payload: %w", err)
 		}
-		result.AddFunction(Function(minimumTagName, DefaultFlags, minimumValidator, intVal))
+		result.AddFunction(Function(minimumTagName, DefaultFlags, minimumValidator, intVal).
+			WithEmits(Emission{field.ErrorTypeInvalid, "minimum", ""}))
 	}
 	return result, nil
 }
@@ -485,13 +494,15 @@ func (maximumTagValidator) GetValidations(context Context, tag codetags.Tag) (Va
 		if err != nil {
 			return result, fmt.Errorf("failed to parse tag payload: %w", err)
 		}
-		result.AddFunction(Function(maximumTagName, DefaultFlags, maximumValidator, uintVal))
+		result.AddFunction(Function(maximumTagName, DefaultFlags, maximumValidator, uintVal).
+			WithEmits(Emission{field.ErrorTypeInvalid, "maximum", ""}))
 	} else {
 		intVal, err := util.ParseSignedInt(tag.Value, bitSize)
 		if err != nil {
 			return result, fmt.Errorf("failed to parse tag payload: %w", err)
 		}
-		result.AddFunction(Function(maximumTagName, DefaultFlags, maximumValidator, intVal))
+		result.AddFunction(Function(maximumTagName, DefaultFlags, maximumValidator, intVal).
+			WithEmits(Emission{field.ErrorTypeInvalid, "maximum", ""}))
 	}
 	return result, nil
 }
@@ -548,7 +559,8 @@ func (minLengthTagValidator) GetValidations(context Context, tag codetags.Tag) (
 	// any validation, we only add a validation function to the result if the
 	// minimum length constraint is > 0.
 	if intVal > 0 {
-		result.AddFunction(Function(minLengthTagName, DefaultFlags, minLengthValidator, intVal))
+		result.AddFunction(Function(minLengthTagName, DefaultFlags, minLengthValidator, intVal).
+			WithEmits(Emission{field.ErrorTypeTooShort, "minLength", ""}))
 	}
 	return result, nil
 }

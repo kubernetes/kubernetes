@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/validate"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
@@ -292,7 +293,8 @@ func generateSliceValidation(listByPath map[string]*listMetadata, context Contex
 	args := append([]any{matchArg}, constraintIdentifierArgs(constraints)...)
 
 	// Use ShortCircuit flag so these run in the same group as +k8s:optional
-	fn := Function(updateTagName, ShortCircuit, updateSliceValidator, args...)
+	fn := Function(updateTagName, ShortCircuit, updateSliceValidator, args...).
+		WithEmits(Emission{field.ErrorTypeInvalid, "update", ""})
 	return Validations{Functions: []FunctionGen{fn}}, nil
 }
 
@@ -300,7 +302,8 @@ func generateSliceValidation(listByPath map[string]*listMetadata, context Contex
 // identity, so no list metadata or match function is needed.
 func generateMapValidation(constraints []validate.UpdateConstraint) Validations {
 	// Use ShortCircuit flag so these run in the same group as +k8s:optional
-	fn := Function(updateTagName, ShortCircuit, updateMapValidator, constraintIdentifierArgs(constraints)...)
+	fn := Function(updateTagName, ShortCircuit, updateMapValidator, constraintIdentifierArgs(constraints)...).
+		WithEmits(Emission{field.ErrorTypeInvalid, "update", ""})
 	return Validations{Functions: []FunctionGen{fn}}
 }
 
@@ -328,7 +331,8 @@ func emitScalarUpdate(context Context, constraints []validate.UpdateConstraint) 
 	}
 
 	// Use ShortCircuit flag so these run in the same group as +k8s:optional
-	fn := Function(updateTagName, ShortCircuit, validatorFunc, constraintIdentifierArgs(constraints)...)
+	fn := Function(updateTagName, ShortCircuit, validatorFunc, constraintIdentifierArgs(constraints)...).
+		WithEmits(Emission{field.ErrorTypeInvalid, "update", ""})
 	return Validations{Functions: []FunctionGen{fn}}
 }
 

@@ -22,6 +22,7 @@ import (
 	"slices"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/parser/tags"
@@ -316,8 +317,9 @@ func generateMemberFieldValidation(structType *types.Type, group *discriminatorG
 		jsonName = jt.Name
 	}
 
-	// Default validation is Forbidden
-	defaultForbidden, err := getForbiddenValidation(fieldType)
+	// Default-Forbidden runs at structPath.Child(jsonName) inside the
+	// Discriminated runtime; attribute it to "." + jsonName.
+	defaultForbidden, err := getForbiddenValidation(fieldType, "."+jsonName)
 	if err != nil {
 		return Validations{}, err
 	}
@@ -370,6 +372,8 @@ func generateMemberFieldValidation(structType *types.Type, group *discriminatorG
 		wrapper := MultiWrapperFunction{
 			Functions: rulesByValue[val].Functions,
 			ObjType:   nilableFieldType,
+			// Per-mode rules also run at structPath.Child(jsonName).
+			PathFragment: "." + jsonName,
 		}
 
 		// Convert the string tag value to the appropriate typed Go literal
@@ -448,7 +452,10 @@ func uniformStabilityLevel(rules []memberRule) ValidationStabilityLevel {
 	return level
 }
 
-func getForbiddenValidation(t *types.Type) (any, error) {
+// getForbiddenValidation returns a MultiWrapperFunction wrapping the runtime
+// validate.Forbidden* call appropriate for t's kind. pathFragment is the
+// wrapper's PathFragment (see MultiWrapperFunction).
+func getForbiddenValidation(t *types.Type, pathFragment string) (any, error) {
 	var forbidden types.Name
 	nt := util.NativeType(t)
 	switch nt.Kind {
@@ -464,7 +471,8 @@ func getForbiddenValidation(t *types.Type) (any, error) {
 		forbidden = types.Name{Package: libValidationPkg, Name: "ForbiddenValue"}
 	}
 
-	fg := Function(forbiddenTagName, DefaultFlags, forbidden)
+	fg := Function(forbiddenTagName, DefaultFlags, forbidden).
+		WithEmits(Emission{field.ErrorTypeForbidden, "", ""})
 
 	// Use the nilable form to match standard validation function signatures.
 	wrapperObjType := t
@@ -473,8 +481,9 @@ func getForbiddenValidation(t *types.Type) (any, error) {
 	}
 
 	return MultiWrapperFunction{
-		Functions: []FunctionGen{fg},
-		ObjType:   wrapperObjType,
+		Functions:    []FunctionGen{fg},
+		ObjType:      wrapperObjType,
+		PathFragment: pathFragment,
 	}, nil
 }
 

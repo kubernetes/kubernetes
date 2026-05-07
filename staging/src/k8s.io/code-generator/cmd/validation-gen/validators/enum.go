@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
@@ -185,7 +186,8 @@ func (etv *enumTagValidator) GetValidations(context Context, _ codetags.Tag) (Va
 		}))
 		exclusions = exclusionsVar
 	}
-	fn := Function(enumTagName, DefaultFlags, enumValidator, symbolsVarName, exclusions)
+	fn := Function(enumTagName, DefaultFlags, enumValidator, symbolsVarName, exclusions).
+		WithEmits(Emission{field.ErrorTypeNotSupported, "", ""})
 	result.AddFunction(fn)
 
 	return result, nil

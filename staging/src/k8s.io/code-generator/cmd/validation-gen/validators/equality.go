@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
@@ -90,7 +91,8 @@ func (v neqTagValidator) GetValidations(context Context, tag codetags.Tag) (Vali
 		return Validations{}, fmt.Errorf("unsupported type for 'neq' tag: %s", t.Name)
 	}
 
-	fn := Function(v.TagName(), DefaultFlags, neqValidator, disallowedValue)
+	fn := Function(v.TagName(), DefaultFlags, neqValidator, disallowedValue).
+		WithEmits(Emission{field.ErrorTypeInvalid, "neq", ""})
 	return Validations{Functions: []FunctionGen{fn}}, nil
 }
 

@@ -517,6 +517,19 @@ type DeferredGen struct {
 	Callback func() (Validations, error)
 }
 
+// Emission describes the field.Error a runtime validator produces on failure.
+// Must match what the runtime function emits via .WithOrigin(...).
+type Emission struct {
+	Type   field.ErrorType
+	Origin string
+	// PathFragment, when non-empty, is the static field-path component the
+	// runtime validator appends to fldPath before emitting the error (e.g.
+	// "[*]" for Unique, which reports field.Duplicate(fldPath.Index(i), ...)
+	// at the offending element). Used by tools that walk the FunctionGen
+	// tree to reconstruct the path the runtime will emit at.
+	PathFragment string
+}
+
 // FunctionGen describes a function call that should be generated.
 type FunctionGen struct {
 	// TagName is the tag which triggered this function.
@@ -563,6 +576,11 @@ type FunctionGen struct {
 	// StabilityLevelSelfManaged indicates that the function already has stability levels
 	// embedded or handled, and should not be wrapped by levelTagValidator.
 	StabilityLevelSelfManaged bool
+
+	// Emits, when non-nil, declares the field.Error the runtime validator
+	// produces on failure. Set via WithEmits; nil for wrappers and
+	// non-emitting validators.
+	Emits *Emission
 }
 
 // WithTypeArgs returns a derived FunctionGen with type arguments.
@@ -594,6 +612,13 @@ func (fg FunctionGen) WithStabilityLevel(level ValidationStabilityLevel) Functio
 	return fg
 }
 
+// WithEmits returns a new FunctionGen that declares the field.Error the
+// runtime validator produces on failure.
+func (fg FunctionGen) WithEmits(emits Emission) FunctionGen {
+	fg.Emits = &emits
+	return fg
+}
+
 // Variable creates a VariableGen for a given variable name and init value.
 func Variable(variable PrivateVar, initializer any) VariableGen {
 	return VariableGen{
@@ -617,6 +642,11 @@ type VariableGen struct {
 type WrapperFunction struct {
 	Function FunctionGen
 	ObjType  *types.Type
+	// PathFragment, when non-empty, is the static field-path component the
+	// wrapping FunctionGen adds to fldPath before invoking Function (e.g.
+	// "[*]" for slice/map value iteration, ".<name>" for subfield). Used
+	// by tools that walk the FunctionGen tree to reconstruct field paths.
+	PathFragment string
 }
 
 // MultiWrapperFunction describes a function literal which has the fingerprint
@@ -625,6 +655,11 @@ type WrapperFunction struct {
 type MultiWrapperFunction struct {
 	Functions []FunctionGen
 	ObjType   *types.Type
+	// PathFragment, when non-empty, is the static field-path component the
+	// wrapping FunctionGen adds to fldPath before invoking the inner Functions
+	// (e.g. ".<jsonName>" for the discriminated-mode validator). Used by tools
+	// that walk the FunctionGen tree to reconstruct field paths.
+	PathFragment string
 }
 
 // Literal is a literal value that, when used as an argument to a validator,
