@@ -19,6 +19,7 @@ package json
 import (
 	"encoding/json"
 	"io"
+	"os"
 	"strconv"
 
 	kjson "sigs.k8s.io/json"
@@ -328,15 +329,11 @@ func (jsonFramer) NewFrameWriter(w io.Writer) io.Writer {
 }
 
 // NewFrameReader implements stream framing for this serializer.
-//
-// The matching NewFrameWriter returns the underlying writer unchanged and
-// expects callers to write self-framing JSON via json.Encoder, which emits
-// compact JSON terminated by `\n`. That writer contract guarantees no raw
-// newlines appear inside frames, so we can split on `\n` directly instead
-// of running the JSON-aware state machine. See framer.NewLineDelimitedFrameReader
-// for the contract details.
 func (jsonFramer) NewFrameReader(r io.ReadCloser) io.ReadCloser {
-	return framer.NewLineDelimitedFrameReader(r)
+	if enabled, _ := strconv.ParseBool(os.Getenv("KUBE_FEATURE_LineDelimitedFrameReader")); enabled {
+		return framer.NewLineDelimitedFrameReader(r)
+	}
+	return framer.NewJSONFramedReader(r)
 }
 
 // YAMLFramer is the default JSON framing behavior, with newlines delimiting individual objects.

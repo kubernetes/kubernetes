@@ -28,21 +28,33 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/cbor"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	k8swatch "k8s.io/apimachinery/pkg/watch"
-	clientfeatures "k8s.io/client-go/features"
-	clientfeaturestesting "k8s.io/client-go/features/testing"
-	"k8s.io/client-go/kubernetes/scheme"
 	restclientwatch "k8s.io/client-go/rest/watch"
 )
 
-var podBenchmarkCodecs = serializer.NewCodecFactory(scheme.Scheme, serializer.WithSerializer(cbor.NewSerializerInfo))
+var kueueGV = schema.GroupVersion{Group: "kueue.x-k8s.io", Version: "v1beta1"}
 
-var podProtobufBenchmarkSizes = []int{
+var workloadBenchmarkScheme = func() *runtime.Scheme {
+	s := runtime.NewScheme()
+	s.AddKnownTypes(kueueGV, &Workload{}, &WorkloadList{})
+	metav1.AddToGroupVersion(s, kueueGV)
+	return s
+}()
+
+var workloadBenchmarkCodecs = serializer.NewCodecFactory(workloadBenchmarkScheme, serializer.WithSerializer(cbor.NewSerializerInfo))
+
+var workloadBenchmarkSizes = []int{
 	10 << 10,
+	15 << 10,
+	20 << 10,
+	30 << 10,
+	40 << 10,
 	50 << 10,
 	100 << 10,
 	200 << 10,
@@ -61,63 +73,54 @@ var podProtobufBenchmarkSizes = []int{
 	1500 << 10,
 }
 
-func BenchmarkPodProtobufRESTClientGet(b *testing.B) {
-	benchmarkPodRESTClientGet(b, k8sruntime.ContentTypeProtobuf)
+func BenchmarkWorkloadJSONRESTClientGet(b *testing.B) {
+	benchmarkWorkloadRESTClientGet(b, k8sruntime.ContentTypeJSON)
 }
 
-func BenchmarkPodJSONRESTClientGet(b *testing.B) {
-	benchmarkPodRESTClientGet(b, k8sruntime.ContentTypeJSON)
+func BenchmarkWorkloadCBORRESTClientGet(b *testing.B) {
+	benchmarkWorkloadRESTClientGet(b, k8sruntime.ContentTypeCBOR)
 }
 
-func BenchmarkPodCBORRESTClientGet(b *testing.B) {
-	benchmarkPodRESTClientGet(b, k8sruntime.ContentTypeCBOR)
+func BenchmarkWorkloadJSONEncode(b *testing.B) {
+	benchmarkWorkloadEncode(b, k8sruntime.ContentTypeJSON)
 }
 
-func BenchmarkPodProtobufEncode(b *testing.B) {
-	benchmarkPodEncode(b, k8sruntime.ContentTypeProtobuf)
+func BenchmarkWorkloadCBOREncode(b *testing.B) {
+	benchmarkWorkloadEncode(b, k8sruntime.ContentTypeCBOR)
 }
 
-func BenchmarkPodJSONEncode(b *testing.B) {
-	benchmarkPodEncode(b, k8sruntime.ContentTypeJSON)
-}
-
-func BenchmarkPodCBOREncode(b *testing.B) {
-	benchmarkPodEncode(b, k8sruntime.ContentTypeCBOR)
-}
-
-func benchmarkPodEncode(b *testing.B, contentType string) {
-	for _, targetSize := range podProtobufBenchmarkSizes {
-		b.Run(fmt.Sprintf("pod_%s_size=%dKB", benchmarkContentTypeName(contentType), targetSize>>10), func(b *testing.B) {
-			pod := makePodForResponseBody(b, targetSize, contentType)
-			encoded := encodePodForBenchmark(b, pod, contentType)
+func benchmarkWorkloadEncode(b *testing.B, contentType string) {
+	for _, targetSize := range workloadBenchmarkSizes {
+		b.Run(fmt.Sprintf("workload_%s_size=%dKB", benchmarkContentTypeName(contentType), targetSize>>10), func(b *testing.B) {
+			workload := makeWorkloadForResponseBody(b, targetSize, contentType)
+			encoded := encodeWorkloadForBenchmark(b, workload, contentType)
 
 			b.ReportAllocs()
 			b.SetBytes(int64(len(encoded)))
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				benchmarkBytes = encodePodForBenchmark(b, pod, contentType)
+				benchmarkBytes = encodeWorkloadForBenchmark(b, workload, contentType)
 			}
 			b.ReportMetric(float64(len(encoded))/1024, benchmarkContentTypeName(contentType)+"_KB")
-			b.ReportMetric(float64(b.N)/b.Elapsed().Seconds(), "pods/s")
+			b.ReportMetric(float64(b.N)/b.Elapsed().Seconds(), "workloads/s")
 		})
 	}
 }
 
-func benchmarkPodRESTClientGet(b *testing.B, contentType string) {
+func benchmarkWorkloadRESTClientGet(b *testing.B, contentType string) {
 	ctx := context.Background()
 	baseURL := &url.URL{Scheme: "https", Host: "benchmark.local"}
-	gvCopy := v1.SchemeGroupVersion
 	contentConfig := ClientContentConfig{
 		ContentType:  contentType,
-		GroupVersion: gvCopy,
-		Negotiator:   k8sruntime.NewClientNegotiator(podBenchmarkCodecs.WithoutConversion(), gvCopy),
+		GroupVersion: kueueGV,
+		Negotiator:   k8sruntime.NewClientNegotiator(workloadBenchmarkCodecs.WithoutConversion(), kueueGV),
 	}
 
-	for _, targetSize := range podProtobufBenchmarkSizes {
-		b.Run(fmt.Sprintf("pod_%s_size=%dKB", benchmarkContentTypeName(contentType), targetSize>>10), func(b *testing.B) {
-			responseBody := makePodResponseBody(b, targetSize, contentType)
+	for _, targetSize := range workloadBenchmarkSizes {
+		b.Run(fmt.Sprintf("workload_%s_size=%dKB", benchmarkContentTypeName(contentType), targetSize>>10), func(b *testing.B) {
+			responseBody := makeWorkloadResponseBody(b, targetSize, contentType)
 			httpClient := &http.Client{
-				Transport: podProtobufBenchmarkTransport(func(req *http.Request) (*http.Response, error) {
+				Transport: workloadBenchmarkTransport(func(req *http.Request) (*http.Response, error) {
 					return &http.Response{
 						StatusCode:    http.StatusOK,
 						Header:        http.Header{"Content-Type": []string{contentType}},
@@ -128,53 +131,45 @@ func benchmarkPodRESTClientGet(b *testing.B, contentType string) {
 			}
 			request := NewRequestWithClient(baseURL, "", contentConfig, httpClient).
 				Verb("GET").
-				AbsPath("/api/v1/namespaces/default/pods/protobuf-benchmark")
+				AbsPath("/apis/kueue.x-k8s.io/v1beta1/namespaces/default/workloads/kueue-benchmark")
 
 			b.ReportAllocs()
 			b.SetBytes(int64(len(responseBody)))
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				out := &v1.Pod{}
+				out := &Workload{}
 				if err := request.Do(ctx).Into(out); err != nil {
 					b.Fatal(err)
 				}
 			}
 			b.ReportMetric(float64(len(responseBody))/1024, benchmarkContentTypeName(contentType)+"_KB")
-			b.ReportMetric(float64(b.N)/b.Elapsed().Seconds(), "pods/s")
+			b.ReportMetric(float64(b.N)/b.Elapsed().Seconds(), "workloads/s")
 		})
 	}
 }
 
-func BenchmarkPodProtobufRESTClientWatch(b *testing.B) {
-	benchmarkPodRESTClientWatch(b, k8sruntime.ContentTypeProtobuf)
+func BenchmarkWorkloadJSONRESTClientWatch(b *testing.B) {
+	benchmarkWorkloadRESTClientWatch(b, k8sruntime.ContentTypeJSON)
 }
 
-func BenchmarkPodJSONRESTClientWatch(b *testing.B) {
-	benchmarkPodRESTClientWatch(b, k8sruntime.ContentTypeJSON)
+func BenchmarkWorkloadCBORRESTClientWatch(b *testing.B) {
+	benchmarkWorkloadRESTClientWatch(b, k8sruntime.ContentTypeCBOR)
 }
 
-func BenchmarkPodCBORRESTClientWatch(b *testing.B) {
-	benchmarkPodRESTClientWatch(b, k8sruntime.ContentTypeCBOR)
+func BenchmarkWorkloadJSONWatchStreamEncode(b *testing.B) {
+	benchmarkWorkloadWatchStreamEncode(b, k8sruntime.ContentTypeJSON)
 }
 
-func BenchmarkPodProtobufWatchStreamEncode(b *testing.B) {
-	benchmarkPodWatchStreamEncode(b, k8sruntime.ContentTypeProtobuf)
+func BenchmarkWorkloadCBORWatchStreamEncode(b *testing.B) {
+	benchmarkWorkloadWatchStreamEncode(b, k8sruntime.ContentTypeCBOR)
 }
 
-func BenchmarkPodJSONWatchStreamEncode(b *testing.B) {
-	benchmarkPodWatchStreamEncode(b, k8sruntime.ContentTypeJSON)
-}
-
-func BenchmarkPodCBORWatchStreamEncode(b *testing.B) {
-	benchmarkPodWatchStreamEncode(b, k8sruntime.ContentTypeCBOR)
-}
-
-func BenchmarkPodJSONWatchStreamFrameRead(b *testing.B) {
+func BenchmarkWorkloadJSONWatchStreamFrameRead(b *testing.B) {
 	const eventsPerWatch = 100
-	for _, targetSize := range podProtobufBenchmarkSizes {
-		b.Run(fmt.Sprintf("pod_json_size=%dKB/events=%d", targetSize>>10, eventsPerWatch), func(b *testing.B) {
-			pod := makePodForResponseBody(b, targetSize, k8sruntime.ContentTypeJSON)
-			streamBody := makePodWatchStreamBody(b, pod, eventsPerWatch, k8sruntime.ContentTypeJSON)
+	for _, targetSize := range workloadBenchmarkSizes {
+		b.Run(fmt.Sprintf("workload_json_size=%dKB/events=%d", targetSize>>10, eventsPerWatch), func(b *testing.B) {
+			workload := makeWorkloadForResponseBody(b, targetSize, k8sruntime.ContentTypeJSON)
+			streamBody := makeWorkloadWatchStreamBody(b, workload, eventsPerWatch, k8sruntime.ContentTypeJSON)
 			readBuffer := make([]byte, len(streamBody)/eventsPerWatch+4096)
 			info := serializerInfoForBenchmark(b, k8sruntime.ContentTypeJSON)
 
@@ -201,138 +196,223 @@ func BenchmarkPodJSONWatchStreamFrameRead(b *testing.B) {
 			}
 			b.ReportMetric(float64(b.Elapsed().Nanoseconds())/float64(b.N*eventsPerWatch), "ns/event")
 			b.ReportMetric(float64(len(streamBody))/1024/float64(eventsPerWatch), "json_KB/event")
-			b.ReportMetric(float64(b.N*eventsPerWatch)/b.Elapsed().Seconds(), "pods/s")
+			b.ReportMetric(float64(b.N*eventsPerWatch)/b.Elapsed().Seconds(), "workloads/s")
 		})
 	}
 }
 
-func benchmarkPodWatchStreamEncode(b *testing.B, contentType string) {
+func benchmarkWorkloadWatchStreamEncode(b *testing.B, contentType string) {
 	const eventsPerWatch = 100
-	for _, targetSize := range podProtobufBenchmarkSizes {
-		b.Run(fmt.Sprintf("pod_%s_size=%dKB/events=%d", benchmarkContentTypeName(contentType), targetSize>>10, eventsPerWatch), func(b *testing.B) {
-			pod := makePodForResponseBody(b, targetSize, contentType)
-			streamBody := makePodWatchStreamBody(b, pod, eventsPerWatch, contentType)
+	for _, targetSize := range workloadBenchmarkSizes {
+		b.Run(fmt.Sprintf("workload_%s_size=%dKB/events=%d", benchmarkContentTypeName(contentType), targetSize>>10, eventsPerWatch), func(b *testing.B) {
+			workload := makeWorkloadForResponseBody(b, targetSize, contentType)
+			streamBody := makeWorkloadWatchStreamBody(b, workload, eventsPerWatch, contentType)
 
 			b.ReportAllocs()
 			b.SetBytes(int64(len(streamBody)))
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				benchmarkBytes = makePodWatchStreamBody(b, pod, eventsPerWatch, contentType)
+				benchmarkBytes = makeWorkloadWatchStreamBody(b, workload, eventsPerWatch, contentType)
 			}
 			b.ReportMetric(float64(b.Elapsed().Nanoseconds())/float64(b.N*eventsPerWatch), "ns/event")
 			b.ReportMetric(float64(len(streamBody))/1024/float64(eventsPerWatch), benchmarkContentTypeName(contentType)+"_KB/event")
-			b.ReportMetric(float64(b.N*eventsPerWatch)/b.Elapsed().Seconds(), "pods/s")
+			b.ReportMetric(float64(b.N*eventsPerWatch)/b.Elapsed().Seconds(), "workloads/s")
 		})
 	}
 }
 
-func benchmarkPodRESTClientWatch(b *testing.B, contentType string) {
+func benchmarkWorkloadRESTClientWatch(b *testing.B, contentType string) {
 	ctx := context.Background()
 	baseURL := &url.URL{Scheme: "https", Host: "benchmark.local"}
-	gvCopy := v1.SchemeGroupVersion
 	contentConfig := ClientContentConfig{
 		ContentType:  contentType,
-		GroupVersion: gvCopy,
-		Negotiator:   k8sruntime.NewClientNegotiator(podBenchmarkCodecs.WithoutConversion(), gvCopy),
+		GroupVersion: kueueGV,
+		Negotiator:   k8sruntime.NewClientNegotiator(workloadBenchmarkCodecs.WithoutConversion(), kueueGV),
 	}
 	const eventsPerWatch = 100
 
-	for _, targetSize := range podProtobufBenchmarkSizes {
-		for _, featureGate := range []struct {
-			name    string
-			enabled bool
-		}{
-			{name: "off", enabled: false},
-			{name: "on", enabled: true},
-		} {
-			b.Run(fmt.Sprintf("pod_%s_size=%dKB/events=%d/fg=%s", benchmarkContentTypeName(contentType), targetSize>>10, eventsPerWatch, featureGate.name), func(b *testing.B) {
-				clientfeaturestesting.SetFeatureDuringTest(b, clientfeatures.ConcurrentWatchObjectDecode, featureGate.enabled)
+	// Toggle the ConcurrentWatchObjectDecode feature gate by setting
+	// KUBE_FEATURE_ConcurrentWatchObjectDecode=true in the env. Run this
+	// benchmark twice (once with, once without) and feed the two outputs
+	// through benchstat to compare.
+	for _, targetSize := range workloadBenchmarkSizes {
+		b.Run(fmt.Sprintf("workload_%s_size=%dKB/events=%d", benchmarkContentTypeName(contentType), targetSize>>10, eventsPerWatch), func(b *testing.B) {
+			workload := makeWorkloadForResponseBody(b, targetSize, contentType)
+			streamBody := makeWorkloadWatchStreamBody(b, workload, eventsPerWatch, contentType)
+			httpClient := &http.Client{
+				Transport: workloadBenchmarkTransport(func(req *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode:    http.StatusOK,
+						Header:        http.Header{"Content-Type": []string{contentType + ";stream=watch"}},
+						Body:          io.NopCloser(bytes.NewReader(streamBody)),
+						ContentLength: int64(len(streamBody)),
+					}, nil
+				}),
+			}
+			request := NewRequestWithClient(baseURL, "", contentConfig, httpClient).
+				Verb("GET").
+				AbsPath("/apis/kueue.x-k8s.io/v1beta1/namespaces/default/workloads").
+				Param("watch", "true")
 
-				pod := makePodForResponseBody(b, targetSize, contentType)
-				streamBody := makePodWatchStreamBody(b, pod, eventsPerWatch, contentType)
-				httpClient := &http.Client{
-					Transport: podProtobufBenchmarkTransport(func(req *http.Request) (*http.Response, error) {
-						return &http.Response{
-							StatusCode:    http.StatusOK,
-							Header:        http.Header{"Content-Type": []string{contentType + ";stream=watch"}},
-							Body:          io.NopCloser(bytes.NewReader(streamBody)),
-							ContentLength: int64(len(streamBody)),
-						}, nil
-					}),
+			b.ReportAllocs()
+			b.SetBytes(int64(len(streamBody)))
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				watcher, err := request.Watch(ctx)
+				if err != nil {
+					b.Fatal(err)
 				}
-				request := NewRequestWithClient(baseURL, "", contentConfig, httpClient).
-					Verb("GET").
-					AbsPath("/api/v1/namespaces/default/pods").
-					Param("watch", "true")
-
-				b.ReportAllocs()
-				b.SetBytes(int64(len(streamBody)))
-				b.ResetTimer()
-				for i := 0; i < b.N; i++ {
-					watcher, err := request.Watch(ctx)
-					if err != nil {
-						b.Fatal(err)
+				seen := 0
+				for event := range watcher.ResultChan() {
+					if event.Type == k8swatch.Error {
+						b.Fatalf("watch returned error event: %#v", event.Object)
 					}
-					seen := 0
-					for event := range watcher.ResultChan() {
-						if event.Type == k8swatch.Error {
-							b.Fatalf("watch returned error event: %#v", event.Object)
-						}
-						benchmarkPodObject = event.Object
-						seen++
-						if seen == eventsPerWatch {
-							break
-						}
-					}
-					watcher.Stop()
-					if seen != eventsPerWatch {
-						b.Fatalf("decoded %d watch events, expected %d", seen, eventsPerWatch)
+					benchmarkWorkloadObject = event.Object
+					seen++
+					if seen == eventsPerWatch {
+						break
 					}
 				}
-				b.ReportMetric(float64(b.Elapsed().Nanoseconds())/float64(b.N*eventsPerWatch), "ns/event")
-				b.ReportMetric(float64(len(streamBody))/1024/float64(eventsPerWatch), benchmarkContentTypeName(contentType)+"_KB/event")
-				b.ReportMetric(float64(b.N*eventsPerWatch)/b.Elapsed().Seconds(), "pods/s")
-			})
-		}
+				watcher.Stop()
+				if seen != eventsPerWatch {
+					b.Fatalf("decoded %d watch events, expected %d", seen, eventsPerWatch)
+				}
+			}
+			b.ReportMetric(float64(b.Elapsed().Nanoseconds())/float64(b.N*eventsPerWatch), "ns/event")
+			b.ReportMetric(float64(len(streamBody))/1024/float64(eventsPerWatch), benchmarkContentTypeName(contentType)+"_KB/event")
+			b.ReportMetric(float64(b.N*eventsPerWatch)/b.Elapsed().Seconds(), "workloads/s")
+		})
 	}
 }
 
-type podProtobufBenchmarkTransport func(*http.Request) (*http.Response, error)
+type workloadBenchmarkTransport func(*http.Request) (*http.Response, error)
 
-func (rt podProtobufBenchmarkTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+func (rt workloadBenchmarkTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return rt(req)
 }
 
-func makePodResponseBody(b testing.TB, targetBytes int, contentType string) []byte {
+func makeWorkloadResponseBody(b testing.TB, targetBytes int, contentType string) []byte {
 	b.Helper()
-	return encodePodForBenchmark(b, makePodForResponseBody(b, targetBytes, contentType), contentType)
+	return encodeWorkloadForBenchmark(b, makeWorkloadForResponseBody(b, targetBytes, contentType), contentType)
 }
 
-func makePodForResponseBody(b testing.TB, targetBytes int, contentType string) *v1.Pod {
+func makeWorkloadForResponseBody(b testing.TB, targetBytes int, contentType string) *Workload {
 	b.Helper()
 	low, high := 0, targetBytes
-	bestPod := newBenchmarkPod(high)
-	bestSize := len(encodePodForBenchmark(b, bestPod, contentType))
+	bestWorkload := newBenchmarkWorkload(high)
+	bestSize := len(encodeWorkloadForBenchmark(b, bestWorkload, contentType))
 	for bestSize < targetBytes {
 		low = high + 1
 		high *= 2
-		bestPod = newBenchmarkPod(high)
-		bestSize = len(encodePodForBenchmark(b, bestPod, contentType))
+		bestWorkload = newBenchmarkWorkload(high)
+		bestSize = len(encodeWorkloadForBenchmark(b, bestWorkload, contentType))
 	}
 	for low <= high {
 		mid := low + (high-low)/2
-		pod := newBenchmarkPod(mid)
-		encodedSize := len(encodePodForBenchmark(b, pod, contentType))
+		workload := newBenchmarkWorkload(mid)
+		encodedSize := len(encodeWorkloadForBenchmark(b, workload, contentType))
 		if encodedSize >= targetBytes {
-			bestPod = pod
+			bestWorkload = workload
 			high = mid - 1
 			continue
 		}
 		low = mid + 1
 	}
-	return bestPod
+	return bestWorkload
 }
 
+// newBenchmarkWorkload builds a Kueue Workload-shaped object whose embedded
+// PodTemplateSpec is sized to drive total encoded bytes near payloadBytes.
+// The Pod-shaped helpers below generate the bulk of the payload via
+// containers/volumes/env padding, matching the size profile of real Workload
+// traffic in apps that wrap large training Pods.
+func newBenchmarkWorkload(payloadBytes int) *Workload {
+	pod := newBenchmarkPod(payloadBytes)
+	template := v1.PodTemplateSpec{
+		ObjectMeta: pod.ObjectMeta,
+		Spec:       pod.Spec,
+	}
+	minCount := int32(1)
+	priority := int32(1000)
+	active := true
+	flavors := map[v1.ResourceName]ResourceFlavorReference{
+		v1.ResourceCPU:                       "default",
+		v1.ResourceMemory:                    "default",
+		v1.ResourceName("nvidia.com/gpu"):    "h100-80g",
+		v1.ResourceName("ephemeral-storage"): "fast-ssd",
+	}
+	now := metav1.Now()
+	return &Workload{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Workload",
+			APIVersion: kueueGV.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "kueue-benchmark",
+			Namespace: "default",
+			UID:       "00000000-0000-0000-0000-000000000001",
+			Labels: map[string]string{
+				"kueue.x-k8s.io/queue-name":     "benchmark-queue",
+				"kueue.x-k8s.io/priority-class": "high",
+				"kueue.x-k8s.io/job-uid":        "abcdef-0123",
+				"app":                           "kueue-benchmark",
+			},
+			Annotations: map[string]string{
+				"kueue.x-k8s.io/owner-name": "training-job",
+				"kueue.x-k8s.io/owner-uid":  "00000000-0000-0000-0000-000000000010",
+			},
+		},
+		Spec: WorkloadSpec{
+			QueueName:         LocalQueueName("benchmark-queue"),
+			PriorityClassName: "high-priority",
+			Priority:          &priority,
+			Active:            &active,
+			PodSets: []PodSet{
+				{
+					Name:     PodSetReference("main"),
+					Count:    1,
+					MinCount: &minCount,
+					Template: template,
+				},
+			},
+		},
+		Status: WorkloadStatus{
+			Admission: &Admission{
+				ClusterQueue: ClusterQueueReference("benchmark-cluster-queue"),
+				PodSetAssignments: []PodSetAssignment{
+					{
+						Name:    PodSetReference("main"),
+						Flavors: flavors,
+						Count:   &minCount,
+					},
+				},
+			},
+			Conditions: []metav1.Condition{
+				{
+					Type:               "Admitted",
+					Status:             metav1.ConditionTrue,
+					Reason:             "QuotaReserved",
+					Message:            "Workload admitted by ClusterQueue benchmark-cluster-queue",
+					LastTransitionTime: now,
+					ObservedGeneration: 1,
+				},
+				{
+					Type:               "PodsReady",
+					Status:             metav1.ConditionTrue,
+					Reason:             "PodsReady",
+					Message:            "All pods are ready",
+					LastTransitionTime: now,
+					ObservedGeneration: 1,
+				},
+			},
+		},
+	}
+}
+
+// newBenchmarkPod generates the Pod-shaped data that fills the embedded
+// PodTemplateSpec inside the Workload. payloadBytes is a knob that drives
+// the number of containers/volumes/env vars and the length of padded
+// values; it does not directly equal the encoded byte count.
 func newBenchmarkPod(payloadBytes int) *v1.Pod {
 	scaleKB := maxInt(1, payloadBytes/1024)
 	containerCount := clampInt(1+scaleKB/25, 1, 12)
@@ -401,10 +481,10 @@ func newBenchmarkPod(payloadBytes int) *v1.Pod {
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "protobuf-benchmark",
+			Name:      "kueue-benchmark",
 			Namespace: "default",
 			Labels: map[string]string{
-				"app":       "protobuf-benchmark",
+				"app":       "kueue-benchmark",
 				"component": "client-go-rest",
 				"tier":      "benchmark",
 			},
@@ -550,7 +630,7 @@ func minInt(a, b int) int {
 	return b
 }
 
-func makePodWatchStreamBody(b testing.TB, pod *v1.Pod, eventCount int, contentType string) []byte {
+func makeWorkloadWatchStreamBody(b testing.TB, workload *Workload, eventCount int, contentType string) []byte {
 	b.Helper()
 
 	info := serializerInfoForBenchmark(b, contentType)
@@ -558,24 +638,24 @@ func makePodWatchStreamBody(b testing.TB, pod *v1.Pod, eventCount int, contentTy
 	frameWriter := info.StreamSerializer.Framer.NewFrameWriter(&buf)
 	watchEventEncoder := restclientwatch.NewEncoder(
 		streaming.NewEncoder(frameWriter, info.StreamSerializer.Serializer),
-		podBenchmarkCodecs.EncoderForVersion(info.Serializer, v1.SchemeGroupVersion),
+		workloadBenchmarkCodecs.EncoderForVersion(info.Serializer, kueueGV),
 	)
 	for i := 0; i < eventCount; i++ {
-		if err := watchEventEncoder.Encode(&k8swatch.Event{Type: k8swatch.Modified, Object: pod}); err != nil {
+		if err := watchEventEncoder.Encode(&k8swatch.Event{Type: k8swatch.Modified, Object: workload}); err != nil {
 			b.Fatalf("failed to encode %s watch event: %v", contentType, err)
 		}
 	}
 	return buf.Bytes()
 }
 
-func encodePodForBenchmark(b testing.TB, pod *v1.Pod, contentType string) []byte {
+func encodeWorkloadForBenchmark(b testing.TB, workload *Workload, contentType string) []byte {
 	b.Helper()
 
 	info := serializerInfoForBenchmark(b, contentType)
-	encoder := podBenchmarkCodecs.EncoderForVersion(info.Serializer, v1.SchemeGroupVersion)
-	data, err := k8sruntime.Encode(encoder, pod)
+	encoder := workloadBenchmarkCodecs.EncoderForVersion(info.Serializer, kueueGV)
+	data, err := k8sruntime.Encode(encoder, workload)
 	if err != nil {
-		b.Fatalf("failed to encode pod as %s: %v", contentType, err)
+		b.Fatalf("failed to encode workload as %s: %v", contentType, err)
 	}
 	return data
 }
@@ -583,7 +663,7 @@ func encodePodForBenchmark(b testing.TB, pod *v1.Pod, contentType string) []byte
 func serializerInfoForBenchmark(b testing.TB, contentType string) k8sruntime.SerializerInfo {
 	b.Helper()
 
-	info, ok := k8sruntime.SerializerInfoForMediaType(podBenchmarkCodecs.SupportedMediaTypes(), contentType)
+	info, ok := k8sruntime.SerializerInfoForMediaType(workloadBenchmarkCodecs.SupportedMediaTypes(), contentType)
 	if !ok {
 		b.Fatalf("serializer for %q was not found", contentType)
 	}
@@ -595,8 +675,6 @@ func serializerInfoForBenchmark(b testing.TB, contentType string) k8sruntime.Ser
 
 func benchmarkContentTypeName(contentType string) string {
 	switch contentType {
-	case k8sruntime.ContentTypeProtobuf:
-		return "protobuf"
 	case k8sruntime.ContentTypeJSON:
 		return "json"
 	case k8sruntime.ContentTypeCBOR:
@@ -606,5 +684,5 @@ func benchmarkContentTypeName(contentType string) string {
 	}
 }
 
-var benchmarkPodObject k8sruntime.Object
+var benchmarkWorkloadObject k8sruntime.Object
 var benchmarkBytes []byte
