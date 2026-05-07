@@ -1273,7 +1273,8 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 		}
 	}
 
-	if resizable, _, _ := allocation.IsInPlacePodVerticalScalingAllowed(pod); resizable {
+	resizable, _, _ := allocation.IsInPlacePodVerticalScalingAllowed(pod)
+	if resizable {
 		changes.ContainersToUpdate = make(map[v1.ResourceName][]containerToUpdateInfo)
 	}
 
@@ -1309,6 +1310,18 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 			if kubecontainer.ShouldContainerBeRestarted(logger, &container, pod, podStatus) {
 				logger.V(3).Info("Container of pod is not in the desired state and shall be started", "containerName", container.Name, "pod", klog.KObj(pod))
 				changes.ContainersToStart = append(changes.ContainersToStart, idx)
+				// for non-running containers with a pending in-place resize,
+				// we cannot call UpdateContainerResources via CRI. set UpdatePodResources as true so
+				// that doPodResizeAction updates the pod-level cgroup before the container restarts.
+				if containerStatus != nil && resizable {
+					actuatedPodResources, _ := m.actuatedState.GetPodLevelResources(pod.UID)
+					actuatedContainerResources, _ := m.actuatedState.GetContainerResources(pod.UID, container.Name)
+					desiredResources := containerResourcesFromRequirements(pod.Spec.Resources, &container.Resources)
+					currentResources := containerResourcesFromRequirements(actuatedPodResources, &actuatedContainerResources)
+					if currentResources != desiredResources {
+						changes.UpdatePodResources = true
+					}
+				}
 				if containerStatus != nil && containerStatus.State == kubecontainer.ContainerStateUnknown {
 					// If container is in unknown state, we don't know whether it
 					// is actually running or not, always try killing it before

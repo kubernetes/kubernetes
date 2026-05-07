@@ -3834,6 +3834,52 @@ func TestComputePodActionsForPodResize(t *testing.T) {
 	}
 }
 
+func TestComputePodResizeActionForOOMKilledContainer(t *testing.T) {
+	if goruntime.GOOS != "linux" {
+		t.Skip("in-place resize is only supported on Linux")
+	}
+	tCtx := ktesting.Init(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	m.machineInfo.MemoryCapacity = 17179860387 // 16GB
+	require.NoError(t, err)
+
+	mem100M := resource.MustParse("100Mi")
+	mem200M := resource.MustParse("200Mi")
+	cpu100m := resource.MustParse("100m")
+
+	pod, status := makeBasePodAndStatus()
+	pod.Spec.Containers = pod.Spec.Containers[:1]
+	status.ContainerStatuses = status.ContainerStatuses[:1]
+
+	pod.Spec.Containers[0].Resources = v1.ResourceRequirements{
+		Limits:   v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
+		Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem200M},
+	}
+	pod.Spec.Containers[0].ResizePolicy = []v1.ContainerResizePolicy{
+		{ResourceName: v1.ResourceCPU, RestartPolicy: v1.NotRequired},
+		{ResourceName: v1.ResourceMemory, RestartPolicy: v1.NotRequired},
+	}
+	// record the pre-resize resource limits as what was last actuated.
+	require.NoError(t, m.actuatedState.SetContainerResources(pod.UID, pod.Spec.Containers[0].Name, v1.ResourceRequirements{
+		Limits:   v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
+		Requests: v1.ResourceList{v1.ResourceCPU: cpu100m, v1.ResourceMemory: mem100M},
+	}))
+
+	// simulate OOMKilled
+	status.ContainerStatuses[0].State = kubecontainer.ContainerStateExited
+	status.ContainerStatuses[0].Hash = kubecontainer.HashContainer(&pod.Spec.Containers[0])
+
+	t.Cleanup(func() { _ = m.actuatedState.RemovePod(pod.UID) })
+
+	actions := m.computePodActions(tCtx, pod, status, false)
+
+	// the container is OOMKilled and must not be added to ContainersToUpdate (no live CRI call).
+	assert.Empty(t, actions.ContainersToUpdate, "OOMKilled container must not be in ContainersToUpdate")
+	// UpdatePodResources must be true so doPodResizeAction updates the pod-level cgroup.
+	assert.True(t, actions.UpdatePodResources, "UpdatePodResources must be true for OOMKilled container with pending resize")
+}
+
 func TestUpdatePodContainerResources(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
