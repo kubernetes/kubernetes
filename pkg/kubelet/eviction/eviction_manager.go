@@ -208,6 +208,10 @@ func (m *managerImpl) Start(ctx context.Context, diskInfoProvider DiskInfoProvid
 	// start the eviction manager monitoring
 	go func() {
 		for {
+			if err := ctx.Err(); err != nil {
+				logger.Info("Eviction manager: monitoring loop exiting", "err", err)
+				return
+			}
 			evictedPods, err := m.synchronize(ctx, diskInfoProvider, podFunc)
 			if evictedPods != nil && err == nil {
 				logger.Info("Eviction manager: pods evicted, waiting for pod to be cleaned up", "pods", klog.KObjSlice(evictedPods))
@@ -216,7 +220,12 @@ func (m *managerImpl) Start(ctx context.Context, diskInfoProvider DiskInfoProvid
 				if err != nil {
 					logger.Error(err, "Eviction manager: failed to synchronize")
 				}
-				time.Sleep(monitoringInterval)
+				select {
+				case <-ctx.Done():
+					logger.Info("Eviction manager: monitoring loop exiting", "err", ctx.Err())
+					return
+				case <-time.After(monitoringInterval):
+				}
 			}
 		}
 	}()
