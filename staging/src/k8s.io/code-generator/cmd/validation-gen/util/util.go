@@ -142,20 +142,9 @@ func ParseInt(val string) (int, error) {
 // validates that the result fits within the specified bit size. The bitSize
 // parameter should be 8, 16, 32, or 64, corresponding to the target Go type.
 // Values outside the representable range for the target type are rejected at
-// parse time with a descriptive error.
+// parse time with a descriptive error. The symbolic values "MIN" and "MAX"
+// are also supported, resolving to the type-appropriate bound.
 func ParseSignedInt(val string, bitSize int) (int64, error) {
-	intVal, err := strconv.ParseInt(val, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("parsing %q as int: %w", val, err)
-	}
-
-	// Verify canonical form: reject leading zeros, unary plus, etc.
-	strVal := strconv.FormatInt(intVal, 10)
-	if strVal != val {
-		return 0, fmt.Errorf("%q is not a valid int value", val)
-	}
-
-	// Validate the parsed value fits in the target type's range.
 	var minVal, maxVal int64
 	switch bitSize {
 	case 8:
@@ -169,6 +158,26 @@ func ParseSignedInt(val string, bitSize int) (int64, error) {
 	default:
 		return 0, fmt.Errorf("unsupported bitSize %d; must be 8, 16, 32, or 64", bitSize)
 	}
+
+	if val == "MIN" {
+		return minVal, nil
+	}
+	if val == "MAX" {
+		return maxVal, nil
+	}
+
+	intVal, err := strconv.ParseInt(val, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("parsing %q as int: %w", val, err)
+	}
+
+	// Verify canonical form: reject leading zeros, unary plus, etc.
+	strVal := strconv.FormatInt(intVal, 10)
+	if strVal != val {
+		return 0, fmt.Errorf("%q is not a valid int value", val)
+	}
+
+	// Validate the parsed value fits in the target type's range.
 	if intVal < minVal || intVal > maxVal {
 		return 0, fmt.Errorf("value %d does not fit in int%d (range [%d, %d])", intVal, bitSize, minVal, maxVal)
 	}
@@ -179,19 +188,9 @@ func ParseSignedInt(val string, bitSize int) (int64, error) {
 // ParseUnsignedInt strictly parses an unsigned integer from a string input and
 // validates that the result fits within the specified bit size. The bitSize
 // parameter should be 8, 16, 32, or 64, corresponding to the target Go type.
+// The symbolic values "MIN" and "MAX" are also supported, resolving to 0 and
+// the maximum representable value for the specified bit size respectively.
 func ParseUnsignedInt(val string, bitSize int) (uint64, error) {
-	uintVal, err := strconv.ParseUint(val, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("parsing %q as uint: %w", val, err)
-	}
-
-	// Verify canonical form: reject leading zeros, unary plus, etc.
-	strVal := strconv.FormatUint(uintVal, 10)
-	if strVal != val {
-		return 0, fmt.Errorf("%q is not a valid uint value", val)
-	}
-
-	// Validate the parsed value fits in the target type's range.
 	var maxVal uint64
 	switch bitSize {
 	case 8:
@@ -205,6 +204,26 @@ func ParseUnsignedInt(val string, bitSize int) (uint64, error) {
 	default:
 		return 0, fmt.Errorf("unsupported bitSize %d; must be 8, 16, 32, or 64", bitSize)
 	}
+
+	if val == "MIN" {
+		return 0, nil
+	}
+	if val == "MAX" {
+		return maxVal, nil
+	}
+
+	uintVal, err := strconv.ParseUint(val, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("parsing %q as uint: %w", val, err)
+	}
+
+	// Verify canonical form: reject leading zeros, unary plus, etc.
+	strVal := strconv.FormatUint(uintVal, 10)
+	if strVal != val {
+		return 0, fmt.Errorf("%q is not a valid uint value", val)
+	}
+
+	// Validate the parsed value fits in the target type's range.
 	if uintVal > maxVal {
 		return 0, fmt.Errorf("value %d does not fit in uint%d (range [0, %d])", uintVal, bitSize, maxVal)
 	}
