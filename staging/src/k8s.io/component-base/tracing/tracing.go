@@ -60,6 +60,11 @@ func (s *Span) AddEvent(name string, attributes ...attribute.KeyValue) {
 	}
 }
 
+// SetAttributes sets attributes on the OpenTelemetry span.
+func (s *Span) SetAttributes(attributes ...attribute.KeyValue) {
+	s.otelSpan.SetAttributes(attributes...)
+}
+
 // End ends the span, and logs if the span duration is greater than the logThreshold.
 func (s *Span) End(logThreshold time.Duration) {
 	s.otelSpan.End()
