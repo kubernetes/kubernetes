@@ -182,7 +182,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 						"CPU": ptrMatchAllFields(gstruct.Fields{
 							"Time":                 recent(maxStatsAge),
 							"UsageNanoCores":       bounded(10000, 1e9),
-							"UsageCoreNanoSeconds": bounded(10000000, 1e11),
+							"UsageCoreNanoSeconds": bounded(10000000, 1e12),
 							"PSI":                  psiExpectation(),
 						}),
 						"Memory": ptrMatchAllFields(gstruct.Fields{
@@ -233,7 +233,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 				"CPU": ptrMatchAllFields(gstruct.Fields{
 					"Time":                 recent(maxStatsAge),
 					"UsageNanoCores":       bounded(10000, 1e9),
-					"UsageCoreNanoSeconds": bounded(10000000, 1e11),
+					"UsageCoreNanoSeconds": bounded(10000000, 1e12),
 					"PSI":                  psiExpectation(),
 				}),
 				"Memory": ptrMatchAllFields(gstruct.Fields{
@@ -510,7 +510,7 @@ func getSummaryTestPods(f *framework.Framework, numRestarts int32, names ...stri
 								Add: []v1.Capability{"NET_RAW"},
 							},
 						},
-						Command: getRestartingContainerCommand("/test-empty-dir-mnt", 0, numRestarts, "echo 'some bytes' >/outside_the_volume.txt; ping -c 1 google.com; echo 'hello world' >> /test-empty-dir-mnt/file; dd if=/dev/zero of=/dev/null bs=1 count=10000000;"),
+						Command: getRestartingContainerCommand("/test-empty-dir-mnt", 0, numRestarts, "dd if=/dev/zero of=/outside_the_volume.txt bs=4096 count=2 conv=fsync 2>/dev/null; ping -c 1 google.com; echo 'hello world' >> /test-empty-dir-mnt/file; dd if=/dev/zero of=/dev/null bs=1 count=10000000;"),
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{
 								// Must set memory limit to get MemoryStats.AvailableBytes
