@@ -172,6 +172,19 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 				klog.Fatalf("Types requested deepcopy generation but are not copyable: %s",
 					strings.Join(uncopyable, ", "))
 			}
+		} else {
+			// Don't write empty files
+			hasCopyable := false
+			for _, t := range pkg.Types {
+				if copyableType(t) {
+					hasCopyable = true
+					break
+				}
+			}
+			if !hasCopyable {
+				klog.V(3).Infof("  no copyable types; skipping")
+				pkgNeedsGeneration = false
+			}
 		}
 
 		if pkgNeedsGeneration {
