@@ -2081,11 +2081,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
-	genericfeatures.BtreeWatchCache: {
-		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
-
 	genericfeatures.CBORServingAndStorage: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2613,8 +2608,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	genericfeatures.AllowParsingUserUIDFromCertAuth: {},
 
 	genericfeatures.AllowUnsafeMalformedObjectDeletion: {},
-
-	genericfeatures.BtreeWatchCache: {},
 
 	genericfeatures.CBORServingAndStorage: {},
 

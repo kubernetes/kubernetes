@@ -75,11 +75,6 @@ const (
 	// resources using the Kubernetes API only.
 	AllowUnsafeMalformedObjectDeletion featuregate.Feature = "AllowUnsafeMalformedObjectDeletion"
 
-	// owner: @serathius
-	//
-	// Replaces watch cache hashmap implementation with a btree based one, bringing performance improvements.
-	BtreeWatchCache featuregate.Feature = "BtreeWatchCache"
-
 	// owner: @benluddy
 	// kep: https://kep.k8s.io/4222
 	//
@@ -340,11 +335,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 
 	AllowUnsafeMalformedObjectDeletion: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
-	},
-
-	BtreeWatchCache: {
-		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
 	CBORServingAndStorage: {

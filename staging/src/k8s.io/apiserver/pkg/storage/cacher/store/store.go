@@ -22,8 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -79,10 +77,7 @@ type OrderedLister interface {
 }
 
 func NewIndexer(indexers *cache.Indexers) Indexer {
-	if utilfeature.DefaultFeatureGate.Enabled(features.BtreeWatchCache) {
-		return newThreadedBtreeStoreIndexer(ElementIndexers(indexers), btreeDegree)
-	}
-	return cache.NewIndexer(ElementKey, ElementIndexers(indexers))
+	return newThreadedBtreeStoreIndexer(ElementIndexers(indexers), btreeDegree)
 }
 
 // Computing a key of an object is generally non-trivial (it performs
