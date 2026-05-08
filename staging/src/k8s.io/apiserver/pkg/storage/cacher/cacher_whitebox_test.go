@@ -43,7 +43,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/sharding"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
@@ -294,67 +293,46 @@ func TestShouldDelegateList(t *testing.T) {
 	snapshotAvailableOverrides[opts{Recursive: true, ResourceVersion: oldRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = false
 	snapshotAvailableOverrides[opts{Recursive: true, ResourceVersion: oldRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = false
 
-	t.Run("ConsistentListFromCache=false", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
-		t.Run("ListFromCacheSnapshot=false", func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, false)
-			runTestCases(t, false, testCases)
-		})
+	// TODO(p0lyn0mial): the following tests assume that etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
+	// evaluates to true. Otherwise the cache will be bypassed and the test will fail.
+	//
+	// If you were to run only TestGetListCacheBypass you would see that the test fail.
+	// However in CI all test are run and there must be a test(s) that properly
+	// initialize the storage layer so that the mentioned method evaluates to true
+	forceRequestWatchProgressSupport(t)
 
-		t.Run("ListFromCacheSnapshot=true", func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
-			t.Run("SnapshotAvailable=false", func(t *testing.T) {
-				runTestCases(t, false, testCases, listFromSnapshotEnabledOverrides)
-			})
-			t.Run("SnapshotAvailable=true", func(t *testing.T) {
-				runTestCases(t, true, testCases, listFromSnapshotEnabledOverrides, snapshotAvailableOverrides)
-			})
-		})
+	consistentListFromCacheOverrides := map[opts]bool{}
+	for _, recursive := range []bool{true, false} {
+		consistentListFromCacheOverrides[opts{Recursive: recursive}] = false
+		consistentListFromCacheOverrides[opts{Limit: 100, Recursive: recursive}] = false
+	}
+
+	t.Run("ListFromCacheSnapshot=false", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, false)
+		runTestCases(t, false, testCases, consistentListFromCacheOverrides)
 	})
-	t.Run("ConsistentListFromCache=true", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
-		// TODO(p0lyn0mial): the following tests assume that etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
-		// evaluates to true. Otherwise the cache will be bypassed and the test will fail.
-		//
-		// If you were to run only TestGetListCacheBypass you would see that the test fail.
-		// However in CI all test are run and there must be a test(s) that properly
-		// initialize the storage layer so that the mentioned method evaluates to true
-		forceRequestWatchProgressSupport(t)
+	t.Run("ListFromCacheSnapshot=true", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 
-		consistentListFromCacheOverrides := map[opts]bool{}
-		for _, recursive := range []bool{true, false} {
-			consistentListFromCacheOverrides[opts{Recursive: recursive}] = false
-			consistentListFromCacheOverrides[opts{Limit: 100, Recursive: recursive}] = false
-		}
-
-		t.Run("ListFromCacheSnapshot=false", func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, false)
-			runTestCases(t, false, testCases, consistentListFromCacheOverrides)
+		consistentReadWithSnapshotOverrides := map[opts]bool{}
+		// Continues with negative RV are same as consistent read.
+		consistentReadWithSnapshotOverrides[opts{Recursive: true, Limit: 0, Continue: continueOnNegativeRV}] = false
+		consistentReadWithSnapshotOverrides[opts{Recursive: true, Limit: 100, Continue: continueOnNegativeRV}] = false
+		consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Limit: 0, Continue: continueOnNegativeRV}] = false
+		consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Limit: 100, Continue: continueOnNegativeRV}] = false
+		// Exact on RV not yet observed by cache
+		consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: etcdRV, Limit: 100}] = false
+		consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: etcdRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = false
+		consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: etcdRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = false
+		consistentReadWithSnapshotOverrides[opts{Recursive: true, Continue: continueOnEtcdRV}] = false
+		consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Continue: continueOnEtcdRV}] = false
+		consistentReadWithSnapshotOverrides[opts{Recursive: true, Continue: continueOnEtcdRV, Limit: 100}] = false
+		consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Continue: continueOnEtcdRV, Limit: 100}] = false
+		t.Run("SnapshotAvailable=false", func(t *testing.T) {
+			runTestCases(t, false, testCases, listFromSnapshotEnabledOverrides, consistentListFromCacheOverrides, consistentReadWithSnapshotOverrides)
 		})
-		t.Run("ListFromCacheSnapshot=true", func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
-
-			consistentReadWithSnapshotOverrides := map[opts]bool{}
-			// Continues with negative RV are same as consistent read.
-			consistentReadWithSnapshotOverrides[opts{Recursive: true, Limit: 0, Continue: continueOnNegativeRV}] = false
-			consistentReadWithSnapshotOverrides[opts{Recursive: true, Limit: 100, Continue: continueOnNegativeRV}] = false
-			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Limit: 0, Continue: continueOnNegativeRV}] = false
-			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Limit: 100, Continue: continueOnNegativeRV}] = false
-			// Exact on RV not yet observed by cache
-			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: etcdRV, Limit: 100}] = false
-			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: etcdRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = false
-			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: etcdRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = false
-			consistentReadWithSnapshotOverrides[opts{Recursive: true, Continue: continueOnEtcdRV}] = false
-			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Continue: continueOnEtcdRV}] = false
-			consistentReadWithSnapshotOverrides[opts{Recursive: true, Continue: continueOnEtcdRV, Limit: 100}] = false
-			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Continue: continueOnEtcdRV, Limit: 100}] = false
-			t.Run("SnapshotAvailable=false", func(t *testing.T) {
-				runTestCases(t, false, testCases, listFromSnapshotEnabledOverrides, consistentListFromCacheOverrides, consistentReadWithSnapshotOverrides)
-			})
-			t.Run("SnapshotAvailable=true", func(t *testing.T) {
-				runTestCases(t, true, testCases, listFromSnapshotEnabledOverrides, consistentListFromCacheOverrides, consistentReadWithSnapshotOverrides, snapshotAvailableOverrides)
-			})
+		t.Run("SnapshotAvailable=true", func(t *testing.T) {
+			runTestCases(t, true, testCases, listFromSnapshotEnabledOverrides, consistentListFromCacheOverrides, consistentReadWithSnapshotOverrides, snapshotAvailableOverrides)
 		})
 	})
 }
@@ -369,12 +347,11 @@ func mustAtoi(s string) int {
 
 func TestConsistentReadFallback(t *testing.T) {
 	tcs := []struct {
-		name                   string
-		consistentReadsEnabled bool
-		skipStorageFallback    bool
-		watchCacheRV           string
-		storageRV              string
-		fallbackError          bool
+		name                string
+		skipStorageFallback bool
+		watchCacheRV        string
+		storageRV           string
+		fallbackError       bool
 
 		expectError             bool
 		expectTooManyRequests   bool
@@ -385,7 +362,6 @@ func TestConsistentReadFallback(t *testing.T) {
 	}{
 		{
 			name:                    "Success",
-			consistentReadsEnabled:  true,
 			watchCacheRV:            "42",
 			storageRV:               "42",
 			expectRV:                "42",
@@ -398,7 +374,6 @@ apiserver_watch_cache_consistent_read_total{fallback="false", group="", resource
 		},
 		{
 			name:                    "Fallback",
-			consistentReadsEnabled:  true,
 			watchCacheRV:            "2",
 			storageRV:               "42",
 			expectRV:                "42",
@@ -412,7 +387,6 @@ apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource=
 		},
 		{
 			name:                    "Fallback Failure",
-			consistentReadsEnabled:  true,
 			watchCacheRV:            "2",
 			storageRV:               "42",
 			fallbackError:           true,
@@ -427,7 +401,6 @@ apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource=
 		},
 		{
 			name:                    "Skip Storage Fallback",
-			consistentReadsEnabled:  true,
 			skipStorageFallback:     true,
 			watchCacheRV:            "2",
 			storageRV:               "42",
@@ -441,23 +414,10 @@ apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource=
 apiserver_watch_cache_consistent_read_total{fallback="skipped", group="", resource="pods", success="false"} 1
 `,
 		},
-		{
-			name:                    "Disabled",
-			watchCacheRV:            "2",
-			storageRV:               "42",
-			expectRV:                "42",
-			expectRequestsToStorage: 1,
-			expectMetric:            ``,
-		},
 	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.consistentReadsEnabled {
-				forceRequestWatchProgressSupport(t)
-			} else {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
-			}
+			forceRequestWatchProgressSupport(t)
 			if tc.skipStorageFallback {
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCacheSkipTimeoutFallback, true)
 			}
@@ -644,48 +604,10 @@ func TestMatchExactResourceVersionFallback(t *testing.T) {
 	}
 }
 
-func TestGetListNonRecursiveCacheBypass(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
-	backingStorage := &cachertesting.MockStorage{}
-	cacher, _, err := newTestCacher(backingStorage)
-	if err != nil {
-		t.Fatalf("Couldn't create cacher: %v", err)
-	}
-	defer cacher.Stop()
-	delegator := NewCacheDelegator(cacher, backingStorage)
-	defer delegator.Stop()
-
-	pred := storage.SelectionPredicate{
-		Limit: 500,
-	}
-	result := &example.PodList{}
-
-
-	// Inject error to underlying layer and check if cacher is not bypassed.
-	backingStorage.InjectGetListError(errDummy)
-	err = delegator.GetList(context.TODO(), "/pods/ns", storage.ListOptions{
-		ResourceVersion: "0",
-		Predicate:       pred,
-	}, result)
-	if err != nil {
-		t.Errorf("GetList with Limit and RV=0 should be served from cache: %v", err)
-	}
-
-	err = delegator.GetList(context.TODO(), "/pods/ns", storage.ListOptions{
-		ResourceVersion: "",
-		Predicate:       pred,
-	}, result)
-	if !errors.Is(err, errDummy) {
-		t.Errorf("GetList with Limit without RV=0 should bypass cacher: %v", err)
-	}
-}
-
 func TestGetListNonRecursiveCacheWithConsistentListFromCache(t *testing.T) {
-	// Set feature gates once at the beginning since we only care about ConsistentListFromCache=true and ListFromCacheSnapshot=false
+	// Set feature gates once at the beginning since we only care about ListFromCacheSnapshot=false
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.ConsistentListFromCache: true,
-		features.ListFromCacheSnapshot:   false,
+		features.ListFromCacheSnapshot: false,
 	})
 	forceRequestWatchProgressSupport(t)
 
@@ -814,7 +736,6 @@ func TestGetCacheBypass(t *testing.T) {
 
 	result := &example.Pod{}
 
-
 	// Inject error to underlying layer and check if cacher is not bypassed.
 	backingStorage.InjectGetListError(errDummy)
 	err = delegator.Get(context.TODO(), "/pods/ns/pod-0", storage.GetOptions{
@@ -843,7 +764,6 @@ func TestWatchCacheBypass(t *testing.T) {
 	defer cacher.Stop()
 	delegator := NewCacheDelegator(cacher, backingStorage)
 	defer delegator.Stop()
-
 
 	_, err = delegator.Watch(context.TODO(), "/pods/ns", storage.ListOptions{
 		ResourceVersion: "0",
@@ -989,7 +909,6 @@ func TestWatcherNotGoingBackInTime(t *testing.T) {
 	}
 	defer cacher.Stop()
 
-
 	// Ensure there is some budget for slowing down processing.
 	cacher.dispatchTimeoutBudget.returnUnused(100 * time.Millisecond)
 
@@ -1072,7 +991,6 @@ func TestCacherDontAcceptRequestsStopped(t *testing.T) {
 	}
 	delegator := NewCacheDelegator(cacher, backingStorage)
 	defer delegator.Stop()
-
 
 	w, err := delegator.Watch(context.Background(), "/pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
 	if err != nil {
@@ -1244,7 +1162,6 @@ func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
 	}
 	defer cacher.Stop()
 
-
 	pred := storage.Everything
 	pred.AllowWatchBookmarks = true
 
@@ -1415,7 +1332,6 @@ func TestInitialEventsEndBookmark(t *testing.T) {
 	}
 	defer cacher.Stop()
 
-
 	makePod := func(index uint64) *example.Pod {
 		return &example.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -1577,7 +1493,6 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 	}
 	defer cacher.Stop()
 
-
 	// Ensure there is some budget for slowing down processing.
 	cacher.dispatchTimeoutBudget.returnUnused(100 * time.Millisecond)
 
@@ -1651,7 +1566,6 @@ func TestBookmarksOnResourceVersionUpdates(t *testing.T) {
 	// Ensure that bookmarks are sent more frequently than every 1m.
 	cacher.bookmarkWatchers = newTimeBucketWatchers(clock.RealClock{}, 2*time.Second)
 
-
 	makePod := func(i int) *examplev1.Pod {
 		return &examplev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -1724,7 +1638,6 @@ func TestStartingResourceVersion(t *testing.T) {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
 	defer cacher.Stop()
-
 
 	// Ensure there is some budget for slowing down processing.
 	// We use the fakeTimeBudget to prevent this test from flaking under
@@ -1800,7 +1713,6 @@ func TestDispatchEventWillNotBeBlockedByTimedOutWatcher(t *testing.T) {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
 	defer cacher.Stop()
-
 
 	// Ensure there is some budget for slowing down processing.
 	// We use the fakeTimeBudget to prevent this test from flaking under
@@ -1939,7 +1851,6 @@ func TestCachingDeleteEvents(t *testing.T) {
 	}
 	defer cacher.Stop()
 
-
 	fooPredicate := storage.SelectionPredicate{
 		Label: labels.SelectorFromSet(map[string]string{"foo": "true"}),
 		Field: fields.Everything(),
@@ -2016,7 +1927,6 @@ func testCachingObjects(t *testing.T, watchersCount int) {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
 	defer cacher.Stop()
-
 
 	dispatchedEvents := []*watchCacheEvent{}
 	cacher.watchCache.eventHandler = func(event *watchCacheEvent) {
@@ -2109,7 +2019,6 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 	}
 	defer cacher.Stop()
 
-
 	// Ensure there is enough budget for slow processing since
 	// the entire watch cache is going to be served through the
 	// interval and events won't be popped from the cacheWatcher's
@@ -2184,8 +2093,7 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 
 func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.WatchList:               true,
-		features.ConsistentListFromCache: true,
+		features.WatchList: true,
 	})
 	forceRequestWatchProgressSupport(t)
 
@@ -2314,7 +2222,6 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 				t.Fatalf("Couldn't create cacher: %v", err)
 			}
 			defer cacher.Stop()
-
 
 			w, err := cacher.Watch(context.Background(), "/pods/ns", scenario.opts)
 			require.NoError(t, err, "failed to create watch: %v")
@@ -2474,7 +2381,6 @@ func TestWatchListIsSynchronisedWhenNoEventsFromStoreReceived(t *testing.T) {
 	require.NoError(t, err, "failed to create cacher")
 	defer cacher.Stop()
 
-
 	pred := storage.Everything
 	pred.AllowWatchBookmarks = true
 	opts := storage.ListOptions{
@@ -2500,7 +2406,6 @@ func TestForgetWatcher(t *testing.T) {
 	cacher, _, err := newTestCacher(backingStorage)
 	require.NoError(t, err)
 	defer cacher.Stop()
-
 
 	assertCacherInternalState := func(expectedWatchersCounter, expectedValueWatchersCounter int) {
 		cacher.Lock()
@@ -2889,7 +2794,6 @@ func TestGetBookmarkAfterResourceVersionLockedFunc(t *testing.T) {
 			require.NoError(t, err, "couldn't create cacher")
 
 			defer cacher.Stop()
-
 
 			cacher.watchCache.UpdateResourceVersion(fmt.Sprintf("%d", scenario.watchCacheResourceVersion))
 			parsedResourceVersion := 0
