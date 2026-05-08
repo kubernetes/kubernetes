@@ -94,7 +94,7 @@ func (persistentvolumeclaimStrategy) WarningsOnCreate(ctx context.Context, obj r
 func (persistentvolumeclaimStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (persistentvolumeclaimStrategy) AllowCreateOnUpdate() bool {
+func (persistentvolumeclaimStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -131,7 +131,7 @@ func (persistentvolumeclaimStrategy) WarningsOnUpdate(ctx context.Context, obj, 
 	return pvcutil.GetWarningsForPersistentVolumeClaim(obj.(*api.PersistentVolumeClaim))
 }
 
-func (persistentvolumeclaimStrategy) AllowUnconditionalUpdate() bool {
+func (persistentvolumeclaimStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

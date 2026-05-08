@@ -66,7 +66,7 @@ func (priorityClassStrategy) WarningsOnCreate(ctx context.Context, obj runtime.O
 func (priorityClassStrategy) Canonicalize(obj runtime.Object) {}
 
 // AllowCreateOnUpdate is false for PriorityClass; this means POST is needed to create one.
-func (priorityClassStrategy) AllowCreateOnUpdate() bool {
+func (priorityClassStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -81,6 +81,6 @@ func (priorityClassStrategy) WarningsOnUpdate(ctx context.Context, obj, old runt
 }
 
 // AllowUnconditionalUpdate is the default update policy for PriorityClass objects.
-func (priorityClassStrategy) AllowUnconditionalUpdate() bool {
+func (priorityClassStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }

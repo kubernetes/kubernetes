@@ -100,7 +100,7 @@ func (svcStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []s
 func (svcStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (svcStrategy) AllowCreateOnUpdate() bool {
+func (svcStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return true
 }
 
@@ -114,7 +114,7 @@ func (svcStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object
 	return serviceapi.GetWarningsForService(obj.(*api.Service), old.(*api.Service))
 }
 
-func (svcStrategy) AllowUnconditionalUpdate() bool {
+func (svcStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

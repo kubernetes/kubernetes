@@ -73,7 +73,7 @@ func (nodeStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 }
 
 // AllowCreateOnUpdate is false for nodes.
-func (nodeStrategy) AllowCreateOnUpdate() bool {
+func (nodeStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -155,7 +155,7 @@ func (nodeStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Objec
 	return nodeWarnings(obj)
 }
 
-func (nodeStrategy) AllowUnconditionalUpdate() bool {
+func (nodeStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

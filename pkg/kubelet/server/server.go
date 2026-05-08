@@ -302,7 +302,7 @@ type NodeRequestAttributesGetter interface {
 type AuthInterface interface {
 	authenticator.Request
 	NodeRequestAttributesGetter
-	authorizer.Authorizer
+	authorizer.UnconditionalAuthorizer
 	dynamiccertificates.CAContentProvider
 }
 

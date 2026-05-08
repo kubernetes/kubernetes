@@ -79,7 +79,7 @@ func (networkPolicyStrategy) WarningsOnCreate(ctx context.Context, obj runtime.O
 func (networkPolicyStrategy) Canonicalize(obj runtime.Object) {}
 
 // AllowCreateOnUpdate is false for NetworkPolicy; this means POST is needed to create one.
-func (networkPolicyStrategy) AllowCreateOnUpdate() bool {
+func (networkPolicyStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -95,7 +95,7 @@ func (networkPolicyStrategy) WarningsOnUpdate(ctx context.Context, obj, old runt
 }
 
 // AllowUnconditionalUpdate is the default update policy for NetworkPolicy objects.
-func (networkPolicyStrategy) AllowUnconditionalUpdate() bool {
+func (networkPolicyStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

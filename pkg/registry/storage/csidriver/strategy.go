@@ -91,7 +91,7 @@ func (csiDriverStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Objec
 func (csiDriverStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (csiDriverStrategy) AllowCreateOnUpdate() bool {
+func (csiDriverStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -152,6 +152,6 @@ func (csiDriverStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.
 	return warnings
 }
 
-func (csiDriverStrategy) AllowUnconditionalUpdate() bool {
+func (csiDriverStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }

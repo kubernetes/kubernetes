@@ -119,7 +119,7 @@ func TestHeap_AddOrUpdate_Add(t *testing.T) {
 	if e, a := 11, item.val; err != nil || a != e {
 		t.Fatalf("expected %d, got %d", e, a)
 	}
-	if err := h.Delete(mkHeapObj("baz", 11)); err == nil { // Nothing is deleted.
+	if obj := h.Delete(mkHeapObj("baz", 11)); obj.name != "" { // Nothing is deleted.
 		t.Fatalf("nothing should be deleted from the heap")
 	}
 	h.AddOrUpdate(mkHeapObj("foo", 14)) // foo is updated.
@@ -143,7 +143,7 @@ func TestHeap_Delete(t *testing.T) {
 	h.AddOrUpdate(mkHeapObj("baz", 11))
 
 	// Delete head. Delete should work with "key" and doesn't care about the value.
-	if err := h.Delete(mkHeapObj("bar", 200)); err != nil {
+	if obj := h.Delete(mkHeapObj("bar", 200)); obj.name == "" {
 		t.Fatalf("Failed to delete head.")
 	}
 	item, err := h.Pop()
@@ -154,15 +154,15 @@ func TestHeap_Delete(t *testing.T) {
 	h.AddOrUpdate(mkHeapObj("faz", 30))
 	len := h.data.Len()
 	// Delete non-existing item.
-	if err = h.Delete(mkHeapObj("non-existent", 10)); err == nil || len != h.data.Len() {
+	if obj := h.Delete(mkHeapObj("non-existent", 10)); obj.name != "" || len != h.data.Len() {
 		t.Fatalf("Didn't expect any item removal")
 	}
 	// Delete tail.
-	if err = h.Delete(mkHeapObj("bal", 31)); err != nil {
+	if obj := h.Delete(mkHeapObj("bal", 31)); obj.name == "" {
 		t.Fatalf("Failed to delete tail.")
 	}
 	// Delete one of the items with value 30.
-	if err = h.Delete(mkHeapObj("zab", 30)); err != nil {
+	if obj := h.Delete(mkHeapObj("zab", 30)); obj.name == "" {
 		t.Fatalf("Failed to delete item.")
 	}
 	item, err = h.Pop()
@@ -283,8 +283,8 @@ func TestHeapWithRecorder(t *testing.T) {
 	if *metricRecorder != 4 {
 		t.Errorf("expected count to be 4 but got %d", *metricRecorder)
 	}
-	if err := h.Delete(mkHeapObj("bar", 1)); err != nil {
-		t.Fatal(err)
+	if obj := h.Delete(mkHeapObj("bar", 1)); obj.name == "" {
+		t.Fatalf("Failed to delete item")
 	}
 	if *metricRecorder != 3 {
 		t.Errorf("expected count to be 3 but got %d", *metricRecorder)

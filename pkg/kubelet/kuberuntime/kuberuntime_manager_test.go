@@ -42,6 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -70,14 +71,38 @@ var (
 	containerRestartPolicyAlways       = v1.ContainerRestartPolicyAlways
 )
 
-func createTestRuntimeManager(tCtx ktesting.TContext) (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
-	return createTestRuntimeManagerWithErrors(tCtx, nil)
+type testRuntimeManagerOptions struct {
+	errors   map[string][]error
+	recorder *record.FakeRecorder
 }
 
-func createTestRuntimeManagerWithErrors(tCtx ktesting.TContext, errors map[string][]error) (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
+type testRuntimeManagerOption func(*testRuntimeManagerOptions)
+
+func withErrors(errors map[string][]error) testRuntimeManagerOption {
+	return func(o *testRuntimeManagerOptions) {
+		o.errors = errors
+	}
+}
+
+func withRecorder(recorder *record.FakeRecorder) testRuntimeManagerOption {
+	return func(o *testRuntimeManagerOptions) {
+		o.recorder = recorder
+	}
+}
+
+func createTestRuntimeManager(tCtx ktesting.TContext, opts ...testRuntimeManagerOption) (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
+	options := &testRuntimeManagerOptions{}
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	if options.recorder == nil {
+		options.recorder = &record.FakeRecorder{}
+	}
+
 	fakeRuntimeService := apitest.NewFakeRuntimeService()
-	if errors != nil {
-		fakeRuntimeService.Errors = errors
+	if options.errors != nil {
+		fakeRuntimeService.Errors = options.errors
 	}
 	fakeImageService := apitest.NewFakeImageService()
 	// Only an empty machineInfo is needed here, because in unit test all containers are besteffort,
@@ -88,7 +113,7 @@ func createTestRuntimeManagerWithErrors(tCtx ktesting.TContext, errors map[strin
 		MemoryCapacity: uint64(memoryCapacityQuantity.Value()),
 	}
 	osInterface := &containertest.FakeOS{}
-	manager, err := newFakeKubeRuntimeManager(tCtx, fakeRuntimeService, fakeImageService, machineInfo, osInterface, &containertest.FakeRuntimeHelper{}, noopoteltrace.NewTracerProvider().Tracer(""))
+	manager, err := newFakeKubeRuntimeManager(tCtx, fakeRuntimeService, fakeImageService, machineInfo, osInterface, &containertest.FakeRuntimeHelper{}, noopoteltrace.NewTracerProvider().Tracer(""), options.recorder)
 	return fakeRuntimeService, fakeImageService, manager, err
 }
 
@@ -1008,6 +1033,95 @@ func TestSyncPodWithRestartAllContainers(t *testing.T) {
 		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
 	}
 	verifyContainerStatuses(t, fakeRuntime, expected, "start only the init container")
+}
+
+func TestSyncPodNoEventsInSteadyState(t *testing.T) {
+	simplecontainer := v1.Container{
+		Name:            "foo1",
+		Image:           "busybox",
+		ImagePullPolicy: v1.PullIfNotPresent,
+	}
+
+	type testCase struct {
+		name    string
+		podspec v1.PodSpec
+	}
+
+	testCases := []testCase{
+		{
+			name: "simple pod",
+			podspec: v1.PodSpec{
+				Containers: []v1.Container{simplecontainer},
+			},
+		},
+		{
+			name: "pod with image volume",
+			podspec: v1.PodSpec{
+				Containers: []v1.Container{simplecontainer},
+				Volumes: []v1.Volume{
+					{
+						Name: "image-volume",
+						VolumeSource: v1.VolumeSource{
+							Image: &v1.ImageVolumeSource{Reference: "image1:latest", PullPolicy: v1.PullAlways},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	consumeEvents := func(recorder *record.FakeRecorder) []string {
+		var events []string
+		for {
+			select {
+			case ev := <-recorder.Events:
+				events = append(events, ev)
+			default:
+				return events
+			}
+		}
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create a recorder with a large enough buffer to hold all events generated during a single sync
+			recorder := record.NewFakeRecorder(100)
+
+			tCtx := ktesting.Init(t)
+			_, _, m, err := createTestRuntimeManager(tCtx, withRecorder(recorder))
+			require.NoError(t, err)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID:       "12345678",
+					Name:      "foo",
+					Namespace: "new",
+				},
+				Spec: tc.podspec,
+			}
+
+			// Sync the pod and store the resulting pod status.
+			backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+			result := m.SyncPod(tCtx, pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff, false)
+			require.NoError(t, result.Error())
+
+			runtimePod, err := m.GetPod(tCtx, pod.UID)
+			require.NoError(t, err)
+			podStatus, err := m.GetPodStatus(tCtx, runtimePod)
+			require.NoError(t, err)
+
+			// We need to consume events from the initial sync, but their content is not important.
+			events := consumeEvents(recorder)
+			t.Logf("recorded events during initial sync: %v", events)
+
+			// Sync again, passing in pod status from the previous sync. This should be steady state.
+			result = m.SyncPod(tCtx, pod, podStatus, []v1.Secret{}, backOff, false)
+			require.NoError(t, result.Error())
+
+			events = consumeEvents(recorder)
+			assert.Empty(t, events, "no events expected during steady state")
+		})
+	}
 }
 
 // A helper function to get a basic pod and its status assuming all sandbox and
@@ -4472,7 +4586,7 @@ func TestDoPodResizeAction(t *testing.T) {
 		},
 	} {
 		t.Run(tc.testName, func(t *testing.T) {
-			_, _, m, err := createTestRuntimeManagerWithErrors(tCtx, tc.runtimeErrors)
+			_, _, m, err := createTestRuntimeManager(tCtx, withErrors(tc.runtimeErrors))
 			require.NoError(t, err)
 			m.cpuCFSQuota = true // Enforce CPU Limits
 

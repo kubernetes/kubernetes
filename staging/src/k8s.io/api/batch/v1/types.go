@@ -534,9 +534,6 @@ type JobStatus struct {
 
 	// The number of pods which are terminating (in phase Pending or Running
 	// and have a deletionTimestamp).
-	//
-	// This field is beta-level. The job controller populates the field when
-	// the feature gate JobPodReplacementPolicy is enabled (enabled by default).
 	// +optional
 	Terminating *int32 `json:"terminating,omitempty" protobuf:"varint,11,opt,name=terminating"`
 
@@ -627,10 +624,8 @@ const (
 	// JobReasponDeadlineExceeded means job duration is past ActiveDeadline
 	JobReasonDeadlineExceeded string = "DeadlineExceeded"
 	// JobReasonMaxFailedIndexesExceeded indicates that an indexed of a job failed
-	// This const is used in beta-level feature: https://kep.k8s.io/3850.
 	JobReasonMaxFailedIndexesExceeded string = "MaxFailedIndexesExceeded"
 	// JobReasonFailedIndexes means Job has failed indexes.
-	// This const is used in beta-level feature: https://kep.k8s.io/3850.
 	JobReasonFailedIndexes string = "FailedIndexes"
 	// JobReasonSuccessPolicy reason indicates a SuccessCriteriaMet condition is added due to
 	// a Job met successPolicy.

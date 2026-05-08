@@ -40,6 +40,7 @@ import (
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	schedulinginformers "k8s.io/client-go/informers/scheduling/v1alpha2"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
@@ -61,6 +62,7 @@ type WorkloadExecutor struct {
 	dataItems                    []DataItem
 	numPodsScheduledPerNamespace map[string]int
 	podInformer                  coreinformers.PodInformer
+	podGroupInformer             schedulinginformers.PodGroupInformer
 	throughputErrorMargin        float64
 	testCase                     *testCase
 	workload                     *Workload
@@ -90,6 +92,8 @@ func (e *WorkloadExecutor) runOp(tCtx ktesting.TContext, op realOp, opIndex int)
 		return e.runBarrierOp(tCtx, opIndex, concreteOp)
 	case *sleepOp:
 		return e.runSleepOp(tCtx, concreteOp)
+	case *waitForPodGroups:
+		return e.runWaitForPodGroupsOp(tCtx, concreteOp)
 	case *startCollectingMetricsOp:
 		return e.runStartCollectingMetricsOp(tCtx, opIndex, concreteOp)
 	case *stopCollectingMetricsOp:
@@ -180,6 +184,29 @@ func (e *WorkloadExecutor) runSleepOp(tCtx ktesting.TContext, op *sleepOp) error
 	select {
 	case <-tCtx.Done():
 	case <-time.After(op.Duration.Duration):
+	}
+	return nil
+}
+
+// runWaitForPodGroupsOp executes the waitForPodGroups operation.
+// It polls the scheduler's informer cache until the expected number of pod groups
+// are visible in the given namespace. This ensures that subsequent operations
+// (like creating pods that reference these pod groups) won't fail due to cache lag.
+// It timeouts after 10 seconds if the condition is not met.
+func (e *WorkloadExecutor) runWaitForPodGroupsOp(tCtx ktesting.TContext, op *waitForPodGroups) error {
+	tCtx.Logf("waiting for %d PodGroups in namespace %q", op.Count, op.Namespace)
+	err := wait.PollUntilContextTimeout(tCtx, 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+		podGroups, err := e.podGroupInformer.Lister().PodGroups(op.Namespace).List(labels.Everything())
+		if err != nil {
+			return false, err
+		}
+		if len(podGroups) >= op.Count {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return fmt.Errorf("timed out waiting for PodGroups: %w", err)
 	}
 	return nil
 }

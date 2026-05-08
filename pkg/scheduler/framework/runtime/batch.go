@@ -38,6 +38,8 @@ type OpportunisticBatch struct {
 	// Used primarily for tests, count the total pods we
 	// have successfully batched.
 	batchedPods int64
+
+	genericWorkloadEnabled bool
 }
 
 type batchState struct {
@@ -168,8 +170,12 @@ func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, pod *v1.P
 
 	// In this case, a previous pod was scheduled by another profile, meaning we can't use the state anymore.
 	if cycleCount != b.lastCycle.cycleCount+1 {
-		b.logUnusableState(logger, cycleCount, metrics.BatchFlushPodSkipped)
-		return false
+		// In case of PodGroup scheduling cycle, multiple pods can share the same cycle count.
+		// The batch state can be reused in that case.
+		if !b.genericWorkloadEnabled || cycleCount != b.lastCycle.cycleCount {
+			b.logUnusableState(logger, cycleCount, metrics.BatchFlushPodSkipped)
+			return false
+		}
 	}
 
 	// If our last pod failed we can't use the state.
@@ -228,8 +234,9 @@ func (b *OpportunisticBatch) stateEmpty() bool {
 	return b.state == nil || b.state.sortedNodes == nil || b.state.sortedNodes.Len() == 0
 }
 
-func newOpportunisticBatch(h fwk.Handle) *OpportunisticBatch {
+func newOpportunisticBatch(h fwk.Handle, genericWorkloadEnabled bool) *OpportunisticBatch {
 	return &OpportunisticBatch{
-		handle: h,
+		handle:                 h,
+		genericWorkloadEnabled: genericWorkloadEnabled,
 	}
 }

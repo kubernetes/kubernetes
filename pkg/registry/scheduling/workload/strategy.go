@@ -74,7 +74,7 @@ func (workloadStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object
 
 func (workloadStrategy) Canonicalize(obj runtime.Object) {}
 
-func (workloadStrategy) AllowCreateOnUpdate() bool {
+func (workloadStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -90,7 +90,7 @@ func (workloadStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.O
 	return nil
 }
 
-func (workloadStrategy) AllowUnconditionalUpdate() bool {
+func (workloadStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

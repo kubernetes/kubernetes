@@ -354,7 +354,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 // authorizeUnsafeDelete ensures that the user has permission to do
 // 'unsafe-delete-ignore-read-errors' on the resource being deleted when
 // ignoreStoreReadErrorWithClusterBreakingPotential is enabled
-func authorizeUnsafeDelete(ctx context.Context, attr admission.Attributes, authz authorizer.Authorizer) (err error) {
+func authorizeUnsafeDelete(ctx context.Context, attr admission.Attributes, authz authorizer.UnconditionalAuthorizer) (err error) {
 	if attr.GetOperation() != admission.Delete || attr.GetOperationOptions() == nil {
 		return nil
 	}

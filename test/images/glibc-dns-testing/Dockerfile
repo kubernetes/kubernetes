@@ -27,10 +27,12 @@
 ARG BASEIMAGE
 FROM $BASEIMAGE
 
+ARG TARGETARCH
+
 RUN apt-get update && \
     apt-get install -y dnsutils && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-ADD https://github.com/coredns/coredns/releases/download/v1.5.0/coredns_1.5.0_linux_BASEARCH.tgz /coredns.tgz
+ADD https://github.com/coredns/coredns/releases/download/v1.5.0/coredns_1.5.0_linux_${TARGETARCH}.tgz /coredns.tgz
 RUN tar -xzvf /coredns.tgz && rm -f /coredns.tgz

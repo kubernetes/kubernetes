@@ -41,13 +41,13 @@ import (
 
 type dispatcher struct {
 	matcher generic.PolicyMatcher
-	authz   authorizer.Authorizer
+	authz   authorizer.UnconditionalAuthorizer
 }
 
 var _ generic.Dispatcher[PolicyHook] = &dispatcher{}
 
 func NewDispatcher(
-	authorizer authorizer.Authorizer,
+	authorizer authorizer.UnconditionalAuthorizer,
 	matcher generic.PolicyMatcher,
 ) generic.Dispatcher[PolicyHook] {
 	return &dispatcher{

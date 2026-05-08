@@ -828,17 +828,23 @@ func TestSchedulerRestartWithNominatedNode(t *testing.T) {
 		pls = append(pls, mockQueueSort, mockPreBind)
 		pls = append(pls, additionalPlugins...)
 		registry, prof := schedulerutils.InitRegistryAndConfig(t, nil, pls...)
-		return schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 0,
+		testCtx, teardown := schedulerutils.InitTestSchedulerForFrameworkTest(t, testContext, 0,
 			false, /* do not run scheduler immediately after init */
 			scheduler.WithProfiles(prof),
 			scheduler.WithFrameworkOutOfTreeRegistry(registry),
 		)
+		// Ensure both nodes are in the cache before proceeding
+		if err := testutils.WaitForNodesInCache(testCtx.Ctx, testCtx.Scheduler, 2); err != nil {
+			t.Fatalf("Failed to wait for nodes in cache: %v", err)
+		}
+		return testCtx, teardown
 	}
 
 	// To allow triggering scheduler restart in binding phase, we need to initialize the scheduler
 	// and pass the testCtx.SchedulerCloseFn to the bind plugin before calling Scheduler.Run.
 	mockBind := &mockBindPlugin{}
 	testCtx, _ := initSched(mockBind)
+
 	// This will fail the binding cycle and stop the scheduler
 	// Scheduler should set NNN for podA before this step.
 	mockBind.bindFn = func() *fwk.Status {

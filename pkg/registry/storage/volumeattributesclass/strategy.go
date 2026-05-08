@@ -60,7 +60,7 @@ func (volumeAttributesClassStrategy) WarningsOnCreate(ctx context.Context, obj r
 func (volumeAttributesClassStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (volumeAttributesClassStrategy) AllowCreateOnUpdate() bool {
+func (volumeAttributesClassStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -77,6 +77,6 @@ func (volumeAttributesClassStrategy) WarningsOnUpdate(ctx context.Context, obj, 
 	return nil
 }
 
-func (volumeAttributesClassStrategy) AllowUnconditionalUpdate() bool {
+func (volumeAttributesClassStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }

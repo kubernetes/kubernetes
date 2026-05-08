@@ -1664,27 +1664,12 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		podIP = podIPs[0]
 	}
 
-	// Get podSandboxConfig for containers to start.
-	podSandboxConfig, err := m.generatePodSandboxConfig(ctx, pod, podContainerChanges.Attempt)
-	if err != nil {
-		logger.Error(err, "GeneratePodSandboxConfig for pod failed", "pod", klog.KObj(pod))
-		result.Fail(fmt.Errorf("GeneratePodSandboxConfig for pod %q failed: %w", format.Pod(pod), err))
-		return
-	}
-
-	imageVolumePullResults, err := m.getImageVolumes(ctx, pod, podSandboxConfig, pullSecrets)
-	if err != nil {
-		logger.Error(err, "Get image volumes for pod failed", "pod", klog.KObj(pod))
-		result.Fail(err)
-		return
-	}
-
 	// Helper containing boilerplate common to starting all types of containers.
 	// typeName is a description used to describe this type of container in log messages,
 	// currently: "container", "init container" or "ephemeral container"
 	// metricLabel is the label used to describe this type of container in monitoring metrics.
 	// currently: "container", "init_container" or "ephemeral_container"
-	start := func(ctx context.Context, typeName, metricLabel string, spec *startSpec) error {
+	startWithInitState := func(ctx context.Context, typeName, metricLabel string, spec *startSpec, podSandboxConfig *runtimeapi.PodSandboxConfig, imageVolumePullResults imageVolumePulls) error {
 		startContainerResult := kubecontainer.NewSyncResult(kubecontainer.StartContainer, spec.container.Name)
 		result.AddSyncResult(startContainerResult)
 
@@ -1740,16 +1725,60 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 		return nil
 	}
 
+	// State required only if we need to start any containers.
+	var (
+		podSandboxConfig       *runtimeapi.PodSandboxConfig
+		imageVolumePullResults imageVolumePulls
+	)
+
+	// lazyStart initializes state required to start containers and returns a start function.
+	lazyStart := func() func(ctx context.Context, typeName, metricLabel string, spec *startSpec) error {
+		var err error
+
+		if podSandboxConfig == nil {
+			podSandboxConfig, err = m.generatePodSandboxConfig(ctx, pod, podContainerChanges.Attempt)
+			if err != nil {
+				logger.Error(err, "GeneratePodSandboxConfig for pod failed", "pod", klog.KObj(pod))
+				result.Fail(fmt.Errorf("GeneratePodSandboxConfig for pod %q failed: %w", format.Pod(pod), err))
+				return nil
+			}
+		}
+
+		if imageVolumePullResults == nil {
+			imageVolumePullResults, err = m.getImageVolumes(ctx, pod, podSandboxConfig, pullSecrets)
+			if err != nil {
+				// Don't start any containers until we have all image volumes.
+				logger.Error(err, "Get image volumes for pod failed", "pod", klog.KObj(pod))
+				result.Fail(err)
+				return nil
+			}
+		}
+
+		return func(ctx context.Context, typeName, metricLabel string, spec *startSpec) error {
+			return startWithInitState(ctx, typeName, metricLabel, spec, podSandboxConfig, imageVolumePullResults)
+		}
+	}
+
 	// Step 6: start ephemeral containers
 	// These are started "prior" to init containers to allow running ephemeral containers even when there
 	// are errors starting an init container. In practice init containers will start first since ephemeral
 	// containers cannot be specified on pod creation.
 	for _, idx := range podContainerChanges.EphemeralContainersToStart {
+		start := lazyStart()
+		if start == nil {
+			return
+		}
+
 		start(ctx, "ephemeral container", metrics.EphemeralContainer, ephemeralContainerStartSpec(&pod.Spec.EphemeralContainers[idx]))
 	}
 
 	// Step 7: start init containers.
 	for _, idx := range podContainerChanges.InitContainersToStart {
+		start := lazyStart()
+		if start == nil {
+			return
+		}
+
 		container := &pod.Spec.InitContainers[idx]
 		// Start the next init container.
 		if err := start(ctx, "init container", metrics.InitContainer, containerStartSpec(container)); err != nil {
@@ -1789,6 +1818,11 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 
 	// Step 9: start containers in podContainerChanges.ContainersToStart.
 	for _, idx := range podContainerChanges.ContainersToStart {
+		start := lazyStart()
+		if start == nil {
+			return
+		}
+
 		start(ctx, "container", metrics.Container, containerStartSpec(&pod.Spec.Containers[idx]))
 	}
 

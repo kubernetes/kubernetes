@@ -128,7 +128,7 @@ func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag
 		return Validations{}, fmt.Errorf("nested deferred validations are not supported for eachVal value")
 	}
 
-	if result.Empty() && !result.OpaqueValType {
+	if result.Empty() {
 		return Validations{}, fmt.Errorf("no validation functions found")
 	}
 

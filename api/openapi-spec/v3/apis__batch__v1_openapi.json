@@ -480,7 +480,7 @@
             "type": "integer"
           },
           "terminating": {
-            "description": "The number of pods which are terminating (in phase Pending or Running and have a deletionTimestamp).\n\nThis field is beta-level. The job controller populates the field when the feature gate JobPodReplacementPolicy is enabled (enabled by default).",
+            "description": "The number of pods which are terminating (in phase Pending or Running and have a deletionTimestamp).",
             "format": "int32",
             "type": "integer"
           },
@@ -4587,7 +4587,7 @@
         "properties": {
           "mountPath": {
             "default": "",
-            "description": "Path within the container at which the volume should be mounted.  Must not contain ':'.",
+            "description": "Path within the container at which the volume should be mounted.",
             "type": "string"
           },
           "mountPropagation": {

@@ -82,7 +82,7 @@ func (*deviceTaintRuleStrategy) WarningsOnCreate(ctx context.Context, obj runtim
 func (*deviceTaintRuleStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (*deviceTaintRuleStrategy) AllowCreateOnUpdate() bool {
+func (*deviceTaintRuleStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -122,7 +122,7 @@ func (*deviceTaintRuleStrategy) WarningsOnUpdate(ctx context.Context, obj, old r
 	return nil
 }
 
-func (*deviceTaintRuleStrategy) AllowUnconditionalUpdate() bool {
+func (*deviceTaintRuleStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

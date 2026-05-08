@@ -105,9 +105,9 @@ func GetModelNameTargets(context *generator.Context, args *args.Args, boilerplat
 			continue
 		}
 
-		openAPISchemaNamePackage, err := extractOpenAPISchemaNamePackage(pkg.Comments)
+		openAPISchemaNamePackage, err := resolvePackageModelPackage(pkg)
 		if err != nil {
-			klog.Fatalf("Package %v: invalid %s:%v", i, tagModelPackage, err)
+			klog.Fatalf("Package %v: %v", i, err)
 		}
 		hasPackageTag := len(openAPISchemaNamePackage) > 0
 

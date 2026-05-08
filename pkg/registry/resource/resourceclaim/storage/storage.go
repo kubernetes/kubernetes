@@ -41,7 +41,7 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against ResourceClaims.
-func NewREST(optsGetter generic.RESTOptionsGetter, nsClient v1.NamespaceInterface, authorizer authorizer.Authorizer) (*REST, *StatusREST, error) {
+func NewREST(optsGetter generic.RESTOptionsGetter, nsClient v1.NamespaceInterface, authorizer authorizer.UnconditionalAuthorizer) (*REST, *StatusREST, error) {
 	if nsClient == nil {
 		return nil, nil, fmt.Errorf("namespace client is required")
 	}

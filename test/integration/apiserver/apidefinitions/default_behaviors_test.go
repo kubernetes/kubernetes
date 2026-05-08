@@ -18,14 +18,17 @@ package apidefinitions
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/util/retry"
 )
 
 // TestAllowCreateOnUpdate verifies that APIs prefer AllowCreateOnUpdate() = false.
@@ -36,20 +39,21 @@ import (
 func TestAllowCreateOnUpdate(t *testing.T) {
 	exempt := sets.New(
 		// Leases are maintained exclusively via PUT requests.
-		"leasecandidates.coordination.k8s.io",
-		"leases.coordination.k8s.io",
+		"leasecandidates.v1alpha2.coordination.k8s.io",
+		"leasecandidates.v1beta1.coordination.k8s.io",
+		"leases.v1.coordination.k8s.io",
 
 		// Grandfathered APIs with no clear rationale:
-		"clusterrolebindings.rbac.authorization.k8s.io",
-		"clusterroles.rbac.authorization.k8s.io",
-		"endpoints",
-		"events.events.k8s.io",
-		"events",
-		"limitranges",
-		"rolebindings.rbac.authorization.k8s.io",
-		"roles.rbac.authorization.k8s.io",
-		"runtimeclasses.node.k8s.io",
-		"services",
+		"clusterrolebindings.v1.rbac.authorization.k8s.io",
+		"clusterroles.v1.rbac.authorization.k8s.io",
+		"endpoints.v1",
+		"events.v1.events.k8s.io",
+		"events.v1",
+		"limitranges.v1",
+		"rolebindings.v1.rbac.authorization.k8s.io",
+		"roles.v1.rbac.authorization.k8s.io",
+		"runtimeclasses.v1.node.k8s.io",
+		"services.v1",
 	)
 	TestAllDefinitions(t, "allow-create-on-update", func(t *testing.T, api Definition) {
 		if !api.HasVerb("create") || !api.HasVerb("get") || !api.HasVerb("update") || !api.HasVerb("delete") {
@@ -60,7 +64,10 @@ func TestAllowCreateOnUpdate(t *testing.T) {
 		obj.SetResourceVersion("")
 		obj.SetUID("")
 		_, err := client.Update(context.TODO(), obj, metav1.UpdateOptions{})
-		assertDefault(t, api.Mapping.Resource, "AllowCreateOnUpdate must be false", errors.IsNotFound(err), exempt)
+		if err != nil && !apierrors.IsNotFound(err) {
+			t.Fatalf("Unexpected error from Update: %v", err)
+		}
+		assertDefault(t, api.Mapping.Resource, "AllowCreateOnUpdate must be false", apierrors.IsNotFound(err), exempt)
 	})
 }
 
@@ -71,9 +78,12 @@ func TestAllowCreateOnUpdate(t *testing.T) {
 func TestGenerateName(t *testing.T) {
 	exempt := sets.New(
 		// APIs with specific naming requirements that to not support generateName:
-		"apiservices.apiregistration.k8s.io",
-		"customresourcedefinitions.apiextensions.k8s.io",
-		"ipaddresses.networking.k8s.io",
+		"apiservices.v1.apiregistration.k8s.io",
+		"clustertrustbundles.v1alpha1.certificates.k8s.io",
+		"clustertrustbundles.v1beta1.certificates.k8s.io",
+		"customresourcedefinitions.v1.apiextensions.k8s.io",
+		"ipaddresses.v1.networking.k8s.io",
+		"storageversions.v1alpha1.internal.apiserver.k8s.io",
 	)
 	TestAllDefinitions(t, "generate-name", func(t *testing.T, api Definition) {
 		if !api.HasVerb("create") || !api.HasVerb("get") || !api.HasVerb("update") || !api.HasVerb("delete") {
@@ -86,6 +96,9 @@ func TestGenerateName(t *testing.T) {
 		obj.SetResourceVersion("")
 		obj.SetUID("")
 		created, err := client.Create(context.TODO(), obj, metav1.CreateOptions{})
+		if err != nil && !apierrors.IsInvalid(err) {
+			t.Fatalf("Unexpected error from Create: %v", err)
+		}
 		generated := err == nil && strings.HasPrefix(created.GetName(), "default-behaviors-")
 		assertDefault(t, api.Mapping.Resource, "metadata.generateName must produce a server-generated name", generated, exempt)
 	})
@@ -98,49 +111,40 @@ func TestGenerateName(t *testing.T) {
 func TestAllowUnconditionalUpdate(t *testing.T) {
 	exempt := sets.New(
 		// Grandfathered APIs:
-		"apiservices.apiregistration.k8s.io",
 		"certificatesigningrequests.v1.certificates.k8s.io",
 		"clusterrolebindings.v1.rbac.authorization.k8s.io",
 		"clusterroles.v1.rbac.authorization.k8s.io",
-		"clustertrustbundles.certificates.k8s.io",
+		"clustertrustbundles.v1alpha1.certificates.k8s.io",
 		"configmaps.v1",
 		"controllerrevisions.v1.apps",
 		"cronjobs.v1.batch",
-		"csidrivers.storage.k8s.io",
-		"csinodes.storage.k8s.io",
-		"csistoragecapacities.storage.k8s.io",
-		"customresourcedefinitions.apiextensions.k8s.io",
 		"daemonsets.v1.apps",
 		"deployments.v1.apps",
 		"deviceclasses.v1.resource.k8s.io",
+		"deviceclasses.v1beta1.resource.k8s.io",
+		"deviceclasses.v1beta2.resource.k8s.io",
+		"devicetaintrules.v1alpha3.resource.k8s.io",
+		"devicetaintrules.v1beta2.resource.k8s.io",
 		"endpoints.v1",
 		"endpointslices.v1.discovery.k8s.io",
 		"events.v1.events.k8s.io",
 		"events.v1",
 		"flowschemas.v1.flowcontrol.apiserver.k8s.io",
-		"foos.cr.bar.com",
 		"horizontalpodautoscalers.v1.autoscaling",
 		"horizontalpodautoscalers.v2.autoscaling",
 		"ingressclasses.v1.networking.k8s.io",
 		"ingresses.v1.networking.k8s.io",
-		"integers.random.numbers.com",
 		"ipaddresses.v1.networking.k8s.io",
 		"jobs.v1.batch",
-		"leasecandidates.coordination.k8s.io",
-		"leases.coordination.k8s.io",
 		"limitranges.v1",
-		"mutatingadmissionpolicies.admissionregistration.k8s.io",
-		"mutatingadmissionpolicybindings.admissionregistration.k8s.io",
-		"mutatingwebhookconfigurations.admissionregistration.k8s.io",
 		"namespaces.v1",
 		"networkpolicies.v1.networking.k8s.io",
 		"nodes.v1",
-		"pandas.awesome.bears.com",
-		"pants.custom.fancy.com",
+		"pants.v1.custom.fancy.com",
 		"persistentvolumeclaims.v1",
 		"persistentvolumes.v1",
-		"podcertificaterequests.certificates.k8s.io",
-		"poddisruptionbudgets.policy",
+		"podcertificaterequests.v1alpha1.certificates.k8s.io",
+		"podgroups.v1alpha2.scheduling.k8s.io",
 		"pods.v1",
 		"podtemplates.v1",
 		"priorityclasses.v1.scheduling.k8s.io",
@@ -148,25 +152,27 @@ func TestAllowUnconditionalUpdate(t *testing.T) {
 		"replicasets.v1.apps",
 		"replicationcontrollers.v1",
 		"resourceclaims.v1.resource.k8s.io",
+		"resourceclaims.v1beta1.resource.k8s.io",
+		"resourceclaims.v1beta2.resource.k8s.io",
 		"resourceclaimtemplates.v1.resource.k8s.io",
+		"resourceclaimtemplates.v1beta1.resource.k8s.io",
+		"resourceclaimtemplates.v1beta2.resource.k8s.io",
 		"resourcequotas.v1",
 		"resourceslices.v1.resource.k8s.io",
+		"resourceslices.v1beta1.resource.k8s.io",
+		"resourceslices.v1beta2.resource.k8s.io",
 		"rolebindings.v1.rbac.authorization.k8s.io",
 		"roles.v1.rbac.authorization.k8s.io",
-		"runtimeclasses.node.k8s.io",
 		"secrets.v1",
 		"serviceaccounts.v1",
 		"servicecidrs.v1.networking.k8s.io",
 		"services.v1",
 		"statefulsets.v1.apps",
 		"storageclasses.v1.storage.k8s.io",
-		"storageversionmigrations.storagemigration.k8s.io",
-		"storageversions.internal.apiserver.k8s.io",
-		"validatingadmissionpolicies.admissionregistration.k8s.io",
-		"validatingadmissionpolicybindings.admissionregistration.k8s.io",
-		"validatingwebhookconfigurations.admissionregistration.k8s.io",
-		"volumeattachments.storage.k8s.io",
+		"validatingadmissionpolicies.v1beta1.admissionregistration.k8s.io",
+		"validatingadmissionpolicybindings.v1beta1.admissionregistration.k8s.io",
 		"volumeattributesclasses.v1.storage.k8s.io",
+		"workloads.v1alpha2.scheduling.k8s.io",
 	)
 	TestAllDefinitions(t, "unconditional-update", func(t *testing.T, api Definition) {
 		if !api.HasVerb("create") || !api.HasVerb("get") || !api.HasVerb("update") || !api.HasVerb("delete") {
@@ -182,8 +188,11 @@ func TestAllowUnconditionalUpdate(t *testing.T) {
 
 		created.SetResourceVersion("")
 		_, err = client.Update(context.TODO(), created, metav1.UpdateOptions{})
-
-		assertDefault(t, api.Mapping.Resource, "AllowUnconditionalUpdate must be false", errors.IsConflict(err), exempt)
+		rejected := apierrors.IsConflict(err) || isInvalidResourceVersion(err)
+		if err != nil && !rejected {
+			t.Fatalf("Unexpected error from Update: %v", err)
+		}
+		assertDefault(t, api.Mapping.Resource, "AllowUnconditionalUpdate must be false", rejected, exempt)
 	})
 }
 
@@ -197,8 +206,8 @@ func TestDefaultGarbageCollectionPolicy(t *testing.T) {
 	// APIs that use OrphanDependents garbage collection policy
 	orphanDependentsExempt := sets.New(
 		// Grandfathered APIs that use OrphanDependants for backward compatibility
-		"jobs.batch",
-		"replicationcontrollers",
+		"jobs.v1.batch",
+		"replicationcontrollers.v1",
 
 		// non-GA APIs that use OrphanDependants, such as cronjobs, exist but is no longer served
 	)
@@ -208,8 +217,9 @@ func TestDefaultGarbageCollectionPolicy(t *testing.T) {
 	// APIs that use Unsupported garbage collection policy
 	unsupportedExempt := sets.New(
 		// Events are intended to be high-volume leaf nodes.
-		"events",
-		"events.events.k8s.io",
+		"events.v1",
+		"events.v1.events.k8s.io",
+		"customresourcedefinitions.v1.apiextensions.k8s.io",
 	)
 	TestAllDefinitions(t, "default-gc-policy", func(t *testing.T, api Definition) {
 		if !api.HasVerb("create") || !api.HasVerb("get") || !api.HasVerb("update") || !api.HasVerb("delete") {
@@ -222,17 +232,10 @@ func TestDefaultGarbageCollectionPolicy(t *testing.T) {
 		if _, err := client.Create(context.TODO(), obj, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create: %v", err)
 		}
-		latest, err := client.Get(context.TODO(), name, metav1.GetOptions{})
-		if err != nil {
-			t.Fatalf("Failed to get latest: %v", err)
-		}
-
 		// A blocking finalizer is added first, so the object is not removed
 		// before we can observe the result of each delete.
-		latest.SetFinalizers(append(latest.GetFinalizers(), "test.k8s.io/block"))
-		if _, err := client.Update(context.TODO(), latest, metav1.UpdateOptions{}); err != nil {
-			t.Logf("Could not set test finalizer, skipping GC policy check: %v", err)
-			return
+		if err := addBlockingFinalizer(client, name); err != nil {
+			t.Fatalf("Could not set test finalizer: %v", err)
 		}
 		if err := client.Delete(context.TODO(), name, metav1.DeleteOptions{}); err != nil {
 			t.Fatalf("Failed to delete: %v", err)
@@ -246,14 +249,15 @@ func TestDefaultGarbageCollectionPolicy(t *testing.T) {
 		isBackground := !hasOrphan && !hasForegroundDeletion
 
 		assertDefault(t, api.Mapping.Resource, "DefaultGarbageCollectionPolicy must be unset, to indicate that dependents are background deleted", isBackground, orphanDependentsExempt.Union(foregroundExempt))
-		if orphanDependentsExempt.Has(api.Mapping.Resource.GroupResource().String()) {
+		resName := ResourceString(api.Mapping.Resource)
+		if orphanDependentsExempt.Has(resName) {
 			if !hasOrphan {
-				t.Errorf("%s: DefaultGarbageCollectionPolicy expected to be OrphanDependents", api.Mapping.Resource.GroupResource().String())
+				t.Errorf("%s: DefaultGarbageCollectionPolicy expected to be OrphanDependents", resName)
 			}
 		}
-		if foregroundExempt.Has(api.Mapping.Resource.GroupResource().String()) {
+		if foregroundExempt.Has(resName) {
 			if !hasForegroundDeletion {
-				t.Errorf("%s: DefaultGarbageCollectionPolicy expected to be DeleteDependents", api.Mapping.Resource.GroupResource().String())
+				t.Errorf("%s: DefaultGarbageCollectionPolicy expected to be DeleteDependents", resName)
 			}
 		}
 	})
@@ -269,17 +273,10 @@ func TestDefaultGarbageCollectionPolicy(t *testing.T) {
 		if _, err := client.Create(context.TODO(), obj, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create: %v", err)
 		}
-		latest, err := client.Get(context.TODO(), name, metav1.GetOptions{})
-		if err != nil {
-			t.Fatalf("Failed to get latest: %v", err)
-		}
-
 		// A blocking finalizer is added first, so the object is not removed
 		// before we can observe the result of each delete.
-		latest.SetFinalizers(append(latest.GetFinalizers(), "test.k8s.io/block"))
-		if _, err := client.Update(context.TODO(), latest, metav1.UpdateOptions{}); err != nil {
-			t.Logf("Could not set test finalizer, skipping GC policy check: %v", err)
-			return
+		if err := addBlockingFinalizer(client, name); err != nil {
+			t.Fatalf("Could not set test finalizer: %v", err)
 		}
 
 		// Also check for APIs using Unsupported garbage collection policy
@@ -303,7 +300,7 @@ func TestCheckGracefulDelete(t *testing.T) {
 	exempt := sets.New(
 		// Pods support a grace period window to send SIGTERM and let containers shut down
 		// cleanly before the object is removed.
-		"pods",
+		"pods.v1",
 	)
 	TestAllDefinitions(t, "check-graceful-delete", func(t *testing.T, api Definition) {
 		if !api.HasVerb("create") || !api.HasVerb("get") || !api.HasVerb("update") || !api.HasVerb("delete") {
@@ -325,6 +322,9 @@ func TestCheckGracefulDelete(t *testing.T) {
 			t.Fatalf("Failed to delete with grace period: %v", err)
 		}
 		after, err := rsc.Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			t.Fatalf("Unexpected error from Get after delete: %v", err)
+		}
 
 		isGraceful := false
 		if err == nil {
@@ -337,7 +337,38 @@ func TestCheckGracefulDelete(t *testing.T) {
 	})
 }
 
-// assertDefault checks that a default behavior holds, with an allowlist for known exceptions.
+// addBlockingFinalizer appends a test finalizer to name, retrying on conflict.
+func addBlockingFinalizer(client dynamic.ResourceInterface, name string) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		latest, err := client.Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		latest.SetFinalizers(append(latest.GetFinalizers(), "test.k8s.io/block"))
+		_, err = client.Update(context.TODO(), latest, metav1.UpdateOptions{})
+		return err
+	})
+}
+
+// isInvalidResourceVersion reports whether err is an Invalid status error caused by metadata.resourceVersion.
+func isInvalidResourceVersion(err error) bool {
+	if !apierrors.IsInvalid(err) {
+		return false
+	}
+	var statusErr *apierrors.StatusError
+	if !errors.As(err, &statusErr) || statusErr.ErrStatus.Details == nil {
+		return false
+	}
+	for _, cause := range statusErr.ErrStatus.Details.Causes {
+		if cause.Field == "metadata.resourceVersion" {
+			return true
+		}
+	}
+	return false
+}
+
+// assertDefault checks that expected behavior conforms, unless the gvr is in the allow list, in which the behavor is
+// expected to continue to not confirm.
 func assertDefault(t *testing.T, gvr schema.GroupVersionResource, msg string, conforms bool, allowed sets.Set[string]) {
 	t.Helper()
 	name := ResourceString(gvr)

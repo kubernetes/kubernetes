@@ -243,7 +243,7 @@ type admitTestCase struct {
 	features             featuregate.FeatureGate
 	setupFunc            func(t *testing.T)
 	err                  string
-	authz                authorizer.Authorizer
+	authz                authorizer.UnconditionalAuthorizer
 }
 
 func (a *admitTestCase) run(t *testing.T) {

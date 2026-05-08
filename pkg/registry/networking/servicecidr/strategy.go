@@ -97,7 +97,7 @@ func (serviceCIDRStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for ServiceCIDR; this means POST is needed to create one.
-func (serviceCIDRStrategy) AllowCreateOnUpdate() bool {
+func (serviceCIDRStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -115,7 +115,7 @@ func (serviceCIDRStrategy) ValidateUpdate(ctx context.Context, new, old runtime.
 }
 
 // AllowUnconditionalUpdate is the default update policy for ServiceCIDR objects.
-func (serviceCIDRStrategy) AllowUnconditionalUpdate() bool {
+func (serviceCIDRStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

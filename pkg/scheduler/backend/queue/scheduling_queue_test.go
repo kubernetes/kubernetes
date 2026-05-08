@@ -1412,26 +1412,155 @@ func TestPriorityQueue_UpdateWhenInflight(t *testing.T) {
 }
 
 func TestPriorityQueue_Delete(t *testing.T) {
-	objs := []runtime.Object{highPriorityPodInfo.Pod, unschedulablePodInfo.Pod}
-	_, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	q := NewTestQueueWithObjects(ctx, newDefaultQueueSort(), objs)
-	q.Update(ctx, highPriorityPodInfo.Pod, highPriNominatedPodInfo.Pod)
-	q.Add(ctx, unschedulablePodInfo.Pod)
-	q.Delete(highPriNominatedPodInfo.Pod)
-	if !q.activeQ.has(newQueuedPodInfoForLookup(unschedulablePodInfo.Pod)) {
-		t.Errorf("Expected %v to be in activeQ.", unschedulablePodInfo.Pod.Name)
+	metrics.Register()
+	timestamp := time.Now()
+
+	pod1 := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Obj()
+	pInfo1 := &framework.QueuedPodInfo{
+		PodInfo:              mustNewTestPodInfo(t, pod1),
+		Timestamp:            timestamp,
+		UnschedulablePlugins: sets.New("fakePlugin"),
+		PendingPlugins:       sets.New("fakePendingPlugin"),
 	}
-	if q.activeQ.has(newQueuedPodInfoForLookup(highPriNominatedPodInfo.Pod)) {
-		t.Errorf("Didn't expect %v to be in activeQ.", highPriorityPodInfo.Pod.Name)
+	pod2 := st.MakePod().Name("pod2").Namespace("ns1").UID("pod2").Obj()
+	pInfo2 := &framework.QueuedPodInfo{
+		PodInfo:              mustNewTestPodInfo(t, pod2),
+		Timestamp:            timestamp,
+		UnschedulablePlugins: sets.New("fakePlugin2"),
 	}
-	if len(q.nominator.nominatedPods) != 1 {
-		t.Errorf("Expected nominatedPods to have only 'unschedulablePodInfo': %v", q.nominator.nominatedPods)
+
+	tests := []struct {
+		name                string
+		operations          []operation
+		operands            []*framework.QueuedPodInfo
+		podToDelete         *v1.Pod
+		expectedAbsentPods  []*v1.Pod
+		expectedPresentPods []*v1.Pod
+		expectedMetrics     map[string]int
+	}{
+		{
+			name: "Delete pod from activeQ",
+			operations: []operation{
+				add,
+				add,
+			},
+			operands:            []*framework.QueuedPodInfo{pInfo1, pInfo2},
+			podToDelete:         pod1,
+			expectedAbsentPods:  []*v1.Pod{pod1},
+			expectedPresentPods: []*v1.Pod{pod2},
+			expectedMetrics: map[string]int{
+				"fakePlugin":        0,
+				"fakePendingPlugin": 0,
+				"fakePlugin2":       0,
+			},
+		},
+		{
+			name: "Delete pod from backoffQ",
+			operations: []operation{
+				popAndRequeueAsBackoff,
+				add,
+			},
+			operands:            []*framework.QueuedPodInfo{pInfo1, pInfo2},
+			podToDelete:         pod1,
+			expectedAbsentPods:  []*v1.Pod{pod1},
+			expectedPresentPods: []*v1.Pod{pod2},
+			expectedMetrics: map[string]int{
+				"fakePlugin":        0,
+				"fakePendingPlugin": 0,
+				"fakePlugin2":       0,
+			},
+		},
+		{
+			name: "Delete pod from unschedulablePods",
+			operations: []operation{
+				popAndRequeueAsUnschedulable,
+				popAndRequeueAsUnschedulable,
+			},
+			operands:            []*framework.QueuedPodInfo{pInfo1, pInfo2},
+			podToDelete:         pod1,
+			expectedAbsentPods:  []*v1.Pod{pod1},
+			expectedPresentPods: []*v1.Pod{pod2},
+			expectedMetrics: map[string]int{
+				"fakePlugin":        0,
+				"fakePendingPlugin": 0,
+				"fakePlugin2":       1,
+			},
+		},
+		{
+			name: "Delete nominated pod from activeQ",
+			operations: []operation{
+				add,
+			},
+			operands:           []*framework.QueuedPodInfo{{PodInfo: highPriNominatedPodInfo}},
+			podToDelete:        highPriNominatedPodInfo.Pod,
+			expectedAbsentPods: []*v1.Pod{highPriNominatedPodInfo.Pod},
+			expectedMetrics: map[string]int{
+				"fakePlugin":        0,
+				"fakePendingPlugin": 0,
+				"fakePlugin2":       0,
+			},
+		},
+		{
+			name: "Delete non-existing pod",
+			operations: []operation{
+				popAndRequeueAsUnschedulable,
+			},
+			operands:            []*framework.QueuedPodInfo{pInfo1},
+			podToDelete:         pod2,
+			expectedAbsentPods:  []*v1.Pod{pod2},
+			expectedPresentPods: []*v1.Pod{pod1},
+			expectedMetrics: map[string]int{
+				"fakePlugin":        1,
+				"fakePendingPlugin": 1,
+				"fakePlugin2":       0,
+			},
+		},
 	}
-	q.Delete(unschedulablePodInfo.Pod)
-	if len(q.nominator.nominatedPods) != 0 {
-		t.Errorf("Expected nominatedPods to be empty: %v", q.nominator)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			q := NewTestQueue(tCtx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)))
+
+			// Reset metrics for plugins used in the test
+			allPlugins := sets.New("fakePlugin", "fakePendingPlugin", "fakePlugin2")
+			for plugin := range allPlugins {
+				metrics.UnschedulableReason(plugin, pod1.Spec.SchedulerName).Set(0)
+			}
+
+			// Execute operations
+			for i, op := range tt.operations {
+				op(tCtx, q, tt.operands[i])
+			}
+
+			q.Delete(tt.podToDelete)
+
+			// Verification
+			for _, pod := range tt.expectedAbsentPods {
+				pInfoLookup := newQueuedPodInfoForLookup(pod)
+				if q.activeQ.has(pInfoLookup) || q.backoffQ.has(pInfoLookup) || q.unschedulablePods.get(pod) != nil {
+					t.Errorf("Expected pod %v to be absent, but it is present", pod.Name)
+				}
+			}
+
+			for _, pod := range tt.expectedPresentPods {
+				pInfoLookup := newQueuedPodInfoForLookup(pod)
+				if !q.activeQ.has(pInfoLookup) && !q.backoffQ.has(pInfoLookup) && q.unschedulablePods.get(pod) == nil {
+					t.Errorf("Expected pod %v to be present, but it is absent", pod.Name)
+				}
+			}
+
+			for plugin, expectedVal := range tt.expectedMetrics {
+				val, _ := testutil.GetGaugeMetricValue(metrics.UnschedulableReason(plugin, tt.podToDelete.Spec.SchedulerName))
+				if diff := cmp.Diff(float64(expectedVal), val); diff != "" {
+					t.Errorf("Unexpected metric value for plugin %v after delete (-want, +got):\n%s", plugin, diff)
+				}
+			}
+
+			if len(q.nominator.nominatedPods) != 0 || len(q.nominator.nominatedPodToNode) != 0 {
+				t.Errorf("Expected nominatedPods and nominatedPodToNode to be empty, but got %v and %v", q.nominator.nominatedPods, q.nominator.nominatedPodToNode)
+			}
+		})
 	}
 }
 
@@ -3150,9 +3279,10 @@ var (
 	}
 	popAndRequeueAsUnschedulable = func(tCtx ktesting.TContext, queue *PriorityQueue, pInfo *framework.QueuedPodInfo) {
 		// To simulate the pod is failed in scheduling in the real world, Pop() the pod from activeQ before AddUnschedulableIfNotPresent() below.
-		// UnschedulablePlugins will get cleared by Pop, so make a copy first.
+		// UnschedulablePlugins and PendingPlugins will get cleared by Pop, so make a copy first.
 		logger := klog.FromContext(tCtx)
 		unschedulablePlugins := pInfo.UnschedulablePlugins.Clone()
+		pendingPlugins := pInfo.PendingPlugins.Clone()
 		queue.Add(tCtx, pInfo.Pod)
 		p, err := queue.Pop(logger)
 		if err != nil {
@@ -3162,6 +3292,7 @@ var (
 		}
 		// Simulate plugins that are waiting for some events.
 		p.UnschedulablePlugins = unschedulablePlugins
+		p.PendingPlugins = pendingPlugins
 		if err := queue.AddUnschedulableIfNotPresent(logger, p, 1); err != nil {
 			tCtx.Fatalf("Unexpected error during AddUnschedulableIfNotPresent: %v", err)
 		}

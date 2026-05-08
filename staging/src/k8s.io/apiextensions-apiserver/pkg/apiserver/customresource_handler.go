@@ -114,7 +114,7 @@ type crdHandler struct {
 	converterFactory *conversion.CRConverterFactory
 
 	// so that we can do create on update.
-	authorizer authorizer.Authorizer
+	authorizer authorizer.UnconditionalAuthorizer
 
 	// request timeout we should delay storage teardown for
 	requestTimeout time.Duration
@@ -177,7 +177,7 @@ func NewCustomResourceDefinitionHandler(
 	serviceResolver webhook.ServiceResolver,
 	authResolverWrapper webhook.AuthenticationInfoResolverWrapper,
 	masterCount int,
-	authorizer authorizer.Authorizer,
+	authorizer authorizer.UnconditionalAuthorizer,
 	requestTimeout time.Duration,
 	minRequestTimeout time.Duration,
 	staticOpenAPISpec map[string]*spec.Schema,

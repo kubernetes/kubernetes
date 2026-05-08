@@ -37,7 +37,7 @@ import (
 type mutatingAdmissionPolicyBindingStrategy struct {
 	rest.DeclarativeValidation
 	names.NameGenerator
-	authorizer       authorizer.Authorizer
+	authorizer       authorizer.UnconditionalAuthorizer
 	policyGetter     PolicyGetter
 	resourceResolver resolver.ResourceResolver
 }
@@ -49,7 +49,7 @@ type PolicyGetter interface {
 }
 
 // NewStrategy is the default logic that applies when creating and updating MutatingAdmissionPolicyBinding objects.
-func NewStrategy(authorizer authorizer.Authorizer, policyGetter PolicyGetter, resourceResolver resolver.ResourceResolver) *mutatingAdmissionPolicyBindingStrategy {
+func NewStrategy(authorizer authorizer.UnconditionalAuthorizer, policyGetter PolicyGetter, resourceResolver resolver.ResourceResolver) *mutatingAdmissionPolicyBindingStrategy {
 	return &mutatingAdmissionPolicyBindingStrategy{
 		DeclarativeValidation: rest.DeclarativeValidation{Scheme: legacyscheme.Scheme},
 		NameGenerator:         names.SimpleNameGenerator,
@@ -113,7 +113,7 @@ func (v *mutatingAdmissionPolicyBindingStrategy) Canonicalize(obj runtime.Object
 }
 
 // AllowCreateOnUpdate is false for MutatingAdmissionPolicyBinding; this means you may not create one with a PUT request.
-func (v *mutatingAdmissionPolicyBindingStrategy) AllowCreateOnUpdate() bool {
+func (v *mutatingAdmissionPolicyBindingStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -139,6 +139,6 @@ func (v *mutatingAdmissionPolicyBindingStrategy) WarningsOnUpdate(ctx context.Co
 
 // AllowUnconditionalUpdate is the default update policy for MutatingAdmissionPolicyBinding objects. Status update should
 // only be allowed if version match.
-func (v *mutatingAdmissionPolicyBindingStrategy) AllowUnconditionalUpdate() bool {
+func (v *mutatingAdmissionPolicyBindingStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }

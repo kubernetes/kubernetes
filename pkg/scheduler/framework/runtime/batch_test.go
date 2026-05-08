@@ -195,6 +195,8 @@ func TestBatchBasic(t *testing.T) {
 		firstChosenNode string
 		// firstOtherNodes is supposed to set only if firstPodScheduledSuccessfully is true.
 		firstOtherNodes framework.SortedScoredNodes
+		// if it's true, the test case behaves as if the pods are processed during the same PodGroup scheduling cycle.
+		sameCycle bool
 		// if it's true, the test case behaves as if there is another pod handled by another profile between the first and second pod.
 		skipPod                    bool
 		secondPodID                string
@@ -202,6 +204,7 @@ func TestBatchBasic(t *testing.T) {
 		secondSig                  string
 		secondChosenNode           string
 		secondOtherNodes           framework.SortedScoredNodes
+		genericWorkloadEnabled     bool
 		expectedHint               string
 		expectedState              *batchState
 	}{
@@ -291,6 +294,34 @@ func TestBatchBasic(t *testing.T) {
 			expectedHint:                  "",
 		},
 		{
+			name:                          "pod doesn't use batch from preceding pod when they are from the same cycle state, but GenericWorkload is disabled",
+			firstPodID:                    blockingPodID("1"),
+			firstSig:                      "sig",
+			firstChosenNode:               "n3",
+			firstOtherNodes:               newTestNodes([]string{"n1"}),
+			firstPodScheduledSuccessfully: true,
+			sameCycle:                     true,
+			secondPodID:                   blockingPodID("2"),
+			secondSig:                     "sig",
+			secondChosenNode:              "n1",
+			genericWorkloadEnabled:        false,
+			expectedHint:                  "",
+		},
+		{
+			name:                          "pod uses batch from preceding pod when they are from the same cycle state and GenericWorkload is enabled",
+			firstPodID:                    blockingPodID("1"),
+			firstSig:                      "sig",
+			firstChosenNode:               "n3",
+			firstOtherNodes:               newTestNodes([]string{"n1"}),
+			firstPodScheduledSuccessfully: true,
+			sameCycle:                     true,
+			secondPodID:                   blockingPodID("2"),
+			secondSig:                     "sig",
+			secondChosenNode:              "n1",
+			genericWorkloadEnabled:        true,
+			expectedHint:                  "n1",
+		},
+		{
 			name:                          "pod uses batch from preceding pod and leaves remaining batch to next pod",
 			firstPodID:                    blockingPodID("1"),
 			firstSig:                      "sig",
@@ -339,7 +370,7 @@ func TestBatchBasic(t *testing.T) {
 			}
 
 			signature := fwk.PodSignature(tt.firstSig)
-			batch := newOpportunisticBatch(testFwk)
+			batch := newOpportunisticBatch(testFwk, tt.genericWorkloadEnabled)
 			state := framework.NewCycleState()
 
 			// Run the first "pod" through
@@ -354,6 +385,8 @@ func TestBatchBasic(t *testing.T) {
 			var cycleCount int64 = 2
 			if tt.skipPod {
 				cycleCount = 3
+			} else if tt.sameCycle {
+				cycleCount = 1
 			}
 
 			// Run the second pod

@@ -84,7 +84,7 @@ func (storageVersionStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // Does not allow creating a StorageVersion object with a PUT request.
-func (storageVersionStrategy) AllowCreateOnUpdate() bool {
+func (storageVersionStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -103,7 +103,7 @@ func (storageVersionStrategy) WarningsOnUpdate(ctx context.Context, obj, old run
 
 // AllowUnconditionalUpdate is the default update policy for storageVersion objects. Status update should
 // only be allowed if version match.
-func (storageVersionStrategy) AllowUnconditionalUpdate() bool {
+func (storageVersionStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 

@@ -90,7 +90,7 @@ func (persistentvolumeStrategy) WarningsOnCreate(ctx context.Context, obj runtim
 func (persistentvolumeStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (persistentvolumeStrategy) AllowCreateOnUpdate() bool {
+func (persistentvolumeStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -116,7 +116,7 @@ func (persistentvolumeStrategy) WarningsOnUpdate(ctx context.Context, obj, old r
 	return pvutil.GetWarningsForPersistentVolume(obj.(*api.PersistentVolume))
 }
 
-func (persistentvolumeStrategy) AllowUnconditionalUpdate() bool {
+func (persistentvolumeStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

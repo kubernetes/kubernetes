@@ -277,10 +277,6 @@ const (
 	// This is added to control plane nodes to preserve backwards compatibility with a legacy behavior.
 	LabelExcludeFromExternalLB = "node.kubernetes.io/exclude-from-external-load-balancers"
 
-	// AnnotationKubeadmCRISocket specifies the annotation kubeadm uses to preserve the crisocket information given to kubeadm at
-	// init/join time for use later. kubeadm annotates the node object with this information
-	AnnotationKubeadmCRISocket = "kubeadm.alpha.kubernetes.io/cri-socket"
-
 	// KubeadmConfigConfigMap specifies in what ConfigMap in the kube-system namespace the `kubeadm init` configuration should be stored
 	KubeadmConfigConfigMap = "kubeadm-config"
 

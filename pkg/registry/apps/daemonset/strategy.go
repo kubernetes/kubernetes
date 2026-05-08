@@ -132,7 +132,7 @@ func (daemonSetStrategy) Canonicalize(obj runtime.Object) {
 
 // AllowCreateOnUpdate is false for daemon set; this means a POST is
 // needed to create one
-func (daemonSetStrategy) AllowCreateOnUpdate() bool {
+func (daemonSetStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -159,7 +159,7 @@ func (daemonSetStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.
 }
 
 // AllowUnconditionalUpdate is the default update policy for daemon set objects.
-func (daemonSetStrategy) AllowUnconditionalUpdate() bool {
+func (daemonSetStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

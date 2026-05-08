@@ -37,12 +37,12 @@ import (
 type mutatingAdmissionPolicyStrategy struct {
 	rest.DeclarativeValidation
 	names.NameGenerator
-	authorizer       authorizer.Authorizer
+	authorizer       authorizer.UnconditionalAuthorizer
 	resourceResolver resolver.ResourceResolver
 }
 
 // NewStrategy is the default logic that applies when creating and updating MutatingAdmissionPolicy objects.
-func NewStrategy(authorizer authorizer.Authorizer, resourceResolver resolver.ResourceResolver) *mutatingAdmissionPolicyStrategy {
+func NewStrategy(authorizer authorizer.UnconditionalAuthorizer, resourceResolver resolver.ResourceResolver) *mutatingAdmissionPolicyStrategy {
 	return &mutatingAdmissionPolicyStrategy{
 		DeclarativeValidation: rest.DeclarativeValidation{Scheme: legacyscheme.Scheme},
 		NameGenerator:         names.SimpleNameGenerator,
@@ -105,7 +105,7 @@ func (v *mutatingAdmissionPolicyStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for MutatingAdmissionPolicy; this means you may not create one with a PUT request.
-func (v *mutatingAdmissionPolicyStrategy) AllowCreateOnUpdate() bool {
+func (v *mutatingAdmissionPolicyStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -131,6 +131,6 @@ func (v *mutatingAdmissionPolicyStrategy) WarningsOnUpdate(ctx context.Context, 
 
 // AllowUnconditionalUpdate is the default update policy for MutatingAdmissionPolicy objects. Status update should
 // only be allowed if version match.
-func (v *mutatingAdmissionPolicyStrategy) AllowUnconditionalUpdate() bool {
+func (v *mutatingAdmissionPolicyStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }

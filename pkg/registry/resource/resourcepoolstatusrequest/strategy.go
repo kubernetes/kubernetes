@@ -82,7 +82,7 @@ func (*resourcePoolStatusRequestStrategy) WarningsOnCreate(ctx context.Context, 
 func (*resourcePoolStatusRequestStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (*resourcePoolStatusRequestStrategy) AllowCreateOnUpdate() bool {
+func (*resourcePoolStatusRequestStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -101,7 +101,7 @@ func (*resourcePoolStatusRequestStrategy) WarningsOnUpdate(ctx context.Context, 
 	return nil
 }
 
-func (*resourcePoolStatusRequestStrategy) AllowUnconditionalUpdate() bool {
+func (*resourcePoolStatusRequestStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 

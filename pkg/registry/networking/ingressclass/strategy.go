@@ -83,7 +83,7 @@ func (ingressClassStrategy) Canonicalize(obj runtime.Object) {
 
 // AllowCreateOnUpdate is false for IngressClass; this means POST is needed to
 // create one.
-func (ingressClassStrategy) AllowCreateOnUpdate() bool {
+func (ingressClassStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -102,6 +102,6 @@ func (ingressClassStrategy) WarningsOnUpdate(ctx context.Context, obj, old runti
 
 // AllowUnconditionalUpdate is the default update policy for IngressClass
 // objects.
-func (ingressClassStrategy) AllowUnconditionalUpdate() bool {
+func (ingressClassStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }

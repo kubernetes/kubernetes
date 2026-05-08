@@ -131,7 +131,7 @@ func (namespaceStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for namespaces.
-func (namespaceStrategy) AllowCreateOnUpdate() bool {
+func (namespaceStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -146,7 +146,7 @@ func (namespaceStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.
 	return nil
 }
 
-func (namespaceStrategy) AllowUnconditionalUpdate() bool {
+func (namespaceStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

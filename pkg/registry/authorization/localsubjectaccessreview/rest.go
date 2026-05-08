@@ -32,10 +32,10 @@ import (
 )
 
 type REST struct {
-	authorizer authorizer.Authorizer
+	authorizer authorizer.UnconditionalAuthorizer
 }
 
-func NewREST(authorizer authorizer.Authorizer) *REST {
+func NewREST(authorizer authorizer.UnconditionalAuthorizer) *REST {
 	return &REST{authorizer}
 }
 

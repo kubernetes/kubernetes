@@ -18,6 +18,7 @@ package validatingadmissionpolicybinding
 
 import (
 	"context"
+
 	"k8s.io/apiserver/pkg/registry/rest"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -37,7 +38,7 @@ import (
 type validatingAdmissionPolicyBindingStrategy struct {
 	rest.DeclarativeValidation
 	names.NameGenerator
-	authorizer       authorizer.Authorizer
+	authorizer       authorizer.UnconditionalAuthorizer
 	policyGetter     PolicyGetter
 	resourceResolver resolver.ResourceResolver
 }
@@ -53,7 +54,7 @@ type PolicyGetter interface {
 }
 
 // NewStrategy is the default logic that applies when creating and updating ValidatingAdmissionPolicyBinding objects.
-func NewStrategy(authorizer authorizer.Authorizer, policyGetter PolicyGetter, resourceResolver resolver.ResourceResolver) *validatingAdmissionPolicyBindingStrategy {
+func NewStrategy(authorizer authorizer.UnconditionalAuthorizer, policyGetter PolicyGetter, resourceResolver resolver.ResourceResolver) *validatingAdmissionPolicyBindingStrategy {
 	return &validatingAdmissionPolicyBindingStrategy{
 		DeclarativeValidation: rest.DeclarativeValidation{Scheme: legacyscheme.Scheme},
 		NameGenerator:         names.SimpleNameGenerator,
@@ -117,7 +118,7 @@ func (v *validatingAdmissionPolicyBindingStrategy) Canonicalize(obj runtime.Obje
 }
 
 // AllowCreateOnUpdate is false for ValidatingAdmissionPolicyBinding; this means you may not create one with a PUT request.
-func (v *validatingAdmissionPolicyBindingStrategy) AllowCreateOnUpdate() bool {
+func (v *validatingAdmissionPolicyBindingStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -143,6 +144,6 @@ func (v *validatingAdmissionPolicyBindingStrategy) WarningsOnUpdate(ctx context.
 
 // AllowUnconditionalUpdate is the default update policy for ValidatingAdmissionPolicyBinding objects. Status update should
 // only be allowed if version match.
-func (v *validatingAdmissionPolicyBindingStrategy) AllowUnconditionalUpdate() bool {
+func (v *validatingAdmissionPolicyBindingStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }

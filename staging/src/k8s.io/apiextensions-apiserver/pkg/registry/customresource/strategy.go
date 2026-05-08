@@ -261,12 +261,12 @@ func (customResourceStrategy) Canonicalize(obj runtime.Object) {
 
 // AllowCreateOnUpdate is false for CustomResources; this means a POST is
 // needed to create one.
-func (customResourceStrategy) AllowCreateOnUpdate() bool {
+func (customResourceStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
 // AllowUnconditionalUpdate is the default update policy for CustomResource objects.
-func (customResourceStrategy) AllowUnconditionalUpdate() bool {
+func (customResourceStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 

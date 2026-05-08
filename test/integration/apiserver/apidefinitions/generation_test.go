@@ -20,6 +20,7 @@ import (
 	"context"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -36,17 +37,20 @@ func TestGenerationManagement(t *testing.T) {
 	// DO NOT ADD NEW ENTRIES HERE.
 	// This tracks resources that have status but do not manage generation.
 	generationExempt := sets.New(
-		"apiservices.apiregistration.k8s.io",
-		"certificatesigningrequests.certificates.k8s.io",
-		"namespaces",
-		"nodes",
-		"persistentvolumeclaims",
-		"persistentvolumes",
-		"resourceclaims.resource.k8s.io",
-		"resourcequotas",
-		"servicecidrs.networking.k8s.io",
-		"services",
-		"volumeattachments.storage.k8s.io",
+		"apiservices.v1.apiregistration.k8s.io",
+		"certificatesigningrequests.v1.certificates.k8s.io",
+		"namespaces.v1",
+		"nodes.v1",
+		"persistentvolumeclaims.v1",
+		"persistentvolumes.v1",
+		"resourceclaims.v1.resource.k8s.io",
+		"resourceclaims.v1beta1.resource.k8s.io",
+		"resourceclaims.v1beta2.resource.k8s.io",
+		"resourcequotas.v1",
+		"servicecidrs.v1.networking.k8s.io",
+		"services.v1",
+		"storageversions.v1alpha1.internal.apiserver.k8s.io",
+		"volumeattachments.v1.storage.k8s.io",
 	)
 
 	TestAllDefinitions(t, "generation-namespace", func(t *testing.T, api Definition) {
@@ -108,8 +112,12 @@ func TestGenerationManagement(t *testing.T) {
 		// Verify that updating spec does bump generation.
 		result, err := rsc.Patch(context.TODO(), name, types.MergePatchType, []byte(differentSpec), metav1.PatchOptions{})
 		if err != nil {
-			t.Logf("Patch to main endpoint failed: %v", err)
-		} else if result.GetGeneration() <= afterStatus.GetGeneration() {
+			if !errors.IsInvalid(err) {
+				t.Fatalf("Patch to main endpoint failed with unexpected error: %v", err)
+			}
+			return
+		}
+		if result.GetGeneration() <= afterStatus.GetGeneration() {
 			if matchesException(api.Mapping.Resource, generationExempt) {
 				if result.GetGeneration() != 0 {
 					t.Errorf("Expected generation exempt resource always have generation 0, but got %v", result.GetGeneration())

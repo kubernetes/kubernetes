@@ -643,7 +643,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 	out := e.NewFunc()
 
 	// only ignore a not found error if this type allows creating on update, or we're forcing allowing create (like for server-side-apply)
-	ignoreNotFound := e.UpdateStrategy.AllowCreateOnUpdate() || forceAllowCreate
+	ignoreNotFound := e.UpdateStrategy.AllowCreateOnUpdate(ctx) || forceAllowCreate
 	// deleteObj is only used in case a deletion is carried out
 	var deleteObj runtime.Object
 	err = e.Storage.GuaranteedUpdate(ctx, key, out, ignoreNotFound, storagePreconditions, func(existing runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
@@ -652,7 +652,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 			return nil, nil, err
 		}
 		if existingResourceVersion == 0 {
-			if !e.UpdateStrategy.AllowCreateOnUpdate() && !forceAllowCreate {
+			if !e.UpdateStrategy.AllowCreateOnUpdate(ctx) && !forceAllowCreate {
 				return nil, nil, apierrors.NewNotFound(qualifiedResource, name)
 			}
 		}
@@ -671,7 +671,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		if err != nil {
 			return nil, nil, err
 		}
-		doUnconditionalUpdate := newResourceVersion == 0 && e.UpdateStrategy.AllowUnconditionalUpdate()
+		doUnconditionalUpdate := newResourceVersion == 0 && e.UpdateStrategy.AllowUnconditionalUpdate(ctx)
 
 		if existingResourceVersion == 0 {
 			// Init metadata as early as possible.

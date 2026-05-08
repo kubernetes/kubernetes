@@ -223,8 +223,39 @@ func (a *HorizontalController) Run(ctx context.Context, workers int) {
 }
 
 // obj could be an *v1.HorizontalPodAutoscaler, or a DeletionFinalStateUnknown marker item.
-func (a *HorizontalController) updateHPA(old, cur interface{}) {
-	a.enqueueHPA(cur)
+func (a *HorizontalController) updateHPA(oldObj, curObj interface{}) {
+	oldHPA, ok := oldObj.(*autoscalingv2.HorizontalPodAutoscaler)
+	if !ok {
+		a.enqueueRateLimited(curObj)
+		return
+	}
+	curHPA, ok := curObj.(*autoscalingv2.HorizontalPodAutoscaler)
+	if !ok {
+		a.enqueueRateLimited(curObj)
+		return
+	}
+
+	// When HPAGeneration is enabled, the API server bumps Generation on spec
+	// mutations, so we can use it to distinguish spec changes from status-only
+	// updates. Spec changes trigger immediate reconciliation; status-only
+	// changes (e.g. the controller's own status write) stay rate-limited to
+	// avoid a hot-loop. See https://issues.k8s.io/42715.
+	if utilfeature.DefaultFeatureGate.Enabled(features.HPAGeneration) &&
+		oldHPA.Generation != curHPA.Generation {
+		a.enqueueHPA(curHPA)
+		return
+	}
+
+	a.enqueueRateLimited(curHPA)
+}
+
+func (a *HorizontalController) enqueueRateLimited(obj interface{}) {
+	key, err := controller.KeyFunc(obj)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %w", obj, err))
+		return
+	}
+	a.queue.AddRateLimited(key)
 }
 
 // obj could be an *v1.HorizontalPodAutoscaler, or a DeletionFinalStateUnknown marker item.
@@ -235,21 +266,23 @@ func (a *HorizontalController) enqueueHPA(obj interface{}) {
 		return
 	}
 
-	// Requests are always added to queue with resyncPeriod delay.  If there's already
-	// request for the HPA in the queue then a new request is always dropped. Requests spend resync
-	// interval in queue so HPAs are processed every resync interval.
-	a.queue.AddRateLimited(key)
-
 	// Register HPA in the hpaSelectors map if it's not present yet. Attaching the Nothing selector
 	// that does not select objects. The actual selector is going to be updated
 	// when it's available during the autoscaler reconciliation.
+	// Registering first avoids a race where immediate reconciliation starts
+	// before selector bookkeeping exists.
+	hpaKey := selectors.Parse(key)
 	a.hpaSelectorsMux.Lock()
-	defer a.hpaSelectorsMux.Unlock()
-	if hpaKey := selectors.Parse(key); !a.hpaSelectors.SelectorExists(hpaKey) {
+	if !a.hpaSelectors.SelectorExists(hpaKey) {
 		a.hpaSelectors.PutSelector(hpaKey, labels.Nothing())
 		// Observe HPA addition - only when it's a new HPA
 		a.monitor.ObserveHPAAddition()
 	}
+	a.hpaSelectorsMux.Unlock()
+
+	// Add the HPA to the queue for immediate processing. Deduplication is handled
+	// by the queue: if the key is already queued or being processed, this is a no-op.
+	a.queue.Add(key)
 }
 
 func (a *HorizontalController) deleteHPA(obj interface{}) {

@@ -112,7 +112,7 @@ func (endpointSliceStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for EndpointSlice; this means POST is needed to create one.
-func (endpointSliceStrategy) AllowCreateOnUpdate() bool {
+func (endpointSliceStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -135,7 +135,7 @@ func (endpointSliceStrategy) WarningsOnUpdate(ctx context.Context, obj, old runt
 }
 
 // AllowUnconditionalUpdate is the default update policy for EndpointSlice objects.
-func (endpointSliceStrategy) AllowUnconditionalUpdate() bool {
+func (endpointSliceStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

@@ -79,7 +79,7 @@ func (volumeAttachmentStrategy) WarningsOnCreate(ctx context.Context, obj runtim
 func (volumeAttachmentStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (volumeAttachmentStrategy) AllowCreateOnUpdate() bool {
+func (volumeAttachmentStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -104,7 +104,7 @@ func (volumeAttachmentStrategy) WarningsOnUpdate(ctx context.Context, obj, old r
 	return nil
 }
 
-func (volumeAttachmentStrategy) AllowUnconditionalUpdate() bool {
+func (volumeAttachmentStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 

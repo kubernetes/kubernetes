@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
+	testutilsktesting "k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 )
@@ -461,6 +462,9 @@ func TestFeatureEnabled(t *testing.T) {
 
 func TestRestart(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(tCtx)
+	defer cancel()
+
 	systemDbusTmp := systemDbus
 	defer func() {
 		systemDbus = systemDbusTmp
@@ -511,7 +515,7 @@ func TestRestart(t *testing.T) {
 		StateDirectory:                  os.TempDir(),
 	})
 
-	err := manager.Start(tCtx)
+	err := manager.Start(ctx)
 	lock.Unlock()
 
 	if err != nil {
@@ -531,7 +535,71 @@ func TestRestart(t *testing.T) {
 	}
 }
 
+func TestStartDoesNotReconnectAfterContextCancel(t *testing.T) {
+	logger, tCtx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(tCtx)
+	defer cancel()
+
+	systemDbusTmp := systemDbus
+	defer func() {
+		systemDbus = systemDbusTmp
+	}()
+
+	shutdownGracePeriodRequested := 30 * time.Second
+	shutdownGracePeriodCriticalPods := 10 * time.Second
+	systemInhibitDelay := 40 * time.Second
+	overrideSystemInhibitDelay := 40 * time.Second
+
+	shutdownChans := make(chan chan bool, 2)
+
+	lock.Lock()
+	systemDbus = func() (dbusInhibiter, error) {
+		ch := make(chan bool)
+		shutdownChans <- ch
+		return &fakeDbus{
+			currentInhibitDelay:        systemInhibitDelay,
+			shutdownChan:               ch,
+			overrideSystemInhibitDelay: overrideSystemInhibitDelay,
+		}, nil
+	}
+
+	manager := NewManager(&Config{
+		Logger:                          logger,
+		VolumeManager:                   volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false),
+		Recorder:                        &record.FakeRecorder{},
+		NodeRef:                         &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""},
+		GetPodsFunc:                     func() []*v1.Pod { return nil },
+		KillPodFunc:                     func(*v1.Pod, bool, *int64, func(*v1.PodStatus)) error { return nil },
+		SyncNodeStatusFunc:              func(context.Context) {},
+		ShutdownGracePeriodRequested:    shutdownGracePeriodRequested,
+		ShutdownGracePeriodCriticalPods: shutdownGracePeriodCriticalPods,
+		StateDirectory:                  os.TempDir(),
+	})
+
+	err := manager.Start(ctx)
+	lock.Unlock()
+	require.NoError(t, err)
+
+	var shutdownChan chan bool
+	select {
+	case shutdownChan = <-shutdownChans:
+	case <-time.After(dbusReconnectPeriod):
+		t.Fatal("timed out waiting for initial dbus watch")
+	}
+
+	cancel()
+	close(shutdownChan)
+
+	select {
+	case <-shutdownChans:
+		t.Fatal("shutdown manager reconnected after context cancellation")
+	case <-time.After(dbusReconnectPeriod * 5):
+	}
+}
+
 func Test_managerImpl_processShutdownEvent(t *testing.T) {
+	tCtx := testutilsktesting.Init(t)
+
 	var (
 		fakeRecorder      = &record.FakeRecorder{}
 		fakeVolumeManager = volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false)
@@ -596,6 +664,7 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Use a buffered logger because this test asserts log output.
 			logger := ktesting.NewLogger(t,
 				ktesting.NewConfig(
 					ktesting.BufferLogs(true),
@@ -619,8 +688,11 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 					clock:                            tt.fields.clock,
 				},
 			}
-			if err := m.processShutdownEvent(); (err != nil) != tt.wantErr {
-				t.Errorf("managerImpl.processShutdownEvent() error = %v, wantErr %v", err, tt.wantErr)
+			err := m.processShutdownEvent(tCtx)
+			if tt.wantErr {
+				require.Error(t, err, "managerImpl.processShutdownEvent() should return an error")
+			} else {
+				require.NoError(t, err, "managerImpl.processShutdownEvent() should not return an error")
 			}
 
 			underlier, ok := logger.GetSink().(ktesting.Underlier)
@@ -639,6 +711,8 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 }
 
 func Test_processShutdownEvent_VolumeUnmountTimeout(t *testing.T) {
+	tCtx := testutilsktesting.Init(t)
+
 	var (
 		fakeRecorder               = &record.FakeRecorder{}
 		syncNodeStatus             = func(context.Context) {}
@@ -653,6 +727,7 @@ func Test_processShutdownEvent_VolumeUnmountTimeout(t *testing.T) {
 		// for volume unmount operations that take longer than the allowed grace period.
 		fmt.Errorf("unmount timeout"), false,
 	)
+	// Use a buffered logger because this test asserts log output.
 	logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true)))
 	m := &managerImpl{
 		logger:   logger,
@@ -682,7 +757,7 @@ func Test_processShutdownEvent_VolumeUnmountTimeout(t *testing.T) {
 	}
 
 	start := fakeclock.Now()
-	err := m.processShutdownEvent()
+	err := m.processShutdownEvent(tCtx)
 	end := fakeclock.Now()
 
 	require.NoError(t, err, "managerImpl.processShutdownEvent() should not return an error")

@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
@@ -539,6 +540,250 @@ func TestStatusEquality(t *testing.T) {
 	if !isPodStatusByKubeletEqual(&oldPodStatus, &podStatus) {
 		t.Fatalf("Differences in pod resource claim statuses not owned by kubelet should not affect normalized equality.")
 	}
+}
+
+// TestIsPodStatusByKubeletEqualFutureProof tests that all fields in v1.PodStatus are
+// explicitly categorized as either kubelet-owned or ignored.
+func TestIsPodStatusByKubeletEqualFutureProof(t *testing.T) {
+	// kubeletOwnedFields are fields in v1.PodStatus owned by the kubelet.
+	// Changes to these fields should NOT be ignored by isPodStatusByKubeletEqual.
+	kubeletOwnedFields := sets.NewString(
+		"Phase",
+		"Conditions", // Conditions are specially handled, but considered owned.
+		"Message",
+		"Reason",
+		"NominatedNodeName", // kubelet sets this to empty when pod is scheduled
+		"HostIP",
+		"HostIPs",
+		"PodIP",
+		"PodIPs",
+		"StartTime",
+		"InitContainerStatuses",
+		"ContainerStatuses",
+		"QOSClass",
+		"EphemeralContainerStatuses",
+		"Resize",
+		"AllocatedResources",
+		"ObservedGeneration",
+		"Resources",
+	)
+
+	// kubeletIgnoredFields are fields in v1.PodStatus not owned by the kubelet.
+	// Changes to these fields SHOULD be ignored by isPodStatusByKubeletEqual.
+	kubeletIgnoredFields := sets.NewString(
+		"ResourceClaimStatuses",
+		"ExtendedResourceClaimStatus",
+		"NodeAllocatableResourceClaimStatuses",
+	)
+
+	// Get all fields in v1.PodStatus.
+	status := v1.PodStatus{}
+	allStructFields := sets.NewString()
+	typ := reflect.TypeOf(status)
+	for i := 0; i < typ.NumField(); i++ {
+		allStructFields.Insert(typ.Field(i).Name)
+	}
+
+	// Check that all fields are explicitly categorized.
+	knownFields := kubeletOwnedFields.Union(kubeletIgnoredFields)
+	unknownFields := allStructFields.Difference(knownFields)
+	if unknownFields.Len() > 0 {
+		t.Fatalf("New fields found in v1.PodStatus: %v. Please add them to either "+
+			"kubeletOwnedFields or kubeletIgnoredFields in TestIsPodStatusByKubeletEqualFutureProof "+
+			"and update isPodStatusByKubeletEqual logic if necessary.", unknownFields.List())
+	}
+
+	// Verify that changes to fields that are not owned by kubelet are ignored.
+	t.Run("ignored fields are ignored", func(t *testing.T) {
+		pod := getTestPod()
+		base := pod.Status.DeepCopy()
+
+		// Test ResourceClaimStatuses
+		claimName := "test-claim-resource"
+		modified := base.DeepCopy()
+		modified.ResourceClaimStatuses = []v1.PodResourceClaimStatus{{
+			Name:              "test-claim",
+			ResourceClaimName: &claimName,
+		}}
+		if !isPodStatusByKubeletEqual(base, modified) {
+			t.Error("ResourceClaimStatuses: change should be ignored but was detected")
+		}
+
+		// Test ExtendedResourceClaimStatus
+		modified = base.DeepCopy()
+		modified.ExtendedResourceClaimStatus = &v1.PodExtendedResourceClaimStatus{
+			ResourceClaimName: "test-extended-claim",
+		}
+		if !isPodStatusByKubeletEqual(base, modified) {
+			t.Error("ExtendedResourceClaimStatus: change should be ignored but was detected")
+		}
+
+		// Test NodeAllocatableResourceClaimStatuses
+		modified = base.DeepCopy()
+		modified.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{{
+			ResourceClaimName: "test-node-claim",
+			Containers:        []string{"ctr0"},
+		}}
+		if !isPodStatusByKubeletEqual(base, modified) {
+			t.Error("NodeAllocatableResourceClaimStatuses: change should be ignored but was detected")
+		}
+	})
+
+	// Verify that changes to fields that are owned by kubelet are not ignored.
+	t.Run("owned fields are not ignored", func(t *testing.T) {
+		pod := getTestPod()
+		base := pod.Status.DeepCopy()
+
+		// Test Phase
+		modified := base.DeepCopy()
+		modified.Phase = v1.PodSucceeded
+		if isPodStatusByKubeletEqual(base, modified) {
+			t.Error("Phase: change should be detected but was ignored")
+		}
+
+		// Test Conditions
+		modified = base.DeepCopy()
+		modified.Conditions = append(modified.Conditions, v1.PodCondition{
+			Type:   v1.PodReady,
+			Status: v1.ConditionTrue,
+		})
+		if isPodStatusByKubeletEqual(base, modified) {
+			t.Error("Conditions: change should be detected but was ignored")
+		}
+
+		// Test Message
+		modified = base.DeepCopy()
+		modified.Message = "test message"
+		if isPodStatusByKubeletEqual(base, modified) {
+			t.Error("Message: change should be detected but was ignored")
+		}
+
+		// Test Reason
+		modified = base.DeepCopy()
+		modified.Reason = "TestReason"
+		if isPodStatusByKubeletEqual(base, modified) {
+			t.Error("Reason: change should be detected but was ignored")
+		}
+
+		// Test NominatedNodeName
+		modified = base.DeepCopy()
+		modified.NominatedNodeName = "test-node"
+		if isPodStatusByKubeletEqual(base, modified) {
+			t.Error("NominatedNodeName: change should be detected but was ignored")
+		}
+
+		// Test HostIP
+		modified = base.DeepCopy()
+		modified.HostIP = "192.168.1.1"
+		if isPodStatusByKubeletEqual(base, modified) {
+			t.Error("HostIP: change should be detected but was ignored")
+		}
+
+		// Test HostIPs — type is []v1.HostIP, not []v1.PodIP
+		modified = base.DeepCopy()
+		modified.HostIPs = []v1.HostIP{{IP: "192.168.1.1"}}
+		if isPodStatusByKubeletEqual(base, modified) {
+			t.Error("HostIPs: change should be detected but was ignored")
+		}
+
+		// Test PodIP
+		modified = base.DeepCopy()
+		modified.PodIP = "1.2.3.4"
+		if isPodStatusByKubeletEqual(base, modified) {
+			t.Error("PodIP: change should be detected but was ignored")
+		}
+
+		// Test PodIPs
+		modified = base.DeepCopy()
+		modified.PodIPs = []v1.PodIP{{IP: "1.2.3.5"}}
+		if isPodStatusByKubeletEqual(base, modified) {
+			t.Error("PodIPs: change should be detected but was ignored")
+		}
+
+		// Test StartTime
+		modified = base.DeepCopy()
+		modified.StartTime = ptr.To(metav1.Now())
+		if isPodStatusByKubeletEqual(base, modified) {
+			t.Error("StartTime: change should be detected but was ignored")
+		}
+
+		// Test InitContainerStatuses
+		modified = base.DeepCopy()
+		modified.InitContainerStatuses = []v1.ContainerStatus{
+			{
+				Name:  "init-container",
+				State: v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+			},
+		}
+		if isPodStatusByKubeletEqual(base, modified) {
+			t.Error("InitContainerStatuses: change should be detected but was ignored")
+		}
+
+		// Test ContainerStatuses
+		modified = base.DeepCopy()
+		modified.ContainerStatuses = []v1.ContainerStatus{
+			{
+				Name:  "container",
+				State: v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+			},
+		}
+		if isPodStatusByKubeletEqual(base, modified) {
+			t.Error("ContainerStatuses: change should be detected but was ignored")
+		}
+
+		// Test QOSClass
+		modified = base.DeepCopy()
+		modified.QOSClass = v1.PodQOSGuaranteed
+		if isPodStatusByKubeletEqual(base, modified) {
+			t.Error("QOSClass: change should be detected but was ignored")
+		}
+
+		// Test EphemeralContainerStatuses
+		modified = base.DeepCopy()
+		modified.EphemeralContainerStatuses = []v1.ContainerStatus{
+			{
+				Name:  "ephemeral-container",
+				State: v1.ContainerState{Running: &v1.ContainerStateRunning{}},
+			},
+		}
+		if isPodStatusByKubeletEqual(base, modified) {
+			t.Error("EphemeralContainerStatuses: change should be detected but was ignored")
+		}
+
+		// Test Resize — PodResizeStatus is a non-pointer string alias
+		modified = base.DeepCopy()
+		modified.Resize = v1.PodResizeStatus("InProgress")
+		if isPodStatusByKubeletEqual(base, modified) {
+			t.Error("Resize: change should be detected but was ignored")
+		}
+
+		// Test AllocatedResources
+		modified = base.DeepCopy()
+		modified.AllocatedResources = map[v1.ResourceName]resource.Quantity{
+			v1.ResourceCPU: resource.MustParse("100m"),
+		}
+		if isPodStatusByKubeletEqual(base, modified) {
+			t.Error("AllocatedResources: change should be detected but was ignored")
+		}
+
+		// Test ObservedGeneration
+		modified = base.DeepCopy()
+		modified.ObservedGeneration = 1
+		if isPodStatusByKubeletEqual(base, modified) {
+			t.Error("ObservedGeneration: change should be detected but was ignored")
+		}
+
+		// Test Resources
+		modified = base.DeepCopy()
+		modified.Resources = &v1.ResourceRequirements{
+			Requests: v1.ResourceList{
+				v1.ResourceCPU: resource.MustParse("100m"),
+			},
+		}
+		if isPodStatusByKubeletEqual(base, modified) {
+			t.Error("Resources: change should be detected but was ignored")
+		}
+	})
 }
 
 func TestStatusNormalizationEnforcesMaxBytes(t *testing.T) {

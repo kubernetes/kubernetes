@@ -271,9 +271,11 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			RemovedVersion:    "1.39",
 		},
 		gvr("certificates.k8s.io", "v1beta1", "podcertificaterequests"): {
-			Stub:              `{"metadata": {"name": "req-1"}, "spec": {"signerName":"example.com/signer", "podName":"pod-1", "podUID":"pod-uid-1", "serviceAccountName":"sa-1", "serviceAccountUID":"sa-uid-1", "nodeName":"node-1", "nodeUID":"node-uid-1", "maxExpirationSeconds":86400, "pkixPublicKey":"MCowBQYDK2VwAyEA5g+rk9q/hjojtc2nwHJ660RdX5w1f4AK0/kP391QyLY=", "proofOfPossession":"SuGHX7SMyPHuN5cD5wjKLXGNbhdlCYUnTH65JkTx17iWlLynQ/g9GiTYObftSHNzqRh0ofdgAGqK6a379O7RBw=="}, "userConfig": {"test/foo":"bar"}}`,
+			Stub:              `{"metadata": {"name": "req-1"}, "spec": {"signerName":"example.com/signer", "podName":"pod-1", "podUID":"pod-uid-1", "serviceAccountName":"sa-1", "serviceAccountUID":"sa-uid-1", "nodeName":"node-1", "nodeUID":"node-uid-1", "maxExpirationSeconds":86400, "pkixPublicKey":"MCowBQYDK2VwAyEA5g+rk9q/hjojtc2nwHJ660RdX5w1f4AK0/kP391QyLY=", "proofOfPossession":"SuGHX7SMyPHuN5cD5wjKLXGNbhdlCYUnTH65JkTx17iWlLynQ/g9GiTYObftSHNzqRh0ofdgAGqK6a379O7RBw=="}}`,
 			ExpectedEtcdPath:  "/registry/podcertificaterequests/" + namespace + "/req-1",
 			ExpectedGVK:       gvkP("certificates.k8s.io", "v1beta1", "PodCertificateRequest"),
+			StatusStub:        `{"status": {"conditions": [{"type": "Denied", "status":"True", "lastTransitionTime": "2020-01-01T00:00:00Z", "reason": "TestReason", "message": "test message"}]}}`,
+			MutatedStatusStub: `{"status": {"conditions": [{"type": "Denied", "status":"False", "lastTransitionTime": "2020-01-01T00:00:00Z", "reason": "TestReason", "message": "test message"}]}}`,
 			IntroducedVersion: "1.35",
 			RemovedVersion:    "1.39",
 		},
@@ -651,7 +653,7 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		// k8s.io/kubernetes/pkg/apis/resource/v1alpha3
 		gvr("resource.k8s.io", "v1alpha3", "devicetaintrules"): {
 			Stub:              `{"metadata": {"name": "taint1name"}, "spec": {"taint": {"key": "example.com/taintkey", "value": "taintvalue", "effect": "NoSchedule"}}}`,
-			MutatedStub:       `{"metadata": {"labels":{"a":"c"}}}`,
+			MutatedStub:       `{"spec": {"taint": {"effect": "NoExecute"}}}`,
 			ExpectedEtcdPath:  "/registry/devicetaintrules/taint1name",
 			IntroducedVersion: "1.33",
 			RemovedVersion:    "1.39",
@@ -659,6 +661,8 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		gvr("resource.k8s.io", "v1alpha3", "resourcepoolstatusrequests"): {
 			Stub:              `{"metadata": {"name": "rpsr1name"}, "spec": {"driver": "test-driver.example.com"}}`,
 			ExpectedEtcdPath:  "/registry/resourcepoolstatusrequests/rpsr1name",
+			StatusStub:        `{"status": {"poolCount": 0}}`,
+			MutatedStatusStub: `{"status": {"poolCount": 1}}`,
 			IntroducedVersion: "1.36",
 			RemovedVersion:    "1.42",
 		},
@@ -714,7 +718,7 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		},
 		gvr("resource.k8s.io", "v1beta2", "devicetaintrules"): {
 			Stub:              `{"metadata": {"name": "taint2name"}, "spec": {"taint": {"key": "example.com/taintkey", "value": "taintvalue", "effect": "NoSchedule"}}}`,
-			MutatedStub:       `{"metadata": {"labels":{"a":"c"}}}`,
+			MutatedStub:       `{"spec": {"taint": {"effect": "NoExecute"}}}`,
 			ExpectedEtcdPath:  "/registry/devicetaintrules/taint2name",
 			ExpectedGVK:       gvkP("resource.k8s.io", "v1alpha3", "DeviceTaintRule"), // v1beta2 has higher priority, but to support downgrades v1alpha3 is picked automatically.
 			IntroducedVersion: "1.36",
@@ -911,10 +915,12 @@ func storageVersionAtEmulationVersion(key schema.GroupVersionResource, expectedG
 type StorageData struct {
 	// Stub is a valid JSON object used to create the resource.
 	Stub string
-	// MutatedStub is Stub with at least one spec or metadata field changed to a different value.
-	// This should mutate a spec field if possible. Only mutate a metadata field if the entire spec is immutable.
-	// This mutation is applied using a server-side apply patch.
-	// Required for resources that have a status subresource; leave empty otherwise.
+	// MutatedStub is partial update of Sub as a JSON object, with at least one field
+	// changed to a different value. For resources with a status subresource, MutatedStub
+	// MUST mutate a spec field. If a resource is immutable, do not set MutatedStub.
+	// For resources without a status subresource, MutatedStub may mutate any field
+	// or be left empty ("", do not set this field to "{}" as a noop apply will confuse tests).
+	// The mutation is applied as a patch.
 	// Example: if Stub has `"replicas": 1`, MutatedStub might have `"replicas": 2`.
 	MutatedStub string
 	// StatusStub is a valid JSON status payload used to write to the /status subresource.

@@ -105,7 +105,7 @@ func (podDisruptionBudgetStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is true for PodDisruptionBudget; this means you may create one with a PUT request.
-func (podDisruptionBudgetStrategy) AllowCreateOnUpdate() bool {
+func (podDisruptionBudgetStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -124,7 +124,7 @@ func (podDisruptionBudgetStrategy) WarningsOnUpdate(ctx context.Context, obj, ol
 
 // AllowUnconditionalUpdate is the default update policy for PodDisruptionBudget objects. Status update should
 // only be allowed if version match.
-func (podDisruptionBudgetStrategy) AllowUnconditionalUpdate() bool {
+func (podDisruptionBudgetStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 

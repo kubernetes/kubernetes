@@ -33,7 +33,7 @@ import (
 
 	// Import latest API for init/side-effects
 	_ "k8s.io/kubernetes/pkg/apis/abac/latest"
-	"k8s.io/kubernetes/pkg/apis/abac/v0"
+	v0 "k8s.io/kubernetes/pkg/apis/abac/v0"
 )
 
 type policyLoadError struct {
@@ -49,6 +49,9 @@ func (p policyLoadError) Error() string {
 	}
 	return fmt.Sprintf("error reading policy file %s: %v", p.path, p.err)
 }
+
+var _ = authorizer.Authorizer(PolicyList{})
+var _ = authorizer.RuleResolver(PolicyList{})
 
 // PolicyList is simply a slice of Policy structs.
 type PolicyList []*abac.Policy
