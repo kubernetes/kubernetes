@@ -169,6 +169,11 @@ func BuildGenericConfig(
 	if lastErr = s.Traces.ApplyTo(genericConfig.EgressSelector, genericConfig); lastErr != nil {
 		return
 	}
+	// after applying features, before using APIServerID
+	if len(genericConfig.APIServerID) == 0 {
+		genericConfig.APIServerID = genericapiserver.DefaultAPIServerID(genericConfig.FeatureGate)
+	}
+
 	// wrap the definitions to revert any changes from disabled features
 	getOpenAPIDefinitions = openapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(getOpenAPIDefinitions)
 	namer := openapinamer.NewDefinitionNamer(schemes...)
