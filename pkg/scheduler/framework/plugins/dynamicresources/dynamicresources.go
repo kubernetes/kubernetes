@@ -279,7 +279,9 @@ func (pl *DynamicResources) PreEnqueue(ctx context.Context, pod *v1.Pod) (status
 }
 
 // claimPreQueueingHint returns the set of pod keys affected by a ResourceClaim event.
-// For per-pod claims (with a Pod OwnerReference), only that pod needs evaluation.
+// For per-pod claims (ResourceClaimTemplate-based, with a Pod OwnerReference),
+// only that pod needs evaluation. The key format is "name_namespace" to match
+// the unschedulablePods podInfoMap key (see util.GetPodFullName).
 func claimPreQueueingHint(logger klog.Logger, oldObj, newObj interface{}) sets.Set[string] {
 	obj := newObj
 	if obj == nil {
@@ -290,7 +292,7 @@ func claimPreQueueingHint(logger klog.Logger, oldObj, newObj interface{}) sets.S
 		return nil
 	}
 	for _, ref := range claim.OwnerReferences {
-		if ref.Kind == "Pod" && ref.APIVersion == "v1" {
+		if ref.Kind == "Pod" && ref.APIVersion == v1.SchemeGroupVersion.String() {
 			return sets.New(ref.Name + "_" + claim.Namespace)
 		}
 	}

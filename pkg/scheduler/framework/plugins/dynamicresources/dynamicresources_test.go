@@ -5030,3 +5030,77 @@ func testGatherAllocatedState(tCtx ktesting.TContext) {
 	}
 
 }
+
+func TestClaimPreQueueingHint(t *testing.T) {
+	tests := map[string]struct {
+		oldObj, newObj interface{}
+		wantKeys       sets.Set[string]
+	}{
+		"per-pod claim returns pod key": {
+			newObj: &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "claim-1",
+					Namespace: "ns1",
+					OwnerReferences: []metav1.OwnerReference{
+						{Kind: "Pod", APIVersion: "v1", Name: "pod-1"},
+					},
+				},
+			},
+			wantKeys: sets.New("pod-1_ns1"),
+		},
+		"shared claim returns nil": {
+			newObj: &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "shared-claim",
+					Namespace: "ns1",
+				},
+			},
+			wantKeys: nil,
+		},
+		"non-pod owner returns nil": {
+			newObj: &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "claim-2",
+					Namespace: "ns1",
+					OwnerReferences: []metav1.OwnerReference{
+						{Kind: "ReplicaSet", APIVersion: "apps/v1", Name: "rs-1"},
+					},
+				},
+			},
+			wantKeys: nil,
+		},
+		"delete event uses oldObj": {
+			oldObj: &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "claim-3",
+					Namespace: "ns2",
+					OwnerReferences: []metav1.OwnerReference{
+						{Kind: "Pod", APIVersion: "v1", Name: "pod-2"},
+					},
+				},
+			},
+			newObj:   nil,
+			wantKeys: sets.New("pod-2_ns2"),
+		},
+		"non-claim object returns nil": {
+			newObj:   "not-a-claim",
+			wantKeys: nil,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			logger := klog.Background()
+			got := claimPreQueueingHint(logger, tc.oldObj, tc.newObj)
+			if tc.wantKeys == nil {
+				if got != nil {
+					t.Errorf("expected nil, got %v", got)
+				}
+			} else {
+				if !got.Equal(tc.wantKeys) {
+					t.Errorf("expected %v, got %v", tc.wantKeys, got)
+				}
+			}
+		})
+	}
+}

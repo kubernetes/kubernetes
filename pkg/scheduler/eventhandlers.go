@@ -573,23 +573,29 @@ func addAllEventHandlers(
 			handlers = append(handlers, handlerRegistration)
 		case fwk.ResourceClaim:
 			if utilfeature.DefaultFeatureGate.Enabled(features.DynamicResourceAllocation) {
-				if sched.claimQueue == nil {
-					sched.claimQueue = workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[*claimQueueItem]())
-				}
-				funcs := cache.ResourceEventHandlerFuncs{}
-				if at&fwk.Add != 0 {
-					evt := fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Add}
-					funcs.AddFunc = func(obj interface{}) {
-						sched.claimQueue.Add(&claimQueueItem{evt: evt, newObj: obj})
+				if utilfeature.DefaultFeatureGate.Enabled(features.SchedulerPreQueueingHints) {
+					if sched.claimQueue == nil {
+						sched.claimQueue = workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[*claimQueueItem]())
 					}
-				}
-				if at&fwk.Update != 0 {
-					evt := fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Update}
-					funcs.UpdateFunc = func(old, obj interface{}) {
-						sched.claimQueue.Add(&claimQueueItem{evt: evt, oldObj: old, newObj: obj})
+					funcs := cache.ResourceEventHandlerFuncs{}
+					if at&fwk.Add != 0 {
+						evt := fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Add}
+						funcs.AddFunc = func(obj interface{}) {
+							sched.claimQueue.Add(&claimQueueItem{evt: evt, newObj: obj})
+						}
 					}
+					if at&fwk.Update != 0 {
+						evt := fwk.ClusterEvent{Resource: fwk.ResourceClaim, ActionType: fwk.Update}
+						funcs.UpdateFunc = func(old, obj interface{}) {
+							sched.claimQueue.Add(&claimQueueItem{evt: evt, oldObj: old, newObj: obj})
+						}
+					}
+					handlerRegistration = resourceClaimCache.AddEventHandler(funcs)
+				} else {
+					handlerRegistration = resourceClaimCache.AddEventHandler(
+						buildEvtResHandler(at, fwk.ResourceClaim),
+					)
 				}
-				handlerRegistration = resourceClaimCache.AddEventHandler(funcs)
 				handlers = append(handlers, handlerRegistration)
 			}
 		case fwk.ResourceSlice:
