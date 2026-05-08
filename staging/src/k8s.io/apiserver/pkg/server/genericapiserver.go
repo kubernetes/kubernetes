@@ -1019,12 +1019,10 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 func NewDefaultAPIGroupInfo(group string, scheme *runtime.Scheme, parameterCodec runtime.ParameterCodec, codecs serializer.CodecFactory) APIGroupInfo {
 	opts := []serializer.CodecFactoryOptionsMutator{
 		serializer.WithStreamingCollectionEncodingToJSON(),
+		serializer.WithStreamingCollectionEncodingToProtobuf(),
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
 		opts = append(opts, serializer.WithSerializer(cbor.NewSerializerInfo))
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.StreamingCollectionEncodingToProtobuf) {
-		opts = append(opts, serializer.WithStreamingCollectionEncodingToProtobuf())
 	}
 	if len(opts) != 0 {
 		codecs = serializer.NewCodecFactory(scheme, opts...)
