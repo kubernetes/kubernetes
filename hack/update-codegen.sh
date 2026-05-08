@@ -715,7 +715,7 @@ function codegen::openapi() {
 
 function codegen::applyconfigs() {
     GOPROXY=off go install \
-        k8s.io/kubernetes/pkg/generated/openapi/cmd/models-schema \
+        k8s.io/code-generator/cmd/models-schema \
         k8s.io/code-generator/cmd/applyconfiguration-gen
 
     local ext_apis=()
@@ -743,7 +743,7 @@ function codegen::applyconfigs() {
 
     applyconfiguration-gen \
         -v "${KUBE_VERBOSE}" \
-        --openapi-schema <(models-schema) \
+        --openapi-schema <(models-schema --package k8s.io/kubernetes/pkg/generated/openapi) \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-dir "${KUBE_ROOT}/staging/src/${APPLYCONFIG_PKG}" \
         --output-pkg "${APPLYCONFIG_PKG}" \
