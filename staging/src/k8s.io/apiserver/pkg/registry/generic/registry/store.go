@@ -678,6 +678,10 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 			if objectMeta, err := meta.Accessor(obj); err != nil {
 				return nil, nil, err
 			} else {
+				// Wipe metadata on create-via-update and create-via-apply
+				// requests to match create behavior. Note that this happens
+				// AFTER preconditions are checked.
+				rest.WipeObjectMetaSystemFields(objectMeta)
 				rest.FillObjectMetaSystemFields(objectMeta)
 			}
 
