@@ -2219,12 +2219,7 @@ func countReadyPods(pods []*v1.Pod) int32 {
 // PodReplacementPolicy controls when we recreate pods if they are marked as terminating
 // Failed means that we recreate only once the pod has terminated.
 func onlyReplaceFailedPods(job *batch.Job) bool {
-	// We check both PodReplacementPolicy for nil and failed
-	// because it is possible that  `PodReplacementPolicy` was not defaulted
-	if job.Spec.PodReplacementPolicy != nil && *job.Spec.PodReplacementPolicy == batch.Failed {
-		return true
-	}
-	return job.Spec.PodFailurePolicy != nil
+	return job.Spec.PodReplacementPolicy != nil && *job.Spec.PodReplacementPolicy == batch.Failed
 }
 
 func recordJobPodsCreationTotal(job *batch.Job, jobCtx *syncJobCtx, succeeded, failed int32) {
