@@ -130,6 +130,8 @@ import (
 	fakestoragev1alpha1 "k8s.io/client-go/kubernetes/typed/storage/v1alpha1/fake"
 	storagev1beta1 "k8s.io/client-go/kubernetes/typed/storage/v1beta1"
 	fakestoragev1beta1 "k8s.io/client-go/kubernetes/typed/storage/v1beta1/fake"
+	storagemigrationv1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1"
+	fakestoragemigrationv1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1/fake"
 	storagemigrationv1beta1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1beta1"
 	fakestoragemigrationv1beta1 "k8s.io/client-go/kubernetes/typed/storagemigration/v1beta1/fake"
 	"k8s.io/client-go/testing"
@@ -498,6 +500,11 @@ func (c *Clientset) StorageV1() storagev1.StorageV1Interface {
 // StorageV1alpha1 retrieves the StorageV1alpha1Client
 func (c *Clientset) StorageV1alpha1() storagev1alpha1.StorageV1alpha1Interface {
 	return &fakestoragev1alpha1.FakeStorageV1alpha1{Fake: &c.Fake}
+}
+
+// StoragemigrationV1 retrieves the StoragemigrationV1Client
+func (c *Clientset) StoragemigrationV1() storagemigrationv1.StoragemigrationV1Interface {
+	return &fakestoragemigrationv1.FakeStoragemigrationV1{Fake: &c.Fake}
 }
 
 // StoragemigrationV1beta1 retrieves the StoragemigrationV1beta1Client

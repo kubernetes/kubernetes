@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
+	svmv1 "k8s.io/api/storagemigration/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsfake "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/fake"
 	apiextensionsscheme "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme"
@@ -41,15 +41,15 @@ func init() {
 }
 
 func TestCustomResourceController_Sync(t *testing.T) {
-	newSVM := func(name, group, resource string, conditions ...metav1.Condition) *svmv1beta1.StorageVersionMigration {
-		return &svmv1beta1.StorageVersionMigration{
+	newSVM := func(name, group, resource string, conditions ...metav1.Condition) *svmv1.StorageVersionMigration {
+		return &svmv1.StorageVersionMigration{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 			},
-			Spec: svmv1beta1.StorageVersionMigrationSpec{
+			Spec: svmv1.StorageVersionMigrationSpec{
 				Resource: metav1.GroupResource{Group: group, Resource: resource},
 			},
-			Status: svmv1beta1.StorageVersionMigrationStatus{
+			Status: svmv1.StorageVersionMigrationStatus{
 				Conditions: conditions,
 			},
 		}
@@ -95,7 +95,7 @@ func TestCustomResourceController_Sync(t *testing.T) {
 
 	testCases := []struct {
 		name              string
-		svms              []*svmv1beta1.StorageVersionMigration
+		svms              []*svmv1.StorageVersionMigration
 		crd               *apiextensionsv1.CustomResourceDefinition
 		expectErr         bool
 		expectKubeActions []k8stesting.Action
@@ -103,14 +103,14 @@ func TestCustomResourceController_Sync(t *testing.T) {
 	}{
 		{
 			name:      "Initial sync: CRD missing",
-			svms:      []*svmv1beta1.StorageVersionMigration{newSVM("test-svm", "example.com", "widgets")},
+			svms:      []*svmv1.StorageVersionMigration{newSVM("test-svm", "example.com", "widgets")},
 			expectErr: false,
 			expectKubeActions: []k8stesting.Action{
 				k8stesting.NewUpdateAction(
-					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
+					svmv1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
 					newSVM("test-svm", "example.com", "widgets", metav1.Condition{
-						Type:    string(svmv1beta1.MigrationRunning),
+						Type:    string(svmv1.MigrationRunning),
 						Status:  metav1.ConditionTrue,
 						Reason:  "MigrationRunning",
 						Message: "The migration is running",
@@ -120,15 +120,15 @@ func TestCustomResourceController_Sync(t *testing.T) {
 		},
 		{
 			name:      "Initial sync: CRD exists",
-			svms:      []*svmv1beta1.StorageVersionMigration{newSVM("test-svm", "example.com", "widgets")},
+			svms:      []*svmv1.StorageVersionMigration{newSVM("test-svm", "example.com", "widgets")},
 			crd:       newCRD("widgets.example.com", 1, "v2"),
 			expectErr: false,
 			expectKubeActions: []k8stesting.Action{
 				k8stesting.NewUpdateAction(
-					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
+					svmv1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
 					newSVM("test-svm", "example.com", "widgets", metav1.Condition{
-						Type:    string(svmv1beta1.MigrationRunning),
+						Type:    string(svmv1.MigrationRunning),
 						Status:  metav1.ConditionTrue,
 						Reason:  "MigrationRunning",
 						Message: "The migration is running",
@@ -152,11 +152,11 @@ func TestCustomResourceController_Sync(t *testing.T) {
 		},
 		{
 			name: "Migration running (No-op)",
-			svms: []*svmv1beta1.StorageVersionMigration{newSVM("test-svm", "example.com", "widgets", metav1.Condition{
-				Type:   string(svmv1beta1.MigrationRunning),
+			svms: []*svmv1.StorageVersionMigration{newSVM("test-svm", "example.com", "widgets", metav1.Condition{
+				Type:   string(svmv1.MigrationRunning),
 				Status: metav1.ConditionTrue,
 			}, metav1.Condition{
-				Type:   string(svmv1beta1.MigrationRunning),
+				Type:   string(svmv1.MigrationRunning),
 				Status: metav1.ConditionTrue,
 			})},
 			crd:       newCRD("widgets.example.com", 1, "v2"),
@@ -164,13 +164,13 @@ func TestCustomResourceController_Sync(t *testing.T) {
 		},
 		{
 			name: "Migration succeeded: Update CRD stored versions",
-			svms: []*svmv1beta1.StorageVersionMigration{newSVM("test-svm", "example.com", "widgets",
+			svms: []*svmv1.StorageVersionMigration{newSVM("test-svm", "example.com", "widgets",
 				metav1.Condition{
-					Type:   string(svmv1beta1.MigrationSucceeded),
+					Type:   string(svmv1.MigrationSucceeded),
 					Status: metav1.ConditionTrue,
 				},
 				metav1.Condition{
-					Type:   string(svmv1beta1.MigrationRunning),
+					Type:   string(svmv1.MigrationRunning),
 					Status: metav1.ConditionTrue,
 				},
 			)},
@@ -204,13 +204,13 @@ func TestCustomResourceController_Sync(t *testing.T) {
 		},
 		{
 			name: "Migration succeeded: CRD generation mismatch (No update)",
-			svms: []*svmv1beta1.StorageVersionMigration{newSVM("test-svm", "example.com", "widgets",
+			svms: []*svmv1.StorageVersionMigration{newSVM("test-svm", "example.com", "widgets",
 				metav1.Condition{
-					Type:   string(svmv1beta1.MigrationSucceeded),
+					Type:   string(svmv1.MigrationSucceeded),
 					Status: metav1.ConditionTrue,
 				},
 				metav1.Condition{
-					Type:   string(svmv1beta1.MigrationRunning),
+					Type:   string(svmv1.MigrationRunning),
 					Status: metav1.ConditionTrue,
 				},
 			)},
@@ -233,13 +233,13 @@ func TestCustomResourceController_Sync(t *testing.T) {
 		},
 		{
 			name: "Migration failed: CRD condition updated",
-			svms: []*svmv1beta1.StorageVersionMigration{newSVM("test-svm", "example.com", "widgets",
+			svms: []*svmv1.StorageVersionMigration{newSVM("test-svm", "example.com", "widgets",
 				metav1.Condition{
-					Type:   string(svmv1beta1.MigrationFailed),
+					Type:   string(svmv1.MigrationFailed),
 					Status: metav1.ConditionTrue,
 				},
 				metav1.Condition{
-					Type:   string(svmv1beta1.MigrationRunning),
+					Type:   string(svmv1.MigrationRunning),
 					Status: metav1.ConditionTrue,
 				},
 			)},
@@ -273,13 +273,13 @@ func TestCustomResourceController_Sync(t *testing.T) {
 		},
 		{
 			name: "Cleanup admission updates SVM condition",
-			svms: []*svmv1beta1.StorageVersionMigration{newSVM("test-svm", "example.com", "widgets",
+			svms: []*svmv1.StorageVersionMigration{newSVM("test-svm", "example.com", "widgets",
 				metav1.Condition{
-					Type:   string(svmv1beta1.MigrationSucceeded),
+					Type:   string(svmv1.MigrationSucceeded),
 					Status: metav1.ConditionTrue,
 				},
 				metav1.Condition{
-					Type:               string(svmv1beta1.MigrationRunning),
+					Type:               string(svmv1.MigrationRunning),
 					Status:             metav1.ConditionTrue,
 					Reason:             "MigrationRunning",
 					ObservedGeneration: 1,
@@ -288,16 +288,16 @@ func TestCustomResourceController_Sync(t *testing.T) {
 			expectErr: false,
 			expectKubeActions: []k8stesting.Action{
 				k8stesting.NewUpdateSubresourceAction(
-					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
+					svmv1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"status",
 					"",
 					newSVM("test-svm", "example.com", "widgets",
 						metav1.Condition{
-							Type:   string(svmv1beta1.MigrationSucceeded),
+							Type:   string(svmv1.MigrationSucceeded),
 							Status: metav1.ConditionTrue,
 						},
 						metav1.Condition{
-							Type:   string(svmv1beta1.MigrationRunning),
+							Type:   string(svmv1.MigrationRunning),
 							Status: metav1.ConditionFalse,
 							Reason: "MigrationCompleted",
 						},
@@ -307,13 +307,13 @@ func TestCustomResourceController_Sync(t *testing.T) {
 		},
 		{
 			name: "Promote older SVM first",
-			svms: []*svmv1beta1.StorageVersionMigration{
-				func() *svmv1beta1.StorageVersionMigration {
+			svms: []*svmv1.StorageVersionMigration{
+				func() *svmv1.StorageVersionMigration {
 					svm := newSVM("test-svm-newer", "example.com", "widgets")
 					svm.CreationTimestamp = metav1.Time{Time: time.Now().Add(1 * time.Hour)}
 					return svm
 				}(),
-				func() *svmv1beta1.StorageVersionMigration {
+				func() *svmv1.StorageVersionMigration {
 					svm := newSVM("test-svm-older", "example.com", "widgets")
 					svm.CreationTimestamp = metav1.Time{Time: time.Now().Add(-1 * time.Hour)}
 					return svm
@@ -322,10 +322,10 @@ func TestCustomResourceController_Sync(t *testing.T) {
 			expectErr: false,
 			expectKubeActions: []k8stesting.Action{
 				k8stesting.NewUpdateAction(
-					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
+					svmv1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
 					newSVM("test-svm-older", "example.com", "widgets", metav1.Condition{
-						Type:    string(svmv1beta1.MigrationRunning),
+						Type:    string(svmv1.MigrationRunning),
 						Status:  metav1.ConditionTrue,
 						Reason:  "MigrationRunning",
 						Message: "The migration is running",
@@ -356,7 +356,7 @@ func TestCustomResourceController_Sync(t *testing.T) {
 			kubeClient := kubefake.NewClientset(initialSVMs...)
 
 			kubeInformerFactory := svminformers.NewSharedInformerFactory(kubeClient, 0)
-			svmInformer := kubeInformerFactory.Storagemigration().V1beta1().StorageVersionMigrations()
+			svmInformer := kubeInformerFactory.Storagemigration().V1().StorageVersionMigrations()
 			for _, svm := range tc.svms {
 				err := svmInformer.Informer().GetStore().Add(svm)
 				require.NoError(t, err)
@@ -409,8 +409,8 @@ func TestCustomResourceController_Sync(t *testing.T) {
 					require.Equal(t, expected.GetResource(), actual.GetResource(), "kube action %d: resource mismatch", i)
 
 					if updateAction, ok := actual.(k8stesting.UpdateAction); ok {
-						actualObj := updateAction.GetObject().(*svmv1beta1.StorageVersionMigration)
-						expectedObj := expected.(k8stesting.UpdateAction).GetObject().(*svmv1beta1.StorageVersionMigration)
+						actualObj := updateAction.GetObject().(*svmv1.StorageVersionMigration)
+						expectedObj := expected.(k8stesting.UpdateAction).GetObject().(*svmv1.StorageVersionMigration)
 
 						require.Equal(t, expectedObj.Name, actualObj.Name, "object name mismatch")
 						require.Len(t, actualObj.Status.Conditions, len(expectedObj.Status.Conditions), "condition count mismatch")

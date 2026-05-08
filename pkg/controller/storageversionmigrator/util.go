@@ -19,15 +19,15 @@ package storageversionmigrator
 import (
 	"k8s.io/apimachinery/pkg/api/meta"
 
-	svmv1beta1 "k8s.io/api/storagemigration/v1beta1"
+	svmv1 "k8s.io/api/storagemigration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func setStatusConditions(
-	toBeUpdatedSVM *svmv1beta1.StorageVersionMigration,
-	conditionType svmv1beta1.MigrationConditionType,
+	toBeUpdatedSVM *svmv1.StorageVersionMigration,
+	conditionType svmv1.MigrationConditionType,
 	reason, message string,
-) *svmv1beta1.StorageVersionMigration {
+) *svmv1.StorageVersionMigration {
 	// Cannot set the condition twice.
 	if meta.IsStatusConditionTrue(toBeUpdatedSVM.Status.Conditions, string(conditionType)) ||
 		meta.IsStatusConditionFalse(toBeUpdatedSVM.Status.Conditions, string(conditionType)) {
