@@ -90,6 +90,10 @@ func objectToResolveVal(r runtime.Object) (interface{}, error) {
 func (c *condition) ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs OptionalVariableBindings, namespace *v1.Namespace, runtimeCELCostBudget int64) ([]EvaluationResult, int64, error) {
 	// TODO: replace unstructured with ref.Val for CEL variables when native type support is available
 	evaluations := make([]EvaluationResult, len(c.compilationResults))
+	if len(c.compilationResults) == 0 {
+		return evaluations, runtimeCELCostBudget, nil
+	}
+
 	var err error
 
 	// if this activation supports composition, we will need the compositionCtx. It may be nil.
