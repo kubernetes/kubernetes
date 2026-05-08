@@ -452,7 +452,7 @@ const maxNameGenerationCreateAttempts = 8
 // hooks).  Tests which call this might want to call DeepCopy if they expect to
 // be able to examine the input and output objects for differences.
 func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.RetryGenerateName) && needsNameGeneration(obj) {
+	if needsNameGeneration(obj) {
 		return e.createWithGenerateNameRetry(ctx, obj, createValidation, options)
 	}
 

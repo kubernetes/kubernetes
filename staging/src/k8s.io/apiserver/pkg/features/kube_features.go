@@ -211,11 +211,6 @@ const (
 	// overload.
 	ResilientWatchCacheInitialization featuregate.Feature = "ResilientWatchCacheInitialization"
 
-	// owner: @jpbetz
-	// Resource create requests using generateName are retried automatically by the apiserver
-	// if the generated name conflicts with an existing resource name, up to a maximum number of 7 retries.
-	RetryGenerateName featuregate.Feature = "RetryGenerateName"
-
 	// owner: @cici37
 	//
 	// Allow watch cache to create a watch on a dedicated RPC.
@@ -432,12 +427,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	ResilientWatchCacheInitialization: {
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
 		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	},
-
-	RetryGenerateName: {
-		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.32"), Default: true, LockToDefault: true, PreRelease: featuregate.GA},
 	},
 
 	SeparateCacheWatchRPC: {
