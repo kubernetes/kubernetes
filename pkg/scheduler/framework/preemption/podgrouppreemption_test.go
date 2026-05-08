@@ -958,8 +958,13 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 					scheduledCount = 3 // v1 reprieved: this increases scheduledCount!
 				}
 
+				proposedAssignments := make([]fwk.ProposedAssignment, scheduledCount)
+				for i := range scheduledCount {
+					pod := st.MakePod().Name(fmt.Sprintf("p%d", i+1)).UID(fmt.Sprintf("p%d", i+1)).Obj()
+					proposedAssignments[i] = &testProposedAssignment{pod: pod, nodeName: "node1"}
+				}
 				return &fwk.PodGroupAssignments{
-					ProposedAssignments: make([]fwk.ProposedAssignment, scheduledCount),
+					ProposedAssignments: proposedAssignments,
 				}, fwk.NewStatus(fwk.Success)
 			},
 			expectedPods:   []string{"v2"},
@@ -999,8 +1004,14 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 					scheduledCount = 4 // v1 reprieved: this increases scheduledCount!
 				}
 
+				proposedAssignments := make([]fwk.ProposedAssignment, scheduledCount)
+				for i := range scheduledCount {
+					pod := st.MakePod().Name(fmt.Sprintf("p%d", i+1)).UID(fmt.Sprintf("p%d", i+1)).Obj()
+					proposedAssignments[i] = &testProposedAssignment{pod: pod, nodeName: "node1"}
+				}
+
 				return &fwk.PodGroupAssignments{
-					ProposedAssignments: make([]fwk.ProposedAssignment, scheduledCount),
+					ProposedAssignments: proposedAssignments,
 				}, fwk.NewStatus(fwk.Success)
 			},
 			expectedPods:   []string{"v2"},
@@ -1143,8 +1154,12 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 
 				if availableSlots >= neededSlots {
 					assignmentsCount := min(availableSlots, len(tt.preemptor.Members()))
+					proposedAssignments := make([]fwk.ProposedAssignment, assignmentsCount)
+					for i := range assignmentsCount {
+						proposedAssignments[i] = &testProposedAssignment{pod: tt.preemptor.Members()[i], nodeName: "node1"}
+					}
 					return &fwk.PodGroupAssignments{
-						ProposedAssignments: make([]fwk.ProposedAssignment, assignmentsCount),
+						ProposedAssignments: proposedAssignments,
 					}, fwk.NewStatus(fwk.Success)
 				}
 				return nil, fwk.NewStatus(fwk.Unschedulable)
@@ -1154,7 +1169,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				podGroupLister: pgLister,
 			}
 
-			victims, gotStatus := pl.selectVictimsOnDomain(ctx, tt.preemptor, domain, tt.pdbs, mockSchedulingFunc)
+			res, gotStatus := pl.selectVictimsOnDomain(ctx, tt.preemptor, domain, tt.pdbs, mockSchedulingFunc)
 			if !gotStatus.IsSuccess() {
 				t.Logf("SelectVictimsOnDomain failed: %v", gotStatus.Message())
 			}
@@ -1167,12 +1182,12 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 			if wantCode != fwk.Success {
 				return
 			}
-			if victims == nil {
+			if res == nil {
 				t.Fatalf("expected non-nil victims on success")
 			}
 
 			gotNames := sets.Set[string]{}
-			for _, p := range victims.Pods {
+			for _, p := range res.victims.Pods {
 				gotNames.Insert(p.Name)
 			}
 			wantNames := sets.New(tt.expectedPods...)
@@ -1317,5 +1332,71 @@ func TestMoreImportantVictim(t *testing.T) {
 				t.Errorf("MoreImportantVictim() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+type testProposedAssignment struct {
+	pod      *v1.Pod
+	nodeName string
+}
+
+func (a *testProposedAssignment) GetPod() *v1.Pod {
+	return a.pod
+}
+
+func (a *testProposedAssignment) GetNodeName() string {
+	return a.nodeName
+}
+
+func TestPodGroupEvaluator_SelectVictimsOnDomain_NominatedNodes(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	p1 := st.MakePod().Name("p1").UID("p1").Obj()
+	p2 := st.MakePod().Name("p2").UID("p2").Obj()
+
+	preemptor := newPodGroupPreemptor(
+		st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
+		[]*v1.Pod{p1, p2},
+	)
+
+	domainNodes := []fwk.NodeInfo{
+		framework.NewNodeInfo(),
+	}
+	domainNodes[0].SetNode(st.MakeNode().Name("node1").Obj())
+
+	// Add a low priority pod as a potential victim to satisfy the check
+	p3 := st.MakePod().Name("p3").UID("p3").Node("node1").Priority(lowPriority).Obj()
+	podInfo, _ := framework.NewPodInfo(p3)
+	domainNodes[0].AddPodInfo(podInfo)
+
+	pgLister := &mockPodGroupLister{podGroups: make(map[string]*schedulingapi.PodGroup)}
+	domain := newDomainForWorkloadPreemption(domainNodes, pgLister, "test-domain")
+
+	mockSchedulingFunc := func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
+		return &fwk.PodGroupAssignments{
+			ProposedAssignments: []fwk.ProposedAssignment{
+				&testProposedAssignment{pod: p1, nodeName: "node1"},
+				&testProposedAssignment{pod: p2, nodeName: ""}, // No node assigned
+			},
+		}, fwk.NewStatus(fwk.Success)
+	}
+
+	pl := &PodGroupEvaluator{}
+
+	result, gotStatus := pl.selectVictimsOnDomain(ctx, preemptor, domain, nil, mockSchedulingFunc)
+	if !gotStatus.IsSuccess() {
+		t.Fatalf("SelectVictimsOnDomain failed: %v", gotStatus.Message())
+	}
+
+	if result == nil {
+		t.Fatalf("expected non-nil result")
+	}
+
+	if len(result.nominatedNodeNames) != 1 {
+		t.Errorf("Expected 1 nominated node name, got %d", len(result.nominatedNodeNames))
+	}
+
+	if info, ok := result.nominatedNodeNames[p1]; !ok || info.NominatedNodeName != "node1" {
+		t.Errorf("Expected p1 to be nominated for node1, got %v", info)
 	}
 }

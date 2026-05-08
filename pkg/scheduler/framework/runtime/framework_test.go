@@ -282,8 +282,8 @@ func (pl *TestPlugin) PlacementScoreExtensions() fwk.PlacementScoreExtensions {
 	return nil
 }
 
-func (pl *TestPlugin) PodGroupPostFilter(ctx context.Context, pg *v1alpha3.PodGroup, pods []*v1.Pod, pgSchedulingFunc framework.PodGroupSchedulingFunc) *fwk.Status {
-	return nil
+func (pl *TestPlugin) PodGroupPostFilter(ctx context.Context, pg *v1alpha3.PodGroup, pods []*v1.Pod, pgSchedulingFunc framework.PodGroupSchedulingFunc) (*framework.PodGroupPostFilterResult, *fwk.Status) {
+	return nil, nil
 }
 
 func newTestCloseErrorPlugin(_ context.Context, injArgs runtime.Object, f fwk.Handle) (fwk.Plugin, error) {

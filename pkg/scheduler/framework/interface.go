@@ -165,6 +165,11 @@ type SortedScoredNodes interface {
 // scheduling during workload-aware preemption algorithm.
 type PodGroupSchedulingFunc func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status)
 
+// PodGroupPostFilterResult stores information about nominated nodes for a pod group.
+type PodGroupPostFilterResult struct {
+	NominatedNodeNames map[*v1.Pod]*fwk.NominatingInfo
+}
+
 // PodGroupPostFilterPlugin is an interface for plugins that are called
 // after a PodGroup cannot be scheduled.
 // It should not be used by any other plugin but DefaultPreemption.
@@ -172,7 +177,7 @@ type PodGroupPostFilterPlugin interface {
 	fwk.Plugin
 
 	// PodGroupPostFilter is called after a PodGroup cannot be scheduled.
-	PodGroupPostFilter(ctx context.Context, pg *v1alpha3.PodGroup, pods []*v1.Pod, pgSchedulingFunc PodGroupSchedulingFunc) *fwk.Status
+	PodGroupPostFilter(ctx context.Context, pg *v1alpha3.PodGroup, pods []*v1.Pod, pgSchedulingFunc PodGroupSchedulingFunc) (*PodGroupPostFilterResult, *fwk.Status)
 }
 
 // Framework manages the set of plugins in use by the scheduling framework.
