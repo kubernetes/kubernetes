@@ -48,10 +48,13 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/testserver"
+	storagemetrics "k8s.io/apiserver/pkg/storage/metrics"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	"k8s.io/apiserver/pkg/storage/value"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	k8smetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
@@ -260,6 +263,51 @@ func TestTransformationFailure(t *testing.T) {
 func TestList(t *testing.T) {
 	ctx, store, client := testSetup(t)
 	storagetesting.RunTestList(ctx, t, store, compactStorage(store, client.Client), false, client.Kubernetes.(*storagetesting.KubernetesRecorder))
+}
+
+func TestListMetrics(t *testing.T) {
+	ctx, store, _ := testSetup(t)
+
+	registry := k8smetrics.NewKubeRegistry()
+	storagemetrics.ResetMetricsForTest()
+	defer storagemetrics.ResetMetricsForTest()
+	storagemetrics.RegisterMetricsForTest(registry)
+
+	pod := &example.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: "pod-1"}}
+	out := &example.Pod{}
+	if err := store.Create(ctx, computePodKey(pod), pod, out, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	listOut := &example.PodList{}
+	if err := store.GetList(ctx, "/pods/", storage.ListOptions{Recursive: true, Predicate: storage.Everything}, listOut); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedMetrics := `# HELP apiserver_storage_list_requests_total [ALPHA] Number of LIST requests served from storage partitioned by backend and index.
+# TYPE apiserver_storage_list_requests_total counter
+apiserver_storage_list_requests_total{group="",index="",resource="pods",storage="etcd"} 1
+# HELP apiserver_storage_list_fetched_objects_total [ALPHA] Number of objects read from storage in the course of serving a LIST request partitioned by backend and index.
+# TYPE apiserver_storage_list_fetched_objects_total counter
+apiserver_storage_list_fetched_objects_total{group="",index="",resource="pods",storage="etcd"} 1
+# HELP apiserver_storage_list_evaluated_objects_total [ALPHA] Number of objects tested in the course of serving a LIST request from storage partitioned by backend.
+# TYPE apiserver_storage_list_evaluated_objects_total counter
+apiserver_storage_list_evaluated_objects_total{group="",resource="pods",storage="etcd"} 1
+# HELP apiserver_storage_list_returned_objects_total [ALPHA] Number of objects returned for a LIST request from storage partitioned by backend.
+# TYPE apiserver_storage_list_returned_objects_total counter
+apiserver_storage_list_returned_objects_total{group="",resource="pods",storage="etcd"} 1
+`
+
+	if err := testutil.GatherAndCompare(
+		registry,
+		strings.NewReader(expectedMetrics),
+		"apiserver_storage_list_requests_total",
+		"apiserver_storage_list_fetched_objects_total",
+		"apiserver_storage_list_evaluated_objects_total",
+		"apiserver_storage_list_returned_objects_total",
+	); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestConsistentList(t *testing.T) {

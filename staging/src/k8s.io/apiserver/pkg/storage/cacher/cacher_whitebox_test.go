@@ -55,6 +55,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/cacher/store"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
+	storagemetrics "k8s.io/apiserver/pkg/storage/metrics"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientfeatures "k8s.io/client-go/features"
@@ -557,6 +558,69 @@ apiserver_watch_cache_consistent_read_total{fallback="skipped", group="", resour
 				t.Errorf("unexpected error: %v", err)
 			}
 		})
+	}
+}
+
+func TestListMetrics(t *testing.T) {
+	registry := k8smetrics.NewKubeRegistry()
+	storagemetrics.ResetMetricsForTest()
+	defer storagemetrics.ResetMetricsForTest()
+	storagemetrics.RegisterMetricsForTest(registry)
+
+	backingStorage := &cachertesting.MockStorage{}
+	backingStorage.GetListFn = func(_ context.Context, _ string, _ storage.ListOptions, listObj runtime.Object) error {
+		podList := listObj.(*example.PodList)
+		podList.ListMeta = metav1.ListMeta{ResourceVersion: "100"}
+		return nil
+	}
+
+	cacher, v, err := newTestCacherWithoutSyncing(backingStorage, clock.RealClock{})
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	if err := cacher.ready.wait(context.Background()); err != nil {
+		t.Fatalf("unexpected error waiting for the cache to be ready: %v", err)
+	}
+
+	input := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "ns"}}
+	if err := v.UpdateObject(input, 100); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if err := cacher.watchCache.Add(input); err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	result := &example.PodList{}
+	err = cacher.GetList(context.TODO(), "/pods/", storage.ListOptions{
+		ResourceVersion: "",
+		Predicate:       storage.Everything,
+		Recursive:       true,
+	}, result)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedMetrics := `# HELP apiserver_storage_list_requests_total [ALPHA] Number of LIST requests served from storage partitioned by backend and index.
+# TYPE apiserver_storage_list_requests_total counter
+apiserver_storage_list_requests_total{group="",index="",resource="pods",storage="watchcache"} 1
+# HELP apiserver_storage_list_fetched_objects_total [ALPHA] Number of objects read from storage in the course of serving a LIST request partitioned by backend and index.
+# TYPE apiserver_storage_list_fetched_objects_total counter
+apiserver_storage_list_fetched_objects_total{group="",index="",resource="pods",storage="watchcache"} 1
+# HELP apiserver_storage_list_returned_objects_total [ALPHA] Number of objects returned for a LIST request from storage partitioned by backend.
+# TYPE apiserver_storage_list_returned_objects_total counter
+apiserver_storage_list_returned_objects_total{group="",resource="pods",storage="watchcache"} 1
+`
+
+	if err := testutil.GatherAndCompare(
+		registry,
+		strings.NewReader(expectedMetrics),
+		"apiserver_storage_list_requests_total",
+		"apiserver_storage_list_fetched_objects_total",
+		"apiserver_storage_list_returned_objects_total",
+	); err != nil {
+		t.Fatal(err)
 	}
 }
 

@@ -123,6 +123,62 @@ etcd_bookmark_total{group="apps",resource="deployments"} 1
 	}
 }
 
+func TestRecordStorageListMetrics(t *testing.T) {
+	registry := metrics.NewKubeRegistry()
+	for _, metric := range []interface {
+		metrics.Registerable
+		Reset()
+	}{
+		listStorageCount,
+		listStorageNumFetched,
+		listStorageNumSelectorEvals,
+		listStorageNumReturned,
+	} {
+		metric.Reset()
+		registry.MustRegister(metric)
+	}
+	defer func() {
+		for _, metric := range []interface {
+			metrics.Registerable
+			Reset()
+		}{
+			listStorageCount,
+			listStorageNumFetched,
+			listStorageNumSelectorEvals,
+			listStorageNumReturned,
+		} {
+			metric.Reset()
+		}
+	}()
+
+	RecordStorageListMetrics(schema.GroupResource{Group: "apps", Resource: "deployments"}, 4, 2, 1)
+
+	expectedMetrics := `# HELP apiserver_storage_list_total [ALPHA] Number of LIST requests served from storage
+# TYPE apiserver_storage_list_total counter
+apiserver_storage_list_total{group="apps",resource="deployments"} 1
+# HELP apiserver_storage_list_fetched_objects_total [ALPHA] Number of objects read from storage in the course of serving a LIST request
+# TYPE apiserver_storage_list_fetched_objects_total counter
+apiserver_storage_list_fetched_objects_total{group="apps",resource="deployments"} 4
+# HELP apiserver_storage_list_evaluated_objects_total [ALPHA] Number of objects tested in the course of serving a LIST request from storage
+# TYPE apiserver_storage_list_evaluated_objects_total counter
+apiserver_storage_list_evaluated_objects_total{group="apps",resource="deployments"} 2
+# HELP apiserver_storage_list_returned_objects_total [ALPHA] Number of objects returned for a LIST request from storage
+# TYPE apiserver_storage_list_returned_objects_total counter
+apiserver_storage_list_returned_objects_total{group="apps",resource="deployments"} 1
+`
+
+	if err := testutil.GatherAndCompare(
+		registry,
+		strings.NewReader(expectedMetrics),
+		"apiserver_storage_list_total",
+		"apiserver_storage_list_fetched_objects_total",
+		"apiserver_storage_list_evaluated_objects_total",
+		"apiserver_storage_list_returned_objects_total",
+	); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestRecordEtcdRequest(t *testing.T) {
 	registry := metrics.NewKubeRegistry()
 

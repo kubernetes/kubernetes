@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
+	storagemetrics "k8s.io/apiserver/pkg/storage/metrics"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -144,33 +145,37 @@ var (
 	)
 	listStorageCount = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_storage_list_total",
-			Help:           "Number of LIST requests served from storage",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Name:              "apiserver_storage_list_total",
+			Help:              "Number of LIST requests served from storage",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.37.0",
 		},
 		[]string{"group", "resource"},
 	)
 	listStorageNumFetched = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_storage_list_fetched_objects_total",
-			Help:           "Number of objects read from storage in the course of serving a LIST request",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Name:              "apiserver_storage_list_fetched_objects_total",
+			Help:              "Number of objects read from storage in the course of serving a LIST request",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.37.0",
 		},
 		[]string{"group", "resource"},
 	)
 	listStorageNumSelectorEvals = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_storage_list_evaluated_objects_total",
-			Help:           "Number of objects tested in the course of serving a LIST request from storage",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Name:              "apiserver_storage_list_evaluated_objects_total",
+			Help:              "Number of objects tested in the course of serving a LIST request from storage",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.37.0",
 		},
 		[]string{"group", "resource"},
 	)
 	listStorageNumReturned = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_storage_list_returned_objects_total",
-			Help:           "Number of objects returned for a LIST request from storage",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Name:              "apiserver_storage_list_returned_objects_total",
+			Help:              "Number of objects returned for a LIST request from storage",
+			StabilityLevel:    compbasemetrics.ALPHA,
+			DeprecatedVersion: "1.37.0",
 		},
 		[]string{"group", "resource"},
 	)
@@ -303,6 +308,8 @@ func RecordStorageListMetrics(groupResource schema.GroupResource, numFetched, nu
 	listStorageNumFetched.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numFetched))
 	listStorageNumSelectorEvals.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numEvald))
 	listStorageNumReturned.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numReturned))
+	storagemetrics.RecordListMetrics(groupResource, storagemetrics.StorageBackendEtcd, "", numFetched, numReturned)
+	storagemetrics.RecordListEvaluatedObjects(groupResource, storagemetrics.StorageBackendEtcd, numEvald)
 }
 
 type Monitor interface {
