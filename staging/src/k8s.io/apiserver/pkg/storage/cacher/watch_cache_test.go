@@ -50,6 +50,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
+	"k8s.io/utils/ptr"
 )
 
 func makeTestPod(name string, resourceVersion uint64) *v1.Pod {
@@ -965,6 +966,65 @@ func TestDynamicCache(t *testing.T) {
 	}
 }
 
+func TestWatchCacheRecordsCapacityMetrics(t *testing.T) {
+	tests := []struct {
+		name            string
+		initialCapacity int
+		eventCount      *int
+		interval        time.Duration
+		wantCapacity    float64
+		wantIncrease    int
+		wantDecrease    int
+	}{
+		{
+			name:            "initial watch cache records lower bound capacity",
+			initialCapacity: defaultLowerBoundCapacity,
+			wantCapacity:    defaultLowerBoundCapacity,
+		},
+		{
+			name:            "cache resize up records capacity and increase counter",
+			initialCapacity: defaultLowerBoundCapacity,
+			eventCount:      ptr.To(defaultLowerBoundCapacity),
+			interval:        DefaultEventFreshDuration / (defaultLowerBoundCapacity + 1),
+			wantCapacity:    2 * defaultLowerBoundCapacity,
+			wantIncrease:    1,
+		},
+		{
+			name:            "cache resize down records capacity and decrease counter",
+			initialCapacity: 4 * defaultLowerBoundCapacity,
+			eventCount:      ptr.To(4 * defaultLowerBoundCapacity),
+			interval:        DefaultEventFreshDuration,
+			wantCapacity:    2 * defaultLowerBoundCapacity,
+			wantDecrease:    1,
+		},
+		{
+			name:            "unchanged capacity does not increment resize counters",
+			initialCapacity: defaultLowerBoundCapacity,
+			eventCount:      ptr.To(defaultLowerBoundCapacity),
+			interval:        DefaultEventFreshDuration / defaultLowerBoundCapacity,
+			wantCapacity:    defaultLowerBoundCapacity,
+		},
+	}
+
+	metricLabels := map[string]string{"group": "", "resource": "pods"}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			testutil.SetupMetrics(t, metrics.Register)
+			store := newTestWatchCache(tc.initialCapacity, DefaultEventFreshDuration, &cache.Indexers{})
+			defer store.Stop()
+
+			if tc.eventCount != nil {
+				loadEventWithDuration(store, *tc.eventCount, tc.interval)
+				store.resizeCacheLocked(store.clock.Now().Add(time.Duration(tc.interval.Nanoseconds() * int64(*tc.eventCount))))
+			}
+
+			testutil.AssertGaugeValue(t, "watch_cache_capacity", metricLabels, tc.wantCapacity)
+			testutil.AssertVectorCount(t, "watch_cache_capacity_increase_total", metricLabels, tc.wantIncrease)
+			testutil.AssertVectorCount(t, "watch_cache_capacity_decrease_total", metricLabels, tc.wantDecrease)
+		})
+	}
+}
+
 func loadEventWithDuration(cache *testWatchCache, count int, interval time.Duration) {
 	for i := 0; i < count; i++ {
 		event := &watchCacheEvent{
@@ -1274,7 +1334,7 @@ func TestHistogramCacheReadWait(t *testing.T) {
 			desc:            "resourceVersion is non-zero",
 			resourceVersion: 5,
 			want: `
-		# HELP apiserver_watch_cache_read_wait_seconds [ALPHA] Histogram of time spent waiting for a watch cache to become fresh.
+		# HELP apiserver_watch_cache_read_wait_seconds [BETA] Histogram of time spent waiting for a watch cache to become fresh.
     # TYPE apiserver_watch_cache_read_wait_seconds histogram
 	    apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.005"} 1
         apiserver_watch_cache_read_wait_seconds_bucket{group="",resource="pods",le="0.025"} 1
@@ -1410,4 +1470,95 @@ func TestCacheSnapshots(t *testing.T) {
 	elements = lister.ListPrefix("", "")
 	assert.Len(t, elements, 1)
 	assert.Equal(t, makeTestPod("foo", 600), elements[0].(*store.Element).Object)
+}
+
+func TestWatchCacheRecordsEventsReceivedAndResourceVersion(t *testing.T) {
+	tests := []struct {
+		name            string
+		ops             func(t *testing.T, w *testWatchCache)
+		wantReceived    int
+		wantHasRV       bool
+		wantResourceVer *float64
+	}{
+		{
+			name: "single Add records one received event and sets RV",
+			ops: func(t *testing.T, w *testWatchCache) {
+				require.NoError(t, w.Add(makeTestPod("p1", 5)))
+			},
+			wantReceived:    1,
+			wantHasRV:       true,
+			wantResourceVer: ptr.To(float64(5)),
+		},
+		{
+			name: "multiple Adds keep latest resource version",
+			ops: func(t *testing.T, w *testWatchCache) {
+				require.NoError(t, w.Add(makeTestPod("p-2", 2)))
+				require.NoError(t, w.Add(makeTestPod("p-4", 4)))
+				require.NoError(t, w.Add(makeTestPod("p-7", 7)))
+			},
+			wantReceived:    3,
+			wantHasRV:       true,
+			wantResourceVer: ptr.To(float64(7)),
+		},
+		{
+			name: "Add then Update advances resource version",
+			ops: func(t *testing.T, w *testWatchCache) {
+				require.NoError(t, w.Add(makeTestPod("p1", 3)))
+				require.NoError(t, w.Update(makeTestPod("p1", 8)))
+			},
+			wantReceived:    2,
+			wantHasRV:       true,
+			wantResourceVer: ptr.To(float64(8)),
+		},
+		{
+			name: "Add then Delete advances resource version",
+			ops: func(t *testing.T, w *testWatchCache) {
+				require.NoError(t, w.Add(makeTestPod("p1", 3)))
+				require.NoError(t, w.Delete(makeTestPod("p1", 9)))
+			},
+			wantReceived:    2,
+			wantHasRV:       true,
+			wantResourceVer: ptr.To(float64(9)),
+		},
+		{
+			name: "UpdateResourceVersion advances RV without bumping received",
+			ops: func(t *testing.T, w *testWatchCache) {
+				w.UpdateResourceVersion("12")
+			},
+			wantReceived:    0,
+			wantHasRV:       true,
+			wantResourceVer: ptr.To(float64(12)),
+		},
+		{
+			name: "Add followed by UpdateResourceVersion uses bookmark RV",
+			ops: func(t *testing.T, w *testWatchCache) {
+				require.NoError(t, w.Add(makeTestPod("p1", 3)))
+				w.UpdateResourceVersion("15")
+			},
+			wantReceived:    1,
+			wantHasRV:       true,
+			wantResourceVer: ptr.To(float64(15)),
+		},
+		{
+			name:         "no operations: nothing received, RV unset",
+			ops:          func(t *testing.T, w *testWatchCache) {},
+			wantReceived: 0,
+			wantHasRV:    false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			testutil.SetupMetrics(t, metrics.Register)
+			w := newTestWatchCache(10, DefaultEventFreshDuration, &cache.Indexers{})
+			defer w.Stop()
+
+			tc.ops(t, w)
+
+			testutil.AssertVectorCount(t, "apiserver_watch_cache_events_received_total", map[string]string{"group": "", "resource": "pods"}, tc.wantReceived)
+			if tc.wantResourceVer != nil {
+				testutil.AssertGaugeValue(t, "apiserver_watch_cache_resource_version", map[string]string{"group": "", "resource": "pods"}, *tc.wantResourceVer)
+			}
+		})
+	}
 }

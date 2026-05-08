@@ -383,7 +383,8 @@ func TestConsistentReadFallback(t *testing.T) {
 		expectRV                string
 		expectBlock             bool
 		expectRequestsToStorage int
-		expectMetric            string
+		expectMetric            *map[string]string
+		expectInitMetric        *map[string]string
 	}{
 		{
 			name:                    "Success",
@@ -392,11 +393,14 @@ func TestConsistentReadFallback(t *testing.T) {
 			storageRV:               "42",
 			expectRV:                "42",
 			expectRequestsToStorage: 1,
-			expectMetric: `
-# HELP apiserver_watch_cache_consistent_read_total [ALPHA] Counter for consistent reads from cache.
-# TYPE apiserver_watch_cache_consistent_read_total counter
-apiserver_watch_cache_consistent_read_total{fallback="false", group="", resource="pods", success="true"} 1
-`,
+			expectMetric: &map[string]string{
+				"fallback": "false",
+				"resource": "pods",
+				"success":  "true",
+			},
+			expectInitMetric: &map[string]string{
+				"resource": "pods",
+			},
 		},
 		{
 			name:                    "Fallback",
@@ -406,11 +410,14 @@ apiserver_watch_cache_consistent_read_total{fallback="false", group="", resource
 			expectRV:                "42",
 			expectBlock:             true,
 			expectRequestsToStorage: 2,
-			expectMetric: `
-# HELP apiserver_watch_cache_consistent_read_total [ALPHA] Counter for consistent reads from cache.
-# TYPE apiserver_watch_cache_consistent_read_total counter
-apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource="pods", success="true"} 1
-`,
+			expectMetric: &map[string]string{
+				"fallback": "true",
+				"resource": "pods",
+				"success":  "true",
+			},
+			expectInitMetric: &map[string]string{
+				"resource": "pods",
+			},
 		},
 		{
 			name:                    "Fallback Failure",
@@ -421,11 +428,14 @@ apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource=
 			expectError:             true,
 			expectBlock:             true,
 			expectRequestsToStorage: 2,
-			expectMetric: `
-# HELP apiserver_watch_cache_consistent_read_total [ALPHA] Counter for consistent reads from cache.
-# TYPE apiserver_watch_cache_consistent_read_total counter
-apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource="pods", success="false"} 1
-`,
+			expectMetric: &map[string]string{
+				"fallback": "true",
+				"resource": "pods",
+				"success":  "false",
+			},
+			expectInitMetric: &map[string]string{
+				"resource": "pods",
+			},
 		},
 		{
 			name:                    "Skip Storage Fallback",
@@ -437,11 +447,14 @@ apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource=
 			expectTooManyRequests:   true,
 			expectBlock:             true,
 			expectRequestsToStorage: 1,
-			expectMetric: `
-# HELP apiserver_watch_cache_consistent_read_total [ALPHA] Counter for consistent reads from cache.
-# TYPE apiserver_watch_cache_consistent_read_total counter
-apiserver_watch_cache_consistent_read_total{fallback="skipped", group="", resource="pods", success="false"} 1
-`,
+			expectMetric: &map[string]string{
+				"fallback": "skipped",
+				"resource": "pods",
+				"success":  "false",
+			},
+			expectInitMetric: &map[string]string{
+				"resource": "pods",
+			},
 		},
 		{
 			name:                    "Disabled",
@@ -449,7 +462,10 @@ apiserver_watch_cache_consistent_read_total{fallback="skipped", group="", resour
 			storageRV:               "42",
 			expectRV:                "42",
 			expectRequestsToStorage: 1,
-			expectMetric:            ``,
+			expectMetric:            nil,
+			expectInitMetric: &map[string]string{
+				"resource": "pods",
+			},
 		},
 	}
 	for _, tc := range tcs {
@@ -464,8 +480,8 @@ apiserver_watch_cache_consistent_read_total{fallback="skipped", group="", resour
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCacheSkipTimeoutFallback, true)
 			}
 
+			testutil.SetupMetrics(t, metrics.Register)
 			registry := k8smetrics.NewKubeRegistry()
-			metrics.ConsistentReadTotal.Reset()
 			if err := registry.Register(metrics.ConsistentReadTotal); err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -553,8 +569,12 @@ apiserver_watch_cache_consistent_read_total{fallback="skipped", group="", resour
 				t.Fatalf("Unexpected block, got: %v, want: %v", blocked, tc.expectBlock)
 			}
 
-			if err := testutil.GatherAndCompare(registry, strings.NewReader(tc.expectMetric), "apiserver_watch_cache_consistent_read_total"); err != nil {
-				t.Errorf("unexpected error: %v", err)
+			if tc.expectMetric != nil {
+				testutil.AssertVectorCount(t, "apiserver_watch_cache_consistent_read_total", *tc.expectMetric, 1)
+			}
+
+			if tc.expectInitMetric != nil {
+				testutil.AssertVectorCount(t, "apiserver_watch_cache_initializations_total", *tc.expectInitMetric, 1)
 			}
 		})
 	}
@@ -642,6 +662,164 @@ func TestMatchExactResourceVersionFallback(t *testing.T) {
 				t.Fatalf("Unexpected number of requests to snapshots, got: %d, want: %d", snapshotRequestCount, tc.expectSnapshotRequests)
 			}
 
+		})
+	}
+}
+
+func TestCacherGetListRecordsListCacheMetrics(t *testing.T) {
+	tests := []struct {
+		name         string
+		populate     bool
+		key          string
+		lists        []storage.ListOptions
+		wantCount    int
+		wantFetched  int
+		wantReturned int
+	}{
+		{
+			name:     "recursive list with predicate filtering returns subset",
+			populate: true,
+			key:      "/pods/ns",
+			lists: []storage.ListOptions{
+				{
+					ResourceVersion: "102",
+					Recursive:       true,
+					Predicate: storage.SelectionPredicate{
+						Label: labels.Everything(),
+						Field: fields.SelectorFromSet(map[string]string{"spec.nodeName": "node-1"}),
+					},
+				},
+			},
+			wantCount:    1,
+			wantFetched:  2,
+			wantReturned: 1,
+		},
+		{
+			name:     "recursive list with everything predicate returns all",
+			populate: true,
+			key:      "/pods/ns",
+			lists: []storage.ListOptions{
+				{
+					ResourceVersion: "102",
+					Recursive:       true,
+					Predicate: storage.SelectionPredicate{
+						Label: labels.Everything(),
+						Field: fields.Everything(),
+					},
+				},
+			},
+			wantCount:    1,
+			wantFetched:  2,
+			wantReturned: 2,
+		},
+		{
+			name:     "multiple recursive lists accumulate counts",
+			populate: true,
+			key:      "/pods/ns",
+			lists: []storage.ListOptions{
+				{
+					ResourceVersion: "102",
+					Recursive:       true,
+					Predicate: storage.SelectionPredicate{
+						Label: labels.Everything(),
+						Field: fields.SelectorFromSet(map[string]string{"spec.nodeName": "node-1"}),
+					},
+				},
+				{
+					ResourceVersion: "102",
+					Recursive:       true,
+					Predicate: storage.SelectionPredicate{
+						Label: labels.Everything(),
+						Field: fields.SelectorFromSet(map[string]string{"spec.nodeName": "node-1"}),
+					},
+				},
+				{
+					ResourceVersion: "102",
+					Recursive:       true,
+					Predicate: storage.SelectionPredicate{
+						Label: labels.Everything(),
+						Field: fields.SelectorFromSet(map[string]string{"spec.nodeName": "node-1"}),
+					},
+				},
+			},
+			wantCount:    3,
+			wantFetched:  6,
+			wantReturned: 3,
+		},
+		{
+			name:     "non-recursive list fetches single item",
+			populate: true,
+			key:      "/pods/ns/pod-1",
+			lists: []storage.ListOptions{
+				{
+					ResourceVersion: "102",
+					Predicate: storage.SelectionPredicate{
+						Label: labels.Everything(),
+						Field: fields.Everything(),
+					},
+				},
+			},
+			wantCount:    1,
+			wantFetched:  1,
+			wantReturned: 1,
+		},
+		{
+			name:     "list on empty cache still records call",
+			populate: false,
+			key:      "/pods/ns",
+			lists: []storage.ListOptions{
+				{
+					ResourceVersion: "100",
+					Recursive:       true,
+					Predicate: storage.SelectionPredicate{
+						Label: labels.Everything(),
+						Field: fields.SelectorFromSet(map[string]string{"spec.nodeName": "node-1"}),
+					},
+				},
+			},
+			wantCount:    1,
+			wantFetched:  0,
+			wantReturned: 0,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			testutil.SetupMetrics(t, metrics.Register)
+			cacher, _, err := newTestCacher(&cachertesting.MockStorage{})
+			if err != nil {
+				t.Fatalf("Couldn't create cacher: %v", err)
+			}
+			t.Cleanup(cacher.Stop)
+			if err := cacher.ready.wait(context.Background()); err != nil {
+				t.Fatalf("unexpected error waiting for the cache to be ready: %v", err)
+			}
+
+			if tc.populate {
+				if err := cacher.watchCache.Add(&example.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "ns", ResourceVersion: "101"},
+					Spec:       example.PodSpec{NodeName: "node-1"},
+				}); err != nil {
+					t.Fatalf("unexpected add pod1 error: %v", err)
+				}
+
+				if err := cacher.watchCache.Add(&example.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-2", Namespace: "ns", ResourceVersion: "102"},
+					Spec:       example.PodSpec{NodeName: "node-2"},
+				}); err != nil {
+					t.Fatalf("unexpected add pod2 error: %v", err)
+				}
+			}
+
+			for _, l := range tc.lists {
+				if err := cacher.GetList(context.Background(), tc.key, l, &example.PodList{}); err != nil {
+					t.Fatalf("unexpected list error: %v", err)
+				}
+			}
+
+			testutil.AssertVectorCount(t, "apiserver_cache_list_total", map[string]string{"resource": "pods"}, tc.wantCount)
+			testutil.AssertVectorCount(t, "apiserver_cache_list_fetched_objects_total", map[string]string{"resource": "pods"}, tc.wantFetched)
+			testutil.AssertVectorCount(t, "apiserver_cache_list_returned_objects_total", map[string]string{"resource": "pods"}, tc.wantReturned)
 		})
 	}
 }
@@ -2140,6 +2318,7 @@ func TestCachingDeleteEvents(t *testing.T) {
 }
 
 func testCachingObjects(t *testing.T, watchersCount int) {
+	testutil.SetupMetrics(t, metrics.Register)
 	backingStorage := &cachertesting.MockStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
 	if err != nil {
@@ -2229,6 +2408,8 @@ func testCachingObjects(t *testing.T, watchersCount int) {
 	for i := range watchers {
 		verifyEvents(watchers[i])
 	}
+
+	testutil.AssertVectorCount(t, "apiserver_watch_cache_events_dispatched_total", map[string]string{"resource": "pods"}, len(dispatchedEvents))
 }
 
 func TestCachingObjects(t *testing.T) {

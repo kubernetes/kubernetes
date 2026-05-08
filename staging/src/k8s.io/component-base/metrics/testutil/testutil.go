@@ -38,6 +38,12 @@ type TB interface {
 	Fatalf(format string, args ...any)
 }
 
+type TBM interface {
+	TB
+	Helper()
+	Cleanup(func())
+}
+
 // MetricFamily is a type alias which enables writing gatherers in tests
 // without importing prometheus directly (https://github.com/kubernetes/kubernetes/issues/99876).
 type MetricFamily = dto.MetricFamily
@@ -239,4 +245,37 @@ func ScrapeMetricsProto(url string, client *http.Client) (map[string]*dto.Metric
 		result[mf.GetName()] = &mf
 	}
 	return result, nil
+}
+
+func AssertGaugeValue(t TB, metricName string, labels map[string]string, want float64) {
+	metrics, err := legacyregistry.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("Failed to gather metrics: %v", err)
+	}
+
+	for _, mf := range metrics {
+		if mf.GetName() != metricName {
+			continue // Ignore other metrics.
+		}
+		for _, metric := range mf.GetMetric() {
+			if !LabelsMatch(metric, labels) {
+				continue
+			}
+			if metric.GetGauge() == nil {
+				t.Fatalf("metric %s is not a gauge", metricName)
+			}
+			if got := metric.GetGauge().GetValue(); got != want {
+				t.Fatalf("metric %s labels %v: want %v, got %v", metricName, labels, want, got)
+			}
+			return
+		}
+	}
+	t.Fatalf("metric %s with labels %v not found", metricName, labels)
+}
+
+func SetupMetrics(t TBM, register func()) {
+	t.Helper()
+	register()
+	legacyregistry.Reset()
+	t.Cleanup(legacyregistry.Reset)
 }
