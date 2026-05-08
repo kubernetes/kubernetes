@@ -612,7 +612,7 @@ func (l *Lexer) skipWhiteSpaces(ch byte) byte {
 }
 
 // Lex returns a pair of Token and the literal
-// literal is meaningfull only for IdentifierToken token
+// literal is meaningful only for IdentifierToken token
 func (l *Lexer) Lex() (tok Token, lit string) {
 	switch ch := l.skipWhiteSpaces(l.read()); {
 	case ch == 0:
