@@ -137,6 +137,9 @@ type PlacementCycleState interface {
 	//
 	// See PlacementCycleState for notes on concurrency.
 	Delete(key StateKey)
+	// Range calls f sequentially for each key and value present in the cycle state.
+	// If f returns false, range stops the iteration.
+	Range(f func(key StateKey, value StateData) bool)
 }
 
 // PodGroupCycleState provides a mechanism for plugins that operate on pod groups to store and retrieve arbitrary data.
@@ -161,4 +164,11 @@ type PodGroupCycleState interface {
 	//
 	// See PodGroupCycleState for notes on concurrency.
 	Delete(key StateKey)
+	// GetPlacementCycleStateForName gets the cycle state of the Placement for the given placement name.
+	// Returns nil if no state is found.
+	GetPlacementCycleStateForName(placementName string) PlacementCycleState
+	// SetPlacementCycleStateForName sets the cycle state of the Placement for the given placement name.
+	SetPlacementCycleStateForName(placementName string, state PlacementCycleState)
+	// DeletePlacementCycleStateForName deletes the cycle state of the Placement for the given placement name.
+	DeletePlacementCycleStateForName(placementName string)
 }

@@ -438,9 +438,6 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 	if len(f.bindPlugins) == 0 {
 		return nil, fmt.Errorf("at least one bind plugin is needed for profile with scheduler name %q", profile.SchedulerName)
 	}
-	if len(f.placementGeneratePlugins) > 1 {
-		return nil, fmt.Errorf("at most one placement generate plugin is allowed for profile with scheduler name %q", profile.SchedulerName)
-	}
 
 	podScoreWeights, err := getValidScoreWeights(f, reflect.TypeFor[fwk.ScorePlugin](), append(profile.Plugins.Score.Enabled, profile.Plugins.MultiPoint.Enabled...))
 	if err != nil {
@@ -2021,18 +2018,116 @@ func (f *frameworkImpl) RunPlacementGeneratePlugins(ctx context.Context, state f
 		return []*fwk.Placement{placement}, nil
 	}
 
-	plugin := f.placementGeneratePlugins[0]
+	allPlacements := make([][]*fwk.Placement, len(f.placementGeneratePlugins))
 
-	result, status := f.runPlacementGeneratePlugin(ctx, plugin, state, podGroup, placement)
-	if !status.IsSuccess() {
-		return nil, status.WithPlugin(plugin.Name())
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	statusCh := parallelize.NewResultChannel[*fwk.Status]()
+
+	f.Parallelizer().Until(ctx, len(f.placementGeneratePlugins), func(index int) {
+		plugin := f.placementGeneratePlugins[index]
+		result, status := f.runPlacementGeneratePlugin(ctx, plugin, state, podGroup, placement)
+		if !status.IsSuccess() {
+			statusCh.SendWithCancel(status.WithPlugin(plugin.Name()), cancel)
+			return
+		}
+		if result == nil || len(result.Placements) == 0 {
+			statusCh.SendWithCancel(fwk.NewStatus(fwk.Unschedulable, "no feasible placements found").WithPlugin(plugin.Name()), cancel)
+			return
+		}
+		allPlacements[index] = result.Placements
+	}, metrics.PlacementGenerate)
+
+	if status := statusCh.Receive(); status != nil && !status.IsSuccess() {
+		return nil, status
 	}
 
-	if len(result.Placements) == 0 {
-		return nil, fwk.NewStatus(fwk.Unschedulable, "no feasible placements found").WithPlugin(plugin.Name())
+	filteredPlacements := filterUnchangedPlacements(allPlacements, placement, state)
+
+	if len(filteredPlacements) == 0 {
+		return []*fwk.Placement{placement}, nil
 	}
 
-	return result.Placements, nil
+	mergedPlacements := filteredPlacements[0]
+	for i := 1; i < len(filteredPlacements); i++ {
+		mergedPlacements = mergePlacements(mergedPlacements, filteredPlacements[i], state)
+		if len(mergedPlacements) == 0 {
+			return nil, fwk.NewStatus(fwk.Unschedulable, "no feasible merged placements found")
+		}
+	}
+
+	return mergedPlacements, nil
+}
+
+// filterUnchangedPlacements removes placements that are identical to the input placement.
+// With multiple plugins, it is a common case that some plugins may return a single placement
+// equal to the one provided as input (meaning they don't restrict the placement further).
+// Skipping these unchanged placements optimizes the merge process by avoiding unnecessary work.
+// It also cleans up any state left by plugins for the removed placements.
+func filterUnchangedPlacements(allPlacements [][]*fwk.Placement, inputPlacement *fwk.Placement, state fwk.PodGroupCycleState) [][]*fwk.Placement {
+	var filtered [][]*fwk.Placement
+	for _, p := range allPlacements {
+		if len(p) == 1 && p[0] == inputPlacement {
+			state.DeletePlacementCycleStateForName(p[0].Name)
+			continue
+		}
+		filtered = append(filtered, p)
+	}
+	return filtered
+}
+
+func mergePlacements(placementsA, placementsB []*fwk.Placement, state fwk.PodGroupCycleState) []*fwk.Placement {
+	var result []*fwk.Placement
+	for _, pA := range placementsA {
+		for _, pB := range placementsB {
+			nodesMap := make(map[string]fwk.NodeInfo)
+			for _, n := range pA.Nodes {
+				nodesMap[n.Node().Name] = n
+			}
+			var intersected []fwk.NodeInfo
+			for _, n := range pB.Nodes {
+				if _, ok := nodesMap[n.Node().Name]; ok {
+					intersected = append(intersected, n)
+				}
+			}
+
+			if len(intersected) > 0 {
+				name := pA.Name
+				if pB.Name != "" && pA.Name != pB.Name {
+					if name == "" {
+						name = pB.Name
+					} else {
+						name = name + "-" + pB.Name
+					}
+				}
+
+				merged := &fwk.Placement{
+					Name:  name,
+					Nodes: intersected,
+				}
+
+				mergedState := framework.NewCycleState()
+				pAState := state.GetPlacementCycleStateForName(pA.Name)
+				if pAState != nil {
+					pAState.Range(func(k fwk.StateKey, v fwk.StateData) bool {
+						mergedState.Write(k, v)
+						return true
+					})
+				}
+				pBState := state.GetPlacementCycleStateForName(pB.Name)
+				if pBState != nil {
+					pBState.Range(func(k fwk.StateKey, v fwk.StateData) bool {
+						mergedState.Write(k, v)
+						return true
+					})
+				}
+				state.SetPlacementCycleStateForName(name, mergedState)
+
+				result = append(result, merged)
+			}
+		}
+	}
+	return result
 }
 
 func (f *frameworkImpl) runPlacementGeneratePlugin(ctx context.Context, pl fwk.PlacementGeneratePlugin, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, parentPlacement *fwk.Placement) (*fwk.GeneratePlacementsResult, *fwk.Status) {

@@ -683,6 +683,13 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 			}
 		}
 		placementCycleState := framework.NewCycleState()
+		pState := podGroupCycleState.GetPlacementCycleStateForName(placement.Name)
+		if pState != nil {
+			pState.Range(func(k fwk.StateKey, v fwk.StateData) bool {
+				placementCycleState.Write(k, v)
+				return true
+			})
+		}
 		result := sched.podGroupSchedulingDefaultAlgorithm(ctx, schedFwk, podGroupCycleState, placementCycleState, podGroupInfo, postFilterMode)
 		sched.nodeInfoSnapshot.ForgetPlacement()
 		if result.status.IsError() {

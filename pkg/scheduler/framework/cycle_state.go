@@ -50,6 +50,9 @@ type CycleState struct {
 	// If set to nil, it means this pod is not being scheduled within a placement context.
 	// This field can only be non-nil when GenericWorkload feature flag is enabled.
 	placementCycleState fwk.PlacementCycleState
+	// placementCycleStates map holds PlacementCycleState for each placement, keyed by placement name.
+	placementCycleStates   map[string]fwk.PlacementCycleState
+	placementCycleStatesMu sync.Mutex
 }
 
 // NewCycleState initializes a new CycleState and returns its pointer.
@@ -125,6 +128,47 @@ func (c *CycleState) SetPlacementCycleState(placementCycleState fwk.PlacementCyc
 	c.placementCycleState = placementCycleState
 }
 
+// GetPlacementCycleState gets the cycle state of the Placement for the given placement name.
+// Implements fwk.PodGroupCycleState.
+func (c *CycleState) GetPlacementCycleStateForName(placementName string) fwk.PlacementCycleState {
+	if c == nil {
+		return nil
+	}
+	c.placementCycleStatesMu.Lock()
+	defer c.placementCycleStatesMu.Unlock()
+	if c.placementCycleStates == nil {
+		return nil
+	}
+	return c.placementCycleStates[placementName]
+}
+
+// SetPlacementCycleState sets the cycle state of the Placement for the given placement name.
+// Implements fwk.PodGroupCycleState.
+func (c *CycleState) SetPlacementCycleStateForName(placementName string, state fwk.PlacementCycleState) {
+	if c == nil {
+		return
+	}
+	c.placementCycleStatesMu.Lock()
+	defer c.placementCycleStatesMu.Unlock()
+	if c.placementCycleStates == nil {
+		c.placementCycleStates = make(map[string]fwk.PlacementCycleState)
+	}
+	c.placementCycleStates[placementName] = state
+}
+
+// DeletePlacementCycleStateForName deletes the cycle state of the Placement for the given placement name.
+// Implements fwk.PodGroupCycleState.
+func (c *CycleState) DeletePlacementCycleStateForName(placementName string) {
+	if c == nil {
+		return
+	}
+	c.placementCycleStatesMu.Lock()
+	defer c.placementCycleStatesMu.Unlock()
+	if c.placementCycleStates != nil {
+		delete(c.placementCycleStates, placementName)
+	}
+}
+
 func (c *CycleState) SetSkipAllPostFilterPlugins(flag bool) {
 	c.skipAllPostFilterPlugins = flag
 }
@@ -181,4 +225,15 @@ func (c *CycleState) Write(key fwk.StateKey, val fwk.StateData) {
 // See CycleState for notes on concurrency.
 func (c *CycleState) Delete(key fwk.StateKey) {
 	c.storage.Delete(key)
+}
+
+// Range calls f sequentially for each key and value present in the cycle state.
+// If f returns false, range stops the iteration.
+func (c *CycleState) Range(f func(key fwk.StateKey, value fwk.StateData) bool) {
+	if c == nil {
+		return
+	}
+	c.storage.Range(func(k, v interface{}) bool {
+		return f(k.(fwk.StateKey), v.(fwk.StateData))
+	})
 }

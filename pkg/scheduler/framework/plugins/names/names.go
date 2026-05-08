@@ -40,4 +40,5 @@ const (
 	VolumeZone                      = "VolumeZone"
 	TopologyPlacementGenerator      = "TopologyPlacementGenerator"
 	PodGroupPodsCount               = "PodGroupPodsCount"
+	MockDRAPlacement                = "MockDRAPlacement"
 )
