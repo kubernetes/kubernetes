@@ -6728,6 +6728,49 @@ func TestAllocator(t *testing.T,
 				deviceAllocationResult(req0SubReq1, driverA, pool1, device2, false),
 			)},
 		},
+		"partitionable-devices-devices-consume-counter-set-in-different-nodes": {
+			features: Features{
+				PartitionableDevices: true,
+			},
+			claimsToAllocate: objects(
+				claimWithRequests(claim0, nil, request(req0, classA, 1)),
+			),
+			classes: objects(class(classA, driverA)),
+			slices: unwrapResourceSlices(
+				sliceWithCounterSets(slice1, node1, resourcePool(pool1, 3), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						"memory": resource.MustParse("8Gi"),
+					}),
+				),
+				sliceWithDevices(slice2, node1, resourcePool(pool1, 3), driverA,
+					device(device1, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+							"memory": resource.MustParse("6Gi"),
+						}),
+					),
+				),
+				sliceWithDevices(slice3, node2, resourcePool(pool1, 3), driverA,
+					device(device2, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+							"memory": resource.MustParse("6Gi"),
+						}),
+					),
+					device(device3, fromCounters, nil).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+							"memory": resource.MustParse("2Gi"),
+						}),
+					),
+				),
+			),
+			allocatedDevices: []DeviceID{
+				MakeDeviceID(driverA, pool1, device1),
+			},
+			node: node(node2, region1),
+			expectResults: []any{allocationResult(
+				localNodeSelector(node2),
+				deviceAllocationResult(req0, driverA, pool1, device3, false),
+			)},
+		},
 		"partitionable-devices-validation-error-on-non-targeting-slice": {
 			features: Features{
 				PartitionableDevices: true,

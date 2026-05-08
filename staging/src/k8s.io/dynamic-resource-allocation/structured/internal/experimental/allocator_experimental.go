@@ -127,7 +127,7 @@ func NewAllocator(ctx context.Context,
 	slicesShared := make([]*resourceapi.ResourceSlice, 0)
 	for _, slice := range slices {
 		nodeName := ptr.Deref(slice.Spec.NodeName, "")
-		if nodeName == "" || len(slice.Spec.SharedCounters) > 0 {
+		if nodeName == "" {
 			slicesShared = append(slicesShared, slice)
 		} else {
 			slicesOnNode[nodeName] = append(slicesOnNode[nodeName], slice)
