@@ -785,53 +785,22 @@ func (pi *PodInfo) DeepCopy() *PodInfo {
 	}
 }
 
-// Update creates a full new PodInfo by default. And only updates the pod when the PodInfo
-// has been instantiated and the passed pod is the exact same one as the original pod.
+// Update updates the pod pointer in PodInfo if the passed pod has the same UID.
+// It returns an error if the UIDs mismatch.
 func (pi *PodInfo) Update(pod *v1.Pod) error {
-	if pod != nil && pi.Pod != nil && pi.Pod.UID == pod.UID {
-		// PodInfo includes immutable information, and so it is safe to update the pod in place if it is
-		// the exact same pod
-		pi.Pod = pod
-		return nil
+	if pod == nil {
+		return fmt.Errorf("cannot update with nil pod")
 	}
-	var preferredAffinityTerms []v1.WeightedPodAffinityTerm
-	var preferredAntiAffinityTerms []v1.WeightedPodAffinityTerm
-	if affinity := pod.Spec.Affinity; affinity != nil {
-		if a := affinity.PodAffinity; a != nil {
-			preferredAffinityTerms = a.PreferredDuringSchedulingIgnoredDuringExecution
-		}
-		if a := affinity.PodAntiAffinity; a != nil {
-			preferredAntiAffinityTerms = a.PreferredDuringSchedulingIgnoredDuringExecution
-		}
+	if pi.Pod == nil {
+		return fmt.Errorf("cannot update PodInfo - its Pod is nil")
 	}
-
-	// Attempt to parse the affinity terms
-	var parseErrs []error
-	requiredAffinityTerms, err := fwk.GetAffinityTerms(pod, fwk.GetPodAffinityTerms(pod.Spec.Affinity))
-	if err != nil {
-		parseErrs = append(parseErrs, fmt.Errorf("requiredAffinityTerms: %w", err))
+	if pi.Pod.UID != pod.UID {
+		return fmt.Errorf("pod UID mismatch, expected %v, got %v", pi.Pod.UID, pod.UID)
 	}
-	requiredAntiAffinityTerms, err := fwk.GetAffinityTerms(pod,
-		fwk.GetPodAntiAffinityTerms(pod.Spec.Affinity))
-	if err != nil {
-		parseErrs = append(parseErrs, fmt.Errorf("requiredAntiAffinityTerms: %w", err))
-	}
-	weightedAffinityTerms, err := fwk.GetWeightedAffinityTerms(pod, preferredAffinityTerms)
-	if err != nil {
-		parseErrs = append(parseErrs, fmt.Errorf("preferredAffinityTerms: %w", err))
-	}
-	weightedAntiAffinityTerms, err := fwk.GetWeightedAffinityTerms(pod, preferredAntiAffinityTerms)
-	if err != nil {
-		parseErrs = append(parseErrs, fmt.Errorf("preferredAntiAffinityTerms: %w", err))
-	}
-
 	pi.Pod = pod
-	pi.RequiredAffinityTerms = requiredAffinityTerms
-	pi.RequiredAntiAffinityTerms = requiredAntiAffinityTerms
-	pi.PreferredAffinityTerms = weightedAffinityTerms
-	pi.PreferredAntiAffinityTerms = weightedAntiAffinityTerms
+	// Reset cached resource to force recomputation on next CalculateResource call.
 	pi.cachedResource = nil
-	return utilerrors.NewAggregate(parseErrs)
+	return nil
 }
 
 func (pi *PodInfo) CalculateResource() fwk.PodResource {
@@ -983,9 +952,48 @@ func (f *FitError) Error() string {
 
 // NewPodInfo returns a new PodInfo.
 func NewPodInfo(pod *v1.Pod) (*PodInfo, error) {
-	pInfo := &PodInfo{}
-	err := pInfo.Update(pod)
-	return pInfo, err
+	if pod == nil {
+		return nil, fmt.Errorf("pod cannot be nil")
+	}
+	pInfo := &PodInfo{Pod: pod}
+
+	var preferredAffinityTerms []v1.WeightedPodAffinityTerm
+	var preferredAntiAffinityTerms []v1.WeightedPodAffinityTerm
+	if affinity := pod.Spec.Affinity; affinity != nil {
+		if a := affinity.PodAffinity; a != nil {
+			preferredAffinityTerms = a.PreferredDuringSchedulingIgnoredDuringExecution
+		}
+		if a := affinity.PodAntiAffinity; a != nil {
+			preferredAntiAffinityTerms = a.PreferredDuringSchedulingIgnoredDuringExecution
+		}
+	}
+
+	// Attempt to parse the affinity terms
+	var parseErrs []error
+	requiredAffinityTerms, err := fwk.GetAffinityTerms(pod, fwk.GetPodAffinityTerms(pod.Spec.Affinity))
+	if err != nil {
+		parseErrs = append(parseErrs, fmt.Errorf("requiredAffinityTerms: %w", err))
+	}
+	requiredAntiAffinityTerms, err := fwk.GetAffinityTerms(pod,
+		fwk.GetPodAntiAffinityTerms(pod.Spec.Affinity))
+	if err != nil {
+		parseErrs = append(parseErrs, fmt.Errorf("requiredAntiAffinityTerms: %w", err))
+	}
+	weightedAffinityTerms, err := fwk.GetWeightedAffinityTerms(pod, preferredAffinityTerms)
+	if err != nil {
+		parseErrs = append(parseErrs, fmt.Errorf("preferredAffinityTerms: %w", err))
+	}
+	weightedAntiAffinityTerms, err := fwk.GetWeightedAffinityTerms(pod, preferredAntiAffinityTerms)
+	if err != nil {
+		parseErrs = append(parseErrs, fmt.Errorf("preferredAntiAffinityTerms: %w", err))
+	}
+
+	pInfo.RequiredAffinityTerms = requiredAffinityTerms
+	pInfo.RequiredAntiAffinityTerms = requiredAntiAffinityTerms
+	pInfo.PreferredAffinityTerms = weightedAffinityTerms
+	pInfo.PreferredAntiAffinityTerms = weightedAntiAffinityTerms
+
+	return pInfo, utilerrors.NewAggregate(parseErrs)
 }
 
 // Resource is a collection of compute resource.
