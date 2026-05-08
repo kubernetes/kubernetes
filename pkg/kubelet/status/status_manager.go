@@ -131,9 +131,9 @@ type PodStartupLatencyStateHelper interface {
 // PodUpdateNotifier is an interface for receiving pod status updates.
 type PodUpdateNotifier interface {
 	// OnPodUpdated is called when a pod's status is updated.
-	OnPodUpdated(pod *v1.Pod, status v1.PodStatus, isAdded bool)
+	OnPodUpdated(logger klog.Logger, pod *v1.Pod, status v1.PodStatus, isAdded bool)
 	// OnPodRemoved is called when a pod is terminated.
-	OnPodRemoved(pod *v1.Pod)
+	OnPodRemoved(logger klog.Logger, pod *v1.Pod)
 }
 
 type podStatusNotification struct {
@@ -465,7 +465,7 @@ func (m *manager) SetPodStatus(logger klog.Logger, pod *v1.Pod, status v1.PodSta
 	var notification *podStatusNotification
 	defer func() {
 		if notification != nil {
-			m.sendNotification(notification)
+			m.sendNotification(logger, notification)
 		}
 	}()
 
@@ -491,7 +491,7 @@ func (m *manager) SetContainerReadiness(logger klog.Logger, podUID types.UID, co
 	var notification *podStatusNotification
 	defer func() {
 		if notification != nil {
-			m.sendNotification(notification)
+			m.sendNotification(logger, notification)
 		}
 	}()
 
@@ -561,7 +561,7 @@ func (m *manager) SetContainerStartup(logger klog.Logger, podUID types.UID, cont
 	var notification *podStatusNotification
 	defer func() {
 		if notification != nil {
-			m.sendNotification(notification)
+			m.sendNotification(logger, notification)
 		}
 	}()
 
@@ -638,7 +638,7 @@ func (m *manager) TerminatePod(logger klog.Logger, pod *v1.Pod) {
 	var notification *podStatusNotification
 	defer func() {
 		if notification != nil {
-			m.sendNotification(notification)
+			m.sendNotification(logger, notification)
 		}
 	}()
 
@@ -1011,12 +1011,12 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 	return true, notification
 }
 
-func (m *manager) sendNotification(n *podStatusNotification) {
+func (m *manager) sendNotification(logger klog.Logger, n *podStatusNotification) {
 	for _, notifier := range m.notifiers {
 		if !n.podIsFinished {
-			notifier.OnPodUpdated(n.pod, n.status, n.isAdded)
+			notifier.OnPodUpdated(logger, n.pod, n.status, n.isAdded)
 		} else {
-			notifier.OnPodRemoved(n.pod)
+			notifier.OnPodRemoved(logger, n.pod)
 		}
 	}
 }
