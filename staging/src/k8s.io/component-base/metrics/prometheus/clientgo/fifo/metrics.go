@@ -58,11 +58,24 @@ var (
 	registerOnce sync.Once
 )
 
+// init only installs the provider with cache. The actual metric
+// registration with legacyregistry is deferred until the first factory
+// method is called (which happens at runtime when the first informer is
+// constructed). This ensures Create() — and therefore the read of the
+// NativeHistograms feature gate inside toPromHistogramOpts — runs after
+// ApplyFeatureGates has propagated the gate state.
+//
+// Register() is still exported and idempotent; callers that invoke it
+// directly (instead of relying on first-factory-call activation) get the
+// same behaviour as before.
 func init() {
-	Register()
+	cache.SetInformerMetricsProvider(informerMetricsProvider{})
 }
 
-// Register registers FIFO metrics and sets the metrics provider.
+// Register registers FIFO metrics and sets the metrics provider. It is
+// safe (and idempotent) to call multiple times. Callers do not normally
+// need to invoke this; importing the package and constructing informers
+// is sufficient.
 func Register() {
 	registerOnce.Do(func() {
 		legacyregistry.MustRegister(fifoQueuedItems)
@@ -75,6 +88,7 @@ func Register() {
 type informerMetricsProvider struct{}
 
 func (informerMetricsProvider) NewQueuedItemMetric(id cache.InformerNameAndResource) cache.GaugeMetric {
+	Register()
 	return &reservedGaugeMetric{
 		id: id,
 		gauge: fifoQueuedItems.WithLabelValues(
@@ -87,6 +101,7 @@ func (informerMetricsProvider) NewQueuedItemMetric(id cache.InformerNameAndResou
 }
 
 func (informerMetricsProvider) NewProcessingLatencyMetric(id cache.InformerNameAndResource) cache.HistogramMetric {
+	Register()
 	return &reservedHistogramMetric{
 		id: id,
 		histogram: fifoProcessingLatency.WithLabelValues(
@@ -99,6 +114,7 @@ func (informerMetricsProvider) NewProcessingLatencyMetric(id cache.InformerNameA
 }
 
 func (informerMetricsProvider) NewStoreResourceVersionMetric(id cache.InformerNameAndResource) cache.GaugeMetric {
+	Register()
 	return &reservedGaugeMetric{
 		id: id,
 		gauge: storeResourceVersion.WithLabelValues(
