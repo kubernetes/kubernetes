@@ -203,10 +203,7 @@ func (*quantity) ProgramOptions() []cel.ProgramOption {
 }
 
 func isQuantity(arg ref.Val) ref.Val {
-	str, ok := arg.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	str := arg.Value().(string)
 
 	_, err := resource.ParseQuantity(str)
 	if err != nil {
@@ -217,10 +214,7 @@ func isQuantity(arg ref.Val) ref.Val {
 }
 
 func stringToQuantity(arg ref.Val) ref.Val {
-	str, ok := arg.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	str := arg.Value().(string)
 
 	q, err := resource.ParseQuantity(str)
 	if err != nil {
@@ -231,27 +225,18 @@ func stringToQuantity(arg ref.Val) ref.Val {
 }
 
 func quantityGetApproximateFloat(arg ref.Val) ref.Val {
-	q, ok := arg.Value().(*resource.Quantity)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	q := arg.Value().(*resource.Quantity)
 	return types.Double(q.AsApproximateFloat64())
 }
 
 func quantityCanValue(arg ref.Val) ref.Val {
-	q, ok := arg.Value().(*resource.Quantity)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	q := arg.Value().(*resource.Quantity)
 	_, success := q.AsInt64()
 	return types.Bool(success)
 }
 
 func quantityGetValue(arg ref.Val) ref.Val {
-	q, ok := arg.Value().(*resource.Quantity)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	q := arg.Value().(*resource.Quantity)
 	v, success := q.AsInt64()
 	if !success {
 		return types.WrapErr(errors.New("cannot convert value to integer"))
@@ -260,65 +245,31 @@ func quantityGetValue(arg ref.Val) ref.Val {
 }
 
 func quantityGetSign(arg ref.Val) ref.Val {
-	q, ok := arg.Value().(*resource.Quantity)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	q := arg.Value().(*resource.Quantity)
 	return types.Int(q.Sign())
 }
 
 func quantityIsGreaterThan(arg ref.Val, other ref.Val) ref.Val {
-	q, ok := arg.Value().(*resource.Quantity)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
-	q2, ok := other.Value().(*resource.Quantity)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	q := arg.Value().(*resource.Quantity)
+	q2 := other.Value().(*resource.Quantity)
 	return types.Bool(q.Cmp(*q2) == 1)
 }
 
 func quantityIsLessThan(arg ref.Val, other ref.Val) ref.Val {
-	q, ok := arg.Value().(*resource.Quantity)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
-	q2, ok := other.Value().(*resource.Quantity)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	q := arg.Value().(*resource.Quantity)
+	q2 := other.Value().(*resource.Quantity)
 	return types.Bool(q.Cmp(*q2) == -1)
 }
 
 func quantityCompareTo(arg ref.Val, other ref.Val) ref.Val {
-	q, ok := arg.Value().(*resource.Quantity)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
-	q2, ok := other.Value().(*resource.Quantity)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
+	q := arg.Value().(*resource.Quantity)
+	q2 := other.Value().(*resource.Quantity)
 	return types.Int(q.Cmp(*q2))
 }
 
 func quantityAdd(arg ref.Val, other ref.Val) ref.Val {
-	q, ok := arg.Value().(*resource.Quantity)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
-	q2, ok := other.Value().(*resource.Quantity)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	q := arg.Value().(*resource.Quantity)
+	q2 := other.Value().(*resource.Quantity)
 
 	copy := *q
 	copy.Add(*q2)
@@ -328,15 +279,8 @@ func quantityAdd(arg ref.Val, other ref.Val) ref.Val {
 }
 
 func quantityAddInt(arg ref.Val, other ref.Val) ref.Val {
-	q, ok := arg.Value().(*resource.Quantity)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
-	q2, ok := other.Value().(int64)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	q := arg.Value().(*resource.Quantity)
+	q2 := other.Value().(int64)
 
 	q2Converted := *resource.NewQuantity(q2, resource.DecimalExponent)
 
@@ -348,15 +292,8 @@ func quantityAddInt(arg ref.Val, other ref.Val) ref.Val {
 }
 
 func quantitySub(arg ref.Val, other ref.Val) ref.Val {
-	q, ok := arg.Value().(*resource.Quantity)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
-	q2, ok := other.Value().(*resource.Quantity)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	q := arg.Value().(*resource.Quantity)
+	q2 := other.Value().(*resource.Quantity)
 
 	copy := *q
 	copy.Sub(*q2)
@@ -366,15 +303,8 @@ func quantitySub(arg ref.Val, other ref.Val) ref.Val {
 }
 
 func quantitySubInt(arg ref.Val, other ref.Val) ref.Val {
-	q, ok := arg.Value().(*resource.Quantity)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
-
-	q2, ok := other.Value().(int64)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	q := arg.Value().(*resource.Quantity)
+	q2 := other.Value().(int64)
 
 	q2Converted := *resource.NewQuantity(q2, resource.DecimalExponent)
 

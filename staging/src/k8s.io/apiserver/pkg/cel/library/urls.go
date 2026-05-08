@@ -165,10 +165,7 @@ func (*urls) ProgramOptions() []cel.ProgramOption {
 }
 
 func stringToUrl(arg ref.Val) ref.Val {
-	s, ok := arg.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	s := arg.Value().(string)
 	// Use ParseRequestURI to check the URL before conversion.
 	// ParseRequestURI requires absolute URLs and is used by the OpenAPIv3 'uri' format.
 	_, err := url.ParseRequestURI(s)
@@ -186,50 +183,32 @@ func stringToUrl(arg ref.Val) ref.Val {
 }
 
 func getScheme(arg ref.Val) ref.Val {
-	u, ok := arg.Value().(*url.URL)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	u := arg.Value().(*url.URL)
 	return types.String(u.Scheme)
 }
 
 func getHost(arg ref.Val) ref.Val {
-	u, ok := arg.Value().(*url.URL)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	u := arg.Value().(*url.URL)
 	return types.String(u.Host)
 }
 
 func getHostname(arg ref.Val) ref.Val {
-	u, ok := arg.Value().(*url.URL)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	u := arg.Value().(*url.URL)
 	return types.String(u.Hostname())
 }
 
 func getPort(arg ref.Val) ref.Val {
-	u, ok := arg.Value().(*url.URL)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	u := arg.Value().(*url.URL)
 	return types.String(u.Port())
 }
 
 func getEscapedPath(arg ref.Val) ref.Val {
-	u, ok := arg.Value().(*url.URL)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	u := arg.Value().(*url.URL)
 	return types.String(u.EscapedPath())
 }
 
 func getQuery(arg ref.Val) ref.Val {
-	u, ok := arg.Value().(*url.URL)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	u := arg.Value().(*url.URL)
 
 	result := map[ref.Val]ref.Val{}
 	for k, v := range u.Query() {
@@ -239,10 +218,7 @@ func getQuery(arg ref.Val) ref.Val {
 }
 
 func isURL(arg ref.Val) ref.Val {
-	s, ok := arg.Value().(string)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(arg)
-	}
+	s := arg.Value().(string)
 	_, err := url.ParseRequestURI(s)
 	return types.Bool(err == nil)
 }

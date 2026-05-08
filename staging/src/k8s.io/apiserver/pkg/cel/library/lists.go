@@ -189,16 +189,10 @@ func (*lists) ProgramOptions() []cel.ProgramOption {
 
 func isSorted(val ref.Val) ref.Val {
 	var prev traits.Comparer
-	iterable, ok := val.(traits.Iterable)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(val)
-	}
+	iterable := val.(traits.Iterable)
 	for it := iterable.Iterator(); it.HasNext() == types.True; {
 		next := it.Next()
-		nextCmp, ok := next.(traits.Comparer)
-		if !ok {
-			return types.MaybeNoSuchOverloadErr(next)
-		}
+		nextCmp := next.(traits.Comparer)
 		if prev != nil {
 			cmp := prev.Compare(next)
 			if cmp == types.IntOne {
@@ -212,31 +206,13 @@ func isSorted(val ref.Val) ref.Val {
 
 func sum(init func() ref.Val) functions.UnaryOp {
 	return func(val ref.Val) ref.Val {
-		i := init()
-		acc, ok := i.(traits.Adder)
-		if !ok {
-			// Should never happen since all passed in init values are valid
-			return types.MaybeNoSuchOverloadErr(i)
-		}
-		iterable, ok := val.(traits.Iterable)
-		if !ok {
-			return types.MaybeNoSuchOverloadErr(val)
-		}
+		acc := init().(traits.Adder)
+		iterable := val.(traits.Iterable)
 		for it := iterable.Iterator(); it.HasNext() == types.True; {
 			next := it.Next()
-			nextAdder, ok := next.(traits.Adder)
-			if !ok {
-				// Should never happen for type checked CEL programs
-				return types.MaybeNoSuchOverloadErr(next)
-			}
+			nextAdder := next.(traits.Adder)
 			if acc != nil {
-				s := acc.Add(next)
-				sum, ok := s.(traits.Adder)
-				if !ok {
-					// Should never happen for type checked CEL programs
-					return types.MaybeNoSuchOverloadErr(s)
-				}
-				acc = sum
+				acc = acc.Add(next).(traits.Adder)
 			} else {
 				acc = nextAdder
 			}
@@ -256,17 +232,10 @@ func max() functions.UnaryOp {
 func cmp(opName string, opPreferCmpResult ref.Val) functions.UnaryOp {
 	return func(val ref.Val) ref.Val {
 		var result traits.Comparer
-		iterable, ok := val.(traits.Iterable)
-		if !ok {
-			return types.MaybeNoSuchOverloadErr(val)
-		}
+		iterable := val.(traits.Iterable)
 		for it := iterable.Iterator(); it.HasNext() == types.True; {
 			next := it.Next()
-			nextCmp, ok := next.(traits.Comparer)
-			if !ok {
-				// Should never happen for type checked CEL programs
-				return types.MaybeNoSuchOverloadErr(next)
-			}
+			nextCmp := next.(traits.Comparer)
 			if result == nil {
 				result = nextCmp
 			} else {
@@ -284,10 +253,7 @@ func cmp(opName string, opPreferCmpResult ref.Val) functions.UnaryOp {
 }
 
 func indexOf(list ref.Val, item ref.Val) ref.Val {
-	lister, ok := list.(traits.Lister)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(list)
-	}
+	lister := list.(traits.Lister)
 	sz := lister.Size().(types.Int)
 	for i := types.Int(0); i < sz; i++ {
 		if lister.Get(types.Int(i)).Equal(item) == types.True {
@@ -298,10 +264,7 @@ func indexOf(list ref.Val, item ref.Val) ref.Val {
 }
 
 func lastIndexOf(list ref.Val, item ref.Val) ref.Val {
-	lister, ok := list.(traits.Lister)
-	if !ok {
-		return types.MaybeNoSuchOverloadErr(list)
-	}
+	lister := list.(traits.Lister)
 	sz := lister.Size().(types.Int)
 	for i := sz - 1; i >= 0; i-- {
 		if lister.Get(types.Int(i)).Equal(item) == types.True {
