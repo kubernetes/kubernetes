@@ -17,7 +17,7 @@ limitations under the License.
 package apidefinitions
 
 import (
-	"errors"
+	"fmt"
 
 	"k8s.io/gengo/v2/codetags"
 )
@@ -25,8 +25,9 @@ import (
 const tagGroupName = "groupName"
 
 // extractGeneratorTag returns the values of "+<tagName>" in comments.
-// A sole "false" value sets optedOut and clears values; any other value
-// (including "false" mixed with other values) is returned as-is.
+// If any value is "false", every value must be "false" (duplicate
+// disablement is allowed but mixing disablement with any other value
+// is an error); optedOut is set when so.
 func extractGeneratorTag(comments []string, tagName string) (values []string, optedOut bool, err error) {
 	if tagName == "" {
 		return nil, false, nil
@@ -35,7 +36,18 @@ func extractGeneratorTag(comments []string, tagName string) (values []string, op
 	if err != nil {
 		return nil, false, err
 	}
-	if len(values) == 1 && values[0] == "false" {
+	hasFalse, hasOther := false, false
+	for _, v := range values {
+		if v == "false" {
+			hasFalse = true
+		} else {
+			hasOther = true
+		}
+	}
+	if hasFalse && hasOther {
+		return nil, false, fmt.Errorf("+%s: cannot mix \"false\" with other values; got %v", tagName, values)
+	}
+	if hasFalse {
 		return nil, true, nil
 	}
 	return values, false, nil
@@ -71,19 +83,15 @@ func extractTags(lines []string, names ...string) (map[string][]codetags.Tag, er
 	return out, nil
 }
 
-// ErrGroupUndeclared indicates that no +groupName= tag declares a group
-// for the package.
-var ErrGroupUndeclared = errors.New("no group declared for package")
-
-// GroupNameForPackage returns the +groupName= value from comments, or
-// ErrGroupUndeclared if no such tag is present.
-func GroupNameForPackage(comments []string) (string, error) {
+// GroupNameForPackage returns the value of the +groupName= tag from
+// comments. ok is false when the tag is absent.
+func GroupNameForPackage(comments []string) (group string, ok bool, err error) {
 	values, err := tagValues(comments, tagGroupName)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
-	if len(values) > 0 {
-		return values[0], nil
+	if len(values) == 0 {
+		return "", false, nil
 	}
-	return "", ErrGroupUndeclared
+	return values[0], true, nil
 }

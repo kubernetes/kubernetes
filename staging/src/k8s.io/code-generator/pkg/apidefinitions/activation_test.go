@@ -108,14 +108,13 @@ func TestIdentify(t *testing.T) {
 			comments: []string{"+k8s:prerelease-lifecycle-gen=false"},
 		},
 		{
-			name: "=false mixed with peer pkg passes through",
+			name: "=false mixed with peer pkg is rejected",
 			spec: Conversion,
 			comments: []string{
 				"+k8s:conversion-gen=k8s.io/api/extensions/v1beta1",
 				"+k8s:conversion-gen=false",
 			},
-			wantShouldGenerate: true,
-			wantValues:         []string{"k8s.io/api/extensions/v1beta1", "false"},
+			wantErr: `cannot mix "false"`,
 		},
 		{
 			name: "repeated identical peer is allowed and preserved",
@@ -148,7 +147,7 @@ func TestIdentify(t *testing.T) {
 			comments: []string{
 				"+k8s:conversion-x-gen=k8s.io/api/foo",
 			},
-			wantErr: "+k8s:conversion--gen",
+			wantErr: "+k8s:conversion-x-gen",
 		},
 		{
 			name: "non-generator +k8s: tag passes validation untouched",

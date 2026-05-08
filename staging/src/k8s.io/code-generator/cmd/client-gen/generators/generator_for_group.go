@@ -17,7 +17,6 @@ limitations under the License.
 package generators
 
 import (
-	"errors"
 	"io"
 	"path"
 
@@ -73,11 +72,11 @@ func (g *genGroup) GenerateType(c *generator.Context, t *types.Type, w io.Writer
 	// allow user to define a group name that's different from the one parsed from the directory.
 	p := c.Universe.Package(g.inputPackage)
 	groupName := g.group
-	override, err := apidefinitions.GroupNameForPackage(p.Comments)
-	if err != nil && !errors.Is(err, apidefinitions.ErrGroupUndeclared) {
+	override, ok, err := apidefinitions.GroupNameForPackage(p.Comments)
+	if err != nil {
 		return err
 	}
-	if err == nil {
+	if ok {
 		groupName = override
 	}
 

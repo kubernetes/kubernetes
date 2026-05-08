@@ -17,6 +17,7 @@ limitations under the License.
 package apidefinitions
 
 import (
+	"errors"
 	"fmt"
 	"path"
 	"reflect"
@@ -146,18 +147,41 @@ func checkExplicitDisablement(pkg *types.Package) error {
 		return nil
 	}
 	tagged := codetags.Extract("+", pkg.Comments)
-	var missing []string
+	var missing []Spec
 	for _, spec := range expected {
 		if _, ok := tagged[spec.ActivationTag]; !ok {
-			missing = append(missing, "+"+spec.ActivationTag)
+			missing = append(missing, spec)
 		}
 	}
 	if len(missing) == 0 {
 		return nil
 	}
-	sort.Strings(missing)
-	return fmt.Errorf("%s/doc.go: package classifies as %s but lacks explicit +k8s:<gen>=value or =false for: %s",
-		pkg.Dir, roles, strings.Join(missing, ", "))
+	sort.Slice(missing, func(i, j int) bool { return missing[i].ActivationTag < missing[j].ActivationTag })
+
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "%s/doc.go: %s.\n", pkg.Dir, roles.describePackage(pkg.Dir))
+	sb.WriteString("Set explicit configuration or disablement for these generators in doc.go:")
+	for _, spec := range missing {
+		fmt.Fprintf(&sb, "\n  +%s=<%s>", spec.ActivationTag, valueHint(spec))
+	}
+	return errors.New(sb.String())
+}
+
+// valueHint describes the accepted shape of an ActivationTag value, for
+// inclusion in user-facing errors.
+func valueHint(spec Spec) string {
+	switch spec.ValueMode {
+	case ConversionPeerList:
+		return "peer-package or false"
+	case TypeFilterList:
+		return "TypeMeta or false"
+	case Package:
+		return "package or false"
+	case Boolean:
+		return "true or false"
+	default:
+		return "value or false"
+	}
 }
 
 func expectedGenerators(roles packageRoles) []Spec {
@@ -172,31 +196,47 @@ func expectedGenerators(roles packageRoles) []Spec {
 }
 
 type packageRoles struct {
-	// Not all packages have a single role. Combinations are allowed.
-	isExternalGroup   bool
-	isInternalGroup   bool
+	// isExternalGroup identifies an API group package containing
+	// versioned API types (e.g. staging/src/k8s.io/api/apps).
+	isExternalGroup bool
+
+	// isInternalGroup identifies an API group package containing
+	// API type internals (e.g. pkg/apis/apps). The "internal type" (aka Hub type)
+	// often lives here.
+	isInternalGroup bool
+
+	// isExternalVersion identifies a package containing versioned API types
+	// (e.g. staging/src/k8s.io/api/apps/v1).
 	isExternalVersion bool
+
+	// isInternalVersion identifies a per-version internals package containing
+	// conversion / defaulting / validation for hub types in the parent
+	// directory (e.g. pkg/apis/apps/v1).
 	isInternalVersion bool
 }
 
-func (r packageRoles) String() string {
+func (r packageRoles) describePackage(pkgDir string) string {
 	var parts []string
 	if r.isExternalGroup {
-		parts = append(parts, "external-group")
+		parts = append(parts, "API group package with versioned API types in subpackages")
 	}
 	if r.isInternalGroup {
-		parts = append(parts, "internal-group")
+		parts = append(parts, "API group package containing hub API types")
 	}
 	if r.isExternalVersion {
-		parts = append(parts, "external-version")
+		parts = append(parts, "package containing versioned API types")
 	}
 	if r.isInternalVersion {
-		parts = append(parts, "internal-version")
+		desc := "package containing per-version internals (conversion, defaulting, validation)"
+		if parent := path.Dir(pkgDir); parent != "" && parent != "." && parent != "/" {
+			desc += " for hub types at " + parent
+		}
+		parts = append(parts, desc)
 	}
 	if len(parts) == 0 {
-		return "not-api-package"
+		return "package has no recognized API role"
 	}
-	return strings.Join(parts, ",")
+	return "this package looks like: " + strings.Join(parts, "; ")
 }
 
 // classifyPackage looks for evidence of package roles.
@@ -236,7 +276,7 @@ func classifyPackage(pkg *types.Package) packageRoles {
 }
 
 func looksLikeAPIPackage(pkg *types.Package) bool {
-	if _, err := GroupNameForPackage(pkg.Comments); err == nil {
+	if _, ok, _ := GroupNameForPackage(pkg.Comments); ok {
 		return true
 	}
 	for name := range codetags.Extract("+", pkg.Comments) {

@@ -17,7 +17,6 @@ limitations under the License.
 package apidefinitions
 
 import (
-	"errors"
 	"testing"
 )
 
@@ -26,23 +25,20 @@ func TestGroupNameForPackage(t *testing.T) {
 		name     string
 		comments []string
 		want     string
-		wantErr  error
+		wantOK   bool
 	}{
-		{name: "groupName tag", comments: []string{"+groupName=apps"}, want: "apps"},
-		{name: "qualified groupName", comments: []string{"+groupName=foo.example.com"}, want: "foo.example.com"},
-		{name: "no tag", wantErr: ErrGroupUndeclared},
+		{name: "groupName tag", comments: []string{"+groupName=apps"}, want: "apps", wantOK: true},
+		{name: "qualified groupName", comments: []string{"+groupName=foo.example.com"}, want: "foo.example.com", wantOK: true},
+		{name: "no tag"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := GroupNameForPackage(tc.comments)
-			if tc.wantErr != nil {
-				if !errors.Is(err, tc.wantErr) {
-					t.Errorf("err = %v, want %v", err, tc.wantErr)
-				}
-				return
-			}
+			got, ok, err := GroupNameForPackage(tc.comments)
 			if err != nil {
 				t.Fatalf("err = %v", err)
+			}
+			if ok != tc.wantOK {
+				t.Errorf("ok = %v, want %v", ok, tc.wantOK)
 			}
 			if got != tc.want {
 				t.Errorf("got %q, want %q", got, tc.want)

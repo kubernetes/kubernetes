@@ -18,7 +18,6 @@ limitations under the License.
 package generators
 
 import (
-	"errors"
 	"fmt"
 	"path"
 	"path/filepath"
@@ -281,11 +280,11 @@ func applyGroupOverrides(universe types.Universe, args *args.Args) error {
 	changes := make(map[clientgentypes.GroupVersion]clientgentypes.GroupVersion)
 	for gv, inputDir := range args.GroupVersionPackages() {
 		p := universe.Package(inputDir)
-		override, err := apidefinitions.GroupNameForPackage(p.Comments)
-		if err != nil && !errors.Is(err, apidefinitions.ErrGroupUndeclared) {
+		override, ok, err := apidefinitions.GroupNameForPackage(p.Comments)
+		if err != nil {
 			return err
 		}
-		if err == nil {
+		if ok {
 			newGV := clientgentypes.GroupVersion{
 				Group:   clientgentypes.Group(override),
 				Version: gv.Version,

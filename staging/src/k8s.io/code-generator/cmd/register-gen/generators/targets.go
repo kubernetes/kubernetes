@@ -17,7 +17,6 @@ limitations under the License.
 package generators
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -93,11 +92,11 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 
 			// if there is a comment of the form "// +groupName=somegroup" or "// +groupName=somegroup.foo.bar.io",
 			// extract the fully qualified API group name from it and overwrite the group inferred from the package path
-			override, err := apidefinitions.GroupNameForPackage(pkg.Comments)
-			if err != nil && !errors.Is(err, apidefinitions.ErrGroupUndeclared) {
+			override, ok, err := apidefinitions.GroupNameForPackage(pkg.Comments)
+			if err != nil {
 				klog.Fatalf("error resolving group name: %v", err)
 			}
-			if err == nil {
+			if ok {
 				klog.V(5).Infof("overriding the group name with = %s", override)
 				gv.Group = clientgentypes.Group(override)
 			}

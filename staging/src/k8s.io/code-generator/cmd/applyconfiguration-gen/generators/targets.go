@@ -17,7 +17,6 @@ limitations under the License.
 package generators
 
 import (
-	"errors"
 	"fmt"
 	"path"
 	"path/filepath"
@@ -294,11 +293,11 @@ func groupVersion(p *types.Package) (gv clientgentypes.GroupVersion, err error) 
 	// If there's a comment of the form "// +groupName=somegroup" or
 	// "// +groupName=somegroup.foo.bar.io", use the first field (somegroup) as the name of the
 	// group when generating.
-	override, err := apidefinitions.GroupNameForPackage(p.Comments)
-	if err != nil && !errors.Is(err, apidefinitions.ErrGroupUndeclared) {
+	override, ok, err := apidefinitions.GroupNameForPackage(p.Comments)
+	if err != nil {
 		return gv, err
 	}
-	if err == nil {
+	if ok {
 		gv.Group = clientgentypes.Group(override)
 	}
 
