@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
+	"runtime/debug"
 	"slices"
 	"sort"
 	"strconv"
@@ -165,6 +166,9 @@ type MutableFeatureGate interface {
 	AddFlag(fs *pflag.FlagSet)
 	// Close sets closed to true, and prevents subsequent calls to Add
 	Close()
+	// Freeze sets frozen to true and prevents subsequent mutation of gate values.
+	// An error is returned if gates were read prior to freezing.
+	Freeze() error
 	// Set parses and stores flag gates for known features
 	// from a string like feature1=true,feature2=false,...
 	Set(value string) error
@@ -281,6 +285,12 @@ type featureGate struct {
 	queriedFeatures         atomic.Value
 	emulationVersion        atomic.Pointer[version.Version]
 	minCompatibilityVersion atomic.Pointer[version.Version]
+
+	// frozen is true once all gate changes have been completed, disables all mutation
+	frozen bool
+	// firstRead records the stack of the first caller to Enabled()
+	firstRead      sync.Once
+	firstReadStack string
 }
 
 var _ MutableVersionedFeatureGateWithLogger = &featureGate{}
@@ -485,6 +495,10 @@ func (f *featureGate) SetFromMapWithLogger(logger klog.Logger, m map[string]bool
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
+	if f.frozen {
+		return fmt.Errorf("cannot set %#v, gate is frozen", m)
+	}
+
 	// Copy existing state
 	enabled := map[Feature]bool{}
 	for k, v := range f.enabled.Load().(map[Feature]bool) {
@@ -544,6 +558,9 @@ func (f *featureGate) AddVersioned(features map[Feature]VersionedSpecs) error {
 
 	if f.closed {
 		return fmt.Errorf("cannot add a feature gate after adding it to the flag set")
+	}
+	if f.frozen {
+		return fmt.Errorf("cannot add features %#v, gate is frozen", features)
 	}
 	// Copy existing state
 	known := f.GetAllVersioned()
@@ -653,6 +670,10 @@ func (f *featureGate) AddDependencies(dependencies map[Feature][]Feature) error 
 	if f.closed {
 		return fmt.Errorf("cannot add a feature gate dependency after adding it to the flag set")
 	}
+	if f.frozen {
+		return fmt.Errorf("cannot add a feature gate dependency after frozen")
+	}
+
 	// Copy existing state
 	known := f.GetAllVersioned()
 
@@ -788,6 +809,9 @@ func (f *featureGate) overrideDefaultAtEmulationAndMinCompatVersion(logger klog.
 	if f.closed {
 		return fmt.Errorf("cannot override default for feature %q: gates already added to a flag set", name)
 	}
+	if f.frozen {
+		return fmt.Errorf("cannot override default for feature %q: gates are frozen", name)
+	}
 
 	// Copy existing state
 	known := f.GetAllVersioned()
@@ -865,11 +889,16 @@ func (f *featureGate) SetEmulationVersionAndMinCompatibilityVersionWithLogger(lo
 	helper, logger := logger.WithCallStackHelper()
 	helper()
 
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	if f.frozen {
+		return fmt.Errorf("cannot set emulation version, gate is frozen")
+	}
+
 	if emulationVersion.EqualTo(f.EmulationVersion()) && minCompatibilityVersion.EqualTo(f.MinCompatibilityVersion()) {
 		return nil
 	}
-	f.lock.Lock()
-	defer f.lock.Unlock()
 	logger.V(1).Info("Set feature gate emulation", "emulationVersion", emulationVersion, "minCompatibilityVersion", minCompatibilityVersion)
 
 	// Copy existing state
@@ -945,6 +974,11 @@ func featureEnabled(key Feature, enabled map[Feature]bool, known map[Feature]Ver
 
 // Enabled returns true if the key is enabled.  If the key is not known, this call will panic.
 func (f *featureGate) Enabled(key Feature) bool {
+	f.firstRead.Do(func() {
+		f.lock.Lock()
+		defer f.lock.Unlock()
+		f.firstReadStack = string(debug.Stack())
+	})
 	// TODO: ideally we should lock the feature gate in this call to be safe, need to evaluate how much performance impact locking would have.
 	v := featureEnabled(key, f.enabled.Load().(map[Feature]bool), f.known.Load().(map[Feature]VersionedSpecs), f.EmulationVersion(), f.MinCompatibilityVersion())
 	f.unsafeRecordQueried(key)
@@ -982,6 +1016,21 @@ func (f *featureGate) Close() {
 	f.lock.Lock()
 	f.closed = true
 	f.lock.Unlock()
+}
+
+// Freeze sets frozen to true and prevents subsequent mutation.
+// An error is returned if gates were read prior to freezing.
+func (f *featureGate) Freeze() error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	if f.frozen {
+		return nil
+	}
+	f.frozen = true
+	if f.firstReadStack != "" {
+		return fmt.Errorf("already read from\n%s\nbefore Freeze() was called from\n%s", f.firstReadStack, string(debug.Stack()))
+	}
+	return nil
 }
 
 // AddFlag adds a flag for setting global feature gates to the specified FlagSet.
@@ -1098,6 +1147,11 @@ func (f *featureGate) ExplicitlySet(name Feature) bool {
 func (f *featureGate) ResetFeatureValueToDefault(name Feature) error {
 	f.lock.Lock()
 	defer f.lock.Unlock()
+
+	if f.frozen {
+		return fmt.Errorf("cannot reset to defaults, gate is frozen")
+	}
+
 	enabled := map[Feature]bool{}
 	for k, v := range f.enabled.Load().(map[Feature]bool) {
 		enabled[k] = v

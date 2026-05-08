@@ -105,7 +105,13 @@ See [scheduling](https://kubernetes.io/docs/concepts/scheduling-eviction/)
 for more information about scheduling and the kube-scheduler component.`,
 		PersistentPreRunE: func(*cobra.Command, []string) error {
 			// makes sure feature gates are set before RunE.
-			return opts.ComponentGlobalsRegistry.Set()
+			if err := opts.ComponentGlobalsRegistry.Set(); err != nil {
+				return err
+			}
+			if err := utilfeature.DefaultMutableFeatureGate.Freeze(); err != nil {
+				return err
+			}
+			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runCommand(cmd, opts, registryOptions...)

@@ -129,7 +129,13 @@ controller, and serviceaccounts controller.`,
 			// and CI ensures it works properly against matching kube-apiserver versions.
 			restclient.SetDefaultWarningHandler(restclient.NoWarnings{})
 			// makes sure feature gates are set before RunE.
-			return s.ComponentGlobalsRegistry.Set()
+			if err := s.ComponentGlobalsRegistry.Set(); err != nil {
+				return err
+			}
+			if err := utilfeature.DefaultMutableFeatureGate.Freeze(); err != nil {
+				return err
+			}
+			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			verflag.PrintAndExitIfRequested()
