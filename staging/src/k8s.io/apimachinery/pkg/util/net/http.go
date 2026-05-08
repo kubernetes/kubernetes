@@ -175,6 +175,19 @@ func pingTimeoutSeconds() int {
 	return ret
 }
 
+func maxReadFrameSize() uint32 {
+	if s := os.Getenv("HTTP2_MAX_READ_FRAME_SIZE"); len(s) > 0 {
+		i, err := strconv.ParseUint(s, 10, 32)
+		if err != nil {
+			klog.Warningf("Illegal HTTP2_MAX_READ_FRAME_SIZE(%q): %v", s, err)
+			return 0
+		}
+		klog.Infof("HTTP2 max read frame size set to %d", i)
+		return uint32(i)
+	}
+	return 0
+}
+
 func configureHTTP2Transport(t *http.Transport) error {
 	t2, err := http2.ConfigureTransports(t)
 	if err != nil {
@@ -190,6 +203,9 @@ func configureHTTP2Transport(t *http.Transport) error {
 	// https://github.com/kubernetes/kubernetes/issues/87615.
 	t2.ReadIdleTimeout = time.Duration(readIdleTimeoutSeconds()) * time.Second
 	t2.PingTimeout = time.Duration(pingTimeoutSeconds()) * time.Second
+	if s := maxReadFrameSize(); s > 0 {
+		t2.MaxReadFrameSize = s
+	}
 	return nil
 }
 
