@@ -1017,12 +1017,11 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 // NewDefaultAPIGroupInfo returns an APIGroupInfo stubbed with "normal" values
 // exposed for easier composition from other packages
 func NewDefaultAPIGroupInfo(group string, scheme *runtime.Scheme, parameterCodec runtime.ParameterCodec, codecs serializer.CodecFactory) APIGroupInfo {
-	opts := []serializer.CodecFactoryOptionsMutator{}
+	opts := []serializer.CodecFactoryOptionsMutator{
+		serializer.WithStreamingCollectionEncodingToJSON(),
+	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.CBORServingAndStorage) {
 		opts = append(opts, serializer.WithSerializer(cbor.NewSerializerInfo))
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.StreamingCollectionEncodingToJSON) {
-		opts = append(opts, serializer.WithStreamingCollectionEncodingToJSON())
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.StreamingCollectionEncodingToProtobuf) {
 		opts = append(opts, serializer.WithStreamingCollectionEncodingToProtobuf())
