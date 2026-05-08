@@ -590,9 +590,6 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 
 	f.Describe("feature rollback", func() {
 		ginkgo.It("should reset memory protection to 0 when MemoryQoS is disabled", func(ctx context.Context) {
-			// See https://github.com/kubernetes/kubernetes/pull/138430 for details
-			ginkgo.Skip("skipping test until MemoryQoS rollback is resolved")
-
 			configureMemoryQoSWithPolicy(ctx, 0.9, kubeletconfig.TieredReservationMemoryReservationPolicy)
 
 			pod := memqosMakePod("memqos-rollback", f.Namespace.Name,
@@ -619,8 +616,7 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			restartKubelet(ctx, true)
 			waitForKubeletToStart(ctx, f)
 
-			// QoS-class cgroup memory.low is cleared by the periodic setMemoryQoS loop
-			// (periodicQOSCgroupUpdateInterval = 1 minute) plus kubelet startup time.
+			// Stale QoS-class cgroup memory.low is cleared at kubelet startup.
 			var burstableCgroupPath string
 			if cgroupDriver == "systemd" {
 				burstableCgroupPath = filepath.Join(cgroupRoot, "kubepods.slice", "kubepods-burstable.slice")
@@ -633,9 +629,73 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.Equal(int64(0)),
 				"burstable QoS memory.low should reset to 0 when MemoryQoS is disabled")
 
-			// NOTE: Pod-level and container-level memory.low values persist after rollback.
-			// Pod-level: clearing via systemd SetUnitProperties interferes with other cgroup settings.
-			// Container-level: requires CRI runtime support for Unified in UpdateContainerResources.
+			// Pod and container memory.low values persist but have no effect
+			// since cgroup v2 memory protection is hierarchical (parent=0 wins).
+		})
+
+		ginkgo.It("should not clobber other cgroup values when clearing stale memory protection at startup", func(ctx context.Context) {
+			configureMemoryQoSWithPolicy(ctx, 0.9, kubeletconfig.TieredReservationMemoryReservationPolicy)
+
+			e2epod.NewPodClient(f).CreateSync(ctx, memqosMakePod("memqos-clobber-check", f.Namespace.Name,
+				v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi")},
+				v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+			))
+
+			var burstableCgroupPath string
+			if cgroupDriver == "systemd" {
+				burstableCgroupPath = filepath.Join(cgroupRoot, "kubepods.slice", "kubepods-burstable.slice")
+			} else {
+				burstableCgroupPath = filepath.Join(cgroupRoot, "kubepods", "burstable")
+			}
+
+			ginkgo.By("Verifying memory.low is non-zero while MemoryQoS is enabled")
+			gomega.Eventually(ctx, func() int64 {
+				val, _ := memqosReadCgroupInt64(burstableCgroupPath, cgroupMemoryLow)
+				return val
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(
+				gomega.BeNumerically(">", int64(0)),
+				"memory.low should be non-zero when MemoryQoS is enabled with burstable pods")
+
+			ginkgo.By("Recording baseline cgroup values before rollback")
+			cgroupFiles := []string{"cpu.max", "memory.max"}
+			baselines := make(map[string]string)
+			for _, cgFile := range cgroupFiles {
+				filePath := filepath.Join(burstableCgroupPath, cgFile)
+				if _, statErr := os.Stat(filePath); os.IsNotExist(statErr) {
+					continue
+				}
+				val, err := memqosReadCgroupFile(burstableCgroupPath, cgFile)
+				framework.ExpectNoError(err, "reading baseline %s", cgFile)
+				baselines[cgFile] = val
+				framework.Logf("baseline %s: %s", cgFile, val)
+			}
+
+			ginkgo.By("Disabling MemoryQoS and restarting kubelet")
+			newCfg := oldCfg.DeepCopy()
+			if newCfg.FeatureGates == nil {
+				newCfg.FeatureGates = make(map[string]bool)
+			}
+			newCfg.FeatureGates["MemoryQoS"] = false
+			newCfg.MemoryReservationPolicy = kubeletconfig.NoneMemoryReservationPolicy
+			framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(newCfg))
+			restartKubelet(ctx, true)
+			waitForKubeletToStart(ctx, f)
+
+			ginkgo.By("Verifying memory.low was cleared to 0 at startup")
+			gomega.Eventually(ctx, func() int64 {
+				val, _ := memqosReadCgroupInt64(burstableCgroupPath, cgroupMemoryLow)
+				return val
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.Equal(int64(0)),
+				"memory.low should be cleared at startup when MemoryQoS is disabled")
+
+			ginkgo.By("Verifying other cgroup values were not clobbered by the rollback")
+			for cgFile, baseline := range baselines {
+				post, err := memqosReadCgroupFile(burstableCgroupPath, cgFile)
+				framework.ExpectNoError(err, "reading post-rollback %s", cgFile)
+				framework.Logf("post-rollback %s: got=%s, baseline=%s", cgFile, post, baseline)
+				gomega.Expect(post).To(gomega.Equal(baseline),
+					fmt.Sprintf("%s changed after rollback", cgFile))
+			}
 		})
 	})
 
