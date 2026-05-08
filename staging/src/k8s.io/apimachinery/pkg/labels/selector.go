@@ -18,6 +18,7 @@ package labels
 
 import (
 	"fmt"
+	"math"
 	"slices"
 	"sort"
 	"strconv"
@@ -124,6 +125,153 @@ func Nothing() Selector {
 // Support for detecting such cases can be added in the future.
 func MatchesNothing(selector Selector) bool {
 	return selector == sharedNothingSelector
+}
+
+// SelectorsOverlap returns true if there is any label set that could match both selectors.
+func SelectorsOverlap(selector1, selector2 Selector) bool {
+	reqs1, selectable1 := selector1.Requirements()
+	reqs2, selectable2 := selector2.Requirements()
+	if !selectable1 || !selectable2 {
+		return false
+	}
+
+	requirementsByKey := map[string][]Requirement{}
+	for _, req := range reqs1 {
+		requirementsByKey[req.key] = append(requirementsByKey[req.key], req)
+	}
+	for _, req := range reqs2 {
+		requirementsByKey[req.key] = append(requirementsByKey[req.key], req)
+	}
+
+	for _, reqs := range requirementsByKey {
+		if !requirementsOverlap(reqs) {
+			return false
+		}
+	}
+	return true
+}
+
+func requirementsOverlap(reqs []Requirement) bool {
+	var (
+		mustExist    bool
+		mustNotExist bool
+		allowed      sets.String
+		forbidden    sets.String
+		hasLower     bool
+		lower        int64
+		hasUpper     bool
+		upper        int64
+	)
+
+	for _, req := range reqs {
+		switch req.operator {
+		case selection.In, selection.Equals, selection.DoubleEquals:
+			mustExist = true
+			values := sets.NewString(req.strValues...)
+			if allowed == nil {
+				allowed = values
+			} else {
+				allowed = allowed.Intersection(values)
+			}
+		case selection.NotIn, selection.NotEquals:
+			if forbidden == nil {
+				forbidden = sets.String{}
+			}
+			forbidden.Insert(req.strValues...)
+		case selection.Exists:
+			mustExist = true
+		case selection.DoesNotExist:
+			mustNotExist = true
+		case selection.GreaterThan, selection.LessThan:
+			mustExist = true
+			value, err := strconv.ParseInt(req.strValues[0], 10, 64)
+			if err != nil {
+				return false
+			}
+			switch req.operator {
+			case selection.GreaterThan:
+				if !hasLower || value > lower {
+					hasLower = true
+					lower = value
+				}
+			case selection.LessThan:
+				if !hasUpper || value < upper {
+					hasUpper = true
+					upper = value
+				}
+			}
+		default:
+			return false
+		}
+	}
+
+	if mustNotExist {
+		return !mustExist
+	}
+	if allowed != nil {
+		for value := range allowed {
+			if valueSatisfies(value, forbidden, hasLower, lower, hasUpper, upper) {
+				return true
+			}
+		}
+		return false
+	}
+	if hasLower || hasUpper {
+		return numericValueExists(forbidden, hasLower, lower, hasUpper, upper)
+	}
+	return true
+}
+
+func valueSatisfies(value string, forbidden sets.String, hasLower bool, lower int64, hasUpper bool, upper int64) bool {
+	if forbidden.Has(value) {
+		return false
+	}
+	if hasLower || hasUpper {
+		intValue, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return false
+		}
+		if hasLower && intValue <= lower {
+			return false
+		}
+		if hasUpper && intValue >= upper {
+			return false
+		}
+	}
+	return true
+}
+
+func numericValueExists(forbidden sets.String, hasLower bool, lower int64, hasUpper bool, upper int64) bool {
+	if hasLower && lower == math.MaxInt64 {
+		return false
+	}
+	if hasUpper && upper <= 0 {
+		return false
+	}
+	if hasLower && hasUpper && lower+1 >= upper {
+		return false
+	}
+
+	candidate := int64(0)
+	if hasLower && candidate <= lower {
+		candidate = lower + 1
+	}
+	if hasUpper && candidate >= upper {
+		candidate = upper - 1
+	}
+	if candidate < 0 {
+		candidate = 0
+	}
+	for forbidden.Has(strconv.FormatInt(candidate, 10)) {
+		if candidate == math.MaxInt64 {
+			return false
+		}
+		if hasUpper && candidate+1 >= upper {
+			return false
+		}
+		candidate++
+	}
+	return !hasLower || candidate > lower
 }
 
 // NewSelector returns a nil selector

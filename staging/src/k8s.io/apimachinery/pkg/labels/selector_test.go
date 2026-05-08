@@ -1220,8 +1220,152 @@ func TestMatchesNothing(t *testing.T) {
 	}
 }
 
+func TestSelectorsOverlap(t *testing.T) {
+	tests := []struct {
+		name      string
+		selector1 Selector
+		selector2 Selector
+		want      bool
+	}{
+		{
+			name:      "everything overlaps everything",
+			selector1: Everything(),
+			selector2: Everything(),
+			want:      true,
+		},
+		{
+			name:      "nothing does not overlap everything",
+			selector1: Nothing(),
+			selector2: Everything(),
+			want:      false,
+		},
+		{
+			name:      "empty selector overlaps equality",
+			selector1: mustParseSelector(t, ""),
+			selector2: mustParseSelector(t, "env=prod"),
+			want:      true,
+		},
+		{
+			name:      "same equality overlaps",
+			selector1: mustParseSelector(t, "env=prod"),
+			selector2: mustParseSelector(t, "env=prod"),
+			want:      true,
+		},
+		{
+			name:      "different equality does not overlap",
+			selector1: mustParseSelector(t, "env=prod"),
+			selector2: mustParseSelector(t, "env=dev"),
+			want:      false,
+		},
+		{
+			name:      "subset match labels overlap",
+			selector1: mustParseSelector(t, "env=prod"),
+			selector2: mustParseSelector(t, "env=prod,tier=frontend"),
+			want:      true,
+		},
+		{
+			name:      "intersecting in requirements overlap",
+			selector1: mustParseSelector(t, "env in (prod,stage)"),
+			selector2: mustParseSelector(t, "env in (stage,dev)"),
+			want:      true,
+		},
+		{
+			name:      "disjoint in requirements do not overlap",
+			selector1: mustParseSelector(t, "env in (prod,stage)"),
+			selector2: mustParseSelector(t, "env in (dev,test)"),
+			want:      false,
+		},
+		{
+			name:      "in and notin overlap when an allowed value remains",
+			selector1: mustParseSelector(t, "env in (prod,stage)"),
+			selector2: mustParseSelector(t, "env notin (prod)"),
+			want:      true,
+		},
+		{
+			name:      "in and notin do not overlap when all allowed values are forbidden",
+			selector1: mustParseSelector(t, "env in (prod,stage)"),
+			selector2: mustParseSelector(t, "env notin (prod,stage)"),
+			want:      false,
+		},
+		{
+			name:      "exists and does not exist do not overlap",
+			selector1: mustParseSelector(t, "env"),
+			selector2: mustParseSelector(t, "!env"),
+			want:      false,
+		},
+		{
+			name:      "does not exist overlaps notin because missing label satisfies both",
+			selector1: mustParseSelector(t, "!env"),
+			selector2: mustParseSelector(t, "env notin (prod)"),
+			want:      true,
+		},
+		{
+			name:      "greater than and less than overlap",
+			selector1: mustParseSelector(t, "version>1"),
+			selector2: mustParseSelector(t, "version<3"),
+			want:      true,
+		},
+		{
+			name:      "greater than and less than do not overlap",
+			selector1: mustParseSelector(t, "version>3"),
+			selector2: mustParseSelector(t, "version<3"),
+			want:      false,
+		},
+		{
+			name:      "numeric equality overlaps range",
+			selector1: mustParseSelector(t, "version=2"),
+			selector2: mustParseSelector(t, "version>1,version<3"),
+			want:      true,
+		},
+		{
+			name:      "upper bounded range overlaps not equals",
+			selector1: mustParseSelector(t, "version<2"),
+			selector2: mustParseSelector(t, "version!=1"),
+			want:      true,
+		},
+		{
+			name:      "upper bounded range overlaps when zero is forbidden but another value remains",
+			selector1: mustParseSelector(t, "version<3"),
+			selector2: mustParseSelector(t, "version!=0"),
+			want:      true,
+		},
+		{
+			name:      "upper bounded range does not overlap when all values are forbidden",
+			selector1: mustParseSelector(t, "version<3"),
+			selector2: mustParseSelector(t, "version notin (0,1,2)"),
+			want:      false,
+		},
+		{
+			name:      "non numeric equality does not overlap range",
+			selector1: mustParseSelector(t, "version=stable"),
+			selector2: mustParseSelector(t, "version>1"),
+			want:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := SelectorsOverlap(tt.selector1, tt.selector2); got != tt.want {
+				t.Errorf("SelectorsOverlap(%q, %q) = %v, want %v", tt.selector1, tt.selector2, got, tt.want)
+			}
+			if got := SelectorsOverlap(tt.selector2, tt.selector1); got != tt.want {
+				t.Errorf("SelectorsOverlap(%q, %q) = %v, want %v", tt.selector2, tt.selector1, got, tt.want)
+			}
+		})
+	}
+}
+
 func expectMatchNothing(t *testing.T, selector Selector, want bool) {
 	if MatchesNothing(selector) != want {
 		t.Errorf("Wanted %s to MatchNothing '%t', but it did not.\n", selector, want)
 	}
+}
+
+func mustParseSelector(t *testing.T, selector string) Selector {
+	t.Helper()
+	parsed, err := Parse(selector)
+	if err != nil {
+		t.Fatalf("Parse(%q) failed: %v", selector, err)
+	}
+	return parsed
 }
