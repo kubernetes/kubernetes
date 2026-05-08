@@ -214,6 +214,8 @@ type PriorityQueue struct {
 	isGenericWorkloadEnabled bool
 	// isOpportunisticBatchingEnabled indicates whether the OpportunisticBatching feature gate is enabled.
 	isOpportunisticBatchingEnabled bool
+	// isPreQueueingHintsEnabled indicates whether the SchedulerPreQueueingHints feature gate is enabled.
+	isPreQueueingHintsEnabled bool
 }
 
 // QueueingHintFunction is the wrapper of QueueingHintFn that has PluginName.
@@ -386,6 +388,7 @@ func NewPriorityQueue(
 	isPopFromBackoffQEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SchedulerPopFromBackoffQ)
 	isGenericWorkloadEnabled := utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload)
 	isOpportunisticBatchingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.OpportunisticBatching)
+	isPreQueueingHintsEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SchedulerPreQueueingHints)
 	lessConverted := convertLessFn(lessFn)
 
 	backoffQ := newBackoffQueue(options.clock, options.podInitialBackoffDuration, options.podMaxBackoffDuration, lessConverted, isPopFromBackoffQEnabled)
@@ -406,6 +409,7 @@ func NewPriorityQueue(
 		isPopFromBackoffQEnabled:          isPopFromBackoffQEnabled,
 		isGenericWorkloadEnabled:          isGenericWorkloadEnabled,
 		isOpportunisticBatchingEnabled:    isOpportunisticBatchingEnabled,
+		isPreQueueingHintsEnabled:         isPreQueueingHintsEnabled,
 	}
 	var backoffQPopper backoffQPopper
 	if isPopFromBackoffQEnabled {
@@ -1408,28 +1412,11 @@ func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(logger klog.Logger, event 
 	}
 
 	// Run PreQueueingHintFns to narrow the pod set.
-	var podKeys sets.Set[string]
-	for _, hintMap := range p.queueingHintMap {
-		for eventToMatch, hintfns := range hintMap {
-			if !framework.MatchClusterEvents(eventToMatch, event) {
-				continue
-			}
-			for _, hintfn := range hintfns {
-				if hintfn.PreQueueingHintFn != nil {
-					if keys := hintfn.PreQueueingHintFn(logger, oldObj, newObj); keys != nil {
-						if podKeys == nil {
-							podKeys = keys
-						} else {
-							podKeys = podKeys.Union(keys)
-						}
-					}
-				}
-			}
-		}
-	}
+	podKeys := p.getPreQueueingHintPodKeys(logger, event, oldObj, newObj)
 
 	var unschedulableEntities []framework.QueuedEntityInfo
 	if podKeys != nil {
+		logger.V(5).Info("PreQueueingHint narrowed pod set", "candidates", podKeys.Len(), "total", len(p.unschedulableEntities.entityInfoMap))
 		// Only check entities for pods identified by PreQueueingHint.
 		unschedulableEntities = make([]framework.QueuedEntityInfo, 0, podKeys.Len())
 		for _, entity := range p.unschedulableEntities.entityInfoMap {
@@ -1453,7 +1440,6 @@ func (p *PriorityQueue) moveAllToActiveOrBackoffQueue(logger klog.Logger, event 
 				return true
 			})
 		}
-	}
 	}
 	p.moveEntitiesToActiveOrBackoffQueue(logger, unschedulableEntities, event, oldObj, newObj)
 }
@@ -1494,6 +1480,40 @@ func (p *PriorityQueue) requeueEntityWithQueueingStrategy(logger klog.Logger, en
 	}
 	// Entity is gated. We don't have to push it back to unschedulable queue, because moveToActiveQ should already have done that.
 	return unschedulableQ
+}
+
+// getPreQueueingHintPodKeys returns the set of pod keys that should be evaluated
+// for the given event. Returns nil if all pods should be evaluated.
+//
+// NOTE: this function assumes lock has been acquired in caller
+func (p *PriorityQueue) getPreQueueingHintPodKeys(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}) sets.Set[string] {
+	if !p.isPreQueueingHintsEnabled {
+		return nil
+	}
+	var podKeys sets.Set[string]
+	for _, hintMap := range p.queueingHintMap {
+		for eventToMatch, hintfns := range hintMap {
+			if !framework.MatchClusterEvents(eventToMatch, event) {
+				continue
+			}
+			for _, hintfn := range hintfns {
+				if hintfn.PreQueueingHintFn == nil {
+					continue
+				}
+				keys := hintfn.PreQueueingHintFn(logger, oldObj, newObj)
+				if keys == nil {
+					// nil means all pods should be evaluated (e.g., shared claim).
+					return nil
+				}
+				if podKeys == nil {
+					podKeys = keys
+				} else {
+					podKeys = podKeys.Union(keys)
+				}
+			}
+		}
+	}
+	return podKeys
 }
 
 // NOTE: this function assumes lock has been acquired in caller

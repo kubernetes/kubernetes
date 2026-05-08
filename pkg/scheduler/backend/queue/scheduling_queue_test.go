@@ -7207,3 +7207,122 @@ func TestAddUnschedulablePodIfNotPresentPodGroupMember(t *testing.T) {
 		})
 	}
 }
+
+func TestPriorityQueue_PreQueueingHint(t *testing.T) {
+	tests := []struct {
+		name           string
+		featureEnabled bool
+		pods           []*v1.Pod
+		hintKeys       sets.Set[string]
+		nilHint        bool
+		wantMoved      []string
+	}{
+		{
+			name:           "gate enabled, hint narrows to one pod",
+			featureEnabled: true,
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj(),
+				st.MakePod().Name("pod2").Namespace("ns1").UID("2").Obj(),
+				st.MakePod().Name("pod3").Namespace("ns1").UID("3").Obj(),
+			},
+			hintKeys:  sets.New("pod1_ns1"),
+			wantMoved: []string{"pod1_ns1"},
+		},
+		{
+			name:           "gate enabled, hint returns nil evaluates all",
+			featureEnabled: true,
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj(),
+				st.MakePod().Name("pod2").Namespace("ns1").UID("2").Obj(),
+			},
+			hintKeys:  nil,
+			wantMoved: []string{"pod1_ns1", "pod2_ns1"},
+		},
+		{
+			name:           "gate enabled, one hint returns nil means evaluate all",
+			featureEnabled: true,
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj(),
+				st.MakePod().Name("pod2").Namespace("ns1").UID("2").Obj(),
+				st.MakePod().Name("pod3").Namespace("ns1").UID("3").Obj(),
+			},
+			hintKeys:  sets.New("pod1_ns1"),
+			nilHint:   true,
+			wantMoved: []string{"pod1_ns1", "pod2_ns1", "pod3_ns1"},
+		},
+		{
+			name:           "gate disabled, hint ignored, all pods evaluated",
+			featureEnabled: false,
+			pods: []*v1.Pod{
+				st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj(),
+				st.MakePod().Name("pod2").Namespace("ns1").UID("2").Obj(),
+				st.MakePod().Name("pod3").Namespace("ns1").UID("3").Obj(),
+			},
+			hintKeys:  sets.New("pod1_ns1"),
+			wantMoved: []string{"pod1_ns1", "pod2_ns1", "pod3_ns1"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerPreQueueingHints, tt.featureEnabled)
+			logger, ctx := ktesting.NewTestContext(t)
+
+			var preQueueingHintFn fwk.PreQueueingHintFn
+			if tt.hintKeys != nil {
+				keys := tt.hintKeys
+				preQueueingHintFn = func(logger klog.Logger, oldObj, newObj interface{}) sets.Set[string] {
+					return keys
+				}
+			}
+
+			m := makeEmptyQueueingHintMapPerProfile()
+			hints := []*QueueingHintFunction{
+				{
+					PluginName:        "foo",
+					QueueingHintFn:    queueHintReturnQueue,
+					PreQueueingHintFn: preQueueingHintFn,
+				},
+			}
+			if tt.nilHint {
+				hints = append(hints, &QueueingHintFunction{
+					PluginName:     "bar",
+					QueueingHintFn: queueHintReturnQueue,
+					PreQueueingHintFn: func(logger klog.Logger, oldObj, newObj interface{}) sets.Set[string] {
+						return nil
+					},
+				})
+			}
+			m[""][nodeAdd] = hints
+
+			q := NewTestQueue(ctx, newDefaultQueueSort(), WithQueueingHintMapPerProfile(m))
+
+			for _, pod := range tt.pods {
+				q.Add(ctx, pod)
+				p, err := q.Pop(logger)
+				if err != nil {
+					t.Fatalf("Pop failed: %v", err)
+				}
+				pInfo := &framework.QueuedPodInfo{PodInfo: p.PodInfo, UnschedulablePlugins: sets.New("foo")}
+				if err := q.AddUnschedulableIfNotPresent(logger, pInfo, q.SchedulingCycle()); err != nil {
+					t.Fatalf("AddUnschedulableIfNotPresent failed: %v", err)
+				}
+			}
+
+			q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, nil, nil)
+
+			moved := sets.New[string]()
+			for _, pod := range tt.pods {
+				key := pod.Name + "_" + pod.Namespace
+				if q.unschedulablePods.get(pod) == nil {
+					moved.Insert(key)
+				}
+			}
+
+			wantMoved := sets.New(tt.wantMoved...)
+			if !moved.Equal(wantMoved) {
+				t.Errorf("moved pods = %v, want %v", moved, wantMoved)
+			}
+		})
+	}
+}
