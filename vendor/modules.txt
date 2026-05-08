@@ -270,6 +270,8 @@ github.com/google/cadvisor/fs/tmpfs
 github.com/google/cadvisor/fs/tmpfs/install
 github.com/google/cadvisor/fs/vfs
 github.com/google/cadvisor/fs/vfs/install
+github.com/google/cadvisor/fs/zfs
+github.com/google/cadvisor/fs/zfs/install
 github.com/google/cadvisor/info/v1
 github.com/google/cadvisor/info/v2
 github.com/google/cadvisor/machine
@@ -386,6 +388,7 @@ github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
 # github.com/mistifyio/go-zfs v2.1.2-0.20190413222219-f784269be439+incompatible
 ## explicit
+github.com/mistifyio/go-zfs
 # github.com/mitchellh/go-wordwrap v1.0.1
 ## explicit; go 1.14
 github.com/mitchellh/go-wordwrap
