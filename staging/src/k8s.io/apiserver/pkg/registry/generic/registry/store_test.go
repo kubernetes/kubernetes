@@ -385,7 +385,7 @@ func TestStoreCreate(t *testing.T) {
 		t.Fatalf("Expected 'already exists' error from storage, but got %v", err)
 	}
 
-	// check the 'alredy exists' msg was edited
+	// check the 'already exists' msg was edited
 	msg := &err.(*errors.StatusError).ErrStatus.Message
 	if !strings.Contains(*msg, "object is being deleted:") {
 		t.Errorf("Unexpected error without the 'object is being deleted:' in message: %v", err)
