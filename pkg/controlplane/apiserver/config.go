@@ -23,8 +23,6 @@ import (
 	"net/http"
 	"time"
 
-	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -168,10 +166,8 @@ func BuildGenericConfig(
 	if lastErr = s.EgressSelector.ApplyTo(genericConfig); lastErr != nil {
 		return
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
-		if lastErr = s.Traces.ApplyTo(genericConfig.EgressSelector, genericConfig); lastErr != nil {
-			return
-		}
+	if lastErr = s.Traces.ApplyTo(genericConfig.EgressSelector, genericConfig); lastErr != nil {
+		return
 	}
 	// wrap the definitions to revert any changes from disabled features
 	getOpenAPIDefinitions = openapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(getOpenAPIDefinitions)
@@ -189,11 +185,7 @@ func BuildGenericConfig(
 	if genericConfig.EgressSelector != nil {
 		s.Etcd.StorageConfig.Transport.EgressLookup = genericConfig.EgressSelector.Lookup
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
-		s.Etcd.StorageConfig.Transport.TracerProvider = genericConfig.TracerProvider
-	} else {
-		s.Etcd.StorageConfig.Transport.TracerProvider = noopoteltrace.NewTracerProvider()
-	}
+	s.Etcd.StorageConfig.Transport.TracerProvider = genericConfig.TracerProvider
 
 	storageFactoryConfig := kubeapiserver.NewStorageFactoryConfigEffectiveVersion(genericConfig.EffectiveVersion)
 	storageFactoryConfig.APIResourceConfig = genericConfig.MergedResourceConfig

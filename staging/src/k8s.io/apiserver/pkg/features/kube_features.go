@@ -44,11 +44,6 @@ const (
 	// Assigns each kube-apiserver an ID in a cluster.
 	APIServerIdentity featuregate.Feature = "APIServerIdentity"
 
-	// owner: @dashpole
-	//
-	// Add support for distributed tracing in the API Server
-	APIServerTracing featuregate.Feature = "APIServerTracing"
-
 	// owner: @linxiulei
 	//
 	// Enables serving watch requests in separate goroutines.
@@ -311,12 +306,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	APIServerIdentity: {
 		{Version: version.MustParse("1.20"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.26"), Default: true, PreRelease: featuregate.Beta},
-	},
-
-	APIServerTracing: {
-		{Version: version.MustParse("1.22"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.27"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37
 	},
 
 	APIServingWithRoutine: {
