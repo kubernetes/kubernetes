@@ -195,12 +195,6 @@ const (
 	// headers when forwarding requests to the servers serving the aggregated API.
 	RemoteRequestHeaderUID featuregate.Feature = "RemoteRequestHeaderUID"
 
-	// owner: @wojtek-t
-	//
-	// Enables resilient watchcache initialization to avoid controlplane
-	// overload.
-	ResilientWatchCacheInitialization featuregate.Feature = "ResilientWatchCacheInitialization"
-
 	// owner: @cici37
 	//
 	// Allow watch cache to create a watch on a dedicated RPC.
@@ -401,11 +395,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	RemoteRequestHeaderUID: {
 		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
-	},
-
-	ResilientWatchCacheInitialization: {
-		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	},
 
 	SeparateCacheWatchRPC: {

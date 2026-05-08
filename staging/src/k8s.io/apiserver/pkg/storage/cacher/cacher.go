@@ -521,19 +521,9 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		return nil, err
 	}
 
-	var readyGeneration int
-	if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		var err error
-		var downtime time.Duration
-		readyGeneration, downtime, err = c.ready.checkAndReadGeneration()
-		if err != nil {
-			return nil, errors.NewTooManyRequests(err.Error(), calculateRetryAfterForUnreadyCache(downtime))
-		}
-	} else {
-		readyGeneration, err = c.ready.waitAndReadGeneration(ctx)
-		if err != nil {
-			return nil, errors.NewServiceUnavailable(err.Error())
-		}
+	readyGeneration, downtime, err := c.ready.checkAndReadGeneration()
+	if err != nil {
+		return nil, errors.NewTooManyRequests(err.Error(), calculateRetryAfterForUnreadyCache(downtime))
 	}
 
 	// determine the namespace and name scope of the watch, first from the request, secondarily from the field selector
@@ -760,16 +750,10 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		attribute.Stringer("type", c.groupResource))
 	defer span.End(500 * time.Millisecond)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if downtime, err := c.ready.check(); err != nil {
-			// If Cacher is not initialized, reject List requests
-			// as described in https://kep.k8s.io/4568
-			return errors.NewTooManyRequests(err.Error(), calculateRetryAfterForUnreadyCache(downtime))
-		}
-	} else {
-		if err := c.ready.wait(ctx); err != nil {
-			return errors.NewServiceUnavailable(err.Error())
-		}
+	if downtime, err := c.ready.check(); err != nil {
+		// If Cacher is not initialized, reject List requests
+		// as described in https://kep.k8s.io/4568
+		return errors.NewTooManyRequests(err.Error(), calculateRetryAfterForUnreadyCache(downtime))
 	}
 	span.AddEvent("Ready")
 

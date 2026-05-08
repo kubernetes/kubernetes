@@ -49,7 +49,6 @@ import (
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
@@ -58,7 +57,6 @@ import (
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -2430,13 +2428,11 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 		if err != nil {
 			t.Fatalf("Couldn't create cacher: %v", err)
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-			// The tests assume that Get/GetList/Watch calls shouldn't fail.
-			// However, 429 error can now be returned if watchcache is under initialization.
-			// To avoid rewriting all tests, we wait for watchcache to initialize.
-			if err := cacher.Wait(context.Background()); err != nil {
-				t.Fatal(err)
-			}
+		// The tests assume that Get/GetList/Watch calls shouldn't fail.
+		// However, 429 error can now be returned if watchcache is under initialization.
+		// To avoid rewriting all tests, we wait for watchcache to initialize.
+		if err := cacher.Wait(context.Background()); err != nil {
+			t.Fatal(err)
 		}
 		d := destroyFunc
 		delegator := cacherstorage.NewCacheDelegator(cacher, s)
@@ -2956,4 +2952,3 @@ func TestValidateIndexers(t *testing.T) {
 		}
 	}
 }
-

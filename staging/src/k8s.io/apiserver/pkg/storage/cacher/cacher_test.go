@@ -592,13 +592,11 @@ func testSetupWithEtcdServer(t testing.TB, opts ...setupOption) (context.Context
 		t.Fatalf("Failed to inject list errors: %v", err)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		// The tests assume that Get/GetList/Watch calls shouldn't fail.
-		// However, 429 error can now be returned if watchcache is under initialization.
-		// To avoid rewriting all tests, we wait for watchcache to initialize.
-		if err := cacher.Wait(ctx); err != nil {
-			t.Fatal(err)
-		}
+	// The tests assume that Get/GetList/Watch calls shouldn't fail.
+	// However, 429 error can now be returned if watchcache is under initialization.
+	// To avoid rewriting all tests, we wait for watchcache to initialize.
+	if err := cacher.Wait(ctx); err != nil {
+		t.Fatal(err)
 	}
 	delegator := NewCacheDelegator(cacher, wrappedStorage)
 	terminate := func() {
@@ -613,11 +611,6 @@ func testSetupWithEtcdServer(t testing.TB, opts ...setupOption) (context.Context
 func testSetupWithEtcdAndCreateWrapper(t *testing.T, opts ...setupOption) (storage.Interface, tearDownFunc) {
 	_, cacher, _, tearDown := testSetupWithEtcdServer(t, opts...)
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err := cacher.cacher.ready.wait(context.TODO()); err != nil {
-			t.Fatalf("unexpected error waiting for the cache to be ready")
-		}
-	}
 	return &createWrapper{CacheDelegator: cacher}, tearDown
 }
 

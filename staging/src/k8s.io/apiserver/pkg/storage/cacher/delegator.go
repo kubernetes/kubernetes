@@ -146,32 +146,17 @@ func (c *CacheDelegator) Get(ctx context.Context, key string, opts storage.GetOp
 		return c.storage.Get(ctx, key, opts, objPtr)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if !c.cacher.Ready() {
-			// If Cache is not initialized, delegator Get requests to storage
-			// as described in https://kep.k8s.io/4568
-			span.AddEvent("About to Get from underlying storage - cache not initialized")
-			return c.storage.Get(ctx, key, opts, objPtr)
-		}
+	if !c.cacher.Ready() {
+		// If Cache is not initialized, delegator Get requests to storage
+		// as described in https://kep.k8s.io/4568
+		span.AddEvent("About to Get from underlying storage - cache not initialized")
+		return c.storage.Get(ctx, key, opts, objPtr)
 	}
 	// If resourceVersion is specified, serve it from cache.
 	// It's guaranteed that the returned value is at least that
 	// fresh as the given resourceVersion.
-	getRV, err := c.cacher.versioner.ParseResourceVersion(opts.ResourceVersion)
-	if err != nil {
+	if _, err := c.cacher.versioner.ParseResourceVersion(opts.ResourceVersion); err != nil {
 		return err
-	}
-	// Do not create a trace - it's not for free and there are tons
-	// of Get requests. We can add it if it will be really needed.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if getRV == 0 && !c.cacher.Ready() {
-			// If Cacher is not yet initialized and we don't require any specific
-			// minimal resource version, simply forward the request to storage.
-			return c.storage.Get(ctx, key, opts, objPtr)
-		}
-		if err := c.cacher.ready.wait(ctx); err != nil {
-			return errors.NewServiceUnavailable(err.Error())
-		}
 	}
 	span.AddEvent("About to fetch object from cache")
 	return c.cacher.Get(ctx, key, opts, objPtr)
@@ -190,23 +175,14 @@ func (c *CacheDelegator) GetList(ctx context.Context, key string, opts storage.L
 		return c.storage.GetList(ctx, key, opts, listObj)
 	}
 
-	listRV, err := c.cacher.versioner.ParseResourceVersion(opts.ResourceVersion)
-	if err != nil {
+	if _, err := c.cacher.versioner.ParseResourceVersion(opts.ResourceVersion); err != nil {
 		return err
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if !c.cacher.Ready() && shouldDelegateListOnNotReadyCache(opts) {
-			// If Cacher is not initialized, delegator List requests to storage
-			// as described in https://kep.k8s.io/4568
-			return c.storage.GetList(ctx, key, opts, listObj)
-		}
-	} else {
-		if listRV == 0 && !c.cacher.Ready() {
-			// If Cacher is not yet initialized and we don't require any specific
-			// minimal resource version, simply forward the request to storage.
-			return c.storage.GetList(ctx, key, opts, listObj)
-		}
+	if !c.cacher.Ready() && shouldDelegateListOnNotReadyCache(opts) {
+		// If Cacher is not initialized, delegator List requests to storage
+		// as described in https://kep.k8s.io/4568
+		return c.storage.GetList(ctx, key, opts, listObj)
 	}
 	err = c.cacher.GetList(ctx, key, opts, listObj)
 	success := "true"
