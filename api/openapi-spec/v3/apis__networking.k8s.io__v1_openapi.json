@@ -59,12 +59,7 @@
           "paths": {
             "description": "paths is a collection of paths that map requests to backends.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1.HTTPIngressPath"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.networking.v1.HTTPIngressPath"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -127,12 +122,7 @@
           "items": {
             "description": "items is the list of IPAddresses.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1.IPAddress"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.networking.v1.IPAddress"
             },
             "type": "array"
           },
@@ -190,7 +180,6 @@
           "except": {
             "description": "except is a slice of CIDRs that should not be included within an IPBlock Valid examples are \"192.168.1.0/24\" or \"2001:db8::/64\" Except values will be rejected if they are outside the cidr range",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -321,12 +310,7 @@
           "items": {
             "description": "items is the list of IngressClasses.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1.IngressClass"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.networking.v1.IngressClass"
             },
             "type": "array"
           },
@@ -416,12 +400,7 @@
           "items": {
             "description": "items is the list of Ingress.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1.Ingress"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.networking.v1.Ingress"
             },
             "type": "array"
           },
@@ -465,12 +444,7 @@
           "ports": {
             "description": "ports provides information about the ports exposed by this LoadBalancer.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1.IngressPortStatus"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.networking.v1.IngressPortStatus"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -484,12 +458,7 @@
           "ingress": {
             "description": "ingress is a list containing ingress points for the load-balancer.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1.IngressLoadBalancerIngress"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.networking.v1.IngressLoadBalancerIngress"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -576,12 +545,7 @@
           "rules": {
             "description": "rules is a list of host rules used to configure the Ingress. If unspecified, or no rule matches, all traffic is sent to the default backend.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1.IngressRule"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.networking.v1.IngressRule"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -589,12 +553,7 @@
           "tls": {
             "description": "tls represents the TLS configuration. Currently the Ingress only supports a single TLS port, 443. If multiple members of this list specify different hosts, they will be multiplexed on the same port according to the hostname specified through the SNI TLS extension, if the ingress controller fulfilling the ingress supports SNI.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1.IngressTLS"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.networking.v1.IngressTLS"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -623,7 +582,6 @@
           "hosts": {
             "description": "hosts is a list of hosts included in the TLS certificate. The values in this list must match the name/s used in the tlsSecret. Defaults to the wildcard host setting for the loadbalancer controller fulfilling this Ingress, if left unspecified.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -681,12 +639,7 @@
           "ports": {
             "description": "ports is a list of destination ports for outgoing traffic. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1.NetworkPolicyPort"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.networking.v1.NetworkPolicyPort"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -694,12 +647,7 @@
           "to": {
             "description": "to is a list of destinations for outgoing traffic of pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all destinations (traffic not restricted by destination). If this field is present and contains at least one item, this rule allows traffic only if the traffic matches at least one item in the to list.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1.NetworkPolicyPeer"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.networking.v1.NetworkPolicyPeer"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -713,12 +661,7 @@
           "from": {
             "description": "from is a list of sources which should be able to access the pods selected for this rule. Items in this list are combined using a logical OR operation. If this field is empty or missing, this rule matches all sources (traffic not restricted by source). If this field is present and contains at least one item, this rule allows traffic only if the traffic matches at least one item in the from list.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1.NetworkPolicyPeer"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.networking.v1.NetworkPolicyPeer"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -726,12 +669,7 @@
           "ports": {
             "description": "ports is a list of ports which should be made accessible on the pods selected for this rule. Each item in this list is combined using a logical OR. If this field is empty or missing, this rule matches all ports (traffic not restricted by port). If this field is present and contains at least one item, then this rule allows traffic only if the traffic matches at least one port in the list.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1.NetworkPolicyPort"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.networking.v1.NetworkPolicyPort"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -749,12 +687,7 @@
           "items": {
             "description": "items is a list of schema objects.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1.NetworkPolicy"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.networking.v1.NetworkPolicy"
             },
             "type": "array"
           },
@@ -843,12 +776,7 @@
           "egress": {
             "description": "egress is a list of egress rules to be applied to the selected pods. Outgoing traffic is allowed if there are no NetworkPolicies selecting the pod (and cluster policy otherwise allows the traffic), OR if the traffic matches at least one egress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy limits all outgoing traffic (and serves solely to ensure that the pods it selects are isolated by default). This field is beta-level in 1.8",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1.NetworkPolicyEgressRule"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.networking.v1.NetworkPolicyEgressRule"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -856,12 +784,7 @@
           "ingress": {
             "description": "ingress is a list of ingress rules to be applied to the selected pods. Traffic is allowed to a pod if there are no NetworkPolicies selecting the pod (and cluster policy otherwise allows the traffic), OR if the traffic source is the pod's local node, OR if the traffic matches at least one ingress rule across all of the NetworkPolicy objects whose podSelector matches the pod. If this field is empty then this NetworkPolicy does not allow any traffic (and serves solely to ensure that the pods it selects are isolated by default)",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1.NetworkPolicyIngressRule"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.networking.v1.NetworkPolicyIngressRule"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -878,7 +801,6 @@
           "policyTypes": {
             "description": "policyTypes is a list of rule types that the NetworkPolicy relates to. Valid options are [\"Ingress\"], [\"Egress\"], or [\"Ingress\", \"Egress\"]. If this field is not specified, it will default based on the existence of ingress or egress rules; policies that contain an egress section are assumed to affect egress, and all policies (whether or not they contain an ingress section) are assumed to affect ingress. If you want to write an egress-only policy, you must explicitly specify policyTypes [ \"Egress\" ]. Likewise, if you want to write a policy that specifies that no egress is allowed, you must specify a policyTypes value that include \"Egress\" (since such a policy would not include an egress section and would otherwise default to just [ \"Ingress\" ]). This field is beta-level in 1.8",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -987,12 +909,7 @@
           "items": {
             "description": "items is the list of ServiceCIDRs.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.networking.v1.ServiceCIDR"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.networking.v1.ServiceCIDR"
             },
             "type": "array"
           },
@@ -1028,7 +945,6 @@
           "cidrs": {
             "description": "CIDRs defines the IP blocks in CIDR notation (e.g. \"192.168.0.0/24\" or \"2001:db8::/64\") from which to assign service cluster IPs. Max of two CIDRs is allowed, one of each IP family. This field is immutable.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -1043,12 +959,7 @@
           "conditions": {
             "description": "conditions holds an array of metav1.Condition that describe the state of the ServiceCIDR. Current service state",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
             },
             "type": "array",
             "x-kubernetes-list-map-keys": [
@@ -1067,7 +978,6 @@
           "categories": {
             "description": "categories is a list of the grouped resources this resource belongs to (e.g. 'all')",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -1095,7 +1005,6 @@
           "shortNames": {
             "description": "shortNames is a list of suggested short names of the resource.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -1113,7 +1022,6 @@
           "verbs": {
             "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array"
@@ -1151,12 +1059,7 @@
           "resources": {
             "description": "resources contains the name of the resources and if they are namespaced.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -1231,7 +1134,6 @@
           "dryRun": {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -1291,19 +1193,13 @@
           "matchExpressions": {
             "description": "matchExpressions is a list of label selector requirements. The requirements are ANDed.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
           },
           "matchLabels": {
             "additionalProperties": {
-              "default": "",
               "type": "string"
             },
             "description": "matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is \"key\", the operator is \"In\", and the values array contains only \"value\". The requirements are ANDed.",
@@ -1329,7 +1225,6 @@
           "values": {
             "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -1420,7 +1315,6 @@
         "properties": {
           "annotations": {
             "additionalProperties": {
-              "default": "",
               "type": "string"
             },
             "description": "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations",
@@ -1450,7 +1344,6 @@
           "finalizers": {
             "description": "Must be empty before the object is deleted from the registry. Each entry is an identifier for the responsible component that will remove the entry from the list. If the deletionTimestamp of the object is non-nil, entries in this list can only be removed. Finalizers may be processed and removed in any order.  Order is NOT enforced because it introduces significant risk of stuck finalizers. finalizers is a shared field, any actor with permission can reorder it. If the finalizer list is processed in order, then this can lead to a situation in which the component responsible for the first finalizer in the list is waiting for a signal (field value, external system, or other) produced by a component responsible for a finalizer later in the list, resulting in a deadlock. Without enforced ordering finalizers are free to order amongst themselves and are not vulnerable to ordering changes in the list.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -1468,7 +1361,6 @@
           },
           "labels": {
             "additionalProperties": {
-              "default": "",
               "type": "string"
             },
             "description": "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels",
@@ -1477,12 +1369,7 @@
           "managedFields": {
             "description": "ManagedFields maps workflow-id and version to the set of fields that are managed by that workflow. This is mostly for internal housekeeping, and users typically shouldn't need to set or understand this field. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". The set of fields is always in the version that the workflow used when modifying the object.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -1498,12 +1385,7 @@
           "ownerReferences": {
             "description": "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
             },
             "type": "array",
             "x-kubernetes-list-map-keys": [
@@ -1680,12 +1562,7 @@
           "causes": {
             "description": "The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.StatusCause"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.StatusCause"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
