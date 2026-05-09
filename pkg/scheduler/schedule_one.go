@@ -718,36 +718,39 @@ func (sched *Scheduler) findNodesThatFitPod(ctx context.Context, schedFramework 
 }
 
 func (sched *Scheduler) evaluateNominatedNode(ctx context.Context, pod *v1.Pod, schedFramework framework.Framework, state fwk.CycleState, nodeHint string, diagnosis framework.Diagnosis) ([]fwk.NodeInfo, error) {
-	// In the future we could potentially use the hint if the nominated node failed.
-	// https://github.com/kubernetes/kubernetes/issues/135163
-	nnn := pod.Status.NominatedNodeName
-	if len(nnn) == 0 {
-		nnn = nodeHint
-	}
-
-	nodeInfo, err := sched.nodeInfoSnapshot.GetNodeInPlacement(nnn)
-	if err != nil {
-		if _, err := sched.nodeInfoSnapshot.Get(nnn); err != nil {
+	if nnn := pod.Status.NominatedNodeName; len(nnn) > 0 {
+		feasibleNodes, err := sched.tryEvaluateNominatedNode(ctx, pod, schedFramework, state, nnn, diagnosis)
+		if err != nil {
 			return nil, err
 		}
-		// It's not an error if NNN is in the cluster but not in the placement.
-		// This can happen during the pod group placement scheduling cycle, where we simulate multiple potential placements.
+		if len(feasibleNodes) != 0 {
+			return feasibleNodes, nil
+		}
+	}
+
+	if len(nodeHint) > 0 && nodeHint != pod.Status.NominatedNodeName {
+		return sched.tryEvaluateNominatedNode(ctx, pod, schedFramework, state, nodeHint, diagnosis)
+	}
+
+	return nil, nil
+}
+
+func (sched *Scheduler) tryEvaluateNominatedNode(ctx context.Context, pod *v1.Pod, schedFramework framework.Framework, state fwk.CycleState, nodeName string, diagnosis framework.Diagnosis) ([]fwk.NodeInfo, error) {
+	nodeInfo, err := sched.nodeInfoSnapshot.GetNodeInPlacement(nodeName)
+	if err != nil {
+		if _, err := sched.nodeInfoSnapshot.Get(nodeName); err != nil {
+			return nil, err
+		}
 		logger := klog.FromContext(ctx)
-		logger.V(4).Info("Pod's nominated node is present in the cluster but not available in the current placement", "pod", klog.KObj(pod), "node", pod.Status.NominatedNodeName)
+		logger.V(4).Info("Node not in placement, skipping", "pod", klog.KObj(pod), "node", nodeName)
 		return nil, nil
 	}
-	node := []fwk.NodeInfo{nodeInfo}
-	feasibleNodes, err := sched.findNodesThatPassFilters(ctx, schedFramework, state, pod, &diagnosis, node)
+	feasibleNodes, err := sched.findNodesThatPassFilters(ctx, schedFramework, state, pod, &diagnosis, []fwk.NodeInfo{nodeInfo})
 	if err != nil {
 		return nil, err
 	}
 
-	feasibleNodes, err = findNodesThatPassExtenders(ctx, sched.Extenders, pod, feasibleNodes, diagnosis.NodeToStatus)
-	if err != nil {
-		return nil, err
-	}
-
-	return feasibleNodes, nil
+	return findNodesThatPassExtenders(ctx, sched.Extenders, pod, feasibleNodes, diagnosis.NodeToStatus)
 }
 
 // hasScoring checks if scoring nodes is configured.
