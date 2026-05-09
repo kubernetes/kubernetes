@@ -22,3 +22,5 @@ require (
 )
 
 replace k8s.io/kms => ../../../../kms
+
+replace k8s.io/kube-openapi => github.com/Jefftree/kube-openapi v0.0.8-gnostic.0.20260509153822-41f531fab0d1
