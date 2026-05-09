@@ -24,9 +24,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/validate/content"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	netutils "k8s.io/utils/net"
 )
 
 const (
+	ipSloppyErrorMessage          = "must be a valid IP address, (e.g. 10.9.8.7 or 2001:db8::ffff)"
 	uuidErrorMessage              = "must be a lowercase UUID in 8-4-4-4-12 format"
 	defaultResourceRequestsPrefix = "requests."
 	// Default namespace prefix.
@@ -74,6 +76,22 @@ func LongName[T ~string](_ context.Context, op operation.Operation, fldPath *fie
 		allErrs = append(allErrs, field.Invalid(fldPath, *value, msg).WithOrigin("format=k8s-long-name"))
 	}
 	return allErrs
+}
+
+// IPSloppy verifies that the specified value is a valid IPv4 or IPv6 address using
+// netutils.ParseIPSloppy, matching historical Kubernetes IP validation (including
+// IPv4 octets with leading zeros). Declarative validation ratcheting compares
+// strings with ==, so unchanged stored values skip re-validation; any change to
+// the literal string re-runs this check.
+func IPSloppy[T ~string](_ context.Context, _ operation.Operation, fldPath *field.Path, value, _ *T) field.ErrorList {
+	if value == nil {
+		return nil
+	}
+	s := string(*value)
+	if netutils.ParseIPSloppy(s) == nil {
+		return field.ErrorList{field.Invalid(fldPath, s, ipSloppyErrorMessage).WithOrigin("format=k8s-ip")}
+	}
+	return nil
 }
 
 // LabelKey verifies that the specified value is a valid label key.
