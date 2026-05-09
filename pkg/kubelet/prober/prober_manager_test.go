@@ -133,6 +133,57 @@ func TestAddRemovePods(t *testing.T) {
 	}
 }
 
+func TestAddPodContinuesAfterExistingWorker(t *testing.T) {
+	ctx := ktesting.Init(t)
+
+	pod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "test_pod",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:           "container_a",
+					ReadinessProbe: defaultProbe,
+				},
+				{
+					Name:           "container_b",
+					ReadinessProbe: defaultProbe,
+				},
+			},
+		},
+	}
+
+	m := newTestManager()
+	defer cleanup(t, m)
+
+	// First AddPod: registers workers for both containers.
+	m.AddPod(ctx, &pod)
+	if err := expectProbes(m, []probeKey{
+		{"test_pod", "container_a", readiness},
+		{"test_pod", "container_b", readiness},
+	}); err != nil {
+		t.Fatalf("after first AddPod: %v", err)
+	}
+
+	// Simulate container_b's worker being removed while container_a's is still present.
+	m.workerLock.Lock()
+	delete(m.workers, probeKey{"test_pod", "container_b", readiness})
+	m.workerLock.Unlock()
+
+	// Second AddPod: should re-register container_b's missing worker.
+	// Previously, hitting container_a's existing worker caused an early return,
+	// so container_b was never re-registered.
+	m.AddPod(ctx, &pod)
+
+	if err := expectProbes(m, []probeKey{
+		{"test_pod", "container_a", readiness},
+		{"test_pod", "container_b", readiness},
+	}); err != nil {
+		t.Errorf("container_b worker was not re-registered after second AddPod: %v", err)
+	}
+}
+
 func TestAddRemovePodsWithRestartableInitContainer(t *testing.T) {
 	m := newTestManager()
 	defer cleanup(t, m)
