@@ -673,6 +673,21 @@ func (s *store) EnableResourceSizeEstimation(getKeys storage.KeysFunc) error {
 	return nil
 }
 
+// TestOnlyResetResourceSizeEstimator clears the resource size estimator so a
+// subsequent EnableResourceSizeEstimation call succeeds.
+func TestOnlyResetResourceSizeEstimator(s storage.Interface) {
+	st, ok := s.(*store)
+	if !ok {
+		return
+	}
+	st.collectorMux.Lock()
+	defer st.collectorMux.Unlock()
+	if st.resourceSizeEstimator != nil {
+		st.resourceSizeEstimator.Close()
+		st.resourceSizeEstimator = nil
+	}
+}
+
 func (s *store) getKeys(ctx context.Context) ([]string, error) {
 	startTime := time.Now()
 	prefix, err := s.prepareKey(s.resourcePrefix, true)
