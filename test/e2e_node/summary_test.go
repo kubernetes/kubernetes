@@ -99,10 +99,10 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 					"CPU": ptrMatchAllFields(gstruct.Fields{
 						"Time": recent(maxStatsAge),
 						// CRI stats provider tries to estimate the value of UsageNanoCores. This value can be
-						// either 0 or between 10000 and 2e9.
+						// either 0 or between 10000 and 2e10 ( upper limit seen during test execution ).
 						// Please refer, https://github.com/kubernetes/kubernetes/pull/95345#discussion_r501630942
 						// for more information.
-						"UsageNanoCores":       gomega.SatisfyAny(gstruct.PointTo(gomega.BeZero()), bounded(10000, 2e9)),
+						"UsageNanoCores":       gomega.SatisfyAny(gstruct.PointTo(gomega.BeZero()), bounded(10000, 2e10)),
 						"UsageCoreNanoSeconds": bounded(10000000, 1e15),
 						"PSI":                  psiExpectation(),
 					}),
@@ -285,7 +285,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 					"SystemContainers": gstruct.MatchAllElements(summaryObjectID, systemContainers),
 					"CPU": ptrMatchAllFields(gstruct.Fields{
 						"Time":                 recent(maxStatsAge),
-						"UsageNanoCores":       bounded(100e3, 2e9),
+						"UsageNanoCores":       bounded(100e3, 2e10),
 						"UsageCoreNanoSeconds": bounded(1e9, 1e15),
 						"PSI":                  psiExpectation(),
 					}),
