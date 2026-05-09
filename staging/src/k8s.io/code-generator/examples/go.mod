@@ -10,7 +10,7 @@ require (
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/client-go v0.0.0
-	k8s.io/kube-openapi v0.0.0-20260502001324-b7f5293f4787
+	k8s.io/kube-openapi v0.0.8-gnostic.0.20260509153822-41f531fab0d1
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.2
 )
 
@@ -64,3 +64,5 @@ replace (
 	k8s.io/apimachinery => ../../apimachinery
 	k8s.io/client-go => ../../client-go
 )
+
+replace k8s.io/kube-openapi => github.com/Jefftree/kube-openapi v0.0.8-gnostic.0.20260509153822-41f531fab0d1

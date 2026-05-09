@@ -16,7 +16,7 @@ require (
 	k8s.io/apimachinery v0.0.0
 	k8s.io/gengo/v2 v2.0.0-20250922181213-ec3ebc5fd46b
 	k8s.io/klog/v2 v2.140.0
-	k8s.io/kube-openapi v0.0.0-20260502001324-b7f5293f4787
+	k8s.io/kube-openapi v0.0.8-gnostic.0.20260509153822-41f531fab0d1
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
 	sigs.k8s.io/randfill v1.0.0
 )
@@ -60,5 +60,6 @@ require (
 
 replace (
 	k8s.io/apimachinery => ../apimachinery
+	k8s.io/kube-openapi => github.com/Jefftree/kube-openapi v0.0.8-gnostic.0.20260509153822-41f531fab0d1
 	k8s.io/streaming => ../streaming
 )

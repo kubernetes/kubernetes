@@ -33,10 +33,12 @@ const (
 	// in the source tree like we do for everything else.
 	schemeGroupVersion = "apidefinitions.k8s.io/v1alpha1"
 	kindAPIVersion     = "APIVersion"
+	kindAPIGroup       = "APIGroup"
 
 	// We have a naming convention for the files used to define
 	// APIs in the source tree.
 	apiVersionFile = "apiversion.yaml"
+	apiGroupFile   = "apigroup.yaml"
 )
 
 // LoadAPIVersion reads an apiversion.yaml file, returning nil if absent.
@@ -56,6 +58,22 @@ func LoadAPIVersion(dir string) (*APIVersion, error) {
 		return nil, fmt.Errorf("%s: %w", filepath.Join(dir, apiVersionFile), err)
 	}
 	return av, nil
+}
+
+// LoadAPIGroup reads an apigroup.yaml file, returning nil if absent.
+func LoadAPIGroup(dir string) (*APIGroup, error) {
+	data, err := readManifest(dir, apiGroupFile)
+	if err != nil || data == nil {
+		return nil, err
+	}
+	g := &APIGroup{}
+	if err := yaml.Unmarshal(data, g); err != nil {
+		return nil, fmt.Errorf("%s: %w", filepath.Join(dir, apiGroupFile), err)
+	}
+	if err := validateTypeMeta(g.APIVersion, g.Kind, kindAPIGroup); err != nil {
+		return nil, fmt.Errorf("%s: %w", filepath.Join(dir, apiGroupFile), err)
+	}
+	return g, nil
 }
 
 func readManifest(dir, filename string) ([]byte, error) {
