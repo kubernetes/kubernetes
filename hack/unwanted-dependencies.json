@@ -177,7 +177,6 @@
       ],
       "github.com/json-iterator/go": [
         "github.com/prometheus/client_golang",
-        "k8s.io/kube-openapi",
         "sigs.k8s.io/structured-merge-diff/v6"
       ],
       "github.com/klauspost/compress": [
