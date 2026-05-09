@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package json
+//go:build !goexperiment.jsonv2 || !go1.25
+
+package jsontext
 
 import (
 	"bytes"
 	"io"
 	"math/bits"
-	"sort"
 	"sync"
 )
 
@@ -40,16 +41,16 @@ type bufferStatistics struct {
 	prevLen int // length of previous buffer
 }
 
-func getBufferedEncoder(o EncodeOptions) *Encoder {
+func getBufferedEncoder(opts ...Options) *Encoder {
 	e := bufferedEncoderPool.Get().(*Encoder)
-	if e.buf == nil {
+	if e.s.Buf == nil {
 		// Round up to nearest 2ⁿ to make best use of malloc size classes.
 		// See runtime/sizeclasses.go on Go1.15.
 		// Logical OR with 63 to ensure 64 as the minimum buffer size.
-		n := 1 << bits.Len(uint(e.bufStats.prevLen|63))
-		e.buf = make([]byte, 0, n)
+		n := 1 << bits.Len(uint(e.s.bufStats.prevLen|63))
+		e.s.Buf = make([]byte, 0, n)
 	}
-	e.reset(e.buf[:0], nil, o)
+	e.s.reset(e.s.Buf[:0], nil, opts...)
 	return e
 }
 func putBufferedEncoder(e *Encoder) {
@@ -68,37 +69,37 @@ func putBufferedEncoder(e *Encoder) {
 	//
 	// See https://go.dev/issue/27735.
 	switch {
-	case cap(e.buf) <= 4<<10: // always recycle buffers smaller than 4KiB
-		e.bufStats.strikes = 0
-	case cap(e.buf)/4 <= len(e.buf): // at least 25% utilization
-		e.bufStats.strikes = 0
-	case e.bufStats.strikes < 4: // at most 4 strikes
-		e.bufStats.strikes++
+	case cap(e.s.Buf) <= 4<<10: // always recycle buffers smaller than 4KiB
+		e.s.bufStats.strikes = 0
+	case cap(e.s.Buf)/4 <= len(e.s.Buf): // at least 25% utilization
+		e.s.bufStats.strikes = 0
+	case e.s.bufStats.strikes < 4: // at most 4 strikes
+		e.s.bufStats.strikes++
 	default: // discard the buffer; too large and too often under-utilized
-		e.bufStats.strikes = 0
-		e.bufStats.prevLen = len(e.buf) // heuristic for size to allocate next time
-		e.buf = nil
+		e.s.bufStats.strikes = 0
+		e.s.bufStats.prevLen = len(e.s.Buf) // heuristic for size to allocate next time
+		e.s.Buf = nil
 	}
 	bufferedEncoderPool.Put(e)
 }
 
-func getStreamingEncoder(w io.Writer, o EncodeOptions) *Encoder {
+func getStreamingEncoder(w io.Writer, opts ...Options) *Encoder {
 	if _, ok := w.(*bytes.Buffer); ok {
 		e := bytesBufferEncoderPool.Get().(*Encoder)
-		e.reset(nil, w, o) // buffer taken from bytes.Buffer
+		e.s.reset(nil, w, opts...) // buffer taken from bytes.Buffer
 		return e
 	} else {
 		e := streamingEncoderPool.Get().(*Encoder)
-		e.reset(e.buf[:0], w, o) // preserve existing buffer
+		e.s.reset(e.s.Buf[:0], w, opts...) // preserve existing buffer
 		return e
 	}
 }
 func putStreamingEncoder(e *Encoder) {
-	if _, ok := e.wr.(*bytes.Buffer); ok {
+	if _, ok := e.s.wr.(*bytes.Buffer); ok {
 		bytesBufferEncoderPool.Put(e)
 	} else {
-		if cap(e.buf) > 64<<10 {
-			e.buf = nil // avoid pinning arbitrarily large amounts of memory
+		if cap(e.s.Buf) > 64<<10 {
+			e.s.Buf = nil // avoid pinning arbitrarily large amounts of memory
 		}
 		streamingEncoderPool.Put(e)
 	}
@@ -119,64 +120,33 @@ var (
 	bytesBufferDecoderPool = bufferedDecoderPool
 )
 
-func getBufferedDecoder(b []byte, o DecodeOptions) *Decoder {
+func getBufferedDecoder(b []byte, opts ...Options) *Decoder {
 	d := bufferedDecoderPool.Get().(*Decoder)
-	d.reset(b, nil, o)
+	d.s.reset(b, nil, opts...)
 	return d
 }
 func putBufferedDecoder(d *Decoder) {
 	bufferedDecoderPool.Put(d)
 }
 
-func getStreamingDecoder(r io.Reader, o DecodeOptions) *Decoder {
+func getStreamingDecoder(r io.Reader, opts ...Options) *Decoder {
 	if _, ok := r.(*bytes.Buffer); ok {
 		d := bytesBufferDecoderPool.Get().(*Decoder)
-		d.reset(nil, r, o) // buffer taken from bytes.Buffer
+		d.s.reset(nil, r, opts...) // buffer taken from bytes.Buffer
 		return d
 	} else {
 		d := streamingDecoderPool.Get().(*Decoder)
-		d.reset(d.buf[:0], r, o) // preserve existing buffer
+		d.s.reset(d.s.buf[:0], r, opts...) // preserve existing buffer
 		return d
 	}
 }
 func putStreamingDecoder(d *Decoder) {
-	if _, ok := d.rd.(*bytes.Buffer); ok {
+	if _, ok := d.s.rd.(*bytes.Buffer); ok {
 		bytesBufferDecoderPool.Put(d)
 	} else {
-		if cap(d.buf) > 64<<10 {
-			d.buf = nil // avoid pinning arbitrarily large amounts of memory
+		if cap(d.s.buf) > 64<<10 {
+			d.s.buf = nil // avoid pinning arbitrarily large amounts of memory
 		}
 		streamingDecoderPool.Put(d)
 	}
 }
-
-var stringsPools = &sync.Pool{New: func() any { return new(stringSlice) }}
-
-type stringSlice []string
-
-// getStrings returns a non-nil pointer to a slice with length n.
-func getStrings(n int) *stringSlice {
-	s := stringsPools.Get().(*stringSlice)
-	if cap(*s) < n {
-		*s = make([]string, n)
-	}
-	*s = (*s)[:n]
-	return s
-}
-
-func putStrings(s *stringSlice) {
-	if cap(*s) > 1<<10 {
-		*s = nil // avoid pinning arbitrarily large amounts of memory
-	}
-	stringsPools.Put(s)
-}
-
-// Sort sorts the string slice according to RFC 8785, section 3.2.3.
-func (ss *stringSlice) Sort() {
-	// TODO(https://go.dev/issue/47619): Use slices.SortFunc instead.
-	sort.Sort(ss)
-}
-
-func (ss *stringSlice) Len() int           { return len(*ss) }
-func (ss *stringSlice) Less(i, j int) bool { return lessUTF16((*ss)[i], (*ss)[j]) }
-func (ss *stringSlice) Swap(i, j int)      { (*ss)[i], (*ss)[j] = (*ss)[j], (*ss)[i] }

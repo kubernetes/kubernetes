@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build !goexperiment.jsonv2 || !go1.25
+
 package json
 
 import (
@@ -10,12 +12,12 @@ import (
 )
 
 // stringCache is a cache for strings converted from a []byte.
-type stringCache [256]string // 256*unsafe.Sizeof(string("")) => 4KiB
+type stringCache = [256]string // 256*unsafe.Sizeof(string("")) => 4KiB
 
-// make returns the string form of b.
+// makeString returns the string form of b.
 // It returns a pre-allocated string from c if present, otherwise
 // it allocates a new string, inserts it into the cache, and returns it.
-func (c *stringCache) make(b []byte) string {
+func makeString(c *stringCache, b []byte) string {
 	const (
 		minCachedLen = 2   // single byte strings are already interned by the runtime
 		maxCachedLen = 256 // large enough for UUIDs, IPv6 addresses, SHA-256 checksums, etc.

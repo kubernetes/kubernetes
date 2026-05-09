@@ -32,8 +32,35 @@ type APIVersion struct {
 }
 
 // APIVersionSpec provides a specification for an APIVersion.
-type APIVersionSpec struct {
-	// ModelPackage is the OpenAPI model package name for this group/version
-	// (e.g. "io.k8s.api.apps.v1").
+type APIVersionSpec struct{}
+
+// VersionFromName returns the version part of the metadata.name.
+func (av *APIVersion) VersionFromName() string {
+	_, v, _ := splitGroupVersion(av.Metadata.Name)
+	return v
+}
+
+// APIGroup declares an external versioned API group.
+type APIGroup struct {
+	APIVersion string       `json:"apiVersion"`
+	Kind       string       `json:"kind"`
+	Metadata   Metadata     `json:"metadata"`
+	Spec       APIGroupSpec `json:"spec"`
+}
+
+// APIGroupSpec provides a specification of an APIGroup.
+type APIGroupSpec struct {
+	// ModelPackage is the OpenAPI model package prefix shared by every
+	// version in this group. The per-version model package is
+	// "<ModelPackage>.<version>" (e.g. "io.k8s.api.apps" + "v1" yields
+	// "io.k8s.api.apps.v1").
 	ModelPackage string `json:"modelPackage,omitempty"`
+}
+
+// ModelPackageFor returns the OpenAPI model package for the given version.
+func (g *APIGroup) ModelPackageFor(version string) string {
+	if g.Spec.ModelPackage == "" {
+		return ""
+	}
+	return g.Spec.ModelPackage + "." + version
 }
