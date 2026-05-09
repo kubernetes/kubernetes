@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 )
 
 // worker handles the periodic probing of its assigned container. Each worker has a go-routine
@@ -346,7 +347,7 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	}
 
 	// Note, exec probe does NOT have access to pod environment variables or downward API
-	result, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
+	result, output, err := w.probeManager.prober.probe(ctx, w.probeType, w.pod, status, w.container, w.containerID)
 	if err != nil {
 		// Prober error, throw away the result.
 		return true
@@ -373,10 +374,17 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	if (result == results.Failure && w.resultRun < int(w.spec.FailureThreshold)) ||
 		(result == results.Success && w.resultRun < int(w.spec.SuccessThreshold)) {
 		// Success or failure is below threshold - leave the probe state unchanged.
+		if result == results.Failure {
+			w.probeManager.prober.recordContainerEvent(ctx, w.pod, &w.container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed (attempt %d/%d, below threshold): %s", w.probeType, w.resultRun, w.spec.FailureThreshold, output)
+		}
 		return true
 	}
 
 	w.resultsManager.Set(w.containerID, result, w.pod)
+
+	if result == results.Failure {
+		w.probeManager.prober.recordContainerEvent(ctx, w.pod, &w.container, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed (threshold reached): %s", w.probeType, output)
+	}
 
 	if (w.probeType == liveness && result == results.Failure) || w.probeType == startup {
 		// The container fails a liveness/startup check, it will need to be restarted.
