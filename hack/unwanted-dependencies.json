@@ -192,13 +192,11 @@
       "github.com/modern-go/concurrent": [
         "github.com/json-iterator/go",
         "github.com/prometheus/client_golang",
-        "k8s.io/kube-openapi",
         "sigs.k8s.io/structured-merge-diff/v6"
       ],
       "github.com/modern-go/reflect2": [
         "github.com/json-iterator/go",
         "github.com/prometheus/client_golang",
-        "k8s.io/kube-openapi",
         "sigs.k8s.io/structured-merge-diff/v6"
       ],
       "github.com/planetscale/vtprotobuf": [
