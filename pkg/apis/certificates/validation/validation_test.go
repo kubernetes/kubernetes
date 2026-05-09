@@ -99,7 +99,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				field.Required(specPath.Child("usages"), ""),
+				field.Required(specPath.Child("usages"), "").MarkCoveredByDeclarative(),
 			},
 		},
 		"CSR with no signerName set should fail": {
@@ -347,7 +347,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				field.Required(specPath.Child("usages"), ""),
+				field.Required(specPath.Child("usages"), "").MarkCoveredByDeclarative(),
 			},
 		},
 		"unknown and duplicate usages": {
