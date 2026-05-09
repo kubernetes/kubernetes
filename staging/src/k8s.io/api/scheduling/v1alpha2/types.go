@@ -200,7 +200,6 @@ type PodGroupTemplate struct {
 	// +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
 	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
 	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:maximum=1000000000 # HighestUserDefinablePriority
-	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:minimum=-2147483648
 	Priority *int32 `json:"priority,omitempty" protobuf:"varint,7,opt,name=priority"`
 }
 
@@ -455,7 +454,6 @@ type PodGroupSpec struct {
 	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
 	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:immutable
 	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:maximum=1000000000 # HighestUserDefinablePriority
-	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:minimum=-2147483648
 	Priority *int32 `json:"priority,omitempty" protobuf:"varint,7,opt,name=priority"`
 }
 
