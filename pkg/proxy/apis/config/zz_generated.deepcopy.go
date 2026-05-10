@@ -219,6 +219,11 @@ func (in *KubeProxyNFTablesConfiguration) DeepCopyInto(out *KubeProxyNFTablesCon
 		*out = new(int32)
 		**out = **in
 	}
+	if in.SNATNodeInternalIP != nil {
+		in, out := &in.SNATNodeInternalIP, &out.SNATNodeInternalIP
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

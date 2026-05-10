@@ -115,7 +115,20 @@ func Convert_v1alpha1_KubeProxyIPVSConfiguration_To_config_KubeProxyIPVSConfigur
 
 // Convert_v1alpha1_KubeProxyNFTablesConfiguration_To_config_KubeProxyNFTablesConfiguration is defined here, because public conversion is not auto-generated due to existing warnings.
 func Convert_v1alpha1_KubeProxyNFTablesConfiguration_To_config_KubeProxyNFTablesConfiguration(in *v1alpha1.KubeProxyNFTablesConfiguration, out *kubeproxyconfig.KubeProxyNFTablesConfiguration, scope conversion.Scope) error {
-	return autoConvert_v1alpha1_KubeProxyNFTablesConfiguration_To_config_KubeProxyNFTablesConfiguration(in, out, scope)
+	if err := autoConvert_v1alpha1_KubeProxyNFTablesConfiguration_To_config_KubeProxyNFTablesConfiguration(in, out, scope); err != nil {
+		return err
+	}
+	out.SNATNodeInternalIP = in.SNATNodeInternalIP
+	return nil
+}
+
+// Convert_config_KubeProxyNFTablesConfiguration_To_v1alpha1_KubeProxyNFTablesConfiguration is defined here, because public conversion is not auto-generated due to existing warnings.
+func Convert_config_KubeProxyNFTablesConfiguration_To_v1alpha1_KubeProxyNFTablesConfiguration(in *kubeproxyconfig.KubeProxyNFTablesConfiguration, out *v1alpha1.KubeProxyNFTablesConfiguration, scope conversion.Scope) error {
+	if err := autoConvert_config_KubeProxyNFTablesConfiguration_To_v1alpha1_KubeProxyNFTablesConfiguration(in, out, scope); err != nil {
+		return err
+	}
+	out.SNATNodeInternalIP = in.SNATNodeInternalIP
+	return nil
 }
 
 // Convert_config_DetectLocalConfiguration_To_v1alpha1_DetectLocalConfiguration is defined here, because public conversion is not auto-generated due to existing warnings.
