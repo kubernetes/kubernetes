@@ -86,7 +86,7 @@ type Plugin struct {
 	pvGetter             corev1lister.PersistentVolumeLister
 	csiTranslator        csitrans.CSITranslator
 
-	authz authorizer.Authorizer
+	authz authorizer.UnconditionalAuthorizer
 
 	inspectedFeatureGates                          bool
 	expansionRecoveryEnabled                       bool
@@ -100,7 +100,7 @@ var (
 	_ admission.Interface                                 = &Plugin{}
 	_ apiserveradmission.WantsExternalKubeInformerFactory = &Plugin{}
 	_ apiserveradmission.WantsFeatures                    = &Plugin{}
-	_ apiserveradmission.WantsAuthorizer                  = &Plugin{}
+	_ apiserveradmission.WantsUnconditionalAuthorizer     = &Plugin{}
 )
 
 // InspectFeatureGates allows setting bools without taking a dep on a global variable
@@ -160,8 +160,8 @@ func (p *Plugin) ValidateInitialization() error {
 	return nil
 }
 
-// SetAuthorizer sets the authorizer.
-func (p *Plugin) SetAuthorizer(authz authorizer.Authorizer) {
+// SetUnconditionalAuthorizer sets the authorizer.
+func (p *Plugin) SetUnconditionalAuthorizer(authz authorizer.UnconditionalAuthorizer) {
 	if p.serviceAccountNodeAudienceRestriction {
 		p.authz = authz
 	}

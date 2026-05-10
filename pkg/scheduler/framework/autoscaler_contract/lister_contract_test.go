@@ -148,15 +148,15 @@ func (r *resourceClaimTrackerContract) GatherAllocatedState() (*schedulerapi.All
 	return nil, nil
 }
 
+func (r *resourceClaimTrackerContract) GetPendingAllocation(_ types.UID) *resourceapi.AllocationResult {
+	return nil
+}
+
 func (r *resourceClaimTrackerContract) SignalClaimPendingAllocation(_ types.UID, _ *resourceapi.ResourceClaim) error {
 	return nil
 }
 
-func (r *resourceClaimTrackerContract) ClaimHasPendingAllocation(_ types.UID) bool {
-	return false
-}
-
-func (r *resourceClaimTrackerContract) RemoveClaimPendingAllocation(_ types.UID) (deleted bool) {
+func (r *resourceClaimTrackerContract) MaybeRemoveClaimPendingAllocation(_ types.UID, _ bool) (deleted bool) {
 	return false
 }
 
@@ -182,6 +182,10 @@ func (s *sharedDRAManagerContract) DeviceClasses() fwk.DeviceClassLister {
 }
 
 func (s *sharedDRAManagerContract) DeviceClassResolver() fwk.DeviceClassResolver {
+	return nil
+}
+
+func (s *sharedDRAManagerContract) PodGroups() fwk.PodGroupLister {
 	return nil
 }
 

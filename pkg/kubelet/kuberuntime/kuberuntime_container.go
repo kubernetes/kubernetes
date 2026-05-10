@@ -1139,6 +1139,10 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 
 		case kubecontainer.ContainerStateRunning:
 			if !podutil.IsRestartableInitContainer(container) {
+				if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingInitContainers) {
+					// computePodResizeAction updates 'changes' if resize policy requires restarting this container
+					_ = m.computePodResizeAction(ctx, pod, i, true, status, changes)
+				}
 				break
 			} else { // If container is restartable
 				if container.StartupProbe != nil {

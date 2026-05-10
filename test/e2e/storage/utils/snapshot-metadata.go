@@ -51,7 +51,7 @@ const (
 
 	// SnapshotMetadataService API constants
 	SnapshotMetadataServiceGroup      = "cbt.storage.k8s.io"
-	SnapshotMetadataServiceVersion    = "v1alpha1"
+	SnapshotMetadataServiceVersion    = "v1beta1"
 	SnapshotMetadataServiceAPIVersion = SnapshotMetadataServiceGroup + "/" + SnapshotMetadataServiceVersion
 	SnapshotMetadataServiceKind       = "SnapshotMetadataService"
 	SnapshotMetadataServiceResource   = "snapshotmetadataservices"

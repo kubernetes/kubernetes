@@ -1265,7 +1265,7 @@ func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.Device, 
 		// to use unique strings.
 		var d resourceapi.Device
 		if err := draapi.Convert_api_Device_To_v1_Device(device, &d, nil); err != nil {
-			return false, fmt.Errorf("convert Device: %w", err)
+			return false, fmt.Errorf("convert Device %s: %w", deviceID, err)
 		}
 		matches, details, err := expr.DeviceMatches(alloc.ctx, cel.Device{Driver: deviceID.Driver.String(), AllowMultipleAllocations: d.AllowMultipleAllocations, Attributes: d.Attributes, Capacity: d.Capacity})
 		if class != nil {
@@ -1275,11 +1275,11 @@ func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.Device, 
 		}
 
 		if err != nil {
-			// TODO (future): more detailed errors which reference class resp. claim.
+			err = cel.EnhanceRuntimeError(err)
 			if class != nil {
-				return false, fmt.Errorf("class %s: selector #%d: CEL runtime error: %w", class.Name, i, err)
+				return false, fmt.Errorf("class %s: selector #%d on device %s: CEL runtime error: %w", class.Name, i, deviceID, err)
 			}
-			return false, fmt.Errorf("claim %s: selector #%d: CEL runtime error: %w", klog.KObj(alloc.claimsToAllocate[r.claimIndex]), i, err)
+			return false, fmt.Errorf("claim %s: selector #%d on device %s: CEL runtime error: %w", klog.KObj(alloc.claimsToAllocate[r.claimIndex]), i, deviceID, err)
 		}
 		if !matches {
 			return false, nil

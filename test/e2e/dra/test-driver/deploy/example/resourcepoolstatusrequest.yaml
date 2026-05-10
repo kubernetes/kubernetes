@@ -1,0 +1,10 @@
+apiVersion: resource.k8s.io/v1alpha3
+kind: ResourcePoolStatusRequest
+metadata:
+  name: example
+spec:
+  driver: test-driver.cdi.k8s.io
+  # Optional: filter to a specific pool
+  # poolName: network
+  # Optional: limit number of pools returned (default: 100, max: 1000)
+  # limit: 10

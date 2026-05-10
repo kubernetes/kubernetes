@@ -32,6 +32,7 @@ import (
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
 	openapi "k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/generators/apidefinitions"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 
 	"k8s.io/klog/v2"
@@ -109,13 +110,36 @@ func apiTypeFilterFunc(c *generator.Context, t *types.Type) bool {
 		return false
 	}
 	pkg := c.Universe.Package(t.Name.Package)
-	if hasOpenAPITagValue(pkg.Comments, tagValueTrue) {
+	if isOpenAPIEnabledForPackage(pkg) {
 		return !hasOpenAPITagValue(t.CommentLines, tagValueFalse)
 	}
 	if hasOpenAPITagValue(t.CommentLines, tagValueTrue) {
 		return true
 	}
 	return false
+}
+
+// isOpenAPIEnabledForPackage reports whether openapi generation is
+// requested for pkg. apigroup.yaml and apiversion.yaml are authoritative when present.
+// The +k8s:openapi-gen=true tag is checked only when the API definition files
+// are absent.
+func isOpenAPIEnabledForPackage(pkg *types.Package) bool {
+	if pkg == nil {
+		return false
+	}
+	hasFalse := hasOpenAPITagValue(pkg.Comments, tagValueFalse)
+	hasTrue := hasOpenAPITagValue(pkg.Comments, tagValueTrue)
+	if hasFalse && !hasTrue { // For backward compatability
+		return false
+	}
+	av, err := apidefinitions.LoadAPIVersion(pkg.Dir)
+	if err != nil {
+		klog.Fatalf("Package %v: %v", pkg.Path, err)
+	}
+	if av != nil {
+		return true
+	}
+	return hasTrue
 }
 
 const (
@@ -223,8 +247,8 @@ func getReferableName(m *types.Member) string {
 }
 
 func shouldInlineMembers(m *types.Member) bool {
-	jsonTags := getJsonTags(m)
-	return len(jsonTags) > 1 && jsonTags[1] == "inline"
+	jsonTag, jsonTagExists := reflect.StructTag(m.Tags).Lookup("json")
+	return m.Embedded && jsonTagExists && (jsonTag == "" || strings.HasPrefix(jsonTag, ","))
 }
 
 type openAPITypeWriter struct {
@@ -322,7 +346,7 @@ func (g openAPITypeWriter) shouldUseOpenAPIModelName(t *types.Type) bool {
 		return true
 	}
 	pkg := g.context.Universe.Package(t.Name.Package)
-	value, err = extractOpenAPISchemaNamePackage(pkg.Comments)
+	value, err = resolvePackageModelPackage(pkg)
 	if err != nil {
 		klog.Fatalf("Package %v: invalid %s:%v", pkg, tagModelPackage, err)
 	}

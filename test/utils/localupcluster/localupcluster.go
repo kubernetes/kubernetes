@@ -51,26 +51,29 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
-type KubeComponentName string
+type ClusterComponentName string
 
 // Component names.
 //
-// They match the names in the local-up-cluster.sh output, if the script runs those components.
+// They match the names in the local-up-cluster.sh and etc.sh output, if the script runs those components.
 const (
-	KubeAPIServer         = KubeComponentName("kube-apiserver")
-	KubeControllerManager = KubeComponentName("kube-controller-manager")
-	KubeScheduler         = KubeComponentName("kube-scheduler")
-	Kubelet               = KubeComponentName("kubelet")
-	KubeProxy             = KubeComponentName("kube-proxy")
-	Kubectl               = KubeComponentName("kubectl")
-	LocalUpCluster        = KubeComponentName("local-up-cluster")
+	Etcd                  = ClusterComponentName("etcd")
+	KubeAPIServer         = ClusterComponentName("kube-apiserver")
+	KubeControllerManager = ClusterComponentName("kube-controller-manager")
+	KubeScheduler         = ClusterComponentName("kube-scheduler")
+	Kubelet               = ClusterComponentName("kubelet")
+	KubeProxy             = ClusterComponentName("kube-proxy")
+	Kubectl               = ClusterComponentName("kubectl")
 )
 
 // Kubernetes components running in the cluster, in the order in which they need to be started and upgraded.
-var KubeClusterComponents = []KubeComponentName{KubeAPIServer, KubeControllerManager, KubeScheduler, Kubelet, KubeProxy}
+var KubeClusterComponents = []ClusterComponentName{KubeAPIServer, KubeControllerManager, KubeScheduler, Kubelet, KubeProxy}
+
+// All components, including etcd.
+var components = append([]ClusterComponentName{Etcd}, KubeClusterComponents...)
 
 // RUN <name> <command line> in the local-up-cluster.sh output marks commands that we need to run.
 const localUpClusterRunPrefix = "RUN "
@@ -89,10 +92,8 @@ func repoRoot(tCtx ktesting.TContext) string {
 	}
 }
 
-func New(tCtx ktesting.TContext) *Cluster {
-	tCtx.Helper()
+func New() *Cluster {
 	c := &Cluster{}
-	tCtx.CleanupCtx(c.Stop)
 	return c
 }
 
@@ -106,7 +107,7 @@ func New(tCtx ktesting.TContext) *Cluster {
 // local-up-cluster.sh does not support more than one cluster per host, so
 // tests using this package have to run sequentially.
 type Cluster struct {
-	running    map[KubeComponentName]*Cmd
+	running    map[ClusterComponentName]*Cmd
 	dir        string
 	kubeConfig string
 	settings   map[string]string
@@ -114,7 +115,7 @@ type Cluster struct {
 
 // Start brings up the cluster anew. If it was already running, it will be stopped first.
 //
-// The cluster will be stopped automatically at the end of the test.
+// The caller must invoke Stop in a suitable context to stop the cluster.
 // If the ARTIFACTS env variable is set and the test failed,
 // log files of the kind cluster get dumped into
 // $ARTIFACTS/<test name>/kind/<cluster name> before stopping it.
@@ -127,10 +128,6 @@ type Cluster struct {
 func (c *Cluster) Start(tCtx ktesting.TContext, state string, bindir string, localUpClusterEnv map[string]string) {
 	tCtx.Helper()
 	c.Stop(tCtx)
-	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
-		// Intentional additional lambda function for source code location in log output.
-		c.Stop(tCtx)
-	})
 
 	if artifacts, ok := os.LookupEnv("ARTIFACTS"); ok {
 		// Sanitize the name:
@@ -145,14 +142,17 @@ func (c *Cluster) Start(tCtx ktesting.TContext, state string, bindir string, loc
 	} else {
 		c.dir = tCtx.TempDir()
 	}
-	c.running = make(map[KubeComponentName]*Cmd)
+	c.running = make(map[ClusterComponentName]*Cmd)
 	c.settings = make(map[string]string)
 
-	// Spawn local-up-cluster.sh in background, keep it running (for etcd!),
-	// parse output to pick up commands and run them in order.
-	lines := make(chan Output, 100)
+	// Spawn local-up-cluster.sh in the background,
+	// parse output to pick up commands and run them in order,
+	// then wait for it to finish. Once it has completed,
+	// we know everything that we need to know to run and
+	// modify the cluster.
+	lines := make(chan string, 100)
 	cmd := &Cmd{
-		Name: string(LocalUpCluster),
+		Name: "local-up-cluster",
 		CommandLine: []string{
 			path.Join(repoRoot(tCtx), "hack/local-up-cluster.sh"),
 			"-o", bindir,
@@ -160,7 +160,11 @@ func (c *Cluster) Start(tCtx ktesting.TContext, state string, bindir string, loc
 		},
 		ProcessOutput: func(output Output) {
 			// Redirect processing into the main goroutine.
-			lines <- output
+			if output.EOF {
+				close(lines)
+				return
+			}
+			lines <- output.Line
 		},
 		AdditionalEnv: localUpClusterEnv,
 	}
@@ -176,7 +180,7 @@ func (c *Cluster) Start(tCtx ktesting.TContext, state string, bindir string, loc
 		cmd.AdditionalEnv["KUBE_VERBOSE"] = "2" // Enables -x for configuration variable assignments.
 	}
 	cmd.Start(tCtx)
-	c.running[LocalUpCluster] = cmd
+	defer cmd.Stop(tCtx, "stopping")
 
 processLocalUpClusterOutput:
 	for {
@@ -184,64 +188,54 @@ processLocalUpClusterOutput:
 		case <-tCtx.Done():
 			c.Stop(tCtx)
 			tCtx.Fatalf("interrupted cluster startup: %v", context.Cause(tCtx))
-		case output := <-lines:
-			if c.processLocalUpClusterOutput(tCtx, state, output) {
+		case line, ok := <-lines:
+			if !ok {
 				break processLocalUpClusterOutput
 			}
+			c.processLocalUpClusterOutput(tCtx, state, line)
 		}
 	}
+	// Usually it has stopped by now already because we saw the end of its output stream,
+	// but we still need to verify its exit code.
+	cmd.Wait(tCtx)
+
 	tCtx.Logf("cluster is running, use KUBECONFIG=%s to access it", c.kubeConfig)
 }
 
 // Matches e.g. "+ API_SECURE_PORT=6443".
 var varAssignment = regexp.MustCompile(`^\+ ([A-Z0-9_]+)=(.*)$`)
 
-func (c *Cluster) processLocalUpClusterOutput(tCtx ktesting.TContext, state string, output Output) bool {
-	if output.EOF {
-		if output.Line != "" {
-			tCtx.Fatalf("%s output processing failed: %s", LocalUpCluster, output.Line)
-		}
-		tCtx.Fatalf("%s terminated unexpectedly", LocalUpCluster)
-	}
+func (c *Cluster) processLocalUpClusterOutput(tCtx ktesting.TContext, state string, line string) {
+	tCtx.Logf("local-up-cluster: %s", line)
 
-	tCtx.Logf("local-up-cluster: %s", output.Line)
-
-	if strings.HasPrefix(output.Line, localUpClusterRunPrefix) {
-		line := output.Line[len(localUpClusterRunPrefix):]
+	if strings.HasPrefix(line, localUpClusterRunPrefix) {
+		line := line[len(localUpClusterRunPrefix):]
 		parts := strings.SplitN(line, ": ", 2)
 		if len(parts) != 2 {
-			tCtx.Fatalf("unexpected RUN line: %s", output.Line)
+			tCtx.Fatalf("unexpected RUN line: %s", line)
 		}
 		name := parts[0]
 		cmdLine := parts[1]
 
-		// Cluster components are kept running.
-		if slices.Contains(KubeClusterComponents, KubeComponentName(name)) {
-			c.runKubeComponent(tCtx, state, KubeComponentName(name), cmdLine)
-			return false
+		// Cluster components and etcd are kept running.
+		if slices.Contains(components, ClusterComponentName(name)) {
+			c.runComponent(tCtx, state, ClusterComponentName(name), cmdLine)
+			return
 		}
 
 		// Other commands get invoked and need to terminate before we proceed.
 		c.runCmd(tCtx, name, cmdLine)
-		return false
+		return
 	}
-	if m := varAssignment.FindStringSubmatch(output.Line); m != nil {
+	if m := varAssignment.FindStringSubmatch(line); m != nil {
 		c.settings[m[1]] = m[2]
 		if m[1] == "CERT_DIR" {
 			c.kubeConfig = path.Join(m[2], "admin.kubeconfig")
 		}
-		return false
 	}
-	if strings.Contains(output.Line, "Local etcd is running. Run commands.") {
-		// We have seen and processed all commands.
-		// Time to start testing...
-		return true
-	}
-
-	return false
 }
 
-func (c *Cluster) runKubeComponent(tCtx ktesting.TContext, state string, component KubeComponentName, command string) {
+func (c *Cluster) runComponent(tCtx ktesting.TContext, state string, component ClusterComponentName, command string) {
 	commandLine := fromLocalUpClusterOutput(command)
 
 	cmd := &Cmd{
@@ -277,7 +271,7 @@ func fromLocalUpClusterOutput(command string) []string {
 // Stop ensures that the cluster is not running anymore.
 func (c *Cluster) Stop(tCtx ktesting.TContext) {
 	tCtx.Helper()
-	for _, component := range slices.Backward(KubeClusterComponents) {
+	for _, component := range slices.Backward(components) {
 		cmd := c.running[component]
 		if cmd == nil {
 			continue
@@ -299,7 +293,7 @@ func (c *Cluster) LoadConfig(tCtx ktesting.TContext) *restclient.Config {
 }
 
 // GetSystemLogs returns the output of the given component, the empty string and false if not started.
-func (c *Cluster) GetSystemLogs(tCtx ktesting.TContext, component KubeComponentName) (GString, bool) {
+func (c *Cluster) GetSystemLogs(tCtx ktesting.TContext, component ClusterComponentName) (GString, bool) {
 	cmd, ok := c.running[component]
 	if !ok {
 		return "", false
@@ -341,14 +335,10 @@ type ModifyOptions struct {
 	BinDir string
 
 	// FileByComponent overrides BinDir for those components which are specified here.
-	FileByComponent map[KubeComponentName]string
-
-	// Upgrade determines whether the apiserver gets updated first (upgrade)
-	// or last (downgrade).
-	Upgrade bool
+	FileByComponent map[ClusterComponentName]string
 }
 
-func (m ModifyOptions) GetComponentFile(component KubeComponentName) string {
+func (m ModifyOptions) GetComponentFile(component ClusterComponentName) string {
 	if file, ok := m.FileByComponent[component]; ok {
 		return file
 	}
@@ -370,27 +360,22 @@ func (c *Cluster) Modify(tCtx ktesting.TContext, state string, options ModifyOpt
 	tCtx.Helper()
 
 	restore := ModifyOptions{
-		FileByComponent: make(map[KubeComponentName]string),
+		FileByComponent: make(map[ClusterComponentName]string),
 	}
-
-	restore.Upgrade = !options.Upgrade
-	components := slices.Clone(KubeClusterComponents)
-	if !options.Upgrade {
-		slices.Reverse(components)
-	}
-	for _, component := range components {
-		c.modifyComponent(tCtx, state, options, component, &restore)
-	}
-	return restore
-}
-
-func (c *Cluster) modifyComponent(tCtx ktesting.TContext, state string, options ModifyOptions, component KubeComponentName, restore *ModifyOptions) {
-	tCtx.Helper()
-	tCtx = tCtx.WithStep(fmt.Sprintf("modify %s", component))
 
 	// We could also do things like turning feature gates on or off.
 	// For now we only support replacing the file.
-	if fileName := options.GetComponentFile(component); fileName != "" {
+	updated := make(map[ClusterComponentName]*Cmd)
+
+	// Phase 1: stop all components that need modification in reverse order
+	// so that dependent components (KCM, scheduler) are stopped before the
+	// apiserver they depend on.
+	for _, component := range slices.Backward(KubeClusterComponents) {
+		fileName := options.GetComponentFile(component)
+		if fileName == "" {
+			continue
+		}
+		tCtx := tCtx.WithStep(fmt.Sprintf("stop %s", component))
 		cmd, ok := c.running[component]
 		if !ok {
 			tCtx.Fatal("not running")
@@ -418,12 +403,22 @@ func (c *Cluster) modifyComponent(tCtx ktesting.TContext, state string, options 
 		cmd.Name = string(component) + "-" + state
 		cmd.CommandLine = cmdLine
 		cmd.LogFile = path.Join(c.dir, fmt.Sprintf("%s-%s.log", component, state))
-
-		c.runComponentWithRetry(tCtx, component, cmd)
+		updated[component] = cmd
 	}
+
+	// Phase 2: start all stopped components in the standard startup order
+	// (apiserver first) so that each component starts against a fully-ready
+	// apiserver.
+	for _, component := range KubeClusterComponents {
+		if cmd, ok := updated[component]; ok {
+			c.runComponentWithRetry(tCtx, component, cmd)
+		}
+	}
+
+	return restore
 }
 
-func (c *Cluster) runComponentWithRetry(tCtx ktesting.TContext, component KubeComponentName, cmd *Cmd) {
+func (c *Cluster) runComponentWithRetry(tCtx ktesting.TContext, component ClusterComponentName, cmd *Cmd) {
 	// Sometimes components fail to come up. We have to retry.
 	//
 	// For example, the apiserver's port might not be free again yet (no SO_LINGER!).
@@ -458,21 +453,44 @@ func (c *Cluster) runComponentWithRetry(tCtx ktesting.TContext, component KubeCo
 }
 
 func (c *Cluster) checkReadiness(tCtx ktesting.TContext, cmd *Cmd) {
+	if strings.HasPrefix(cmd.Name, string(Etcd)) {
+		c.checkEndpoint(tCtx, cmd, "http", c.settings["ETCD_HOST"], c.settings["ETCD_PORT"], "/health", nil)
+		return
+	}
+
+	// For all other components we expect to have the .kubeconfig file.
 	restConfig := c.LoadConfig(tCtx)
 	tCtx = tCtx.WithRESTConfig(restConfig)
 	tCtx = tCtx.WithStep(fmt.Sprintf("wait for %s readiness", cmd.Name))
 
+	// For the apiserver we use the admin client certificate with the cluster CA.
+	tlsConfig, err := restclient.TLSConfigFor(restConfig)
+	if err != nil {
+		tCtx.Fatalf("get TLS config for readiness check: %v", err)
+	}
+
+	// The kubelet requires client authentication for /healthz. Use the admin client
+	// certificate with InsecureSkipVerify because the kubelet uses a self-signed cert.
+	tlsConfigWithClientCert := tlsConfig.Clone()
+	tlsConfigWithClientCert.InsecureSkipVerify = true
+
+	// For other components we can skip TLS verification because they use self-signed certs.
+	insecureTLSConfig := &tls.Config{InsecureSkipVerify: true}
+
 	switch {
 	case strings.HasPrefix(cmd.Name, string(KubeAPIServer)):
-		c.checkHealthz(tCtx, cmd, "https", c.settings["API_HOST_IP"], c.settings["API_SECURE_PORT"])
+		c.checkReadyz(tCtx, cmd, "https", c.settings["API_HOST_IP"], c.settings["API_SECURE_PORT"], tlsConfig)
 	case strings.HasPrefix(cmd.Name, string(KubeScheduler)):
-		c.checkHealthz(tCtx, cmd, "https", c.settings["API_HOST_IP"], c.settings["SCHEDULER_SECURE_PORT"])
+		c.checkReadyz(tCtx, cmd, "https", c.settings["API_HOST_IP"], c.settings["SCHEDULER_SECURE_PORT"], insecureTLSConfig)
 	case strings.HasPrefix(cmd.Name, string(KubeControllerManager)):
-		c.checkHealthz(tCtx, cmd, "https", c.settings["API_HOST_IP"], c.settings["KCM_SECURE_PORT"])
+		// TODO: switch to /readyz once it is implemented and available in all tested releases.
+		c.checkHealthz(tCtx, cmd, "https", c.settings["API_HOST_IP"], c.settings["KCM_SECURE_PORT"], insecureTLSConfig)
 	case strings.HasPrefix(cmd.Name, string(KubeProxy)):
-		c.checkHealthz(tCtx, cmd, "http" /* not an error! */, c.settings["API_HOST_IP"], c.settings["PROXY_HEALTHZ_PORT"])
+		// TODO: switch to /readyz once it is implemented and available in all tested releases.
+		c.checkHealthz(tCtx, cmd, "http" /* not an error! */, c.settings["API_HOST_IP"], c.settings["PROXY_HEALTHZ_PORT"], insecureTLSConfig)
 	case strings.HasPrefix(cmd.Name, string(Kubelet)):
-		c.checkHealthz(tCtx, cmd, "https", c.settings["KUBELET_HOST"], c.settings["KUBELET_PORT"])
+		// TODO: switch to /readyz once it is implemented and available in all tested releases.
+		c.checkHealthz(tCtx, cmd, "https", c.settings["KUBELET_HOST"], c.settings["KUBELET_PORT"], tlsConfigWithClientCert)
 
 		// Also wait for the node to be ready.
 		tCtx.WithStep("wait for node ready").Eventually(func(tCtx ktesting.TContext) (*corev1.NodeList, error) {
@@ -484,22 +502,25 @@ func (c *Cluster) checkReadiness(tCtx ktesting.TContext, cmd *Cmd) {
 	}
 }
 
-func (c *Cluster) checkHealthz(tCtx ktesting.TContext, cmd *Cmd, method, hostIP, port string) {
-	url := fmt.Sprintf("%s://%s:%s/healthz", method, hostIP, port)
-	tCtx.WithStep(fmt.Sprintf("check health %s", url)).Eventually(func(tCtx ktesting.TContext) error {
+func (c *Cluster) checkHealthz(tCtx ktesting.TContext, cmd *Cmd, scheme, hostIP, port string, tlsConfig *tls.Config) {
+	c.checkEndpoint(tCtx, cmd, scheme, hostIP, port, "/healthz", tlsConfig)
+}
+
+func (c *Cluster) checkReadyz(tCtx ktesting.TContext, cmd *Cmd, scheme, hostIP, port string, tlsConfig *tls.Config) {
+	c.checkEndpoint(tCtx, cmd, scheme, hostIP, port, "/readyz", tlsConfig)
+}
+
+func (c *Cluster) checkEndpoint(tCtx ktesting.TContext, cmd *Cmd, scheme, hostIP, port, path string, tlsConfig *tls.Config) {
+	url := fmt.Sprintf("%s://%s:%s%s", scheme, hostIP, port, path)
+	tCtx.WithStep(fmt.Sprintf("check %s", url)).Eventually(func(tCtx ktesting.TContext) error {
 		if !cmd.Running() {
 			return gomega.StopTrying(fmt.Sprintf("%s stopped unexpectedly", cmd.Name))
 		}
-		// Like kube::util::wait_for_url in local-up-cluster.sh we use https,
-		// but don't check the certificate.
 		req, err := http.NewRequestWithContext(tCtx, http.MethodGet, url, nil)
 		if err != nil {
 			return fmt.Errorf("create request: %w", err)
 		}
-		tr := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-		client := &http.Client{Transport: tr}
+		client := &http.Client{Transport: &http.Transport{TLSClientConfig: tlsConfig}}
 		resp, err := client.Do(req)
 		if err != nil {
 			return fmt.Errorf("get %s: %w", url, err)
@@ -507,9 +528,11 @@ func (c *Cluster) checkHealthz(tCtx ktesting.TContext, cmd *Cmd, method, hostIP,
 		if err := resp.Body.Close(); err != nil {
 			return fmt.Errorf("close GET response: %w", err)
 		}
-		// Any response is fine, we just need to get here. In practice, we get a 403 Forbidden.
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("%s returned %d, waiting for 200", url, resp.StatusCode)
+		}
 		return nil
-	}).Should(gomega.Succeed(), fmt.Sprintf("HTTP GET %s", url))
+	}).WithPolling(time.Second).Should(gomega.Succeed(), fmt.Sprintf("HTTP GET %s", url))
 }
 
 func dumpProcesses(tCtx ktesting.TContext) {

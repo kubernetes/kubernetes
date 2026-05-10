@@ -37,6 +37,7 @@ import (
 
 func TestGetConntrackMax(t *testing.T) {
 	ncores := runtime.NumCPU()
+	const maxLimit = 1048576
 	testCases := []struct {
 		min        int32
 		maxPerCore int32
@@ -49,7 +50,7 @@ func TestGetConntrackMax(t *testing.T) {
 		{
 			maxPerCore: 67890, // use this if Max is 0
 			min:        1,     // avoid 0 default
-			expected:   67890 * ncores,
+			expected:   min(67890*ncores, maxLimit),
 		},
 		{
 			maxPerCore: 1, // ensure that Min is considered
@@ -69,7 +70,7 @@ func TestGetConntrackMax(t *testing.T) {
 			MaxPerCore: ptr.To(tc.maxPerCore),
 		}
 		_, ctx := ktesting.NewTestContext(t)
-		x, e := getConntrackMax(ctx, &cfg)
+		x, e := getConntrackMax(ctx, &cfg, ncores)
 		if e != nil {
 			if tc.err == "" {
 				t.Errorf("[%d] unexpected error: %v", i, e)
@@ -236,5 +237,28 @@ func TestSetupConntrack(t *testing.T) {
 				t.Errorf("Test %q: Expected conntrack calls: %v, got: %v", test.name, test.expect, fc.called)
 			}
 		})
+	}
+}
+
+func TestGetConntrackMax_Capped(t *testing.T) {
+	// Simulate 512 cores
+	numCPU := 512
+
+	maxPerCore := int32(32768)
+	cfg := proxyconfigapi.KubeProxyConntrackConfiguration{
+		MaxPerCore: ptr.To(maxPerCore),
+		Min:        ptr.To(int32(0)),
+	}
+
+	_, ctx := ktesting.NewTestContext(t)
+	val, err := getConntrackMax(ctx, &cfg, numCPU)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	// 512 * 32768 = 16,777,216. Cap is 1,048,576
+	expected := 1048576
+	if val != expected {
+		t.Errorf("Expected capped value %d, got %d", expected, val)
 	}
 }

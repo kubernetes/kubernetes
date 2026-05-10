@@ -58,7 +58,7 @@ type conntrackConfigurer interface {
 }
 
 func setSysctls(ctx context.Context, ct conntrackConfigurer, config *proxyconfigapi.KubeProxyConntrackConfiguration) error {
-	max, err := getConntrackMax(ctx, config)
+	max, err := getConntrackMax(ctx, config, detectNumCPU())
 	if err != nil {
 		return err
 	}
@@ -106,14 +106,20 @@ func setSysctls(ctx context.Context, ct conntrackConfigurer, config *proxyconfig
 	return nil
 }
 
-func getConntrackMax(ctx context.Context, config *proxyconfigapi.KubeProxyConntrackConfiguration) (int, error) {
+func getConntrackMax(ctx context.Context, config *proxyconfigapi.KubeProxyConntrackConfiguration, numCPU int) (int, error) {
 	logger := klog.FromContext(ctx)
 	if config.MaxPerCore != nil && *config.MaxPerCore > 0 {
 		floor := 0
 		if config.Min != nil {
 			floor = int(*config.Min)
 		}
-		scaled := int(*config.MaxPerCore) * detectNumCPU()
+		scaled := int(*config.MaxPerCore) * numCPU
+		// Cap the value to 1M to avoid excessive memory usage on high-core machines
+		const maxLimit = 1048576
+		if scaled > maxLimit {
+			logger.V(3).Info("GetConntrackMax: capping scaled conntrack-max-per-core", "scaled", scaled, "limit", maxLimit)
+			return maxLimit, nil
+		}
 		if scaled > floor {
 			logger.V(3).Info("GetConntrackMax: using scaled conntrack-max-per-core")
 			return scaled, nil

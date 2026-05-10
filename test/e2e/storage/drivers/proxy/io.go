@@ -24,7 +24,7 @@ import (
 	"k8s.io/klog/v2"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/csi-test/mock/service"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 type PodDirIO struct {

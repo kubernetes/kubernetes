@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha2"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
@@ -113,11 +114,14 @@ type Scheduler struct {
 	// panic.
 	logger klog.Logger
 
+	podGroupLister schedulinglisters.PodGroupLister
+
 	// registeredHandlers contains the registrations of all handlers. It's used to check if all handlers have finished syncing before the scheduling cycles start.
 	registeredHandlers []cache.ResourceEventHandlerRegistration
 
 	nominatedNodeNameForExpectationEnabled bool
 	genericWorkloadEnabled                 bool
+	workloadAwarePreemptionEnabled         bool
 }
 
 func (sched *Scheduler) applyDefaultHandlers() {
@@ -309,6 +313,10 @@ func New(ctx context.Context,
 
 	podLister := informerFactory.Core().V1().Pods().Lister()
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+	var podGroupLister schedulinglisters.PodGroupLister
+	if feature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		podGroupLister = informerFactory.Scheduling().V1alpha2().PodGroups().Lister()
+	}
 
 	snapshot := internalcache.NewEmptySnapshot()
 	metricsRecorder := metrics.NewMetricsAsyncRecorder(1000, time.Second, stopEverything)
@@ -445,7 +453,9 @@ func New(ctx context.Context,
 		logger:                                 logger,
 		APIDispatcher:                          apiDispatcher,
 		nominatedNodeNameForExpectationEnabled: feature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation),
+		podGroupLister:                         podGroupLister,
 		genericWorkloadEnabled:                 feature.DefaultFeatureGate.Enabled(features.GenericWorkload),
+		workloadAwarePreemptionEnabled:         feature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption),
 	}
 	sched.NextPod = podQueue.Pop
 	sched.applyDefaultHandlers()
@@ -484,46 +494,24 @@ func buildQueueingHintMap(ctx context.Context, es []fwk.EnqueueExtensions) (inte
 		// cannot be moved by any regular cluster event.
 		// So, we can just ignore such EventsToRegister here.
 
-		registerNodeAdded := false
-		registerNodeTaintUpdated := false
 		for _, event := range events {
 			fn := event.QueueingHintFn
-			if fn == nil || !feature.DefaultFeatureGate.Enabled(features.SchedulerQueueingHints) {
+			if fn == nil {
 				fn = defaultQueueingHintFn
 			}
 
-			if event.Event.Resource == fwk.Node {
-				if event.Event.ActionType&fwk.Add != 0 {
-					registerNodeAdded = true
-				}
-				if event.Event.ActionType&fwk.UpdateNodeTaint != 0 {
-					registerNodeTaintUpdated = true
-				}
-			}
-
-			queueingHintMap[event.Event] = append(queueingHintMap[event.Event], &internalqueue.QueueingHintFunction{
+			queueingHintFn := &internalqueue.QueueingHintFunction{
 				PluginName:     e.Name(),
 				QueueingHintFn: fn,
-			})
-		}
-		if registerNodeAdded && !registerNodeTaintUpdated {
-			// Temporally fix for the issue https://github.com/kubernetes/kubernetes/issues/109437
-			// NodeAdded QueueingHint isn't always called because of preCheck.
-			// It's definitely not something expected for plugin developers,
-			// and registering UpdateNodeTaint event is the only mitigation for now.
-			//
-			// So, here registers UpdateNodeTaint event for plugins that has NodeAdded event, but don't have UpdateNodeTaint event.
-			// It has a bad impact for the requeuing efficiency though, a lot better than some Pods being stuch in the
-			// unschedulable pod pool.
-			// This behavior will be removed when we remove the preCheck feature.
-			// See: https://github.com/kubernetes/kubernetes/issues/110175
-			queueingHintMap[fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.UpdateNodeTaint}] =
-				append(queueingHintMap[fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.UpdateNodeTaint}],
-					&internalqueue.QueueingHintFunction{
-						PluginName:     e.Name(),
-						QueueingHintFn: defaultQueueingHintFn,
-					},
-				)
+			}
+
+			if event.Event.Resource == fwk.Pod {
+				for _, podEvent := range framework.UnrollPodEvent(event.Event) {
+					queueingHintMap[podEvent] = append(queueingHintMap[podEvent], queueingHintFn)
+				}
+			} else {
+				queueingHintMap[event.Event] = append(queueingHintMap[event.Event], queueingHintFn)
+			}
 		}
 	}
 	if returnErr != nil {

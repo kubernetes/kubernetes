@@ -48,6 +48,9 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 )
 
+// Allow informer caches to observe API updates on slower CI nodes.
+const cacheUpdateTimeout = 10 * time.Second
+
 var (
 	provisioner = "test-provisioner"
 
@@ -334,7 +337,7 @@ func (env *testEnv) updateVolumes(ctx context.Context, pvs []*v1.PersistentVolum
 		}
 		pvs[i] = newPv
 	}
-	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 3*time.Second, false, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, cacheUpdateTimeout, false, func(ctx context.Context) (bool, error) {
 		for _, pv := range pvs {
 			pvInCache, err := env.internalBinder.pvCache.GetAPIObj(pv.Name)
 			if pvInCache == nil || err != nil {
@@ -356,7 +359,7 @@ func (env *testEnv) updateClaims(ctx context.Context, pvcs []*v1.PersistentVolum
 		}
 		pvcs[i] = newPvc
 	}
-	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, 3*time.Second, false, func(ctx context.Context) (bool, error) {
+	return wait.PollUntilContextTimeout(ctx, 100*time.Millisecond, cacheUpdateTimeout, false, func(ctx context.Context) (bool, error) {
 		for _, pvc := range pvcs {
 			pvcInCache, err := env.internalBinder.pvcCache.GetAPIObj(getPVCName(pvc))
 			if pvcInCache == nil || err != nil {

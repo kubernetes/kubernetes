@@ -41,7 +41,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/sharding"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
@@ -104,13 +105,11 @@ func newTestCacher(s storage.Interface) (*Cacher, storage.Versioner, error) {
 		return nil, versioner, err
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		// The tests assume that Get/GetList/Watch calls shouldn't fail.
-		// However, 429 error can now be returned if watchcache is under initialization.
-		// To avoid rewriting all tests, we wait for watcache to initialize.
-		if err := cacher.Wait(context.Background()); err != nil {
-			return nil, storage.APIObjectVersioner{}, err
-		}
+	// The tests assume that Get/GetList/Watch calls shouldn't fail.
+	// However, 429 error can now be returned if watchcache is under initialization.
+	// To avoid rewriting all tests, we wait for watcache to initialize.
+	if err := cacher.Wait(context.Background()); err != nil {
+		return nil, storage.APIObjectVersioner{}, err
 	}
 	return cacher, versioner, nil
 }
@@ -294,67 +293,46 @@ func TestShouldDelegateList(t *testing.T) {
 	snapshotAvailableOverrides[opts{Recursive: true, ResourceVersion: oldRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = false
 	snapshotAvailableOverrides[opts{Recursive: true, ResourceVersion: oldRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = false
 
-	t.Run("ConsistentListFromCache=false", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
-		t.Run("ListFromCacheSnapshot=false", func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, false)
-			runTestCases(t, false, testCases)
-		})
+	// TODO(p0lyn0mial): the following tests assume that etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
+	// evaluates to true. Otherwise the cache will be bypassed and the test will fail.
+	//
+	// If you were to run only TestGetListCacheBypass you would see that the test fail.
+	// However in CI all test are run and there must be a test(s) that properly
+	// initialize the storage layer so that the mentioned method evaluates to true
+	forceRequestWatchProgressSupport(t)
 
-		t.Run("ListFromCacheSnapshot=true", func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
-			t.Run("SnapshotAvailable=false", func(t *testing.T) {
-				runTestCases(t, false, testCases, listFromSnapshotEnabledOverrides)
-			})
-			t.Run("SnapshotAvailable=true", func(t *testing.T) {
-				runTestCases(t, true, testCases, listFromSnapshotEnabledOverrides, snapshotAvailableOverrides)
-			})
-		})
+	consistentListFromCacheOverrides := map[opts]bool{}
+	for _, recursive := range []bool{true, false} {
+		consistentListFromCacheOverrides[opts{Recursive: recursive}] = false
+		consistentListFromCacheOverrides[opts{Limit: 100, Recursive: recursive}] = false
+	}
+
+	t.Run("ListFromCacheSnapshot=false", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, false)
+		runTestCases(t, false, testCases, consistentListFromCacheOverrides)
 	})
-	t.Run("ConsistentListFromCache=true", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
-		// TODO(p0lyn0mial): the following tests assume that etcdfeature.DefaultFeatureSupportChecker.Supports(storage.RequestWatchProgress)
-		// evaluates to true. Otherwise the cache will be bypassed and the test will fail.
-		//
-		// If you were to run only TestGetListCacheBypass you would see that the test fail.
-		// However in CI all test are run and there must be a test(s) that properly
-		// initialize the storage layer so that the mentioned method evaluates to true
-		forceRequestWatchProgressSupport(t)
+	t.Run("ListFromCacheSnapshot=true", func(t *testing.T) {
+		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
 
-		consistentListFromCacheOverrides := map[opts]bool{}
-		for _, recursive := range []bool{true, false} {
-			consistentListFromCacheOverrides[opts{Recursive: recursive}] = false
-			consistentListFromCacheOverrides[opts{Limit: 100, Recursive: recursive}] = false
-		}
-
-		t.Run("ListFromCacheSnapshot=false", func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, false)
-			runTestCases(t, false, testCases, consistentListFromCacheOverrides)
+		consistentReadWithSnapshotOverrides := map[opts]bool{}
+		// Continues with negative RV are same as consistent read.
+		consistentReadWithSnapshotOverrides[opts{Recursive: true, Limit: 0, Continue: continueOnNegativeRV}] = false
+		consistentReadWithSnapshotOverrides[opts{Recursive: true, Limit: 100, Continue: continueOnNegativeRV}] = false
+		consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Limit: 0, Continue: continueOnNegativeRV}] = false
+		consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Limit: 100, Continue: continueOnNegativeRV}] = false
+		// Exact on RV not yet observed by cache
+		consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: etcdRV, Limit: 100}] = false
+		consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: etcdRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = false
+		consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: etcdRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = false
+		consistentReadWithSnapshotOverrides[opts{Recursive: true, Continue: continueOnEtcdRV}] = false
+		consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Continue: continueOnEtcdRV}] = false
+		consistentReadWithSnapshotOverrides[opts{Recursive: true, Continue: continueOnEtcdRV, Limit: 100}] = false
+		consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Continue: continueOnEtcdRV, Limit: 100}] = false
+		t.Run("SnapshotAvailable=false", func(t *testing.T) {
+			runTestCases(t, false, testCases, listFromSnapshotEnabledOverrides, consistentListFromCacheOverrides, consistentReadWithSnapshotOverrides)
 		})
-		t.Run("ListFromCacheSnapshot=true", func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ListFromCacheSnapshot, true)
-
-			consistentReadWithSnapshotOverrides := map[opts]bool{}
-			// Continues with negative RV are same as consistent read.
-			consistentReadWithSnapshotOverrides[opts{Recursive: true, Limit: 0, Continue: continueOnNegativeRV}] = false
-			consistentReadWithSnapshotOverrides[opts{Recursive: true, Limit: 100, Continue: continueOnNegativeRV}] = false
-			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Limit: 0, Continue: continueOnNegativeRV}] = false
-			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Limit: 100, Continue: continueOnNegativeRV}] = false
-			// Exact on RV not yet observed by cache
-			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: etcdRV, Limit: 100}] = false
-			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: etcdRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact}] = false
-			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: etcdRV, ResourceVersionMatch: metav1.ResourceVersionMatchExact, Limit: 100}] = false
-			consistentReadWithSnapshotOverrides[opts{Recursive: true, Continue: continueOnEtcdRV}] = false
-			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Continue: continueOnEtcdRV}] = false
-			consistentReadWithSnapshotOverrides[opts{Recursive: true, Continue: continueOnEtcdRV, Limit: 100}] = false
-			consistentReadWithSnapshotOverrides[opts{Recursive: true, ResourceVersion: "0", Continue: continueOnEtcdRV, Limit: 100}] = false
-			t.Run("SnapshotAvailable=false", func(t *testing.T) {
-				runTestCases(t, false, testCases, listFromSnapshotEnabledOverrides, consistentListFromCacheOverrides, consistentReadWithSnapshotOverrides)
-			})
-			t.Run("SnapshotAvailable=true", func(t *testing.T) {
-				runTestCases(t, true, testCases, listFromSnapshotEnabledOverrides, consistentListFromCacheOverrides, consistentReadWithSnapshotOverrides, snapshotAvailableOverrides)
-			})
+		t.Run("SnapshotAvailable=true", func(t *testing.T) {
+			runTestCases(t, true, testCases, listFromSnapshotEnabledOverrides, consistentListFromCacheOverrides, consistentReadWithSnapshotOverrides, snapshotAvailableOverrides)
 		})
 	})
 }
@@ -369,13 +347,14 @@ func mustAtoi(s string) int {
 
 func TestConsistentReadFallback(t *testing.T) {
 	tcs := []struct {
-		name                   string
-		consistentReadsEnabled bool
-		watchCacheRV           string
-		storageRV              string
-		fallbackError          bool
+		name                string
+		skipStorageFallback bool
+		watchCacheRV        string
+		storageRV           string
+		fallbackError       bool
 
 		expectError             bool
+		expectTooManyRequests   bool
 		expectRV                string
 		expectBlock             bool
 		expectRequestsToStorage int
@@ -383,7 +362,6 @@ func TestConsistentReadFallback(t *testing.T) {
 	}{
 		{
 			name:                    "Success",
-			consistentReadsEnabled:  true,
 			watchCacheRV:            "42",
 			storageRV:               "42",
 			expectRV:                "42",
@@ -396,7 +374,6 @@ apiserver_watch_cache_consistent_read_total{fallback="false", group="", resource
 		},
 		{
 			name:                    "Fallback",
-			consistentReadsEnabled:  true,
 			watchCacheRV:            "2",
 			storageRV:               "42",
 			expectRV:                "42",
@@ -410,7 +387,6 @@ apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource=
 		},
 		{
 			name:                    "Fallback Failure",
-			consistentReadsEnabled:  true,
 			watchCacheRV:            "2",
 			storageRV:               "42",
 			fallbackError:           true,
@@ -424,21 +400,26 @@ apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource=
 `,
 		},
 		{
-			name:                    "Disabled",
+			name:                    "Skip Storage Fallback",
+			skipStorageFallback:     true,
 			watchCacheRV:            "2",
 			storageRV:               "42",
-			expectRV:                "42",
+			expectError:             true,
+			expectTooManyRequests:   true,
+			expectBlock:             true,
 			expectRequestsToStorage: 1,
-			expectMetric:            ``,
+			expectMetric: `
+# HELP apiserver_watch_cache_consistent_read_total [ALPHA] Counter for consistent reads from cache.
+# TYPE apiserver_watch_cache_consistent_read_total counter
+apiserver_watch_cache_consistent_read_total{fallback="skipped", group="", resource="pods", success="false"} 1
+`,
 		},
 	}
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.consistentReadsEnabled {
-				forceRequestWatchProgressSupport(t)
-			} else {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
+			forceRequestWatchProgressSupport(t)
+			if tc.skipStorageFallback {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCacheSkipTimeoutFallback, true)
 			}
 
 			registry := k8smetrics.NewKubeRegistry()
@@ -515,6 +496,9 @@ apiserver_watch_cache_consistent_read_total{fallback="true", group="", resource=
 			duration := cacher.clock.Since(start)
 			if (err != nil) != tc.expectError {
 				t.Fatalf("Unexpected error err: %v", err)
+			}
+			if tc.expectTooManyRequests && !apierrors.IsTooManyRequests(err) {
+				t.Fatalf("Unexpected error, got: %v, want TooManyRequests", err)
 			}
 			if result.ResourceVersion != tc.expectRV {
 				t.Fatalf("Unexpected List response RV, got: %q, want: %q", result.ResourceVersion, tc.expectRV)
@@ -620,53 +604,10 @@ func TestMatchExactResourceVersionFallback(t *testing.T) {
 	}
 }
 
-func TestGetListNonRecursiveCacheBypass(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, false)
-	backingStorage := &cachertesting.MockStorage{}
-	cacher, _, err := newTestCacher(backingStorage)
-	if err != nil {
-		t.Fatalf("Couldn't create cacher: %v", err)
-	}
-	defer cacher.Stop()
-	delegator := NewCacheDelegator(cacher, backingStorage)
-	defer delegator.Stop()
-
-	pred := storage.SelectionPredicate{
-		Limit: 500,
-	}
-	result := &example.PodList{}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err := cacher.ready.wait(context.Background()); err != nil {
-			t.Fatalf("unexpected error waiting for the cache to be ready")
-		}
-	}
-
-	// Inject error to underlying layer and check if cacher is not bypassed.
-	backingStorage.InjectGetListError(errDummy)
-	err = delegator.GetList(context.TODO(), "/pods/ns", storage.ListOptions{
-		ResourceVersion: "0",
-		Predicate:       pred,
-	}, result)
-	if err != nil {
-		t.Errorf("GetList with Limit and RV=0 should be served from cache: %v", err)
-	}
-
-	err = delegator.GetList(context.TODO(), "/pods/ns", storage.ListOptions{
-		ResourceVersion: "",
-		Predicate:       pred,
-	}, result)
-	if !errors.Is(err, errDummy) {
-		t.Errorf("GetList with Limit without RV=0 should bypass cacher: %v", err)
-	}
-}
-
 func TestGetListNonRecursiveCacheWithConsistentListFromCache(t *testing.T) {
-	// Set feature gates once at the beginning since we only care about ConsistentListFromCache=true and ListFromCacheSnapshot=false
+	// Set feature gates once at the beginning since we only care about ListFromCacheSnapshot=false
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.ConsistentListFromCache: true,
-		features.ListFromCacheSnapshot:   false,
+		features.ListFromCacheSnapshot: false,
 	})
 	forceRequestWatchProgressSupport(t)
 
@@ -795,12 +736,6 @@ func TestGetCacheBypass(t *testing.T) {
 
 	result := &example.Pod{}
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err := cacher.ready.wait(context.Background()); err != nil {
-			t.Fatalf("unexpected error waiting for the cache to be ready")
-		}
-	}
-
 	// Inject error to underlying layer and check if cacher is not bypassed.
 	backingStorage.InjectGetListError(errDummy)
 	err = delegator.Get(context.TODO(), "/pods/ns/pod-0", storage.GetOptions{
@@ -830,12 +765,6 @@ func TestWatchCacheBypass(t *testing.T) {
 	delegator := NewCacheDelegator(cacher, backingStorage)
 	defer delegator.Stop()
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err := cacher.ready.wait(context.Background()); err != nil {
-			t.Fatalf("unexpected error waiting for the cache to be ready")
-		}
-	}
-
 	_, err = delegator.Watch(context.TODO(), "/pods/ns", storage.ListOptions{
 		ResourceVersion: "0",
 		Predicate:       storage.Everything,
@@ -850,46 +779,6 @@ func TestWatchCacheBypass(t *testing.T) {
 	})
 	if err != nil {
 		t.Errorf("Watch without RV=0 should be served from cache: %v", err)
-	}
-}
-
-func TestTooManyRequestsNotReturned(t *testing.T) {
-	// Ensure that with ResilientWatchCacheInitialization feature disabled, we don't return 429
-	// errors when watchcache is not initialized.
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ResilientWatchCacheInitialization, false)
-
-	dummyErr := fmt.Errorf("dummy")
-	backingStorage := &cachertesting.MockStorage{GetListErr: dummyErr}
-	cacher, _, err := newTestCacherWithoutSyncing(backingStorage, clock.RealClock{})
-	if err != nil {
-		t.Fatalf("Couldn't create cacher: %v", err)
-	}
-	defer cacher.Stop()
-	delegator := NewCacheDelegator(cacher, backingStorage)
-	defer delegator.Stop()
-
-	opts := storage.ListOptions{
-		ResourceVersion: "0",
-		Predicate:       storage.Everything,
-	}
-
-	// Cancel the request so that it doesn't hang forever.
-	listCtx, listCancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
-	defer listCancel()
-
-	result := &example.PodList{}
-	err = delegator.GetList(listCtx, "/pods/ns", opts, result)
-	if err != nil && apierrors.IsTooManyRequests(err) {
-		t.Errorf("Unexpected 429 error without ResilientWatchCacheInitialization feature for List")
-	}
-
-	watchCtx, watchCancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
-	defer watchCancel()
-
-	_, err = delegator.Watch(watchCtx, "/pods/ns", opts)
-	if err != nil && apierrors.IsTooManyRequests(err) {
-		t.Errorf("Unexpected 429 error without ResilientWatchCacheInitialization feature for Watch")
 	}
 }
 
@@ -1007,14 +896,8 @@ func TestWatchNotHangingOnStartupFailure(t *testing.T) {
 	// Ensure that it terminates when its context is cancelled
 	// (e.g. the request is terminated for whatever reason).
 	_, err = cacher.Watch(ctx, "/pods/ns", storage.ListOptions{ResourceVersion: "0"})
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err == nil || err.Error() != apierrors.NewServiceUnavailable(context.Canceled.Error()).Error() {
-			t.Errorf("Unexpected error: %#v", err)
-		}
-	} else {
-		if err == nil || !strings.Contains(err.Error(), "storage is (re)initializing") {
-			t.Errorf("Unexpected error: %#v", err)
-		}
+	if err == nil || !strings.Contains(err.Error(), "storage is (re)initializing") {
+		t.Errorf("Unexpected error: %#v", err)
 	}
 }
 
@@ -1025,12 +908,6 @@ func TestWatcherNotGoingBackInTime(t *testing.T) {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
 	defer cacher.Stop()
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err := cacher.ready.wait(context.Background()); err != nil {
-			t.Fatalf("unexpected error waiting for the cache to be ready")
-		}
-	}
 
 	// Ensure there is some budget for slowing down processing.
 	cacher.dispatchTimeoutBudget.returnUnused(100 * time.Millisecond)
@@ -1115,12 +992,6 @@ func TestCacherDontAcceptRequestsStopped(t *testing.T) {
 	delegator := NewCacheDelegator(cacher, backingStorage)
 	defer delegator.Stop()
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err := cacher.ready.wait(context.Background()); err != nil {
-			t.Fatalf("unexpected error waiting for the cache to be ready")
-		}
-	}
-
 	w, err := delegator.Watch(context.Background(), "/pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Failed to create watch: %v", err)
@@ -1151,14 +1022,8 @@ func TestCacherDontAcceptRequestsStopped(t *testing.T) {
 		IgnoreNotFound:  true,
 		ResourceVersion: "1",
 	}, result)
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err == nil {
-			t.Fatalf("Success to create Get: %v", err)
-		}
-	} else {
-		if err != nil {
-			t.Fatalf("Failed to get object: %v:", err)
-		}
+	if err != nil {
+		t.Fatalf("Failed to get object: %v:", err)
 	}
 
 	listResult := &example.PodList{}
@@ -1169,14 +1034,8 @@ func TestCacherDontAcceptRequestsStopped(t *testing.T) {
 			Limit: 500,
 		},
 	}, listResult)
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err != nil {
-			t.Fatalf("Failed to create GetList: %v", err)
-		}
-	} else {
-		if err != nil {
-			t.Fatalf("Failed to list objects: %v", err)
-		}
+	if err != nil {
+		t.Fatalf("Failed to list objects: %v", err)
 	}
 
 	select {
@@ -1303,12 +1162,6 @@ func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
 	}
 	defer cacher.Stop()
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err := cacher.ready.wait(context.Background()); err != nil {
-			t.Fatalf("unexpected error waiting for the cache to be ready")
-		}
-	}
-
 	pred := storage.Everything
 	pred.AllowWatchBookmarks = true
 
@@ -1384,11 +1237,6 @@ func testCacherSendBookmarkEvents(t *testing.T, allowWatchBookmarks, expectedBoo
 	}
 	defer cacher.Stop()
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err := cacher.ready.wait(context.Background()); err != nil {
-			t.Fatalf("unexpected error waiting for the cache to be ready")
-		}
-	}
 	pred := storage.Everything
 	pred.AllowWatchBookmarks = allowWatchBookmarks
 
@@ -1483,12 +1331,6 @@ func TestInitialEventsEndBookmark(t *testing.T) {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
 	defer cacher.Stop()
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err := cacher.ready.wait(context.Background()); err != nil {
-			t.Fatalf("unexpected error waiting for the cache to be ready")
-		}
-	}
 
 	makePod := func(index uint64) *example.Pod {
 		return &example.Pod{
@@ -1585,11 +1427,6 @@ func TestCacherSendsMultipleWatchBookmarks(t *testing.T) {
 	// resolution how frequency we recompute.
 	cacher.bookmarkWatchers.bookmarkFrequency = time.Second
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err := cacher.ready.wait(context.Background()); err != nil {
-			t.Fatalf("unexpected error waiting for the cache to be ready")
-		}
-	}
 	pred := storage.Everything
 	pred.AllowWatchBookmarks = true
 
@@ -1655,12 +1492,6 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
 	defer cacher.Stop()
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err := cacher.ready.wait(context.Background()); err != nil {
-			t.Fatalf("unexpected error waiting for the cache to be ready")
-		}
-	}
 
 	// Ensure there is some budget for slowing down processing.
 	cacher.dispatchTimeoutBudget.returnUnused(100 * time.Millisecond)
@@ -1735,12 +1566,6 @@ func TestBookmarksOnResourceVersionUpdates(t *testing.T) {
 	// Ensure that bookmarks are sent more frequently than every 1m.
 	cacher.bookmarkWatchers = newTimeBucketWatchers(clock.RealClock{}, 2*time.Second)
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err := cacher.ready.wait(context.Background()); err != nil {
-			t.Fatalf("unexpected error waiting for the cache to be ready")
-		}
-	}
-
 	makePod := func(i int) *examplev1.Pod {
 		return &examplev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
@@ -1813,12 +1638,6 @@ func TestStartingResourceVersion(t *testing.T) {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
 	defer cacher.Stop()
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err := cacher.ready.wait(context.Background()); err != nil {
-			t.Fatalf("unexpected error waiting for the cache to be ready")
-		}
-	}
 
 	// Ensure there is some budget for slowing down processing.
 	// We use the fakeTimeBudget to prevent this test from flaking under
@@ -1894,12 +1713,6 @@ func TestDispatchEventWillNotBeBlockedByTimedOutWatcher(t *testing.T) {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
 	defer cacher.Stop()
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err := cacher.ready.wait(context.Background()); err != nil {
-			t.Fatalf("unexpected error waiting for the cache to be ready")
-		}
-	}
 
 	// Ensure there is some budget for slowing down processing.
 	// We use the fakeTimeBudget to prevent this test from flaking under
@@ -2038,12 +1851,6 @@ func TestCachingDeleteEvents(t *testing.T) {
 	}
 	defer cacher.Stop()
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err := cacher.ready.wait(context.Background()); err != nil {
-			t.Fatalf("unexpected error waiting for the cache to be ready")
-		}
-	}
-
 	fooPredicate := storage.SelectionPredicate{
 		Label: labels.SelectorFromSet(map[string]string{"foo": "true"}),
 		Field: fields.Everything(),
@@ -2120,12 +1927,6 @@ func testCachingObjects(t *testing.T, watchersCount int) {
 		t.Fatalf("Couldn't create cacher: %v", err)
 	}
 	defer cacher.Stop()
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err := cacher.ready.wait(context.Background()); err != nil {
-			t.Fatalf("unexpected error waiting for the cache to be ready")
-		}
-	}
 
 	dispatchedEvents := []*watchCacheEvent{}
 	cacher.watchCache.eventHandler = func(event *watchCacheEvent) {
@@ -2218,12 +2019,6 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 	}
 	defer cacher.Stop()
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err := cacher.ready.wait(context.Background()); err != nil {
-			t.Fatalf("unexpected error waiting for the cache to be ready")
-		}
-	}
-
 	// Ensure there is enough budget for slow processing since
 	// the entire watch cache is going to be served through the
 	// interval and events won't be popped from the cacheWatcher's
@@ -2298,8 +2093,7 @@ func TestCacheIntervalInvalidationStopsWatch(t *testing.T) {
 
 func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.WatchList:               true,
-		features.ConsistentListFromCache: true,
+		features.WatchList: true,
 	})
 	forceRequestWatchProgressSupport(t)
 
@@ -2428,12 +2222,6 @@ func TestWaitUntilWatchCacheFreshAndForceAllEvents(t *testing.T) {
 				t.Fatalf("Couldn't create cacher: %v", err)
 			}
 			defer cacher.Stop()
-
-			if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-				if err := cacher.ready.wait(context.Background()); err != nil {
-					t.Fatalf("unexpected error waiting for the cache to be ready")
-				}
-			}
 
 			w, err := cacher.Watch(context.Background(), "/pods/ns", scenario.opts)
 			require.NoError(t, err, "failed to create watch: %v")
@@ -2593,12 +2381,6 @@ func TestWatchListIsSynchronisedWhenNoEventsFromStoreReceived(t *testing.T) {
 	require.NoError(t, err, "failed to create cacher")
 	defer cacher.Stop()
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err := cacher.ready.wait(context.Background()); err != nil {
-			t.Fatalf("unexpected error waiting for the cache to be ready")
-		}
-	}
-
 	pred := storage.Everything
 	pred.AllowWatchBookmarks = true
 	opts := storage.ListOptions{
@@ -2625,12 +2407,6 @@ func TestForgetWatcher(t *testing.T) {
 	require.NoError(t, err)
 	defer cacher.Stop()
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if err := cacher.ready.wait(context.Background()); err != nil {
-			t.Fatalf("unexpected error waiting for the cache to be ready")
-		}
-	}
-
 	assertCacherInternalState := func(expectedWatchersCounter, expectedValueWatchersCounter int) {
 		cacher.Lock()
 		defer cacher.Unlock()
@@ -2648,7 +2424,7 @@ func TestForgetWatcher(t *testing.T) {
 	}
 	w := newCacheWatcher(
 		0,
-		func(_ string, _ labels.Set, _ fields.Set) bool { return true },
+		func(_ string, _ labels.Set, _ fields.Set, _ runtime.Object) bool { return true },
 		nil,
 		storage.APIObjectVersioner{},
 		testingclock.NewFakeClock(time.Now()).Now().Add(2*time.Minute),
@@ -3019,12 +2795,6 @@ func TestGetBookmarkAfterResourceVersionLockedFunc(t *testing.T) {
 
 			defer cacher.Stop()
 
-			if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-				if err := cacher.ready.wait(context.Background()); err != nil {
-					t.Fatalf("unexpected error waiting for the cache to be ready")
-				}
-			}
-
 			cacher.watchCache.UpdateResourceVersion(fmt.Sprintf("%d", scenario.watchCacheResourceVersion))
 			parsedResourceVersion := 0
 			if len(scenario.opts.ResourceVersion) > 0 {
@@ -3265,9 +3035,6 @@ func TestListIndexer(t *testing.T) {
 }
 
 func TestRetryAfterForUnreadyCache(t *testing.T) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		t.Skipf("the test requires %v to be enabled", features.ResilientWatchCacheInitialization)
-	}
 	backingStorage := &cachertesting.MockStorage{}
 	clock := testingclock.NewFakeClock(time.Now())
 	cacher, _, err := newTestCacherWithoutSyncing(backingStorage, clock)
@@ -3355,4 +3122,238 @@ func (f *fakeSnapshotter) Add(rv uint64, indexer store.OrderedLister) {}
 func (f *fakeSnapshotter) RemoveLess(rv uint64)                       {}
 func (f *fakeSnapshotter) Len() int {
 	return 0
+}
+
+// --- Sharding unit tests for filterWithAttrsAndPrefixFunction ---
+
+// selectorIncludingUID builds a shard selector whose range contains the hash of uid.
+func selectorIncludingUID(uid string) sharding.Selector {
+	hash := "0x" + sharding.HashField(uid)
+	return sharding.NewSelector(sharding.ShardRangeRequirement{
+		Key:   "object.metadata.uid",
+		Start: hash,
+		End:   incrementHex(hash),
+	})
+}
+
+// selectorExcludingUID builds a shard selector whose range does NOT contain the hash of uid.
+func selectorExcludingUID(uid string) sharding.Selector {
+	hash := "0x" + sharding.HashField(uid)
+	return sharding.NewSelector(sharding.ShardRangeRequirement{
+		Key:   "object.metadata.uid",
+		Start: "0x0000000000000000",
+		End:   hash,
+	})
+}
+
+func incrementHex(hex string) string {
+	b := []byte(hex)
+	for i := len(b) - 1; i >= 2; i-- {
+		if b[i] < '9' {
+			b[i]++
+			return string(b)
+		} else if b[i] == '9' {
+			b[i] = 'a'
+			return string(b)
+		} else if b[i] < 'f' {
+			b[i]++
+			return string(b)
+		}
+		b[i] = '0'
+	}
+	return "0x10000000000000000"
+}
+
+func makeExamplePod(name, namespace, uid string, podLabels map[string]string) *example.Pod {
+	return &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			UID:       types.UID(uid),
+			Labels:    podLabels,
+		},
+	}
+}
+
+func TestFilterWithAttrsAndPrefixFunction_ShardMatchAndLabels(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, true)
+	uid := "test-uid-1"
+	pod := makeExamplePod("pod1", "default", uid, map[string]string{"app": "web"})
+	gr := schema.GroupResource{Resource: "pods"}
+
+	pred := storage.SelectionPredicate{
+		Label:         labels.SelectorFromSet(labels.Set{"app": "web"}),
+		Field:         fields.Everything(),
+		ShardSelector: selectorIncludingUID(uid),
+		GetAttrs:      storage.DefaultNamespaceScopedAttr,
+	}
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+
+	if !filter("/pods/default/pod1", labels.Set{"app": "web"}, fields.Set{"metadata.name": "pod1", "metadata.namespace": "default"}, pod) {
+		t.Error("expected filter to match: shard matches and labels match")
+	}
+}
+
+func TestFilterWithAttrsAndPrefixFunction_ShardMatchButLabelMismatch(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, true)
+	uid := "test-uid-2"
+	pod := makeExamplePod("pod2", "default", uid, map[string]string{"app": "api"})
+	gr := schema.GroupResource{Resource: "pods"}
+
+	pred := storage.SelectionPredicate{
+		Label:         labels.SelectorFromSet(labels.Set{"app": "web"}),
+		Field:         fields.Everything(),
+		ShardSelector: selectorIncludingUID(uid),
+		GetAttrs:      storage.DefaultNamespaceScopedAttr,
+	}
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+
+	if filter("/pods/default/pod2", labels.Set{"app": "api"}, fields.Set{"metadata.name": "pod2", "metadata.namespace": "default"}, pod) {
+		t.Error("expected filter to reject: shard matches but labels don't")
+	}
+}
+
+func TestFilterWithAttrsAndPrefixFunction_ShardMismatch(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, true)
+	uid := "test-uid-3"
+	pod := makeExamplePod("pod3", "default", uid, map[string]string{"app": "web"})
+	gr := schema.GroupResource{Resource: "pods"}
+
+	pred := storage.SelectionPredicate{
+		Label:         labels.Everything(),
+		Field:         fields.Everything(),
+		ShardSelector: selectorExcludingUID(uid),
+		GetAttrs:      storage.DefaultNamespaceScopedAttr,
+	}
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+
+	if filter("/pods/default/pod3", labels.Set{"app": "web"}, fields.Set{"metadata.name": "pod3", "metadata.namespace": "default"}, pod) {
+		t.Error("expected filter to reject: shard does not match")
+	}
+}
+
+func TestFilterWithAttrsAndPrefixFunction_NilShardSelector(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, true)
+	pod := makeExamplePod("pod4", "default", "uid-4", map[string]string{"app": "web"})
+	gr := schema.GroupResource{Resource: "pods"}
+
+	pred := storage.SelectionPredicate{
+		Label:    labels.SelectorFromSet(labels.Set{"app": "web"}),
+		Field:    fields.Everything(),
+		GetAttrs: storage.DefaultNamespaceScopedAttr,
+	}
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+
+	if !filter("/pods/default/pod4", labels.Set{"app": "web"}, fields.Set{"metadata.name": "pod4", "metadata.namespace": "default"}, pod) {
+		t.Error("expected filter to match: nil ShardSelector should pass everything through")
+	}
+}
+
+func TestFilterWithAttrsAndPrefixFunction_EverythingSelector(t *testing.T) {
+	pod := makeExamplePod("pod5", "default", "uid-5", nil)
+	gr := schema.GroupResource{Resource: "pods"}
+
+	pred := storage.SelectionPredicate{
+		Label:         labels.Everything(),
+		Field:         fields.Everything(),
+		ShardSelector: sharding.Everything(),
+		GetAttrs:      storage.DefaultNamespaceScopedAttr,
+	}
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+
+	if !filter("/pods/default/pod5", labels.Set{}, fields.Set{"metadata.name": "pod5", "metadata.namespace": "default"}, pod) {
+		t.Error("expected filter to match: Everything() selector should pass all objects")
+	}
+}
+
+func TestFilterWithAttrsAndPrefixFunction_WrongPrefix(t *testing.T) {
+	uid := "test-uid-6"
+	pod := makeExamplePod("pod6", "default", uid, nil)
+	gr := schema.GroupResource{Resource: "pods"}
+
+	pred := storage.SelectionPredicate{
+		Label:         labels.Everything(),
+		Field:         fields.Everything(),
+		ShardSelector: selectorIncludingUID(uid),
+		GetAttrs:      storage.DefaultNamespaceScopedAttr,
+	}
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+
+	if filter("/configmaps/default/cm1", nil, nil, pod) {
+		t.Error("expected filter to reject: key prefix doesn't match")
+	}
+}
+
+func TestFilterWithAttrsAndPrefixFunction_ShardErrorDropsEvent(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, true)
+	obj := &runtime.Unknown{}
+	gr := schema.GroupResource{Resource: "pods"}
+
+	pred := storage.SelectionPredicate{
+		Label: labels.Everything(),
+		Field: fields.Everything(),
+		ShardSelector: sharding.NewSelector(sharding.ShardRangeRequirement{
+			Key:   "object.metadata.uid",
+			Start: "0x0000000000000000",
+			End:   "0x10000000000000000",
+		}),
+		GetAttrs: storage.DefaultNamespaceScopedAttr,
+	}
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+
+	if filter("/pods/default/pod-err", nil, nil, obj) {
+		t.Error("expected filter to reject: shard matching should fail on unstructured object")
+	}
+}
+
+func TestFilterWithAttrsAndPrefixFunction_NamespaceSharding(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, true)
+	ns := "my-namespace"
+	pod := makeExamplePod("pod-ns", ns, "some-uid", nil)
+
+	nsHash := "0x" + sharding.HashField(ns)
+	sel := sharding.NewSelector(sharding.ShardRangeRequirement{
+		Key:   "object.metadata.namespace",
+		Start: nsHash,
+		End:   incrementHex(nsHash),
+	})
+
+	gr := schema.GroupResource{Resource: "pods"}
+	pred := storage.SelectionPredicate{
+		Label:         labels.Everything(),
+		Field:         fields.Everything(),
+		ShardSelector: sel,
+		GetAttrs:      storage.DefaultNamespaceScopedAttr,
+	}
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+
+	if !filter("/pods/my-namespace/pod-ns", labels.Set{}, fields.Set{"metadata.name": "pod-ns", "metadata.namespace": ns}, pod) {
+		t.Error("expected filter to match: namespace-based shard selector should match")
+	}
+}
+
+func TestFilterWithAttrsAndPrefixFunction_NamespaceShardingMismatch(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ShardedListAndWatch, true)
+	ns := "other-namespace"
+	pod := makeExamplePod("pod-ns2", ns, "some-uid-2", nil)
+
+	targetHash := "0x" + sharding.HashField("my-namespace")
+	sel := sharding.NewSelector(sharding.ShardRangeRequirement{
+		Key:   "object.metadata.namespace",
+		Start: targetHash,
+		End:   incrementHex(targetHash),
+	})
+
+	gr := schema.GroupResource{Resource: "pods"}
+	pred := storage.SelectionPredicate{
+		Label:         labels.Everything(),
+		Field:         fields.Everything(),
+		ShardSelector: sel,
+		GetAttrs:      storage.DefaultNamespaceScopedAttr,
+	}
+	filter := filterWithAttrsAndPrefixFunction("/pods/", pred, gr)
+
+	if filter("/pods/other-namespace/pod-ns2", labels.Set{}, fields.Set{"metadata.name": "pod-ns2", "metadata.namespace": ns}, pod) {
+		t.Error("expected filter to reject: namespace hash doesn't fall in shard range")
+	}
 }

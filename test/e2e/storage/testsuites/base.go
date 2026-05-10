@@ -69,6 +69,7 @@ var BaseSuites = []func() storageframework.TestSuite{
 	InitVolumeStressTestSuite,
 	InitFsGroupChangePolicyTestSuite,
 	InitVolumeGroupSnapshottableTestSuite,
+	InitVolumeGroupSnapshotClassTestSuite,
 	func() storageframework.TestSuite {
 		return InitCustomEphemeralTestSuite(GenericEphemeralTestPatterns())
 	},

@@ -486,7 +486,7 @@ func TestAccessModeConflicts(t *testing.T) {
 	}
 }
 
-func Test_isSchedulableAfterPodDeleted(t *testing.T) {
+func Test_isSchedulableAfterAssignedPodDeleted(t *testing.T) {
 	GCEDiskVolState := v1.Volume{
 		VolumeSource: v1.VolumeSource{
 			GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
@@ -672,7 +672,7 @@ func Test_isSchedulableAfterPodDeleted(t *testing.T) {
 			defer cancel()
 			p := newPluginWithListers(ctx, t, tc.existingPods, nil, []*v1.PersistentVolumeClaim{tc.existingPVC})
 
-			actualHint, err := p.(*VolumeRestrictions).isSchedulableAfterPodDeleted(logger, tc.pod, tc.oldObj, nil)
+			actualHint, err := p.(*VolumeRestrictions).isSchedulableAfterAssignedPodDeleted(logger, tc.pod, tc.oldObj, nil)
 			if tc.expectedErr {
 				if err == nil {
 					t.Error("Expect error, but got nil")

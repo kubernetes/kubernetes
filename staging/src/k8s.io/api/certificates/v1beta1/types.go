@@ -324,6 +324,8 @@ type ClusterTrustBundleSpec struct {
 	// using a `spec.signerName=NAME` field selector.
 	//
 	// +optional
+	// +k8s:alpha(since:"1.37")=+k8s:optional
+	// +k8s:alpha(since:"1.37")=+k8s:immutable
 	SignerName string `json:"signerName,omitempty" protobuf:"bytes,1,opt,name=signerName"`
 
 	// trustBundle contains the individual X.509 trust anchors for this
@@ -365,6 +367,7 @@ type ClusterTrustBundleList struct {
 // signer.
 //
 // Kubelets use this API to implement podCertificate projected volumes
+// +k8s:supportsSubresource="/status"
 type PodCertificateRequest struct {
 	metav1.TypeMeta `json:",inline"`
 

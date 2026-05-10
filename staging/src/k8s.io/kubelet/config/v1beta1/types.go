@@ -102,6 +102,18 @@ const (
 	AlwaysVerify ImagePullCredentialsVerificationPolicy = "AlwaysVerify"
 )
 
+// MemoryReservationPolicy defines how the kubelet applies cgroup v2 memory protection.
+type MemoryReservationPolicy string
+
+const (
+	// NoneMemoryReservationPolicy disables memory.min protection for containers and pods.
+	// This is the default to maintain node stability by preventing "locked" memory.
+	NoneMemoryReservationPolicy MemoryReservationPolicy = "None"
+	// TieredReservationMemoryReservationPolicy enables tiered memory protection:
+	// memory.min for Guaranteed pods, memory.low for Burstable pods.
+	TieredReservationMemoryReservationPolicy MemoryReservationPolicy = "TieredReservation"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // KubeletConfiguration contains the configuration for the Kubelet
@@ -792,7 +804,6 @@ type KubeletConfiguration struct {
 	// Enabling this feature has security implications. The recommendation is to enable it on a need basis for debugging
 	// purposes and disabling otherwise.
 	// Default: false
-	// +featureGate=NodeLogQuery
 	// +optional
 	EnableSystemLogQuery *bool `json:"enableSystemLogQuery,omitempty"`
 	// shutdownGracePeriod specifies the total duration that the node should delay the
@@ -888,6 +899,16 @@ type KubeletConfiguration struct {
 	// +featureGate=MemoryQoS
 	// +optional
 	MemoryThrottlingFactor *float64 `json:"memoryThrottlingFactor,omitempty"`
+	// MemoryReservationPolicy controls how the kubelet applies cgroup v2 memory protection.
+	// "None" (default): The kubelet does not set memory.min for containers and pods,
+	// ensuring no hard memory is locked by the kernel.
+	// "TieredReservation": The kubelet sets cgroup v2 memory.min for Guaranteed pods and memory.low for Burstable pods based on memory requests.
+	// Guaranteed memory is never reclaimed by the kernel; Burstable memory is preferentially retained but may be reclaimed under extreme pressure.
+	// See https://kep.k8s.io/2570 for more details.
+	// Default: None
+	// +featureGate=MemoryQoS
+	// +optional
+	MemoryReservationPolicy MemoryReservationPolicy `json:"memoryReservationPolicy,omitempty"`
 	// registerWithTaints are an array of taints to add to a node object when
 	// the kubelet registers itself. This only takes effect when registerNode
 	// is true and upon the initial registration of the node.

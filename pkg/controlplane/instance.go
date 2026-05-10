@@ -346,6 +346,11 @@ func (c CompletedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get listener address: %w", err)
 	}
+
+	if err := c.Extra.EndpointReconcilerConfig.Reconciler.ValidateIP(c.ControlPlane.Generic.PublicAddress); err != nil {
+		return nil, fmt.Errorf("cannot use public IP %s with endpoint reconciler: %w", c.ControlPlane.Generic.PublicAddress.String(), err)
+	}
+
 	kubernetesServiceCtrl := kubernetesservice.New(kubernetesservice.Config{
 		PublicIP: c.ControlPlane.Generic.PublicAddress,
 
@@ -432,7 +437,10 @@ func (c CompletedConfig) StorageProviders(client *kubernetes.Clientset) ([]contr
 		appsrest.StorageProvider{},
 		admissionregistrationrest.RESTStorageProvider{Authorizer: c.ControlPlane.Generic.Authorization.Authorizer, DiscoveryClient: client.Discovery()},
 		eventsrest.RESTStorageProvider{TTL: c.ControlPlane.EventTTL},
-		resourcerest.RESTStorageProvider{NamespaceClient: client.CoreV1().Namespaces()},
+		resourcerest.RESTStorageProvider{
+			NamespaceClient: client.CoreV1().Namespaces(),
+			Authorizer:      c.ControlPlane.Generic.Authorization.Authorizer,
+		},
 	}
 
 	if AdditionalStorageProvidersForTests != nil {

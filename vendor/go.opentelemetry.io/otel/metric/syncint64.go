@@ -24,12 +24,18 @@ type Int64Counter interface {
 	//
 	// Use the WithAttributeSet (or, if performance is not a concern,
 	// the WithAttributes) option to include measurement attributes.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Add(ctx context.Context, incr int64, options ...AddOption)
 
 	// Enabled reports whether the instrument will process measurements for the given context.
 	//
 	// This function can be used in places where measuring an instrument
 	// would result in computationally expensive operations.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Enabled(context.Context) bool
 }
 
@@ -83,12 +89,18 @@ type Int64UpDownCounter interface {
 	//
 	// Use the WithAttributeSet (or, if performance is not a concern,
 	// the WithAttributes) option to include measurement attributes.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Add(ctx context.Context, incr int64, options ...AddOption)
 
 	// Enabled reports whether the instrument will process measurements for the given context.
 	//
 	// This function can be used in places where measuring an instrument
 	// would result in computationally expensive operations.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Enabled(context.Context) bool
 }
 
@@ -142,12 +154,18 @@ type Int64Histogram interface {
 	//
 	// Use the WithAttributeSet (or, if performance is not a concern,
 	// the WithAttributes) option to include measurement attributes.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Record(ctx context.Context, incr int64, options ...RecordOption)
 
 	// Enabled reports whether the instrument will process measurements for the given context.
 	//
 	// This function can be used in places where measuring an instrument
 	// would result in computationally expensive operations.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Enabled(context.Context) bool
 }
 
@@ -206,12 +224,18 @@ type Int64Gauge interface {
 	//
 	// Use the WithAttributeSet (or, if performance is not a concern,
 	// the WithAttributes) option to include measurement attributes.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Record(ctx context.Context, value int64, options ...RecordOption)
 
 	// Enabled reports whether the instrument will process measurements for the given context.
 	//
 	// This function can be used in places where measuring an instrument
 	// would result in computationally expensive operations.
+	//
+	// Implementations of this method need to be safe for a user to call
+	// concurrently.
 	Enabled(context.Context) bool
 }
 

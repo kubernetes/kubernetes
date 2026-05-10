@@ -54,6 +54,20 @@ kube::test::find_go_packages() {
             -e '^k8s.io/kubernetes/test/e2e_kubeadm(/.*)?$' \
             -e '^k8s.io/.*/test/integration(/.*)?$'
   )
+
+  # Some of our modules are not in this workspace. We have to change directories
+  # to find their tests and then add the module path as prefix to the
+  # packages as indicator that we need to do the same when executing those tests.
+  local module
+  for module in $(find hack/tools -name go.mod | sed -e 's;/go.mod;;'); do
+   (
+     cd "${module}"
+     go list -find \
+             -f '{{if or (gt (len .TestGoFiles) 0) (gt (len .XTestGoFiles) 0)}}{{.ImportPath}}{{end}}' \
+             ./... |
+     sed -e "s;^;${module}/;"
+   )
+  done
 }
 
 set -x
@@ -162,10 +176,18 @@ for arg; do
 done
 if [[ ${#testcases[@]} -eq 0 ]]; then
   # If the user passed no targets in, we want ~everything.
-  kube::util::read-array testcases < <(kube::test::find_go_packages)
+  # In addition also test some specific upstream packages.
+  kube::util::read-array testcases < <(
+    kube::test::find_go_packages
+    grep -v -e '^#' -e '^$' "${KUBE_ROOT}/hack/dependency-unit-tests.conf"
+  )
 else
   # If the user passed targets, we should normalize them.
   # This can be slow for large numbers of inputs.
+  #
+  # Targets have to be part of the Kubernetes source code, i.e.
+  # WHAT=hack/tools/golangci-lint/sigs.k8s.io/logtools
+  # is not supported.
   kube::log::status "Normalizing Go targets"
   kube::util::read-array testcases < <(kube::golang::normalize_go_targets "${testcases[@]}")
 fi
@@ -185,7 +207,7 @@ junitFilenamePrefix() {
     return
   fi
   mkdir -p "${KUBE_JUNIT_REPORT_DIR}"
-  echo "${KUBE_JUNIT_REPORT_DIR}/junit_$(kube::util::sortable_date)"
+  echo -n "${KUBE_JUNIT_REPORT_DIR}/junit_$(echo -n "${1}" | tr /- _)$(kube::util::sortable_date)"
 }
 
 installTools() {
@@ -200,10 +222,32 @@ installTools() {
   fi
 }
 
-runTests() {
-  local junit_filename_prefix
-  junit_filename_prefix=$(junitFilenamePrefix)
+# filterTests distinguishes between tests that run in the main workspace
+# (empty directory prefix, like k8s.io/kubernetes/pkg/kubelet) and those
+# which run only inside specific directories (non-empty directory prefix,
+# like hack/tools/golangci-lint/sigs.k8s.io/logtools).
+#
+# It prints matching tests without the directory prefix.
+filterTests() {
+  local prefix="$1"
+  shift
 
+  for test in "$@"; do
+    if [[ -z "${prefix}" ]]; then
+      # Filter out tests with special setup requirements.
+      if ! [[ "${test}" =~ ^(hack/tools/*|vendor)/ ]]; then
+        echo "${test}"
+      fi
+    else
+      # Filter out tests not in the right sub-directory.
+      if [[ "${test}" =~ ^${prefix} ]]; then
+        echo "${test#"${prefix}"}"
+      fi
+    fi
+  done
+}
+
+runTests() {
   installTools
 
   # Enable coverage data collection?
@@ -225,28 +269,71 @@ runTests() {
     cover_msg="without code coverage"
   fi
 
-  # Keep the raw JSON output in addition to the JUnit file?
-  local jsonfile=""
-  if [[ -n "${junit_filename_prefix}" ]] && [[ ${KUBE_KEEP_VERBOSE_TEST_OUTPUT} =~ ^[yY]$ ]]; then
-      jsonfile="${junit_filename_prefix}.stdout"
-  fi
-
   kube::log::status "Running tests ${cover_msg} ${KUBE_RACE:+"and with ${KUBE_RACE}"}"
-  kube::log::run gotestsum --format="${gotestsum_format}" \
+  rc=0
+  local junitfiles=()
+  # The different prefixes must be disjoint, i.e. one prefix cannot be contained in another.
+  # We cannot test packages in hack/tools because it would be ambiguous whether
+  # hack/tools/foo/bar is "foo/bar" in hack/tools or "bar" in "hack/tools/foo".
+  for prefix in "" "vendor/" $(find hack/tools/*/* -name go.mod | sed -e 's;/go.mod;/;'); do
+    unset testcases
+    kube::util::read-array testcases < <(filterTests "${prefix}" "$@")
+
+    if [[ ${#testcases[@]} -eq 0 ]]; then
+      continue
+    fi
+
+    local junit_filename_prefix
+    junit_filename_prefix=$(junitFilenamePrefix "${prefix}")
+
+    local jsonfile=""
+    local junitfile=""
+    if [[ -n "${junit_filename_prefix}" ]]; then
+      junitfile="${junit_filename_prefix}.xml"
+      junitfiles+=( "${junitfile}" )
+      # Keep the raw JSON output in addition to the JUnit file?
+      if [[ ${KUBE_KEEP_VERBOSE_TEST_OUTPUT} =~ ^[yY]$ ]]; then
+        jsonfile="${junit_filename_prefix}.stdout"
+      fi
+    fi
+
+    if ! (
+           case "${prefix}" in
+             "")
+               ;;
+             "vendor/")
+               # Upstream tests are not vendored, so we have to download without modifying the vendor directory.
+               # Preserves existing GOFLAGS if set.
+               # The final value gets injected and logged below via env.
+               GOFLAGS="${GOFLAGS:+${GOFLAGS} }-mod=readonly" ;;
+             hack/tools/*)
+               GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)"
+               # hack/tools is not part of the workspace, must change the directory.
+               cd "${prefix}"
+               ;;
+             *)
+               # Some other non-workspace test, change the directory.
+               cd "${prefix}" ;;
+           esac
+           pwd
+           kube::log::run env GOTOOLCHAIN="${GOTOOLCHAIN:-}" GOFLAGS="${GOFLAGS:-}" gotestsum --format="${gotestsum_format}" \
             --jsonfile="${jsonfile}" \
-            --junitfile="${junit_filename_prefix:+"${junit_filename_prefix}.xml"}" \
+            --junitfile="${junitfile}" \
             --raw-command \
             -- \
             go test -json \
             "${goflags[@]:+${goflags[@]}}" \
             "${KUBE_TIMEOUT}" \
-            "$@" \
-            "${testargs[@]:+${testargs[@]}}" \
-    && rc=$? || rc=$?
+            "${testcases[@]}" \
+            "${testargs[@]:+${testargs[@]}}"
+      ); then
+      rc=1
+    fi
+  done
 
-  if [[ -n "${junit_filename_prefix}" ]]; then
-    prune-junit-xml -prune-tests="${KUBE_PRUNE_JUNIT_TESTS}" "${junit_filename_prefix}.xml"
-  fi
+  for junitfile in "${junitfiles[@]}"; do
+    prune-junit-xml -prune-tests="${KUBE_PRUNE_JUNIT_TESTS}" "${junitfile}"
+  done
 
   if [[ ${KUBE_COVER} =~ ^[yY]$ ]]; then
     coverage_html_file="${cover_report_dir}/combined-coverage.html"

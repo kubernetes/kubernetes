@@ -19,15 +19,19 @@ package testing
 import (
 	"bytes"
 	"context"
+	"reflect"
 	"sort"
 	"strconv"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	runtimetest "k8s.io/apimachinery/pkg/runtime/testing"
+	"k8s.io/apimachinery/pkg/test/coverage"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/version"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -38,12 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"sigs.k8s.io/randfill"
 )
-
-// ValidateFunc is a function that runs validation.
-type ValidateFunc func(ctx context.Context, obj runtime.Object) field.ErrorList
-
-// ValidateUpdateFunc is a function that runs update validation.
-type ValidateUpdateFunc func(ctx context.Context, obj, old runtime.Object) field.ErrorList
 
 // VerifyVersionedValidationEquivalence tests that all versions of an API return equivalent validation errors.
 // It accepts optional configuration to handle path normalization across API versions where structures differ.
@@ -286,7 +284,7 @@ func WithMinEmulationVersion(v *version.Version) ValidationTestConfig {
 // guaranteeing a safe migration. It also checks the errors against an expected set.
 // It compares errors by field, origin and type; all three should match to be called equivalent.
 // It also make sure all versions of the given API returns equivalent errors.
-func VerifyValidationEquivalence(t *testing.T, ctx context.Context, obj runtime.Object, validateFn ValidateFunc, expectedErrs field.ErrorList, testConfigs ...ValidationTestConfig) {
+func VerifyValidationEquivalence(t *testing.T, ctx context.Context, obj runtime.Object, strategy rest.RESTCreateStrategy, expectedErrs field.ErrorList, testConfigs ...ValidationTestConfig) {
 	t.Helper()
 	opts := &validationOption{}
 	for _, testcfg := range testConfigs {
@@ -294,8 +292,12 @@ func VerifyValidationEquivalence(t *testing.T, ctx context.Context, obj runtime.
 	}
 
 	verifyValidationEquivalence(t, expectedErrs, func(c context.Context) field.ErrorList {
-		return validateFn(c, obj)
-	}, ctx, opts)
+		errs := strategy.Validate(c, obj)
+		if dv, ok := strategy.(rest.DeclarativeValidationStrategy); ok {
+			errs = dv.ValidateDeclaratively(c, obj, nil, errs, operation.Create, dv.DeclarativeValidationConfig(c, obj, nil))
+		}
+		return errs
+	}, ctx, opts, obj)
 	VerifyVersionedValidationEquivalence(t, obj, nil, testConfigs...)
 }
 
@@ -317,7 +319,7 @@ func VerifyValidationEquivalence(t *testing.T, ctx context.Context, obj runtime.
 // guaranteeing a safe migration. It also checks the errors against an expected set.
 // It compares errors by field, origin and type; all three should match to be called equivalent.
 // It also make sure all versions of the given API returns equivalent errors.
-func VerifyUpdateValidationEquivalence(t *testing.T, ctx context.Context, obj, old runtime.Object, validateUpdateFn ValidateUpdateFunc, expectedErrs field.ErrorList, testConfigs ...ValidationTestConfig) {
+func VerifyUpdateValidationEquivalence(t *testing.T, ctx context.Context, obj, old runtime.Object, strategy rest.RESTUpdateStrategy, expectedErrs field.ErrorList, testConfigs ...ValidationTestConfig) {
 	t.Helper()
 	opts := &validationOption{}
 	for _, testcfg := range testConfigs {
@@ -325,13 +327,17 @@ func VerifyUpdateValidationEquivalence(t *testing.T, ctx context.Context, obj, o
 	}
 
 	verifyValidationEquivalence(t, expectedErrs, func(c context.Context) field.ErrorList {
-		return validateUpdateFn(c, obj, old)
-	}, ctx, opts)
+		errs := strategy.ValidateUpdate(c, obj, old)
+		if dv, ok := strategy.(rest.DeclarativeValidationStrategy); ok {
+			errs = dv.ValidateDeclaratively(c, obj, old, errs, operation.Update, dv.DeclarativeValidationConfig(c, obj, old))
+		}
+		return errs
+	}, ctx, opts, obj)
 	VerifyVersionedValidationEquivalence(t, obj, old, testConfigs...)
 }
 
 // verifyValidationEquivalence is a generic helper that verifies validation equivalence with and without declarative validation.
-func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, runValidations func(context.Context) field.ErrorList, ctx context.Context, opt *validationOption) {
+func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, runValidations func(context.Context) field.ErrorList, ctx context.Context, opt *validationOption, obj runtime.Object) {
 	t.Helper()
 	var declarativeBetaEnabledErrs field.ErrorList
 	var declarativeBetaDisabledErrs field.ErrorList
@@ -421,12 +427,26 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 		testCtx := rest.WithAllDeclarativeEnforcedForTest(ctx)
 		allDeclarativeErrs := runValidations(testCtx)
 
+		// Record the declarative-validation rules observed in this subtest so
+		// AssertDeclarativeCoverage (in TestMain) can confirm every declared
+		// rule was exercised by at least one test case.
+		recordObservedRules(testCtx, obj, allDeclarativeErrs)
+
+		// In this mode, strategy.go validation remove all hand written validations errors which are marked covered by declarative validations.
+		// so we have to filter out errors which are filtered out by strategy.go.
+		// This is because declarative validations do not return those errors due to short circuiting of validations at the parent node.
+		filteredExpectedErrors := make(field.ErrorList, 0, len(expectedErrs))
+		for _, err := range expectedErrs {
+			if !err.ShortCircuitedInDeclarative {
+				filteredExpectedErrors = append(filteredExpectedErrors, err)
+			}
+		}
 		// The matcher here is more specific to ensure that errors from Alpha rules
 		// are included and matched correctly.
 		// This also ensure that errors are coming from the declarative validations only.
 		dvErrorMatcher := errOutputMatcher.ByValidationStabilityLevel().BySource()
-		if len(expectedErrs) > 0 {
-			dvErrorMatcher.Test(t, expectedErrs, allDeclarativeErrs)
+		if len(filteredExpectedErrors) > 0 {
+			dvErrorMatcher.Test(t, filteredExpectedErrors, allDeclarativeErrs)
 		} else if len(allDeclarativeErrs) != 0 {
 			t.Errorf("expected no errors, but got: %v", allDeclarativeErrs)
 		}
@@ -459,6 +479,22 @@ func verifyValidationEquivalence(t *testing.T, expectedErrs field.ErrorList, run
 		equivalenceMatcher.Test(t, imperativeErrs, declarativeBetaEnabledErrs)
 		equivalenceMatcher.Test(t, imperativeErrs, declarativeBetaDisabledErrs)
 	}
+}
+
+// recordObservedRules extracts the GVK for obj (preferring the scheme's
+// canonical Kind, falling back to the Go type name) and forwards every error
+// to coverage.RecordObservedRules.
+func recordObservedRules(ctx context.Context, obj runtime.Object, errs field.ErrorList) {
+	info, ok := genericapirequest.RequestInfoFrom(ctx)
+	if !ok {
+		return
+	}
+	kind := reflect.TypeOf(obj).Elem().Name()
+	if gvks, _, err := legacyscheme.Scheme.ObjectKinds(obj); err == nil && len(gvks) > 0 {
+		kind = gvks[0].Kind
+	}
+	gvk := schema.GroupVersionKind{Group: info.APIGroup, Version: info.APIVersion, Kind: kind}
+	coverage.RecordObservedRules(gvk, errs)
 }
 
 // deDuplicateErrors removes duplicate errors from an ErrorList based on the provided matcher.

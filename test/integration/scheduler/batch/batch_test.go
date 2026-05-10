@@ -40,7 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutil "k8s.io/kubernetes/test/integration/util"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 type podDef struct {

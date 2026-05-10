@@ -657,6 +657,11 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		if utilfeature.DefaultFeatureGate.Enabled(features.DRADeviceTaintRules) {
 			kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule(Read...).Groups(resourceGroup).Resources("devicetaintrules").RuleOrDie())
 		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.DRAResourceClaimGranularStatusAuthorization) {
+			kubeSchedulerRules = append(kubeSchedulerRules,
+				rbacv1helpers.NewRule("update", "patch").Groups(resourceGroup).Resources("resourceclaims/binding").RuleOrDie(),
+			)
+		}
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("podgroups").RuleOrDie())

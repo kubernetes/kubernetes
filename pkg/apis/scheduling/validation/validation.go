@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -74,15 +75,7 @@ func ValidatePodGroup(podGroup *scheduling.PodGroup) field.ErrorList {
 
 // ValidatePodGroupUpdate tests if an update to PodGroup is valid.
 func ValidatePodGroupUpdate(podGroup, oldPodGroup *scheduling.PodGroup) field.ErrorList {
-	allErrs := apivalidation.ValidateObjectMetaUpdate(&podGroup.ObjectMeta, &oldPodGroup.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, validatePodGroupSpecUpdate(&podGroup.Spec, &oldPodGroup.Spec, field.NewPath("spec"))...)
-	return allErrs
-}
-
-func validatePodGroupSpecUpdate(spec, oldSpec *scheduling.PodGroupSpec, fldPath *field.Path) field.ErrorList {
-	allErrs := apivalidation.ValidateImmutableField(spec.PodGroupTemplateRef, oldSpec.PodGroupTemplateRef, fldPath.Child("podGroupTemplateRef")).WithOrigin("immutable").MarkCoveredByDeclarative()
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.SchedulingPolicy, oldSpec.SchedulingPolicy, fldPath.Child("schedulingPolicy")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
-	return allErrs
+	return apivalidation.ValidateObjectMetaUpdate(&podGroup.ObjectMeta, &oldPodGroup.ObjectMeta, field.NewPath("metadata"))
 }
 
 // ValidateWorkload tests if all fields in a Workload are set correctly.
@@ -92,16 +85,7 @@ func ValidateWorkload(workload *scheduling.Workload) field.ErrorList {
 
 // ValidateWorkloadUpdate tests if an update to Workload is valid.
 func ValidateWorkloadUpdate(workload, oldWorkload *scheduling.Workload) field.ErrorList {
-	allErrs := apivalidation.ValidateObjectMetaUpdate(&workload.ObjectMeta, &oldWorkload.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateWorkloadSpecUpdate(&workload.Spec, &oldWorkload.Spec, field.NewPath("spec"))...)
-	return allErrs
-}
-
-func validateWorkloadSpecUpdate(spec, oldSpec *scheduling.WorkloadSpec, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(spec.ControllerRef, oldSpec.ControllerRef, fldPath.Child("controllerRef")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(spec.PodGroupTemplates, oldSpec.PodGroupTemplates, fldPath.Child("podGroupTemplates")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
-	return allErrs
+	return apivalidation.ValidateObjectMetaUpdate(&workload.ObjectMeta, &oldWorkload.ObjectMeta, field.NewPath("metadata"))
 }
 
 // ValidatePodGroupStatusUpdate tests if an update to the status of a PodGroup is valid.
@@ -109,5 +93,27 @@ func ValidatePodGroupStatusUpdate(podGroup, oldPodGroup *scheduling.PodGroup) fi
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&podGroup.ObjectMeta, &oldPodGroup.ObjectMeta, field.NewPath("metadata"))
 	fldPath := field.NewPath("status")
 	allErrs = append(allErrs, metav1validation.ValidateConditions(podGroup.Status.Conditions, fldPath.Child("conditions"))...)
+	allErrs = append(allErrs, validatePodGroupResourceClaimStatuses(podGroup.Status.ResourceClaimStatuses, podGroup.Spec.ResourceClaims, fldPath.Child("resourceClaimStatuses"))...)
 	return allErrs
+}
+
+func validatePodGroupResourceClaimStatuses(statuses []scheduling.PodGroupResourceClaimStatus, podGroupClaims []scheduling.PodGroupResourceClaim, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	for i, status := range statuses {
+		idxPath := fldPath.Index(i)
+		// There's no need to check the content of the name. If it matches an entry,
+		// then it is valid, otherwise we reject it here.
+		if !havePodGroupClaim(podGroupClaims, status.Name) {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("name"), status.Name, "must match the name of an entry in `spec.resourceClaims`"))
+		}
+	}
+
+	return allErrs
+}
+
+func havePodGroupClaim(podGroupClaims []scheduling.PodGroupResourceClaim, name string) bool {
+	return slices.ContainsFunc(podGroupClaims, func(podGroupClaim scheduling.PodGroupResourceClaim) bool {
+		return podGroupClaim.Name == name
+	})
 }

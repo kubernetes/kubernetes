@@ -36,7 +36,7 @@ func TestPodGroupState_AssumeForget(t *testing.T) {
 		t.Fatal("Pod should be initially in UnscheduledPods")
 	}
 
-	pgs.assumePod(pod.UID)
+	pgs.assumePod(pod)
 	if !pgs.AssumedPods().Has(pod.UID) {
 		t.Fatal("Pod should be in AssumedPods after AssumePod")
 	}
@@ -63,7 +63,7 @@ func TestPodGroupState_Clone(t *testing.T) {
 
 	pgs.addPod(pod1)
 	pgs.addPod(pod2)
-	pgs.assumePod(pod2.UID)
+	pgs.assumePod(pod2)
 
 	snap := pgs.snapshot()
 
@@ -88,8 +88,8 @@ func TestPodGroupState_Clone(t *testing.T) {
 	}
 
 	// Mutating the clone does not affect the original.
-	snap.assumePod(pod1.UID)
-	if pgs.assumedPods.Has(pod1.UID) {
+	snap.assumePod(pod1)
+	if _, ok := pgs.assumedPods[pod1.UID]; ok {
 		t.Error("mutation to clone should not affect original's assumedPods")
 	}
 
@@ -132,7 +132,7 @@ func TestPodGroupState_PodCounts(t *testing.T) {
 	}
 
 	// Assuming a pod should move it from unscheduled to assumed, increasing the count of scheduled pods.
-	pgs.assumePod(pod1.UID)
+	pgs.assumePod(pod1)
 	if count := pgs.AllPodsCount(); count != 3 {
 		t.Errorf("Expected AllPodsCount to be 3, got %d", count)
 	}
@@ -141,7 +141,7 @@ func TestPodGroupState_PodCounts(t *testing.T) {
 	}
 
 	// Assuming a pod that is already scheduled should not change the counts.
-	pgs.assumePod(pod3.UID)
+	pgs.assumePod(pod3)
 	if count := pgs.AllPodsCount(); count != 3 {
 		t.Errorf("Expected AllPodsCount to be 3, got %d", count)
 	}
@@ -150,7 +150,7 @@ func TestPodGroupState_PodCounts(t *testing.T) {
 	}
 
 	// Assuming a pod that is not in the state should not change the counts.
-	pgs.assumePod(pod4.UID)
+	pgs.assumePod(pod4)
 	if count := pgs.AllPodsCount(); count != 3 {
 		t.Errorf("Expected AllPodsCount to be 3, got %d", count)
 	}
@@ -187,7 +187,7 @@ func TestPodGroupState_PodCounts(t *testing.T) {
 	}
 
 	// Assuming a pod again should move it back to assumed, increasing the count of scheduled pods.
-	pgs.assumePod(pod2.UID)
+	pgs.assumePod(pod2)
 	if count := pgs.AllPodsCount(); count != 3 {
 		t.Errorf("Expected AllPodsCount to be 3, got %d", count)
 	}
@@ -221,14 +221,18 @@ func TestPodGroupState_ScheduledPods(t *testing.T) {
 	pgs.addPod(unscheduledPod)
 	pgs.addPod(assumedPod)
 
-	pgs.assumePod(assumedPod.UID)
+	// Simulate the scheduler assuming the pod on a node.
+	assumedPodWithNodeName := assumedPod.DeepCopy()
+	assumedPodWithNodeName.Spec.NodeName = "node2"
+
+	pgs.assumePod(assumedPodWithNodeName)
 	scheduledPods := pgs.ScheduledPods()
 
 	snapshot := pgs.snapshot()
-	pgs.assumePod(unscheduledPod.UID)
+	pgs.assumePod(unscheduledPod)
 	snapshotScheduledPods := snapshot.ScheduledPods()
 
-	expectedScheduledPods := []*v1.Pod{assignedPod, assumedPod}
+	expectedScheduledPods := []*v1.Pod{assignedPod, assumedPodWithNodeName}
 
 	if diff := cmp.Diff(expectedScheduledPods, scheduledPods); diff != "" {
 		t.Errorf("unexpected ScheduledPods result (-want,+got):\n%s", diff)

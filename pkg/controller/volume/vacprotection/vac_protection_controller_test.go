@@ -34,7 +34,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/volume/protectionutil"
+	"k8s.io/kubernetes/pkg/controller/util/protectionutil"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/utils/dump"
 )

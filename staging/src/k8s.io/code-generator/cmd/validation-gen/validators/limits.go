@@ -20,24 +20,29 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
 )
 
 const (
-	minItemsTagName  = "k8s:minItems"
-	maxItemsTagName  = "k8s:maxItems"
-	minimumTagName   = "k8s:minimum"
-	maximumTagName   = "k8s:maximum"
-	minLengthTagName = "k8s:minLength"
-	maxLengthTagName = "k8s:maxLength"
-	maxBytesTagName  = "k8s:maxBytes"
+	minItemsTagName      = "k8s:minItems"
+	maxItemsTagName      = "k8s:maxItems"
+	minimumTagName       = "k8s:minimum"
+	maximumTagName       = "k8s:maximum"
+	minLengthTagName     = "k8s:minLength"
+	maxLengthTagName     = "k8s:maxLength"
+	maxBytesTagName      = "k8s:maxBytes"
+	maxPropertiesTagName = "k8s:maxProperties"
+	minPropertiesTagName = "k8s:minProperties"
 )
 
 func init() {
 	RegisterTagValidator(minItemsTagValidator{})
 	RegisterTagValidator(maxItemsTagValidator{})
+	RegisterTagValidator(minPropertiesTagValidator{})
+	RegisterTagValidator(maxPropertiesTagValidator{})
 	RegisterTagValidator(minimumTagValidator{})
 	RegisterTagValidator(maximumTagValidator{})
 	RegisterTagValidator(minLengthTagValidator{})
@@ -77,14 +82,15 @@ func (maxLengthTagValidator) GetValidations(context Context, tag codetags.Tag) (
 	if intVal < 0 {
 		return result, fmt.Errorf("must be greater than or equal to zero")
 	}
-	result.AddFunction(Function(maxLengthTagName, DefaultFlags, maxLengthValidator, intVal))
+	result.AddFunction(Function(maxLengthTagName, DefaultFlags, maxLengthValidator, intVal).
+		WithEmits(Emission{field.ErrorTypeTooLong, "maxLength", ""}))
 	return result, nil
 }
 
 func (mltv maxLengthTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            mltv.TagName(),
-		StabilityLevel: TagStabilityLevelBeta,
+		StabilityLevel: TagStabilityLevelStable,
 		Scopes:         sets.List(mltv.ValidScopes()),
 		Description: `Indicates that a string field has a limit on its length in characters.
 		This could allow up to 4*N bytes if multi-byte characters are used.
@@ -130,7 +136,8 @@ func (maxBytesTagValidator) GetValidations(context Context, tag codetags.Tag) (V
 	if intVal < 0 {
 		return result, fmt.Errorf("must be greater than or equal to zero")
 	}
-	result.AddFunction(Function(maxBytesTagName, DefaultFlags, maxBytesValidator, intVal))
+	result.AddFunction(Function(maxBytesTagName, DefaultFlags, maxBytesValidator, intVal).
+		WithEmits(Emission{field.ErrorTypeTooLong, "maxBytes", ""}))
 	return result, nil
 }
 
@@ -187,19 +194,82 @@ func (minItemsTagValidator) GetValidations(context Context, tag codetags.Tag) (V
 	if intVal < 0 {
 		return result, fmt.Errorf("must be greater than or equal to zero")
 	}
-	result.AddFunction(Function(minItemsTagName, DefaultFlags, minItemsValidator, intVal))
+	result.AddFunction(Function(minItemsTagName, DefaultFlags, minItemsValidator, intVal).
+		WithEmits(Emission{field.ErrorTypeTooFew, "minItems", ""}))
 	return result, nil
 }
 
 func (mitv minItemsTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            mitv.TagName(),
-		StabilityLevel: TagStabilityLevelBeta,
+		StabilityLevel: TagStabilityLevelStable,
 		Scopes:         sets.List(mitv.ValidScopes()),
 		Description:    "Indicates that a list has a minimum size.",
 		Payloads: []TagPayloadDoc{{
 			Description: "<non-negative integer>",
 			Docs:        "This list must be at least X items long.",
+		}},
+		PayloadsType:     codetags.ValueTypeInt,
+		PayloadsRequired: true,
+	}
+}
+
+type minPropertiesTagValidator struct{}
+
+func (minPropertiesTagValidator) Init(_ Config) {}
+
+func (minPropertiesTagValidator) TagName() string {
+	return minPropertiesTagName
+}
+
+var minPropertiesTagValidScopes = sets.New(
+	ScopeType,
+	ScopeField,
+)
+
+func (minPropertiesTagValidator) ValidScopes() sets.Set[Scope] {
+	return minPropertiesTagValidScopes
+}
+
+var minPropertiesValidator = types.Name{Package: libValidationPkg, Name: "MinProperties"}
+
+func (minPropertiesTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+	var result Validations
+
+	// NOTE: pointers to maps are not supported, so we should never see a pointer here.
+	t := util.NativeType(context.Type)
+	if t.Kind != types.Map {
+		return Validations{}, fmt.Errorf("can only be used on map types (%s)", rootTypeString(context.Type, t))
+	}
+	keyType := util.NativeType(t.Key)
+	if keyType.Kind != types.Builtin || keyType.Name.Name != "string" {
+		return Validations{}, fmt.Errorf("can only be used on map types with string-based keys (%s)", rootTypeString(context.Type, t))
+	}
+
+	intVal, err := util.ParseInt(tag.Value)
+	if err != nil {
+		return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
+	}
+	if intVal < 0 {
+		return result, fmt.Errorf("must be greater than or equal to zero")
+	}
+	if intVal > 100000 {
+		return result, fmt.Errorf("must be less than or equal to 100000")
+	}
+	result.AddFunction(Function(minPropertiesTagName, DefaultFlags, minPropertiesValidator, intVal).
+		WithEmits(Emission{field.ErrorTypeTooFew, "minProperties", ""}))
+	return result, nil
+}
+
+func (mptv minPropertiesTagValidator) Docs() TagDoc {
+	return TagDoc{
+		Tag:            mptv.TagName(),
+		StabilityLevel: TagStabilityLevelStable,
+		Scopes:         sets.List(mptv.ValidScopes()),
+		Description:    "minProperties provides a limit on properties of an object as defined by JSON schema. In Kubernetes it may only be used to constrain the number of elements on a field defined as a golang map.",
+		Payloads: []TagPayloadDoc{{
+			Description: "<non-negative integer>",
+			Docs:        "This map must have at least X properties (where X <= 100000).",
 		}},
 		PayloadsType:     codetags.ValueTypeInt,
 		PayloadsRequired: true,
@@ -243,7 +313,8 @@ func (maxItemsTagValidator) GetValidations(context Context, tag codetags.Tag) (V
 		return result, fmt.Errorf("must be greater than or equal to zero")
 	}
 	// Note: maxItems short-circuits other validations for safety.
-	result.AddFunction(Function(maxItemsTagName, ShortCircuit, maxItemsValidator, intVal))
+	result.AddFunction(Function(maxItemsTagName, ShortCircuit, maxItemsValidator, intVal).
+		WithEmits(Emission{field.ErrorTypeTooMany, "maxItems", ""}))
 	return result, nil
 }
 
@@ -256,6 +327,69 @@ func (mitv maxItemsTagValidator) Docs() TagDoc {
 		Payloads: []TagPayloadDoc{{
 			Description: "<non-negative integer>",
 			Docs:        "This list must be no more than X items long.",
+		}},
+		PayloadsType:     codetags.ValueTypeInt,
+		PayloadsRequired: true,
+	}
+}
+
+type maxPropertiesTagValidator struct{}
+
+func (maxPropertiesTagValidator) Init(_ Config) {}
+
+func (maxPropertiesTagValidator) TagName() string {
+	return maxPropertiesTagName
+}
+
+var maxPropertiesTagValidScopes = sets.New(
+	ScopeType,
+	ScopeField,
+)
+
+func (maxPropertiesTagValidator) ValidScopes() sets.Set[Scope] {
+	return maxPropertiesTagValidScopes
+}
+
+var maxPropertiesValidator = types.Name{Package: libValidationPkg, Name: "MaxProperties"}
+
+func (maxPropertiesTagValidator) GetValidations(context Context, tag codetags.Tag) (Validations, error) {
+	var result Validations
+
+	// NOTE: pointers to maps are not supported, so we should never see a pointer here.
+	t := util.NativeType(context.Type)
+	if t.Kind != types.Map {
+		return Validations{}, fmt.Errorf("can only be used on map types (%s)", rootTypeString(context.Type, t))
+	}
+	keyType := util.NativeType(t.Key)
+	if keyType.Kind != types.Builtin || keyType.Name.Name != "string" {
+		return Validations{}, fmt.Errorf("can only be used on map types with string-based keys (%s)", rootTypeString(context.Type, t))
+	}
+
+	intVal, err := util.ParseInt(tag.Value)
+	if err != nil {
+		return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
+	}
+	if intVal < 0 {
+		return result, fmt.Errorf("must be greater than or equal to zero")
+	}
+	if intVal > 100000 {
+		return result, fmt.Errorf("must be less than or equal to 100000")
+	}
+	// Note: maxProperties short-circuits other validations.
+	result.AddFunction(Function(maxPropertiesTagName, ShortCircuit, maxPropertiesValidator, intVal).
+		WithEmits(Emission{field.ErrorTypeTooMany, "maxProperties", ""}))
+	return result, nil
+}
+
+func (mptv maxPropertiesTagValidator) Docs() TagDoc {
+	return TagDoc{
+		Tag:            mptv.TagName(),
+		StabilityLevel: TagStabilityLevelStable,
+		Scopes:         sets.List(mptv.ValidScopes()),
+		Description:    "maxProperties provides a limit on properties of an object as defined by JSON schema. In Kubernetes it may only be used to constrain the number of elements on a field defined as a golang map.",
+		Payloads: []TagPayloadDoc{{
+			Description: "<non-negative integer>",
+			Docs:        "This map must have no more than X properties (where X <= 100000).",
 		}},
 		PayloadsType:     codetags.ValueTypeInt,
 		PayloadsRequired: true,
@@ -288,14 +422,25 @@ func (minimumTagValidator) GetValidations(context Context, tag codetags.Tag) (Va
 		return result, fmt.Errorf("can only be used on integer types (%s)", rootTypeString(context.Type, t))
 	}
 
-	intVal, err := util.ParseInt(tag.Value)
+	bitSize, err := intBitSize(t)
 	if err != nil {
-		return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
+		return result, err
 	}
-	if isUnsignedInt(t) && intVal < 0 {
-		return result, fmt.Errorf("must be greater than or equal to zero for unsigned types (%s)", rootTypeString(context.Type, t))
+	if isUnsignedInt(t) {
+		uintVal, err := util.ParseUnsignedInt(tag.Value, bitSize)
+		if err != nil {
+			return result, fmt.Errorf("failed to parse tag payload: %w", err)
+		}
+		result.AddFunction(Function(minimumTagName, DefaultFlags, minimumValidator, uintVal).
+			WithEmits(Emission{field.ErrorTypeInvalid, "minimum", ""}))
+	} else {
+		intVal, err := util.ParseSignedInt(tag.Value, bitSize)
+		if err != nil {
+			return result, fmt.Errorf("failed to parse tag payload: %w", err)
+		}
+		result.AddFunction(Function(minimumTagName, DefaultFlags, minimumValidator, intVal).
+			WithEmits(Emission{field.ErrorTypeInvalid, "minimum", ""}))
 	}
-	result.AddFunction(Function(minimumTagName, DefaultFlags, minimumValidator, intVal))
 	return result, nil
 }
 
@@ -340,21 +485,32 @@ func (maximumTagValidator) GetValidations(context Context, tag codetags.Tag) (Va
 		return result, fmt.Errorf("can only be used on integer types (%s)", rootTypeString(context.Type, t))
 	}
 
-	intVal, err := util.ParseInt(tag.Value)
+	bitSize, err := intBitSize(t)
 	if err != nil {
-		return result, fmt.Errorf("failed to parse tag payload as int: %w", err)
+		return result, err
 	}
-	if isUnsignedInt(t) && intVal < 0 {
-		return result, fmt.Errorf("must be greater than or equal to zero for unsigned types (%s)", rootTypeString(context.Type, t))
+	if isUnsignedInt(t) {
+		uintVal, err := util.ParseUnsignedInt(tag.Value, bitSize)
+		if err != nil {
+			return result, fmt.Errorf("failed to parse tag payload: %w", err)
+		}
+		result.AddFunction(Function(maximumTagName, DefaultFlags, maximumValidator, uintVal).
+			WithEmits(Emission{field.ErrorTypeInvalid, "maximum", ""}))
+	} else {
+		intVal, err := util.ParseSignedInt(tag.Value, bitSize)
+		if err != nil {
+			return result, fmt.Errorf("failed to parse tag payload: %w", err)
+		}
+		result.AddFunction(Function(maximumTagName, DefaultFlags, maximumValidator, intVal).
+			WithEmits(Emission{field.ErrorTypeInvalid, "maximum", ""}))
 	}
-	result.AddFunction(Function(maximumTagName, DefaultFlags, maximumValidator, intVal))
 	return result, nil
 }
 
 func (mtv maximumTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            mtv.TagName(),
-		StabilityLevel: TagStabilityLevelBeta,
+		StabilityLevel: TagStabilityLevelStable,
 		Scopes:         sets.List(mtv.ValidScopes()),
 		Description:    "Indicates that a numeric field has a maximum value.",
 		Payloads: []TagPayloadDoc{{
@@ -403,7 +559,8 @@ func (minLengthTagValidator) GetValidations(context Context, tag codetags.Tag) (
 	// any validation, we only add a validation function to the result if the
 	// minimum length constraint is > 0.
 	if intVal > 0 {
-		result.AddFunction(Function(minLengthTagName, DefaultFlags, minLengthValidator, intVal))
+		result.AddFunction(Function(minLengthTagName, DefaultFlags, minLengthValidator, intVal).
+			WithEmits(Emission{field.ErrorTypeTooShort, "minLength", ""}))
 	}
 	return result, nil
 }
@@ -411,7 +568,7 @@ func (minLengthTagValidator) GetValidations(context Context, tag codetags.Tag) (
 func (mltv minLengthTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            mltv.TagName(),
-		StabilityLevel: TagStabilityLevelAlpha,
+		StabilityLevel: TagStabilityLevelStable,
 		Scopes:         sets.List(mltv.ValidScopes()),
 		Description: `Indicates that a string field has a minimum length for its value in characters.
 		This means that the minimum size in bytes is a range from X to 4X if multi-byte characters are allowed.

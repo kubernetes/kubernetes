@@ -39,13 +39,20 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	// type Struct
-	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_Struct(ctx, op, nil /* fldPath */, obj.(*Struct), safe.Cast[*Struct](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*Struct)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_Struct(
+					ctx, op, nil, /* fldPath */
+					obj.(*Struct),
+					safe.Cast[*Struct](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
@@ -53,36 +60,56 @@ var zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tes
 
 // Validate_Struct validates an instance of Struct according
 // to declarative validation rules in the API schema.
-func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
+func Validate_Struct(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *Struct) (errs field.ErrorList) {
+
 	// field Struct.TypeMeta has no validation
 
-	// field Struct.Tasks
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []Task, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.Tasks
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []Task,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
+			if e := validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_item_zerorooneof_simple_Struct_tasks_,
+				func(list []Task) bool {
+					for i := range list {
+						if list[i].Name == "failed" {
+							return true
+						}
+					}
+					return false
+				},
+				func(list []Task) bool {
+					for i := range list {
+						if list[i].Name == "succeeded" {
+							return true
+						}
+					}
+					return false
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			// lists with map semantics require unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a Task, b Task) bool { return a.Name == b.Name })...)
-			errs = append(errs, validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_code_generator_cmd_validation_gen_output_tests_tags_item_zerorooneof_simple_Struct_tasks_, func(list []Task) bool {
-				for i := range list {
-					if list[i].Name == "failed" {
-						return true
-					}
-				}
-				return false
-			}, func(list []Task) bool {
-				for i := range list {
-					if list[i].Name == "succeeded" {
-						return true
-					}
-				}
-				return false
-			})...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+				func(a Task, b Task) bool { return a.Name == b.Name }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("tasks"), obj.Tasks, safe.Field(oldObj, func(oldObj *Struct) []Task { return oldObj.Tasks }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) []Task {
+				return oldObj.Tasks
+			})
+		errs = append(errs, fn(fldPath.Child("tasks"), obj.Tasks, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }

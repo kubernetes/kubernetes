@@ -27,11 +27,13 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializers "k8s.io/apiserver/pkg/admission/initializer"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	schedulingv1listers "k8s.io/client-go/listers/scheduling/v1"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -90,11 +92,11 @@ func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactor
 
 var (
 	podResource           = core.Resource("pods")
+	podGroupResource      = scheduling.Resource("podgroups")
 	priorityClassResource = scheduling.Resource("priorityclasses")
 )
 
-// Admit checks Pods and admits or rejects them. It also resolves the priority of pods based on their PriorityClass.
-// Note that pod validation mechanism prevents update of a pod priority.
+// Admit checks Pods and PodGroups and admits or rejects them. It also resolves the priority of pods and pod groups based on their PriorityClass.
 func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	operation := a.GetOperation()
 	// Ignore all calls to subresources
@@ -107,7 +109,11 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 			return p.admitPod(a)
 		}
 		return nil
-
+	case podGroupResource:
+		if operation == admission.Create {
+			return p.admitPodGroup(a)
+		}
+		return nil
 	default:
 		return nil
 	}
@@ -182,6 +188,31 @@ func (p *Plugin) admitPod(a admission.Attributes) error {
 			pod.Spec.PreemptionPolicy = &corePolicy
 		}
 	}
+	return nil
+}
+
+// admitPodGroup makes sure a new pod group does not set spec.Priority field. It also makes sure that
+// the PriorityClassName exists if it is provided and resolves the pod group priority from the PriorityClassName.
+func (p *Plugin) admitPodGroup(attributes admission.Attributes) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
+		return nil
+	}
+
+	pg, ok := attributes.GetObject().(*scheduling.PodGroup)
+	if !ok {
+		return errors.NewBadRequest("resource was marked with kind PodGroup but was unable to be converted")
+	}
+
+	priorityClassName, priority, _, err := p.establishPriority(attributes, &pg.Spec.PriorityClassName)
+	if err != nil {
+		return err
+	}
+	// Reject if the pod group already contained a priority that differs from the one computed from the priority class.
+	if pg.Spec.Priority != nil && *pg.Spec.Priority != priority {
+		return admission.NewForbidden(attributes, fmt.Errorf("priority set in the pod group (%d) must match the priority computed (%d) based on the priority class set in the spec", *pg.Spec.Priority, priority))
+	}
+	pg.Spec.Priority = &priority
+	pg.Spec.PriorityClassName = priorityClassName
 	return nil
 }
 

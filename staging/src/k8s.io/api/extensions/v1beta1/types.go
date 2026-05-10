@@ -88,6 +88,7 @@ type Scale struct {
 // DEPRECATED - This group version of Deployment is deprecated by apps/v1beta2/Deployment. See the release notes for
 // more information.
 // Deployment enables declarative updates for Pods and ReplicaSets.
+// +k8s:supportsSubresource="/status"
 type Deployment struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata.
@@ -539,6 +540,7 @@ type DaemonSetCondition struct {
 // DEPRECATED - This group version of DaemonSet is deprecated by apps/v1beta2/DaemonSet. See the release notes for
 // more information.
 // DaemonSet represents the configuration of a daemon set.
+// +k8s:supportsSubresource="/status"
 type DaemonSet struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -603,6 +605,7 @@ type DaemonSetList struct {
 // externally-reachable urls, load balance traffic, terminate SSL, offer name
 // based virtual hosting etc.
 // DEPRECATED - This group version of Ingress is deprecated by networking.k8s.io/v1beta1 Ingress. See the release notes for more information.
+// +k8s:supportsSubresource="/status"
 type Ingress struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -914,6 +917,7 @@ type IngressBackend struct {
 // DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1beta2/ReplicaSet. See the release notes for
 // more information.
 // ReplicaSet ensures that a specified number of pod replicas are running at any given time.
+// +k8s:supportsSubresource="/status"
 type ReplicaSet struct {
 	metav1.TypeMeta `json:",inline"`
 

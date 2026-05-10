@@ -38,6 +38,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -64,6 +65,7 @@ const (
 	driverClassName = "test"
 	podName         = "test-pod"
 	containerName   = "test-container"
+	podGroupName    = "test-podgroup"
 )
 
 var (
@@ -393,13 +395,12 @@ func genTestPodWithClaims(claimNames ...string) *v1.Pod {
 	containerClaims := make([]v1.ResourceClaim, 0, len(claimNames))
 
 	for _, claimName := range claimNames {
-		cn := claimName
 		resourceClaims = append(resourceClaims, v1.PodResourceClaim{
-			Name:              cn,
-			ResourceClaimName: &cn,
+			Name:              claimName,
+			ResourceClaimName: &claimName,
 		})
 		containerClaims = append(containerClaims, v1.ResourceClaim{
-			Name: cn,
+			Name: claimName,
 		})
 	}
 
@@ -450,6 +451,38 @@ func genTestPodWithExtendedResource() *v1.Pod {
 						ContainerName: containerName,
 						ResourceName:  "example.com/gpu",
 						RequestName:   "container-0-request-0",
+					},
+				},
+			},
+		},
+	}
+}
+
+func genTestPodWithPodGroup() *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      podName,
+			Namespace: namespace,
+			UID:       podUID,
+		},
+		Spec: v1.PodSpec{
+			SchedulingGroup: &v1.PodSchedulingGroup{
+				PodGroupName: new(podGroupName),
+			},
+			ResourceClaims: []v1.PodResourceClaim{
+				{
+					Name:              claimName,
+					ResourceClaimName: new(claimName),
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Resources: v1.ResourceRequirements{
+						Claims: []v1.ResourceClaim{
+							{
+								Name: claimName,
+							},
+						},
 					},
 				},
 			},
@@ -532,6 +565,49 @@ func genTestClaimWithExtendedResource(name, driver, device, podUID string) *reso
 			},
 			ReservedFor: []resourceapi.ResourceClaimConsumerReference{
 				{UID: types.UID(podUID)},
+			},
+		},
+	}
+}
+
+func genTestPodGroupClaim(name, driver, device, podGroupName string) *resourceapi.ResourceClaim {
+	return &resourceapi.ResourceClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			UID:       types.UID(fmt.Sprintf("%s-uid", name)),
+		},
+		Spec: resourceapi.ResourceClaimSpec{
+			Devices: resourceapi.DeviceClaim{
+				Requests: []resourceapi.DeviceRequest{
+					{
+						Name: requestName,
+						Exactly: &resourceapi.ExactDeviceRequest{
+							DeviceClassName: className,
+						},
+					},
+				},
+			},
+		},
+		Status: resourceapi.ResourceClaimStatus{
+			Allocation: &resourceapi.AllocationResult{
+				Devices: resourceapi.DeviceAllocationResult{
+					Results: []resourceapi.DeviceRequestAllocationResult{
+						{
+							Request: requestName,
+							Pool:    poolName,
+							Device:  device,
+							Driver:  driver,
+						},
+					},
+				},
+			},
+			ReservedFor: []resourceapi.ResourceClaimConsumerReference{
+				{
+					APIGroup: schedulingapi.GroupName,
+					Resource: "podgroups",
+					Name:     podGroupName,
+				},
 			},
 		},
 	}
@@ -771,6 +847,8 @@ func TestPrepareResources(t *testing.T) {
 		wantTimeout         bool
 		wantResourceSkipped bool
 
+		draWorkloadResourceClaimsEnabled bool
+
 		expectedErrMsg         string
 		expectedClaimInfoState state.ClaimInfoState
 		expectedPrepareCalls   uint32
@@ -846,6 +924,20 @@ dra_operations_duration_seconds_count{is_error="true",operation_name="PrepareRes
 			pod:            genTestPod(),
 			claim:          genTestClaim(claimName, driverName, deviceName, ""),
 			expectedErrMsg: "is not allowed to use ResourceClaim ",
+			expectedMetric: `# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="true",operation_name="PrepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="true",operation_name="PrepareResources"} 0
+dra_operations_duration_seconds_count{is_error="true",operation_name="PrepareResources"} 1
+`,
+		},
+		{
+			description:                      "pod is not allowed to use resource claim from podgroup",
+			draWorkloadResourceClaimsEnabled: true,
+			driverName:                       driverName,
+			pod:                              genTestPodWithPodGroup(),
+			claim:                            genTestPodGroupClaim(claimName, driverName, deviceName, ""),
+			expectedErrMsg:                   "is not allowed to use ResourceClaim ",
 			expectedMetric: `# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
 # TYPE dra_operations_duration_seconds histogram
 dra_operations_duration_seconds_bucket{is_error="true",operation_name="PrepareResources",le="+Inf"} 1
@@ -977,6 +1069,44 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareRe
 `,
 		},
 		{
+			description:                      "should prepare resource for podgroup, claim not in cache",
+			draWorkloadResourceClaimsEnabled: true,
+			driverName:                       driverName,
+			pod:                              genTestPodWithPodGroup(),
+			claim:                            genTestPodGroupClaim(claimName, driverName, deviceName, podGroupName),
+			expectedClaimInfoState:           genClaimInfoState(cdiID),
+			resp:                             genPrepareResourcesResponse(claimUID),
+			expectedPrepareCalls:             1,
+			expectedMetric: `# HELP dra_grpc_operations_duration_seconds [ALPHA] Duration in seconds of the DRA gRPC operations
+# TYPE dra_grpc_operations_duration_seconds histogram
+dra_grpc_operations_duration_seconds_bucket{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources",le="+Inf"} 1
+dra_grpc_operations_duration_seconds_sum{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources"} 0
+dra_grpc_operations_duration_seconds_count{driver_name="test-driver",grpc_status_code="OK",method_name="/k8s.io.kubelet.pkg.apis.dra.v1.DRAPlugin/NodePrepareResources"} 1
+# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="false",operation_name="PrepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="false",operation_name="PrepareResources"} 0
+dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareResources"} 1
+`,
+		},
+		{
+			description:                      "should fail to prepare resource for podgroup when the feature is disabled",
+			draWorkloadResourceClaimsEnabled: false,
+			driverName:                       driverName,
+			pod:                              genTestPodWithPodGroup(),
+			claim:                            genTestPodGroupClaim(claimName, driverName, deviceName, podGroupName),
+			expectedClaimInfoState:           genClaimInfoState(cdiID),
+			resp:                             genPrepareResourcesResponse(claimUID),
+			expectedPrepareCalls:             0,
+			expectedErrMsg:                   "is not allowed to use ResourceClaim ",
+			expectedMetric: `# HELP dra_operations_duration_seconds [ALPHA] Latency histogram in seconds for the duration of handling all ResourceClaims referenced by a pod when the pod starts or stops. Identified by the name of the operation (PrepareResources or UnprepareResources) and separated by the success of the operation. The number of failed operations is provided through the histogram's overall count.
+# TYPE dra_operations_duration_seconds histogram
+dra_operations_duration_seconds_bucket{is_error="true",operation_name="PrepareResources",le="+Inf"} 1
+dra_operations_duration_seconds_sum{is_error="true",operation_name="PrepareResources"} 0
+dra_operations_duration_seconds_count{is_error="true",operation_name="PrepareResources"} 1
+`,
+		},
+		{
 			description:    "claim UIDs mismatch",
 			driverName:     driverName,
 			pod:            genTestPod(),
@@ -1080,8 +1210,12 @@ dra_operations_duration_seconds_count{is_error="false",operation_name="PrepareRe
 				manager.cache.add(test.claimInfo)
 			}
 
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, true)
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAConsumableCapacity, true)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRAExtendedResource:       true,
+				features.DRAConsumableCapacity:     true,
+				features.DRAWorkloadResourceClaims: test.draWorkloadResourceClaimsEnabled,
+				features.GenericWorkload:           test.draWorkloadResourceClaimsEnabled, // dependency of DRAWorkloadResourceClaims
+			})
 			err = manager.PrepareResources(backgroundCtx, test.pod)
 
 			assert.Equal(t, test.expectedPrepareCalls, draServerInfo.server.prepareResourceCalls.Load())
@@ -2531,6 +2665,242 @@ func TestTruncateHealthMessage(t *testing.T) {
 				assert.Len(t, result, v1.ResourceHealthMessageMaxLength)
 				assert.Equal(t, "...", result[len(result)-3:])
 			}
+		})
+	}
+}
+
+func TestBuildResourceHealth(t *testing.T) {
+	testCases := map[string]struct {
+		device        state.Device
+		healthInfo    state.DeviceHealth
+		enableMessage bool
+		wantHealth    v1.ResourceHealthStatus
+		wantResource  v1.ResourceID
+		wantMessage   *string
+	}{
+		"message enabled and CDI id": {
+			device: state.Device{
+				PoolName:     "pool",
+				DeviceName:   "device",
+				CDIDeviceIDs: []string{"driver/pool=device"},
+			},
+			healthInfo: state.DeviceHealth{
+				Health:  state.DeviceHealthStatusHealthy,
+				Message: "device ok",
+			},
+			enableMessage: true,
+			wantHealth:    v1.ResourceHealthStatusHealthy,
+			wantResource:  v1.ResourceID("driver/pool=device"),
+			wantMessage:   ptr.To("device ok"),
+		},
+		"message disabled": {
+			device: state.Device{
+				PoolName:     "pool",
+				DeviceName:   "device",
+				CDIDeviceIDs: []string{"driver/pool=device"},
+			},
+			healthInfo: state.DeviceHealth{
+				Health:  state.DeviceHealthStatusHealthy,
+				Message: "device ok",
+			},
+			enableMessage: false,
+			wantHealth:    v1.ResourceHealthStatusHealthy,
+			wantResource:  v1.ResourceID("driver/pool=device"),
+			wantMessage:   nil,
+		},
+		"empty message": {
+			device: state.Device{
+				PoolName:     "pool",
+				DeviceName:   "device",
+				CDIDeviceIDs: []string{"driver/pool=device"},
+			},
+			healthInfo: state.DeviceHealth{
+				Health:  state.DeviceHealthStatusHealthy,
+				Message: "",
+			},
+			enableMessage: true,
+			wantHealth:    v1.ResourceHealthStatusHealthy,
+			wantResource:  v1.ResourceID("driver/pool=device"),
+			wantMessage:   nil,
+		},
+		"unhealthy status": {
+			device: state.Device{
+				PoolName:     "pool",
+				DeviceName:   "device",
+				CDIDeviceIDs: []string{"driver/pool=device"},
+			},
+			healthInfo: state.DeviceHealth{
+				Health:  state.DeviceHealthStatusUnhealthy,
+				Message: "device ok",
+			},
+			enableMessage: true,
+			wantHealth:    v1.ResourceHealthStatusUnhealthy,
+			wantResource:  v1.ResourceID("driver/pool=device"),
+			wantMessage:   ptr.To("device ok"),
+		},
+		"unknown status": {
+			device: state.Device{
+				PoolName:     "pool",
+				DeviceName:   "device",
+				CDIDeviceIDs: []string{"driver/pool=device"},
+			},
+			healthInfo: state.DeviceHealth{
+				Health:  state.DeviceHealthStatusUnknown,
+				Message: "device ok",
+			},
+			enableMessage: true,
+			wantHealth:    v1.ResourceHealthStatusUnknown,
+			wantResource:  v1.ResourceID("driver/pool=device"),
+			wantMessage:   ptr.To("device ok"),
+		},
+		"fallback resource id": {
+			device: state.Device{
+				PoolName:   "pool",
+				DeviceName: "device",
+			},
+			healthInfo: state.DeviceHealth{
+				Health:  state.DeviceHealthStatusUnhealthy,
+				Message: "device ok",
+			},
+			enableMessage: true,
+			wantHealth:    v1.ResourceHealthStatusUnhealthy,
+			wantResource:  v1.ResourceID("driver/pool/device"),
+			wantMessage:   ptr.To("device ok"),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			got := buildResourceHealth("driver", tc.device, tc.healthInfo, tc.enableMessage)
+			assert.Equal(t, tc.wantHealth, got.Health)
+			assert.Equal(t, tc.wantResource, got.ResourceID)
+			assert.Equal(t, tc.wantMessage, got.Message)
+		})
+	}
+}
+
+func TestToResourceHealthStatus(t *testing.T) {
+	testCases := map[string]struct {
+		input    state.DeviceHealthStatus
+		expected v1.ResourceHealthStatus
+	}{
+		"healthy": {
+			input:    state.DeviceHealthStatusHealthy,
+			expected: v1.ResourceHealthStatusHealthy,
+		},
+		"unhealthy": {
+			input:    state.DeviceHealthStatusUnhealthy,
+			expected: v1.ResourceHealthStatusUnhealthy,
+		},
+		"unknown": {
+			input:    state.DeviceHealthStatusUnknown,
+			expected: v1.ResourceHealthStatusUnknown,
+		},
+		"empty": {
+			input:    state.DeviceHealthStatus(""),
+			expected: v1.ResourceHealthStatusUnknown,
+		},
+		"unexpected": {
+			input:    state.DeviceHealthStatus("Other"),
+			expected: v1.ResourceHealthStatusUnknown,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, toResourceHealthStatus(tc.input))
+		})
+	}
+}
+
+func TestToDeviceHealthStatus(t *testing.T) {
+	testCases := map[string]struct {
+		input    drahealthv1alpha1.HealthStatus
+		expected state.DeviceHealthStatus
+	}{
+		"healthy": {
+			input:    drahealthv1alpha1.HealthStatus_HEALTHY,
+			expected: state.DeviceHealthStatusHealthy,
+		},
+		"unhealthy": {
+			input:    drahealthv1alpha1.HealthStatus_UNHEALTHY,
+			expected: state.DeviceHealthStatusUnhealthy,
+		},
+		"unknown": {
+			input:    drahealthv1alpha1.HealthStatus_UNKNOWN,
+			expected: state.DeviceHealthStatusUnknown,
+		},
+		"unexpected": {
+			input:    drahealthv1alpha1.HealthStatus(99),
+			expected: state.DeviceHealthStatusUnknown,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.expected, toDeviceHealthStatus(tc.input))
+		})
+	}
+}
+
+func TestBuildDeviceHealth(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	longMessage := strings.Repeat("a", v1.ResourceHealthMessageMaxLength+5)
+
+	testCases := map[string]struct {
+		health         drahealthv1alpha1.HealthStatus
+		timeoutSeconds int64
+		message        string
+		wantHealth     state.DeviceHealthStatus
+		wantTimeout    time.Duration
+		wantMessage    string
+	}{
+		"healthy with positive timeout": {
+			health:         drahealthv1alpha1.HealthStatus_HEALTHY,
+			timeoutSeconds: 12,
+			message:        "ok",
+			wantHealth:     state.DeviceHealthStatusHealthy,
+			wantTimeout:    12 * time.Second,
+			wantMessage:    "ok",
+		},
+		"unhealthy with zero timeout": {
+			health:         drahealthv1alpha1.HealthStatus_UNHEALTHY,
+			timeoutSeconds: 0,
+			message:        "fail",
+			wantHealth:     state.DeviceHealthStatusUnhealthy,
+			wantTimeout:    DefaultHealthTimeout,
+			wantMessage:    "fail",
+		},
+		"unknown with negative timeout": {
+			health:         drahealthv1alpha1.HealthStatus_UNKNOWN,
+			timeoutSeconds: -1,
+			message:        longMessage,
+			wantHealth:     state.DeviceHealthStatusUnknown,
+			wantTimeout:    DefaultHealthTimeout,
+			wantMessage:    truncateHealthMessage(longMessage),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			grpcDevice := &drahealthv1alpha1.DeviceHealth{
+				Device: &drahealthv1alpha1.DeviceIdentifier{
+					PoolName:   "pool",
+					DeviceName: "device",
+				},
+				Health:                    tc.health,
+				LastUpdatedTime:           123,
+				HealthCheckTimeoutSeconds: tc.timeoutSeconds,
+				Message:                   tc.message,
+			}
+
+			got := buildDeviceHealth(logger, grpcDevice)
+			assert.Equal(t, "pool", got.PoolName)
+			assert.Equal(t, "device", got.DeviceName)
+			assert.Equal(t, tc.wantHealth, got.Health)
+			assert.Equal(t, time.Unix(123, 0), got.LastUpdated)
+			assert.Equal(t, tc.wantTimeout, got.HealthCheckTimeout)
+			assert.Equal(t, tc.wantMessage, got.Message)
 		})
 	}
 }

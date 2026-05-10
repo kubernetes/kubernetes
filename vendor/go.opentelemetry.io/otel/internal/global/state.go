@@ -8,16 +8,13 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"go.opentelemetry.io/otel/internal/errorhandler"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
 
 type (
-	errorHandlerHolder struct {
-		eh ErrorHandler
-	}
-
 	tracerProviderHolder struct {
 		tp trace.TracerProvider
 	}
@@ -32,12 +29,10 @@ type (
 )
 
 var (
-	globalErrorHandler  = defaultErrorHandler()
 	globalTracer        = defaultTracerValue()
 	globalPropagators   = defaultPropagatorsValue()
 	globalMeterProvider = defaultMeterProvider()
 
-	delegateErrorHandlerOnce      sync.Once
 	delegateTraceOnce             sync.Once
 	delegateTextMapPropagatorOnce sync.Once
 	delegateMeterOnce             sync.Once
@@ -53,7 +48,7 @@ var (
 // Subsequent calls to SetErrorHandler after the first will not forward errors
 // to the new ErrorHandler for prior returned instances.
 func GetErrorHandler() ErrorHandler {
-	return globalErrorHandler.Load().(errorHandlerHolder).eh
+	return errorhandler.GetErrorHandler()
 }
 
 // SetErrorHandler sets the global ErrorHandler to h.
@@ -63,26 +58,7 @@ func GetErrorHandler() ErrorHandler {
 // ErrorHandler. Subsequent calls will set the global ErrorHandler, but not
 // delegate errors to h.
 func SetErrorHandler(h ErrorHandler) {
-	current := GetErrorHandler()
-
-	if _, cOk := current.(*ErrDelegator); cOk {
-		if _, ehOk := h.(*ErrDelegator); ehOk && current == h {
-			// Do not assign to the delegate of the default ErrDelegator to be
-			// itself.
-			Error(
-				errors.New("no ErrorHandler delegate configured"),
-				"ErrorHandler remains its current value.",
-			)
-			return
-		}
-	}
-
-	delegateErrorHandlerOnce.Do(func() {
-		if def, ok := current.(*ErrDelegator); ok {
-			def.setDelegate(h)
-		}
-	})
-	globalErrorHandler.Store(errorHandlerHolder{eh: h})
+	errorhandler.SetErrorHandler(h)
 }
 
 // TracerProvider is the internal implementation for global.TracerProvider.
@@ -172,12 +148,6 @@ func SetMeterProvider(mp metric.MeterProvider) {
 		}
 	})
 	globalMeterProvider.Store(meterProviderHolder{mp: mp})
-}
-
-func defaultErrorHandler() *atomic.Value {
-	v := &atomic.Value{}
-	v.Store(errorHandlerHolder{eh: &ErrDelegator{}})
-	return v
 }
 
 func defaultTracerValue() *atomic.Value {

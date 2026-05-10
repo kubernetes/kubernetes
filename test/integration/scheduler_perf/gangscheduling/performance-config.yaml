@@ -1,0 +1,93 @@
+# The following labels are used in this file:
+#
+# - integration-test: test cases to run as the integration test.
+# - performance: test cases to run in the performance test.
+# - short: supplemental label for the above two labels (must not used alone), which literally means short execution time test cases.
+
+- name: GangScheduling
+  featureGates:
+    GenericWorkload: true
+    GangScheduling: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNamespaces
+    prefix: gang
+    count: 1
+  - opcode: createAny
+    # Create pod groups (gangs), each has a min count policy specified in pod group template.
+    # Each pod group is named gang-0, gang-1, ... gang-(n-1).
+    countParam: $initPodGroups
+    namespace: gang-0
+    templatePath: templates/podgroup.yaml
+  - opcode: waitForPodGroups
+    # Wait for the scheduler's informer cache to reflect the newly created PodGroup objects.
+    namespace: gang-0
+    countParam: $initPodGroups
+  - opcode: createPods
+    # Create pods with reference to the pod groups (gangs) according to their indices (e.g., pods 0-2 → gang-0, pods 3-5 → gang-1, etc.).
+    countParam: $initPodGroups
+    countMultiplierParam: $podsPerGroup
+    namespace: gang-0
+    podTemplatePath: templates/gang-pod.yaml
+    collectMetrics: true
+    templateParams:
+      podsPerGroup: $podsPerGroup
+  workloads:
+  - name: 10Nodes_3Gangs
+    labels: [integration-test, short]
+    params:
+      initNodes: 10
+      initPodGroups: 3
+      podsPerGroup: 3
+  - name: 100Nodes_10Gangs
+    labels: [integration-test]
+    params:
+      initNodes: 100
+      initPodGroups: 10
+      podsPerGroup: 3
+  - name: 5000Nodes_1000Gangs_3000Pods
+    labels: [performance]
+    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=scheduler_podgroup_scheduling_attempt_duration_seconds&Name=BenchmarkPerfScheduling%2FGangScheduling%2F5000Nodes_1000Gangs_3000Pods%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+    # Measured scheduler_podgroup_scheduling_attempt_duration_seconds/Average ~3.7 ms; threshold set conservatively at 8.
+    threshold: 8
+    thresholdMetricSelector:
+      name: scheduler_podgroup_scheduling_attempt_duration_seconds
+      labels:
+        result: scheduled
+      dataBucket: Average
+      expectLower: true
+    params:
+      initNodes: 5000
+      initPodGroups: 1000
+      podsPerGroup: 3
+  - name: 5000Nodes_2000Gangs_6000Pods
+    labels: [performance]
+    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=scheduler_podgroup_scheduling_attempt_duration_seconds&Name=BenchmarkPerfScheduling%2FGangScheduling%2F5000Nodes_2000Gangs_6000Pods%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+    # Measured scheduler_podgroup_scheduling_attempt_duration_seconds/Average ~5.0 ms; threshold set conservatively at 10.
+    threshold: 10
+    thresholdMetricSelector:
+      name: scheduler_podgroup_scheduling_attempt_duration_seconds
+      labels:
+        result: scheduled
+      dataBucket: Average
+      expectLower: true
+    params:
+      initNodes: 5000
+      initPodGroups: 2000
+      podsPerGroup: 3
+  - name: 5000Nodes_3000Gangs_9000Pods
+    labels: [performance]
+    # https://perf-dash.k8s.io/#/?jobname=scheduler-perf-benchmark&metriccategoryname=Scheduler&metricname=BenchmarkPerfScheduling&Metric=scheduler_podgroup_scheduling_attempt_duration_seconds&Name=BenchmarkPerfScheduling%2FGangScheduling%2F5000Nodes_3000Gangs_9000Pods%2Ftest&event=not%20applicable&extension_point=not%20applicable&plugin=not%20applicable&result=not%20applicable
+    # Measured scheduler_podgroup_scheduling_attempt_duration_seconds/Average ~5.7 ms; threshold set conservatively at 12.
+    threshold: 12
+    thresholdMetricSelector:
+      name: scheduler_podgroup_scheduling_attempt_duration_seconds
+      labels:
+        result: scheduled
+      dataBucket: Average
+      expectLower: true
+    params:
+      initNodes: 5000
+      initPodGroups: 3000
+      podsPerGroup: 3

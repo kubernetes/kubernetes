@@ -62,7 +62,7 @@ func NewClient(opts ...Option) otlptrace.Client {
 func newClient(opts ...Option) *client {
 	cfg := otlpconfig.NewGRPCConfig(asGRPCOptions(opts)...)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background()) //nolint:gosec  // cancel called in client shutdown.
 
 	c := &client{
 		endpoint:      cfg.Traces.Endpoint,
@@ -248,7 +248,7 @@ func (c *client) exportContext(parent context.Context) (context.Context, context
 	if c.exportTimeout > 0 {
 		ctx, cancel = context.WithTimeoutCause(parent, c.exportTimeout, errors.New("exporter export timeout"))
 	} else {
-		ctx, cancel = context.WithCancel(parent)
+		ctx, cancel = context.WithCancel(parent) //nolint:gosec  // cancel called by caller when export is complete.
 	}
 
 	if c.metadata.Len() > 0 {

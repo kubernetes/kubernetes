@@ -34,7 +34,7 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-func Test_isSchedulableAfterPodChange(t *testing.T) {
+func Test_isSchedulableAfterAssignedPodChange(t *testing.T) {
 	tests := []struct {
 		name           string
 		pod            *v1.Pod
@@ -104,13 +104,6 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 			expectedHint: fwk.Queue,
 		},
 		{
-			name:         "updated pod is the target pod",
-			pod:          st.MakePod().UID("p").Name("p").Label("foo", "baz").Obj(),
-			newPod:       st.MakePod().UID("p").Name("p").Label("foo", "baz").Obj(),
-			oldPod:       st.MakePod().UID("p").Name("p").Label("foo", "bar").Obj(),
-			expectedHint: fwk.Queue,
-		},
-		{
 			name:         "modify pod label to change it from satisfying pod anti-affinity to not satisfying anti-affinity",
 			pod:          st.MakePod().UID("p").Name("p").PodAntiAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Obj(),
 			newPod:       st.MakePod().UID("other").Node("fake-node").Label("service", "aaaa").Obj(),
@@ -176,14 +169,33 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 			snapshot := cache.NewSnapshot(nil, nil)
 			pl := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, snapshot, namespaces)
 			p := pl.(*InterPodAffinity)
-			actualHint, err := p.isSchedulableAfterPodChange(logger, tc.pod, tc.oldPod, tc.newPod)
+			actualHint, err := p.isSchedulableAfterAssignedPodChange(logger, tc.pod, tc.oldPod, tc.newPod)
 			if err != nil {
-				t.Errorf("unexpected error: %v", err)
+				t.Fatalf("unexpected error: %v", err)
 			}
 			if diff := cmp.Diff(tc.expectedHint, actualHint); diff != "" {
-				t.Errorf("expected QueuingHint doesn't match (-want,+got): \n %s", diff)
+				t.Errorf("unexpected QueueingHint (-want, +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func Test_isSchedulableAfterTargetPodUpdateLabel(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	pod := st.MakePod().UID("p").Name("p").Label("foo", "baz").Obj()
+
+	snapshot := cache.NewSnapshot(nil, nil)
+	pl := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, snapshot, namespaces)
+	p := pl.(*InterPodAffinity)
+	actualHint, err := p.isSchedulableAfterTargetPodUpdateLabel(logger, pod, pod.DeepCopy(), pod.DeepCopy())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if diff := cmp.Diff(fwk.Queue, actualHint); diff != "" {
+		t.Errorf("unexpected QueueingHint (-want, +got):\n%s", diff)
 	}
 }
 

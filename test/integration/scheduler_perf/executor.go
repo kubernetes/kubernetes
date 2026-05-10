@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"os"
 	"runtime"
@@ -39,6 +40,7 @@ import (
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	schedulinginformers "k8s.io/client-go/informers/scheduling/v1alpha2"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
@@ -46,7 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	testutils "k8s.io/kubernetes/test/utils"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 )
@@ -60,11 +62,13 @@ type WorkloadExecutor struct {
 	dataItems                    []DataItem
 	numPodsScheduledPerNamespace map[string]int
 	podInformer                  coreinformers.PodInformer
+	podGroupInformer             schedulinginformers.PodGroupInformer
 	throughputErrorMargin        float64
 	testCase                     *testCase
-	workload                     *workload
+	workload                     *Workload
 	topicName                    string
 	nextNodeIndex                int
+	opts                         *schedulerPerfOptions
 }
 
 func (e *WorkloadExecutor) wait() {
@@ -88,6 +92,8 @@ func (e *WorkloadExecutor) runOp(tCtx ktesting.TContext, op realOp, opIndex int)
 		return e.runBarrierOp(tCtx, opIndex, concreteOp)
 	case *sleepOp:
 		return e.runSleepOp(tCtx, concreteOp)
+	case *waitForPodGroups:
+		return e.runWaitForPodGroupsOp(tCtx, concreteOp)
 	case *startCollectingMetricsOp:
 		return e.runStartCollectingMetricsOp(tCtx, opIndex, concreteOp)
 	case *stopCollectingMetricsOp:
@@ -109,6 +115,15 @@ func (e *WorkloadExecutor) runCreateNodesOp(tCtx ktesting.TContext, opIndex int,
 		return err
 	}
 	e.nextNodeIndex += op.Count
+	if e.opts != nil && e.opts.nodeUpdateFn != nil {
+		nodes, err := waitListAllNodes(tCtx, tCtx.Client())
+		if err != nil {
+			return fmt.Errorf("failed to list nodes for nodeUpdateFn: %w", err)
+		}
+		if err := e.opts.nodeUpdateFn(tCtx, e.scheduler, e.workload, nodes); err != nil {
+			return fmt.Errorf("nodeUpdateFn failed: %w", err)
+		}
+	}
 	return nil
 }
 
@@ -169,6 +184,29 @@ func (e *WorkloadExecutor) runSleepOp(tCtx ktesting.TContext, op *sleepOp) error
 	select {
 	case <-tCtx.Done():
 	case <-time.After(op.Duration.Duration):
+	}
+	return nil
+}
+
+// runWaitForPodGroupsOp executes the waitForPodGroups operation.
+// It polls the scheduler's informer cache until the expected number of pod groups
+// are visible in the given namespace. This ensures that subsequent operations
+// (like creating pods that reference these pod groups) won't fail due to cache lag.
+// It timeouts after 10 seconds if the condition is not met.
+func (e *WorkloadExecutor) runWaitForPodGroupsOp(tCtx ktesting.TContext, op *waitForPodGroups) error {
+	tCtx.Logf("waiting for %d PodGroups in namespace %q", op.Count, op.Namespace)
+	err := wait.PollUntilContextTimeout(tCtx, 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+		podGroups, err := e.podGroupInformer.Lister().PodGroups(op.Namespace).List(labels.Everything())
+		if err != nil {
+			return false, err
+		}
+		if len(podGroups) >= op.Count {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return fmt.Errorf("timed out waiting for PodGroups: %w", err)
 	}
 	return nil
 }
@@ -792,7 +830,7 @@ func getNodePreparer(prefix string, cno *createNodesOp, clientset clientset.Inte
 
 	nodeTemplate := StaticNodeTemplate(makeBaseNode(prefix))
 	if cno.NodeTemplatePath != nil {
-		nodeTemplate = nodeTemplateFromFile(*cno.NodeTemplatePath)
+		nodeTemplate = nodeTemplateWithParams{path: *cno.NodeTemplatePath, params: cno.TemplateParams}
 	}
 
 	return NewIntegrationTestNodePreparer(
@@ -842,7 +880,7 @@ func waitUntilPodsScheduledInNamespace(tCtx ktesting.TContext, podInformer corei
 func getPodStrategy(cpo *createPodsOp) (testutils.TestPodCreateStrategy, error) {
 	podTemplate := testutils.StaticPodTemplate(makeBasePod())
 	if cpo.PodTemplatePath != nil {
-		podTemplate = podTemplateFromFile(*cpo.PodTemplatePath)
+		podTemplate = podTemplateWithParams{path: *cpo.PodTemplatePath, params: cpo.TemplateParams}
 	}
 	if cpo.PersistentVolumeClaimTemplatePath == nil {
 		return testutils.NewCustomCreatePodStrategy(podTemplate), nil
@@ -859,21 +897,35 @@ func getPodStrategy(cpo *createPodsOp) (testutils.TestPodCreateStrategy, error) 
 	return testutils.NewCreatePodWithPersistentVolumeStrategy(pvcTemplate, getCustomVolumeFactory(pvTemplate), podTemplate), nil
 }
 
-type nodeTemplateFromFile string
+type nodeTemplateWithParams struct {
+	path   string
+	params map[string]any
+}
 
-func (f nodeTemplateFromFile) GetNodeTemplate(index, count int) (*v1.Node, error) {
+func (n nodeTemplateWithParams) GetNodeTemplate(index, count int) (*v1.Node, error) {
+	env := make(map[string]any)
+	maps.Copy(env, n.params)
+	env["Index"] = index
+	env["Count"] = count
 	nodeSpec := &v1.Node{}
-	if err := getSpecFromTextTemplateFile(string(f), map[string]any{"Index": index, "Count": count}, nodeSpec); err != nil {
+	if err := getSpecFromTextTemplateFile(n.path, env, nodeSpec); err != nil {
 		return nil, fmt.Errorf("parsing Node: %w", err)
 	}
 	return nodeSpec, nil
 }
 
-type podTemplateFromFile string
+type podTemplateWithParams struct {
+	path   string
+	params map[string]any
+}
 
-func (f podTemplateFromFile) GetPodTemplate(index, count int) (*v1.Pod, error) {
+func (p podTemplateWithParams) GetPodTemplate(index, count int) (*v1.Pod, error) {
+	env := make(map[string]any)
+	maps.Copy(env, p.params)
+	env["Index"] = index
+	env["Count"] = count
 	podSpec := &v1.Pod{}
-	if err := getSpecFromTextTemplateFile(string(f), map[string]any{"Index": index, "Count": count}, podSpec); err != nil {
+	if err := getSpecFromTextTemplateFile(p.path, env, podSpec); err != nil {
 		return nil, fmt.Errorf("parsing Pod: %w", err)
 	}
 	return podSpec, nil

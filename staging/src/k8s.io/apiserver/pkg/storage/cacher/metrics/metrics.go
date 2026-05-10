@@ -20,6 +20,8 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -185,6 +187,26 @@ var (
 			Help:           "Counter for status of consistency checks between etcd and watch cache",
 			StabilityLevel: compbasemetrics.ALPHA,
 		}, []string{"group", "resource", "status"})
+
+	WatchShardsTotal = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Namespace:      namespace,
+			Name:           "watch_shards_total",
+			Help:           "Number of active sharded watch connections broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+
+	WatchFilteredEventsTotal = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Namespace:      namespace,
+			Name:           "watch_filtered_events_total",
+			Help:           "Counter of events filtered out by shard selector during watch dispatch, broken by resource type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -208,6 +230,10 @@ func Register() {
 		legacyregistry.MustRegister(WatchCacheReadWait)
 		legacyregistry.MustRegister(ConsistentReadTotal)
 		legacyregistry.MustRegister(StorageConsistencyCheckTotal)
+		if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
+			legacyregistry.MustRegister(WatchShardsTotal)
+			legacyregistry.MustRegister(WatchFilteredEventsTotal)
+		}
 	})
 }
 
@@ -225,7 +251,22 @@ func RecordResourceVersion(groupResource schema.GroupResource, resourceVersion u
 	watchCacheResourceVersion.WithLabelValues(groupResource.Group, groupResource.Resource).Set(float64(resourceVersion % 1000000000000000))
 }
 
-// RecordsWatchCacheCapacityChange record watchCache capacity resize(increase or decrease) operations.
+// RecordShardedWatchStarted increments the active sharded watch gauge for the given resource.
+func RecordShardedWatchStarted(groupResource schema.GroupResource) {
+	WatchShardsTotal.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
+}
+
+// RecordShardedWatchStopped decrements the active sharded watch gauge for the given resource.
+func RecordShardedWatchStopped(groupResource schema.GroupResource) {
+	WatchShardsTotal.WithLabelValues(groupResource.Group, groupResource.Resource).Dec()
+}
+
+// RecordWatchFilteredEvent increments the counter for events filtered by shard selector.
+func RecordWatchFilteredEvent(groupResource schema.GroupResource) {
+	WatchFilteredEventsTotal.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
+}
+
+// RecordsWatchCacheCapacityChange records watchCache capacity resize(increase or decrease) operations.
 func RecordsWatchCacheCapacityChange(groupResource schema.GroupResource, old, new int) {
 	WatchCacheCapacity.WithLabelValues(groupResource.Group, groupResource.Resource).Set(float64(new))
 	if old < new {

@@ -251,11 +251,6 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 
 			ginkgo.By("Restarting the kubelet")
 			restartKubelet(ctx)
-
-			// wait until the kubelet health check will succeed
-			gomega.Eventually(ctx, func(ctx context.Context) bool {
-				return kubeletHealthCheck(kubeletHealthCheckURL)
-			}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
 		}
 	})
 	if err := createTemporaryCgroupsForReservation(cgroupManager); err != nil {
@@ -286,11 +281,6 @@ func runTest(ctx context.Context, f *framework.Framework) error {
 
 	ginkgo.By("Starting the kubelet")
 	restartKubelet(ctx)
-
-	// wait until the kubelet health check will succeed
-	gomega.Eventually(ctx, func() bool {
-		return kubeletHealthCheck(kubeletHealthCheckURL)
-	}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
 
 	if err != nil {
 		return err

@@ -154,7 +154,7 @@ func fieldNameByTag(structTagToParse string) func(field reflect.StructField) str
 				// https://pkg.go.dev/encoding/xml#Marshal
 				// https://pkg.go.dev/encoding/json#Marshal
 				// https://pkg.go.dev/go.mongodb.org/mongo-driver/bson#hdr-Structs
-				// https://pkg.go.dev/gopkg.in/yaml.v2#Marshal
+				// https://pkg.go.dev/go.yaml.in/yaml/v3#Marshal
 				name := splits[0]
 				return name
 			}
@@ -609,7 +609,8 @@ func newNativeTypes(fieldNameHandler NativeTypesFieldNameHandler, rawType reflec
 	var iterateStructMembers func(reflect.Type)
 	iterateStructMembers = func(t reflect.Type) {
 		if k := t.Kind(); k == reflect.Pointer || k == reflect.Slice || k == reflect.Array || k == reflect.Map {
-			t = t.Elem()
+			iterateStructMembers(t.Elem())
+			return
 		}
 		if t.Kind() != reflect.Struct {
 			return

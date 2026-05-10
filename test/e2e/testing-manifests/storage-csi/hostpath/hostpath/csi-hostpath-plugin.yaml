@@ -300,6 +300,7 @@ spec:
             - --v=5
             - --csi-address=/csi/csi.sock
             - --kubelet-registration-path=/var/lib/kubelet/plugins/csi-hostpath/csi.sock
+            - --http-endpoint=:9809
           securityContext:
             # This is necessary only for systems with SELinux, where
             # non-privileged sidecar containers cannot access unix domain socket
@@ -311,6 +312,18 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: spec.nodeName
+          ports:
+            - containerPort: 9809
+              name: healthz
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 30
+            timeoutSeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3
           volumeMounts:
           - mountPath: /csi
             name: socket-dir
@@ -343,7 +356,7 @@ spec:
             name: socket-dir
 
         - name: csi-provisioner
-          image: registry.k8s.io/sig-storage/csi-provisioner:v6.1.1
+          image: registry.k8s.io/sig-storage/csi-provisioner:v6.2.0
           args:
             - -v=5
             - --csi-address=/csi/csi.sock
@@ -387,7 +400,7 @@ spec:
               name: socket-dir
 
         - name: csi-snapshot-metadata
-          image: registry.k8s.io/sig-storage/csi-snapshot-metadata:v0.2.0
+          image: registry.k8s.io/sig-storage/csi-snapshot-metadata:v1.0.0
           imagePullPolicy: IfNotPresent
           args:
           - --csi-address=/csi/csi.sock

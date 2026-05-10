@@ -594,6 +594,7 @@ message TypeChecking {
 }
 
 // ValidatingAdmissionPolicy describes the definition of an admission validation policy that accepts or rejects an object without changing it.
+// +k8s:supportsSubresource="/status"
 message ValidatingAdmissionPolicy {
   // metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
   // +optional

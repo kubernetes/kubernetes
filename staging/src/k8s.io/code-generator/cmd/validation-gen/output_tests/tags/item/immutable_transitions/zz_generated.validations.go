@@ -39,34 +39,52 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	// type Struct
-	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_Struct(ctx, op, nil /* fldPath */, obj.(*Struct), safe.Cast[*Struct](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*Struct)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_Struct(
+					ctx, op, nil, /* fldPath */
+					obj.(*Struct),
+					safe.Cast[*Struct](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
 // Validate_Struct validates an instance of Struct according
 // to declarative validation rules in the API schema.
-func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
+func Validate_Struct(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *Struct) (errs field.ErrorList) {
+
 	// field Struct.TypeMeta has no validation
 
-	// field Struct.ListField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []Item, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.ListField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []Item,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a Item, b Item) bool { return a.Key1 == b.Key1 })...)
-			func() { // cohort {"key1": "a"}
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+				func(a Item, b Item) bool { return a.Key1 == b.Key1 }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			func() { // cohort = "{"key1": "a"}"
 				earlyReturn := false
-				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key1 == "a" }, validate.DirectEqual, validate.Immutable); len(e) != 0 {
+				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+					func(item *Item) bool { return item.Key1 == "a" }, validate.DirectEqual, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
 				}
@@ -74,11 +92,14 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 					return // do not proceed
 				}
 			}()
-			func() { // cohort {"key1": "b"}
+			func() { // cohort = "{"key1": "b"}"
 				earlyReturn := false
-				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key1 == "b" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
-					return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField", func(o *Item) *string { return &o.StringField }, validate.DirectEqualPtr, validate.Immutable)
-				}); len(e) != 0 {
+				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+					func(item *Item) bool { return item.Key1 == "b" }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
+						return validate.Subfield(ctx, op, fldPath, obj, oldObj, "stringField",
+							func(o *Item) *string { return &o.StringField }, validate.DirectEqualPtr, validate.Immutable)
+					}).MarkShortCircuit(); len(e) != 0 {
 					errs = append(errs, e...)
 					earlyReturn = true
 				}
@@ -87,7 +108,13 @@ func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field
 				}
 			}()
 			return
-		}(fldPath.Child("listField"), obj.ListField, safe.Field(oldObj, func(oldObj *Struct) []Item { return oldObj.ListField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) []Item {
+				return oldObj.ListField
+			})
+		errs = append(errs, fn(fldPath.Child("listField"), obj.ListField, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }

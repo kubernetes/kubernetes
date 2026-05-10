@@ -302,7 +302,6 @@ var annotationsToSkip = map[string]bool{
 }
 
 // skipCopyAnnotation returns true if we should skip copying the annotation with the given annotation key
-// TODO: How to decide which annotations should / should not be copied?
 //
 // See https://github.com/kubernetes/kubernetes/pull/20035#issuecomment-179558615
 func skipCopyAnnotation(key string) bool {
@@ -541,8 +540,6 @@ func RsListFromClient(c appsclient.AppsV1Interface) RsListFunc {
 		return ret, err
 	}
 }
-
-// TODO: switch RsListFunc and podListFunc to full namespacers
 
 // RsListFunc returns the ReplicaSet from the ReplicaSet namespace and the List metav1.ListOptions.
 type RsListFunc func(string, metav1.ListOptions) ([]*apps.ReplicaSet, error)
@@ -865,7 +862,6 @@ func IsSaturated(deployment *apps.Deployment, rs *apps.ReplicaSet) bool {
 // WaitForObservedDeployment polls for deployment to be updated so that deployment.Status.ObservedGeneration >= desiredGeneration.
 // Returns error if polling timesout.
 func WaitForObservedDeployment(getDeploymentFunc func() (*apps.Deployment, error), desiredGeneration int64, interval, timeout time.Duration) error {
-	// TODO: This should take clientset.Interface when all code is updated to use clientset. Keeping it this way allows the function to be used by callers who have client.Interface.
 	return wait.PollImmediate(interval, timeout, func() (bool, error) {
 		deployment, err := getDeploymentFunc()
 		if err != nil {
@@ -928,7 +924,6 @@ func GetDeploymentsForReplicaSet(deploymentLister appslisters.DeploymentLister, 
 		return nil, fmt.Errorf("no deployments found for ReplicaSet %v because it has no labels", rs.Name)
 	}
 
-	// TODO: MODIFY THIS METHOD so that it checks for the podTemplateSpecHash label
 	dList, err := deploymentLister.Deployments(rs.Namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err

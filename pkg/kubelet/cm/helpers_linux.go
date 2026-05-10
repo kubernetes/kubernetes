@@ -34,6 +34,7 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm/util"
 )
 
@@ -123,7 +124,7 @@ func HugePageLimits(resourceList v1.ResourceList) map[int64]int64 {
 }
 
 // ResourceConfigForPod takes the input pod and outputs the cgroup resource config.
-func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, enforceMemoryQoS bool) *ResourceConfig {
+func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod uint64, enforceMemoryQoS bool, memoryReservationPolicy kubeletconfig.MemoryReservationPolicy) *ResourceConfig {
 	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodLevelResources)
 	// sum requests and limits.
 	reqs := resourcehelper.PodRequests(allocatedPod, resourcehelper.PodResourcesOptions{
@@ -207,14 +208,20 @@ func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod
 	}
 	result.HugePageLimit = hugePageLimits
 
-	if enforceMemoryQoS {
-		memoryMin := int64(0)
+	if enforceMemoryQoS && memoryReservationPolicy == kubeletconfig.TieredReservationMemoryReservationPolicy {
+		memoryRequest := int64(0)
 		if request, found := reqs[v1.ResourceMemory]; found {
-			memoryMin = request.Value()
+			memoryRequest = request.Value()
 		}
-		if memoryMin > 0 {
+		if memoryRequest > 0 {
+			// Guaranteed pods get memory.min (hard protection, kernel never reclaims).
+			// Burstable pods get memory.low (soft protection, kernel prefers not to reclaim).
+			cgroupKey := Cgroup2MemoryLow
+			if qosClass == v1.PodQOSGuaranteed {
+				cgroupKey = Cgroup2MemoryMin
+			}
 			result.Unified = map[string]string{
-				Cgroup2MemoryMin: strconv.FormatInt(memoryMin, 10),
+				cgroupKey: strconv.FormatInt(memoryRequest, 10),
 			}
 		}
 	}

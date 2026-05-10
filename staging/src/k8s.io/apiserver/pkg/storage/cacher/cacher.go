@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/audit"
@@ -247,7 +248,7 @@ func (t *watcherBookmarkTimeBuckets) popExpiredWatchersThreadUnsafe() [][]*cache
 	return expiredWatchers
 }
 
-type filterWithAttrsFunc func(key string, l labels.Set, f fields.Set) bool
+type filterWithAttrsFunc func(key string, l labels.Set, f fields.Set, obj runtime.Object) bool
 
 type indexedTriggerFunc struct {
 	indexName   string
@@ -520,19 +521,9 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		return nil, err
 	}
 
-	var readyGeneration int
-	if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		var err error
-		var downtime time.Duration
-		readyGeneration, downtime, err = c.ready.checkAndReadGeneration()
-		if err != nil {
-			return nil, errors.NewTooManyRequests(err.Error(), calculateRetryAfterForUnreadyCache(downtime))
-		}
-	} else {
-		readyGeneration, err = c.ready.waitAndReadGeneration(ctx)
-		if err != nil {
-			return nil, errors.NewServiceUnavailable(err.Error())
-		}
+	readyGeneration, downtime, err := c.ready.checkAndReadGeneration()
+	if err != nil {
+		return nil, errors.NewTooManyRequests(err.Error(), calculateRetryAfterForUnreadyCache(downtime))
 	}
 
 	// determine the namespace and name scope of the watch, first from the request, secondarily from the field selector
@@ -602,7 +593,7 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 	// to compute watcher.forget function (which has to happen under lock).
 	watcher := newCacheWatcher(
 		chanSize,
-		filterWithAttrsAndPrefixFunction(key, pred),
+		filterWithAttrsAndPrefixFunction(key, pred, c.groupResource),
 		emptyFunc,
 		c.versioner,
 		deadline,
@@ -674,6 +665,15 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		// We're simulating the immediate watch termination, which boils down to simply
 		// closing the watcher.
 		return newImmediateCloseWatcher(), nil
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) && pred.ShardSelector != nil && !pred.ShardSelector.Empty() {
+		metrics.RecordShardedWatchStarted(c.groupResource)
+		originalForget := watcher.forget
+		watcher.forget = func(drainWatcher bool) {
+			metrics.RecordShardedWatchStopped(c.groupResource)
+			originalForget(drainWatcher)
+		}
 	}
 
 	go watcher.processInterval(ctx, cacheInterval, requiredResourceVersion)
@@ -750,16 +750,10 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		attribute.Stringer("type", c.groupResource))
 	defer span.End(500 * time.Millisecond)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if downtime, err := c.ready.check(); err != nil {
-			// If Cacher is not initialized, reject List requests
-			// as described in https://kep.k8s.io/4568
-			return errors.NewTooManyRequests(err.Error(), calculateRetryAfterForUnreadyCache(downtime))
-		}
-	} else {
-		if err := c.ready.wait(ctx); err != nil {
-			return errors.NewServiceUnavailable(err.Error())
-		}
+	if downtime, err := c.ready.check(); err != nil {
+		// If Cacher is not initialized, reject List requests
+		// as described in https://kep.k8s.io/4568
+		return errors.NewTooManyRequests(err.Error(), calculateRetryAfterForUnreadyCache(downtime))
 	}
 	span.AddEvent("Ready")
 
@@ -794,7 +788,15 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		if !ok {
 			return fmt.Errorf("non *store.Element returned from storage: %v", obj)
 		}
-		if opts.Predicate.MatchesObjectAttributes(elem.Labels, elem.Fields) {
+		shardMatch := true
+		if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
+			var err error
+			shardMatch, err = opts.Predicate.MatchesSharding(elem.Object)
+			if err != nil {
+				return fmt.Errorf("shard matching failed: %w", err)
+			}
+		}
+		if shardMatch && opts.Predicate.MatchesObjectAttributes(elem.Labels, elem.Fields) {
 			selectedObjects = append(selectedObjects, elem.Object)
 			lastSelectedObjectKey = elem.Key
 		}
@@ -824,6 +826,9 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		if err = c.versioner.UpdateList(listObj, resp.ResourceVersion, continueValue, remainingItemCount); err != nil {
 			return err
 		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
+		opts.Predicate.SetShardInfoOnList(listObj)
 	}
 	metrics.RecordListCacheMetrics(c.groupResource, indexUsed, len(resp.Items), listVal.Len())
 	return nil
@@ -1203,10 +1208,22 @@ func forgetWatcher(c *Cacher, w *cacheWatcher, index int, scope namespacedName, 
 	}
 }
 
-func filterWithAttrsAndPrefixFunction(key string, p storage.SelectionPredicate) filterWithAttrsFunc {
-	filterFunc := func(objKey string, label labels.Set, field fields.Set) bool {
+func filterWithAttrsAndPrefixFunction(key string, p storage.SelectionPredicate, groupResource schema.GroupResource) filterWithAttrsFunc {
+	isSharded := utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) && p.ShardSelector != nil && !p.ShardSelector.Empty()
+	filterFunc := func(objKey string, label labels.Set, field fields.Set, obj runtime.Object) bool {
 		if !hasPathPrefix(objKey, key) {
 			return false
+		}
+		if isSharded {
+			matches, err := p.MatchesSharding(obj)
+			if err != nil {
+				utilruntime.HandleError(fmt.Errorf("shard matching failed for %v: %w", groupResource, err))
+				return false
+			}
+			if !matches {
+				metrics.RecordWatchFilteredEvent(groupResource)
+				return false
+			}
 		}
 		return p.MatchesObjectAttributes(label, field)
 	}

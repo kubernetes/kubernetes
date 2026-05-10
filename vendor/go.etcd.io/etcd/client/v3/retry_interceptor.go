@@ -28,6 +28,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 
 	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
@@ -42,6 +43,8 @@ func (c *Client) unaryClientInterceptor(optFuncs ...retryOption) grpc.UnaryClien
 	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 		ctx = withVersion(ctx)
 		grpcOpts, retryOpts := filterCallOptions(opts)
+		var p peer.Peer
+		grpcOpts = append(grpcOpts, grpc.Peer(&p))
 		callOpts := reuseOrNewWithCallOptions(intOpts, retryOpts)
 		// short circuit for simplicity, and avoiding allocations.
 		if callOpts.max == 0 {
@@ -65,6 +68,7 @@ func (c *Client) unaryClientInterceptor(optFuncs ...retryOption) grpc.UnaryClien
 			c.GetLogger().Warn(
 				"retrying of unary invoker failed",
 				zap.String("target", cc.Target()),
+				zap.String("peer", p.String()),
 				zap.String("method", method),
 				zap.Uint("attempt", attempt),
 				zap.Error(lastErr),

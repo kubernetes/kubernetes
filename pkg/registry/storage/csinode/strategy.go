@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/storage"
@@ -29,13 +30,13 @@ import (
 
 // csiNodeStrategy implements behavior for CSINode objects
 type csiNodeStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating
 // CSINode objects via the REST API.
-var Strategy = csiNodeStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = csiNodeStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 func (csiNodeStrategy) NamespaceScoped() bool {
 	return false
@@ -57,7 +58,7 @@ func (csiNodeStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object)
 func (csiNodeStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (csiNodeStrategy) AllowCreateOnUpdate() bool {
+func (csiNodeStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -76,6 +77,6 @@ func (csiNodeStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Ob
 	return nil
 }
 
-func (csiNodeStrategy) AllowUnconditionalUpdate() bool {
+func (csiNodeStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }

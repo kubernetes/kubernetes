@@ -330,13 +330,12 @@ func TestEnqueueExtensionsNodeUpdate(t *testing.T) {
 	}
 }
 
-func TestEnqueueExtensionsPodUpdate(t *testing.T) {
+func TestIsSchedulableAfterTargetPodUpdate(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 
 	targetPodName := "test-pod"
 	targetPodUID := "123"
 
-	// Test isSchedulableAfterPodUpdate
 	testCases := []struct {
 		name              string
 		oldPod            *v1.Pod
@@ -408,18 +407,6 @@ func TestEnqueueExtensionsPodUpdate(t *testing.T) {
 			expectedHint: fwk.QueueSkip,
 		},
 		{
-			name:              "Updated pod not the same as target pod",
-			oldPod:            st.MakePod().Name("another-test-pod").UID("456").Label("foo", "bar").Obj(),
-			newPod:            st.MakePod().Name("another-test-pod").UID("456").Obj(),
-			componenetVersion: version.MustParseSemantic("1.35.0"),
-			setupMock: func(m *ndftesting.MockFeature) {
-				m.SetInferForScheduling(func(podInfo *ndf.PodInfo) bool { return false })
-				m.SetName("TestFeature")
-				m.SetMaxVersion(nil)
-			},
-			expectedHint: fwk.QueueSkip,
-		},
-		{
 			name:              "Infer returns error",
 			oldPod:            st.MakePod().Name(targetPodName).UID(targetPodUID).Obj(),
 			newPod:            st.MakePod().Name(targetPodName).UID(targetPodUID).Label("foo", "bar").Obj(),
@@ -445,7 +432,7 @@ func TestEnqueueExtensionsPodUpdate(t *testing.T) {
 				version:      tc.componenetVersion,
 				enabled:      true,
 			}
-			hint, err := plugin.isSchedulableAfterPodUpdate(logger, st.MakePod().Name(targetPodName).UID(targetPodUID).Obj(), tc.oldPod, tc.newPod)
+			hint, err := plugin.isSchedulableAfterTargetPodUpdate(logger, st.MakePod().Name(targetPodName).UID(targetPodUID).Obj(), tc.oldPod, tc.newPod)
 			if tc.expectedErr != "" {
 				if err == nil {
 					t.Fatalf("expected error containing %q, got nil", tc.expectedErr)

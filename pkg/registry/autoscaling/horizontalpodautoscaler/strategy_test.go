@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
@@ -40,6 +41,51 @@ const (
 	zeroMinReplicas  zeroMinReplicasSet = true
 	oneMinReplicas                      = false
 )
+
+func TestPrepareForGeneration(t *testing.T) {
+	testCases := []struct {
+		name                       string
+		featureGateEnabled         bool
+		expectedGenerationOnCreate int64
+		expectedGenerationOnUpdate int64
+	}{
+		{
+			name:                       "With HPAGeneration enabled",
+			featureGateEnabled:         true,
+			expectedGenerationOnCreate: 1,
+			expectedGenerationOnUpdate: 2,
+		},
+		{
+			name:                       "With HPAGeneration disabled",
+			featureGateEnabled:         false,
+			expectedGenerationOnCreate: 0,
+			expectedGenerationOnUpdate: 0,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAGeneration, tc.featureGateEnabled)
+
+			hpa := prepareHPA(oneMinReplicas, withTolerance)
+			Strategy.PrepareForCreate(context.Background(), &hpa)
+
+			if hpa.Generation != tc.expectedGenerationOnCreate {
+				t.Error("Expected generation to be ", tc.expectedGenerationOnCreate, ", got ", hpa.Generation)
+			}
+
+			// Create an updated HPA with a different spec
+			hpaUpdated := hpa.DeepCopy() // prepareHPA(zeroMinReplicas, withoutTolerance)
+			hpaUpdated.Spec.MaxReplicas = 100
+			Strategy.PrepareForUpdate(context.Background(), hpaUpdated, &hpa)
+
+			if hpaUpdated.Generation != tc.expectedGenerationOnUpdate {
+				t.Error("Expected generation to be ", tc.expectedGenerationOnUpdate, ", got ", hpaUpdated.Generation)
+			}
+		})
+	}
+}
 
 func TestPrepareForCreateConfigurableToleranceEnabled(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAConfigurableTolerance, true)

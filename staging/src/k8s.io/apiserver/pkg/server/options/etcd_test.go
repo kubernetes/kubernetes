@@ -17,7 +17,10 @@ limitations under the License.
 package options
 
 import (
+	"context"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -29,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
+	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -476,4 +480,164 @@ func TestRestOptionsStorageObjectCountTracker(t *testing.T) {
 	if restOptions.StorageConfig.StorageObjectCountTracker != serverConfig.StorageObjectCountTracker {
 		t.Errorf("There are different StorageObjectCountTracker in restOptions and serverConfig")
 	}
+}
+
+func TestMonitorCache(t *testing.T) {
+	setCreateMonitor := func(t *testing.T, fn func(storagebackend.Config) (metrics.Monitor, error)) {
+		t.Helper()
+		original := createMonitor
+		createMonitor = fn
+		t.Cleanup(func() {
+			createMonitor = original
+		})
+	}
+
+	newTestCache := func(t *testing.T) *monitorCache {
+		t.Helper()
+		stopCh := make(chan struct{})
+		t.Cleanup(func() { close(stopCh) })
+		cache, err := newMonitorCache(&SimpleStorageFactory{}, stopCh)
+		if err != nil {
+			t.Fatalf("newMonitorCache() returned error: %v", err)
+		}
+		return cache
+	}
+
+	testCases := []struct {
+		name string
+		test func(t *testing.T)
+	}{
+		{
+			name: "reuses cached monitors on subsequent get calls",
+			test: func(t *testing.T) {
+				cache := newTestCache(t)
+				monitor := &fakeMonitor{}
+				var createCalls atomic.Int32
+
+				setCreateMonitor(t, func(cfg storagebackend.Config) (metrics.Monitor, error) {
+					createCalls.Add(1)
+					return monitor, nil
+				})
+
+				first, err := cache.get()
+				if err != nil {
+					t.Fatalf("first get() returned error: %v", err)
+				}
+				second, err := cache.get()
+				if err != nil {
+					t.Fatalf("second get() returned error: %v", err)
+				}
+
+				if got := createCalls.Load(); got != 1 {
+					t.Fatalf("expected createMonitor to be called once, got %d", got)
+				}
+				if len(first) != 1 || len(second) != 1 {
+					t.Fatalf("expected exactly one monitor from each call, got %d and %d", len(first), len(second))
+				}
+				if first[0] != monitor || second[0] != monitor {
+					t.Fatal("expected both calls to return the cached monitor instance")
+				}
+			},
+		},
+		{
+			name: "returns error when get is called after cache is closed",
+			test: func(t *testing.T) {
+				cache := newTestCache(t)
+				monitor := &fakeMonitor{}
+
+				setCreateMonitor(t, func(cfg storagebackend.Config) (metrics.Monitor, error) {
+					return monitor, nil
+				})
+
+				if _, err := cache.get(); err != nil {
+					t.Fatalf("initial get() returned error: %v", err)
+				}
+
+				cache.close()
+
+				if got := monitor.closeCalls.Load(); got != 1 {
+					t.Fatalf("expected close to be called once, got %d", got)
+				}
+				if _, err := cache.get(); err == nil || err.Error() != "monitor cache is closed" {
+					t.Fatalf("expected closed-cache error, got %v", err)
+				}
+			},
+		},
+		{
+			name: "concurrent get calls all return the first initialized monitors",
+			test: func(t *testing.T) {
+				cache := newTestCache(t)
+				monitor := &fakeMonitor{}
+				initStarted := make(chan struct{})
+				allowInit := make(chan struct{})
+				var createCalls atomic.Int32
+
+				setCreateMonitor(t, func(cfg storagebackend.Config) (metrics.Monitor, error) {
+					if createCalls.Add(1) == 1 {
+						close(initStarted)
+					}
+					<-allowInit
+					return monitor, nil
+				})
+
+				const numGoroutines = 10
+				start := make(chan struct{})
+				results := make(chan []metrics.Monitor, numGoroutines)
+				errs := make(chan error, numGoroutines)
+				var wg sync.WaitGroup
+				wg.Add(numGoroutines)
+
+				for range numGoroutines {
+					go func() {
+						defer wg.Done()
+						<-start
+						got, err := cache.get()
+						results <- got
+						errs <- err
+					}()
+				}
+
+				close(start)
+				<-initStarted
+				close(allowInit)
+				wg.Wait()
+
+				if got := createCalls.Load(); got != 1 {
+					t.Fatalf("expected createMonitor to be called once, got %d", got)
+				}
+				if len(cache.monitors) != 1 || cache.monitors[0] != monitor {
+					t.Fatal("expected the initialized monitor to be cached")
+				}
+
+				for range numGoroutines {
+					if err := <-errs; err != nil {
+						t.Fatalf("get() returned error: %v", err)
+					}
+					got := <-results
+					if len(got) != 1 || got[0] != monitor {
+						t.Fatal("expected all goroutines to receive the same cached monitor")
+					}
+				}
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.test(t)
+		})
+	}
+}
+
+type fakeMonitor struct {
+	closeCalls atomic.Int32
+}
+
+func (f *fakeMonitor) Monitor(ctx context.Context) (metrics.StorageMetrics, error) {
+	return metrics.StorageMetrics{}, nil
+}
+
+func (f *fakeMonitor) Close() error {
+	f.closeCalls.Add(1)
+	return nil
 }

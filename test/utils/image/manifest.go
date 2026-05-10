@@ -214,8 +214,8 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[APIServer] = Config{list.PromoterE2eRegistry, "sample-apiserver", "1.29.2"}
 	configs[AppArmorLoader] = Config{list.PromoterE2eRegistry, "apparmor-loader", "1.4"}
 	configs[BusyBox] = Config{list.PromoterE2eRegistry, "busybox", "1.37.0-1"}
-	configs[DistrolessIptables] = Config{list.BuildImageRegistry, "distroless-iptables", "v0.9.0"}
-	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.6.8-0"}
+	configs[DistrolessIptables] = Config{list.BuildImageRegistry, "distroless-iptables", "v0.9.1"}
+	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.6.10-0"}
 	configs[InvalidRegistryImage] = Config{list.InvalidRegistry, "alpine", "3.1"}
 	configs[IpcUtils] = Config{list.PromoterE2eRegistry, "ipc-utils", "1.4"}
 	configs[GlibcDnsTesting] = Config{list.PromoterE2eRegistry, "glibc-dns-testing", "2.0.0"}
@@ -230,7 +230,7 @@ func initImageConfigs(list RegistryList) (map[ImageID]Config, map[ImageID]Config
 	configs[Nonewprivs] = Config{list.PromoterE2eRegistry, "nonewprivs", "1.4"}
 	configs[NonRoot] = Config{list.PromoterE2eRegistry, "nonroot", "1.5"}
 	// Pause - when these values are updated, also update cmd/kubelet/app/options/container_runtime.go
-	configs[Pause] = Config{list.GcRegistry, "pause", "3.10.1"}
+	configs[Pause] = Config{list.GcRegistry, "pause", "3.10.2"}
 	configs[Perl] = Config{list.PromoterE2eRegistry, "perl", "5.26"}
 	configs[RegressionIssue74839] = Config{list.PromoterE2eRegistry, "regression-issue-74839", "1.4"}
 	configs[ResourceConsumer] = Config{list.PromoterE2eRegistry, "resource-consumer", "1.14"}

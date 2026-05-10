@@ -314,7 +314,8 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 	}
 
 	errs := validation.ValidateScale(scale)
-	errs = rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, scale, oldScale, errs, operation.Update, rest.WithSubresourceMapper(i.scaleGVKMapper))
+	dv := rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}
+	errs = dv.ValidateDeclaratively(ctx, scale, oldScale, errs, operation.Update, rest.DeclarativeValidationConfig{SubresourceGVKMapper: i.scaleGVKMapper})
 
 	if len(errs) > 0 {
 		return nil, errors.NewInvalid(autoscaling.Kind("Scale"), replicationcontroller.Name, errs)

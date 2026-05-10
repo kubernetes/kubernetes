@@ -300,6 +300,7 @@ var (
 		"ShutdownGracePeriod.Duration",
 		"ShutdownGracePeriodCriticalPods.Duration",
 		"MemoryThrottlingFactor",
+		"MemoryReservationPolicy",
 		"ContainerRuntimeEndpoint",
 		"ImageServiceEndpoint",
 		"Tracing.Endpoint",

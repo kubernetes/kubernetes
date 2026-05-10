@@ -253,6 +253,8 @@ message ClusterTrustBundleSpec {
   // using a `spec.signerName=NAME` field selector.
   //
   // +optional
+  // +k8s:alpha(since:"1.37")=+k8s:optional
+  // +k8s:alpha(since:"1.37")=+k8s:immutable
   optional string signerName = 1;
 
   // trustBundle contains the individual X.509 trust anchors for this
@@ -282,6 +284,7 @@ message ExtraValue {
 // signer.
 //
 // Kubelets use this API to implement podCertificate projected volumes
+// +k8s:supportsSubresource="/status"
 message PodCertificateRequest {
   // metadata contains the object metadata.
   //

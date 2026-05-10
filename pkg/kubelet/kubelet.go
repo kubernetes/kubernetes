@@ -38,7 +38,7 @@ import (
 	"github.com/opencontainers/selinux/go-selinux"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.opentelemetry.io/otel/trace"
 
 	"k8s.io/client-go/informers"
@@ -91,6 +91,7 @@ import (
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/config/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
+	"k8s.io/kubernetes/pkg/kubelet/apis/pods"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	kubeletcertificate "k8s.io/kubernetes/pkg/kubelet/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/clustertrustbundle"
@@ -302,6 +303,7 @@ type Bootstrap interface {
 	ListenAndServe(ctx context.Context, kubeCfg *kubeletconfiginternal.KubeletConfiguration, tlsConfig *tls.Config, auth server.AuthInterface, tp trace.TracerProvider)
 	ListenAndServeReadOnly(ctx context.Context, address net.IP, port uint, tp trace.TracerProvider)
 	ListenAndServePodResources(ctx context.Context)
+	ListenAndServePods(ctx context.Context)
 	Run(ctx context.Context, updates <-chan kubetypes.PodUpdate)
 }
 
@@ -405,10 +407,11 @@ func PreInitRuntimeService(ctx context.Context, kubeCfg *kubeletconfiginternal.K
 		remoteImageEndpoint = kubeCfg.ContainerRuntimeEndpoint
 	}
 	var err error
-	if kubeDeps.RemoteRuntimeService, err = remote.NewRemoteRuntimeService(ctx, kubeCfg.ContainerRuntimeEndpoint, kubeCfg.RuntimeRequestTimeout.Duration, kubeDeps.TracerProvider); err != nil {
+	useStreaming := utilfeature.DefaultFeatureGate.Enabled(features.CRIListStreaming)
+	if kubeDeps.RemoteRuntimeService, err = remote.NewRemoteRuntimeService(ctx, kubeCfg.ContainerRuntimeEndpoint, kubeCfg.RuntimeRequestTimeout.Duration, kubeDeps.TracerProvider, useStreaming); err != nil {
 		return err
 	}
-	if kubeDeps.RemoteImageService, err = remote.NewRemoteImageService(ctx, remoteImageEndpoint, kubeCfg.RuntimeRequestTimeout.Duration, kubeDeps.TracerProvider); err != nil {
+	if kubeDeps.RemoteImageService, err = remote.NewRemoteImageService(ctx, remoteImageEndpoint, kubeCfg.RuntimeRequestTimeout.Duration, kubeDeps.TracerProvider, useStreaming); err != nil {
 		return err
 	}
 
@@ -640,6 +643,7 @@ func NewMainKubelet(ctx context.Context,
 		enableControllerAttachDetach: kubeCfg.EnableControllerAttachDetach,
 		makeIPTablesUtilChains:       kubeCfg.MakeIPTablesUtilChains,
 		nodeStatusMaxImages:          nodeStatusMaxImages,
+		pluginManagerStopCh:          wait.NeverStop,
 		tracer:                       tracer,
 		nodeStartupLatencyTracker:    kubeDeps.NodeStartupLatencyTracker,
 		podStartupLatencyTracker:     kubeDeps.PodStartupLatencyTracker,
@@ -691,6 +695,12 @@ func NewMainKubelet(ctx context.Context,
 	klet.podManager = kubepod.NewBasicPodManager()
 
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodsAPI) {
+		broadcaster := pods.NewBroadcaster()
+		klet.podsServer = pods.NewPodsServer(broadcaster, klet.podManager, klet.statusManager)
+		klet.statusManager.AddPodUpdateNotifier(klet.podsServer)
+	}
 	klet.allocationManager = allocation.NewManager(
 		klet.getRootDir(),
 		klet.statusManager,
@@ -796,6 +806,7 @@ func NewMainKubelet(ctx context.Context,
 		kubeCfg.MemorySwap.SwapBehavior,
 		kubeDeps.ContainerManager.GetNodeAllocatableAbsolute,
 		*kubeCfg.MemoryThrottlingFactor,
+		kubeCfg.MemoryReservationPolicy,
 		klet.podStartupLatencyTracker,
 		kubeDeps.TracerProvider,
 		tokenManager,
@@ -808,7 +819,6 @@ func NewMainKubelet(ctx context.Context,
 	klet.containerRuntime = runtime
 	klet.streamingRuntime = runtime
 	klet.runner = runtime
-	klet.allocationManager.SetContainerRuntime(runtime)
 	resizeAdmitHandler := allocation.NewPodResizesAdmitHandler(klet.containerManager, runtime, klet.allocationManager, logger)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime, runtimeCacheRefreshPeriod)
@@ -890,7 +900,7 @@ func NewMainKubelet(ctx context.Context,
 		return nil, err
 	}
 	klet.containerGC = containerGC
-	klet.containerDeletor = newPodContainerDeletor(klet.containerRuntime, max(containerGCPolicy.MaxPerPodContainer, minDeadContainerInPod))
+	klet.containerDeletor = newPodContainerDeletor(logger, klet.containerRuntime, max(containerGCPolicy.MaxPerPodContainer, minDeadContainerInPod))
 
 	// setup imageManager
 	imageManager, err := images.NewImageGCManager(klet.containerRuntime, klet.StatsProvider, postImageGCHooks, kubeDeps.Recorder, nodeRef, imageGCPolicy, kubeDeps.TracerProvider)
@@ -1069,6 +1079,11 @@ func NewMainKubelet(ctx context.Context,
 	handlers = append(handlers, evictionAdmitHandler)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
+		if status, err := klet.containerRuntime.Status(ctx); err == nil && status != nil {
+			klet.runtimeState.setRuntimeFeatures(status.Features)
+		} else if err != nil {
+			logger.V(4).Info("Unable to prefetch container runtime features for node declared features", "err", err)
+		}
 		v, err := versionutil.Parse(version.Get().String())
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse version: %w", err)
@@ -1543,6 +1558,10 @@ type Kubelet struct {
 	// plugins need to be registered/unregistered based on this node and makes it so.
 	pluginManager pluginmanager.PluginManager
 
+	// pluginManagerStopCh controls plugin manager shutdown. Production kubelets
+	// use wait.NeverStop, while tests may inject a closable channel.
+	pluginManagerStopCh <-chan struct{}
+
 	// This flag sets a maximum number of images to report in the node status.
 	nodeStatusMaxImages int32
 
@@ -1569,6 +1588,9 @@ type Kubelet struct {
 
 	// flagz is the Reader interface to get flags for flagz page.
 	flagz flagz.Reader
+
+	// podsServer is the server that provides the pods gRPC service.
+	podsServer *pods.PodsServer
 }
 
 // ListPodStats is delegated to StatsProvider, which implements stats.Provider interface
@@ -1819,7 +1841,11 @@ func (kl *Kubelet) initializeRuntimeDependentModules(ctx context.Context) {
 
 	// Start the plugin manager
 	logger.V(4).Info("Starting plugin manager")
-	go kl.pluginManager.Run(ctx, kl.sourcesReady, wait.NeverStop)
+	pluginManagerStopCh := kl.pluginManagerStopCh
+	if pluginManagerStopCh == nil {
+		pluginManagerStopCh = wait.NeverStop
+	}
+	go kl.pluginManager.Run(ctx, kl.sourcesReady, pluginManagerStopCh)
 
 	err = kl.shutdownManager.Start(ctx)
 	if err != nil {
@@ -2330,6 +2356,7 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 				ID:        pod.UID,
 				Name:      pod.Name,
 				Namespace: pod.Namespace,
+				Timestamp: kl.clock.Now(),
 			}
 		} else {
 			return fmt.Errorf("unable to get pod prior to final pod termination: %w", err)
@@ -3152,7 +3179,7 @@ func (kl *Kubelet) HandlePodReconcile(ctx context.Context, pods []*v1.Pod) {
 		// can do better. If it's about preserving pod status info we can also do better.
 		if eviction.PodIsEvicted(pod.Status) {
 			if podStatus, err := kl.podCache.Get(pod.UID); err == nil {
-				kl.containerDeletor.deleteContainersInPod("", podStatus, true)
+				kl.containerDeletor.deleteContainersInPod(logger, "", podStatus, true)
 			}
 		}
 	}
@@ -3310,23 +3337,41 @@ func (pp *kubeletPodsProvider) GetPodByName(namespace, name string) (*v1.Pod, bo
 	return pod, true
 }
 
-// ListenAndServePodResources runs the kubelet podresources grpc service
+// ListenAndServePodResources runs the kubelet podresources grpc service.
 func (kl *Kubelet) ListenAndServePodResources(ctx context.Context) {
-	endpoint, err := util.LocalEndpoint(kl.getPodResourcesDir(), podresources.Socket)
-	if err != nil {
-		klog.FromContext(ctx).V(2).Info("Failed to get local endpoint for PodResources endpoint", "err", err)
-		return
-	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.KubeletPodResourcesGet) {
+		endpoint, err := util.LocalEndpoint(kl.getPodResourcesDir(), podresources.Socket)
+		if err != nil {
+			klog.FromContext(ctx).V(2).Info("Failed to get local endpoint for PodResources endpoint", "err", err)
+			return
+		}
 
-	providers := podresources.PodResourcesProviders{
-		Pods:             &kubeletPodsProvider{kl: kl},
-		Devices:          kl.containerManager,
-		Cpus:             kl.containerManager,
-		Memory:           kl.containerManager,
-		DynamicResources: kl.containerManager,
-	}
+		providers := podresources.PodResourcesProviders{
+			Pods:             &kubeletPodsProvider{kl: kl},
+			Devices:          kl.containerManager,
+			Cpus:             kl.containerManager,
+			Memory:           kl.containerManager,
+			DynamicResources: kl.containerManager,
+		}
 
-	server.ListenAndServePodResources(ctx, endpoint, providers)
+		server.ListenAndServePodResources(ctx, endpoint, providers)
+	}
+}
+
+// ListenAndServePod initializes an HTTP server to serve the Pod API.
+func (kl *Kubelet) ListenAndServePods(ctx context.Context) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodsAPI) {
+		endpoint, err := util.LocalEndpoint(kl.getPodsAPIDir(), pods.Socket)
+		if err != nil {
+			klog.FromContext(ctx).Error(err, "Failed to get local endpoint for pod api")
+			return
+		}
+		server.ListenAndServePodsServer(
+			ctx,
+			endpoint,
+			kl.podsServer,
+		)
+	}
 }
 
 // Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.
@@ -3334,7 +3379,7 @@ func (kl *Kubelet) cleanUpContainersInPod(ctx context.Context, podID types.UID, 
 	if podStatus, err := kl.podCache.Get(podID); err == nil {
 		// When an evicted or deleted pod has already synced, all containers can be removed.
 		removeAll := kl.podWorkers.ShouldPodContentBeRemoved(podID)
-		kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, removeAll)
+		kl.containerDeletor.deleteContainersInPod(klog.FromContext(ctx), exitedContainerID, podStatus, removeAll)
 	}
 }
 

@@ -97,6 +97,7 @@ type Scale struct {
 //
 // The StatefulSet guarantees that a given network identity will always
 // map to the same storage identity.
+// +k8s:supportsSubresource="/status"
 type StatefulSet struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
@@ -148,11 +149,12 @@ const (
 	// strategy, new Pods will be created from the specification version indicated
 	// by the StatefulSet's updateRevision.
 	RollingUpdateStatefulSetStrategyType StatefulSetUpdateStrategyType = "RollingUpdate"
-	// OnDeleteStatefulSetStrategyType triggers the legacy behavior. Version
-	// tracking and ordered rolling restarts are disabled. Pods are recreated
-	// from the StatefulSetSpec when they are manually deleted. When a scale
-	// operation is performed with this strategy,specification version indicated
-	// by the StatefulSet's currentRevision.
+	// OnDeleteStatefulSetStrategyType disables ordered rolling restarts. Version
+	// tracking is done on a best-effort basis - the controller will try to
+	// eventually converge StatefulSet's currentRevision with updateRevision.
+	// Pods are recreated from the StatefulSetSpec when they are manually deleted.
+	// When a scale operation is performed with this strategy, new Pods will be
+	// created from the specification version indicated by the StatefulSet's updateRevision.
 	OnDeleteStatefulSetStrategyType StatefulSetUpdateStrategyType = "OnDelete"
 )
 
@@ -403,6 +405,7 @@ type StatefulSetList struct {
 // DEPRECATED - This group version of Deployment is deprecated by apps/v1beta2/Deployment. See the release notes for
 // more information.
 // Deployment enables declarative updates for Pods and ReplicaSets.
+// +k8s:supportsSubresource="/status"
 type Deployment struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata.

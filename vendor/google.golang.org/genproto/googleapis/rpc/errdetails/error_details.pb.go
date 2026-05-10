@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC
+// Copyright 2026 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -957,17 +957,17 @@ type BadRequest_FieldViolation struct {
 	// In this example, in proto `field` could take one of the following values:
 	//
 	//   - `full_name` for a violation in the `full_name` value
-	//   - `email_addresses[1].email` for a violation in the `email` field of the
+	//   - `email_addresses[0].email` for a violation in the `email` field of the
 	//     first `email_addresses` message
-	//   - `email_addresses[3].type[2]` for a violation in the second `type`
+	//   - `email_addresses[2].type[1]` for a violation in the second `type`
 	//     value in the third `email_addresses` message.
 	//
 	// In JSON, the same values are represented as:
 	//
 	//   - `fullName` for a violation in the `fullName` value
-	//   - `emailAddresses[1].email` for a violation in the `email` field of the
+	//   - `emailAddresses[0].email` for a violation in the `email` field of the
 	//     first `emailAddresses` message
-	//   - `emailAddresses[3].type[2]` for a violation in the second `type`
+	//   - `emailAddresses[2].type[1]` for a violation in the second `type`
 	//     value in the third `emailAddresses` message.
 	Field string `protobuf:"bytes,1,opt,name=field,proto3" json:"field,omitempty"`
 	// A description of why the request element is bad.

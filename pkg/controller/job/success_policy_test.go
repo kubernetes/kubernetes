@@ -21,42 +21,30 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	batch "k8s.io/api/batch/v1"
-	utilversion "k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/ptr"
 )
 
 func TestMatchSuccessPolicy(t *testing.T) {
 	testCases := map[string]struct {
-		successPolicy          *batch.SuccessPolicy
-		completions            int32
-		succeededIndexes       orderedIntervals
-		wantMessage            string
-		wantMetSuccessPolicy   bool
-		enableJobSuccessPolicy bool
+		successPolicy        *batch.SuccessPolicy
+		completions          int32
+		succeededIndexes     orderedIntervals
+		wantMessage          string
+		wantMetSuccessPolicy bool
 	}{
-		"JobSuccessPolicy is disabled": {
+		"successPolicy is null": {
 			completions:      10,
 			succeededIndexes: orderedIntervals{{0, 0}},
 		},
-		"successPolicy is null": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{0, 0}},
-		},
 		"any rules are nothing": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{0, 0}},
-			successPolicy:          &batch.SuccessPolicy{Rules: []batch.SuccessPolicyRule{}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{0, 0}},
+			successPolicy:    &batch.SuccessPolicy{Rules: []batch.SuccessPolicyRule{}},
 		},
 		"rules.succeededIndexes is invalid format": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{0, 0}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{0, 0}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededIndexes: ptr.To("invalid-form"),
@@ -64,9 +52,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			},
 		},
 		"rules.succeededIndexes is specified; succeededIndexes matched rules": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{0, 2}, {4, 7}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{0, 2}, {4, 7}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededIndexes: ptr.To("0-2"),
@@ -76,9 +63,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			wantMetSuccessPolicy: true,
 		},
 		"rules.succeededIndexes is specified; succeededIndexes didn't match rules": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{0, 2}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{0, 2}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededIndexes: ptr.To("3"),
@@ -86,9 +72,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			},
 		},
 		"rules.succeededCount is specified; succeededIndexes matched rules": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{0, 2}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{0, 2}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededCount: ptr.To[int32](2),
@@ -98,9 +83,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			wantMetSuccessPolicy: true,
 		},
 		"rules.succeededCount is specified; succeededIndexes didn't match rules": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{0, 2}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{0, 2}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededCount: ptr.To[int32](4),
@@ -108,9 +92,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			},
 		},
 		"multiple rules; rules.succeededIndexes is specified; succeededIndexes met one of rules": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{0, 2}, {4, 7}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{0, 2}, {4, 7}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{
 					{
@@ -125,9 +108,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			wantMetSuccessPolicy: true,
 		},
 		"multiple rules; rules.succeededIndexes is specified; succeededIndexes met all rules": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{0, 2}, {4, 7}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{0, 2}, {4, 7}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{
 					{
@@ -142,9 +124,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			wantMetSuccessPolicy: true,
 		},
 		"rules.succeededIndexes and rules.succeededCount are specified; succeededIndexes met all rules": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{0, 2}, {4, 7}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{0, 2}, {4, 7}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededIndexes: ptr.To("3-6"),
@@ -155,9 +136,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			wantMessage:          "Matched rules at index 0",
 		},
 		"rules.succeededIndexes and rules.succeededCount are specified; succeededIndexes didn't match rules": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{0, 2}, {6, 7}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{0, 2}, {6, 7}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededIndexes: ptr.To("3-6"),
@@ -174,11 +154,9 @@ func TestMatchSuccessPolicy(t *testing.T) {
 				}},
 			},
 		},
-
 		"rules.succeededIndexes is specified; succeededIndexes matched rules; rules is proper subset of succeededIndexes": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{1, 5}, {6, 9}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{1, 5}, {6, 9}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededIndexes: ptr.To("2-4,6-8"),
@@ -188,9 +166,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			wantMessage:          "Matched rules at index 0",
 		},
 		"rules.succeededIndexes is specified; succeededIndexes matched rules; rules equals succeededIndexes": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{2, 4}, {6, 9}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{2, 4}, {6, 9}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededIndexes: ptr.To("2-4,6-9"),
@@ -200,9 +177,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			wantMessage:          "Matched rules at index 0",
 		},
 		"rules.succeededIndexes is specified; succeededIndexes matched rules; rules is subset of succeededIndexes": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{2, 5}, {7, 15}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{2, 5}, {7, 15}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededIndexes: ptr.To("2-4,8-12"),
@@ -212,9 +188,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			wantMessage:          "Matched rules at index 0",
 		},
 		"rules.succeededIndexes is specified; succeededIndexes didn't match rules; rules is an empty set": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{1, 3}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{1, 3}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededIndexes: ptr.To(""),
@@ -222,9 +197,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			},
 		},
 		"rules.succeededIndexes is specified; succeededIndexes didn't match rules; succeededIndexes is an empty set": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{},
+			completions:      10,
+			succeededIndexes: orderedIntervals{},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededIndexes: ptr.To(""),
@@ -232,9 +206,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			},
 		},
 		"rules.succeededIndexes is specified; succeededIndexes didn't match rules; rules and succeededIndexes are empty set": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{},
+			completions:      10,
+			succeededIndexes: orderedIntervals{},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededIndexes: ptr.To(""),
@@ -242,9 +215,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			},
 		},
 		"rules.succeededIndexes is specified; succeededIndexes didn't match rules; all elements of rules.succeededIndexes aren't included in succeededIndexes": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{1, 3}, {5, 7}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{1, 3}, {5, 7}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededIndexes: ptr.To("10-12,14-16"),
@@ -252,9 +224,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			},
 		},
 		"rules.succeededIndexes is specified; succeededIndexes didn't match rules; rules overlaps succeededIndexes at first": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{2, 4}, {6, 8}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{2, 4}, {6, 8}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededIndexes: ptr.To("1-3,5-7"),
@@ -262,9 +233,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			},
 		},
 		"rules.succeededIndexes and rules.succeededCount are specified; succeededIndexes matched rules; rules overlaps succeededIndexes at first": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{2, 4}, {6, 8}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{2, 4}, {6, 8}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededIndexes: ptr.To("1-3,5-7"),
@@ -275,9 +245,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			wantMessage:          "Matched rules at index 0",
 		},
 		"rules.succeededIndexes is specified; succeededIndexes didn't match rules; rules overlaps succeededIndexes at last": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{1, 3}, {5, 7}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{1, 3}, {5, 7}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededIndexes: ptr.To("2-4,6-9"),
@@ -285,9 +254,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			},
 		},
 		"rules.succeededIndexes and rules.succeededCount are specified; succeededIndexes matched rules; rules overlaps succeededIndexes at last": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{1, 3}, {5, 7}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{1, 3}, {5, 7}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededIndexes: ptr.To("2-4,6-9"),
@@ -298,9 +266,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			wantMessage:          "Matched rules at index 0",
 		},
 		"rules.succeededIndexes is specified; succeededIndexes didn't match rules; rules completely overlaps succeededIndexes": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{1, 3}, {7, 8}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{1, 3}, {7, 8}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededIndexes: ptr.To("0-4,6-9"),
@@ -308,9 +275,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			},
 		},
 		"rules.succeededIndexes and rules.succeededCount are specified; succeededIndexes matched rules; rules completely overlaps succeededIndexes": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{1, 3}, {7, 8}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{1, 3}, {7, 8}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededIndexes: ptr.To("0-4,6-9"),
@@ -321,9 +287,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			wantMessage:          "Matched rules at index 0",
 		},
 		"rules.succeededIndexes is specified; succeededIndexes didn't match rules; rules overlaps multiple succeededIndexes at last": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{1, 3}, {5, 9}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{1, 3}, {5, 9}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededIndexes: ptr.To("0-6,8-9"),
@@ -331,9 +296,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			},
 		},
 		"rules.succeededIndexes and rules.succeededCount are specified; succeededIndexes matched rules; rules overlaps multiple succeededIndexes at last": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{1, 3}, {5, 9}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{1, 3}, {5, 9}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededIndexes: ptr.To("0-6,8-9"),
@@ -344,9 +308,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			wantMessage:          "Matched rules at index 0",
 		},
 		"rules.succeededIndexes is specified; succeededIndexes didn't match rules; rules overlaps succeededIndexes at first, and rules equals succeededIndexes at last": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{1, 5}, {7, 10}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{1, 5}, {7, 10}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededIndexes: ptr.To("0-5,7-9"),
@@ -354,9 +317,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			},
 		},
 		"rules.succeededIndexes and rules.succeededCount are specified; succeededIndexes matched rules; rules overlaps succeededIndexes at first, and rules equals succeededIndexes at last": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{1, 5}, {7, 10}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{1, 5}, {7, 10}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededIndexes: ptr.To("0-5,7-9"),
@@ -367,9 +329,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			wantMessage:          "Matched rules at index 0",
 		},
 		"rules.succeededIndexes is specified; succeededIndexes didn't match rules; the first rules overlaps succeededIndexes at first": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{1, 10}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{1, 10}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededIndexes: ptr.To("0-3,6-9"),
@@ -377,9 +338,8 @@ func TestMatchSuccessPolicy(t *testing.T) {
 			},
 		},
 		"rules.succeededIndexes and rules.succeededCount are specified; succeededIndexes matched rules; the first rules overlaps succeededIndexes at first": {
-			enableJobSuccessPolicy: true,
-			completions:            10,
-			succeededIndexes:       orderedIntervals{{1, 10}},
+			completions:      10,
+			succeededIndexes: orderedIntervals{{1, 10}},
 			successPolicy: &batch.SuccessPolicy{
 				Rules: []batch.SuccessPolicyRule{{
 					SucceededIndexes: ptr.To("0-3,6-9"),
@@ -392,11 +352,6 @@ func TestMatchSuccessPolicy(t *testing.T) {
 	}
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			if !tc.enableJobSuccessPolicy {
-				// TODO: this will be removed in 1.36.
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, feature.DefaultFeatureGate, utilversion.MustParse("1.32"))
-			}
-			featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.JobSuccessPolicy, tc.enableJobSuccessPolicy)
 			logger := ktesting.NewLogger(t,
 				ktesting.NewConfig(
 					ktesting.BufferLogs(true),

@@ -790,6 +790,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.NodeAddressApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeAffinity"):
 		return &applyconfigurationscorev1.NodeAffinityApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("NodeAllocatableResourceClaimStatus"):
+		return &applyconfigurationscorev1.NodeAllocatableResourceClaimStatusApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeCondition"):
 		return &applyconfigurationscorev1.NodeConditionApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeConfigSource"):
@@ -1620,6 +1622,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1.ExactDeviceRequestApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("NetworkDeviceData"):
 		return &applyconfigurationsresourcev1.NetworkDeviceDataApplyConfiguration{}
+	case resourcev1.SchemeGroupVersion.WithKind("NodeAllocatableResourceMapping"):
+		return &applyconfigurationsresourcev1.NodeAllocatableResourceMappingApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("OpaqueDeviceConfiguration"):
 		return &applyconfigurationsresourcev1.OpaqueDeviceConfigurationApplyConfiguration{}
 	case resourcev1.SchemeGroupVersion.WithKind("ResourceClaim"):
@@ -1652,6 +1656,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &resourcev1alpha3.DeviceTaintRuleStatusApplyConfiguration{}
 	case v1alpha3.SchemeGroupVersion.WithKind("DeviceTaintSelector"):
 		return &resourcev1alpha3.DeviceTaintSelectorApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("PoolStatus"):
+		return &resourcev1alpha3.PoolStatusApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("ResourcePoolStatusRequest"):
+		return &resourcev1alpha3.ResourcePoolStatusRequestApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("ResourcePoolStatusRequestSpec"):
+		return &resourcev1alpha3.ResourcePoolStatusRequestSpecApplyConfiguration{}
+	case v1alpha3.SchemeGroupVersion.WithKind("ResourcePoolStatusRequestStatus"):
+		return &resourcev1alpha3.ResourcePoolStatusRequestStatusApplyConfiguration{}
 
 		// Group=resource.k8s.io, Version=v1beta1
 	case resourcev1beta1.SchemeGroupVersion.WithKind("AllocatedDeviceStatus"):
@@ -1712,6 +1724,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta1.DeviceTolerationApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("NetworkDeviceData"):
 		return &applyconfigurationsresourcev1beta1.NetworkDeviceDataApplyConfiguration{}
+	case resourcev1beta1.SchemeGroupVersion.WithKind("NodeAllocatableResourceMapping"):
+		return &applyconfigurationsresourcev1beta1.NodeAllocatableResourceMappingApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("OpaqueDeviceConfiguration"):
 		return &applyconfigurationsresourcev1beta1.OpaqueDeviceConfigurationApplyConfiguration{}
 	case resourcev1beta1.SchemeGroupVersion.WithKind("ResourceClaim"):
@@ -1800,6 +1814,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsresourcev1beta2.ExactDeviceRequestApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("NetworkDeviceData"):
 		return &applyconfigurationsresourcev1beta2.NetworkDeviceDataApplyConfiguration{}
+	case resourcev1beta2.SchemeGroupVersion.WithKind("NodeAllocatableResourceMapping"):
+		return &applyconfigurationsresourcev1beta2.NodeAllocatableResourceMappingApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("OpaqueDeviceConfiguration"):
 		return &applyconfigurationsresourcev1beta2.OpaqueDeviceConfigurationApplyConfiguration{}
 	case resourcev1beta2.SchemeGroupVersion.WithKind("ResourceClaim"):
@@ -1830,6 +1846,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsschedulingv1alpha2.GangSchedulingPolicyApplyConfiguration{}
 	case schedulingv1alpha2.SchemeGroupVersion.WithKind("PodGroup"):
 		return &applyconfigurationsschedulingv1alpha2.PodGroupApplyConfiguration{}
+	case schedulingv1alpha2.SchemeGroupVersion.WithKind("PodGroupResourceClaim"):
+		return &applyconfigurationsschedulingv1alpha2.PodGroupResourceClaimApplyConfiguration{}
+	case schedulingv1alpha2.SchemeGroupVersion.WithKind("PodGroupResourceClaimStatus"):
+		return &applyconfigurationsschedulingv1alpha2.PodGroupResourceClaimStatusApplyConfiguration{}
+	case schedulingv1alpha2.SchemeGroupVersion.WithKind("PodGroupSchedulingConstraints"):
+		return &applyconfigurationsschedulingv1alpha2.PodGroupSchedulingConstraintsApplyConfiguration{}
 	case schedulingv1alpha2.SchemeGroupVersion.WithKind("PodGroupSchedulingPolicy"):
 		return &applyconfigurationsschedulingv1alpha2.PodGroupSchedulingPolicyApplyConfiguration{}
 	case schedulingv1alpha2.SchemeGroupVersion.WithKind("PodGroupSpec"):
@@ -1840,6 +1862,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsschedulingv1alpha2.PodGroupTemplateApplyConfiguration{}
 	case schedulingv1alpha2.SchemeGroupVersion.WithKind("PodGroupTemplateReference"):
 		return &applyconfigurationsschedulingv1alpha2.PodGroupTemplateReferenceApplyConfiguration{}
+	case schedulingv1alpha2.SchemeGroupVersion.WithKind("TopologyConstraint"):
+		return &applyconfigurationsschedulingv1alpha2.TopologyConstraintApplyConfiguration{}
 	case schedulingv1alpha2.SchemeGroupVersion.WithKind("TypedLocalObjectReference"):
 		return &applyconfigurationsschedulingv1alpha2.TypedLocalObjectReferenceApplyConfiguration{}
 	case schedulingv1alpha2.SchemeGroupVersion.WithKind("Workload"):

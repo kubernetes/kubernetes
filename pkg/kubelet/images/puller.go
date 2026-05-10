@@ -53,26 +53,24 @@ func newParallelImagePuller(imageService kubecontainer.ImageService, maxParallel
 }
 
 func (pip *parallelImagePuller) pullImage(ctx context.Context, spec kubecontainer.ImageSpec, credentials []credentialprovider.TrackedAuthConfig, pullChan chan<- pullResult, podSandboxConfig *runtimeapi.PodSandboxConfig) {
-	go func() {
-		if pip.tokens != nil {
-			pip.tokens <- struct{}{}
-			defer func() { <-pip.tokens }()
-		}
-		startTime := time.Now()
-		imageRef, creds, err := pip.imageService.PullImage(ctx, spec, credentials, podSandboxConfig)
-		var size uint64
-		if err == nil && imageRef != "" {
-			// Getting the image size with best effort, ignoring the error.
-			size, _ = pip.imageService.GetImageSize(ctx, spec)
-		}
-		pullChan <- pullResult{
-			imageRef:        imageRef,
-			imageSize:       size,
-			err:             err,
-			pullDuration:    time.Since(startTime),
-			credentialsUsed: creds,
-		}
-	}()
+	if pip.tokens != nil {
+		pip.tokens <- struct{}{}
+		defer func() { <-pip.tokens }()
+	}
+	startTime := time.Now()
+	imageRef, creds, err := pip.imageService.PullImage(ctx, spec, credentials, podSandboxConfig)
+	var size uint64
+	if err == nil && imageRef != "" {
+		// Getting the image size with best effort, ignoring the error.
+		size, _ = pip.imageService.GetImageSize(ctx, spec)
+	}
+	pullChan <- pullResult{
+		imageRef:        imageRef,
+		imageSize:       size,
+		err:             err,
+		pullDuration:    time.Since(startTime),
+		credentialsUsed: creds,
+	}
 }
 
 // Maximum number of image pull requests than can be queued.

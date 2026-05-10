@@ -31,6 +31,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	resourcbeta "k8s.io/api/resource/v1beta2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -69,6 +70,8 @@ const (
 	ruleStatusPeriod = 10 * time.Second
 
 	maxUIDCacheEntries = 500
+
+	podGroupIndex = "podGroupPerPod"
 )
 
 // Controller listens to Taint changes of DRA devices and Toleration changes of ResourceClaims,
@@ -106,6 +109,8 @@ type Controller struct {
 	hasSynced     atomic.Int32
 	metrics       metrics.Metrics
 	workqueue     workqueue.TypedRateLimitingInterface[workItem]
+
+	workloadResourceClaimsEnabled bool
 
 	// The evictedPods cache keeps track of Pods for which we know that
 	// they have been evicted.
@@ -556,14 +561,16 @@ func (tc *Controller) maybeUpdateRuleStatus(ctx context.Context, ruleRef taintev
 		ruleEvict := rule.DeepCopy()
 		ruleEvict.Spec.Taint.Effect = resourcbeta.DeviceTaintEffectNoExecute
 		tc := &Controller{
-			logger:          klog.LoggerWithName(logger, "simulation"),
-			podLister:       tc.podLister,
-			ruleLister:      nil, // Replaced by simulateRule.
-			deletePodAt:     make(map[tainteviction.NamespacedObject]evictionAndReason),
-			allocatedClaims: maps.Clone(tc.allocatedClaims),
-			pools:           tc.pools,
-			evictingRules:   make(map[string]*resourcbeta.DeviceTaintRule),
-			workqueue:       &NOPQueue[workItem]{},
+			logger:                        klog.LoggerWithName(logger, "simulation"),
+			podInformer:                   tc.podInformer,
+			podLister:                     tc.podLister,
+			ruleLister:                    nil, // Replaced by simulateRule.
+			deletePodAt:                   make(map[tainteviction.NamespacedObject]evictionAndReason),
+			allocatedClaims:               maps.Clone(tc.allocatedClaims),
+			pools:                         tc.pools,
+			evictingRules:                 make(map[string]*resourcbeta.DeviceTaintRule),
+			workqueue:                     &NOPQueue[workItem]{},
+			workloadResourceClaimsEnabled: tc.workloadResourceClaimsEnabled,
 		}
 		defer tc.workqueue.ShutDown()
 
@@ -726,7 +733,7 @@ func (tc *Controller) countTaintedDevices(rule *resourcbeta.DeviceTaintRule) (nu
 
 // New creates a new Controller that will use passed clientset to communicate with the API server.
 // Spawns no goroutines. That happens in Run.
-func New(c clientset.Interface, podInformer coreinformers.PodInformer, claimInformer resourceinformers.ResourceClaimInformer, sliceInformer resourceinformers.ResourceSliceInformer, ruleInformer resourcealphainformers.DeviceTaintRuleInformer, classInformer resourceinformers.DeviceClassInformer, controllerName string) *Controller {
+func New(c clientset.Interface, podInformer coreinformers.PodInformer, claimInformer resourceinformers.ResourceClaimInformer, sliceInformer resourceinformers.ResourceSliceInformer, ruleInformer resourcealphainformers.DeviceTaintRuleInformer, classInformer resourceinformers.DeviceClassInformer, controllerName string, workloadResourceClaimsEnabled bool) *Controller {
 	metrics.Register() // It would be nicer to pass the controller name here, but that probably would break generating https://kubernetes.io/docs/reference/instrumentation/metrics.
 
 	tc := &Controller{
@@ -752,6 +759,8 @@ func New(c clientset.Interface, podInformer coreinformers.PodInformer, claimInfo
 		},
 		metrics:     metrics.Global,
 		evictedPods: newUIDCache(maxUIDCacheEntries),
+
+		workloadResourceClaimsEnabled: workloadResourceClaimsEnabled,
 	}
 
 	// The informer for DeviceTaintRules only gets instantiated if the corresponding
@@ -818,6 +827,10 @@ func (tc *Controller) Run(ctx context.Context, numWorkers int) error {
 		klog.FlushAndExit(klog.ExitFlushTimeout, 1)
 	}
 	defer eventBroadcaster.Shutdown()
+
+	if err := tc.addIndexers(); err != nil {
+		return err
+	}
 
 	claimHandler, err := tc.claimInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj any) {
@@ -1021,6 +1034,28 @@ func (tc *Controller) Run(ctx context.Context, numWorkers int) error {
 	}
 
 	<-ctx.Done()
+	return nil
+}
+
+func (tc *Controller) addIndexers() error {
+	if !tc.workloadResourceClaimsEnabled {
+		return nil
+	}
+
+	err := tc.podInformer.Informer().AddIndexers(cache.Indexers{podGroupIndex: func(obj any) ([]string, error) {
+		pod, ok := obj.(*v1.Pod)
+		if !ok {
+			return nil, fmt.Errorf("unexpected type %T reached Pod informer indexer", obj)
+		}
+		if pod.Spec.SchedulingGroup == nil || pod.Spec.SchedulingGroup.PodGroupName == nil {
+			return nil, nil
+		}
+		return []string{pod.Namespace + "/" + *pod.Spec.SchedulingGroup.PodGroupName}, nil
+	}})
+	if err != nil {
+		return fmt.Errorf("adding %s indexer for pods: %w", podGroupIndex, err)
+	}
+
 	return nil
 }
 
@@ -1471,21 +1506,43 @@ func (tc *Controller) handlePodChange(oldPod, newPod *v1.Pod) {
 
 func (tc *Controller) handlePods(claim *resourceapi.ResourceClaim) {
 	for _, consumer := range claim.Status.ReservedFor {
-		if consumer.APIGroup == "" && consumer.Resource == "pods" {
+		switch {
+		case consumer.APIGroup == "" && consumer.Resource == "pods":
 			pod, err := tc.podLister.Pods(claim.Namespace).Get(consumer.Name)
 			if err != nil {
 				if apierrors.IsNotFound(err) {
-					return
+					continue
 				}
 				// Should not happen.
 				utilruntime.HandleErrorWithLogger(tc.logger, err, "retrieve pod from cache")
-				return
+				continue
 			}
 			if pod.UID != consumer.UID {
 				// Not the pod we were looking for.
-				return
+				continue
 			}
 			tc.handlePod(pod)
+		case consumer.APIGroup == schedulingapi.GroupName && consumer.Resource == "podgroups":
+			// PodGroups may persist in a ResourceClaim's status.reservedFor if
+			// the DRAWorkloadResourceClaims feature is disabled after having
+			// been enabled, so we need to check again here that the feature is
+			// enabled now.
+			if !tc.workloadResourceClaimsEnabled {
+				continue
+			}
+			podGroupKey := claim.Namespace + "/" + consumer.Name
+			pods, err := tc.podInformer.Informer().GetIndexer().ByIndex(podGroupIndex, podGroupKey)
+			if err != nil {
+				utilruntime.HandleErrorWithLogger(tc.logger, err, "retrieve Pods for PodGroup %s from cache", podGroupKey)
+				continue
+			}
+			for _, obj := range pods {
+				pod, ok := obj.(*v1.Pod)
+				if !ok {
+					continue
+				}
+				tc.handlePod(pod)
+			}
 		}
 	}
 }
@@ -1536,11 +1593,11 @@ func (tc *Controller) podEvictionTime(pod *v1.Pod) *evictionAndReason {
 			// Referenced, but not found or not allocated. Also not tainted.
 			continue
 		}
-		if mustCheckOwner && resourceclaim.IsForPod(pod, allocatedClaim.ResourceClaim) != nil {
+		if mustCheckOwner && resourceclaim.IsForPod(pod, allocatedClaim.ResourceClaim, tc.workloadResourceClaimsEnabled) != nil {
 			// Claim and pod don't match. Ignore the claim.
 			continue
 		}
-		if !resourceclaim.IsReservedForPod(pod, allocatedClaim.ResourceClaim) {
+		if !resourceclaim.IsReservedForPod(pod, allocatedClaim.ResourceClaim, tc.workloadResourceClaimsEnabled) {
 			// The pod isn't the one which is allowed and/or supposed to use the claim.
 			// Perhaps that pod instance already got deleted and we are looking at its
 			// replacement under the same name. Either way, ignore.

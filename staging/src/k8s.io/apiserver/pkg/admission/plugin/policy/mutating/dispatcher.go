@@ -43,7 +43,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
-func NewDispatcher(a authorizer.Authorizer, m *matching.Matcher, tcm patch.TypeConverterManager) generic.Dispatcher[PolicyHook] {
+func NewDispatcher(a authorizer.UnconditionalAuthorizer, m *matching.Matcher, tcm patch.TypeConverterManager) generic.Dispatcher[PolicyHook] {
 	res := &dispatcher{
 		matcher:              m,
 		authz:                a,
@@ -60,7 +60,7 @@ func NewDispatcher(a authorizer.Authorizer, m *matching.Matcher, tcm patch.TypeC
 
 type dispatcher struct {
 	matcher              *matching.Matcher
-	authz                authorizer.Authorizer
+	authz                authorizer.UnconditionalAuthorizer
 	typeConverterManager patch.TypeConverterManager
 	generic.Dispatcher[PolicyHook]
 }

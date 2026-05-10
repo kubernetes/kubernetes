@@ -33,7 +33,6 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	apidiscoveryv2 "k8s.io/api/apidiscovery/v2"
-	apidiscoveryv2beta1 "k8s.io/api/apidiscovery/v2beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -60,18 +59,16 @@ const (
 	defaultBurst = 300
 
 	AcceptV1 = runtime.ContentTypeJSON
-	// Aggregated discovery content-type (v2beta1). NOTE: content-type parameters
+	// Aggregated discovery content-type. NOTE: content-type parameters
 	// MUST be ordered (g, v, as) for server in "Accept" header (BUT we are resilient
 	// to ordering when comparing returned values in "Content-Type" header).
-	AcceptV2Beta1  = runtime.ContentTypeJSON + ";" + "g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList"
 	AcceptV2       = runtime.ContentTypeJSON + ";" + "g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList"
 	AcceptV2NoPeer = runtime.ContentTypeJSON + ";" + "g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList;profile=nopeer"
 	// Prioritize aggregated discovery by placing first in the order of discovery accept types.
-	acceptDiscoveryFormats = AcceptV2 + "," + AcceptV2Beta1 + "," + AcceptV1
+	acceptDiscoveryFormats = AcceptV2 + "," + AcceptV1
 )
 
 // Aggregated discovery content-type GVK.
-var v2Beta1GVK = schema.GroupVersionKind{Group: "apidiscovery.k8s.io", Version: "v2beta1", Kind: "APIGroupDiscoveryList"}
 var v2GVK = schema.GroupVersionKind{Group: "apidiscovery.k8s.io", Version: "v2", Kind: "APIGroupDiscoveryList"}
 
 // DiscoveryInterface holds the methods that discover server-supported API groups,
@@ -277,13 +274,6 @@ func (d *DiscoveryClient) downloadLegacy() (
 			return nil, nil, nil, err
 		}
 		apiGroupList, resourcesByGV, failedGVs = SplitGroupsAndResources(aggregatedDiscovery)
-	} else if isGVK, _ := ContentTypeIsGVK(responseContentType, v2Beta1GVK); isGVK {
-		var aggregatedDiscovery apidiscoveryv2beta1.APIGroupDiscoveryList
-		err = json.Unmarshal(body, &aggregatedDiscovery)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		apiGroupList, resourcesByGV, failedGVs = SplitGroupsAndResourcesV2Beta1(aggregatedDiscovery)
 	} else {
 		// Default is unaggregated discovery v1.
 		var v metav1.APIVersions
@@ -333,13 +323,6 @@ func (d *DiscoveryClient) downloadAPIs() (
 			return nil, nil, nil, err
 		}
 		apiGroupList, resourcesByGV, failedGVs = SplitGroupsAndResources(aggregatedDiscovery)
-	} else if isGVK, _ := ContentTypeIsGVK(responseContentType, v2Beta1GVK); isGVK {
-		var aggregatedDiscovery apidiscoveryv2beta1.APIGroupDiscoveryList
-		err = json.Unmarshal(body, &aggregatedDiscovery)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		apiGroupList, resourcesByGV, failedGVs = SplitGroupsAndResourcesV2Beta1(aggregatedDiscovery)
 	} else {
 		// Default is unaggregated discovery v1.
 		err = json.Unmarshal(body, apiGroupList)
@@ -368,9 +351,9 @@ func selectDiscoveryAcceptHeader(useLegacy, nopeer bool) string {
 // content-type parameters, as well as parameters added by
 // intermediaries such as proxies or gateways. Examples:
 //
-//	("application/json; g=apidiscovery.k8s.io;v=v2beta1;as=APIGroupDiscoveryList", {apidiscovery.k8s.io, v2beta1, APIGroupDiscoveryList}) = (true, nil)
-//	("application/json; as=APIGroupDiscoveryList;v=v2beta1;g=apidiscovery.k8s.io", {apidiscovery.k8s.io, v2beta1, APIGroupDiscoveryList}) = (true, nil)
-//	("application/json; as=APIGroupDiscoveryList;v=v2beta1;g=apidiscovery.k8s.io;charset=utf-8", {apidiscovery.k8s.io, v2beta1, APIGroupDiscoveryList}) = (true, nil)
+//	("application/json; g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList", {apidiscovery.k8s.io, v2, APIGroupDiscoveryList}) = (true, nil)
+//	("application/json; as=APIGroupDiscoveryList;v=v2;g=apidiscovery.k8s.io", {apidiscovery.k8s.io, v2, APIGroupDiscoveryList}) = (true, nil)
+//	("application/json; as=APIGroupDiscoveryList;v=v2;g=apidiscovery.k8s.io;charset=utf-8", {apidiscovery.k8s.io, v2, APIGroupDiscoveryList}) = (true, nil)
 //	("application/json", any GVK) = (false, nil)
 //	("application/json; charset=UTF-8", any GVK) = (false, nil)
 //	("malformed content type string", any GVK) = (false, error)

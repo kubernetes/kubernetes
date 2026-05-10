@@ -75,10 +75,6 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	ComprehensiveNamespaceDraining = framework.WithFeature(framework.ValidFeatures.Add("ComprehensiveNamespaceDraining"))
 
-	// Onwer: sig-node
-	// Enables configuring per-container restart policy and restart policy rules.
-	ContainerRestartRules = framework.WithFeature(framework.ValidFeatures.Add("ContainerRestartRules"))
-
 	// Owner: sig-node
 	// Enables configuring custom stop signals for containers from container lifecycle
 	ContainerStopSignals = framework.WithFeature(framework.ValidFeatures.Add("ContainerStopSignals"))
@@ -311,7 +307,10 @@ var (
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	NodeAuthorizer = framework.WithFeature(framework.ValidFeatures.Add("NodeAuthorizer"))
 
-	// TODO: document the feature (owning SIG, when to use this feature for a test)
+	// Owner: sig-windows, sig-node
+	// kep: https://kep.k8s.io/2271
+	// Marks tests that require the kubelet to have enableSystemLogQuery set to true
+	// in the kubelet configuration. This handler is off by default.
 	NodeLogQuery = framework.WithFeature(framework.ValidFeatures.Add("NodeLogQuery"))
 
 	// Owner: sig-node
@@ -423,9 +422,9 @@ var (
 	// Tests marked with this feature require:
 	// - A CSI driver that supports the snapshot metadata service (e.g., CSI hostpath driver with --enable-snapshot-metadata)
 	// - The external-snapshot-metadata sidecar deployed alongside the CSI driver
-	// - The SnapshotMetadataService CRD (cbt.storage.k8s.io/v1alpha1) installed
+	// - The SnapshotMetadataService CRD (cbt.storage.k8s.io/v1beta1) installed
 	// - A storage driver that implements the CapSnapshotMetadata capability
-	SnapshotMetadata = framework.WithFeature(framework.ValidFeatures.Add("SnapshotMetadata"))
+	SnapshotMetadata = framework.WithFeature(framework.ValidFeatures.Add("snapshotmetadata"))
 
 	// TODO: document the feature (owning SIG, when to use this feature for a test)
 	StackdriverAcceleratorMonitoring = framework.WithFeature(framework.ValidFeatures.Add("StackdriverAcceleratorMonitoring"))

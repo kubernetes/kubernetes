@@ -56,12 +56,18 @@ import (
 // (flattened fields) and v1/v1beta2 (fields under 'exactly') for validation error paths.
 var ResourceNormalizationRules = []field.NormalizationRule{
 	{
-		Regexp:      regexp.MustCompile(`spec.devices\.requests\[(\d+)\]\.(deviceClassName|selectors|allocationMode|count|adminAccess|tolerations)`),
+		// ResourceClaim
+		Regexp:      regexp.MustCompile(`spec\.devices\.requests\[(\d+)\]\.(deviceClassName|selectors|allocationMode|count|adminAccess|tolerations)`),
 		Replacement: "spec.devices.requests[$1].exactly.$2",
 	},
 	{
+		// ResourceClaimTemplate (RCT.Spec.Spec adds an extra "spec." prefix)
+		Regexp:      regexp.MustCompile(`spec\.spec\.devices\.requests\[(\d+)\]\.(deviceClassName|selectors|allocationMode|count|adminAccess|tolerations)`),
+		Replacement: "spec.spec.devices.requests[$1].exactly.$2",
+	},
+	{
 		// This v1beta1 'basic' to flattened rule is to support ResourceSlice
-		Regexp:      regexp.MustCompile(`spec.devices\[(\d+)\]\.basic\.`),
+		Regexp:      regexp.MustCompile(`spec\.devices\[(\d+)\]\.basic\.`),
 		Replacement: "spec.devices[$1].",
 	},
 }
@@ -325,7 +331,10 @@ func validateCELSelector(celSelector resource.CELDeviceSelector, fldPath *field.
 		return allErrs
 	}
 
-	result := dracel.GetCompiler(dracel.Features{EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity)}).CompileCELExpression(celSelector.Expression, dracel.Options{EnvType: &envType})
+	result := dracel.GetCompiler(dracel.Features{
+		EnableConsumableCapacity: utilfeature.DefaultFeatureGate.Enabled(features.DRAConsumableCapacity),
+		EnableListTypeAttributes: utilfeature.DefaultFeatureGate.Enabled(features.DRAListTypeAttributes),
+	}).CompileCELExpression(celSelector.Expression, dracel.Options{EnvType: &envType})
 	if result.Error != nil {
 		allErrs = append(allErrs, convertCELErrorToValidationError(fldPath.Child("expression"), celSelector.Expression, result.Error))
 	} else if result.MaxCost > resource.CELSelectorExpressionMaxCost {
@@ -513,6 +522,9 @@ func validateDeviceRequestAllocationResult(result resource.DeviceRequestAllocati
 	allErrs = append(allErrs, validatePoolName(result.Pool, fldPath.Child("pool")).MarkCoveredByDeclarative()...)
 	allErrs = append(allErrs, validateDeviceName(result.Device, fldPath.Child("device"))...)
 	allErrs = append(allErrs, validateDeviceBindingParameters(result.BindingConditions, result.BindingFailureConditions, fldPath)...)
+	for i, toleration := range result.Tolerations {
+		allErrs = append(allErrs, validateDeviceToleration(toleration, fldPath.Child("tolerations").Index(i))...)
+	}
 	if result.ShareID != nil {
 		allErrs = append(allErrs, validateUID(string(*result.ShareID), fldPath.Child("shareID")).MarkCoveredByDeclarative()...)
 	}
@@ -708,8 +720,8 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 	}
 
 	maxDevices := resource.ResourceSliceMaxDevices
-	if haveDeviceTaints(spec) || haveConsumesCounters(spec) {
-		maxDevices = resource.ResourceSliceMaxDevicesWithTaintsOrConsumesCounters
+	if haveDeviceTaints(spec) || haveConsumesCounters(spec) || haveListAttributes(spec) {
+		maxDevices = resource.ResourceSliceMaxDevicesWithAdvancedFeatures
 	}
 	allErrs = append(allErrs, validateSet(spec.Devices, maxDevices,
 		func(device resource.Device, fldPath *field.Path) field.ErrorList {
@@ -727,6 +739,24 @@ func validateResourceSliceSpec(spec, oldSpec *resource.ResourceSliceSpec, fldPat
 		}, fldPath.Child("sharedCounters"), sizeCovered, uniquenessCovered)...)
 
 	return allErrs
+}
+
+func haveListAttributes(spec *resource.ResourceSliceSpec) bool {
+	if spec == nil {
+		return false
+	}
+
+	for _, device := range spec.Devices {
+		for _, attribute := range device.Attributes {
+			if attribute.BoolValues != nil ||
+				attribute.IntValues != nil ||
+				attribute.StringValues != nil ||
+				attribute.VersionValues != nil {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func haveDeviceTaints(spec *resource.ResourceSliceSpec) bool {
@@ -776,7 +806,7 @@ func validateCounterSet(counterSet resource.CounterSet, fldPath *field.Path) fie
 		allErrs = append(allErrs, validateCounterName(counterSet.Name, fldPath.Child("name"))...).MarkCoveredByDeclarative()
 	}
 	if len(counterSet.Counters) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("counters"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("counters"), "").MarkCoveredByDeclarative())
 	} else {
 		// The size limit is enforced for across all sets by the caller.
 		allErrs = append(allErrs, validateMap(counterSet.Counters, resource.ResourceSliceMaxCountersPerCounterSet, validation.DNS1123LabelMaxLength,
@@ -802,11 +832,17 @@ func validateDevice(device resource.Device, oldDevice *resource.Device, fldPath 
 	var allErrs field.ErrorList
 	allowMultipleAllocations := device.AllowMultipleAllocations != nil && *device.AllowMultipleAllocations
 	allErrs = append(allErrs, validateDeviceName(device.Name, fldPath.Child("name"))...)
+
 	// Warn about exceeding the maximum length only once. If any individual
 	// field is too large, then so is the combination.
+	// we count the total number of attribute entries (scalars and list items)
 	attributeAndCapacityLength := len(device.Attributes) + len(device.Capacity)
 	if attributeAndCapacityLength > resource.ResourceSliceMaxAttributesAndCapacitiesPerDevice {
 		allErrs = append(allErrs, field.Invalid(fldPath, attributeAndCapacityLength, fmt.Sprintf("the total number of attributes and capacities must not exceed %d", resource.ResourceSliceMaxAttributesAndCapacitiesPerDevice)))
+	}
+	numAttributeValues := numEntriesDeviceAttribute(device)
+	if numAttributeValues > resource.ResourceSliceMaxAttributeValuesPerDevice {
+		allErrs = append(allErrs, field.Invalid(fldPath, numAttributeValues, fmt.Sprintf("the total number of attribute values must not exceed %d", resource.ResourceSliceMaxAttributeValuesPerDevice)))
 	}
 
 	allErrs = append(allErrs, validateMap(device.Attributes, -1, attributeAndCapacityMaxKeyLength, validateQualifiedName, validateDeviceAttribute, fldPath.Child("attributes"))...)
@@ -865,7 +901,57 @@ func validateDevice(device resource.Device, oldDevice *resource.Device, fldPath 
 	}
 
 	allErrs = append(allErrs, validateDeviceBindingParameters(device.BindingConditions, device.BindingFailureConditions, fldPath)...)
+	allErrs = append(allErrs, validateNodeAllocatableResourceMappings(device.NodeAllocatableResourceMappings, device.Capacity, fldPath.Child("nodeAllocatableResourceMappings"))...)
+
 	return allErrs
+}
+
+func validateNodeAllocatableResourceMappings(mappings map[corev1.ResourceName]resource.NodeAllocatableResourceMapping, capacities map[resource.QualifiedName]resource.DeviceCapacity, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for resourceName, mapping := range mappings {
+		keyPath := fldPath.Key(string(resourceName))
+		if !v1helper.IsNativeResource(resourceName) {
+			allErrs = append(allErrs, field.Invalid(keyPath, resourceName, "must be a node allocatable resource name"))
+		}
+
+		if mapping.AllocationMultiplier == nil && mapping.CapacityKey == nil {
+			allErrs = append(allErrs, field.Invalid(keyPath, "", "at least one of allocationMultiplier or capacityKey must be set"))
+		} else {
+			if mapping.AllocationMultiplier != nil {
+				if mapping.AllocationMultiplier.Sign() <= 0 {
+					allErrs = append(allErrs, field.Invalid(keyPath.Child("allocationMultiplier"), mapping.AllocationMultiplier.String(), "must be positive"))
+				}
+			}
+			if mapping.CapacityKey != nil {
+				if *mapping.CapacityKey == "" {
+					allErrs = append(allErrs, field.Invalid(keyPath.Child("capacityKey"), "", "capacityKey must not be an empty string"))
+				} else if capacities == nil {
+					allErrs = append(allErrs, field.NotFound(keyPath.Child("capacityKey"), *mapping.CapacityKey))
+				} else if _, exists := capacities[*mapping.CapacityKey]; !exists {
+					allErrs = append(allErrs, field.NotFound(keyPath.Child("capacityKey"), *mapping.CapacityKey))
+				}
+			}
+		}
+	}
+	return allErrs
+}
+
+// numEntriesDeviceAttribute counts the total number of entries in the device's attributes,
+// counting each item in list values separately.
+// This is used to enforce the maximum number of attributes and capacities
+// per device when the DRAListTypeAttributes feature gate is enabled.
+func numEntriesDeviceAttribute(device resource.Device) int {
+	numEntries := 0
+	for _, attr := range device.Attributes {
+		if len(attr.BoolValues) == 0 && len(attr.IntValues) == 0 && len(attr.StringValues) == 0 && len(attr.VersionValues) == 0 {
+			numEntries++
+			continue
+		}
+		// These fields are actually mutually exclusive, but we count the total number of entries across all of them.
+		// If setting multiple fields in the list value, the validation will fail later and report that exactly one value must be specified.
+		numEntries += len(attr.BoolValues) + len(attr.IntValues) + len(attr.StringValues) + len(attr.VersionValues)
+	}
+	return numEntries
 }
 
 func validateDeviceCounterConsumption(deviceCounterConsumption resource.DeviceCounterConsumption, fldPath *field.Path) field.ErrorList {
@@ -877,7 +963,7 @@ func validateDeviceCounterConsumption(deviceCounterConsumption resource.DeviceCo
 		allErrs = append(allErrs, validateCounterName(deviceCounterConsumption.CounterSet, fldPath.Child("counterSet"))...).MarkCoveredByDeclarative()
 	}
 	if len(deviceCounterConsumption.Counters) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("counters"), ""))
+		allErrs = append(allErrs, field.Required(fldPath.Child("counters"), "").MarkCoveredByDeclarative())
 	} else {
 		allErrs = append(allErrs, validateMap(deviceCounterConsumption.Counters, resource.ResourceSliceMaxCountersPerDeviceCounterConsumption,
 			validation.DNS1123LabelMaxLength, validateCounterName, validateDeviceCounter, fldPath.Child("counters"), keysCovered)...)
@@ -921,6 +1007,36 @@ func validateDeviceAttribute(attribute resource.DeviceAttribute, fldPath *field.
 	if attribute.VersionValue != nil {
 		numFields++
 		allErrs = append(allErrs, validateDeviceAttributeVersionValue(attribute.VersionValue, fldPath.Child("version"))...)
+	}
+	if attribute.BoolValues != nil {
+		numFields++
+		if len(attribute.BoolValues) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("bools"), attribute.BoolValues, "must not be empty if specified"))
+		}
+	}
+	if attribute.IntValues != nil {
+		numFields++
+		if len(attribute.IntValues) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("ints"), attribute.IntValues, "must not be empty if specified"))
+		}
+	}
+	if attribute.StringValues != nil {
+		numFields++
+		if len(attribute.StringValues) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("strings"), attribute.StringValues, "must not be empty if specified"))
+		}
+		for i, item := range attribute.StringValues {
+			allErrs = append(allErrs, validateDeviceAttributeStringValue(&item, fldPath.Child("strings").Index(i)).WithOrigin("maxBytes").MarkCoveredByDeclarative()...)
+		}
+	}
+	if attribute.VersionValues != nil {
+		numFields++
+		if len(attribute.VersionValues) == 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("versions"), attribute.VersionValues, "must not be empty if specified"))
+		}
+		for i, item := range attribute.VersionValues {
+			allErrs = append(allErrs, validateDeviceAttributeVersionValue(&item, fldPath.Child("versions").Index(i))...)
+		}
 	}
 
 	switch numFields {

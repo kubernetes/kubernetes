@@ -42,13 +42,13 @@ type KubeletAuth struct {
 	// KubeletRequestAttributesGetter builds authorization.Attributes for a request to the Kubelet API
 	NodeRequestAttributesGetter
 	// authorizer determines whether a given authorization.Attributes is allowed
-	authorizer.Authorizer
+	authorizer.UnconditionalAuthorizer
 	// CAContentProvider returns CA content for client CA authorization
 	dynamiccertificates.CAContentProvider
 }
 
 // NewKubeletAuth returns a kubelet.AuthInterface composed of the given authenticator, attribute getter, and authorizer
-func NewKubeletAuth(authenticator authenticator.Request, authorizerAttributeGetter NodeRequestAttributesGetter, authorizer authorizer.Authorizer, clientCAProvider dynamiccertificates.CAContentProvider) AuthInterface {
+func NewKubeletAuth(authenticator authenticator.Request, authorizerAttributeGetter NodeRequestAttributesGetter, authorizer authorizer.UnconditionalAuthorizer, clientCAProvider dynamiccertificates.CAContentProvider) AuthInterface {
 	return &KubeletAuth{authenticator, authorizerAttributeGetter, authorizer, clientCAProvider}
 }
 

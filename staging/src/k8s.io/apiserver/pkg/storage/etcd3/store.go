@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"path"
 	"reflect"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -38,8 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
@@ -203,9 +200,7 @@ func New(c *kubernetes.Client, compactor Compactor, codec runtime.Codec, newFunc
 	w.getCurrentStorageRV = func(ctx context.Context) (uint64, error) {
 		return s.GetCurrentResourceVersion(ctx)
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) || utilfeature.DefaultFeatureGate.Enabled(features.WatchList) {
-		etcdfeature.DefaultFeatureSupportChecker.CheckClient(c.Ctx(), c, storage.RequestWatchProgress)
-	}
+	etcdfeature.DefaultFeatureSupportChecker.CheckClient(c.Ctx(), c, storage.RequestWatchProgress)
 	return s, nil
 }
 
@@ -702,34 +697,22 @@ func (s *store) ReadinessCheck() error {
 }
 
 func (s *store) GetCurrentResourceVersion(ctx context.Context) (uint64, error) {
-	emptyList := s.newListFunc()
-	pred := storage.SelectionPredicate{
-		Label: labels.Everything(),
-		Field: fields.Everything(),
-		Limit: 1, // just in case we actually hit something
-	}
-
-	err := s.GetList(ctx, s.resourcePrefix, storage.ListOptions{Predicate: pred}, emptyList)
-	if err != nil {
-		return 0, err
-	}
-	emptyListAccessor, err := meta.ListAccessor(emptyList)
-	if err != nil {
-		return 0, err
-	}
-	if emptyListAccessor == nil {
-		return 0, fmt.Errorf("unable to extract a list accessor from %T", emptyList)
-	}
-
-	currentResourceVersion, err := strconv.Atoi(emptyListAccessor.GetResourceVersion())
+	preparedKey, err := s.prepareKey(s.resourcePrefix, false)
 	if err != nil {
 		return 0, err
 	}
 
-	if currentResourceVersion == 0 {
+	startTime := time.Now()
+	getResp, err := s.client.Kubernetes.Get(ctx, preparedKey, kubernetes.GetOptions{})
+	metrics.RecordEtcdRequest("getCurrentResourceVersion", s.groupResource, err, startTime)
+	if err != nil {
+		return 0, err
+	}
+
+	if getResp.Revision == 0 {
 		return 0, fmt.Errorf("the current resource version must be greater than 0")
 	}
-	return uint64(currentResourceVersion), nil
+	return uint64(getResp.Revision), nil
 }
 
 // GetList implements storage.Interface.
@@ -895,7 +878,13 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	if err != nil {
 		return err
 	}
-	return s.versioner.UpdateList(listObj, uint64(withRev), continueValue, remainingItemCount)
+	if err := s.versioner.UpdateList(listObj, uint64(withRev), continueValue, remainingItemCount); err != nil {
+		return err
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
+		opts.Predicate.SetShardInfoOnList(listObj)
+	}
+	return nil
 }
 
 func (s *store) getList(ctx context.Context, keyPrefix string, recursive bool, options kubernetes.ListOptions) (resp kubernetes.ListResponse, err error) {

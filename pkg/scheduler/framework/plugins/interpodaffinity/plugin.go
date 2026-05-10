@@ -45,11 +45,10 @@ var _ fwk.SignPlugin = &InterPodAffinity{}
 
 // InterPodAffinity is a plugin that checks inter pod affinity
 type InterPodAffinity struct {
-	parallelizer              fwk.Parallelizer
-	args                      config.InterPodAffinityArgs
-	sharedLister              fwk.SharedLister
-	nsLister                  listersv1.NamespaceLister
-	enableSchedulingQueueHint bool
+	parallelizer fwk.Parallelizer
+	args         config.InterPodAffinityArgs
+	sharedLister fwk.SharedLister
+	nsLister     listersv1.NamespaceLister
 }
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -81,15 +80,6 @@ func (pl *InterPodAffinity) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.Sig
 // EventsToRegister returns the possible events that may make a failed Pod
 // schedulable
 func (pl *InterPodAffinity) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
-	// A note about UpdateNodeTaint event:
-	// Ideally, it's supposed to register only Add | UpdateNodeLabel because UpdateNodeTaint will never change the result from this plugin.
-	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
-	// See: https://github.com/kubernetes/kubernetes/issues/109437
-	nodeActionType := fwk.Add | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint
-	if pl.enableSchedulingQueueHint {
-		// When QueueingHint is enabled, we don't use preCheck and we don't need to register UpdateNodeTaint event.
-		nodeActionType = fwk.Add | fwk.UpdateNodeLabel
-	}
 	return []fwk.ClusterEventWithHint{
 		// All ActionType includes the following events:
 		// - Delete. An unschedulable Pod may fail due to violating an existing Pod's anti-affinity constraints,
@@ -98,8 +88,9 @@ func (pl *InterPodAffinity) EventsToRegister(_ context.Context) ([]fwk.ClusterEv
 		// an unschedulable Pod schedulable.
 		// - Add. An unschedulable Pod may fail due to violating pod-affinity constraints,
 		// adding an assigned Pod may make it schedulable.
-		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Add | fwk.UpdatePodLabel | fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterPodChange},
-		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Add | fwk.UpdatePodLabel | fwk.Delete}, QueueingHintFn: pl.isSchedulableAfterAssignedPodChange},
+		{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.UpdatePodLabel}, QueueingHintFn: pl.isSchedulableAfterTargetPodUpdateLabel},
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeLabel}, QueueingHintFn: pl.isSchedulableAfterNodeChange},
 	}, nil
 }
 
@@ -116,11 +107,10 @@ func New(_ context.Context, plArgs runtime.Object, h fwk.Handle, fts feature.Fea
 		return nil, err
 	}
 	pl := &InterPodAffinity{
-		parallelizer:              h.Parallelizer(),
-		args:                      args,
-		sharedLister:              h.SnapshotSharedLister(),
-		nsLister:                  h.SharedInformerFactory().Core().V1().Namespaces().Lister(),
-		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,
+		parallelizer: h.Parallelizer(),
+		args:         args,
+		sharedLister: h.SnapshotSharedLister(),
+		nsLister:     h.SharedInformerFactory().Core().V1().Namespaces().Lister(),
 	}
 
 	return pl, nil
@@ -168,18 +158,10 @@ func GetNamespaceLabelsSnapshot(logger klog.Logger, ns string, nsLister listersv
 	return
 }
 
-func (pl *InterPodAffinity) isSchedulableAfterPodChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+func (pl *InterPodAffinity) isSchedulableAfterAssignedPodChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	originalPod, modifiedPod, err := util.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
 		return fwk.Queue, err
-	}
-	if modifiedPod != nil && originalPod != nil && pod.UID == modifiedPod.UID {
-		// The only update event we listen on is UpdatePodLabel, so we can assume the labels have changed.
-		// The pod can become schedulable after update to its labels because e.g. some other pod might have
-		// anti-affinity on the old labels but not on the new ones.
-		logger.V(5).Info("the target pod labels have changed and it may be schedulable now",
-			"pod", klog.KObj(pod))
-		return fwk.Queue, nil
 	}
 	// We don't need to check cases where NodeName or NominatedNodeName changes on a pod because in those cases Add/Delete event is fired
 	if (modifiedPod != nil && modifiedPod.Spec.NodeName == "" && modifiedPod.Status.NominatedNodeName == "") ||
@@ -251,6 +233,14 @@ func (pl *InterPodAffinity) isSchedulableAfterPodChange(logger klog.Logger, pod 
 	logger.V(5).Info("a scheduled pod was deleted but it doesn't match the target pod's anti-affinity, nor vice versa",
 		"pod", klog.KObj(pod), "originalPod", klog.KObj(originalPod))
 	return fwk.QueueSkip, nil
+}
+
+func (pl *InterPodAffinity) isSchedulableAfterTargetPodUpdateLabel(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	// The pod can become schedulable after an update to its labels because e.g. some other
+	// pod might have anti-affinity on the old labels but not on the new ones.
+	logger.V(5).Info("the target pod labels have changed and it may be schedulable now",
+		"pod", klog.KObj(pod))
+	return fwk.Queue, nil
 }
 
 func (pl *InterPodAffinity) isSchedulableAfterNodeChange(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {

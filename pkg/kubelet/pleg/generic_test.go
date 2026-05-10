@@ -33,9 +33,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -824,8 +827,7 @@ kubelet_running_pods 2
 		},
 	}
 
-	for _, test := range tests {
-		tc := test
+	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(tc.wants), tc.metricsName); err != nil {
 				t.Fatal(err)
@@ -835,6 +837,7 @@ kubelet_running_pods 2
 }
 
 func TestWorkerLoop(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PLEGOnDemandRelist, true)
 	synctest.Test(t, func(t *testing.T) {
 		runtimeMock := containertest.NewMockRuntime(t)
 		cache := kubecontainer.NewCache()
@@ -867,6 +870,7 @@ func TestWorkerLoop(t *testing.T) {
 		mctx := context.Background()
 		call = runtimeMock.EXPECT().GetPod(mctx, pod1.ID).RunAndReturn(func(ctx context.Context, uid types.UID) (*kubecontainer.Pod, error) {
 			assert.Equal(t, pod1.ID, uid)
+			pod1.Timestamp = time.Now()
 			return pod1, nil
 		}).Once()
 		call = runtimeMock.EXPECT().GetPodStatus(mctx, pod1).RunAndReturn(func(_ context.Context, pod *kubecontainer.Pod) (*kubecontainer.PodStatus, error) {
@@ -889,6 +893,8 @@ func TestWorkerLoop(t *testing.T) {
 		time.Sleep(2 * time.Second)
 
 		call = runtimeMock.EXPECT().GetPods(mctx, true).RunAndReturn(func(_ context.Context, _ bool) ([]*kubecontainer.Pod, error) {
+			pod1.Timestamp = time.Now()
+			pod2.Timestamp = time.Now()
 			return []*kubecontainer.Pod{pod1, pod2}, nil
 		}).NotBefore(call).Once()
 		call = runtimeMock.EXPECT().GetPodStatus(mctx, pod2).RunAndReturn(func(_ context.Context, pod *kubecontainer.Pod) (*kubecontainer.PodStatus, error) {
@@ -918,6 +924,8 @@ func TestWorkerLoop(t *testing.T) {
 		time.Sleep(2 * time.Second)
 
 		call = runtimeMock.EXPECT().GetPods(mctx, true).RunAndReturn(func(_ context.Context, _ bool) ([]*kubecontainer.Pod, error) {
+			pod1.Timestamp = time.Now()
+			pod2.Timestamp = time.Now()
 			return []*kubecontainer.Pod{pod1, pod2}, nil
 		}).NotBefore(call).Once()
 		runtimeMock.EXPECT().GetPodStatus(mctx, pod1).RunAndReturn(func(_ context.Context, pod *kubecontainer.Pod) (*kubecontainer.PodStatus, error) {

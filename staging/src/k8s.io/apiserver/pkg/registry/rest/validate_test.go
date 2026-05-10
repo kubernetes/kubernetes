@@ -167,16 +167,15 @@ func TestValidateDeclaratively(t *testing.T) {
 		})
 		t.Run(tc.name, func(t *testing.T) {
 
-			cfg := &validationConfigOption{
-				options: tc.options,
+			cfg := &ValidationConfigOption{
+				DeclarativeValidationConfig: DeclarativeValidationConfig{Options: tc.options},
 			}
 			if tc.oldObject == nil {
-				cfg.opType = operation.Create
+				cfg.OpType = operation.Create
 			} else {
-				cfg.opType = operation.Update
+				cfg.OpType = operation.Update
 			}
-			// takeover is not used here, passing false for shouldFail
-			results := panicSafeValidateFunc(validateDeclaratively, false, cfg.validationIdentifier)(ctx, scheme, tc.object, tc.oldObject, cfg)
+			results := panicSafeValidateFunc(validateDeclaratively)(ctx, scheme, tc.object, tc.oldObject, cfg)
 			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
 			matcher.Test(t, tc.expected, results)
 		})
@@ -244,6 +243,7 @@ func TestGatherDeclarativeValidationMismatches(t *testing.T) {
 		expectMismatches        bool
 		expectDetailsContaining []string
 		normalizedRules         []field.NormalizationRule
+		shortCircuitMismatch    bool
 	}{
 		{
 			name:              "No errors - no mismatch",
@@ -346,11 +346,32 @@ func TestGatherDeclarativeValidationMismatches(t *testing.T) {
 			declarativeErrors: field.ErrorList{},
 			expectMismatches:  false,
 		},
+		{
+			name: "Short-circuit match: DV parent covers HV parent and child",
+			imperativeErrors: field.ErrorList{
+				field.Invalid(pathStandard, "val", "immutable").MarkCoveredByDeclarative().WithOrigin("immutable"),
+				field.Required(pathStandard.Child("kind"), "val").MarkCoveredByDeclarative().WithOrigin("min"),
+			},
+			declarativeErrors: field.ErrorList{
+				func() *field.Error {
+					e := field.Invalid(pathStandard, "val", "immutable").WithOrigin("immutable")
+					e.ShortCircuit = true
+					return e
+				}(),
+			},
+			expectMismatches:     false,
+			shortCircuitMismatch: true,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			details := gatherDeclarativeValidationMismatches(tc.imperativeErrors, tc.declarativeErrors, tc.enforced, tc.normalizedRules)
+			details := gatherDeclarativeValidationMismatches(tc.imperativeErrors, tc.declarativeErrors, tc.enforced, ValidationConfigOption{
+				DeclarativeValidationConfig: DeclarativeValidationConfig{
+					NormalizationRules:   tc.normalizedRules,
+					ShortCircuitMismatch: tc.shortCircuitMismatch,
+				},
+			})
 			// Check if mismatches were found if expected
 			if tc.expectMismatches && len(details) == 0 {
 				t.Errorf("Expected mismatches but got none")
@@ -417,7 +438,7 @@ func TestCompareDeclarativeErrorsAndEmitMismatches(t *testing.T) {
 			defer klog.LogToStderr(true)
 			ctx := context.Background()
 
-			compareDeclarativeErrorsAndEmitMismatches(ctx, tc.imperativeErrs, tc.declarativeErrs, tc.enforced, "test_validationIdentifier", nil)
+			compareDeclarativeErrorsAndEmitMismatches(ctx, tc.imperativeErrs, tc.declarativeErrs, "test_validationIdentifier", tc.enforced, ValidationConfigOption{})
 
 			klog.Flush()
 			logOutput := buf.String()
@@ -445,14 +466,14 @@ func TestWithRecover(t *testing.T) {
 
 	testCases := []struct {
 		name               string
-		validateFn         func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList
+		validateFn         func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList
 		enforcementEnabled bool
 		wantErrs           field.ErrorList
 		expectLogRegex     string
 	}{
 		{
 			name: "no panic",
-			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList {
+			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList {
 				return field.ErrorList{
 					field.Invalid(field.NewPath("field"), "value", "reason"),
 				}
@@ -465,7 +486,7 @@ func TestWithRecover(t *testing.T) {
 		},
 		{
 			name: "panic with enforcement disabled",
-			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList {
+			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList {
 				panic("test panic")
 			},
 			enforcementEnabled: false,
@@ -475,7 +496,7 @@ func TestWithRecover(t *testing.T) {
 		},
 		{
 			name: "panic with enforcement enabled",
-			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList {
+			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList {
 				panic("test panic")
 			},
 			enforcementEnabled: true,
@@ -486,7 +507,7 @@ func TestWithRecover(t *testing.T) {
 		},
 		{
 			name: "nil return, no panic",
-			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList {
+			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList {
 				return nil
 			},
 			enforcementEnabled: false,
@@ -502,9 +523,8 @@ func TestWithRecover(t *testing.T) {
 			klog.LogToStderr(false)
 			defer klog.LogToStderr(true)
 
-			// Pass the enforcement flag to panicSafeValidateFunc
-			wrapped := panicSafeValidateFunc(tc.validateFn, tc.enforcementEnabled, "test_validationIdentifier")
-			gotErrs := wrapped(ctx, scheme, obj, nil, &validationConfigOption{opType: operation.Create, options: options})
+			wrapped := panicSafeValidateFunc(tc.validateFn)
+			gotErrs := wrapped(ctx, scheme, obj, nil, &ValidationConfigOption{ValidationIdentifier: "test_validationIdentifier", OpType: operation.Create, DeclarativeValidationConfig: DeclarativeValidationConfig{Options: options, DeclarativeEnforcement: tc.enforcementEnabled}})
 
 			klog.Flush()
 			logOutput := buf.String()
@@ -539,14 +559,14 @@ func TestWithRecoverUpdate(t *testing.T) {
 
 	testCases := []struct {
 		name               string
-		validateFn         func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList
+		validateFn         func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList
 		enforcementEnabled bool
 		wantErrs           field.ErrorList
 		expectLogRegex     string
 	}{
 		{
 			name: "no panic",
-			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList {
+			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList {
 				return field.ErrorList{
 					field.Invalid(field.NewPath("field"), "value", "reason"),
 				}
@@ -559,7 +579,7 @@ func TestWithRecoverUpdate(t *testing.T) {
 		},
 		{
 			name: "panic with enforcement disabled",
-			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList {
+			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList {
 				panic("test update panic")
 			},
 			enforcementEnabled: false,
@@ -569,7 +589,7 @@ func TestWithRecoverUpdate(t *testing.T) {
 		},
 		{
 			name: "panic with enforcement enabled",
-			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList {
+			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList {
 				panic("test update panic")
 			},
 			enforcementEnabled: true,
@@ -580,7 +600,7 @@ func TestWithRecoverUpdate(t *testing.T) {
 		},
 		{
 			name: "nil return, no panic",
-			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *validationConfigOption) field.ErrorList {
+			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList {
 				return nil
 			},
 			enforcementEnabled: false,
@@ -597,8 +617,8 @@ func TestWithRecoverUpdate(t *testing.T) {
 			defer klog.LogToStderr(true)
 
 			// Pass the enforcement flag to panicSafeValidateUpdateFunc
-			wrapped := panicSafeValidateFunc(tc.validateFn, tc.enforcementEnabled, "test_validationIdentifier")
-			gotErrs := wrapped(ctx, scheme, obj, oldObj, &validationConfigOption{opType: operation.Update, options: options})
+			wrapped := panicSafeValidateFunc(tc.validateFn)
+			gotErrs := wrapped(ctx, scheme, obj, oldObj, &ValidationConfigOption{ValidationIdentifier: "test_validationIdentifier", OpType: operation.Update, DeclarativeValidationConfig: DeclarativeValidationConfig{Options: options, DeclarativeEnforcement: tc.enforcementEnabled}})
 
 			klog.Flush()
 			logOutput := buf.String()
@@ -932,12 +952,11 @@ func TestValidateDeclarativelyWithMigrationChecks(t *testing.T) {
 			inputErrs := make(field.ErrorList, len(tc.imperativeErrors))
 			copy(inputErrs, tc.imperativeErrors)
 
-			opts := []ValidationConfig{}
-			if tc.declarativeEnforcement {
-				opts = append(opts, WithDeclarativeEnforcement())
+			config := DeclarativeValidationConfig{
+				DeclarativeEnforcement: tc.declarativeEnforcement,
 			}
 
-			gotErrs := ValidateDeclarativelyWithMigrationChecks(ctx, localScheme, obj, nil, inputErrs, operation.Create, opts...)
+			gotErrs := ValidateDeclarativelyWithMigrationChecks(ctx, localScheme, obj, nil, inputErrs, operation.Create, config)
 
 			if !equalErrorLists(gotErrs, tc.expectedErrors) {
 				t.Errorf("Expected errors: %v, got: %v", tc.expectedErrors, gotErrs)

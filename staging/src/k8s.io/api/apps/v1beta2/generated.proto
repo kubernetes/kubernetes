@@ -67,6 +67,7 @@ message ControllerRevisionList {
 // DEPRECATED - This group version of DaemonSet is deprecated by apps/v1/DaemonSet. See the release notes for
 // more information.
 // DaemonSet represents the configuration of a daemon set.
+// +k8s:supportsSubresource="/status"
 message DaemonSet {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -227,6 +228,7 @@ message DaemonSetUpdateStrategy {
 // DEPRECATED - This group version of Deployment is deprecated by apps/v1/Deployment. See the release notes for
 // more information.
 // Deployment enables declarative updates for Pods and ReplicaSets.
+// +k8s:supportsSubresource="/status"
 message Deployment {
   // Standard object metadata.
   // +optional
@@ -384,6 +386,7 @@ message DeploymentStrategy {
 // DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1/ReplicaSet. See the release notes for
 // more information.
 // ReplicaSet ensures that a specified number of pod replicas are running at any given time.
+// +k8s:supportsSubresource="/status"
 message ReplicaSet {
   // If the Labels of a ReplicaSet are empty, they are defaulted to
   // be the same as the Pod(s) that the ReplicaSet manages.
@@ -651,6 +654,7 @@ message ScaleStatus {
 //
 // The StatefulSet guarantees that a given network identity will always
 // map to the same storage identity.
+// +k8s:supportsSubresource="/status"
 message StatefulSet {
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;

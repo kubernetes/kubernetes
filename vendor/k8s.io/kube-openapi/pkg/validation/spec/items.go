@@ -20,6 +20,7 @@ import (
 	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
 	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
+	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/jsontext"
 )
 
 const (
@@ -122,13 +123,13 @@ func (i *Items) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (i *Items) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
+func (i *Items) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 	var x struct {
 		CommonValidations
 		SimpleSchema
-		Extensions
+		Extensions Extensions `json:",inline"`
 	}
-	if err := opts.UnmarshalNext(dec, &x); err != nil {
+	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
 		return err
 	}
 	if err := i.Refable.Ref.fromMap(x.Extensions); err != nil {
@@ -165,16 +166,16 @@ func (i Items) MarshalJSON() ([]byte, error) {
 	return swag.ConcatJSON(b4, b3, b1, b2), nil
 }
 
-func (i Items) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+func (i Items) MarshalJSONTo(enc *jsontext.Encoder) error {
 	var x struct {
 		CommonValidations commonValidationsOmitZero `json:",inline"`
 		SimpleSchema      simpleSchemaOmitZero      `json:",inline"`
 		Ref               string                    `json:"$ref,omitempty"`
-		Extensions
+		Extensions        Extensions                `json:",inline"`
 	}
 	x.CommonValidations = commonValidationsOmitZero(i.CommonValidations)
 	x.SimpleSchema = simpleSchemaOmitZero(i.SimpleSchema)
 	x.Ref = i.Refable.Ref.String()
 	x.Extensions = internal.SanitizeExtensions(i.Extensions)
-	return opts.MarshalNext(enc, x)
+	return jsonv2.MarshalEncode(enc, x)
 }

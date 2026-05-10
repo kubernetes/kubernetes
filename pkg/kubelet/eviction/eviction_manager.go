@@ -588,6 +588,15 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(logger klog.Logger,
 			thresholdsMap[container.Name] = ephemeralLimit
 		}
 	}
+	for _, container := range pod.Spec.InitContainers {
+		if !podutil.IsRestartableInitContainer(&container) {
+			continue
+		}
+		ephemeralLimit := container.Resources.Limits.StorageEphemeral()
+		if ephemeralLimit != nil && ephemeralLimit.Value() != 0 {
+			thresholdsMap[container.Name] = ephemeralLimit
+		}
+	}
 
 	for _, containerStat := range podStats.Containers {
 		containerUsed := diskUsage(containerStat.Logs)

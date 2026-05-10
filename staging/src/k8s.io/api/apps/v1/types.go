@@ -46,6 +46,7 @@ const (
 //
 // The StatefulSet guarantees that a given network identity will always
 // map to the same storage identity.
+// +k8s:supportsSubresource="/status"
 type StatefulSet struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -104,11 +105,12 @@ const (
 	// strategy, new Pods will be created from the specification version indicated
 	// by the StatefulSet's updateRevision.
 	RollingUpdateStatefulSetStrategyType StatefulSetUpdateStrategyType = "RollingUpdate"
-	// OnDeleteStatefulSetStrategyType triggers the legacy behavior. Version
-	// tracking and ordered rolling restarts are disabled. Pods are recreated
-	// from the StatefulSetSpec when they are manually deleted. When a scale
-	// operation is performed with this strategy,specification version indicated
-	// by the StatefulSet's currentRevision.
+	// OnDeleteStatefulSetStrategyType disables ordered rolling restarts. Version
+	// tracking is done on a best-effort basis - the controller will try to
+	// eventually converge StatefulSet's currentRevision with updateRevision.
+	// Pods are recreated from the StatefulSetSpec when they are manually deleted.
+	// When a scale operation is performed with this strategy, new Pods will be
+	// created from the specification version indicated by the StatefulSet's updateRevision.
 	OnDeleteStatefulSetStrategyType StatefulSetUpdateStrategyType = "OnDelete"
 )
 
@@ -359,6 +361,7 @@ type StatefulSetList struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.9
 
 // Deployment enables declarative updates for Pods and ReplicaSets.
+// +k8s:supportsSubresource="/status"
 type Deployment struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -762,6 +765,7 @@ type DaemonSetCondition struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.9
 
 // DaemonSet represents the configuration of a daemon set.
+// +k8s:supportsSubresource="/status"
 type DaemonSet struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -813,6 +817,7 @@ type DaemonSetList struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.9
 
 // ReplicaSet ensures that a specified number of pod replicas are running at any given time.
+// +k8s:supportsSubresource="/status"
 type ReplicaSet struct {
 	metav1.TypeMeta `json:",inline"`
 

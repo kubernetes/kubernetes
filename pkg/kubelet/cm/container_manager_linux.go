@@ -406,8 +406,9 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 			enforceCPULimits:  cm.EnforceCPULimits,
 			// cpuCFSQuotaPeriod is in microseconds. NodeConfig.CPUCFSQuotaPeriod is time.Duration (measured in nano seconds).
 			// Convert (cm.CPUCFSQuotaPeriod) [nanoseconds] / time.Microsecond (1000) to get cpuCFSQuotaPeriod in microseconds.
-			cpuCFSQuotaPeriod:   uint64(cm.CPUCFSQuotaPeriod / time.Microsecond),
-			podContainerManager: cm,
+			cpuCFSQuotaPeriod:       uint64(cm.CPUCFSQuotaPeriod / time.Microsecond),
+			podContainerManager:     cm,
+			memoryReservationPolicy: cm.MemoryReservationPolicy,
 		}
 	}
 	return &podContainerManagerNoop{

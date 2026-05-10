@@ -38,7 +38,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/internal/output"
 	testapiserver "k8s.io/kubernetes/test/utils/apiserver"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 // The line number of the following code is checked in TestFailureOutput below.

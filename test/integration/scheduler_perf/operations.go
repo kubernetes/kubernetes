@@ -22,8 +22,10 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"maps"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -34,7 +36,7 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/klog/v2"
 	testutils "k8s.io/kubernetes/test/utils"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 )
@@ -54,6 +56,9 @@ type createAny struct {
 	// Count determines how many objects get created. Defaults to 1 if unset.
 	Count      *int
 	CountParam string
+	// Params to be passed to the template.
+	// Values with `$` prefix will be resolved to the workload parameters.
+	TemplateParams map[string]any
 }
 
 var _ runnableOp = &createAny{}
@@ -71,13 +76,20 @@ func (c *createAny) collectsMetrics() bool {
 	return false
 }
 
-func (c createAny) patchParams(w *workload) (realOp, error) {
+func (c createAny) patchParams(w *Workload) (realOp, error) {
 	if c.CountParam != "" {
 		count, err := w.Params.get(c.CountParam[1:])
 		if err != nil {
 			return nil, err
 		}
 		c.Count = ptr.To(count)
+	}
+	if len(c.TemplateParams) > 0 {
+		var err error
+		c.TemplateParams, err = resolveTemplateParams(c.TemplateParams, w)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return &c, c.isValid(false)
 }
@@ -95,7 +107,11 @@ func (c *createAny) run(tCtx ktesting.TContext) {
 		count = *c.Count
 	}
 	for index := 0; index < count; index++ {
-		c.create(tCtx, map[string]any{"Index": index, "Count": count})
+		env := make(map[string]any)
+		maps.Copy(env, c.TemplateParams)
+		env["Index"] = index
+		env["Count"] = count
+		c.create(tCtx, env)
 	}
 }
 
@@ -202,6 +218,9 @@ type createNodesOp struct {
 	NodeAllocatableStrategy  *testutils.NodeAllocatableStrategy
 	LabelNodePrepareStrategy *testutils.LabelNodePrepareStrategy
 	UniqueNodeLabelStrategy  *testutils.UniqueNodeLabelStrategy
+	// Params to be passed to the template.
+	// Values with `$` prefix will be resolved to the workload parameters.
+	TemplateParams map[string]any
 }
 
 func (cno *createNodesOp) isValid(allowParameterization bool) error {
@@ -215,10 +234,16 @@ func (*createNodesOp) collectsMetrics() bool {
 	return false
 }
 
-func (cno createNodesOp) patchParams(w *workload) (realOp, error) {
+func (cno createNodesOp) patchParams(w *Workload) (realOp, error) {
+	var err error
 	if cno.CountParam != "" {
-		var err error
 		cno.Count, err = w.Params.get(cno.CountParam[1:])
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(cno.TemplateParams) > 0 {
+		cno.TemplateParams, err = resolveTemplateParams(cno.TemplateParams, w)
 		if err != nil {
 			return nil, err
 		}
@@ -253,7 +278,7 @@ func (*createNamespacesOp) collectsMetrics() bool {
 	return false
 }
 
-func (cmo createNamespacesOp) patchParams(w *workload) (realOp, error) {
+func (cmo createNamespacesOp) patchParams(w *Workload) (realOp, error) {
 	if cmo.CountParam != "" {
 		var err error
 		cmo.Count, err = w.Params.get(cmo.CountParam[1:])
@@ -274,6 +299,10 @@ type createPodsOp struct {
 	Count int
 	// Template parameter for Count.
 	CountParam string
+	// Template parameter for multiplying CountParam. It is used when total number of pods
+	// is defined by number of pods per podgroup for multiple podgroups.
+	// Optional.
+	CountMultiplierParam string
 	// If false, Count pods get created rapidly. This can be used to
 	// measure how quickly the scheduler can fill up a cluster.
 	//
@@ -317,11 +346,17 @@ type createPodsOp struct {
 	// Optional
 	PersistentVolumeTemplatePath      *string
 	PersistentVolumeClaimTemplatePath *string
+	// Params to be passed to the template.
+	// Values with `$` prefix will be resolved to the workload parameters.
+	TemplateParams map[string]any
 }
 
 func (cpo *createPodsOp) isValid(allowParameterization bool) error {
 	if !isValidCount(allowParameterization, cpo.Count, cpo.CountParam) {
 		return fmt.Errorf("invalid Count=%d / CountParam=%q", cpo.Count, cpo.CountParam)
+	}
+	if cpo.CountMultiplierParam != "" && !isValidParameterizable(cpo.CountMultiplierParam) {
+		return fmt.Errorf("invalid CountMultiplierParam=%q", cpo.CountMultiplierParam)
 	}
 	if cpo.CollectMetrics && cpo.SkipWaitToCompletion {
 		// While it's technically possible to achieve this, the additional
@@ -342,13 +377,20 @@ func (cpo *createPodsOp) collectsMetrics() bool {
 	return cpo.CollectMetrics
 }
 
-func (cpo createPodsOp) patchParams(w *workload) (realOp, error) {
+func (cpo createPodsOp) patchParams(w *Workload) (realOp, error) {
+	var err error
 	if cpo.CountParam != "" {
-		var err error
 		cpo.Count, err = w.Params.get(cpo.CountParam[1:])
 		if err != nil {
 			return nil, err
 		}
+	}
+	if cpo.CountMultiplierParam != "" {
+		multiplier, err := w.Params.get(cpo.CountMultiplierParam[1:])
+		if err != nil {
+			return nil, err
+		}
+		cpo.Count *= multiplier
 	}
 	if cpo.DurationParam != "" {
 		durationStr, err := getParam[string](w.Params, cpo.DurationParam[1:])
@@ -360,8 +402,13 @@ func (cpo createPodsOp) patchParams(w *workload) (realOp, error) {
 		}
 	}
 	if cpo.SteadyStateParam != "" {
-		var err error
 		cpo.SteadyState, err = getParam[bool](w.Params, cpo.SteadyStateParam[1:])
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(cpo.TemplateParams) > 0 {
+		cpo.TemplateParams, err = resolveTemplateParams(cpo.TemplateParams, w)
 		if err != nil {
 			return nil, err
 		}
@@ -395,7 +442,7 @@ func (cpso *createPodSetsOp) collectsMetrics() bool {
 	return cpso.CreatePodsOp.CollectMetrics
 }
 
-func (cpso createPodSetsOp) patchParams(w *workload) (realOp, error) {
+func (cpso createPodSetsOp) patchParams(w *Workload) (realOp, error) {
 	if cpso.CountParam != "" {
 		var err error
 		cpso.Count, err = w.Params.get(cpso.CountParam[1:])
@@ -442,7 +489,7 @@ func (dpo *deletePodsOp) collectsMetrics() bool {
 	return false
 }
 
-func (dpo deletePodsOp) patchParams(w *workload) (realOp, error) {
+func (dpo deletePodsOp) patchParams(w *Workload) (realOp, error) {
 	return &dpo, nil
 }
 
@@ -489,7 +536,7 @@ func (*churnOp) collectsMetrics() bool {
 	return false
 }
 
-func (co churnOp) patchParams(w *workload) (realOp, error) {
+func (co churnOp) patchParams(w *Workload) (realOp, error) {
 	return &co, nil
 }
 
@@ -530,7 +577,7 @@ func (*barrierOp) collectsMetrics() bool {
 	return false
 }
 
-func (bo barrierOp) patchParams(w *workload) (realOp, error) {
+func (bo barrierOp) patchParams(w *Workload) (realOp, error) {
 	if bo.StageRequirement == "" {
 		bo.StageRequirement = Scheduled
 	}
@@ -556,7 +603,7 @@ func (so *sleepOp) collectsMetrics() bool {
 	return false
 }
 
-func (so sleepOp) patchParams(w *workload) (realOp, error) {
+func (so sleepOp) patchParams(w *Workload) (realOp, error) {
 	if so.DurationParam != "" {
 		durationStr, err := getParam[string](w.Params, so.DurationParam[1:])
 		if err != nil {
@@ -567,6 +614,40 @@ func (so sleepOp) patchParams(w *workload) (realOp, error) {
 		}
 	}
 	return &so, nil
+}
+
+// waitForPodGroups defines an op that waits for a specific number of PodGroup objects to be visible in the scheduler's cache.
+type waitForPodGroups struct {
+	// Must be waitForPodGroupsOpcode.
+	Opcode operationCode
+	// Namespace the objects should be in.
+	Namespace string
+	// Count determines how many objects to wait for.
+	Count int
+	// CountParam is the name of the parameter that determines the count.
+	CountParam string
+}
+
+func (w *waitForPodGroups) isValid(allowParameterization bool) error {
+	if !isValidCount(allowParameterization, w.Count, w.CountParam) {
+		return fmt.Errorf("invalid Count=%d / CountParam=%q", w.Count, w.CountParam)
+	}
+	return nil
+}
+
+func (w *waitForPodGroups) collectsMetrics() bool {
+	return false
+}
+
+func (w waitForPodGroups) patchParams(workload *Workload) (realOp, error) {
+	if w.CountParam != "" {
+		var err error
+		w.Count, err = workload.Params.get(w.CountParam[1:])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &w, (&w).isValid(false)
 }
 
 // startCollectingMetricsOp defines an op that starts metrics collectors.
@@ -595,7 +676,7 @@ func (*startCollectingMetricsOp) collectsMetrics() bool {
 	return false
 }
 
-func (scm startCollectingMetricsOp) patchParams(_ *workload) (realOp, error) {
+func (scm startCollectingMetricsOp) patchParams(_ *Workload) (realOp, error) {
 	return &scm, nil
 }
 
@@ -615,8 +696,28 @@ func (*stopCollectingMetricsOp) collectsMetrics() bool {
 	return true
 }
 
-func (scm stopCollectingMetricsOp) patchParams(_ *workload) (realOp, error) {
+func (scm stopCollectingMetricsOp) patchParams(_ *Workload) (realOp, error) {
 	return &scm, nil
+}
+
+// resolveTemplateParams resolves the template parameters using the workload parameters.
+func resolveTemplateParams(templateParams map[string]any, w *Workload) (map[string]any, error) {
+	if len(templateParams) == 0 {
+		return templateParams, nil
+	}
+	resolved := maps.Clone(templateParams)
+	for k, v := range resolved {
+		if s, ok := v.(string); ok && strings.HasPrefix(s, "$") {
+			paramKey := s[1:]
+			if val, found := w.Params.params[paramKey]; found {
+				w.Params.isUsed[paramKey] = true
+				resolved[k] = val
+				continue
+			}
+			return nil, fmt.Errorf("parameter %q not found", paramKey)
+		}
+	}
+	return resolved, nil
 }
 
 func getTemplateFuncs() template.FuncMap {

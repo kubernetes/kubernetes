@@ -2,19 +2,13 @@
 timeout: 1200s
 options:
   substitution_option: ALLOW_LOOSE
-  machineType: 'N1_HIGHCPU_8'
+  machineType: 'E2_HIGHCPU_8'
 steps:
-  - name: 'gcr.io/k8s-staging-test-infra/gcb-docker-gcloud:v20240523-a15ad90fc9@sha256:bb04162508c2c61637eae700a0d8e8c8be8f2d4c831d2b75e59db2d4dd6cf75d'
-    entrypoint: 'bash'
+  - name: 'gcr.io/k8s-staging-test-infra/gcb-docker-gcloud:v20260108-7f313c340e@sha256:4d778a001ae3f4247b2b61d8a870319e71d66c87556969a6399b90972e4d0491'
     dir: ./build/pause
     env:
-      - DOCKER_CLI_EXPERIMENTAL=enabled
       - REGISTRY=gcr.io/$PROJECT_ID
       - IMAGE=gcr.io/$PROJECT_ID/pause
-      - HOME=/root
     args:
-      - '-c'
-      - |
-        gcloud auth configure-docker \
-        && docker buildx create --name img-builder --use \
-        && make all-push
+      - make 
+      - all-push

@@ -80,7 +80,7 @@ type TransportCacheMetric interface {
 }
 
 // TransportCreateCallsMetric counts the number of times a transport is created
-// partitioned by the result of the cache: hit, miss, uncacheable
+// partitioned by the result of the cache: hit, miss, miss-gc, uncacheable
 type TransportCreateCallsMetric interface {
 	Increment(result string)
 }
@@ -89,6 +89,18 @@ type TransportCreateCallsMetric interface {
 // partitioned by the result and reason.
 type TransportCAReloadsMetric interface {
 	Increment(result, reason string)
+}
+
+// TransportCertRotationGCCallsMetric counts the number of times a cert rotation
+// goroutine cancel func is called via GC cleanup.
+type TransportCertRotationGCCallsMetric interface {
+	Increment()
+}
+
+// TransportCacheGCCallsMetric counts the number of times a GC cleanup
+// attempts to delete a cache entry, partitioned by the result: deleted, skipped.
+type TransportCacheGCCallsMetric interface {
+	Increment(result string)
 }
 
 var (
@@ -123,27 +135,34 @@ var (
 	// TransportCreateCalls is the metric that counts the number of times a new transport
 	// is created
 	TransportCreateCalls TransportCreateCallsMetric = noopTransportCreateCalls{}
-
 	// TransportCAReloads is the metric that counts the number of times a CA reload is attempted
 	TransportCAReloads TransportCAReloadsMetric = noopTransportCAReloads{}
+	// TransportCertRotationGCCalls counts the number of times a cert rotation goroutine
+	// cancel func is called via GC cleanup
+	TransportCertRotationGCCalls TransportCertRotationGCCallsMetric = noopTransportCertRotationGCCalls{}
+	// TransportCacheGCCalls counts the number of times a GC cleanup attempts
+	// to delete a transport cache entry, partitioned by result: deleted, skipped.
+	TransportCacheGCCalls TransportCacheGCCallsMetric = noopTransportCacheGCCalls{}
 )
 
 // RegisterOpts contains all the metrics to register. Metrics may be nil.
 type RegisterOpts struct {
-	ClientCertExpiry      ExpiryMetric
-	ClientCertRotationAge DurationMetric
-	RequestLatency        LatencyMetric
-	ResolverLatency       ResolverLatencyMetric
-	RequestSize           SizeMetric
-	ResponseSize          SizeMetric
-	RateLimiterLatency    LatencyMetric
-	RequestResult         ResultMetric
-	ExecPluginCalls       CallsMetric
-	ExecPluginPolicyCalls PolicyCallsMetric
-	RequestRetry          RetryMetric
-	TransportCacheEntries TransportCacheMetric
-	TransportCreateCalls  TransportCreateCallsMetric
-	TransportCAReloads    TransportCAReloadsMetric
+	ClientCertExpiry             ExpiryMetric
+	ClientCertRotationAge        DurationMetric
+	RequestLatency               LatencyMetric
+	ResolverLatency              ResolverLatencyMetric
+	RequestSize                  SizeMetric
+	ResponseSize                 SizeMetric
+	RateLimiterLatency           LatencyMetric
+	RequestResult                ResultMetric
+	ExecPluginCalls              CallsMetric
+	ExecPluginPolicyCalls        PolicyCallsMetric
+	RequestRetry                 RetryMetric
+	TransportCacheEntries        TransportCacheMetric
+	TransportCreateCalls         TransportCreateCallsMetric
+	TransportCAReloads           TransportCAReloadsMetric
+	TransportCertRotationGCCalls TransportCertRotationGCCallsMetric
+	TransportCacheGCCalls        TransportCacheGCCallsMetric
 }
 
 // Register registers metrics for the rest client to use. This can
@@ -191,6 +210,12 @@ func Register(opts RegisterOpts) {
 		}
 		if opts.TransportCAReloads != nil {
 			TransportCAReloads = opts.TransportCAReloads
+		}
+		if opts.TransportCertRotationGCCalls != nil {
+			TransportCertRotationGCCalls = opts.TransportCertRotationGCCalls
+		}
+		if opts.TransportCacheGCCalls != nil {
+			TransportCacheGCCalls = opts.TransportCacheGCCalls
 		}
 	})
 }
@@ -243,3 +268,11 @@ func (noopTransportCreateCalls) Increment(string) {}
 type noopTransportCAReloads struct{}
 
 func (noopTransportCAReloads) Increment(result, reason string) {}
+
+type noopTransportCertRotationGCCalls struct{}
+
+func (noopTransportCertRotationGCCalls) Increment() {}
+
+type noopTransportCacheGCCalls struct{}
+
+func (noopTransportCacheGCCalls) Increment(string) {}

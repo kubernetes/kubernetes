@@ -92,6 +92,7 @@ type HorizontalPodAutoscalerStatus struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.2
 
 // configuration of a horizontal pod autoscaler.
+// +k8s:supportsSubresource="/status"
 type HorizontalPodAutoscaler struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -414,6 +415,8 @@ const (
 	// ScalingLimited indicates that the calculated scale based on metrics would be above or
 	// below the range for the HPA, and has thus been capped.
 	ScalingLimited HorizontalPodAutoscalerConditionType = "ScalingLimited"
+	// ScaledToZero indicates that the HPA controller scaled the workload to zero.
+	ScaledToZero HorizontalPodAutoscalerConditionType = "ScaledToZero"
 )
 
 // HorizontalPodAutoscalerCondition describes the state of

@@ -193,6 +193,7 @@ type NodeConfig struct {
 	CPUManagerReconcilePeriod    time.Duration
 	MemoryManagerPolicy          string
 	MemoryManagerReservedMemory  []kubeletconfig.MemoryReservation
+	MemoryReservationPolicy      kubeletconfig.MemoryReservationPolicy
 	PodPidsLimit                 int64
 	EnforceCPULimits             bool
 	CPUCFSQuotaPeriod            time.Duration

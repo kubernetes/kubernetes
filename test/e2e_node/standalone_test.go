@@ -394,7 +394,7 @@ var _ = SIGDescribe(feature.StandaloneMode, func() {
 				ginkgo.By("wait for the mirror pod to be updated")
 				gomega.Eventually(ctx, func(g gomega.Gomega) {
 					pod, err := getPodFromStandaloneKubelet(ctx, staticPod.Namespace, staticPod.Name)
-					g.Expect(pod.Status.StartTime).NotTo(gomega.Equal(startTime))
+					g.Expect(pod.Status.StartTime.Equal(startTime)).To(gomega.BeFalseBecause("startTime should not be equal"))
 					g.Expect(err).Should(gomega.Succeed())
 					g.Expect(pod.Status.InitContainerStatuses).To(gomega.HaveLen(1))
 					cstatus := pod.Status.InitContainerStatuses[0]

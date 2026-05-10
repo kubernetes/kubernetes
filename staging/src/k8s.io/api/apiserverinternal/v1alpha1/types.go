@@ -25,6 +25,7 @@ import (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Storage version of a specific resource.
+// +k8s:supportsSubresource="/status"
 type StorageVersion struct {
 	metav1.TypeMeta `json:",inline"`
 	// metadata is the standard object metadata.

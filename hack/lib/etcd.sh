@@ -16,7 +16,7 @@
 
 # A set of helpers for starting/running etcd for tests
 
-ETCD_VERSION=${ETCD_VERSION:-3.6.8}
+ETCD_VERSION=${ETCD_VERSION:-3.6.10}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
 # This is intentionally not called ETCD_LOG_LEVEL:
@@ -84,6 +84,11 @@ kube::etcd::start() {
   else
     ETCD_LOGFILE=${ETCD_LOGFILE:-"/dev/null"}
   fi
+  if [[ -n "${ETCD_DRY_RUN:-}" ]]; then
+      echo "RUN etcd: $(command -v etcd) --advertise-client-urls ${KUBE_INTEGRATION_ETCD_URL} --data-dir ${ETCD_DIR} --listen-client-urls ${KUBE_INTEGRATION_ETCD_URL} --listen-peer-urls http://localhost:0 --log-level=${ETCD_LOGLEVEL}"
+      return
+  fi
+
   kube::log::info "etcd --advertise-client-urls ${KUBE_INTEGRATION_ETCD_URL} --data-dir ${ETCD_DIR} --listen-client-urls http://${ETCD_HOST}:${ETCD_PORT} --listen-peer-urls http://localhost:0 --log-level=${ETCD_LOGLEVEL} 2> \"${ETCD_LOGFILE}\" >/dev/null"
   etcd --advertise-client-urls "${KUBE_INTEGRATION_ETCD_URL}" --data-dir "${ETCD_DIR}" --listen-client-urls "${KUBE_INTEGRATION_ETCD_URL}" --listen-peer-urls "http://localhost:0" --log-level="${ETCD_LOGLEVEL}" 2> "${ETCD_LOGFILE}" >/dev/null &
   ETCD_PID=$!

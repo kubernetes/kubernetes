@@ -360,6 +360,7 @@ const (
 // PersistentVolume (PV) is a storage resource provisioned by an administrator.
 // It is analogous to a node.
 // More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes
+// +k8s:supportsSubresource="/status"
 type PersistentVolume struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -510,6 +511,7 @@ type PersistentVolumeList struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.0
 
 // PersistentVolumeClaim is a user's request for and claim to a persistent volume
+// +k8s:supportsSubresource="/status"
 type PersistentVolumeClaim struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -578,8 +580,8 @@ type PersistentVolumeClaimSpec struct {
 	// * An existing PVC (PersistentVolumeClaim)
 	// If the provisioner or an external controller can support the specified data source,
 	// it will create a new volume based on the contents of the specified data source.
-	// When the AnyVolumeDataSource feature gate is enabled, dataSource contents will be copied to dataSourceRef,
-	// and dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified.
+	// dataSource contents will be copied to dataSourceRef, and dataSourceRef contents will be
+	// copied to dataSource when dataSourceRef.namespace is not specified.
 	// If the namespace is specified, then dataSourceRef will not be copied to dataSource.
 	// +optional
 	DataSource *TypedLocalObjectReference `json:"dataSource,omitempty" protobuf:"bytes,7,opt,name=dataSource"`
@@ -604,7 +606,6 @@ type PersistentVolumeClaimSpec struct {
 	//   specified.
 	// * While dataSource only allows local objects, dataSourceRef allows objects
 	//   in any namespaces.
-	// (Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled.
 	// (Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.
 	// +optional
 	DataSourceRef *TypedObjectReference `json:"dataSourceRef,omitempty" protobuf:"bytes,8,opt,name=dataSourceRef"`
@@ -669,6 +670,17 @@ const (
 	PersistentVolumeClaimVolumeModifyVolumeError PersistentVolumeClaimConditionType = "ModifyVolumeError"
 	// Volume is being modified
 	PersistentVolumeClaimVolumeModifyingVolume PersistentVolumeClaimConditionType = "ModifyingVolume"
+
+	// PersistentVolumeClaimUnused indicates whether the PVC is currently not in use by any Pod.
+	// When status is True, the PVC is not referenced by any non-terminal Pod.
+	// The lastTransitionTime indicates when the PVC last transitioned to being unused.
+	//
+	// Both in-use time and unused time duration indicated by this condition may be shorter or
+	// slightly longer than actual in-use time or unused time because of processing delays or
+	// when this feature was enabled in the cluster.
+	//
+	// Requires PersistentVolumeClaimUnusedSinceTime alpha featuregate
+	PersistentVolumeClaimUnused PersistentVolumeClaimConditionType = "Unused"
 )
 
 // +enum
@@ -2389,8 +2401,7 @@ type VolumeMount struct {
 	// If this field is not specified, it is treated as an equivalent of Disabled.
 	// +optional
 	RecursiveReadOnly *RecursiveReadOnlyMode `json:"recursiveReadOnly,omitempty" protobuf:"bytes,7,opt,name=recursiveReadOnly,casttype=RecursiveReadOnlyMode"`
-	// Path within the container at which the volume should be mounted.  Must
-	// not contain ':'.
+	// Path within the container at which the volume should be mounted.
 	MountPath string `json:"mountPath" protobuf:"bytes,3,opt,name=mountPath"`
 	// Path within the volume from which the container's volume should be mounted.
 	// Defaults to "" (volume's root).
@@ -3629,7 +3640,7 @@ type VolumeMountStatus struct {
 	// volumeStatus represents volume-type-specific status about the mounted
 	// volume.
 	// +optional
-	VolumeStatus `json:"volumeStatus,omitempty" protobuf:"bytes,5,opt,name=volumeStatus"`
+	VolumeStatus *VolumeStatus `json:"volumeStatus,omitempty" protobuf:"bytes,5,opt,name=volumeStatus"`
 }
 
 // VolumeStatus represents the status of a mounted volume.
@@ -4494,6 +4505,14 @@ type PodSpec struct {
 //
 // It adds a name to it that uniquely identifies the ResourceClaim inside the Pod.
 // Containers that need access to the ResourceClaim reference it with this name.
+//
+// When the DRAWorkloadResourceClaims feature gate is enabled and this Pod
+// belongs to a PodGroup, a PodResourceClaim is matched to a
+// PodGroupResourceClaim if all of their fields are equal (Name,
+// ResourceClaimName, and ResourceClaimTemplateName). A matched claim references
+// a single ResourceClaim shared across all Pods in the PodGroup, reserved for
+// the PodGroup in ResourceClaimStatus.ReservedFor rather than for individual
+// Pods.
 type PodResourceClaim struct {
 	// Name uniquely identifies this resource claim inside the pod.
 	// This must be a DNS_LABEL.
@@ -4520,6 +4539,16 @@ type PodResourceClaim struct {
 	// generated component, will be used to form a unique name for the
 	// ResourceClaim, which will be recorded in pod.status.resourceClaimStatuses.
 	//
+	// When the DRAWorkloadResourceClaims feature gate is enabled and the pod
+	// belongs to a PodGroup that defines a PodGroupResourceClaim with the same
+	// Name and ResourceClaimTemplateName, this PodResourceClaim resolves to the
+	// ResourceClaim generated for the PodGroup. All pods in the group that
+	// define an equivalent PodResourceClaim matching the
+	// PodGroupResourceClaim's Name and ResourceClaimTemplateName share the same
+	// generated ResourceClaim. ResourceClaims generated for a PodGroup are
+	// owned by the PodGroup and their lifecycles are tied to the PodGroup
+	// instead of any individual pod.
+	//
 	// This field is immutable and no changes will be made to the
 	// corresponding ResourceClaim by the control plane after creating the
 	// ResourceClaim.
@@ -4539,9 +4568,16 @@ type PodResourceClaimStatus struct {
 	Name string `json:"name" protobuf:"bytes,1,name=name"`
 
 	// ResourceClaimName is the name of the ResourceClaim that was
-	// generated for the Pod in the namespace of the Pod. If this is
-	// unset, then generating a ResourceClaim was not necessary. The
-	// pod.spec.resourceClaims entry can be ignored in this case.
+	// generated for the Pod in the namespace of the Pod.
+	//
+	// When the DRAWorkloadResourceClaims feature is enabled and the
+	// corresponding PodResourceClaim matches a PodGroupResourceClaim
+	// made by the Pod's PodGroup, then this is the name of the
+	// ResourceClaim generated and reserved for the PodGroup.
+	//
+	// If this is unset, then generating a ResourceClaim was not
+	// necessary. The pod.spec.resourceClaims entry can be ignored in
+	// this case.
 	//
 	// +optional
 	ResourceClaimName *string `json:"resourceClaimName,omitempty" protobuf:"bytes,2,opt,name=resourceClaimName"`
@@ -5432,25 +5468,16 @@ type PodStatus struct {
 	// +featureGate=InPlacePodLevelResourcesVerticalScaling
 	// +optional
 	Resources *ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,20,opt,name=resources"`
-}
 
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +k8s:prerelease-lifecycle-gen:introduced=1.0
-
-// PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded
-type PodStatusResult struct {
-	metav1.TypeMeta `json:",inline"`
-	// Standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources
+	// that were allocated for this pod through DRA claims. This includes resources currently
+	// reported in v1.Node `status.allocatable` that are not extended resources
+	// (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources).
+	// Examples include "cpu", "memory", "ephemeral-storage", and hugepages.
+	// +featureGate=DRANodeAllocatableResources
 	// +optional
-	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	// Most recently observed status of the pod.
-	// This data may not be up to date.
-	// Populated by the system.
-	// Read-only.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +optional
-	Status PodStatus `json:"status,omitempty" protobuf:"bytes,2,opt,name=status"`
+	// +listType=atomic
+	NodeAllocatableResourceClaimStatuses []NodeAllocatableResourceClaimStatus `json:"nodeAllocatableResourceClaimStatuses,omitempty" protobuf:"bytes,21,rep,name=nodeAllocatableResourceClaimStatuses"`
 }
 
 // +genclient
@@ -5461,6 +5488,8 @@ type PodStatusResult struct {
 
 // Pod is a collection of containers that can run on a host. This resource is created
 // by clients and scheduled onto hosts.
+// +k8s:supportsSubresource="/status"
+// +k8s:supportsSubresource="/ephemeralcontainers"
 type Pod struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -5653,6 +5682,7 @@ type ReplicationControllerCondition struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +k8s:prerelease-lifecycle-gen:introduced=1.0
 // +k8s:supportsSubresource="/scale"
+// +k8s:supportsSubresource="/status"
 
 // ReplicationController represents the configuration of a replication controller.
 type ReplicationController struct {
@@ -6249,6 +6279,8 @@ type ServicePort struct {
 // Service is a named abstraction of software service (for example, mysql) consisting of local port
 // (for example 3306) that the proxy listens on, and the selector that determines which pods
 // will answer requests sent through the proxy.
+// +k8s:supportsSubresource="/status"
+// +k8s:supportsSubresource="/proxy"
 type Service struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -6984,6 +7016,8 @@ type ResourceList map[ResourceName]resource.Quantity
 
 // Node is a worker node in Kubernetes.
 // Each node will have a unique identifier in the cache (i.e. in etcd).
+// +k8s:supportsSubresource="/status"
+// +k8s:supportsSubresource="/proxy"
 type Node struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -7111,6 +7145,7 @@ type NamespaceCondition struct {
 
 // Namespace provides a scope for Names.
 // Use of multiple namespaces is optional.
+// +k8s:supportsSubresource="/status"
 type Namespace struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -7846,6 +7881,7 @@ type ResourceQuotaStatus struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.0
 
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
+// +k8s:supportsSubresource="/status"
 type ResourceQuota struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -8466,4 +8502,18 @@ type ImageVolumeSource struct {
 	// Defaults to Always if :latest tag is specified, or IfNotPresent otherwise.
 	// +optional
 	PullPolicy PullPolicy `json:"pullPolicy,omitempty" protobuf:"bytes,2,opt,name=pullPolicy,casttype=PullPolicy"`
+}
+
+// NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.
+type NodeAllocatableResourceClaimStatus struct {
+	// ResourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.
+	// +required
+	ResourceClaimName string `json:"resourceClaimName" protobuf:"bytes,1,opt,name=resourceClaimName"`
+	// Containers lists the names of all containers in this pod that reference the claim.
+	// +optional
+	// +listType=set
+	Containers []string `json:"containers,omitempty" protobuf:"bytes,2,rep,name=containers"`
+	// Resources is a map of the node-allocatable resource name to the aggregate quantity allocated to the claim.
+	// +required
+	Resources map[ResourceName]resource.Quantity `json:"resources" protobuf:"bytes,3,rep,name=resources"`
 }

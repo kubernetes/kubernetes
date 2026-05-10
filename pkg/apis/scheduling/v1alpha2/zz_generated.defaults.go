@@ -22,6 +22,7 @@ limitations under the License.
 package v1alpha2
 
 import (
+	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -29,5 +30,21 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&schedulingv1alpha2.PodGroup{}, func(obj interface{}) { SetObjectDefaults_PodGroup(obj.(*schedulingv1alpha2.PodGroup)) })
+	scheme.AddTypeDefaultingFunc(&schedulingv1alpha2.PodGroupList{}, func(obj interface{}) { SetObjectDefaults_PodGroupList(obj.(*schedulingv1alpha2.PodGroupList)) })
 	return nil
+}
+
+func SetObjectDefaults_PodGroup(in *schedulingv1alpha2.PodGroup) {
+	if in.Spec.DisruptionMode == nil {
+		var ptrVar1 schedulingv1alpha2.DisruptionMode = "Pod"
+		in.Spec.DisruptionMode = &ptrVar1
+	}
+}
+
+func SetObjectDefaults_PodGroupList(in *schedulingv1alpha2.PodGroupList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_PodGroup(a)
+	}
 }

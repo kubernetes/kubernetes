@@ -92,9 +92,8 @@ func getPodMatches(ctx context.Context, c clientset.Interface, nodeName string, 
 func waitTillNPodsRunningOnNodes(ctx context.Context, c clientset.Interface, nodeNames sets.String, podNamePrefix string, namespace string, targetNumPods int, timeout time.Duration) error {
 	return wait.PollUntilContextTimeout(ctx, pollInterval, timeout, false, func(ctx context.Context) (bool, error) {
 		matchCh := make(chan sets.String, len(nodeNames))
-		for _, item := range nodeNames.List() {
+		for _, nodeName := range nodeNames.List() {
 			// Launch a goroutine per node to check the pods running on the nodes.
-			nodeName := item
 			go func() {
 				matchCh <- getPodMatches(ctx, c, nodeName, podNamePrefix, namespace)
 			}()
@@ -323,7 +322,6 @@ var _ = SIGDescribe("kubelet", func() {
 		for _, itArg := range deleteTests {
 			name := fmt.Sprintf(
 				"kubelet should be able to delete %d pods per node in %v.", itArg.podsPerNode, itArg.timeout)
-			itArg := itArg
 			ginkgo.It(name, func(ctx context.Context) {
 				start(ctx)
 				totalPods := itArg.podsPerNode * numNodes

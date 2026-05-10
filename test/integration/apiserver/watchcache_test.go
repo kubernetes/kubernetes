@@ -180,9 +180,8 @@ func BenchmarkListFromWatchCache(b *testing.B) {
 	wg := sync.WaitGroup{}
 
 	errCh := make(chan error, namespaces)
-	for i := range namespaces {
+	for index := range namespaces {
 		wg.Add(1)
-		index := i
 		go func() {
 			defer wg.Done()
 

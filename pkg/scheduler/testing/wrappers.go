@@ -1324,6 +1324,11 @@ func (wrapper *ResourceClaimWrapper) ReservedForPod(podName string, podUID types
 	return wrapper.ReservedFor(resourceapi.ResourceClaimConsumerReference{Resource: "pods", Name: podName, UID: podUID})
 }
 
+// ReservedForPodGroup sets that field of the inner object given information about one podgroup.
+func (wrapper *ResourceClaimWrapper) ReservedForPodGroup(podGroupName string, podGroupUID types.UID) *ResourceClaimWrapper {
+	return wrapper.ReservedFor(resourceapi.ResourceClaimConsumerReference{APIGroup: schedulingapi.GroupName, Resource: "podgroups", Name: podGroupName, UID: podGroupUID})
+}
+
 type ResourceSliceWrapper struct {
 	resourceapi.ResourceSlice
 }
@@ -1588,6 +1593,12 @@ func (wrapper *PodGroupWrapper) Namespace(namespace string) *PodGroupWrapper {
 	return wrapper
 }
 
+// UID sets `uid` as the UID of the inner PodGroup.
+func (wrapper *PodGroupWrapper) UID(uid types.UID) *PodGroupWrapper {
+	wrapper.PodGroup.UID = uid
+	return wrapper
+}
+
 // Obj returns the inner PodGroup.
 func (wrapper *PodGroupWrapper) Obj() *schedulingapi.PodGroup {
 	return &wrapper.PodGroup
@@ -1619,6 +1630,73 @@ func (wrapper *PodGroupWrapper) TemplateRef(templateName, workloadName string) *
 	return wrapper
 }
 
+// TopologyKey sets appropriate TopologyKey field in the SchedulingConstraints of the inner PodGroup.
+func (wrapper *PodGroupWrapper) TopologyKey(topologyKey string) *PodGroupWrapper {
+	wrapper.PodGroup.Spec.SchedulingConstraints = &schedulingapi.PodGroupSchedulingConstraints{
+		Topology: []schedulingapi.TopologyConstraint{
+			{
+				Key: topologyKey,
+			},
+		},
+	}
+	return wrapper
+}
+
+// ResourceClaims adds resource claims to the inner PodGroup.
+func (wrapper *PodGroupWrapper) ResourceClaims(claims ...schedulingapi.PodGroupResourceClaim) *PodGroupWrapper {
+	wrapper.Spec.ResourceClaims = append(wrapper.Spec.ResourceClaims, claims...)
+	return wrapper
+}
+
+// ResourceClaimStatuses adds resource claim statuses to the inner PodGroup.
+func (wrapper *PodGroupWrapper) ResourceClaimStatuses(statuses ...schedulingapi.PodGroupResourceClaimStatus) *PodGroupWrapper {
+	wrapper.Status.ResourceClaimStatuses = append(wrapper.Status.ResourceClaimStatuses, statuses...)
+	return wrapper
+}
+
+// DisruptionMode sets the disruption mode of the inner PodGroup.
+func (wrapper *PodGroupWrapper) DisruptionMode(mode schedulingapi.DisruptionMode) *PodGroupWrapper {
+	wrapper.PodGroup.Spec.DisruptionMode = &mode
+	return wrapper
+}
+
+// Priority sets the priority of the inner PodGroup.
+func (wrapper *PodGroupWrapper) Priority(priority int32) *PodGroupWrapper {
+	wrapper.PodGroup.Spec.Priority = &priority
+	return wrapper
+}
+
+// WorkloadWrapper wraps a Workload inside.
+type WorkloadWrapper struct{ schedulingapi.Workload }
+
+// MakeWorkload creates a Workload wrapper.
+func MakeWorkload() *WorkloadWrapper {
+	return &WorkloadWrapper{}
+}
+
+// Obj returns the inner Workload.
+func (wrapper *WorkloadWrapper) Obj() *schedulingapi.Workload {
+	return &wrapper.Workload
+}
+
+// Name sets `name` as the name of the inner Workload.
+func (wrapper *WorkloadWrapper) Name(name string) *WorkloadWrapper {
+	wrapper.Workload.Name = name
+	return wrapper
+}
+
+// Namespace sets `namespace` as the namespace of the inner Workload.
+func (wrapper *WorkloadWrapper) Namespace(namespace string) *WorkloadWrapper {
+	wrapper.Workload.Namespace = namespace
+	return wrapper
+}
+
+// PodGroupTemplate appends the given PodGroupTemplate to the Workload spec.
+func (wrapper *WorkloadWrapper) PodGroupTemplate(t schedulingapi.PodGroupTemplate) *WorkloadWrapper {
+	wrapper.Workload.Spec.PodGroupTemplates = append(wrapper.Workload.Spec.PodGroupTemplates, t)
+	return wrapper
+}
+
 // PodGroupTemplateWrapper wraps a PodGroupTemplate inside.
 type PodGroupTemplateWrapper struct{ schedulingapi.PodGroupTemplate }
 
@@ -1628,8 +1706,8 @@ func MakePodGroupTemplate() *PodGroupTemplateWrapper {
 }
 
 // Obj returns the inner PodGroupTemplate.
-func (wrapper *PodGroupTemplateWrapper) Obj() *schedulingapi.PodGroupTemplate {
-	return &wrapper.PodGroupTemplate
+func (wrapper *PodGroupTemplateWrapper) Obj() schedulingapi.PodGroupTemplate {
+	return wrapper.PodGroupTemplate
 }
 
 // Name sets `name` as the name of the inner PodGroupTemplate.

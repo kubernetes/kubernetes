@@ -980,6 +980,367 @@ func TestGetPodTopologyHints(t *testing.T) {
 	}
 }
 
+func TestDeviceNUMANodes(t *testing.T) {
+	resource := "testdevice"
+	deviceOnNode := func(id string, node int) *pluginapi.Device {
+		return &pluginapi.Device{
+			ID:       id,
+			Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: int64(node)}}},
+		}
+	}
+
+	t.Run("collects NUMA nodes from all devices", func(t *testing.T) {
+		m := ManagerImpl{
+			allDevices: NewResourceDeviceInstances(),
+			numaNodes:  []int{0, 3, 5, 7},
+		}
+		m.allDevices[resource] = DeviceInstances{
+			"a": deviceOnNode("a", 3),
+			"b": deviceOnNode("b", 5),
+		}
+
+		nodes := m.deviceNUMANodes(resource)
+		expected := []int{3, 5}
+		if !reflect.DeepEqual(nodes, expected) {
+			t.Fatalf("expected nodes %v, got %v", expected, nodes)
+		}
+	})
+
+	t.Run("device without topology is ignored", func(t *testing.T) {
+		m := ManagerImpl{
+			allDevices: NewResourceDeviceInstances(),
+			numaNodes:  []int{0, 4},
+		}
+		m.allDevices[resource] = DeviceInstances{
+			"a": deviceOnNode("a", 4),
+			"b": {ID: "b", Topology: nil},
+		}
+
+		nodes := m.deviceNUMANodes(resource)
+		expected := []int{4}
+		if !reflect.DeepEqual(nodes, expected) {
+			t.Fatalf("expected nodes %v, got %v", expected, nodes)
+		}
+	})
+
+	t.Run("returns empty when no device has topology", func(t *testing.T) {
+		m := ManagerImpl{
+			allDevices: NewResourceDeviceInstances(),
+		}
+		m.allDevices[resource] = DeviceInstances{
+			"a": {ID: "a", Topology: nil},
+			"b": {ID: "b", Topology: nil},
+		}
+
+		nodes := m.deviceNUMANodes(resource)
+		if len(nodes) != 0 {
+			t.Fatalf("expected empty nodes, got %v", nodes)
+		}
+	})
+
+	t.Run("unknown NUMA IDs from device plugin are dropped", func(t *testing.T) {
+		m := ManagerImpl{
+			allDevices: NewResourceDeviceInstances(),
+			numaNodes:  []int{0, 1},
+		}
+		m.allDevices[resource] = DeviceInstances{
+			"a": deviceOnNode("a", 0),
+			"b": deviceOnNode("b", 99),
+		}
+
+		nodes := m.deviceNUMANodes(resource)
+		expected := []int{0}
+		if !reflect.DeepEqual(nodes, expected) {
+			t.Fatalf("expected nodes %v (node 99 should be dropped), got %v", expected, nodes)
+		}
+	})
+}
+
+func TestGenerateDeviceTopologyHintsFiltersNUMANodes(t *testing.T) {
+	resource := "gpu"
+
+	t.Run("two node machine, device on one node", func(t *testing.T) {
+		m := ManagerImpl{
+			allDevices: NewResourceDeviceInstances(),
+			numaNodes:  []int{0, 1},
+		}
+		m.allDevices[resource] = DeviceInstances{
+			"a": {
+				ID:       "a",
+				Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: 0}}},
+			},
+		}
+
+		hints := m.generateDeviceTopologyHints(resource, sets.New[string]("a"), nil, 1)
+
+		maskNode0, _ := bitmask.NewBitMask(0)
+		expected := []topologymanager.TopologyHint{
+			{NUMANodeAffinity: maskNode0, Preferred: true},
+		}
+
+		if !reflect.DeepEqual(hints, expected) {
+			t.Fatalf("expected hints %v, got %v", expected, hints)
+		}
+	})
+
+	t.Run("large NUMA machine with devices on small subset", func(t *testing.T) {
+		allNUMA := make([]int, 34)
+		for i := range allNUMA {
+			allNUMA[i] = i
+		}
+
+		m := ManagerImpl{
+			allDevices: NewResourceDeviceInstances(),
+			numaNodes:  allNUMA,
+		}
+		m.allDevices[resource] = DeviceInstances{
+			"gpu0": {
+				ID:       "gpu0",
+				Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: 0}}},
+			},
+			"gpu1": {
+				ID:       "gpu1",
+				Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: 1}}},
+			},
+		}
+
+		hints := m.generateDeviceTopologyHints(resource, sets.New[string]("gpu0", "gpu1"), nil, 1)
+		sort.SliceStable(hints, func(i, j int) bool { return hints[i].LessThan(hints[j]) })
+
+		maskNode0, _ := bitmask.NewBitMask(0)
+		maskNode1, _ := bitmask.NewBitMask(1)
+		maskBoth, _ := bitmask.NewBitMask(0, 1)
+		expected := []topologymanager.TopologyHint{
+			{NUMANodeAffinity: maskNode0, Preferred: true},
+			{NUMANodeAffinity: maskNode1, Preferred: true},
+			{NUMANodeAffinity: maskBoth, Preferred: false},
+		}
+		sort.SliceStable(expected, func(i, j int) bool { return expected[i].LessThan(expected[j]) })
+
+		if !reflect.DeepEqual(hints, expected) {
+			t.Fatalf("expected hints %v, got %v", expected, hints)
+		}
+	})
+
+	t.Run("devices span all NUMA nodes", func(t *testing.T) {
+		m := ManagerImpl{
+			allDevices: NewResourceDeviceInstances(),
+			numaNodes:  []int{0, 1},
+		}
+		m.allDevices[resource] = DeviceInstances{
+			"a": {
+				ID:       "a",
+				Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: 0}}},
+			},
+			"b": {
+				ID:       "b",
+				Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: 1}}},
+			},
+		}
+
+		hints := m.generateDeviceTopologyHints(resource, sets.New[string]("a", "b"), nil, 1)
+
+		fullMask, _ := bitmask.NewBitMask(0, 1)
+		fullMaskCount := 0
+		for _, h := range hints {
+			if h.NUMANodeAffinity.IsEqual(fullMask) {
+				fullMaskCount++
+			}
+		}
+		if fullMaskCount != 1 {
+			t.Fatalf("expected exactly one full-machine mask, got %d in hints: %v", fullMaskCount, hints)
+		}
+	})
+
+	t.Run("reusable device on filtered node", func(t *testing.T) {
+		m := ManagerImpl{
+			allDevices: NewResourceDeviceInstances(),
+			numaNodes:  []int{0, 1, 2, 3},
+		}
+		m.allDevices[resource] = DeviceInstances{
+			"a": {
+				ID:       "a",
+				Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: 0}}},
+			},
+		}
+
+		hints := m.generateDeviceTopologyHints(resource, nil, sets.New[string]("a"), 1)
+
+		expected := []topologymanager.TopologyHint{
+			{NUMANodeAffinity: makeSocketMask(0), Preferred: true},
+		}
+		if !reflect.DeepEqual(hints, expected) {
+			t.Fatalf("expected hints %v, got %v", expected, hints)
+		}
+	})
+
+	t.Run("reusable and available on different nodes", func(t *testing.T) {
+		m := ManagerImpl{
+			allDevices: NewResourceDeviceInstances(),
+			numaNodes:  []int{0, 1, 2, 3},
+		}
+		m.allDevices[resource] = DeviceInstances{
+			"a": {
+				ID:       "a",
+				Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: 0}}},
+			},
+			"b": {
+				ID:       "b",
+				Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: 1}}},
+			},
+		}
+
+		hints := m.generateDeviceTopologyHints(resource, sets.New[string]("b"), sets.New[string]("a"), 2)
+
+		expected := []topologymanager.TopologyHint{
+			{NUMANodeAffinity: makeSocketMask(0, 1), Preferred: true},
+		}
+		if !reflect.DeepEqual(hints, expected) {
+			t.Fatalf("expected hints %v, got %v", expected, hints)
+		}
+	})
+}
+
+// TestFilteredDeviceHintsMergeWithOtherProviders exercises policy.Merge with
+// the device hints produced by our changed code, without needing to wire up
+// real CPU/memory managers.
+func TestFilteredDeviceHintsMergeWithOtherProviders(t *testing.T) {
+	t.Run("device on node 0", func(t *testing.T) {
+		numaNodes := []int{0, 1}
+		numaInfo := &topologymanager.NUMAInfo{
+			Nodes:         numaNodes,
+			NUMADistances: topologymanager.NUMADistances{},
+		}
+
+		m := ManagerImpl{
+			allDevices: NewResourceDeviceInstances(),
+			numaNodes:  numaNodes,
+		}
+		m.allDevices["gpu"] = DeviceInstances{
+			"gpu0": {
+				ID:       "gpu0",
+				Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: 0}}},
+			},
+		}
+
+		deviceHints := m.generateDeviceTopologyHints("gpu", sets.New[string]("gpu0"), nil, 1)
+
+		providersHints := []map[string][]topologymanager.TopologyHint{
+			{"gpu": deviceHints},
+			{"cpu": {
+				{NUMANodeAffinity: makeSocketMask(0), Preferred: true},
+				{NUMANodeAffinity: makeSocketMask(0, 1), Preferred: false},
+			}},
+			{"memory": {
+				{NUMANodeAffinity: makeSocketMask(0), Preferred: true},
+				{NUMANodeAffinity: makeSocketMask(0, 1), Preferred: false},
+			}},
+		}
+
+		assertMergePreferred(t, numaInfo, providersHints, makeSocketMask(0))
+	})
+
+	t.Run("device on non-zero node only", func(t *testing.T) {
+		numaNodes := []int{0, 1}
+		numaInfo := &topologymanager.NUMAInfo{
+			Nodes:         numaNodes,
+			NUMADistances: topologymanager.NUMADistances{},
+		}
+
+		m := ManagerImpl{
+			allDevices: NewResourceDeviceInstances(),
+			numaNodes:  numaNodes,
+		}
+		m.allDevices["gpu"] = DeviceInstances{
+			"gpu0": {
+				ID:       "gpu0",
+				Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: 1}}},
+			},
+		}
+
+		deviceHints := m.generateDeviceTopologyHints("gpu", sets.New[string]("gpu0"), nil, 1)
+
+		providersHints := []map[string][]topologymanager.TopologyHint{
+			{"gpu": deviceHints},
+			{"cpu": {
+				{NUMANodeAffinity: makeSocketMask(1), Preferred: true},
+				{NUMANodeAffinity: makeSocketMask(0, 1), Preferred: false},
+			}},
+			{"memory": {
+				{NUMANodeAffinity: makeSocketMask(1), Preferred: true},
+				{NUMANodeAffinity: makeSocketMask(0, 1), Preferred: false},
+			}},
+		}
+
+		assertMergePreferred(t, numaInfo, providersHints, makeSocketMask(1))
+	})
+
+	t.Run("high NUMA node IDs without node 0", func(t *testing.T) {
+		numaNodes := []int{3, 7}
+		numaInfo := &topologymanager.NUMAInfo{
+			Nodes:         numaNodes,
+			NUMADistances: topologymanager.NUMADistances{},
+		}
+
+		m := ManagerImpl{
+			allDevices: NewResourceDeviceInstances(),
+			numaNodes:  numaNodes,
+		}
+		m.allDevices["gpu"] = DeviceInstances{
+			"gpu0": {
+				ID:       "gpu0",
+				Topology: &pluginapi.TopologyInfo{Nodes: []*pluginapi.NUMANode{{ID: 7}}},
+			},
+		}
+
+		deviceHints := m.generateDeviceTopologyHints("gpu", sets.New[string]("gpu0"), nil, 1)
+
+		providersHints := []map[string][]topologymanager.TopologyHint{
+			{"gpu": deviceHints},
+			{"cpu": {
+				{NUMANodeAffinity: makeSocketMask(7), Preferred: true},
+				{NUMANodeAffinity: makeSocketMask(3, 7), Preferred: false},
+			}},
+			{"memory": {
+				{NUMANodeAffinity: makeSocketMask(7), Preferred: true},
+				{NUMANodeAffinity: makeSocketMask(3, 7), Preferred: false},
+			}},
+		}
+
+		assertMergePreferred(t, numaInfo, providersHints, makeSocketMask(7))
+	})
+}
+
+func assertMergePreferred(t *testing.T, numaInfo *topologymanager.NUMAInfo, providersHints []map[string][]topologymanager.TopologyHint, expectedMask bitmask.BitMask) {
+	t.Helper()
+	tCtx := ktesting.Init(t)
+	for _, policyName := range []string{"best-effort", "restricted"} {
+		t.Run(policyName, func(t *testing.T) {
+			var policy topologymanager.Policy
+			switch policyName {
+			case "best-effort":
+				policy = topologymanager.NewBestEffortPolicy(numaInfo, topologymanager.PolicyOptions{})
+			case "restricted":
+				policy = topologymanager.NewRestrictedPolicy(numaInfo, topologymanager.PolicyOptions{})
+			}
+
+			bestHint, admit := policy.Merge(tCtx.Logger(), providersHints)
+			if !admit {
+				t.Fatalf("expected pod to be admitted under %s policy", policyName)
+			}
+			if bestHint.NUMANodeAffinity == nil {
+				t.Fatalf("expected non-nil NUMANodeAffinity")
+			}
+			if !bestHint.NUMANodeAffinity.IsEqual(expectedMask) {
+				t.Fatalf("expected best hint %v, got %v", expectedMask, bestHint.NUMANodeAffinity)
+			}
+			if !bestHint.Preferred {
+				t.Fatalf("expected best hint to be preferred")
+			}
+		})
+	}
+}
+
 type topologyHintTestCase struct {
 	description      string
 	pod              *v1.Pod
@@ -1051,10 +1412,6 @@ func getCommonTestCases() []topologyHintTestCase {
 					{
 						NUMANodeAffinity: makeSocketMask(1),
 						Preferred:        true,
-					},
-					{
-						NUMANodeAffinity: makeSocketMask(0, 1),
-						Preferred:        false,
 					},
 				},
 			},
@@ -1273,10 +1630,6 @@ func getCommonTestCases() []topologyHintTestCase {
 						NUMANodeAffinity: makeSocketMask(0),
 						Preferred:        true,
 					},
-					{
-						NUMANodeAffinity: makeSocketMask(0, 1),
-						Preferred:        false,
-					},
 				},
 			},
 		},
@@ -1348,10 +1701,6 @@ func getCommonTestCases() []topologyHintTestCase {
 					{
 						NUMANodeAffinity: makeSocketMask(0),
 						Preferred:        true,
-					},
-					{
-						NUMANodeAffinity: makeSocketMask(0, 1),
-						Preferred:        false,
 					},
 				},
 			},

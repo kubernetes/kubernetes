@@ -23,22 +23,28 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubeletconfigpaths "k8s.io/kubernetes/pkg/kubelet/kubeletconfig"
 	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e_node/services"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -88,8 +94,36 @@ var _ = SIGDescribe("user namespaces kubeconfig tests", "[LinuxOnly]", feature.U
 					RestartPolicy: v1.RestartPolicyNever,
 				},
 			}
-			expected := []string{strconv.FormatInt(customIDsPerPod, 10)}
-			e2eoutput.TestContainerOutput(ctx, f, "idsPerPod is configured correctly", pod, 0, expected)
+			podClient := e2epod.NewPodClient(f)
+			createdPod := podClient.Create(ctx, pod)
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				ginkgo.By("delete the pod")
+				podClient.DeleteSync(ctx, createdPod.Name, metav1.DeleteOptions{GracePeriodSeconds: ptr.To(int64(0))}, f.Timeouts.PodDelete)
+				// DeleteSync waits until the pod is deleted from the API server.
+				// But we need the pod dir to removed from the node before we
+				// continue. The pod dir is not deleted with the pod, but left for
+				// the periodic run of the cleanup function to delete it later. So,
+				// let's wait until the dir is removed.
+				// The reason we need to wait for the dir to be removed is because
+				// tempSetCurrentKubeletConfig's AfterEach will restart the kubelet
+				// with the original idsPerPod. If the pod directory is still on
+				// disk, the kubelet will fail to start as the new kubelet config
+				// can't be honored if we have pods on disk with another config.
+				podDir := filepath.Join(services.KubeletRootDirectory, kubeletconfigpaths.DefaultKubeletPodsDirName, string(createdPod.UID))
+				gomega.Eventually(ctx, func() bool {
+					_, err := os.Stat(podDir)
+					return os.IsNotExist(err)
+				}).WithTimeout(f.Timeouts.PodDelete).Should(gomega.BeTrueBecause("pod directory %s must be removed - kubelet can't restart", podDir))
+			})
+
+			err := e2epod.WaitForPodSuccessInNamespaceTimeout(ctx, f.ClientSet, createdPod.Name, f.Namespace.Name, f.Timeouts.PodStart)
+			framework.ExpectNoError(err)
+
+			logs, err := e2epod.GetPodLogs(ctx, f.ClientSet, f.Namespace.Name, createdPod.Name, "container")
+			framework.ExpectNoError(err)
+			expected := strconv.FormatInt(customIDsPerPod, 10)
+			gomega.Expect(logs).To(gomega.ContainSubstring(expected))
+
 		})
 	})
 })

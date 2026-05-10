@@ -5,6 +5,7 @@ package trace // import "go.opentelemetry.io/otel/sdk/trace"
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -262,6 +263,7 @@ func (p *TracerProvider) ForceFlush(ctx context.Context) error {
 		return nil
 	}
 
+	var err error
 	for _, sps := range spss {
 		select {
 		case <-ctx.Done():
@@ -269,11 +271,9 @@ func (p *TracerProvider) ForceFlush(ctx context.Context) error {
 		default:
 		}
 
-		if err := sps.sp.ForceFlush(ctx); err != nil {
-			return err
-		}
+		err = errors.Join(err, sps.sp.ForceFlush(ctx))
 	}
-	return nil
+	return err
 }
 
 // Shutdown shuts down TracerProvider. All registered span processors are shut down
@@ -303,14 +303,7 @@ func (p *TracerProvider) Shutdown(ctx context.Context) error {
 		sps.state.Do(func() {
 			err = sps.sp.Shutdown(ctx)
 		})
-		if err != nil {
-			if retErr == nil {
-				retErr = err
-			} else {
-				// Poor man's list of errors
-				retErr = fmt.Errorf("%w; %w", retErr, err)
-			}
-		}
+		retErr = errors.Join(retErr, err)
 	}
 	p.spanProcessors.Store(&spanProcessorStates{})
 	return retErr

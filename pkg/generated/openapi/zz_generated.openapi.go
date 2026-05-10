@@ -571,6 +571,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.Node{}.OpenAPIModelName():                                                                                schema_k8sio_api_core_v1_Node(ref),
 		corev1.NodeAddress{}.OpenAPIModelName():                                                                         schema_k8sio_api_core_v1_NodeAddress(ref),
 		corev1.NodeAffinity{}.OpenAPIModelName():                                                                        schema_k8sio_api_core_v1_NodeAffinity(ref),
+		corev1.NodeAllocatableResourceClaimStatus{}.OpenAPIModelName():                                                  schema_k8sio_api_core_v1_NodeAllocatableResourceClaimStatus(ref),
 		corev1.NodeCondition{}.OpenAPIModelName():                                                                       schema_k8sio_api_core_v1_NodeCondition(ref),
 		corev1.NodeConfigSource{}.OpenAPIModelName():                                                                    schema_k8sio_api_core_v1_NodeConfigSource(ref),
 		corev1.NodeConfigStatus{}.OpenAPIModelName():                                                                    schema_k8sio_api_core_v1_NodeConfigStatus(ref),
@@ -628,7 +629,6 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		corev1.PodSignature{}.OpenAPIModelName():                                                                        schema_k8sio_api_core_v1_PodSignature(ref),
 		corev1.PodSpec{}.OpenAPIModelName():                                                                             schema_k8sio_api_core_v1_PodSpec(ref),
 		corev1.PodStatus{}.OpenAPIModelName():                                                                           schema_k8sio_api_core_v1_PodStatus(ref),
-		corev1.PodStatusResult{}.OpenAPIModelName():                                                                     schema_k8sio_api_core_v1_PodStatusResult(ref),
 		corev1.PodTemplate{}.OpenAPIModelName():                                                                         schema_k8sio_api_core_v1_PodTemplate(ref),
 		corev1.PodTemplateList{}.OpenAPIModelName():                                                                     schema_k8sio_api_core_v1_PodTemplateList(ref),
 		corev1.PodTemplateSpec{}.OpenAPIModelName():                                                                     schema_k8sio_api_core_v1_PodTemplateSpec(ref),
@@ -1018,6 +1018,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1.DeviceToleration{}.OpenAPIModelName():                                                                schema_k8sio_api_resource_v1_DeviceToleration(ref),
 		resourcev1.ExactDeviceRequest{}.OpenAPIModelName():                                                              schema_k8sio_api_resource_v1_ExactDeviceRequest(ref),
 		resourcev1.NetworkDeviceData{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1_NetworkDeviceData(ref),
+		resourcev1.NodeAllocatableResourceMapping{}.OpenAPIModelName():                                                  schema_k8sio_api_resource_v1_NodeAllocatableResourceMapping(ref),
 		resourcev1.OpaqueDeviceConfiguration{}.OpenAPIModelName():                                                       schema_k8sio_api_resource_v1_OpaqueDeviceConfiguration(ref),
 		resourcev1.ResourceClaim{}.OpenAPIModelName():                                                                   schema_k8sio_api_resource_v1_ResourceClaim(ref),
 		resourcev1.ResourceClaimConsumerReference{}.OpenAPIModelName():                                                  schema_k8sio_api_resource_v1_ResourceClaimConsumerReference(ref),
@@ -1039,6 +1040,11 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		v1alpha3.DeviceTaintRuleSpec{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1alpha3_DeviceTaintRuleSpec(ref),
 		v1alpha3.DeviceTaintRuleStatus{}.OpenAPIModelName():                                                             schema_k8sio_api_resource_v1alpha3_DeviceTaintRuleStatus(ref),
 		v1alpha3.DeviceTaintSelector{}.OpenAPIModelName():                                                               schema_k8sio_api_resource_v1alpha3_DeviceTaintSelector(ref),
+		v1alpha3.PoolStatus{}.OpenAPIModelName():                                                                        schema_k8sio_api_resource_v1alpha3_PoolStatus(ref),
+		v1alpha3.ResourcePoolStatusRequest{}.OpenAPIModelName():                                                         schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequest(ref),
+		v1alpha3.ResourcePoolStatusRequestList{}.OpenAPIModelName():                                                     schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequestList(ref),
+		v1alpha3.ResourcePoolStatusRequestSpec{}.OpenAPIModelName():                                                     schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequestSpec(ref),
+		v1alpha3.ResourcePoolStatusRequestStatus{}.OpenAPIModelName():                                                   schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequestStatus(ref),
 		resourcev1beta1.AllocatedDeviceStatus{}.OpenAPIModelName():                                                      schema_k8sio_api_resource_v1beta1_AllocatedDeviceStatus(ref),
 		resourcev1beta1.AllocationResult{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta1_AllocationResult(ref),
 		resourcev1beta1.BasicDevice{}.OpenAPIModelName():                                                                schema_k8sio_api_resource_v1beta1_BasicDevice(ref),
@@ -1069,6 +1075,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta1.DeviceTaint{}.OpenAPIModelName():                                                                schema_k8sio_api_resource_v1beta1_DeviceTaint(ref),
 		resourcev1beta1.DeviceToleration{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta1_DeviceToleration(ref),
 		resourcev1beta1.NetworkDeviceData{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta1_NetworkDeviceData(ref),
+		resourcev1beta1.NodeAllocatableResourceMapping{}.OpenAPIModelName():                                             schema_k8sio_api_resource_v1beta1_NodeAllocatableResourceMapping(ref),
 		resourcev1beta1.OpaqueDeviceConfiguration{}.OpenAPIModelName():                                                  schema_k8sio_api_resource_v1beta1_OpaqueDeviceConfiguration(ref),
 		resourcev1beta1.ResourceClaim{}.OpenAPIModelName():                                                              schema_k8sio_api_resource_v1beta1_ResourceClaim(ref),
 		resourcev1beta1.ResourceClaimConsumerReference{}.OpenAPIModelName():                                             schema_k8sio_api_resource_v1beta1_ResourceClaimConsumerReference(ref),
@@ -1117,6 +1124,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta2.DeviceToleration{}.OpenAPIModelName():                                                           schema_k8sio_api_resource_v1beta2_DeviceToleration(ref),
 		resourcev1beta2.ExactDeviceRequest{}.OpenAPIModelName():                                                         schema_k8sio_api_resource_v1beta2_ExactDeviceRequest(ref),
 		resourcev1beta2.NetworkDeviceData{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta2_NetworkDeviceData(ref),
+		resourcev1beta2.NodeAllocatableResourceMapping{}.OpenAPIModelName():                                             schema_k8sio_api_resource_v1beta2_NodeAllocatableResourceMapping(ref),
 		resourcev1beta2.OpaqueDeviceConfiguration{}.OpenAPIModelName():                                                  schema_k8sio_api_resource_v1beta2_OpaqueDeviceConfiguration(ref),
 		resourcev1beta2.ResourceClaim{}.OpenAPIModelName():                                                              schema_k8sio_api_resource_v1beta2_ResourceClaim(ref),
 		resourcev1beta2.ResourceClaimConsumerReference{}.OpenAPIModelName():                                             schema_k8sio_api_resource_v1beta2_ResourceClaimConsumerReference(ref),
@@ -1136,11 +1144,15 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		schedulingv1alpha2.GangSchedulingPolicy{}.OpenAPIModelName():                                                    schema_k8sio_api_scheduling_v1alpha2_GangSchedulingPolicy(ref),
 		schedulingv1alpha2.PodGroup{}.OpenAPIModelName():                                                                schema_k8sio_api_scheduling_v1alpha2_PodGroup(ref),
 		schedulingv1alpha2.PodGroupList{}.OpenAPIModelName():                                                            schema_k8sio_api_scheduling_v1alpha2_PodGroupList(ref),
+		schedulingv1alpha2.PodGroupResourceClaim{}.OpenAPIModelName():                                                   schema_k8sio_api_scheduling_v1alpha2_PodGroupResourceClaim(ref),
+		schedulingv1alpha2.PodGroupResourceClaimStatus{}.OpenAPIModelName():                                             schema_k8sio_api_scheduling_v1alpha2_PodGroupResourceClaimStatus(ref),
+		schedulingv1alpha2.PodGroupSchedulingConstraints{}.OpenAPIModelName():                                           schema_k8sio_api_scheduling_v1alpha2_PodGroupSchedulingConstraints(ref),
 		schedulingv1alpha2.PodGroupSchedulingPolicy{}.OpenAPIModelName():                                                schema_k8sio_api_scheduling_v1alpha2_PodGroupSchedulingPolicy(ref),
 		schedulingv1alpha2.PodGroupSpec{}.OpenAPIModelName():                                                            schema_k8sio_api_scheduling_v1alpha2_PodGroupSpec(ref),
 		schedulingv1alpha2.PodGroupStatus{}.OpenAPIModelName():                                                          schema_k8sio_api_scheduling_v1alpha2_PodGroupStatus(ref),
 		schedulingv1alpha2.PodGroupTemplate{}.OpenAPIModelName():                                                        schema_k8sio_api_scheduling_v1alpha2_PodGroupTemplate(ref),
 		schedulingv1alpha2.PodGroupTemplateReference{}.OpenAPIModelName():                                               schema_k8sio_api_scheduling_v1alpha2_PodGroupTemplateReference(ref),
+		schedulingv1alpha2.TopologyConstraint{}.OpenAPIModelName():                                                      schema_k8sio_api_scheduling_v1alpha2_TopologyConstraint(ref),
 		schedulingv1alpha2.TypedLocalObjectReference{}.OpenAPIModelName():                                               schema_k8sio_api_scheduling_v1alpha2_TypedLocalObjectReference(ref),
 		schedulingv1alpha2.Workload{}.OpenAPIModelName():                                                                schema_k8sio_api_scheduling_v1alpha2_Workload(ref),
 		schedulingv1alpha2.WorkloadList{}.OpenAPIModelName():                                                            schema_k8sio_api_scheduling_v1alpha2_WorkloadList(ref),
@@ -1294,6 +1306,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		metav1.Preconditions{}.OpenAPIModelName():                                                                       schema_pkg_apis_meta_v1_Preconditions(ref),
 		metav1.RootPaths{}.OpenAPIModelName():                                                                           schema_pkg_apis_meta_v1_RootPaths(ref),
 		metav1.ServerAddressByClientCIDR{}.OpenAPIModelName():                                                           schema_pkg_apis_meta_v1_ServerAddressByClientCIDR(ref),
+		metav1.ShardInfo{}.OpenAPIModelName():                                                                           schema_pkg_apis_meta_v1_ShardInfo(ref),
 		metav1.Status{}.OpenAPIModelName():                                                                              schema_pkg_apis_meta_v1_Status(ref),
 		metav1.StatusCause{}.OpenAPIModelName():                                                                         schema_pkg_apis_meta_v1_StatusCause(ref),
 		metav1.StatusDetails{}.OpenAPIModelName():                                                                       schema_pkg_apis_meta_v1_StatusDetails(ref),
@@ -9387,7 +9400,7 @@ func schema_k8sio_api_apps_v1_StatefulSetUpdateStrategy(ref common.ReferenceCall
 				Properties: map[string]spec.Schema{
 					"type": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Type indicates the type of the StatefulSetUpdateStrategy. Default is RollingUpdate.\n\nPossible enum values:\n - `\"OnDelete\"` triggers the legacy behavior. Version tracking and ordered rolling restarts are disabled. Pods are recreated from the StatefulSetSpec when they are manually deleted. When a scale operation is performed with this strategy,specification version indicated by the StatefulSet's currentRevision.\n - `\"RollingUpdate\"` indicates that update will be applied to all Pods in the StatefulSet with respect to the StatefulSet ordering constraints. When a scale operation is performed with this strategy, new Pods will be created from the specification version indicated by the StatefulSet's updateRevision.",
+							Description: "Type indicates the type of the StatefulSetUpdateStrategy. Default is RollingUpdate.\n\nPossible enum values:\n - `\"OnDelete\"` disables ordered rolling restarts. Version tracking is done on a best-effort basis - the controller will try to eventually converge StatefulSet's currentRevision with updateRevision. Pods are recreated from the StatefulSetSpec when they are manually deleted. When a scale operation is performed with this strategy, new Pods will be created from the specification version indicated by the StatefulSet's updateRevision.\n - `\"RollingUpdate\"` indicates that update will be applied to all Pods in the StatefulSet with respect to the StatefulSet ordering constraints. When a scale operation is performed with this strategy, new Pods will be created from the specification version indicated by the StatefulSet's updateRevision.",
 							Type:        []string{"string"},
 							Format:      "",
 							Enum:        []interface{}{"OnDelete", "RollingUpdate"},
@@ -17051,7 +17064,7 @@ func schema_k8sio_api_batch_v1_JobStatus(ref common.ReferenceCallback) common.Op
 					},
 					"terminating": {
 						SchemaProps: spec.SchemaProps{
-							Description: "The number of pods which are terminating (in phase Pending or Running and have a deletionTimestamp).\n\nThis field is beta-level. The job controller populates the field when the feature gate JobPodReplacementPolicy is enabled (enabled by default).",
+							Description: "The number of pods which are terminating (in phase Pending or Running and have a deletionTimestamp).",
 							Type:        []string{"integer"},
 							Format:      "int32",
 						},
@@ -25100,6 +25113,64 @@ func schema_k8sio_api_core_v1_NodeAffinity(ref common.ReferenceCallback) common.
 	}
 }
 
+func schema_k8sio_api_core_v1_NodeAllocatableResourceClaimStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeAllocatableResourceClaimStatus describes the status of node allocatable resources allocated via DRA.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"resourceClaimName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ResourceClaimName is the resource claim referenced by the pod that resulted in this node allocatable resource allocation.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"containers": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Containers lists the names of all containers in this pod that reference the claim.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"resources": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Resources is a map of the node-allocatable resource name to the aggregate quantity allocated to the claim.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(resource.Quantity{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"resourceClaimName", "resources"},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_core_v1_NodeCondition(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -26359,13 +26430,13 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimSpec(ref common.ReferenceCall
 					},
 					"dataSource": {
 						SchemaProps: spec.SchemaProps{
-							Description: "dataSource field can be used to specify either: * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot) * An existing PVC (PersistentVolumeClaim) If the provisioner or an external controller can support the specified data source, it will create a new volume based on the contents of the specified data source. When the AnyVolumeDataSource feature gate is enabled, dataSource contents will be copied to dataSourceRef, and dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified. If the namespace is specified, then dataSourceRef will not be copied to dataSource.",
+							Description: "dataSource field can be used to specify either: * An existing VolumeSnapshot object (snapshot.storage.k8s.io/VolumeSnapshot) * An existing PVC (PersistentVolumeClaim) If the provisioner or an external controller can support the specified data source, it will create a new volume based on the contents of the specified data source. dataSource contents will be copied to dataSourceRef, and dataSourceRef contents will be copied to dataSource when dataSourceRef.namespace is not specified. If the namespace is specified, then dataSourceRef will not be copied to dataSource.",
 							Ref:         ref(corev1.TypedLocalObjectReference{}.OpenAPIModelName()),
 						},
 					},
 					"dataSourceRef": {
 						SchemaProps: spec.SchemaProps{
-							Description: "dataSourceRef specifies the object from which to populate the volume with data, if a non-empty volume is desired. This may be any object from a non-empty API group (non core object) or a PersistentVolumeClaim object. When this field is specified, volume binding will only succeed if the type of the specified object matches some installed volume populator or dynamic provisioner. This field will replace the functionality of the dataSource field and as such if both fields are non-empty, they must have the same value. For backwards compatibility, when namespace isn't specified in dataSourceRef, both fields (dataSource and dataSourceRef) will be set to the same value automatically if one of them is empty and the other is non-empty. When namespace is specified in dataSourceRef, dataSource isn't set to the same value and must be empty. There are three important differences between dataSource and dataSourceRef: * While dataSource only allows two specific types of objects, dataSourceRef\n  allows any non-core object, as well as PersistentVolumeClaim objects.\n* While dataSource ignores disallowed values (dropping them), dataSourceRef\n  preserves all values, and generates an error if a disallowed value is\n  specified.\n* While dataSource only allows local objects, dataSourceRef allows objects\n  in any namespaces.\n(Beta) Using this field requires the AnyVolumeDataSource feature gate to be enabled. (Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
+							Description: "dataSourceRef specifies the object from which to populate the volume with data, if a non-empty volume is desired. This may be any object from a non-empty API group (non core object) or a PersistentVolumeClaim object. When this field is specified, volume binding will only succeed if the type of the specified object matches some installed volume populator or dynamic provisioner. This field will replace the functionality of the dataSource field and as such if both fields are non-empty, they must have the same value. For backwards compatibility, when namespace isn't specified in dataSourceRef, both fields (dataSource and dataSourceRef) will be set to the same value automatically if one of them is empty and the other is non-empty. When namespace is specified in dataSourceRef, dataSource isn't set to the same value and must be empty. There are three important differences between dataSource and dataSourceRef: * While dataSource only allows two specific types of objects, dataSourceRef\n  allows any non-core object, as well as PersistentVolumeClaim objects.\n* While dataSource ignores disallowed values (dropping them), dataSourceRef\n  preserves all values, and generates an error if a disallowed value is\n  specified.\n* While dataSource only allows local objects, dataSourceRef allows objects\n  in any namespaces.\n(Alpha) Using the namespace field of dataSourceRef requires the CrossNamespaceVolumeDataSource feature gate to be enabled.",
 							Ref:         ref(corev1.TypedObjectReference{}.OpenAPIModelName()),
 						},
 					},
@@ -28071,7 +28142,7 @@ func schema_k8sio_api_core_v1_PodResourceClaim(ref common.ReferenceCallback) com
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "PodResourceClaim references exactly one ResourceClaim, either directly or by naming a ResourceClaimTemplate which is then turned into a ResourceClaim for the pod.\n\nIt adds a name to it that uniquely identifies the ResourceClaim inside the Pod. Containers that need access to the ResourceClaim reference it with this name.",
+				Description: "PodResourceClaim references exactly one ResourceClaim, either directly or by naming a ResourceClaimTemplate which is then turned into a ResourceClaim for the pod.\n\nIt adds a name to it that uniquely identifies the ResourceClaim inside the Pod. Containers that need access to the ResourceClaim reference it with this name.\n\nWhen the DRAWorkloadResourceClaims feature gate is enabled and this Pod belongs to a PodGroup, a PodResourceClaim is matched to a PodGroupResourceClaim if all of their fields are equal (Name, ResourceClaimName, and ResourceClaimTemplateName). A matched claim references a single ResourceClaim shared across all Pods in the PodGroup, reserved for the PodGroup in ResourceClaimStatus.ReservedFor rather than for individual Pods.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"name": {
@@ -28091,7 +28162,7 @@ func schema_k8sio_api_core_v1_PodResourceClaim(ref common.ReferenceCallback) com
 					},
 					"resourceClaimTemplateName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ResourceClaimTemplateName is the name of a ResourceClaimTemplate object in the same namespace as this pod.\n\nThe template will be used to create a new ResourceClaim, which will be bound to this pod. When this pod is deleted, the ResourceClaim will also be deleted. The pod name and resource name, along with a generated component, will be used to form a unique name for the ResourceClaim, which will be recorded in pod.status.resourceClaimStatuses.\n\nThis field is immutable and no changes will be made to the corresponding ResourceClaim by the control plane after creating the ResourceClaim.\n\nExactly one of ResourceClaimName and ResourceClaimTemplateName must be set.",
+							Description: "ResourceClaimTemplateName is the name of a ResourceClaimTemplate object in the same namespace as this pod.\n\nThe template will be used to create a new ResourceClaim, which will be bound to this pod. When this pod is deleted, the ResourceClaim will also be deleted. The pod name and resource name, along with a generated component, will be used to form a unique name for the ResourceClaim, which will be recorded in pod.status.resourceClaimStatuses.\n\nWhen the DRAWorkloadResourceClaims feature gate is enabled and the pod belongs to a PodGroup that defines a PodGroupResourceClaim with the same Name and ResourceClaimTemplateName, this PodResourceClaim resolves to the ResourceClaim generated for the PodGroup. All pods in the group that define an equivalent PodResourceClaim matching the PodGroupResourceClaim's Name and ResourceClaimTemplateName share the same generated ResourceClaim. ResourceClaims generated for a PodGroup are owned by the PodGroup and their lifecycles are tied to the PodGroup instead of any individual pod.\n\nThis field is immutable and no changes will be made to the corresponding ResourceClaim by the control plane after creating the ResourceClaim.\n\nExactly one of ResourceClaimName and ResourceClaimTemplateName must be set.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -28120,7 +28191,7 @@ func schema_k8sio_api_core_v1_PodResourceClaimStatus(ref common.ReferenceCallbac
 					},
 					"resourceClaimName": {
 						SchemaProps: spec.SchemaProps{
-							Description: "ResourceClaimName is the name of the ResourceClaim that was generated for the Pod in the namespace of the Pod. If this is unset, then generating a ResourceClaim was not necessary. The pod.spec.resourceClaims entry can be ignored in this case.",
+							Description: "ResourceClaimName is the name of the ResourceClaim that was generated for the Pod in the namespace of the Pod.\n\nWhen the DRAWorkloadResourceClaims feature is enabled and the corresponding PodResourceClaim matches a PodGroupResourceClaim made by the Pod's PodGroup, then this is the name of the ResourceClaim generated and reserved for the PodGroup.\n\nIf this is unset, then generating a ResourceClaim was not necessary. The pod.spec.resourceClaims entry can be ignored in this case.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -29095,54 +29166,30 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 							Ref:         ref(corev1.ResourceRequirements{}.OpenAPIModelName()),
 						},
 					},
-				},
-			},
-		},
-		Dependencies: []string{
-			corev1.ContainerStatus{}.OpenAPIModelName(), corev1.HostIP{}.OpenAPIModelName(), corev1.PodCondition{}.OpenAPIModelName(), corev1.PodExtendedResourceClaimStatus{}.OpenAPIModelName(), corev1.PodIP{}.OpenAPIModelName(), corev1.PodResourceClaimStatus{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
-	}
-}
-
-func schema_k8sio_api_core_v1_PodStatusResult(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "PodStatusResult is a wrapper for PodStatus returned by kubelet that can be encode/decoded",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"kind": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
-							Type:        []string{"string"},
-							Format:      "",
+					"nodeAllocatableResourceClaimStatuses": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
 						},
-					},
-					"apiVersion": {
 						SchemaProps: spec.SchemaProps{
-							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
-							Type:        []string{"string"},
-							Format:      "",
-						},
-					},
-					"metadata": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-							Default:     map[string]interface{}{},
-							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
-						},
-					},
-					"status": {
-						SchemaProps: spec.SchemaProps{
-							Description: "Most recently observed status of the pod. This data may not be up to date. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
-							Ref:         ref(corev1.PodStatus{}.OpenAPIModelName()),
+							Description: "NodeAllocatableResourceClaimStatuses contains the status of node-allocatable resources that were allocated for this pod through DRA claims. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(corev1.NodeAllocatableResourceClaimStatus{}.OpenAPIModelName()),
+									},
+								},
+							},
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			corev1.PodStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
+			corev1.ContainerStatus{}.OpenAPIModelName(), corev1.HostIP{}.OpenAPIModelName(), corev1.NodeAllocatableResourceClaimStatus{}.OpenAPIModelName(), corev1.PodCondition{}.OpenAPIModelName(), corev1.PodExtendedResourceClaimStatus{}.OpenAPIModelName(), corev1.PodIP{}.OpenAPIModelName(), corev1.PodResourceClaimStatus{}.OpenAPIModelName(), corev1.ResourceRequirements{}.OpenAPIModelName(), resource.Quantity{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
 	}
 }
 
@@ -32866,7 +32913,7 @@ func schema_k8sio_api_core_v1_VolumeMount(ref common.ReferenceCallback) common.O
 					},
 					"mountPath": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Path within the container at which the volume should be mounted.  Must not contain ':'.",
+							Description: "Path within the container at which the volume should be mounted.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -32941,7 +32988,6 @@ func schema_k8sio_api_core_v1_VolumeMountStatus(ref common.ReferenceCallback) co
 					"volumeStatus": {
 						SchemaProps: spec.SchemaProps{
 							Description: "volumeStatus represents volume-type-specific status about the mounted volume.",
-							Default:     map[string]interface{}{},
 							Ref:         ref(corev1.VolumeStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -46821,7 +46867,7 @@ func schema_k8sio_api_resource_v1_AllocationResult(ref common.ReferenceCallback)
 					},
 					"allocationTimestamp": {
 						SchemaProps: spec.SchemaProps{
-							Description: "AllocationTimestamp stores the time when the resources were allocated. This field is not guaranteed to be set, in which case that time is unknown.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gate.",
+							Description: "AllocationTimestamp stores the time when the resources were allocated. This field is not guaranteed to be set, in which case that time is unknown.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gate.",
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
@@ -46842,7 +46888,7 @@ func schema_k8sio_api_resource_v1_CELDeviceSelector(ref common.ReferenceCallback
 				Properties: map[string]spec.Schema{
 					"expression": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Expression is a CEL expression which evaluates a single device. It must evaluate to true when the device under consideration satisfies the desired criteria, and false when it does not. Any other result is an error and causes allocation of devices to abort.\n\nThe expression's input is an object named \"device\", which carries the following properties:\n - driver (string): the name of the driver which defines this device.\n - attributes (map[string]object): the device's attributes, grouped by prefix\n   (e.g. device.attributes[\"dra.example.com\"] evaluates to an object with all\n   of the attributes which were prefixed by \"dra.example.com\".\n - capacity (map[string]object): the device's capacities, grouped by prefix.\n - allowMultipleAllocations (bool): the allowMultipleAllocations property of the device\n   (v1.34+ with the DRAConsumableCapacity feature enabled).\n\nExample: Consider a device with driver=\"dra.example.com\", which exposes two attributes named \"model\" and \"ext.example.com/family\" and which exposes one capacity named \"modules\". This input to this expression would have the following fields:\n\n    device.driver\n    device.attributes[\"dra.example.com\"].model\n    device.attributes[\"ext.example.com\"].family\n    device.capacity[\"dra.example.com\"].modules\n\nThe device.driver field can be used to check for a specific driver, either as a high-level precondition (i.e. you only want to consider devices from this driver) or as part of a multi-clause expression that is meant to consider devices from different drivers.\n\nThe value type of each attribute is defined by the device definition, and users who write these expressions must consult the documentation for their specific drivers. The value type of each capacity is Quantity.\n\nIf an unknown prefix is used as a lookup in either device.attributes or device.capacity, an empty map will be returned. Any reference to an unknown field will cause an evaluation error and allocation to abort.\n\nA robust expression should check for the existence of attributes before referencing them.\n\nFor ease of use, the cel.bind() function is enabled, and can be used to simplify expressions that access multiple attributes with the same domain. For example:\n\n    cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)\n\nThe length of the expression must be smaller or equal to 10 Ki. The cost of evaluating it is also limited based on the estimated number of logical steps.",
+							Description: "Expression is a CEL expression which evaluates a single device. It must evaluate to true when the device under consideration satisfies the desired criteria, and false when it does not. Any other result is an error and causes allocation of devices to abort.\n\nThe expression's input is an object named \"device\", which carries the following properties:\n - driver (string): the name of the driver which defines this device.\n - attributes (map[string]object): the device's attributes, grouped by prefix\n   (e.g. device.attributes[\"dra.example.com\"] evaluates to an object with all\n   of the attributes which were prefixed by \"dra.example.com\").\n - capacity (map[string]object): the device's capacities, grouped by prefix.\n - allowMultipleAllocations (bool): the allowMultipleAllocations property of the device\n   (v1.34+ with the DRAConsumableCapacity feature enabled).\n\nExample: Consider a device with driver=\"dra.example.com\", which exposes two attributes named \"model\" and \"ext.example.com/family\" and which exposes one capacity named \"modules\". This input to this expression would have the following fields:\n\n    device.driver\n    device.attributes[\"dra.example.com\"].model\n    device.attributes[\"ext.example.com\"].family\n    device.capacity[\"dra.example.com\"].modules\n\nThe device.driver field can be used to check for a specific driver, either as a high-level precondition (i.e. you only want to consider devices from this driver) or as part of a multi-clause expression that is meant to consider devices from different drivers.\n\nThe value type of each attribute is defined by the device definition, and users who write these expressions must consult the documentation for their specific drivers. The value type of each capacity is Quantity.\n\nIf an unknown prefix is used as a lookup in either device.attributes or device.capacity, an empty map will be returned. Any reference to an unknown field will cause an evaluation error and allocation to abort.\n\nA robust expression should check for the existence of attributes before referencing them.\n\nCommon errors: - \"no such key\": Use optional chaining (.? followed by orValue())\n  or guarding the check with has() for optional fields.\n  See CEL Optional Types for details:\n  https://pkg.go.dev/github.com/google/cel-go@v0.17.4/cel#OptionalTypes\n\nFor more CEL expression syntax and examples, see: https://kubernetes.io/docs/reference/using-api/cel/\n\nFor ease of use, the cel.bind() function is enabled, and can be used to simplify expressions that access multiple attributes with the same domain. For example:\n\n    cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)\n\nWhen the DRAListTypeAttributes feature gate is enabled, the includes() helper is available and it can work for both scalar and list-type attributes. It was introduced to support smooth migration from scalar attributes to list-type attributes while keeping CEL expressions simple. For example:\n\n    device.attributes[\"dra.example.com\"].models.includes(\"some-model\")\n\nThe length of the expression must be smaller or equal to 10 Ki. The cost of evaluating it is also limited based on the estimated number of logical steps.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -47129,7 +47175,7 @@ func schema_k8sio_api_resource_v1_Device(ref common.ReferenceCallback) common.Op
 					},
 					"bindsToNode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "BindsToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim. If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector to match the node where the allocation was made.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
+							Description: "BindsToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim. If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector to match the node where the allocation was made.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -47141,7 +47187,7 @@ func schema_k8sio_api_resource_v1_Device(ref common.ReferenceCallback) common.Op
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
+							Description: "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -47161,7 +47207,7 @@ func schema_k8sio_api_resource_v1_Device(ref common.ReferenceCallback) common.Op
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is set to \"True\", a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
+							Description: "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is set to \"True\", a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -47181,12 +47227,27 @@ func schema_k8sio_api_resource_v1_Device(ref common.ReferenceCallback) common.Op
 							Format:      "",
 						},
 					},
+					"nodeAllocatableResourceMappings": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NodeAllocatableResourceMappings defines the mapping of node resources that are managed by the DRA driver exposing this device. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages. In addition to standard requests made through the Pod `spec`, these resources can also be requested through claims and allocated by the DRA driver. For example, a CPU DRA driver might allocate exclusive CPUs or auxiliary node memory dependencies of an accelerator device. The keys of this map are the node-allocatable resource names (e.g., \"cpu\", \"memory\"). Extended resource names are not permitted as keys.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(resourcev1.NodeAllocatableResourceMapping{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"name"},
 			},
 		},
 		Dependencies: []string{
-			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1.DeviceAttribute{}.OpenAPIModelName(), resourcev1.DeviceCapacity{}.OpenAPIModelName(), resourcev1.DeviceCounterConsumption{}.OpenAPIModelName(), resourcev1.DeviceTaint{}.OpenAPIModelName()},
+			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1.DeviceAttribute{}.OpenAPIModelName(), resourcev1.DeviceCapacity{}.OpenAPIModelName(), resourcev1.DeviceCounterConsumption{}.OpenAPIModelName(), resourcev1.DeviceTaint{}.OpenAPIModelName(), resourcev1.NodeAllocatableResourceMapping{}.OpenAPIModelName()},
 	}
 }
 
@@ -47327,6 +47388,86 @@ func schema_k8sio_api_resource_v1_DeviceAttribute(ref common.ReferenceCallback) 
 							Description: "VersionValue is a semantic version according to semver.org spec 2.0.0. Must not be longer than 64 characters.",
 							Type:        []string{"string"},
 							Format:      "",
+						},
+					},
+					"ints": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "IntValues is a non-empty list of numbers.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: 0,
+										Type:    []string{"integer"},
+										Format:  "int64",
+									},
+								},
+							},
+						},
+					},
+					"bools": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "BoolValues is a non-empty list of true/false values.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: false,
+										Type:    []string{"boolean"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"strings": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "StringValues is a non-empty list of strings. Each string must not be longer than 64 characters.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"versions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "VersionValues is a non-empty list of semantic versions according to semver.org spec 2.0.0. Each version string must not be longer than 64 characters.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
 						},
 					},
 				},
@@ -47512,7 +47653,6 @@ func schema_k8sio_api_resource_v1_DeviceClass(ref common.ReferenceCallback) comm
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -47702,14 +47842,14 @@ func schema_k8sio_api_resource_v1_DeviceConstraint(ref common.ReferenceCallback)
 					},
 					"matchAttribute": {
 						SchemaProps: spec.SchemaProps{
-							Description: "MatchAttribute requires that all devices in question have this attribute and that its type and value are the same across those devices.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.\n\nMust include the domain qualifier.",
+							Description: "MatchAttribute requires that all devices in question have this attribute and that its type and value are the same across those devices.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.\n\nWhen the DRAListTypeAttributes feature gate is enabled, comparison uses set semantics(i.e., element order and duplicates are ignored): list-valued attributes match when the intersection across all devices is non-empty. Scalar values are treated as single-element lists for backward compatibility.\n\nMust include the domain qualifier.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"distinctAttribute": {
 						SchemaProps: spec.SchemaProps{
-							Description: "DistinctAttribute requires that all devices in question have this attribute and that its type and value are unique across those devices.\n\nThis acts as the inverse of MatchAttribute.\n\nThis constraint is used to avoid allocating multiple requests to the same device by ensuring attribute-level differentiation.\n\nThis is useful for scenarios where resource requests must be fulfilled by separate physical devices. For example, a container requests two network interfaces that must be allocated from two different physical NICs.",
+							Description: "DistinctAttribute requires that all devices in question have this attribute and that its type and value are unique across those devices.\n\nWhen the DRAListTypeAttributes feature gate is enabled, comparison uses set semantics (i.e., element order and duplicates are ignored): list-valued attributes must be pairwise disjoint across devices. Scalar values are treated as singleton sets for backward compatibility.\n\nThis acts as the inverse of MatchAttribute.\n\nThis constraint is used to avoid allocating multiple requests to the same device by ensuring attribute-level differentiation.\n\nThis is useful for scenarios where resource requests must be fulfilled by separate physical devices. For example, a container requests two network interfaces that must be allocated from two different physical NICs.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -47880,7 +48020,7 @@ func schema_k8sio_api_resource_v1_DeviceRequestAllocationResult(ref common.Refer
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingConditions contains a copy of the BindingConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
+							Description: "BindingConditions contains a copy of the BindingConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -47900,7 +48040,7 @@ func schema_k8sio_api_resource_v1_DeviceRequestAllocationResult(ref common.Refer
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
+							Description: "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -48289,6 +48429,34 @@ func schema_k8sio_api_resource_v1_NetworkDeviceData(ref common.ReferenceCallback
 	}
 }
 
+func schema_k8sio_api_resource_v1_NodeAllocatableResourceMapping(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeAllocatableResourceMapping defines the translation between the DRA device/capacity units requested to the corresponding quantity of the node allocatable resource.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"capacityKey": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CapacityKey references a capacity name defined as a key in the `spec.devices[*].capacity` map. When this field is set, the value associated with this key in the `status.allocation.devices.results[*].consumedCapacity` map (for a specific claim allocation) determines the base quantity for the node allocatable resource. If `allocationMultiplier` is also set, it is multiplied with the base quantity. For example, if `spec.devices[*].capacity` has an entry \"dra.example.com/memory\": \"128Gi\", and this field is set to \"dra.example.com/memory\", then for a claim allocation that consumes { \"dra.example.com/memory\": \"4Gi\" } the base quantity for the node allocatable resource mapping will be \"4Gi\", and `allocationMultiplier` should be omitted or set to \"1\".",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"allocationMultiplier": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AllocationMultiplier is used as a multiplier for the allocated device count or the allocated capacity in the claim. It defaults to 1 if not specified. How the field is used also depends on whether `capacityKey` is set. 1.  If `capacityKey` is NOT set: `allocationMultiplier` multiplies the device count allocated to the claim.\n\t   a. A DRA driver representing each CPU core as a device would have\n       {ResourceName: \"cpu\", allocationMultiplier: \"2\"} in its\n       `nodeAllocatableResourceMappings`. If 4 devices are allocated to the claim,\n\t\t  4 * 2 CPUs would be considered as allocated and subtracted from the node's capacity.\n    b. A GPU device that needs additional node memory per GPU allocation would\n       have {ResourceName: \"memory\", allocationMultiplier: \"2Gi\"}.  Each allocated\n\t\t  GPU device instance of this type will account for 2Gi of memory.\n\n2.  If `capacityKey` IS set: `allocationMultiplier` is multiplied by the amount of that capacity consumed.\n\t   The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `allocationMultiplier`.\n    For example, if a Device's capacity \"dra.example.com/cores\" is consumed,\n    and each \"core\" provides 2 \"cpu\"s, the mapping would be:\n    {ResourceName: \"cpu\", capacityKey: \"dra.example.com/cores\", allocationMultiplier: \"2\"}.\n    If a claim consumes 8 \"dra.example.com/cores\", the CPU footprint is 8 * 2 = 16.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_resource_v1_OpaqueDeviceConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -48362,7 +48530,6 @@ func schema_k8sio_api_resource_v1_ResourceClaim(ref common.ReferenceCallback) co
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -48594,7 +48761,6 @@ func schema_k8sio_api_resource_v1_ResourceClaimTemplate(ref common.ReferenceCall
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -48675,7 +48841,6 @@ func schema_k8sio_api_resource_v1_ResourceClaimTemplateSpec(ref common.Reference
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -48921,7 +49086,7 @@ func schema_k8sio_api_resource_v1alpha3_CELDeviceSelector(ref common.ReferenceCa
 				Properties: map[string]spec.Schema{
 					"expression": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Expression is a CEL expression which evaluates a single device. It must evaluate to true when the device under consideration satisfies the desired criteria, and false when it does not. Any other result is an error and causes allocation of devices to abort.\n\nThe expression's input is an object named \"device\", which carries the following properties:\n - driver (string): the name of the driver which defines this device.\n - attributes (map[string]object): the device's attributes, grouped by prefix\n   (e.g. device.attributes[\"dra.example.com\"] evaluates to an object with all\n   of the attributes which were prefixed by \"dra.example.com\".\n - capacity (map[string]object): the device's capacities, grouped by prefix.\n\nExample: Consider a device with driver=\"dra.example.com\", which exposes two attributes named \"model\" and \"ext.example.com/family\" and which exposes one capacity named \"modules\". This input to this expression would have the following fields:\n\n    device.driver\n    device.attributes[\"dra.example.com\"].model\n    device.attributes[\"ext.example.com\"].family\n    device.capacity[\"dra.example.com\"].modules\n\nThe device.driver field can be used to check for a specific driver, either as a high-level precondition (i.e. you only want to consider devices from this driver) or as part of a multi-clause expression that is meant to consider devices from different drivers.\n\nThe value type of each attribute is defined by the device definition, and users who write these expressions must consult the documentation for their specific drivers. The value type of each capacity is Quantity.\n\nIf an unknown prefix is used as a lookup in either device.attributes or device.capacity, an empty map will be returned. Any reference to an unknown field will cause an evaluation error and allocation to abort.\n\nA robust expression should check for the existence of attributes before referencing them.\n\nFor ease of use, the cel.bind() function is enabled, and can be used to simplify expressions that access multiple attributes with the same domain. For example:\n\n    cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)\n\nThe length of the expression must be smaller or equal to 10 Ki. The cost of evaluating it is also limited based on the estimated number of logical steps.",
+							Description: "Expression is a CEL expression which evaluates a single device. It must evaluate to true when the device under consideration satisfies the desired criteria, and false when it does not. Any other result is an error and causes allocation of devices to abort.\n\nThe expression's input is an object named \"device\", which carries the following properties:\n - driver (string): the name of the driver which defines this device.\n - attributes (map[string]object): the device's attributes, grouped by prefix\n   (e.g. device.attributes[\"dra.example.com\"] evaluates to an object with all\n   of the attributes which were prefixed by \"dra.example.com\").\n - capacity (map[string]object): the device's capacities, grouped by prefix.\n\nExample: Consider a device with driver=\"dra.example.com\", which exposes two attributes named \"model\" and \"ext.example.com/family\" and which exposes one capacity named \"modules\". This input to this expression would have the following fields:\n\n    device.driver\n    device.attributes[\"dra.example.com\"].model\n    device.attributes[\"ext.example.com\"].family\n    device.capacity[\"dra.example.com\"].modules\n\nThe device.driver field can be used to check for a specific driver, either as a high-level precondition (i.e. you only want to consider devices from this driver) or as part of a multi-clause expression that is meant to consider devices from different drivers.\n\nThe value type of each attribute is defined by the device definition, and users who write these expressions must consult the documentation for their specific drivers. The value type of each capacity is Quantity.\n\nIf an unknown prefix is used as a lookup in either device.attributes or device.capacity, an empty map will be returned. Any reference to an unknown field will cause an evaluation error and allocation to abort.\n\nA robust expression should check for the existence of attributes before referencing them.\n\nCommon errors: - \"no such key\": Use optional chaining (.? followed by orValue())\n  or guarding the check with has() for optional fields.\n  See CEL Optional Types for details:\n  https://pkg.go.dev/github.com/google/cel-go@v0.17.4/cel#OptionalTypes\n\nFor more CEL expression syntax and examples, see: https://kubernetes.io/docs/reference/using-api/cel/\n\nFor ease of use, the cel.bind() function is enabled, and can be used to simplify expressions that access multiple attributes with the same domain. For example:\n\n    cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)\n\nThe length of the expression must be smaller or equal to 10 Ki. The cost of evaluating it is also limited based on the estimated number of logical steps.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -49205,6 +49370,295 @@ func schema_k8sio_api_resource_v1alpha3_DeviceTaintSelector(ref common.Reference
 	}
 }
 
+func schema_k8sio_api_resource_v1alpha3_PoolStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PoolStatus contains status information for a single resource pool.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"driver": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Driver is the DRA driver name for this pool. Must be a DNS subdomain (e.g., \"gpu.example.com\").",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"poolName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PoolName is the name of the pool. Must be a valid resource pool name (DNS subdomains separated by \"/\").",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"generation": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Generation is the pool generation observed across all ResourceSlices in this pool. Only the latest generation is reported. During a generation rollout, if not all slices at the latest generation have been published, the pool is included with a validationError and device counts unset.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"resourceSliceCount": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ResourceSliceCount is the number of ResourceSlices that make up this pool. May be unset when validationError is set.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"totalDevices": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TotalDevices is the total number of devices in the pool across all slices. A value of 0 means the pool has no devices. May be unset when validationError is set.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"allocatedDevices": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AllocatedDevices is the number of devices currently allocated to claims. A value of 0 means no devices are allocated. May be unset when validationError is set.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"availableDevices": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AvailableDevices is the number of devices available for allocation. This equals TotalDevices - AllocatedDevices - UnavailableDevices. A value of 0 means no devices are currently available. May be unset when validationError is set.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"unavailableDevices": {
+						SchemaProps: spec.SchemaProps{
+							Description: "UnavailableDevices is the number of devices that are not available due to taints or other conditions, but are not allocated. A value of 0 means all unallocated devices are available. May be unset when validationError is set.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"nodeName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NodeName is the node this pool is associated with. When omitted, the pool is not associated with a specific node. Must be a valid DNS subdomain name (RFC1123).",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"validationError": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ValidationError is set when the pool's data could not be fully validated (e.g., incomplete slice publication). When set, device count fields and ResourceSliceCount may be unset.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"driver", "poolName", "generation"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourcePoolStatusRequest triggers a one-time calculation of resource pool status based on the provided filters. Once status is set, the request is considered complete and will not be reprocessed. Users should delete and recreate requests to get updated information.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec defines the filters for which pools to include in the status. The spec is immutable once created.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(v1alpha3.ResourcePoolStatusRequestSpec{}.OpenAPIModelName()),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status is populated by the controller with the calculated pool status. When status is non-nil, the request is considered complete and the entire object becomes immutable.",
+							Ref:         ref(v1alpha3.ResourcePoolStatusRequestStatus{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"metadata", "spec"},
+			},
+		},
+		Dependencies: []string{
+			v1alpha3.ResourcePoolStatusRequestSpec{}.OpenAPIModelName(), v1alpha3.ResourcePoolStatusRequestStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequestList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourcePoolStatusRequestList is a collection of ResourcePoolStatusRequests.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is the list of ResourcePoolStatusRequests.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(v1alpha3.ResourcePoolStatusRequest{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			v1alpha3.ResourcePoolStatusRequest{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequestSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourcePoolStatusRequestSpec defines the filters for the pool status request.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"driver": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Driver specifies the DRA driver name to filter pools. Only pools from ResourceSlices with this driver will be included. Must be a DNS subdomain (e.g., \"gpu.example.com\").",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"poolName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PoolName optionally filters to a specific pool name. If not specified, all pools from the specified driver are included. When specified, must be a non-empty valid resource pool name (DNS subdomains separated by \"/\").",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"limit": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Limit optionally specifies the maximum number of pools to return in the status. If more pools match the filter criteria, the response will be truncated (i.e., len(status.pools) < status.poolCount).\n\nDefault: 100 Minimum: 1 Maximum: 1000",
+							Default:     100,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+				Required: []string{"driver"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequestStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ResourcePoolStatusRequestStatus contains the calculated pool status information.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"poolCount": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PoolCount is the total number of pools that matched the filter criteria, regardless of truncation. This helps users understand how many pools exist even when the response is truncated. A value of 0 means no pools matched the filter criteria.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"pools": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Pools contains the first `spec.limit` matching pools, sorted by driver then pool name. If `len(pools) < poolCount`, the list was truncated. When omitted, no pools matched the request filters.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(v1alpha3.PoolStatus{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"type",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "type",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Conditions provide information about the state of the request. A condition with type=Complete or type=Failed will always be set when the status is populated.\n\nKnown condition types: - \"Complete\": True when the request has been processed successfully - \"Failed\": True when the request could not be processed",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"poolCount"},
+			},
+		},
+		Dependencies: []string{
+			v1alpha3.PoolStatus{}.OpenAPIModelName(), metav1.Condition{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_resource_v1beta1_AllocatedDeviceStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -49308,7 +49762,7 @@ func schema_k8sio_api_resource_v1beta1_AllocationResult(ref common.ReferenceCall
 					},
 					"allocationTimestamp": {
 						SchemaProps: spec.SchemaProps{
-							Description: "AllocationTimestamp stores the time when the resources were allocated. This field is not guaranteed to be set, in which case that time is unknown.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gate.",
+							Description: "AllocationTimestamp stores the time when the resources were allocated. This field is not guaranteed to be set, in which case that time is unknown.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gate.",
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
@@ -49417,7 +49871,7 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 					},
 					"bindsToNode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "BindsToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim. If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector to match the node where the allocation was made.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
+							Description: "BindsToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim. If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector to match the node where the allocation was made.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -49429,7 +49883,7 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
+							Description: "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -49449,7 +49903,7 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
+							Description: "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -49469,11 +49923,26 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 							Format:      "",
 						},
 					},
+					"nodeAllocatableResourceMappings": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NodeAllocatableResourceMappings defines the mapping of node resources that are managed by the DRA driver exposing this device. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages. In addition to standard requests made through the Pod `spec`, these resources can also be requested through claims and allocated by the DRA driver. For example, a CPU DRA driver might allocate exclusive CPUs or auxiliary node memory dependencies of an accelerator device. The keys of this map are the node-allocatable resource names (e.g., \"cpu\", \"memory\"). Extended resource names are not permitted as keys.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(resourcev1beta1.NodeAllocatableResourceMapping{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1beta1.DeviceAttribute{}.OpenAPIModelName(), resourcev1beta1.DeviceCapacity{}.OpenAPIModelName(), resourcev1beta1.DeviceCounterConsumption{}.OpenAPIModelName(), resourcev1beta1.DeviceTaint{}.OpenAPIModelName()},
+			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1beta1.DeviceAttribute{}.OpenAPIModelName(), resourcev1beta1.DeviceCapacity{}.OpenAPIModelName(), resourcev1beta1.DeviceCounterConsumption{}.OpenAPIModelName(), resourcev1beta1.DeviceTaint{}.OpenAPIModelName(), resourcev1beta1.NodeAllocatableResourceMapping{}.OpenAPIModelName()},
 	}
 }
 
@@ -49486,7 +49955,7 @@ func schema_k8sio_api_resource_v1beta1_CELDeviceSelector(ref common.ReferenceCal
 				Properties: map[string]spec.Schema{
 					"expression": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Expression is a CEL expression which evaluates a single device. It must evaluate to true when the device under consideration satisfies the desired criteria, and false when it does not. Any other result is an error and causes allocation of devices to abort.\n\nThe expression's input is an object named \"device\", which carries the following properties:\n - driver (string): the name of the driver which defines this device.\n - attributes (map[string]object): the device's attributes, grouped by prefix\n   (e.g. device.attributes[\"dra.example.com\"] evaluates to an object with all\n   of the attributes which were prefixed by \"dra.example.com\".\n - capacity (map[string]object): the device's capacities, grouped by prefix.\n - allowMultipleAllocations (bool): the allowMultipleAllocations property of the device\n   (v1.34+ with the DRAConsumableCapacity feature enabled).\n\nExample: Consider a device with driver=\"dra.example.com\", which exposes two attributes named \"model\" and \"ext.example.com/family\" and which exposes one capacity named \"modules\". This input to this expression would have the following fields:\n\n    device.driver\n    device.attributes[\"dra.example.com\"].model\n    device.attributes[\"ext.example.com\"].family\n    device.capacity[\"dra.example.com\"].modules\n\nThe device.driver field can be used to check for a specific driver, either as a high-level precondition (i.e. you only want to consider devices from this driver) or as part of a multi-clause expression that is meant to consider devices from different drivers.\n\nThe value type of each attribute is defined by the device definition, and users who write these expressions must consult the documentation for their specific drivers. The value type of each capacity is Quantity.\n\nIf an unknown prefix is used as a lookup in either device.attributes or device.capacity, an empty map will be returned. Any reference to an unknown field will cause an evaluation error and allocation to abort.\n\nA robust expression should check for the existence of attributes before referencing them.\n\nFor ease of use, the cel.bind() function is enabled, and can be used to simplify expressions that access multiple attributes with the same domain. For example:\n\n    cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)\n\nThe length of the expression must be smaller or equal to 10 Ki. The cost of evaluating it is also limited based on the estimated number of logical steps.",
+							Description: "Expression is a CEL expression which evaluates a single device. It must evaluate to true when the device under consideration satisfies the desired criteria, and false when it does not. Any other result is an error and causes allocation of devices to abort.\n\nThe expression's input is an object named \"device\", which carries the following properties:\n - driver (string): the name of the driver which defines this device.\n - attributes (map[string]object): the device's attributes, grouped by prefix\n   (e.g. device.attributes[\"dra.example.com\"] evaluates to an object with all\n   of the attributes which were prefixed by \"dra.example.com\").\n - capacity (map[string]object): the device's capacities, grouped by prefix.\n - allowMultipleAllocations (bool): the allowMultipleAllocations property of the device\n   (v1.34+ with the DRAConsumableCapacity feature enabled).\n\nExample: Consider a device with driver=\"dra.example.com\", which exposes two attributes named \"model\" and \"ext.example.com/family\" and which exposes one capacity named \"modules\". This input to this expression would have the following fields:\n\n    device.driver\n    device.attributes[\"dra.example.com\"].model\n    device.attributes[\"ext.example.com\"].family\n    device.capacity[\"dra.example.com\"].modules\n\nThe device.driver field can be used to check for a specific driver, either as a high-level precondition (i.e. you only want to consider devices from this driver) or as part of a multi-clause expression that is meant to consider devices from different drivers.\n\nThe value type of each attribute is defined by the device definition, and users who write these expressions must consult the documentation for their specific drivers. The value type of each capacity is Quantity.\n\nIf an unknown prefix is used as a lookup in either device.attributes or device.capacity, an empty map will be returned. Any reference to an unknown field will cause an evaluation error and allocation to abort.\n\nA robust expression should check for the existence of attributes before referencing them.\n\nCommon errors: - \"no such key\": Use optional chaining (.? followed by orValue())\n  or guarding the check with has() for optional fields.\n  See CEL Optional Types for details:\n  https://pkg.go.dev/github.com/google/cel-go@v0.17.4/cel#OptionalTypes\n\nFor more CEL expression syntax and examples, see: https://kubernetes.io/docs/reference/using-api/cel/\n\nFor ease of use, the cel.bind() function is enabled, and can be used to simplify expressions that access multiple attributes with the same domain. For example:\n\n    cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)\n\nWhen the DRAListTypeAttributes feature gate is enabled, the includes() helper is available and it can work for both scalar and list-type attributes. It was introduced to support smooth migration from scalar attributes to list-type attributes while keeping CEL expressions simple. For example:\n\n    device.attributes[\"dra.example.com\"].models.includes(\"some-model\")\n\nThe length of the expression must be smaller or equal to 10 Ki. The cost of evaluating it is also limited based on the estimated number of logical steps.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -49837,6 +50306,86 @@ func schema_k8sio_api_resource_v1beta1_DeviceAttribute(ref common.ReferenceCallb
 							Format:      "",
 						},
 					},
+					"ints": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "IntValues is a non-empty list of numbers.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: 0,
+										Type:    []string{"integer"},
+										Format:  "int64",
+									},
+								},
+							},
+						},
+					},
+					"bools": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "BoolValues is a non-empty list of true/false values.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: false,
+										Type:    []string{"boolean"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"strings": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "StringValues is a non-empty list of strings. Each string must not be longer than 64 characters.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"versions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "VersionValues is a non-empty list of semantic versions according to semver.org spec 2.0.0. Each version string must not be longer than 64 characters.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
@@ -50020,7 +50569,6 @@ func schema_k8sio_api_resource_v1beta1_DeviceClass(ref common.ReferenceCallback)
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -50210,14 +50758,14 @@ func schema_k8sio_api_resource_v1beta1_DeviceConstraint(ref common.ReferenceCall
 					},
 					"matchAttribute": {
 						SchemaProps: spec.SchemaProps{
-							Description: "MatchAttribute requires that all devices in question have this attribute and that its type and value are the same across those devices.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.\n\nMust include the domain qualifier.",
+							Description: "MatchAttribute requires that all devices in question have this attribute and that its type and value are the same across those devices.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.\n\nWhen the DRAListTypeAttributes feature gate is enabled, comparison uses set semantics(i.e., element order and duplicates are ignored): list-valued attributes match when the intersection across all devices is non-empty. Scalar values are treated as singleton sets for backward compatibility.\n\nMust include the domain qualifier.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"distinctAttribute": {
 						SchemaProps: spec.SchemaProps{
-							Description: "DistinctAttribute requires that all devices in question have this attribute and that its type and value are unique across those devices.\n\nThis acts as the inverse of MatchAttribute.\n\nThis constraint is used to avoid allocating multiple requests to the same device by ensuring attribute-level differentiation.\n\nThis is useful for scenarios where resource requests must be fulfilled by separate physical devices. For example, a container requests two network interfaces that must be allocated from two different physical NICs.",
+							Description: "DistinctAttribute requires that all devices in question have this attribute and that its type and value are unique across those devices.\n\nWhen the DRAListTypeAttributes feature gate is enabled, comparison uses set semantics (i.e., element order and duplicates are ignored): list-valued attributes must be pairwise disjoint across devices. Scalar values are treated as singleton sets for backward compatibility.\n\nThis acts as the inverse of MatchAttribute.\n\nThis constraint is used to avoid allocating multiple requests to the same device by ensuring attribute-level differentiation.\n\nThis is useful for scenarios where resource requests must be fulfilled by separate physical devices. For example, a container requests two network interfaces that must be allocated from two different physical NICs.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -50456,7 +51004,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceRequestAllocationResult(ref common.
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingConditions contains a copy of the BindingConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
+							Description: "BindingConditions contains a copy of the BindingConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -50476,7 +51024,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceRequestAllocationResult(ref common.
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
+							Description: "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -50775,6 +51323,34 @@ func schema_k8sio_api_resource_v1beta1_NetworkDeviceData(ref common.ReferenceCal
 	}
 }
 
+func schema_k8sio_api_resource_v1beta1_NodeAllocatableResourceMapping(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeAllocatableResourceMapping defines the translation between the DRA device/capacity units requested to the corresponding quantity of the node allocatable resource.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"capacityKey": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CapacityKey references a capacity name defined as a key in the `spec.devices[*].capacity` map. When this field is set, the value associated with this key in the `status.allocation.devices.results[*].consumedCapacity` map (for a specific claim allocation) determines the base quantity for the node allocatable resource. If `allocationMultiplier` is also set, it is multiplied with the base quantity. For example, if `spec.devices[*].capacity` has an entry \"dra.example.com/memory\": \"128Gi\", and this field is set to \"dra.example.com/memory\", then for a claim allocation that consumes { \"dra.example.com/memory\": \"4Gi\" } the base quantity for the node allocatable resource mapping will be \"4Gi\", and `allocationMultiplier` should be omitted or set to \"1\".",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"allocationMultiplier": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AllocationMultiplier is used as a multiplier for the allocated device count or the allocated capacity in the claim. It defaults to 1 if not specified. How the field is used also depends on whether `capacityKey` is set. 1.  If `capacityKey` is NOT set: `allocationMultiplier` multiplies the device count allocated to the claim.\n\t   a. A DRA driver representing each CPU core as a device would have\n       {ResourceName: \"cpu\", allocationMultiplier: \"2\"} in its\n       `nodeAllocatableResourceMappings`. If 4 devices are allocated to the claim,\n\t\t  4 * 2 CPUs would be considered as allocated and subtracted from the node's capacity.\n    b. A GPU device that needs additional node memory per GPU allocation would\n       have {ResourceName: \"memory\", allocationMultiplier: \"2Gi\"}.  Each allocated\n\t\t  GPU device instance of this type will account for 2Gi of memory.\n\n2.  If `capacityKey` IS set: `allocationMultiplier` is multiplied by the amount of that capacity consumed.\n\t   The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `allocationMultiplier`.\n    For example, if a Device's capacity \"dra.example.com/cores\" is consumed,\n    and each \"core\" provides 2 \"cpu\"s, the mapping would be:\n    {ResourceName: \"cpu\", capacityKey: \"dra.example.com/cores\", allocationMultiplier: \"2\"}.\n    If a claim consumes 8 \"dra.example.com/cores\", the CPU footprint is 8 * 2 = 16.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_resource_v1beta1_OpaqueDeviceConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -50848,7 +51424,6 @@ func schema_k8sio_api_resource_v1beta1_ResourceClaim(ref common.ReferenceCallbac
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -51080,7 +51655,6 @@ func schema_k8sio_api_resource_v1beta1_ResourceClaimTemplate(ref common.Referenc
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -51161,7 +51735,6 @@ func schema_k8sio_api_resource_v1beta1_ResourceClaimTemplateSpec(ref common.Refe
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -51501,7 +52074,7 @@ func schema_k8sio_api_resource_v1beta2_AllocationResult(ref common.ReferenceCall
 					},
 					"allocationTimestamp": {
 						SchemaProps: spec.SchemaProps{
-							Description: "AllocationTimestamp stores the time when the resources were allocated. This field is not guaranteed to be set, in which case that time is unknown.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gate.",
+							Description: "AllocationTimestamp stores the time when the resources were allocated. This field is not guaranteed to be set, in which case that time is unknown.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gate.",
 							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
@@ -51522,7 +52095,7 @@ func schema_k8sio_api_resource_v1beta2_CELDeviceSelector(ref common.ReferenceCal
 				Properties: map[string]spec.Schema{
 					"expression": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Expression is a CEL expression which evaluates a single device. It must evaluate to true when the device under consideration satisfies the desired criteria, and false when it does not. Any other result is an error and causes allocation of devices to abort.\n\nThe expression's input is an object named \"device\", which carries the following properties:\n - driver (string): the name of the driver which defines this device.\n - attributes (map[string]object): the device's attributes, grouped by prefix\n   (e.g. device.attributes[\"dra.example.com\"] evaluates to an object with all\n   of the attributes which were prefixed by \"dra.example.com\".\n - capacity (map[string]object): the device's capacities, grouped by prefix.\n - allowMultipleAllocations (bool): the allowMultipleAllocations property of the device\n   (v1.34+ with the DRAConsumableCapacity feature enabled).\n\nExample: Consider a device with driver=\"dra.example.com\", which exposes two attributes named \"model\" and \"ext.example.com/family\" and which exposes one capacity named \"modules\". This input to this expression would have the following fields:\n\n    device.driver\n    device.attributes[\"dra.example.com\"].model\n    device.attributes[\"ext.example.com\"].family\n    device.capacity[\"dra.example.com\"].modules\n\nThe device.driver field can be used to check for a specific driver, either as a high-level precondition (i.e. you only want to consider devices from this driver) or as part of a multi-clause expression that is meant to consider devices from different drivers.\n\nThe value type of each attribute is defined by the device definition, and users who write these expressions must consult the documentation for their specific drivers. The value type of each capacity is Quantity.\n\nIf an unknown prefix is used as a lookup in either device.attributes or device.capacity, an empty map will be returned. Any reference to an unknown field will cause an evaluation error and allocation to abort.\n\nA robust expression should check for the existence of attributes before referencing them.\n\nFor ease of use, the cel.bind() function is enabled, and can be used to simplify expressions that access multiple attributes with the same domain. For example:\n\n    cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)\n\nThe length of the expression must be smaller or equal to 10 Ki. The cost of evaluating it is also limited based on the estimated number of logical steps.",
+							Description: "Expression is a CEL expression which evaluates a single device. It must evaluate to true when the device under consideration satisfies the desired criteria, and false when it does not. Any other result is an error and causes allocation of devices to abort.\n\nThe expression's input is an object named \"device\", which carries the following properties:\n - driver (string): the name of the driver which defines this device.\n - attributes (map[string]object): the device's attributes, grouped by prefix\n   (e.g. device.attributes[\"dra.example.com\"] evaluates to an object with all\n   of the attributes which were prefixed by \"dra.example.com\").\n - capacity (map[string]object): the device's capacities, grouped by prefix.\n - allowMultipleAllocations (bool): the allowMultipleAllocations property of the device\n   (v1.34+ with the DRAConsumableCapacity feature enabled).\n\nExample: Consider a device with driver=\"dra.example.com\", which exposes two attributes named \"model\" and \"ext.example.com/family\" and which exposes one capacity named \"modules\". This input to this expression would have the following fields:\n\n    device.driver\n    device.attributes[\"dra.example.com\"].model\n    device.attributes[\"ext.example.com\"].family\n    device.capacity[\"dra.example.com\"].modules\n\nThe device.driver field can be used to check for a specific driver, either as a high-level precondition (i.e. you only want to consider devices from this driver) or as part of a multi-clause expression that is meant to consider devices from different drivers.\n\nThe value type of each attribute is defined by the device definition, and users who write these expressions must consult the documentation for their specific drivers. The value type of each capacity is Quantity.\n\nIf an unknown prefix is used as a lookup in either device.attributes or device.capacity, an empty map will be returned. Any reference to an unknown field will cause an evaluation error and allocation to abort.\n\nA robust expression should check for the existence of attributes before referencing them.\n\nCommon errors: - \"no such key\": Use optional chaining (.? followed by orValue())\n  or guarding the check with has() for optional fields.\n  See CEL Optional Types for details:\n  https://pkg.go.dev/github.com/google/cel-go@v0.17.4/cel#OptionalTypes\n\nFor more CEL expression syntax and examples, see: https://kubernetes.io/docs/reference/using-api/cel/\n\nFor ease of use, the cel.bind() function is enabled, and can be used to simplify expressions that access multiple attributes with the same domain. For example:\n\n    cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)\n\nWhen the DRAListTypeAttributes feature gate is enabled, the includes() helper is available and it can work for both scalar and list-type attributes. It was introduced to support smooth migration from scalar attributes to list-type attributes while keeping CEL expressions simple. For example:\n\n    device.attributes[\"dra.example.com\"].models.includes(\"some-model\")\n\nThe length of the expression must be smaller or equal to 10 Ki. The cost of evaluating it is also limited based on the estimated number of logical steps.",
 							Default:     "",
 							Type:        []string{"string"},
 							Format:      "",
@@ -51809,7 +52382,7 @@ func schema_k8sio_api_resource_v1beta2_Device(ref common.ReferenceCallback) comm
 					},
 					"bindsToNode": {
 						SchemaProps: spec.SchemaProps{
-							Description: "BindsToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim. If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector to match the node where the allocation was made.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
+							Description: "BindsToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim. If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector to match the node where the allocation was made.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
@@ -51821,7 +52394,7 @@ func schema_k8sio_api_resource_v1beta2_Device(ref common.ReferenceCallback) comm
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
+							Description: "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -51841,7 +52414,7 @@ func schema_k8sio_api_resource_v1beta2_Device(ref common.ReferenceCallback) comm
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is set to \"True\", a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
+							Description: "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is set to \"True\", a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -51861,12 +52434,27 @@ func schema_k8sio_api_resource_v1beta2_Device(ref common.ReferenceCallback) comm
 							Format:      "",
 						},
 					},
+					"nodeAllocatableResourceMappings": {
+						SchemaProps: spec.SchemaProps{
+							Description: "NodeAllocatableResourceMappings defines the mapping of node resources that are managed by the DRA driver exposing this device. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages. In addition to standard requests made through the Pod `spec`, these resources can also be requested through claims and allocated by the DRA driver. For example, a CPU DRA driver might allocate exclusive CPUs or auxiliary node memory dependencies of an accelerator device. The keys of this map are the node-allocatable resource names (e.g., \"cpu\", \"memory\"). Extended resource names are not permitted as keys.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(resourcev1beta2.NodeAllocatableResourceMapping{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 				Required: []string{"name"},
 			},
 		},
 		Dependencies: []string{
-			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1beta2.DeviceAttribute{}.OpenAPIModelName(), resourcev1beta2.DeviceCapacity{}.OpenAPIModelName(), resourcev1beta2.DeviceCounterConsumption{}.OpenAPIModelName(), resourcev1beta2.DeviceTaint{}.OpenAPIModelName()},
+			corev1.NodeSelector{}.OpenAPIModelName(), resourcev1beta2.DeviceAttribute{}.OpenAPIModelName(), resourcev1beta2.DeviceCapacity{}.OpenAPIModelName(), resourcev1beta2.DeviceCounterConsumption{}.OpenAPIModelName(), resourcev1beta2.DeviceTaint{}.OpenAPIModelName(), resourcev1beta2.NodeAllocatableResourceMapping{}.OpenAPIModelName()},
 	}
 }
 
@@ -52007,6 +52595,86 @@ func schema_k8sio_api_resource_v1beta2_DeviceAttribute(ref common.ReferenceCallb
 							Description: "VersionValue is a semantic version according to semver.org spec 2.0.0. Must not be longer than 64 characters.",
 							Type:        []string{"string"},
 							Format:      "",
+						},
+					},
+					"ints": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "IntValues is a non-empty list of numbers.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: 0,
+										Type:    []string{"integer"},
+										Format:  "int64",
+									},
+								},
+							},
+						},
+					},
+					"bools": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "BoolValues is a non-empty list of true/false values.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: false,
+										Type:    []string{"boolean"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"strings": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "StringValues is a non-empty list of strings. Each string must not be longer than 64 characters.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"versions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "VersionValues is a non-empty list of semantic versions according to semver.org spec 2.0.0. Each version string must not be longer than 64 characters.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
 						},
 					},
 				},
@@ -52192,7 +52860,6 @@ func schema_k8sio_api_resource_v1beta2_DeviceClass(ref common.ReferenceCallback)
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -52382,14 +53049,14 @@ func schema_k8sio_api_resource_v1beta2_DeviceConstraint(ref common.ReferenceCall
 					},
 					"matchAttribute": {
 						SchemaProps: spec.SchemaProps{
-							Description: "MatchAttribute requires that all devices in question have this attribute and that its type and value are the same across those devices.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.\n\nMust include the domain qualifier.",
+							Description: "MatchAttribute requires that all devices in question have this attribute and that its type and value are the same across those devices.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.\n\nWhen the DRAListTypeAttributes feature gate is enabled, comparison uses set semantics(i.e., element order and duplicates are ignored): list-valued attributes match when the intersection across all devices is non-empty. Scalar values are treated as singleton sets for backward compatibility.\n\nMust include the domain qualifier.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
 					"distinctAttribute": {
 						SchemaProps: spec.SchemaProps{
-							Description: "DistinctAttribute requires that all devices in question have this attribute and that its type and value are unique across those devices.\n\nThis acts as the inverse of MatchAttribute.\n\nThis constraint is used to avoid allocating multiple requests to the same device by ensuring attribute-level differentiation.\n\nThis is useful for scenarios where resource requests must be fulfilled by separate physical devices. For example, a container requests two network interfaces that must be allocated from two different physical NICs.",
+							Description: "DistinctAttribute requires that all devices in question have this attribute and that its type and value are unique across those devices.\n\nWhen the DRAListTypeAttributes feature gate is enabled, comparison uses set semantics (i.e., element order and duplicates are ignored): list-valued attributes must be pairwise disjoint across devices. Scalar values are treated as singleton sets for backward compatibility.\n\nThis acts as the inverse of MatchAttribute.\n\nThis constraint is used to avoid allocating multiple requests to the same device by ensuring attribute-level differentiation.\n\nThis is useful for scenarios where resource requests must be fulfilled by separate physical devices. For example, a container requests two network interfaces that must be allocated from two different physical NICs.",
 							Type:        []string{"string"},
 							Format:      "",
 						},
@@ -52560,7 +53227,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceRequestAllocationResult(ref common.
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingConditions contains a copy of the BindingConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
+							Description: "BindingConditions contains a copy of the BindingConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -52580,7 +53247,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceRequestAllocationResult(ref common.
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
+							Description: "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -53173,6 +53840,34 @@ func schema_k8sio_api_resource_v1beta2_NetworkDeviceData(ref common.ReferenceCal
 	}
 }
 
+func schema_k8sio_api_resource_v1beta2_NodeAllocatableResourceMapping(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "NodeAllocatableResourceMapping defines the translation between the DRA device/capacity units requested to the corresponding quantity of the node allocatable resource.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"capacityKey": {
+						SchemaProps: spec.SchemaProps{
+							Description: "CapacityKey references a capacity name defined as a key in the `spec.devices[*].capacity` map. When this field is set, the value associated with this key in the `status.allocation.devices.results[*].consumedCapacity` map (for a specific claim allocation) determines the base quantity for the node allocatable resource. If `allocationMultiplier` is also set, it is multiplied with the base quantity. For example, if `spec.devices[*].capacity` has an entry \"dra.example.com/memory\": \"128Gi\", and this field is set to \"dra.example.com/memory\", then for a claim allocation that consumes { \"dra.example.com/memory\": \"4Gi\" } the base quantity for the node allocatable resource mapping will be \"4Gi\", and `allocationMultiplier` should be omitted or set to \"1\".",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"allocationMultiplier": {
+						SchemaProps: spec.SchemaProps{
+							Description: "AllocationMultiplier is used as a multiplier for the allocated device count or the allocated capacity in the claim. It defaults to 1 if not specified. How the field is used also depends on whether `capacityKey` is set. 1.  If `capacityKey` is NOT set: `allocationMultiplier` multiplies the device count allocated to the claim.\n\t   a. A DRA driver representing each CPU core as a device would have\n       {ResourceName: \"cpu\", allocationMultiplier: \"2\"} in its\n       `nodeAllocatableResourceMappings`. If 4 devices are allocated to the claim,\n\t\t  4 * 2 CPUs would be considered as allocated and subtracted from the node's capacity.\n    b. A GPU device that needs additional node memory per GPU allocation would\n       have {ResourceName: \"memory\", allocationMultiplier: \"2Gi\"}.  Each allocated\n\t\t  GPU device instance of this type will account for 2Gi of memory.\n\n2.  If `capacityKey` IS set: `allocationMultiplier` is multiplied by the amount of that capacity consumed.\n\t   The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `allocationMultiplier`.\n    For example, if a Device's capacity \"dra.example.com/cores\" is consumed,\n    and each \"core\" provides 2 \"cpu\"s, the mapping would be:\n    {ResourceName: \"cpu\", capacityKey: \"dra.example.com/cores\", allocationMultiplier: \"2\"}.\n    If a claim consumes 8 \"dra.example.com/cores\", the CPU footprint is 8 * 2 = 16.",
+							Ref:         ref(resource.Quantity{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			resource.Quantity{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_resource_v1beta2_OpaqueDeviceConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -53246,7 +53941,6 @@ func schema_k8sio_api_resource_v1beta2_ResourceClaim(ref common.ReferenceCallbac
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -53478,7 +54172,6 @@ func schema_k8sio_api_resource_v1beta2_ResourceClaimTemplate(ref common.Referenc
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -53559,7 +54252,6 @@ func schema_k8sio_api_resource_v1beta2_ResourceClaimTemplateSpec(ref common.Refe
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -54048,6 +54740,105 @@ func schema_k8sio_api_scheduling_v1alpha2_PodGroupList(ref common.ReferenceCallb
 	}
 }
 
+func schema_k8sio_api_scheduling_v1alpha2_PodGroupResourceClaim(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodGroupResourceClaim references exactly one ResourceClaim, either directly or by naming a ResourceClaimTemplate which is then turned into a ResourceClaim for the PodGroup.\n\nIt adds a name to it that uniquely identifies the ResourceClaim inside the PodGroup. Pods that need access to the ResourceClaim define a matching reference in its own Spec.ResourceClaims. The Pod's claim must match all fields of the PodGroup's claim exactly.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name uniquely identifies this resource claim inside the PodGroup. This must be a DNS_LABEL.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"resourceClaimName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ResourceClaimName is the name of a ResourceClaim object in the same namespace as this PodGroup. The ResourceClaim will be reserved for the PodGroup instead of its individual pods.\n\nExactly one of ResourceClaimName and ResourceClaimTemplateName must be set.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"resourceClaimTemplateName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ResourceClaimTemplateName is the name of a ResourceClaimTemplate object in the same namespace as this PodGroup.\n\nThe template will be used to create a new ResourceClaim, which will be bound to this PodGroup. When this PodGroup is deleted, the ResourceClaim will also be deleted. The PodGroup name and resource name, along with a generated component, will be used to form a unique name for the ResourceClaim, which will be recorded in podgroup.status.resourceClaimStatuses.\n\nThis field is immutable and no changes will be made to the corresponding ResourceClaim by the control plane after creating the ResourceClaim.\n\nExactly one of ResourceClaimName and ResourceClaimTemplateName must be set.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha2_PodGroupResourceClaimStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodGroupResourceClaimStatus is stored in the PodGroupStatus for each PodGroupResourceClaim which references a ResourceClaimTemplate. It stores the generated name for the corresponding ResourceClaim.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name uniquely identifies this resource claim inside the PodGroup. This must match the name of an entry in podgroup.spec.resourceClaims, which implies that the string must be a DNS_LABEL.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"resourceClaimName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ResourceClaimName is the name of the ResourceClaim that was generated for the PodGroup in the namespace of the PodGroup. If this is unset, then generating a ResourceClaim was not necessary. The podgroup.spec.resourceClaims entry can be ignored in this case.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"name"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha2_PodGroupSchedulingConstraints(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "PodGroupSchedulingConstraints defines scheduling constraints (e.g. topology) for a PodGroup.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"topology": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Topology defines the topology constraints for the pod group. Currently only a single topology constraint can be specified. This may change in the future.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(schedulingv1alpha2.TopologyConstraint{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha2.TopologyConstraint{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_api_scheduling_v1alpha2_PodGroupSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -54107,12 +54898,65 @@ func schema_k8sio_api_scheduling_v1alpha2_PodGroupSpec(ref common.ReferenceCallb
 							Ref:         ref(schedulingv1alpha2.PodGroupSchedulingPolicy{}.OpenAPIModelName()),
 						},
 					},
+					"schedulingConstraints": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroup. Controllers are expected to fill this field by copying it from a PodGroupTemplate. This field is immutable. This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.",
+							Ref:         ref(schedulingv1alpha2.PodGroupSchedulingConstraints{}.OpenAPIModelName()),
+						},
+					},
+					"resourceClaims": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge,retainKeys",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "ResourceClaims defines which ResourceClaims may be shared among Pods in the group. Pods consume the devices allocated to a PodGroup's claim by defining a claim in its own Spec.ResourceClaims that matches the PodGroup's claim exactly. The claim must have the same name and refer to the same ResourceClaim or ResourceClaimTemplate.\n\nThis is an alpha-level field and requires that the DRAWorkloadResourceClaims feature gate is enabled.\n\nThis field is immutable.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(schedulingv1alpha2.PodGroupResourceClaim{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"disruptionMode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DisruptionMode defines the mode in which a given PodGroup can be disrupted. Controllers are expected to fill this field by copying it from a PodGroupTemplate. One of Pod, PodGroup. Defaults to Pod if unset. This field is immutable. This field is available only when the WorkloadAwarePreemption feature gate is enabled.\n\n\nPossible enum values:\n - `\"Pod\"` means that individual pods can be disrupted or preempted independently. It doesn't depend on exact set of pods currently running in this PodGroup.\n - `\"PodGroup\"` means that the whole PodGroup needs to be disrupted or preempted together.",
+							Default:     "Pod",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Pod", "PodGroup"},
+						},
+					},
+					"priorityClassName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PriorityClassName defines the priority that should be considered when scheduling this pod group. Controllers are expected to fill this field by copying it from a PodGroupTemplate. Otherwise, it is validated and resolved similarly to the PriorityClassName on PodGroupTemplate (i.e. if no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, the pod group's priority will be zero). This field is immutable. This field is available only when the WorkloadAwarePreemption feature gate is enabled.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"priority": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Priority is the value of priority of this pod group. Various system components use this field to find the priority of the pod group. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority. This field is immutable. This field is available only when the WorkloadAwarePreemption feature gate is enabled.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 				},
 				Required: []string{"schedulingPolicy"},
 			},
 		},
 		Dependencies: []string{
-			schedulingv1alpha2.PodGroupSchedulingPolicy{}.OpenAPIModelName(), schedulingv1alpha2.PodGroupTemplateReference{}.OpenAPIModelName()},
+			schedulingv1alpha2.PodGroupResourceClaim{}.OpenAPIModelName(), schedulingv1alpha2.PodGroupSchedulingConstraints{}.OpenAPIModelName(), schedulingv1alpha2.PodGroupSchedulingPolicy{}.OpenAPIModelName(), schedulingv1alpha2.PodGroupTemplateReference{}.OpenAPIModelName()},
 	}
 }
 
@@ -54147,11 +54991,35 @@ func schema_k8sio_api_scheduling_v1alpha2_PodGroupStatus(ref common.ReferenceCal
 							},
 						},
 					},
+					"resourceClaimStatuses": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge,retainKeys",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Status of resource claims.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(schedulingv1alpha2.PodGroupResourceClaimStatus{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},
 		Dependencies: []string{
-			metav1.Condition{}.OpenAPIModelName()},
+			schedulingv1alpha2.PodGroupResourceClaimStatus{}.OpenAPIModelName(), metav1.Condition{}.OpenAPIModelName()},
 	}
 }
 
@@ -54177,12 +55045,64 @@ func schema_k8sio_api_scheduling_v1alpha2_PodGroupTemplate(ref common.ReferenceC
 							Ref:         ref(schedulingv1alpha2.PodGroupSchedulingPolicy{}.OpenAPIModelName()),
 						},
 					},
+					"schedulingConstraints": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroupTemplate. This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.",
+							Ref:         ref(schedulingv1alpha2.PodGroupSchedulingConstraints{}.OpenAPIModelName()),
+						},
+					},
+					"resourceClaims": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "name",
+								"x-kubernetes-patch-strategy":  "merge,retainKeys",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "ResourceClaims defines which ResourceClaims may be shared among Pods in the group. Pods consume the devices allocated to a PodGroup's claim by defining a claim in its own Spec.ResourceClaims that matches the PodGroup's claim exactly. The claim must have the same name and refer to the same ResourceClaim or ResourceClaimTemplate.\n\nThis is an alpha-level field and requires that the DRAWorkloadResourceClaims feature gate is enabled.\n\nThis field is immutable.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(schedulingv1alpha2.PodGroupResourceClaim{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"disruptionMode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DisruptionMode defines the mode in which a given PodGroup can be disrupted. One of Pod, PodGroup. This field is available only when the WorkloadAwarePreemption feature gate is enabled.\n\n\nPossible enum values:\n - `\"Pod\"` means that individual pods can be disrupted or preempted independently. It doesn't depend on exact set of pods currently running in this PodGroup.\n - `\"PodGroup\"` means that the whole PodGroup needs to be disrupted or preempted together.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Pod", "PodGroup"},
+						},
+					},
+					"priorityClassName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PriorityClassName indicates the priority that should be considered when scheduling a pod group created from this template. If no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, pod groups created from this template will have the priority set to zero. This field is available only when the WorkloadAwarePreemption feature gate is enabled.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"priority": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Priority is the value of priority of pod groups created from this template. Various system components use this field to find the priority of the pod group. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority. This field is available only when the WorkloadAwarePreemption feature gate is enabled.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
 				},
 				Required: []string{"name", "schedulingPolicy"},
 			},
 		},
 		Dependencies: []string{
-			schedulingv1alpha2.PodGroupSchedulingPolicy{}.OpenAPIModelName()},
+			schedulingv1alpha2.PodGroupResourceClaim{}.OpenAPIModelName(), schedulingv1alpha2.PodGroupSchedulingConstraints{}.OpenAPIModelName(), schedulingv1alpha2.PodGroupSchedulingPolicy{}.OpenAPIModelName()},
 	}
 }
 
@@ -54215,6 +55135,28 @@ func schema_k8sio_api_scheduling_v1alpha2_PodGroupTemplateReference(ref common.R
 		},
 		Dependencies: []string{
 			schedulingv1alpha2.WorkloadPodGroupTemplateReference{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha2_TopologyConstraint(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "TopologyConstraint defines a topology constraint for a PodGroup.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"key": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Key specifies the key of the node label representing the topology domain. All pods within the PodGroup must be colocated within the same domain instance. Different PodGroups can land on different domain instances even if they derive from the same PodGroupTemplate. Examples: \"topology.kubernetes.io/rack\"",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"key"},
+			},
+		},
 	}
 }
 
@@ -61635,9 +62577,17 @@ func schema_pkg_apis_meta_v1_ListMeta(ref common.ReferenceCallback) common.OpenA
 							Format:      "int64",
 						},
 					},
+					"shardInfo": {
+						SchemaProps: spec.SchemaProps{
+							Description: "shardInfo is set when the list is a filtered subset of the full collection, as selected by a shard selector on the request. It echoes back the selector so clients can verify which shard they received and merge sharded responses. Clients should not cache sharded list responses as a full representation of the collection.\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
+							Ref:         ref(metav1.ShardInfo{}.OpenAPIModelName()),
+						},
+					},
 				},
 			},
 		},
+		Dependencies: []string{
+			metav1.ShardInfo{}.OpenAPIModelName()},
 	}
 }
 
@@ -61729,6 +62679,13 @@ func schema_pkg_apis_meta_v1_ListOptions(ref common.ReferenceCallback) common.Op
 						SchemaProps: spec.SchemaProps{
 							Description: "`sendInitialEvents=true` may be set together with `watch=true`. In that case, the watch stream will begin with synthetic events to produce the current state of objects in the collection. Once all such events have been sent, a synthetic \"Bookmark\" event  will be sent. The bookmark will report the ResourceVersion (RV) corresponding to the set of objects, and be marked with `\"k8s.io/initial-events-end\": \"true\"` annotation. Afterwards, the watch stream will proceed as usual, sending watch events corresponding to changes (subsequent to the RV) to objects watched.\n\nWhen `sendInitialEvents` option is set, we require `resourceVersionMatch` option to also be set. The semantic of the watch request is as following: - `resourceVersionMatch` = NotOlderThan\n  is interpreted as \"data at least as new as the provided `resourceVersion`\"\n  and the bookmark event is send when the state is synced\n  to a `resourceVersion` at least as fresh as the one provided by the ListOptions.\n  If `resourceVersion` is unset, this is interpreted as \"consistent read\" and the\n  bookmark event is send when the state is synced at least to the moment\n  when request started being processed.\n- `resourceVersionMatch` set to any other value or unset\n  Invalid error is returned.\n\nDefaults to true if `resourceVersion=\"\"` or `resourceVersion=\"0\"` (for backward compatibility reasons) and to false otherwise.",
 							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"shardSelector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
+							Type:        []string{"string"},
 							Format:      "",
 						},
 					},
@@ -62308,6 +63265,28 @@ func schema_pkg_apis_meta_v1_ServerAddressByClientCIDR(ref common.ReferenceCallb
 					},
 				},
 				Required: []string{"clientCIDR", "serverAddress"},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_meta_v1_ShardInfo(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "ShardInfo describes the shard selector that was applied to produce a list response. Its presence on a list response indicates the list is a filtered subset.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"selector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "selector is the shard selector string from the request, echoed back so clients can verify which shard they received and merge responses from multiple shards.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"selector"},
 			},
 		},
 	}
@@ -71889,6 +72868,13 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Description: "MemoryThrottlingFactor specifies the factor multiplied by the memory limit or node allocatable memory when setting the cgroupv2 memory.high value to enforce MemoryQoS. Decreasing this factor will set lower high limit for container cgroups and put heavier reclaim pressure while increasing will put less reclaim pressure. See https://kep.k8s.io/2570 for more details. Default: 0.9",
 							Type:        []string{"number"},
 							Format:      "double",
+						},
+					},
+					"memoryReservationPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "MemoryReservationPolicy controls how the kubelet applies cgroup v2 memory protection. \"None\" (default): The kubelet does not set memory.min for containers and pods, ensuring no hard memory is locked by the kernel. \"TieredReservation\": The kubelet sets cgroup v2 memory.min for Guaranteed pods and memory.low for Burstable pods based on memory requests. Guaranteed memory is never reclaimed by the kernel; Burstable memory is preferentially retained but may be reclaimed under extreme pressure. See https://kep.k8s.io/2570 for more details. Default: None",
+							Type:        []string{"string"},
+							Format:      "",
 						},
 					},
 					"registerWithTaints": {

@@ -101,6 +101,7 @@ const (
 	StartedPodsTotalKey             = "started_pods_total"
 	StartedPodsErrorsTotalKey       = "started_pods_errors_total"
 	StartedContainersTotalKey       = "started_containers_total"
+	TerminatedContainersTotalKey    = "terminated_containers_total"
 	StartedContainersErrorsTotalKey = "started_containers_errors_total"
 
 	// Metrics to track HostProcess container usage by this kubelet
@@ -164,6 +165,10 @@ const (
 	DRAOperationsDurationKey     = "operations_duration_seconds"
 	DRAGRPCOperationsDurationKey = "grpc_operations_duration_seconds"
 
+	// Metric keys for MemoryQoS
+	MemoryQoSNodeMemoryMinBytesKey = "memory_qos_node_memory_min_bytes"
+	MemoryQoSNodeMemoryLowBytesKey = "memory_qos_node_memory_low_bytes"
+
 	// Values used in metric labels
 	Container          = "container"
 	InitContainer      = "init_container"
@@ -197,6 +202,9 @@ const (
 
 	// Metric key for podcertificate states.
 	PodCertificateStatesKey = "podcertificate_states"
+
+	// Metric key for podsapi
+	PodWatchEventsDroppedKey = "pod_watch_events_dropped_total"
 )
 
 type imageSizeBucket struct {
@@ -758,6 +766,16 @@ var (
 		},
 		[]string{"container_type"},
 	)
+	// TerminatedContainersTotal is a counter that tracks the number of container terminations
+	TerminatedContainersTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           TerminatedContainersTotalKey,
+			Help:           "Cumulative number of container terminations.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"container_type", "exit_code", "reason"},
+	)
 	// StartedContainersTotal is a counter that tracks the number of errors creating containers
 	StartedContainersErrorsTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -932,6 +950,26 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           MemoryManagerPinningErrorsTotalKey,
 			Help:           "The number of memory pages allocations which required pinning that failed.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// MemoryQoSNodeMemoryMinBytes tracks total cgroup v2 memory.min (hard protection) for Guaranteed pods.
+	MemoryQoSNodeMemoryMinBytes = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           MemoryQoSNodeMemoryMinBytesKey,
+			Help:           "Total cgroup v2 memory.min in bytes for Guaranteed pods. This memory is hard-reserved and never reclaimed by the kernel.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+
+	// MemoryQoSNodeMemoryLowBytes tracks total cgroup v2 memory.low (soft protection) for Burstable pods.
+	MemoryQoSNodeMemoryLowBytes = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           MemoryQoSNodeMemoryLowBytesKey,
+			Help:           "Total cgroup v2 memory.low in bytes for Burstable pods. This memory is soft-reserved and may be reclaimed under extreme pressure.",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -1255,6 +1293,16 @@ var (
 		},
 		[]string{"resource_name", "assignment_type"},
 	)
+
+	// PodWatchEventsDroppedTotal tracks the number of dropped pod watch events.
+	PodWatchEventsDroppedTotal = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodWatchEventsDroppedKey,
+			Help:           "Cumulative number of pod watch events dropped.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
 )
 
 var registerMetrics sync.Once
@@ -1319,6 +1367,7 @@ func Register() {
 		legacyregistry.MustRegister(StartedPodsTotal)
 		legacyregistry.MustRegister(StartedPodsErrorsTotal)
 		legacyregistry.MustRegister(StartedContainersTotal)
+		legacyregistry.MustRegister(TerminatedContainersTotal)
 		legacyregistry.MustRegister(StartedContainersErrorsTotal)
 		legacyregistry.MustRegister(StartedHostProcessContainersTotal)
 		legacyregistry.MustRegister(StartedHostProcessContainersErrorsTotal)
@@ -1333,6 +1382,10 @@ func Register() {
 		legacyregistry.MustRegister(ContainerAlignedComputeResourcesFailure)
 		legacyregistry.MustRegister(MemoryManagerPinningRequestTotal)
 		legacyregistry.MustRegister(MemoryManagerPinningErrorsTotal)
+		if utilfeature.DefaultFeatureGate.Enabled(features.MemoryQoS) {
+			legacyregistry.MustRegister(MemoryQoSNodeMemoryMinBytes)
+			legacyregistry.MustRegister(MemoryQoSNodeMemoryLowBytes)
+		}
 		legacyregistry.MustRegister(TopologyManagerAdmissionRequestsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionErrorsTotal)
 		legacyregistry.MustRegister(TopologyManagerAdmissionDuration)
@@ -1378,6 +1431,8 @@ func Register() {
 			legacyregistry.MustRegister(ResourceManagerAllocationErrorsTotal)
 			legacyregistry.MustRegister(ResourceManagerContainerAssignments)
 		}
+
+		legacyregistry.MustRegister(PodWatchEventsDroppedTotal)
 	})
 }
 

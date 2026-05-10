@@ -394,7 +394,7 @@ type AuthenticationInfo struct {
 type AuthorizationInfo struct {
 	// Authorizer determines whether the subject is allowed to make the request based only
 	// on the RequestURI
-	Authorizer authorizer.Authorizer
+	Authorizer authorizer.UnconditionalAuthorizer
 }
 
 func init() {
@@ -1069,9 +1069,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 
 	// WithTracing comes after authentication so we can allow authenticated
 	// clients to influence sampling.
-	if c.FeatureGate.Enabled(genericfeatures.APIServerTracing) {
-		handler = genericapifilters.WithTracing(handler, c.TracerProvider)
-	}
+	handler = genericapifilters.WithTracing(handler, c.TracerProvider)
 	failedHandler = filterlatency.TrackCompleted(failedHandler)
 	handler = filterlatency.TrackCompleted(handler)
 	handler = genericapifilters.WithAuthentication(handler, c.Authentication.Authenticator, failedHandler, c.Authentication.APIAudiences, c.Authentication.RequestHeaderConfig)

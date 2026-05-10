@@ -37,7 +37,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/controller/devicetainteviction"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -151,6 +151,7 @@ func testEvictCluster(tCtx ktesting.TContext, useRule useRuleMode) {
 		ruleInformer,
 		informerFactory.Resource().V1().DeviceClasses(),
 		"device-taint-eviction",
+		utilfeature.DefaultFeatureGate.Enabled(features.DRAWorkloadResourceClaims),
 	)
 
 	var numExistingPods atomic.Int64

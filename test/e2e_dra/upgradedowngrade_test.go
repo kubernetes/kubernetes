@@ -41,7 +41,7 @@ import (
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/kubernetes/test/utils/localupcluster"
 )
 
@@ -198,7 +198,7 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 					break
 				}
 				base := path.Base(header.Name)
-				if slices.Contains(localupcluster.KubeClusterComponents, localupcluster.KubeComponentName(base)) {
+				if slices.Contains(localupcluster.KubeClusterComponents, localupcluster.ClusterComponentName(base)) {
 					data, err := io.ReadAll(unpack)
 					tCtx.ExpectNoError(err, fmt.Sprintf("read content of %s", header.Name))
 					tCtx.ExpectNoError(os.MkdirAll(binDir, 0755), "create directory for binaries")
@@ -208,9 +208,11 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 		})
 	}
 
-	var cluster *localupcluster.Cluster
+	cluster := localupcluster.New()
+	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
+		tCtx.Step("cleanup", cluster.Stop)
+	})
 	tCtx.Step(fmt.Sprintf("bring up v%d.%d", major, previousMinor), func(tCtx ktesting.TContext) {
-		cluster = localupcluster.New(tCtx)
 		localUpClusterEnv := map[string]string{
 			"RUNTIME_CONFIG": "resource.k8s.io/v1beta1,resource.k8s.io/v1beta2,resource.k8s.io/v1alpha3",
 			"FEATURE_GATES":  "DynamicResourceAllocation=true,DRADeviceTaintRules=true,DRADeviceTaints=true,DRAExtendedResource=true,DRAPartitionableDevices=true",
@@ -315,7 +317,7 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 	// We could split this up into first updating the apiserver, then control plane components, then restarting kubelet.
 	// For the purpose of this test here we we primarily care about full before/after comparisons, so not done yet.
 	// TODO
-	restoreOptions := cluster.Modify(tCtx.WithStep(fmt.Sprintf("update to %s", gitVersion)), "1-"+gitVersion, localupcluster.ModifyOptions{Upgrade: true, BinDir: dir})
+	restoreOptions := cluster.Modify(tCtx.WithStep(fmt.Sprintf("update to %s", gitVersion)), "1-"+gitVersion, localupcluster.ModifyOptions{BinDir: dir})
 
 	// kubelet wipes all resource slices because it doesn't know which drivers were running.
 	// We need to wait for them to be recreated.

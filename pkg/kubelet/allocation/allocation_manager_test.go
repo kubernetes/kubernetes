@@ -146,6 +146,7 @@ func TestUpdatePodFromAllocation(t *testing.T) {
 	resizedPod := pod.DeepCopy()
 	resizedPod.Spec.Containers[0].Resources.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(200, resource.DecimalSI)
 	resizedPod.Spec.InitContainers[0].Resources.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(300, resource.DecimalSI)
+	resizedPod.Spec.InitContainers[1].Resources.Requests[v1.ResourceCPU] = *resource.NewMilliQuantity(300, resource.DecimalSI)
 
 	resizedPodWithPodLevelResources := resizedPod.DeepCopy()
 	resizedPodWithPodLevelResources.Spec.Resources = &v1.ResourceRequirements{
@@ -308,9 +309,6 @@ func TestRetryPendingResizes(t *testing.T) {
 	if goruntime.GOOS == "windows" {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
-	metrics.Register()
-	metrics.PodInfeasibleResizes.Reset()
-
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
 	containerRestartPolicyAlways := v1.ContainerRestartPolicyAlways
 
@@ -370,7 +368,6 @@ func TestRetryPendingResizes(t *testing.T) {
 				Resources: v1.ResourceRequirements{
 					Requests: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 				},
-				RestartPolicy: &containerRestartPolicyAlways,
 			},
 		},
 	}
@@ -489,7 +486,7 @@ func TestRetryPendingResizes(t *testing.T) {
 			expectPodSyncTriggered: "true",
 		},
 		{
-			name:                  "Request memory increase beyond node capacity - expect Infeasible",
+			name:                  "Request memory increase beyond node capacity - expect Deferred",
 			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem4500M},
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
@@ -498,14 +495,14 @@ func TestRetryPendingResizes(t *testing.T) {
 				{
 					Type:    v1.PodResizePending,
 					Status:  "True",
-					Reason:  "Infeasible",
-					Message: "Node didn't have enough capacity: memory, requested: 4718592000, capacity: 4294967296",
+					Reason:  "Deferred",
+					Message: "Node didn't have enough resource: memory, requested: 4718592000, used: 2147483648, capacity: 4294967296",
 				},
 			},
 			expectPodSyncTriggered: "true",
 		},
 		{
-			name:                  "Request CPU increase beyond node capacity - expect Infeasible",
+			name:                  "Request CPU increase beyond node capacity - expect Deferred",
 			originalRequests:      v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
 			newRequests:           v1.ResourceList{v1.ResourceCPU: cpu5000m, v1.ResourceMemory: mem1000M},
 			expectedAllocatedReqs: v1.ResourceList{v1.ResourceCPU: cpu1000m, v1.ResourceMemory: mem1000M},
@@ -514,8 +511,8 @@ func TestRetryPendingResizes(t *testing.T) {
 				{
 					Type:    v1.PodResizePending,
 					Status:  "True",
-					Reason:  "Infeasible",
-					Message: "Node didn't have enough capacity: cpu, requested: 5000, capacity: 4000",
+					Reason:  "Deferred",
+					Message: "Node didn't have enough resource: cpu, requested: 5000, used: 2000, capacity: 4000",
 				},
 			},
 			expectPodSyncTriggered: "true",
@@ -704,7 +701,7 @@ func TestRetryPendingResizes(t *testing.T) {
 			expectPodSyncTriggered: "true",
 		},
 		{
-			name:                         "pod-level: Request memory increase beyond node capacity - expect Infeasible",
+			name:                         "pod-level: Request memory increase beyond node capacity - expect Deferred",
 			inPlacePodLevelResizeEnabled: true,
 			originalPodRequests:          v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem1500M},
 			newPodRequests:               v1.ResourceList{v1.ResourceCPU: cpu1500m, v1.ResourceMemory: mem4500M},
@@ -716,8 +713,8 @@ func TestRetryPendingResizes(t *testing.T) {
 				{
 					Type:    v1.PodResizePending,
 					Status:  "True",
-					Reason:  "Infeasible",
-					Message: "Node didn't have enough capacity: memory, requested: 4718592000, capacity: 4294967296",
+					Reason:  "Deferred",
+					Message: "Node didn't have enough resource: memory, requested: 4718592000, used: 2147483648, capacity: 4294967296",
 				},
 			},
 			expectPodSyncTriggered: "true",
@@ -725,19 +722,24 @@ func TestRetryPendingResizes(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		for _, isSidecarContainer := range []bool{false, true} {
-			if tt.inPlacePodLevelResizeEnabled && isSidecarContainer {
+		for _, containerType := range []string{"regular", "non-sidecar-init", "sidecar"} {
+			isInitContainer := containerType != "regular"
+
+			if tt.inPlacePodLevelResizeEnabled && isInitContainer {
 				continue // pod level resources makes the distinction between container types irrelevant
 			}
-			t.Run(fmt.Sprintf("%s/sidecar=%t", tt.name, isSidecarContainer), func(t *testing.T) {
+			t.Run(fmt.Sprintf("%s/containerType=%s", tt.name, containerType), func(t *testing.T) {
 				if tt.inPlacePodLevelResizeEnabled {
 					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodLevelResourcesVerticalScaling, true)
 				}
 				var originalPod *v1.Pod
 				var originalCtr *v1.Container
-				if isSidecarContainer {
+				if isInitContainer {
 					originalPod = testPod2.DeepCopy()
 					originalCtr = &originalPod.Spec.InitContainers[0]
+					if containerType == "sidecar" {
+						originalPod.Spec.InitContainers[0].RestartPolicy = &containerRestartPolicyAlways
+					}
 				} else {
 					originalPod = testPod1.DeepCopy()
 					originalCtr = &originalPod.Spec.Containers[0]
@@ -750,7 +752,7 @@ func TestRetryPendingResizes(t *testing.T) {
 				}
 
 				newPod := originalPod.DeepCopy()
-				if isSidecarContainer {
+				if isInitContainer {
 					newPod.Spec.InitContainers[0].Resources.Requests = tt.newRequests
 					newPod.Spec.InitContainers[0].Resources.Limits = tt.newLimits
 				} else {
@@ -807,7 +809,7 @@ func TestRetryPendingResizes(t *testing.T) {
 				}
 
 				var updatedPodCtr v1.Container
-				if isSidecarContainer {
+				if isInitContainer {
 					updatedPodCtr = updatedPod.Spec.InitContainers[0]
 				} else {
 					updatedPodCtr = updatedPod.Spec.Containers[0]
@@ -860,15 +862,6 @@ func TestRetryPendingResizes(t *testing.T) {
 			})
 		}
 	}
-
-	expectedMetrics := `
-		# HELP kubelet_pod_infeasible_resizes_total [ALPHA] Number of infeasible resizes for pods.
-	    # TYPE kubelet_pod_infeasible_resizes_total counter
-	    kubelet_pod_infeasible_resizes_total{reason_detail="insufficient_node_allocatable"} 5
-	`
-	assert.NoError(t, testutil.GatherAndCompare(
-		legacyregistry.DefaultGatherer, strings.NewReader(expectedMetrics), "kubelet_pod_infeasible_resizes_total",
-	))
 }
 
 func TestRetryPendingResizesGuanteedQOSPods(t *testing.T) {
@@ -1385,8 +1378,8 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 				{
 					Type:               v1.PodResizePending,
 					Status:             "True",
-					Reason:             v1.PodReasonInfeasible,
-					Message:            "Node didn't have enough capacity: memory, requested: 4718592000, capacity: 4294967296",
+					Reason:             v1.PodReasonDeferred,
+					Message:            "Node didn't have enough resource: cpu, requested: 5000, used: 0, capacity: 4000",
 					ObservedGeneration: 2,
 				},
 				{
@@ -1395,7 +1388,7 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 					ObservedGeneration: 1,
 				},
 			},
-			expectedEvent: `Warning ResizeInfeasible Pod resize Infeasible: {"containers":[{"name":"c1","resources":{"requests":{"cpu":"5","memory":"4500Mi"}}}],"generation":2,"error":"Node didn't have enough capacity: memory, requested: 4718592000, capacity: 4294967296"}`,
+			expectedEvent: `Warning ResizeDeferred Pod resize OutOfcpu: {"containers":[{"name":"c1","resources":{"requests":{"cpu":"5","memory":"4500Mi"}}}],"generation":2,"error":"Node didn't have enough resource: cpu, requested: 5000, used: 0, capacity: 4000"}`,
 		},
 		{
 			name:       "same as previous case to ensure no new event is generated",
@@ -1406,8 +1399,8 @@ func TestRetryPendingResizesMultipleConditions(t *testing.T) {
 				{
 					Type:               v1.PodResizePending,
 					Status:             "True",
-					Reason:             v1.PodReasonInfeasible,
-					Message:            "Node didn't have enough capacity: memory, requested: 4718592000, capacity: 4294967296",
+					Reason:             v1.PodReasonDeferred,
+					Message:            "Node didn't have enough resource: cpu, requested: 5000, used: 0, capacity: 4000",
 					ObservedGeneration: 2,
 				},
 				{
@@ -2452,7 +2445,6 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 		config.NewSourcesReady(func(_ sets.Set[string]) bool { return true }),
 		record.NewFakeRecorder(20),
 	)
-	allocationManager.SetContainerRuntime(runtime)
 
 	getNode := func(context.Context, bool) (*v1.Node, error) {
 		return &v1.Node{

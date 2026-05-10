@@ -39,6 +39,12 @@ func (m *PodGroup) Reset() { *m = PodGroup{} }
 
 func (m *PodGroupList) Reset() { *m = PodGroupList{} }
 
+func (m *PodGroupResourceClaim) Reset() { *m = PodGroupResourceClaim{} }
+
+func (m *PodGroupResourceClaimStatus) Reset() { *m = PodGroupResourceClaimStatus{} }
+
+func (m *PodGroupSchedulingConstraints) Reset() { *m = PodGroupSchedulingConstraints{} }
+
 func (m *PodGroupSchedulingPolicy) Reset() { *m = PodGroupSchedulingPolicy{} }
 
 func (m *PodGroupSpec) Reset() { *m = PodGroupSpec{} }
@@ -48,6 +54,8 @@ func (m *PodGroupStatus) Reset() { *m = PodGroupStatus{} }
 func (m *PodGroupTemplate) Reset() { *m = PodGroupTemplate{} }
 
 func (m *PodGroupTemplateReference) Reset() { *m = PodGroupTemplateReference{} }
+
+func (m *TopologyConstraint) Reset() { *m = TopologyConstraint{} }
 
 func (m *TypedLocalObjectReference) Reset() { *m = TypedLocalObjectReference{} }
 
@@ -208,6 +216,120 @@ func (m *PodGroupList) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *PodGroupResourceClaim) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *PodGroupResourceClaim) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *PodGroupResourceClaim) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.ResourceClaimTemplateName != nil {
+		i -= len(*m.ResourceClaimTemplateName)
+		copy(dAtA[i:], *m.ResourceClaimTemplateName)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.ResourceClaimTemplateName)))
+		i--
+		dAtA[i] = 0x1a
+	}
+	if m.ResourceClaimName != nil {
+		i -= len(*m.ResourceClaimName)
+		copy(dAtA[i:], *m.ResourceClaimName)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.ResourceClaimName)))
+		i--
+		dAtA[i] = 0x12
+	}
+	i -= len(m.Name)
+	copy(dAtA[i:], m.Name)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *PodGroupResourceClaimStatus) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *PodGroupResourceClaimStatus) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *PodGroupResourceClaimStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.ResourceClaimName != nil {
+		i -= len(*m.ResourceClaimName)
+		copy(dAtA[i:], *m.ResourceClaimName)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.ResourceClaimName)))
+		i--
+		dAtA[i] = 0x12
+	}
+	i -= len(m.Name)
+	copy(dAtA[i:], m.Name)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Name)))
+	i--
+	dAtA[i] = 0xa
+	return len(dAtA) - i, nil
+}
+
+func (m *PodGroupSchedulingConstraints) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *PodGroupSchedulingConstraints) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *PodGroupSchedulingConstraints) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Topology) > 0 {
+		for iNdEx := len(m.Topology) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.Topology[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0xa
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
 func (m *PodGroupSchedulingPolicy) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -275,6 +397,49 @@ func (m *PodGroupSpec) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.Priority != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.Priority))
+		i--
+		dAtA[i] = 0x38
+	}
+	i -= len(m.PriorityClassName)
+	copy(dAtA[i:], m.PriorityClassName)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.PriorityClassName)))
+	i--
+	dAtA[i] = 0x32
+	if m.DisruptionMode != nil {
+		i -= len(*m.DisruptionMode)
+		copy(dAtA[i:], *m.DisruptionMode)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.DisruptionMode)))
+		i--
+		dAtA[i] = 0x2a
+	}
+	if len(m.ResourceClaims) > 0 {
+		for iNdEx := len(m.ResourceClaims) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.ResourceClaims[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x22
+		}
+	}
+	if m.SchedulingConstraints != nil {
+		{
+			size, err := m.SchedulingConstraints.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1a
+	}
 	{
 		size, err := m.SchedulingPolicy.MarshalToSizedBuffer(dAtA[:i])
 		if err != nil {
@@ -320,6 +485,20 @@ func (m *PodGroupStatus) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if len(m.ResourceClaimStatuses) > 0 {
+		for iNdEx := len(m.ResourceClaimStatuses) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.ResourceClaimStatuses[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x12
+		}
+	}
 	if len(m.Conditions) > 0 {
 		for iNdEx := len(m.Conditions) - 1; iNdEx >= 0; iNdEx-- {
 			{
@@ -357,6 +536,49 @@ func (m *PodGroupTemplate) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
+	if m.Priority != nil {
+		i = encodeVarintGenerated(dAtA, i, uint64(*m.Priority))
+		i--
+		dAtA[i] = 0x38
+	}
+	i -= len(m.PriorityClassName)
+	copy(dAtA[i:], m.PriorityClassName)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.PriorityClassName)))
+	i--
+	dAtA[i] = 0x32
+	if m.DisruptionMode != nil {
+		i -= len(*m.DisruptionMode)
+		copy(dAtA[i:], *m.DisruptionMode)
+		i = encodeVarintGenerated(dAtA, i, uint64(len(*m.DisruptionMode)))
+		i--
+		dAtA[i] = 0x2a
+	}
+	if len(m.ResourceClaims) > 0 {
+		for iNdEx := len(m.ResourceClaims) - 1; iNdEx >= 0; iNdEx-- {
+			{
+				size, err := m.ResourceClaims[iNdEx].MarshalToSizedBuffer(dAtA[:i])
+				if err != nil {
+					return 0, err
+				}
+				i -= size
+				i = encodeVarintGenerated(dAtA, i, uint64(size))
+			}
+			i--
+			dAtA[i] = 0x22
+		}
+	}
+	if m.SchedulingConstraints != nil {
+		{
+			size, err := m.SchedulingConstraints.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintGenerated(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x1a
+	}
 	{
 		size, err := m.SchedulingPolicy.MarshalToSizedBuffer(dAtA[:i])
 		if err != nil {
@@ -407,6 +629,34 @@ func (m *PodGroupTemplateReference) MarshalToSizedBuffer(dAtA []byte) (int, erro
 		i--
 		dAtA[i] = 0xa
 	}
+	return len(dAtA) - i, nil
+}
+
+func (m *TopologyConstraint) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *TopologyConstraint) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *TopologyConstraint) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	i -= len(m.Key)
+	copy(dAtA[i:], m.Key)
+	i = encodeVarintGenerated(dAtA, i, uint64(len(m.Key)))
+	i--
+	dAtA[i] = 0xa
 	return len(dAtA) - i, nil
 }
 
@@ -682,6 +932,55 @@ func (m *PodGroupList) Size() (n int) {
 	return n
 }
 
+func (m *PodGroupResourceClaim) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Name)
+	n += 1 + l + sovGenerated(uint64(l))
+	if m.ResourceClaimName != nil {
+		l = len(*m.ResourceClaimName)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.ResourceClaimTemplateName != nil {
+		l = len(*m.ResourceClaimTemplateName)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
+func (m *PodGroupResourceClaimStatus) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Name)
+	n += 1 + l + sovGenerated(uint64(l))
+	if m.ResourceClaimName != nil {
+		l = len(*m.ResourceClaimName)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	return n
+}
+
+func (m *PodGroupSchedulingConstraints) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.Topology) > 0 {
+		for _, e := range m.Topology {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	return n
+}
+
 func (m *PodGroupSchedulingPolicy) Size() (n int) {
 	if m == nil {
 		return 0
@@ -711,6 +1010,25 @@ func (m *PodGroupSpec) Size() (n int) {
 	}
 	l = m.SchedulingPolicy.Size()
 	n += 1 + l + sovGenerated(uint64(l))
+	if m.SchedulingConstraints != nil {
+		l = m.SchedulingConstraints.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if len(m.ResourceClaims) > 0 {
+		for _, e := range m.ResourceClaims {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	if m.DisruptionMode != nil {
+		l = len(*m.DisruptionMode)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	l = len(m.PriorityClassName)
+	n += 1 + l + sovGenerated(uint64(l))
+	if m.Priority != nil {
+		n += 1 + sovGenerated(uint64(*m.Priority))
+	}
 	return n
 }
 
@@ -722,6 +1040,12 @@ func (m *PodGroupStatus) Size() (n int) {
 	_ = l
 	if len(m.Conditions) > 0 {
 		for _, e := range m.Conditions {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	if len(m.ResourceClaimStatuses) > 0 {
+		for _, e := range m.ResourceClaimStatuses {
 			l = e.Size()
 			n += 1 + l + sovGenerated(uint64(l))
 		}
@@ -739,6 +1063,25 @@ func (m *PodGroupTemplate) Size() (n int) {
 	n += 1 + l + sovGenerated(uint64(l))
 	l = m.SchedulingPolicy.Size()
 	n += 1 + l + sovGenerated(uint64(l))
+	if m.SchedulingConstraints != nil {
+		l = m.SchedulingConstraints.Size()
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if len(m.ResourceClaims) > 0 {
+		for _, e := range m.ResourceClaims {
+			l = e.Size()
+			n += 1 + l + sovGenerated(uint64(l))
+		}
+	}
+	if m.DisruptionMode != nil {
+		l = len(*m.DisruptionMode)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	l = len(m.PriorityClassName)
+	n += 1 + l + sovGenerated(uint64(l))
+	if m.Priority != nil {
+		n += 1 + sovGenerated(uint64(*m.Priority))
+	}
 	return n
 }
 
@@ -752,6 +1095,17 @@ func (m *PodGroupTemplateReference) Size() (n int) {
 		l = m.Workload.Size()
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	return n
+}
+
+func (m *TopologyConstraint) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	l = len(m.Key)
+	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -885,6 +1239,44 @@ func (this *PodGroupList) String() string {
 	}, "")
 	return s
 }
+func (this *PodGroupResourceClaim) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PodGroupResourceClaim{`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`ResourceClaimName:` + valueToStringGenerated(this.ResourceClaimName) + `,`,
+		`ResourceClaimTemplateName:` + valueToStringGenerated(this.ResourceClaimTemplateName) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PodGroupResourceClaimStatus) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&PodGroupResourceClaimStatus{`,
+		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
+		`ResourceClaimName:` + valueToStringGenerated(this.ResourceClaimName) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *PodGroupSchedulingConstraints) String() string {
+	if this == nil {
+		return "nil"
+	}
+	repeatedStringForTopology := "[]TopologyConstraint{"
+	for _, f := range this.Topology {
+		repeatedStringForTopology += strings.Replace(strings.Replace(f.String(), "TopologyConstraint", "TopologyConstraint", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForTopology += "}"
+	s := strings.Join([]string{`&PodGroupSchedulingConstraints{`,
+		`Topology:` + repeatedStringForTopology + `,`,
+		`}`,
+	}, "")
+	return s
+}
 func (this *PodGroupSchedulingPolicy) String() string {
 	if this == nil {
 		return "nil"
@@ -900,9 +1292,19 @@ func (this *PodGroupSpec) String() string {
 	if this == nil {
 		return "nil"
 	}
+	repeatedStringForResourceClaims := "[]PodGroupResourceClaim{"
+	for _, f := range this.ResourceClaims {
+		repeatedStringForResourceClaims += strings.Replace(strings.Replace(f.String(), "PodGroupResourceClaim", "PodGroupResourceClaim", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForResourceClaims += "}"
 	s := strings.Join([]string{`&PodGroupSpec{`,
 		`PodGroupTemplateRef:` + strings.Replace(this.PodGroupTemplateRef.String(), "PodGroupTemplateReference", "PodGroupTemplateReference", 1) + `,`,
 		`SchedulingPolicy:` + strings.Replace(strings.Replace(this.SchedulingPolicy.String(), "PodGroupSchedulingPolicy", "PodGroupSchedulingPolicy", 1), `&`, ``, 1) + `,`,
+		`SchedulingConstraints:` + strings.Replace(this.SchedulingConstraints.String(), "PodGroupSchedulingConstraints", "PodGroupSchedulingConstraints", 1) + `,`,
+		`ResourceClaims:` + repeatedStringForResourceClaims + `,`,
+		`DisruptionMode:` + valueToStringGenerated(this.DisruptionMode) + `,`,
+		`PriorityClassName:` + fmt.Sprintf("%v", this.PriorityClassName) + `,`,
+		`Priority:` + valueToStringGenerated(this.Priority) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -916,8 +1318,14 @@ func (this *PodGroupStatus) String() string {
 		repeatedStringForConditions += fmt.Sprintf("%v", f) + ","
 	}
 	repeatedStringForConditions += "}"
+	repeatedStringForResourceClaimStatuses := "[]PodGroupResourceClaimStatus{"
+	for _, f := range this.ResourceClaimStatuses {
+		repeatedStringForResourceClaimStatuses += strings.Replace(strings.Replace(f.String(), "PodGroupResourceClaimStatus", "PodGroupResourceClaimStatus", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForResourceClaimStatuses += "}"
 	s := strings.Join([]string{`&PodGroupStatus{`,
 		`Conditions:` + repeatedStringForConditions + `,`,
+		`ResourceClaimStatuses:` + repeatedStringForResourceClaimStatuses + `,`,
 		`}`,
 	}, "")
 	return s
@@ -926,9 +1334,19 @@ func (this *PodGroupTemplate) String() string {
 	if this == nil {
 		return "nil"
 	}
+	repeatedStringForResourceClaims := "[]PodGroupResourceClaim{"
+	for _, f := range this.ResourceClaims {
+		repeatedStringForResourceClaims += strings.Replace(strings.Replace(f.String(), "PodGroupResourceClaim", "PodGroupResourceClaim", 1), `&`, ``, 1) + ","
+	}
+	repeatedStringForResourceClaims += "}"
 	s := strings.Join([]string{`&PodGroupTemplate{`,
 		`Name:` + fmt.Sprintf("%v", this.Name) + `,`,
 		`SchedulingPolicy:` + strings.Replace(strings.Replace(this.SchedulingPolicy.String(), "PodGroupSchedulingPolicy", "PodGroupSchedulingPolicy", 1), `&`, ``, 1) + `,`,
+		`SchedulingConstraints:` + strings.Replace(this.SchedulingConstraints.String(), "PodGroupSchedulingConstraints", "PodGroupSchedulingConstraints", 1) + `,`,
+		`ResourceClaims:` + repeatedStringForResourceClaims + `,`,
+		`DisruptionMode:` + valueToStringGenerated(this.DisruptionMode) + `,`,
+		`PriorityClassName:` + fmt.Sprintf("%v", this.PriorityClassName) + `,`,
+		`Priority:` + valueToStringGenerated(this.Priority) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -939,6 +1357,16 @@ func (this *PodGroupTemplateReference) String() string {
 	}
 	s := strings.Join([]string{`&PodGroupTemplateReference{`,
 		`Workload:` + strings.Replace(this.Workload.String(), "WorkloadPodGroupTemplateReference", "WorkloadPodGroupTemplateReference", 1) + `,`,
+		`}`,
+	}, "")
+	return s
+}
+func (this *TopologyConstraint) String() string {
+	if this == nil {
+		return "nil"
+	}
+	s := strings.Join([]string{`&TopologyConstraint{`,
+		`Key:` + fmt.Sprintf("%v", this.Key) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1402,6 +1830,353 @@ func (m *PodGroupList) Unmarshal(dAtA []byte) error {
 	}
 	return nil
 }
+func (m *PodGroupResourceClaim) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PodGroupResourceClaim: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PodGroupResourceClaim: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ResourceClaimName", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(dAtA[iNdEx:postIndex])
+			m.ResourceClaimName = &s
+			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ResourceClaimTemplateName", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(dAtA[iNdEx:postIndex])
+			m.ResourceClaimTemplateName = &s
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *PodGroupResourceClaimStatus) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PodGroupResourceClaimStatus: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PodGroupResourceClaimStatus: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Name", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Name = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ResourceClaimName", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := string(dAtA[iNdEx:postIndex])
+			m.ResourceClaimName = &s
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *PodGroupSchedulingConstraints) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: PodGroupSchedulingConstraints: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: PodGroupSchedulingConstraints: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Topology", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Topology = append(m.Topology, TopologyConstraint{})
+			if err := m.Topology[len(m.Topology)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
 func (m *PodGroupSchedulingPolicy) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
 	iNdEx := 0
@@ -1622,6 +2397,161 @@ func (m *PodGroupSpec) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SchedulingConstraints", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SchedulingConstraints == nil {
+				m.SchedulingConstraints = &PodGroupSchedulingConstraints{}
+			}
+			if err := m.SchedulingConstraints.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ResourceClaims", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ResourceClaims = append(m.ResourceClaims, PodGroupResourceClaim{})
+			if err := m.ResourceClaims[len(m.ResourceClaims)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DisruptionMode", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := DisruptionMode(dAtA[iNdEx:postIndex])
+			m.DisruptionMode = &s
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PriorityClassName", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.PriorityClassName = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 7:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Priority", wireType)
+			}
+			var v int32
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Priority = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -1703,6 +2633,40 @@ func (m *PodGroupStatus) Unmarshal(dAtA []byte) error {
 			}
 			m.Conditions = append(m.Conditions, v1.Condition{})
 			if err := m.Conditions[len(m.Conditions)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ResourceClaimStatuses", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ResourceClaimStatuses = append(m.ResourceClaimStatuses, PodGroupResourceClaimStatus{})
+			if err := m.ResourceClaimStatuses[len(m.ResourceClaimStatuses)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
 			iNdEx = postIndex
@@ -1821,6 +2785,161 @@ func (m *PodGroupTemplate) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			iNdEx = postIndex
+		case 3:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SchedulingConstraints", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.SchedulingConstraints == nil {
+				m.SchedulingConstraints = &PodGroupSchedulingConstraints{}
+			}
+			if err := m.SchedulingConstraints.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ResourceClaims", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ResourceClaims = append(m.ResourceClaims, PodGroupResourceClaim{})
+			if err := m.ResourceClaims[len(m.ResourceClaims)-1].Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DisruptionMode", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			s := DisruptionMode(dAtA[iNdEx:postIndex])
+			m.DisruptionMode = &s
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field PriorityClassName", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.PriorityClassName = string(dAtA[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 7:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Priority", wireType)
+			}
+			var v int32
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				v |= int32(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.Priority = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(dAtA[iNdEx:])
@@ -1906,6 +3025,88 @@ func (m *PodGroupTemplateReference) Unmarshal(dAtA []byte) error {
 			if err := m.Workload.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipGenerated(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *TopologyConstraint) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowGenerated
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: TopologyConstraint: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: TopologyConstraint: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Key", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				stringLen |= uint64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Key = string(dAtA[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

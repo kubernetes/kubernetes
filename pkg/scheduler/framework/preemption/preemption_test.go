@@ -22,11 +22,13 @@ import (
 	"fmt"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
@@ -49,7 +51,7 @@ import (
 )
 
 var (
-	midPriority, highPriority = int32(100), int32(1000)
+	lowPriority, midPriority, highPriority = int32(10), int32(100), int32(1000)
 
 	veryLargeRes = map[v1.ResourceName]string{
 		v1.ResourceCPU:    "500m",
@@ -624,6 +626,216 @@ func TestCallExtenders(t *testing.T) {
 						t.Errorf("callExtenders() number of victim pods mismatch for node %s. got: %d, want: %d", gotCandidate.Name(), len(gotCandidate.Victims().Pods), len(wantCandidate.Victims().Pods))
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestFilterVictimsWithPDBViolation(t *testing.T) {
+	newPodInfo := func(p *v1.Pod) fwk.PodInfo {
+		pi, _ := framework.NewPodInfo(p)
+		return pi
+	}
+
+	viNoPDBMatch := &victim{pods: []fwk.PodInfo{newPodInfo(st.MakePod().Name("p1").Label("app", "foo").Obj())}}
+	viMatchPDB := &victim{pods: []fwk.PodInfo{newPodInfo(st.MakePod().Name("p1").Namespace(metav1.NamespaceDefault).Label("app", "foo").Obj())}}
+	viMatchPDB2 := &victim{pods: []fwk.PodInfo{newPodInfo(st.MakePod().Name("p2").Namespace(metav1.NamespaceDefault).Label("app", "foo").Obj())}}
+	viPodGroup := &victim{
+		pods: []fwk.PodInfo{
+			newPodInfo(st.MakePod().Name("p1").Namespace(metav1.NamespaceDefault).Label("app", "foo").Obj()),
+			newPodInfo(st.MakePod().Name("p2").Namespace(metav1.NamespaceDefault).Label("app", "foo").Obj()),
+		},
+	}
+	viMatchMultiplePDBs := &victim{pods: []fwk.PodInfo{newPodInfo(st.MakePod().Name("p1").Namespace(metav1.NamespaceDefault).Label("app", "foo").Label("tier", "backend").Obj())}}
+
+	tests := []struct {
+		name                 string
+		victims              []*victim
+		pdbs                 []*policy.PodDisruptionBudget
+		expectedViolating    []*victim
+		expectedNonViolating []*victim
+	}{
+		{
+			name:                 "no victims, no PDBs",
+			victims:              nil,
+			pdbs:                 nil,
+			expectedViolating:    nil,
+			expectedNonViolating: nil,
+		},
+		{
+			name:    "victim with no matching PDBs",
+			victims: []*victim{viNoPDBMatch},
+			pdbs: []*policy.PodDisruptionBudget{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault},
+					Spec: policy.PodDisruptionBudgetSpec{
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "bar"}},
+					},
+				},
+			},
+			expectedViolating:    nil,
+			expectedNonViolating: []*victim{viNoPDBMatch},
+		},
+		{
+			name:    "victim matching PDB, adequate DisruptionsAllowed",
+			victims: []*victim{viMatchPDB},
+			pdbs: []*policy.PodDisruptionBudget{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault},
+					Spec: policy.PodDisruptionBudgetSpec{
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
+					},
+					Status: policy.PodDisruptionBudgetStatus{
+						DisruptionsAllowed: 1,
+					},
+				},
+			},
+			expectedViolating:    nil,
+			expectedNonViolating: []*victim{viMatchPDB},
+		},
+		{
+			name:    "victim matching PDB, no DisruptionsAllowed",
+			victims: []*victim{viMatchPDB},
+			pdbs: []*policy.PodDisruptionBudget{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault},
+					Spec: policy.PodDisruptionBudgetSpec{
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
+					},
+					Status: policy.PodDisruptionBudgetStatus{
+						DisruptionsAllowed: 0,
+					},
+				},
+			},
+			expectedViolating:    []*victim{viMatchPDB},
+			expectedNonViolating: nil,
+		},
+		{
+			name:    "podgroup victim with multiple pods, one violating",
+			victims: []*victim{viPodGroup},
+			pdbs: []*policy.PodDisruptionBudget{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault},
+					Spec: policy.PodDisruptionBudgetSpec{
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
+					},
+					Status: policy.PodDisruptionBudgetStatus{
+						DisruptionsAllowed: 1,
+					},
+				},
+			},
+			expectedViolating:    []*victim{viPodGroup},
+			expectedNonViolating: nil,
+		},
+		{
+			name:    "podgroup victim with multiple pods, none violating",
+			victims: []*victim{viPodGroup},
+			pdbs: []*policy.PodDisruptionBudget{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault},
+					Spec: policy.PodDisruptionBudgetSpec{
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
+					},
+					Status: policy.PodDisruptionBudgetStatus{
+						DisruptionsAllowed: 2,
+					},
+				},
+			},
+			expectedViolating:    nil,
+			expectedNonViolating: []*victim{viPodGroup},
+		},
+		{
+			name:    "multiple victims matching the same PDB",
+			victims: []*victim{viMatchPDB, viMatchPDB2},
+			pdbs: []*policy.PodDisruptionBudget{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault},
+					Spec: policy.PodDisruptionBudgetSpec{
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
+					},
+					Status: policy.PodDisruptionBudgetStatus{
+						DisruptionsAllowed: 1,
+					},
+				},
+			},
+			expectedViolating:    []*victim{viMatchPDB2},
+			expectedNonViolating: []*victim{viMatchPDB},
+		},
+		{
+			name:    "pod in DisruptedPods is ignored",
+			victims: []*victim{viMatchPDB},
+			pdbs: []*policy.PodDisruptionBudget{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault},
+					Spec: policy.PodDisruptionBudgetSpec{
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
+					},
+					Status: policy.PodDisruptionBudgetStatus{
+						DisruptionsAllowed: 0,
+						DisruptedPods: map[string]metav1.Time{
+							"p1": {Time: time.Now()},
+						},
+					},
+				},
+			},
+			expectedViolating:    nil,
+			expectedNonViolating: []*victim{viMatchPDB},
+		},
+		{
+			name:    "PDB with empty selector",
+			victims: []*victim{viMatchPDB},
+			pdbs: []*policy.PodDisruptionBudget{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault},
+					Spec: policy.PodDisruptionBudgetSpec{
+						Selector: &metav1.LabelSelector{}, // matches nothing
+					},
+					Status: policy.PodDisruptionBudgetStatus{
+						DisruptionsAllowed: 0,
+					},
+				},
+			},
+			expectedViolating:    nil,
+			expectedNonViolating: []*victim{viMatchPDB},
+		},
+		{
+			name:    "Multiple PDBs",
+			victims: []*victim{viMatchMultiplePDBs},
+			pdbs: []*policy.PodDisruptionBudget{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault},
+					Spec: policy.PodDisruptionBudgetSpec{
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
+					},
+					Status: policy.PodDisruptionBudgetStatus{
+						DisruptionsAllowed: 1,
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault},
+					Spec: policy.PodDisruptionBudgetSpec{
+						Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"tier": "backend"}},
+					},
+					Status: policy.PodDisruptionBudgetStatus{
+						DisruptionsAllowed: 0,
+					},
+				},
+			},
+			expectedViolating:    []*victim{viMatchMultiplePDBs},
+			expectedNonViolating: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			violating, nonViolating := filterVictimsWithPDBViolation(tt.victims, tt.pdbs)
+
+			if diff := cmp.Diff(tt.expectedViolating, violating, cmp.Comparer(func(a, b *victim) bool { return a == b })); diff != "" {
+				t.Errorf("violating victims mismatch (-want, +got):\n%s", diff)
+			}
+
+			if diff := cmp.Diff(tt.expectedNonViolating, nonViolating, cmp.Comparer(func(a, b *victim) bool { return a == b })); diff != "" {
+				t.Errorf("nonViolating victims mismatch (-want, +got):\n%s", diff)
 			}
 		})
 	}

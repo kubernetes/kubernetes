@@ -34,19 +34,17 @@ type authzResult struct {
 	err        error
 }
 
+var _ = authorizer.Authorizer(&cachingAuthorizer{})
+
 type cachingAuthorizer struct {
-	authorizer authorizer.Authorizer
+	authorizer authorizer.UnconditionalAuthorizer
 	decisions  map[string]authzResult
 }
 
 // NewCachingAuthorizer returns an authorizer that caches decisions for the duration
 // of the authorizers use. Intended to be used for short-lived operations such as
 // the handling of a request in the admission chain, and then discarded.
-//
-// For cache key stability, this sorts user.Groups and each user.Extra value
-// slice before key construction. This means ordering of user.Info.Extra values is
-// treated as insignificant by this authorizer.
-func NewCachingAuthorizer(in authorizer.Authorizer) authorizer.Authorizer {
+func NewCachingAuthorizer(in authorizer.UnconditionalAuthorizer) authorizer.UnconditionalAuthorizer {
 	return &cachingAuthorizer{
 		authorizer: in,
 		decisions:  make(map[string]authzResult),

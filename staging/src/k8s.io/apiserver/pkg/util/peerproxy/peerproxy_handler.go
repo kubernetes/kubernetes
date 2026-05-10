@@ -182,7 +182,7 @@ func (h *peerProxyHandler) WrapHandler(handler http.Handler) http.Handler {
 		// find servers that are capable of serving this request
 		peerServerIDs := h.findServiceableByPeerFromPeerDiscoveryCache(gvr)
 		if len(peerServerIDs) == 0 {
-			klog.Errorf("gvr %v is not served by anything in this cluster", gvr)
+			klog.V(3).Infof("gvr %v is not served by anything in this cluster", gvr)
 			handler.ServeHTTP(w, r)
 			return
 		}

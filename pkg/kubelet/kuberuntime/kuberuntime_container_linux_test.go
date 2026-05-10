@@ -41,6 +41,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
+	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/types"
@@ -558,6 +559,7 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	_, _, m, err := createTestRuntimeManager(tCtx)
 	assert.NoError(t, err)
+	m.memoryReservationPolicy = kubeletconfiginternal.TieredReservationMemoryReservationPolicy
 
 	podRequestMemory := resource.MustParse("128Mi")
 	pod1LimitMemory := resource.MustParse("256Mi")
@@ -656,9 +658,44 @@ func TestGenerateContainerConfigWithMemoryQoSEnforced(t *testing.T) {
 		linuxConfig, err := m.generateLinuxContainerConfig(tCtx, &test.pod.Spec.Containers[0], test.pod, new(int64), "", nil, true)
 		assert.NoError(t, err)
 		assert.Equal(t, test.expected.containerConfig, linuxConfig, test.name)
-		assert.Equal(t, linuxConfig.GetResources().GetUnified()["memory.min"], strconv.FormatInt(test.expected.memoryLow, 10), test.name)
+		assert.Equal(t, linuxConfig.GetResources().GetUnified()["memory.low"], strconv.FormatInt(test.expected.memoryLow, 10), test.name)
 		assert.Equal(t, linuxConfig.GetResources().GetUnified()["memory.high"], strconv.FormatInt(test.expected.memoryHigh, 10), test.name)
 	}
+}
+
+func TestGenerateContainerConfigMemoryQoSPolicyNone(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	m.memoryReservationPolicy = kubeletconfiginternal.NoneMemoryReservationPolicy
+
+	podRequestMemory := resource.MustParse("128Mi")
+	podLimitMemory := resource.MustParse("256Mi")
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "bar",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "foo",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: podRequestMemory},
+						Limits:   v1.ResourceList{v1.ResourceMemory: podLimitMemory},
+					},
+				},
+			},
+		},
+	}
+
+	linuxConfig, err := m.generateLinuxContainerConfig(tCtx, &pod.Spec.Containers[0], pod, new(int64), "", nil, true)
+	require.NoError(t, err)
+	assert.Equal(t, "0", linuxConfig.GetResources().GetUnified()["memory.min"])
+	assert.NotEmpty(t, linuxConfig.GetResources().GetUnified()["memory.high"])
 }
 
 func TestGetHugepageLimitsFromResources(t *testing.T) {
@@ -2012,7 +2049,7 @@ func TestGenerateUpdatePodSandboxResourcesRequest(t *testing.T) {
 			expectedLcr := m.calculateSandboxResources(tCtx, tc.pod)
 			expectedLcrOverhead := m.convertOverheadToLinuxResources(tc.pod)
 
-			podResourcesCfg := cm.ResourceConfigForPod(tc.pod, tc.enforceCPULimits, uint64((m.cpuCFSQuotaPeriod.Duration)/time.Microsecond), false)
+			podResourcesCfg := cm.ResourceConfigForPod(tc.pod, tc.enforceCPULimits, uint64((m.cpuCFSQuotaPeriod.Duration)/time.Microsecond), false, kubeletconfiginternal.NoneMemoryReservationPolicy)
 			assert.NotNil(t, podResourcesCfg, "podResourcesCfg is expected to be not nil")
 
 			if podResourcesCfg.CPUPeriod == nil {
@@ -2050,7 +2087,7 @@ func TestUpdatePodSandboxResources(t *testing.T) {
 	}
 
 	// Create fake sandbox and container
-	fakeSandbox, fakeContainers := makeAndSetFakePod(t, m, fakeRuntime, pod)
+	fakeSandbox, fakeContainers := makeAndSetFakePod(tCtx, m, fakeRuntime, pod)
 	assert.Len(t, fakeContainers, 1)
 
 	runtimePod, err := m.GetPod(tCtx, pod.UID)

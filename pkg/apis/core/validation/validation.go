@@ -65,6 +65,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/helper/qos"
 	podshelper "k8s.io/kubernetes/pkg/apis/core/pods"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/fieldpath"
@@ -3645,9 +3646,10 @@ func validateResizePolicy(policyList []core.ContainerResizePolicy, fldPath *fiel
 		}
 
 		if *podRestartPolicy == core.RestartPolicyNever && p.RestartPolicy != core.NotRequired {
-			allErrors = append(allErrors, field.Invalid(fldPath, p.RestartPolicy, "must be 'NotRequired' when `restartPolicy` is 'Never'"))
+			allErrors = append(allErrors, field.Invalid(fldPath, p.RestartPolicy, "must be 'NotRequired' when pod `restartPolicy` is 'Never'"))
 		}
 	}
+
 	return allErrors
 }
 
@@ -3695,7 +3697,7 @@ func validateContainerRestartPolicy(policy *core.ContainerRestartPolicy, rules [
 			allowedActions = supportedContainerRestartRuleActionsWithRestartAllContainers
 		}
 		if !allowedActions.Has(rule.Action) {
-			allErrs = append(allErrs, field.NotSupported(policyRulesFld.Child("action"), rule.Action, sets.List(supportedContainerRestartRuleActions)))
+			allErrs = append(allErrs, field.NotSupported(policyRulesFld.Child("action"), rule.Action, sets.List(allowedActions)))
 		}
 
 		if rule.ExitCodes != nil {
@@ -3857,6 +3859,14 @@ func validateInitContainers(containers []core.Container, os *core.PodOS, regular
 
 		if !opts.AllowSidecarResizePolicy && len(ctr.ResizePolicy) > 0 {
 			allErrs = append(allErrs, field.Invalid(idxPath.Child("resizePolicy"), ctr.ResizePolicy, "must not be set for init containers"))
+		}
+
+		if !restartAlways && !opts.AllowExistingRestartContainerForNonSidecarInitContainer {
+			for j, p := range ctr.ResizePolicy {
+				if p.RestartPolicy == core.RestartContainer {
+					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("resizePolicy").Index(j).Child("restartPolicy"), p.RestartPolicy, "must not be set to 'RestartContainer' for non-sidecar initContainers"))
+				}
+			}
 		}
 	}
 
@@ -4477,6 +4487,8 @@ type PodValidationOptions struct {
 	AllowEnvFilesValidation bool
 	// Allows containers have restart policy and restart policy rules.
 	AllowContainerRestartPolicyRules bool
+	// Allow existing RestartContainer resize policy for non-sidecar init containers for backward compatibility
+	AllowExistingRestartContainerForNonSidecarInitContainer bool
 	// Allow user namespaces with volume devices, even though they will not function properly (should only be tolerated in updates of objects which already have this invalid configuration).
 	AllowUserNamespacesWithVolumeDevices bool
 	// Allow taint toleration comparison operators (Lt, Gt)
@@ -4487,6 +4499,8 @@ type PodValidationOptions struct {
 	AllowRestartAllContainers bool
 	// Allows container statuses to contain image volume digest
 	AllowImageVolumeWithDigest bool
+	// Allow empty image volume reference for backward compatibility
+	AllowEmptyImageVolumeReference bool
 }
 
 // validatePodMetadataAndSpec tests if required fields in the pod.metadata and pod.spec are set,
@@ -6039,6 +6053,7 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	allErrs = append(allErrs, ValidateEphemeralContainerStateTransition(newPod.Status.EphemeralContainerStatuses, oldPod.Status.EphemeralContainerStatuses, fldPath.Child("ephemeralContainerStatuses"))...)
 	allErrs = append(allErrs, validatePodResourceClaimStatuses(newPod.Status.ResourceClaimStatuses, newPod.Spec.ResourceClaims, fldPath.Child("resourceClaimStatuses"))...)
 	allErrs = append(allErrs, validatePodExtendedResourceClaimStatus(newPod.Status.ExtendedResourceClaimStatus, &newPod.Spec, fldPath.Child("extendedResourceClaimStatus"))...)
+	allErrs = append(allErrs, validateNodeAllocatableResourceClaimStatus(newPod.Status, &newPod.Spec, fldPath.Child("nodeAllocatableResourceClaimStatuses"))...)
 
 	if newIPErrs := validatePodIPs(newPod, oldPod); len(newIPErrs) > 0 {
 		allErrs = append(allErrs, newIPErrs...)
@@ -6121,6 +6136,67 @@ func validatePodResourceClaimStatuses(statuses []core.PodResourceClaimStatus, po
 		if status.ResourceClaimName != nil {
 			for _, detail := range ValidateResourceClaimName(*status.ResourceClaimName, false) {
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("resourceClaimName"), status.ResourceClaimName, detail))
+			}
+		}
+	}
+
+	return allErrs
+}
+
+// validateNodeAllocatableResourceClaimStatus validates NodeAllocatableResourceClaimStatuses in a pod status
+func validateNodeAllocatableResourceClaimStatus(podStatus core.PodStatus, podSpec *core.PodSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if len(podStatus.NodeAllocatableResourceClaimStatuses) == 0 {
+		return allErrs
+	}
+
+	for i, nodeAllocatableStatus := range podStatus.NodeAllocatableResourceClaimStatuses {
+		statusFldPath := fldPath.Index(i)
+		if nodeAllocatableStatus.ResourceClaimName == "" {
+			allErrs = append(allErrs, field.Required(statusFldPath.Child("resourceClaimName"), "must not be empty"))
+		}
+
+		// First check the podSpec to see if the ResourceClaim is directly referenced.
+		// If not, check the podStatus to see if the ResourceClaim was generated from a template.
+		found := false
+		for _, claimRef := range podSpec.ResourceClaims {
+			if (claimRef.ResourceClaimName != nil) && (*claimRef.ResourceClaimName == nodeAllocatableStatus.ResourceClaimName) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			for _, claimRef := range podStatus.ResourceClaimStatuses {
+				if (claimRef.ResourceClaimName != nil) && (*claimRef.ResourceClaimName == nodeAllocatableStatus.ResourceClaimName) {
+					found = true
+					break
+				}
+			}
+		}
+
+		if !found {
+			allErrs = append(allErrs, field.Invalid(statusFldPath.Child("resourceClaimName"), nodeAllocatableStatus.ResourceClaimName, "no mapping found in pod reference"))
+		}
+
+		// TODO(KEP-5517): Evaluate if its ok to have no containers referencing a node allocatable resource claim.
+		// This is pending on defining kubelet cgroup enforcement.
+		if len(nodeAllocatableStatus.Containers) == 0 {
+			allErrs = append(allErrs, field.Required(statusFldPath.Child("containers"), "must not be empty"))
+		}
+
+		resourcesFldPath := statusFldPath.Child("resources")
+		if len(nodeAllocatableStatus.Resources) == 0 {
+			allErrs = append(allErrs, field.Required(resourcesFldPath, "must not be empty"))
+		}
+
+		for resourceName, quantity := range nodeAllocatableStatus.Resources {
+			keyPath := resourcesFldPath.Key(string(resourceName))
+			if !v1helper.IsNativeResource(v1.ResourceName(resourceName)) {
+				allErrs = append(allErrs, field.Invalid(keyPath, resourceName, "must be a node allocatable resource name"))
+			}
+			if quantity.Cmp(resource.Quantity{}) < 0 {
+				allErrs = append(allErrs, field.Invalid(keyPath, quantity.String(), "must be non-negative"))
 			}
 		}
 	}
@@ -6278,7 +6354,15 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 		allErrs = append(allErrs, validatePodLevelResourcesResize(newPod, oldPod, &newPodSpecCopy, specPath, opts)...)
 	}
 
-	// Part 3: Validate that the changes between oldPod.Spec.Containers[].Resources and
+	// Part 3: Disable InPlaceResize if a pod is using DRA resource claims for node-allocatable resources.
+	// TODO(KEP-5517) - Handle in place resize with node-allocatable resource claims.
+	// Currently, the presence of any node-allocatable resource claim blocks resizing for all resources, irrespective of whether
+	// ResourceClaim is used for the same resource.
+	if len(oldPod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
+		allErrs = append(allErrs, field.Forbidden(specPath, "pods with node allocatable resource claims cannot be resized"))
+	}
+
+	// Part 4: Validate that the changes between oldPod.Spec.Containers[].Resources and
 	// newPod.Spec.Containers[].Resources are allowed. Also validate that the changes between oldPod.Spec.InitContainers[].Resources and
 	// newPod.Spec.InitContainers[].Resources are allowed.
 
@@ -6291,17 +6375,15 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	}
 
 	// Do not allow removing resource requests/limits on resize.
-	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
-		for ix, ctr := range oldPod.Spec.InitContainers {
-			if !isRestartableInitContainer(&ctr) {
-				continue
-			}
-			allErrs = append(allErrs, validateContainerResize(
-				&newPod.Spec.InitContainers[ix].Resources,
-				&oldPod.Spec.InitContainers[ix].Resources,
-				newPod.Spec.InitContainers[ix].ResizePolicy,
-				specPath.Child("initContainers").Index(ix).Child("resources"))...)
+	for ix, ctr := range oldPod.Spec.InitContainers {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingInitContainers) && !isRestartableInitContainer(&ctr) {
+			continue
 		}
+		allErrs = append(allErrs, validateContainerResize(
+			&newPod.Spec.InitContainers[ix].Resources,
+			&oldPod.Spec.InitContainers[ix].Resources,
+			newPod.Spec.InitContainers[ix].ResizePolicy,
+			specPath.Child("initContainers").Index(ix).Child("resources"))...)
 	}
 	for ix := range oldPod.Spec.Containers {
 		allErrs = append(allErrs, validateContainerResize(
@@ -6325,26 +6407,38 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	newPodSpecCopy.Containers = newContainers
 
 	// Ensure that only CPU and memory resources are mutable for restartable init containers.
-	// Also ensure that resources are immutable for non-restartable init containers.
 	var newInitContainers []core.Container
-	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
-		for ix, container := range newPodSpecCopy.InitContainers {
-			if isRestartableInitContainer(&container) { // restartable init container
-				dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.InitContainers[ix])
-				if !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix]) {
-					// This likely means that the user has made changes to resources other than CPU and memory for sidecar container.
-					errs := field.Forbidden(specPath, "only cpu and memory resources for sidecar containers are mutable")
-					allErrs = append(allErrs, errs)
-				}
-			} else if !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix]) { // non-restartable init container
-				// This likely means that the user has modified resources of non-sidecar init container.
-				errs := field.Forbidden(specPath, "resources for non-sidecar init containers are immutable")
+	for ix, container := range newPodSpecCopy.InitContainers {
+		isRestartable := isRestartableInitContainer(&container)
+		canResize := isRestartable || utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingInitContainers)
+		modifiedContainer := !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix])
+
+		if canResize {
+			dropCPUMemoryResourcesFromContainer(&container, &oldPod.Spec.InitContainers[ix])
+			if !apiequality.Semantic.DeepEqual(container, oldPod.Spec.InitContainers[ix]) {
+				// This likely means that the user has made changes to resources other than CPU and memory for sidecar container.
+				errs := field.Forbidden(specPath.Child("initContainers").Index(ix), "only cpu and memory resources for init or sidecar containers are mutable")
 				allErrs = append(allErrs, errs)
 			}
-			newInitContainers = append(newInitContainers, container)
+			if modifiedContainer && !isRestartable {
+				for _, resizePolicy := range container.ResizePolicy {
+					if resizePolicy.RestartPolicy == core.RestartContainer {
+						// TODO: This validation check can eventually be removed in 1.40,
+						// as https://github.com/kubernetes/kubernetes/pull/137458 prohibits
+						// the ability to set RestartContainer resize policy for non-sidecar init containers.
+						errs := field.Forbidden(specPath.Child("initContainers").Index(ix), "non-sidecar init containers with a resize policy of RestartContainer cannot be resized")
+						allErrs = append(allErrs, errs)
+					}
+				}
+			}
+		} else if modifiedContainer { // modified non-resizable init container
+			// This likely means that the user has modified resources of non-sidecar init container.
+			errs := field.Forbidden(specPath, "resources for non-sidecar init containers are immutable")
+			allErrs = append(allErrs, errs)
 		}
-		newPodSpecCopy.InitContainers = newInitContainers
+		newInitContainers = append(newInitContainers, container)
 	}
+	newPodSpecCopy.InitContainers = newInitContainers
 
 	if len(allErrs) > 0 {
 		return allErrs
@@ -9558,7 +9652,7 @@ func validateLinuxContainerUser(linuxContainerUser *core.LinuxContainerUser, fld
 
 func validateImageVolumeSource(imageVolume *core.ImageVolumeSource, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if opts.ResourceIsPod && len(imageVolume.Reference) == 0 {
+	if !opts.AllowEmptyImageVolumeReference && len(imageVolume.Reference) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("reference"), ""))
 	}
 	allErrs = append(allErrs, validatePullPolicy(imageVolume.PullPolicy, fldPath.Child("pullPolicy"))...)
@@ -9640,8 +9734,12 @@ func validateImageVolumeStatus(imageVolumeStatus *core.ImageVolumeStatus, fldPat
 }
 
 // validateVolumeStatus returns an error if the given struct has more than 1 populated field.
-func validateVolumeStatus(volumeStatus core.VolumeStatus, fldPath *field.Path) field.ErrorList {
+func validateVolumeStatus(volumeStatus *core.VolumeStatus, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
+
+	if volumeStatus == nil {
+		return allErrors
+	}
 
 	numStatuses := 0
 

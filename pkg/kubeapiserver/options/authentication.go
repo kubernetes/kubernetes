@@ -41,7 +41,6 @@ import (
 	apiservervalidation "k8s.io/apiserver/pkg/apis/apiserver/validation"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	authenticationcel "k8s.io/apiserver/pkg/authentication/cel"
-	genericfeatures "k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
@@ -345,7 +344,6 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&o.AuthenticationConfigFile, "authentication-config", o.AuthenticationConfigFile, ""+
 		"File with Authentication Configuration to configure the JWT Token authenticator or the anonymous authenticator. "+
-		"Requires the StructuredAuthenticationConfiguration feature gate. "+
 		"This flag is mutually exclusive with the --oidc-* flags if the file configures the JWT Token authenticator. "+
 		"This flag is mutually exclusive with --anonymous-auth if the file configures the Anonymous authenticator.")
 
@@ -511,7 +509,7 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 		}
 	}
 
-	// When the StructuredAuthenticationConfiguration feature is enabled and the authentication config file is provided,
+	// When the authentication config file is provided,
 	// load the authentication config from the file, otherwise set up an empty configuration.
 	if len(o.AuthenticationConfigFile) > 0 {
 		var err error
@@ -861,11 +859,6 @@ func (o *BuiltInAuthenticationOptions) validateOIDCOptions() []error {
 	}
 
 	// New validation when authentication config file is provided
-
-	// Authentication config file is only supported when the StructuredAuthenticationConfiguration feature is enabled
-	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StructuredAuthenticationConfiguration) {
-		allErrors = append(allErrors, fmt.Errorf("set --feature-gates=%s=true to use authentication-config file", genericfeatures.StructuredAuthenticationConfiguration))
-	}
 
 	// Authentication config file and oidc-* flags are mutually exclusive
 	if o.OIDC != nil && o.OIDC.FlagsSet {

@@ -296,7 +296,7 @@ func newFakePlugin(name string) func(ctx context.Context, object runtime.Object,
 	}
 }
 
-func nilRecorderFactory(_ string) events.EventRecorder {
+func nilRecorderFactory(_ string) events.EventRecorderLogger {
 	return nil
 }
 

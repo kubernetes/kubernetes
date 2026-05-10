@@ -998,6 +998,13 @@ items:
     - list
     - watch
   - apiGroups:
+    - resource.k8s.io
+    resources:
+    - resourceclaims/binding
+    verbs:
+    - patch
+    - update
+  - apiGroups:
     - scheduling.k8s.io
     resources:
     - podgroups

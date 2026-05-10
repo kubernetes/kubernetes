@@ -38,64 +38,113 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	// type Struct
-	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_Struct(ctx, op, nil /* fldPath */, obj.(*Struct), safe.Cast[*Struct](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*Struct)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_Struct(
+					ctx, op, nil, /* fldPath */
+					obj.(*Struct),
+					safe.Cast[*Struct](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
 // Validate_LabelKeyStringType validates an instance of LabelKeyStringType according
 // to declarative validation rules in the API schema.
-func Validate_LabelKeyStringType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *LabelKeyStringType) (errs field.ErrorList) {
-	errs = append(errs, validate.LabelKey(ctx, op, fldPath, obj, oldObj)...)
+func Validate_LabelKeyStringType(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *LabelKeyStringType) (errs field.ErrorList) {
+
+	if e := validate.LabelKey(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+		errs = append(errs, e...)
+	}
 
 	return errs
 }
 
 // Validate_Struct validates an instance of Struct according
 // to declarative validation rules in the API schema.
-func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
+func Validate_Struct(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *Struct) (errs field.ErrorList) {
+
 	// field Struct.TypeMeta has no validation
 
-	// field Struct.LabelKeyField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.LabelKeyField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
-			errs = append(errs, validate.LabelKey(ctx, op, fldPath, obj, oldObj)...)
+			if e := validate.LabelKey(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("labelKeyField"), &obj.LabelKeyField, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.LabelKeyField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *string {
+				return &oldObj.LabelKeyField
+			})
+		errs = append(errs, fn(fldPath.Child("labelKeyField"), &obj.LabelKeyField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.LabelKeyPtrField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.LabelKeyPtrField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
-			errs = append(errs, validate.LabelKey(ctx, op, fldPath, obj, oldObj)...)
+			if e := validate.LabelKey(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("labelKeyPtrField"), obj.LabelKeyPtrField, safe.Field(oldObj, func(oldObj *Struct) *string { return oldObj.LabelKeyPtrField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *string {
+				return oldObj.LabelKeyPtrField
+			})
+		errs = append(errs, fn(fldPath.Child("labelKeyPtrField"), obj.LabelKeyPtrField, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.LabelKeyTypedefField
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *LabelKeyStringType, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.LabelKeyTypedefField
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *LabelKeyStringType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_LabelKeyStringType(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("labelKeyTypedefField"), &obj.LabelKeyTypedefField, safe.Field(oldObj, func(oldObj *Struct) *LabelKeyStringType { return &oldObj.LabelKeyTypedefField }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) *LabelKeyStringType {
+				return &oldObj.LabelKeyTypedefField
+			})
+		errs = append(errs, fn(fldPath.Child("labelKeyTypedefField"), &obj.LabelKeyTypedefField, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }

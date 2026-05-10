@@ -31,6 +31,7 @@ import (
 // HorizontalPodAutoscaler is the configuration for a horizontal pod
 // autoscaler, which automatically manages the replica count of any resource
 // implementing the scale subresource based on the metrics specified.
+// +k8s:supportsSubresource="/status"
 type HorizontalPodAutoscaler struct {
 	metav1.TypeMeta `json:",inline"`
 	// metadata is the standard object metadata.
@@ -450,6 +451,8 @@ const (
 	// ScalingLimited indicates that the calculated scale based on metrics would be above or
 	// below the range for the HPA, and has thus been capped.
 	ScalingLimited HorizontalPodAutoscalerConditionType = "ScalingLimited"
+	// ScaledToZero indicates that the HPA controller scaled the workload to zero.
+	ScaledToZero HorizontalPodAutoscalerConditionType = "ScaledToZero"
 )
 
 // HorizontalPodAutoscalerCondition describes the state of

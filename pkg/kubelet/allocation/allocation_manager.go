@@ -37,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/config"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -80,10 +79,6 @@ type Manager interface {
 	// TODO: See if we can remove this and just add them in the allocation manager constructor.
 	AddPodAdmitHandlers(handlers lifecycle.PodAdmitHandlers)
 
-	// SetContainerRuntime sets the allocation manager's container runtime.
-	// TODO: See if we can remove this and just add it in the allocation manager constructor.
-	SetContainerRuntime(runtime kubecontainer.Runtime)
-
 	// AddPod checks if a pod can be admitted. If so, it admits the pod and updates the allocation.
 	// The function returns a boolean value indicating whether the pod
 	// can be admitted, a brief single-word reason and a message explaining why
@@ -115,10 +110,9 @@ type Manager interface {
 type manager struct {
 	allocated state.State
 
-	admitHandlers    lifecycle.PodAdmitHandlers
-	containerRuntime kubecontainer.Runtime
-	statusManager    status.Manager
-	sourcesReady     config.SourcesReady
+	admitHandlers lifecycle.PodAdmitHandlers
+	statusManager status.Manager
+	sourcesReady  config.SourcesReady
 
 	ticker         *time.Ticker
 	triggerPodSync func(pod *v1.Pod)
@@ -497,16 +491,12 @@ func allocationFromPod(pod *v1.Pod) state.PodResourceInfo {
 		podAlloc.PodLevelResources = pod.Spec.Resources.DeepCopy()
 	}
 	podAlloc.ContainerResources = make(map[string]v1.ResourceRequirements)
-	for _, container := range pod.Spec.Containers {
+	for container, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
+		if !IsResizableContainer(container, containerType) {
+			continue
+		}
 		alloc := *container.Resources.DeepCopy()
 		podAlloc.ContainerResources[container.Name] = alloc
-	}
-
-	for _, container := range pod.Spec.InitContainers {
-		if podutil.IsRestartableInitContainer(&container) {
-			alloc := *container.Resources.DeepCopy()
-			podAlloc.ContainerResources[container.Name] = alloc
-		}
 	}
 
 	return podAlloc
@@ -516,10 +506,6 @@ func (m *manager) AddPodAdmitHandlers(handlers lifecycle.PodAdmitHandlers) {
 	for _, a := range handlers {
 		m.admitHandlers.AddPodAdmitHandler(a)
 	}
-}
-
-func (m *manager) SetContainerRuntime(runtime kubecontainer.Runtime) {
-	m.containerRuntime = runtime
 }
 
 func (m *manager) AddPod(activePods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
@@ -643,7 +629,7 @@ func (m *manager) getAllocatedPods(activePods []*v1.Pod) []*v1.Pod {
 func IsResizableContainer(container *v1.Container, containerType podutil.ContainerType) bool {
 	switch containerType {
 	case podutil.InitContainers:
-		return podutil.IsRestartableInitContainer(container)
+		return utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingInitContainers) || podutil.IsRestartableInitContainer(container)
 	case podutil.Containers:
 		return true
 	default:

@@ -31,8 +31,12 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	schedulingapi "k8s.io/api/scheduling/v1alpha2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
+
+const schedulingAPIGroupPrefix = schedulingapi.GroupName + "/"
 
 var (
 	// ErrAPIUnsupported is wrapped by the actual errors returned by Name and
@@ -78,25 +82,114 @@ func Name(pod *v1.Pod, podClaim *v1.PodResourceClaim) (name *string, mustCheckOw
 	}
 }
 
-// IsForPod checks that the ResourceClaim is the one that
-// was created for the Pod. It returns an error that is informative
-// enough to be returned by the caller without adding further details
-// about the Pod or ResourceClaim.
-func IsForPod(pod *v1.Pod, claim *resourceapi.ResourceClaim) error {
+// NameFromPodGroup returns the name of the ResourceClaim object that gets
+// referenced by or created for the PodGroupResourceClaim. Three different
+// results are possible:
+//
+//   - An error is returned when some field is not set as expected (either the
+//     input is invalid or the API got extended and the library and the client
+//     using it need to be updated) or the claim hasn't been created yet.
+//
+//     The error includes PodGroup and PodGroup claim name and the unexpected
+//     field and is derived from one of the pre-defined errors in this package.
+//
+//   - A nil string pointer and no error when the ResourceClaim intentionally
+//     didn't get created and the PodGroupResourceClaim can be ignored.
+//
+//   - A pointer to the name and no error when the ResourceClaim got created.
+//     In this case the boolean determines whether IsForPodGroup must be called
+//     after retrieving the ResourceClaim and before using it.
+func NameFromPodGroup(podGroup *schedulingapi.PodGroup, podGroupClaim *schedulingapi.PodGroupResourceClaim) (name *string, mustCheckOwner bool, err error) {
+	switch {
+	case podGroupClaim.ResourceClaimName != nil:
+		return podGroupClaim.ResourceClaimName, false, nil
+	case podGroupClaim.ResourceClaimTemplateName != nil:
+		for _, status := range podGroup.Status.ResourceClaimStatuses {
+			if status.Name == podGroupClaim.Name {
+				return status.ResourceClaimName, true, nil
+			}
+		}
+		return nil, false, fmt.Errorf("PodGroup %s/%s: %w", podGroup.Namespace, podGroup.Name, ErrClaimNotFound)
+	default:
+		return nil, false, fmt.Errorf("PodGroup %s/%s, spec.resourceClaim %s: %w", podGroup.Namespace, podGroup.Name, podGroupClaim.Name, ErrAPIUnsupported)
+	}
+}
+
+// IsForPod checks that the ResourceClaim is the one that was created for the
+// Pod or, if acceptPodGroupOwner is true, its PodGroup. PodGroup owners should
+// only be considered when the DRAWorkloadResourceClaims feature gate is
+// enabled. It returns an error that is informative enough to be returned by the
+// caller without adding further details about the Pod or ResourceClaim.
+func IsForPod(pod *v1.Pod, claim *resourceapi.ResourceClaim, acceptPodGroupOwner bool) error {
 	// Checking the namespaces is just a precaution. The caller should
 	// never pass in a ResourceClaim that isn't from the same namespace as the
 	// Pod.
-	if claim.Namespace != pod.Namespace || !metav1.IsControlledBy(claim, pod) {
-		return fmt.Errorf("ResourceClaim %s/%s was not created for pod %s/%s (pod is not owner)", claim.Namespace, claim.Name, pod.Namespace, pod.Name)
+	if claim.Namespace != pod.Namespace {
+		return fmt.Errorf("ResourceClaim %s/%s is not in the same namespace as Pod %s/%s", claim.Namespace, claim.Name, pod.Namespace, pod.Name)
+	}
+	if !metav1.IsControlledBy(claim, pod) {
+		if acceptPodGroupOwner {
+			if !isForPodGroupByPod(pod, claim) {
+				return fmt.Errorf("ResourceClaim %s/%s was not created for Pod %s/%s (neither Pod nor PodGroup %s is the owner)", claim.Namespace, claim.Name, pod.Namespace, pod.Name, *pod.Spec.SchedulingGroup.PodGroupName)
+			}
+			return nil
+		}
+		return fmt.Errorf("ResourceClaim %s/%s was not created for Pod %s/%s (Pod is not owner)", claim.Namespace, claim.Name, pod.Namespace, pod.Name)
 	}
 	return nil
 }
 
-// IsReservedForPod checks whether a claim lists the pod as one of the objects
-// that the claim was reserved for.
-func IsReservedForPod(pod *v1.Pod, claim *resourceapi.ResourceClaim) bool {
+// IsForPodGroup checks that the ResourceClaim is the one that
+// was created for the PodGroup. It returns an error that is informative
+// enough to be returned by the caller without adding further details
+// about the Pod or ResourceClaim.
+func IsForPodGroup(podGroup *schedulingapi.PodGroup, claim *resourceapi.ResourceClaim) error {
+	// Checking the namespaces is just a precaution. The caller should
+	// never pass in a ResourceClaim that isn't from the same namespace as the
+	// Pod.
+	if claim.Namespace != podGroup.Namespace {
+		return fmt.Errorf("ResourceClaim %s/%s is not in the same namespace as PodGroup %s/%s", claim.Namespace, claim.Name, podGroup.Namespace, podGroup.Name)
+	}
+	if !metav1.IsControlledBy(claim, podGroup) {
+		return fmt.Errorf("ResourceClaim %s/%s was not created for PodGroup %s/%s (PodGroup is not owner)", claim.Namespace, claim.Name, podGroup.Namespace, podGroup.Name)
+	}
+	return nil
+}
+
+// isForPodGroupByPod performs the same function as [IsForPodGroup] by checking
+// for the API group, kind, and name of the PodGroup in the claim's
+// Status.ReservedFor instead of its UID, which is not known to the Pod.
+func isForPodGroupByPod(pod *v1.Pod, claim *resourceapi.ResourceClaim) bool {
+	if pod.Spec.SchedulingGroup == nil || pod.Spec.SchedulingGroup.PodGroupName == nil {
+		return false
+	}
+	controller := metav1.GetControllerOfNoCopy(claim)
+	return controller != nil &&
+		controller.Name == *pod.Spec.SchedulingGroup.PodGroupName &&
+		controller.Kind == "PodGroup" &&
+		// The version component of the APIVersion is ignored because that
+		// may change. The group component is still checked.
+		strings.HasPrefix(controller.APIVersion, schedulingAPIGroupPrefix)
+}
+
+// IsReservedForPod checks whether a claim lists the Pod as one
+// of the objects that the claim was reserved for. When the
+// acceptPodGroupReservation parameter is true, it also returns true when the
+// claim lists the Pod's PodGroup as one of the objects that the claim was
+// reserved for. The acceptPodGroupReservation parameter should only be set when
+// the DRAWorkloadResourceClaims feature is enabled.
+func IsReservedForPod(pod *v1.Pod, claim *resourceapi.ResourceClaim, acceptPodGroupReservation bool) bool {
 	for _, reserved := range claim.Status.ReservedFor {
 		if reserved.UID == pod.UID {
+			return true
+		}
+		// Pods don't know the UID of their PodGroup, so we check all the
+		// other fields of the reservation that it does know.
+		if acceptPodGroupReservation && reserved.APIGroup == schedulingapi.GroupName &&
+			reserved.Resource == "podgroups" &&
+			pod.Spec.SchedulingGroup != nil &&
+			pod.Spec.SchedulingGroup.PodGroupName != nil &&
+			reserved.Name == *pod.Spec.SchedulingGroup.PodGroupName {
 			return true
 		}
 	}
@@ -107,6 +200,46 @@ func IsReservedForPod(pod *v1.Pod, claim *resourceapi.ResourceClaim) bool {
 func CanBeReserved(claim *resourceapi.ResourceClaim) bool {
 	// Currently no restrictions on sharing...
 	return true
+}
+
+// BindTo constructs a consumer reference for the claim that refers to the
+// object to which the claim should be bound. When the PodResourceClaim Name,
+// ResourceClaimName, and ResourceClaimTemplateName match those of one of the
+// PodGroup's PodGroupResourceClaims, the claim is bound to the PodGroup.
+// Otherwise, the claim is bound to the Pod. The podGroup parameter should only
+// be non-nil when the DRAWorkloadResourceClaims feature gate is enabled.
+func BindTo(pod *v1.Pod, podGroup *schedulingapi.PodGroup, podClaim *v1.PodResourceClaim) (resourceapi.ResourceClaimConsumerReference, error) {
+	if podClaim.ResourceClaimName == nil &&
+		podClaim.ResourceClaimTemplateName == nil {
+		return resourceapi.ResourceClaimConsumerReference{}, fmt.Errorf("Pod %s/%s claim %s: %w", pod.Namespace, pod.Name, podClaim.Name, ErrAPIUnsupported)
+	}
+	if podGroup != nil {
+		if err := podMatchesPodGroup(pod, podGroup); err != nil {
+			return resourceapi.ResourceClaimConsumerReference{}, err
+		}
+		for _, podGroupClaim := range podGroup.Spec.ResourceClaims {
+			if podGroupClaim.ResourceClaimName == nil &&
+				podGroupClaim.ResourceClaimTemplateName == nil {
+				return resourceapi.ResourceClaimConsumerReference{}, fmt.Errorf("PodGroup %s/%s claim %s: %w", podGroup.Namespace, podGroup.Name, podGroupClaim.Name, ErrAPIUnsupported)
+			}
+			if podGroupClaim.Name == podClaim.Name &&
+				ptr.Equal(podGroupClaim.ResourceClaimName, podClaim.ResourceClaimName) &&
+				ptr.Equal(podGroupClaim.ResourceClaimTemplateName, podClaim.ResourceClaimTemplateName) {
+				return resourceapi.ResourceClaimConsumerReference{
+					APIGroup: schedulingapi.GroupName,
+					Resource: "podgroups",
+					Name:     podGroup.Name,
+					UID:      podGroup.UID,
+				}, nil
+			}
+		}
+	}
+	return resourceapi.ResourceClaimConsumerReference{
+		APIGroup: v1.GroupName,
+		Resource: "pods",
+		Name:     pod.Name,
+		UID:      pod.UID,
+	}, nil
 }
 
 // BaseRequestRef returns the request name if the reference is to a top-level
@@ -153,4 +286,14 @@ func isMatch(requests []string, requestRef string) bool {
 
 	baseRequestRef := BaseRequestRef(requestRef)
 	return slices.Contains(requests, baseRequestRef)
+}
+
+func podMatchesPodGroup(pod *v1.Pod, podGroup *schedulingapi.PodGroup) error {
+	if pod.Spec.SchedulingGroup == nil || pod.Spec.SchedulingGroup.PodGroupName == nil {
+		return fmt.Errorf("Pod %s/%s does not belong to a PodGroup", pod.Namespace, pod.Name)
+	}
+	if schedGroupPodGroup := *pod.Spec.SchedulingGroup.PodGroupName; pod.Namespace != podGroup.Namespace || schedGroupPodGroup != podGroup.Name {
+		return fmt.Errorf("Pod %s/%s belongs to PodGroup %s/%s, not PodGroup %s/%s", pod.Namespace, pod.Name, pod.Namespace, schedGroupPodGroup, podGroup.Namespace, podGroup.Name)
+	}
+	return nil
 }

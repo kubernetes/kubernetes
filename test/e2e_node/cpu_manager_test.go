@@ -4033,6 +4033,10 @@ func configureCPUManagerInKubelet(oldCfg *kubeletconfig.KubeletConfiguration, ku
 	newCfg.FeatureGates["CPUManagerPolicyAlphaOptions"] = kubeletArguments.enableCPUManagerOptions
 	newCfg.FeatureGates["DisableCPUQuotaWithExclusiveCPUs"] = kubeletArguments.disableCPUQuotaWithExclusiveCPUs
 	newCfg.FeatureGates["PodLevelResources"] = kubeletArguments.enablePodLevelResources
+	// InPlacePodLevelResourcesVerticalScaling is only supported when PodLevelResources is enabled
+	if !kubeletArguments.enablePodLevelResources {
+		newCfg.FeatureGates["InPlacePodLevelResourcesVerticalScaling"] = kubeletArguments.enablePodLevelResources
+	}
 	newCfg.FeatureGates["PodLevelResourceManagers"] = kubeletArguments.enablePodLevelResourceManagers
 
 	if kubeletArguments.customCPUCFSQuotaPeriod != 0 {

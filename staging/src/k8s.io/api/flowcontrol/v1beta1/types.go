@@ -111,6 +111,7 @@ const (
 
 // FlowSchema defines the schema of a group of flows. Note that a flow is made up of a set of inbound API requests with
 // similar attributes and is identified by a pair of strings: the name of the FlowSchema and a "flow distinguisher".
+// +k8s:supportsSubresource="/status"
 type FlowSchema struct {
 	metav1.TypeMeta `json:",inline"`
 	// `metadata` is the standard object's metadata.
@@ -387,6 +388,7 @@ type FlowSchemaConditionType string
 // +k8s:prerelease-lifecycle-gen:replacement=flowcontrol.apiserver.k8s.io,v1beta3,PriorityLevelConfiguration
 
 // PriorityLevelConfiguration represents the configuration of a priority level.
+// +k8s:supportsSubresource="/status"
 type PriorityLevelConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 	// `metadata` is the standard object's metadata.
@@ -432,15 +434,14 @@ type PriorityLevelConfigurationSpec struct {
 	// Required.
 	// +unionDiscriminator
 	// +k8s:alpha(since: "1.36")=+k8s:required
-	// +k8s:alpha(since: "1.36")=+k8s:discriminator
+	// +k8s:alpha(since: "1.36")=+k8s:modeDiscriminator
 	Type PriorityLevelEnablement `json:"type" protobuf:"bytes,1,opt,name=type"`
 
 	// `limited` specifies how requests are handled for a Limited priority level.
 	// This field must be non-empty if and only if `type` is `"Limited"`.
 	// +optional
 	// +k8s:alpha(since: "1.36")=+k8s:optional
-	// +k8s:alpha(since: "1.36")=+k8s:member("Limited")=+k8s:required
-	// +k8s:alpha(since: "1.36")=+k8s:member("Exempt")=+k8s:forbidden
+	// +k8s:alpha(since: "1.36")=+k8s:ifMode("Limited")=+k8s:required
 	Limited *LimitedPriorityLevelConfiguration `json:"limited,omitempty" protobuf:"bytes,2,opt,name=limited"`
 
 	// `exempt` specifies how requests are handled for an exempt priority level.
@@ -450,8 +451,7 @@ type PriorityLevelConfigurationSpec struct {
 	// for `ExemptPriorityLevelConfiguration` apply.
 	// +optional
 	// +k8s:alpha(since: "1.36")=+k8s:optional
-	// +k8s:alpha(since: "1.36")=+k8s:member("Exempt")=+k8s:optional
-	// +k8s:alpha(since: "1.36")=+k8s:member("Limited")=+k8s:forbidden
+	// +k8s:alpha(since: "1.36")=+k8s:ifMode("Exempt")=+k8s:optional
 	Exempt *ExemptPriorityLevelConfiguration `json:"exempt,omitempty" protobuf:"bytes,3,opt,name=exempt"`
 }
 
@@ -572,15 +572,14 @@ type LimitResponse struct {
 	// Required.
 	// +unionDiscriminator
 	// +k8s:alpha(since: "1.36")=+k8s:required
-	// +k8s:alpha(since: "1.36")=+k8s:discriminator
+	// +k8s:alpha(since: "1.36")=+k8s:modeDiscriminator
 	Type LimitResponseType `json:"type" protobuf:"bytes,1,opt,name=type"`
 
 	// `queuing` holds the configuration parameters for queuing.
 	// This field may be non-empty only if `type` is `"Queue"`.
 	// +optional
 	// +k8s:alpha(since: "1.36")=+k8s:optional
-	// +k8s:alpha(since: "1.36")=+k8s:member("Queue")=+k8s:required
-	// +k8s:alpha(since: "1.36")=+k8s:member("Reject")=+k8s:forbidden
+	// +k8s:alpha(since: "1.36")=+k8s:ifMode("Queue")=+k8s:required
 	Queuing *QueuingConfiguration `json:"queuing,omitempty" protobuf:"bytes,2,opt,name=queuing"`
 }
 

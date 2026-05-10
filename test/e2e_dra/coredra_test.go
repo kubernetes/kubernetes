@@ -26,7 +26,7 @@ import (
 	"k8s.io/dynamic-resource-allocation/resourceslice"
 	drautils "k8s.io/kubernetes/test/e2e/dra/utils"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
 func coreDRAResources(nodes *drautils.Nodes) map[string]resourceslice.DriverResources {

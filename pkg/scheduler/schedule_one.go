@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 	utiltrace "k8s.io/utils/trace"
@@ -358,8 +359,8 @@ func (sched *Scheduler) assumeAndReserve(
 }
 
 // unreserveAndForget unreserves and forgets the pod from scheduler's memory.
-// This function shouldn't be called during binding cycle with a pod that has the NeedsPodGroupScheduling set to true,
-// but this shouldn't happen, because such pods cannot reach binding.
+// This function shouldn't be called during binding cycle with a state, where IsPodGroupSchedulingCycle is set to true,
+// but this shouldn't happen, because such pods with such state cannot reach binding.
 func (sched *Scheduler) unreserveAndForget(
 	ctx context.Context,
 	state fwk.CycleState,
@@ -546,8 +547,9 @@ func (sched *Scheduler) frameworkForPod(pod *v1.Pod) (framework.Framework, error
 func (sched *Scheduler) skipPodSchedule(ctx context.Context, fwk framework.Framework, pod *v1.Pod) bool {
 	// Case 1: pod is being deleted.
 	if pod.DeletionTimestamp != nil {
-		fwk.EventRecorder().Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", "skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
-		klog.FromContext(ctx).V(3).Info("Skip schedule deleting pod", "pod", klog.KObj(pod))
+		logger := klog.FromContext(ctx)
+		fwk.EventRecorder().WithLogger(logger).Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", "skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
+		logger.V(3).Info("Skip schedule deleting pod", "pod", klog.KObj(pod))
 		return true
 	}
 
@@ -1109,6 +1111,16 @@ func (sched *Scheduler) assume(logger klog.Logger, state fwk.CycleState, assumed
 	// If the binding fails, scheduler will release resources allocated to assumed pod
 	// immediately.
 	assumedPodInfo.Pod.Spec.NodeName = host
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) {
+		// If DRANodeAllocatableResources is enabled, copy the calculated node allocatable resource claim status
+		// from the cycle state to the assumed pod's status. This ensures that the scheduler's
+		// cached version of the pod reflects the node allocatable resources allocated by the DRA plugin
+		// for this scheduling cycle, making this information available for NodeInfo cache update.
+		// Any potential NodeAllocatableResourceClaimStatuses from a previously failed scheduling attempt is overwritten.
+		// This field is not explicitly cleared as the Pod object is reconstructed in handleSchedulingFailure()
+		// before re-queueing.
+		assumedPodInfo.Pod.Status.NodeAllocatableResourceClaimStatuses = dynamicresources.ExtractPodNodeAllocatableResourceClaimStatus(logger, state, host)
+	}
 
 	if state.IsPodGroupSchedulingCycle() {
 		err := sched.nodeInfoSnapshot.AssumePod(assumedPodInfo.PodInfo)
@@ -1171,7 +1183,7 @@ func (sched *Scheduler) finishBinding(logger klog.Logger, fwk framework.Framewor
 		return
 	}
 
-	fwk.EventRecorder().Eventf(assumed, nil, v1.EventTypeNormal, "Scheduled", "Binding", "Successfully assigned %v/%v to %v", assumed.Namespace, assumed.Name, targetNode)
+	fwk.EventRecorder().WithLogger(logger).Eventf(assumed, nil, v1.EventTypeNormal, "Scheduled", "Binding", "Successfully assigned %v/%v to %v", assumed.Namespace, assumed.Name, targetNode)
 }
 
 func getAttemptsLabel(p *framework.QueuedPodInfo) string {
@@ -1244,6 +1256,10 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 			logger.Info("Pod has been assigned to node. Abort adding it back to queue.", "pod", klog.KObj(pod), "node", cachedPod.Spec.NodeName)
 			// We need to call DonePod here because we don't call AddUnschedulableIfNotPresent in this case.
 		} else {
+			if cachedPod.UID != podInfo.Pod.UID {
+				logger.V(2).Info("Pod was recreated while handling scheduling failure. Skip requeueing and status updates.", "pod", klog.KObj(pod), "oldUID", podInfo.Pod.UID, "newUID", cachedPod.UID)
+				return
+			}
 			// As <cachedPod> is from SharedInformer, we need to do a DeepCopy() here.
 			// ignore this err since apiserver doesn't properly validate affinity terms
 			// and we can't fix the validation for backwards compatibility.
@@ -1270,7 +1286,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 	}
 
 	msg := truncateMessage(errMsg)
-	podFwk.EventRecorder().Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
+	podFwk.EventRecorder().WithLogger(logger).Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
 	if err := updatePod(ctx, sched.client, podFwk.APICacher(), pod, &v1.PodCondition{
 		Type:               v1.PodScheduled,
 		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(&pod.Status, pod.Generation, v1.PodScheduled),

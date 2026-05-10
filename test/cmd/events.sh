@@ -83,6 +83,7 @@ run_kubectl_events_tests() {
 }
 __EOF__
 
+    kubectl wait --timeout=2s --for=condition=Established=true crd/cronjobs.example.com
     ### Create a example.com/v1 Cronjob in a specific namespace
     kubectl create -f - << __EOF__
 {
