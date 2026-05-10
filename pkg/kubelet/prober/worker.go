@@ -100,10 +100,10 @@ func (p *probeAttributes) setHttpRequestHodler(httpHolder *httpProbeRequestHolde
 // httpProbeRequestHolder caches the http.Request object to minimize allocations during repeated probes.
 // It invalidates the cache if the Pod's IP address changes.
 type httpProbeRequestHolder struct {
-	httpGet   *v1.HTTPGetAction
-	container *v1.Container
-	podIP     string
-	request   *http.Request
+	httpGet     *v1.HTTPGetAction
+	container   *v1.Container
+	podIP       string
+	requestRoot *http.Request
 }
 
 // isInitContainer checks if the worker's container is in the pod's init containers
@@ -127,27 +127,30 @@ func (w *worker) initHttpProbeHolder(container *v1.Container) {
 
 // getRequest returns a cached http.Request or creates a new one if the Pod IP has changed
 // or if the request hasn't been initialized yet.
-func (h *httpProbeRequestHolder) getRequest(currentPodIP string) (*http.Request, error) {
+func (h *httpProbeRequestHolder) getRequest(ctx context.Context, currentPodIP string) (*http.Request, error) {
 
 	if h.podIP != currentPodIP {
 		h.podIP = currentPodIP
 		h.reset()
 	}
 
-	if h.request == nil {
+	if h.requestRoot == nil {
+		// New request data (immutable in future pipeline)
 		req, err := httprobe.NewRequestForHTTPGetAction(h.httpGet, h.container, h.podIP, "probe")
 		if err != nil {
 			return nil, err
 		}
-		h.request = req
+		h.requestRoot = req
 	}
 
-	return h.request, nil
+	// Fork root request
+	// Guaranteed shallow-copy with new Context
+	return h.requestRoot.WithContext(ctx), nil
 }
 
 // reset clears the cached request, forcing a re-initialization on the next probe cycle.
 func (h *httpProbeRequestHolder) reset() {
-	h.request = nil
+	h.requestRoot = nil
 }
 
 // Creates and starts a new probe worker.

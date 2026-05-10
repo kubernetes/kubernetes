@@ -165,7 +165,7 @@ func (pb *prober) runProbe(ctx context.Context, probeType probeType, p *v1.Probe
 		if attr.HttpRequestCacheHolder == nil {
 			req, err = httpprobe.NewRequestForHTTPGetAction(p.HTTPGet, &container, status.PodIP, "probe")
 		} else {
-			req, err = attr.HttpRequestCacheHolder.getRequest(pod.Status.PodIP)
+			req, err = attr.HttpRequestCacheHolder.getRequest(ctx, pod.Status.PodIP)
 
 			if err != nil {
 				logger.V(4).Info("HTTP-Probe failed to get cached request", "error", err)
