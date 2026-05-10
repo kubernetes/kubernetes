@@ -190,6 +190,7 @@ func configureHTTP2Transport(t *http.Transport) error {
 	// https://github.com/kubernetes/kubernetes/issues/87615.
 	t2.ReadIdleTimeout = time.Duration(readIdleTimeoutSeconds()) * time.Second
 	t2.PingTimeout = time.Duration(pingTimeoutSeconds()) * time.Second
+	t2.MaxReadFrameSize = 16777215
 	return nil
 }
 
