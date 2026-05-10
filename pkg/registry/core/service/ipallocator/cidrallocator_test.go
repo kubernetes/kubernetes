@@ -545,7 +545,7 @@ func TestCIDRAllocateDualWrite(t *testing.T) {
 	}
 }
 
-func TestCIDRAllocateDualWriteCollision(t *testing.T) {
+func TestCIDRAllocateDualWriteInconsistentBitmap(t *testing.T) {
 	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DisableAllocatorDualWrite, false)
 	r, err := newTestMetaAllocator()
@@ -564,7 +564,6 @@ func TestCIDRAllocateDualWriteCollision(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.enqueueServiceCIDR(cidr)
-	// wait for the cidr to be processed and set the informer synced
 	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
 		allocator, err := r.getAllocator(netutils.ParseIPSloppy("192.168.0.1"), true)
 		if err != nil {
@@ -578,7 +577,6 @@ func TestCIDRAllocateDualWriteCollision(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create a bitmap allocator that will mirror the ip allocator
 	_, ipnet, err := netutils.ParseCIDRSloppy(cidr.Spec.CIDRs[0])
 	if err != nil {
 		t.Fatalf("unexpected failure: %v", err)
@@ -589,15 +587,128 @@ func TestCIDRAllocateDualWriteCollision(t *testing.T) {
 	}
 	r.bitmapAllocator = bitmapAllocator
 
-	// preallocate one IP in the bitmap allocator
 	err = bitmapAllocator.Allocate(netutils.ParseIPSloppy("192.168.0.5"))
 	if err != nil {
 		t.Fatalf("unexpected error allocating an IP on the bitmap allocator: %v", err)
 	}
-	// the ipallocator must not be able to allocate
+
 	err = r.Allocate(netutils.ParseIPSloppy("192.168.0.5"))
+	if err != nil {
+		t.Fatalf("expected allocation to succeed with inconsistent bitmap, got: %v", err)
+	}
+}
+
+func TestCIDRAllocateDualWriteNewSystemCollision(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DisableAllocatorDualWrite, false)
+	r, err := newTestMetaAllocator()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Destroy()
+
+	if f := r.Free(); f != 0 {
+		t.Errorf("free: %d", f)
+	}
+
+	cidr := newServiceCIDR("test", "192.168.0.0/28")
+	_, err = r.client.ServiceCIDRs().Create(context.Background(), cidr, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.enqueueServiceCIDR(cidr)
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+		allocator, err := r.getAllocator(netutils.ParseIPSloppy("192.168.0.1"), true)
+		if err != nil {
+			t.Logf("unexpected error %v", err)
+			return false, nil
+		}
+		allocator.ipAddressSynced = func() bool { return true }
+		return allocator.ready.Load(), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, ipnet, err := netutils.ParseCIDRSloppy(cidr.Spec.CIDRs[0])
+	if err != nil {
+		t.Fatalf("unexpected failure: %v", err)
+	}
+	bitmapAllocator, err := NewInMemory(ipnet)
+	if err != nil {
+		t.Fatalf("unexpected failure: %v", err)
+	}
+	r.bitmapAllocator = bitmapAllocator
+
+	err = r.Allocate(netutils.ParseIPSloppy("192.168.0.6"))
+	if err != nil {
+		t.Fatalf("first allocation failed: %v", err)
+	}
+
+	err = r.Allocate(netutils.ParseIPSloppy("192.168.0.6"))
 	if err == nil {
-		t.Fatalf("unexpected allocation: %v", err)
+		t.Fatalf("expected second allocation to fail because IP already exists in new system")
+	}
+	if !errors.Is(err, ErrAllocated) {
+		t.Fatalf("expected ErrAllocated, got: %v", err)
+	}
+}
+
+func TestCIDRAllocateDualWriteBothSystemsConsistent(t *testing.T) {
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DisableAllocatorDualWrite, false)
+	r, err := newTestMetaAllocator()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Destroy()
+
+	if f := r.Free(); f != 0 {
+		t.Errorf("free: %d", f)
+	}
+
+	cidr := newServiceCIDR("test", "192.168.0.0/28")
+	_, err = r.client.ServiceCIDRs().Create(context.Background(), cidr, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.enqueueServiceCIDR(cidr)
+	err = wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+		allocator, err := r.getAllocator(netutils.ParseIPSloppy("192.168.0.1"), true)
+		if err != nil {
+			t.Logf("unexpected error %v", err)
+			return false, nil
+		}
+		allocator.ipAddressSynced = func() bool { return true }
+		return allocator.ready.Load(), nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, ipnet, err := netutils.ParseCIDRSloppy(cidr.Spec.CIDRs[0])
+	if err != nil {
+		t.Fatalf("unexpected failure: %v", err)
+	}
+	bitmapAllocator, err := NewInMemory(ipnet)
+	if err != nil {
+		t.Fatalf("unexpected failure: %v", err)
+	}
+	r.bitmapAllocator = bitmapAllocator
+
+	testIP := netutils.ParseIPSloppy("192.168.0.10")
+
+	if bitmapAllocator.Has(testIP) {
+		t.Fatalf("bitmap should not have IP before allocation")
+	}
+
+	err = r.Allocate(testIP)
+	if err != nil {
+		t.Fatalf("allocation failed: %v", err)
+	}
+
+	if !bitmapAllocator.Has(testIP) {
+		t.Fatalf("bitmap should have IP after successful allocation")
 	}
 }
 
