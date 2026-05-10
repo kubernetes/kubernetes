@@ -17,6 +17,7 @@ limitations under the License.
 package flowschema
 
 import (
+	flowschema2 "k8s.io/kubernetes/pkg/registry/flowcontrol/flowschema"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,8 +26,6 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 )
-
-var apiVersions = []string{"v1", "v1beta3", "v1beta2", "v1beta1"}
 
 func TestDeclarativeValidate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
@@ -61,7 +60,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
-			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy, tc.expectedErrs)
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, flowschema2.Strategy, tc.expectedErrs)
 		})
 	}
 }
@@ -102,7 +101,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				IsResourceRequest: true,
 				Verb:              "update",
 			})
-			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, Strategy, tc.expectedErrs)
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, flowschema2.Strategy, tc.expectedErrs)
 		})
 	}
 }
