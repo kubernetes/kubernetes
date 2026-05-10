@@ -89,6 +89,12 @@ type KubeProxyNFTablesConfiguration struct {
 	// masqueradeBit is the bit of the iptables fwmark space to use for SNAT if using
 	// the nftables proxy mode. Values must be within the range [0, 31].
 	MasqueradeBit *int32
+	// snatNodeInternalIP, if true, tells kube-proxy to SNAT service traffic using the
+	// node's InternalIP instead of the egress interface address. This ensures service
+	// traffic is recognized by NetworkPolicy rules that check for node identity.
+	// WARNING: This is an opt-in behavior that changes how SNAT works. Enable only if
+	// your cluster requires service traffic to be SNATed with the node's InternalIP.
+	SNATNodeInternalIP *bool
 }
 
 // KubeProxyConntrackConfiguration contains conntrack settings for
