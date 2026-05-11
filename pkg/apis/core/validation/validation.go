@@ -53,10 +53,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilsysctl "k8s.io/component-helpers/node/util/sysctl"
-	resourcehelper "k8s.io/component-helpers/resource"
 	schedulinghelper "k8s.io/component-helpers/scheduling/corev1"
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	"k8s.io/kubernetes/pkg/apis/certificates"
+	resourcehelper "k8s.io/kubernetes/pkg/apis/core/helper/resource"
 
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -4773,34 +4773,21 @@ func validatePodResources(spec *core.PodSpec, podClaimNames sets.Set[string], fl
 func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	// Convert the *core.PodSpec to *v1.PodSpec to satisfy the call to
-	// resourcehelper.PodRequests method, in the subsequent lines,
-	// which requires a *v1.Pod object (containing a *v1.PodSpec).
-	v1PodSpec := &v1.PodSpec{}
-	// TODO(ndixita): Convert_core_PodSpec_To_v1_PodSpec is risky. Add a copy of
-	// AggregateContainerRequests against internal core.Pod type for beta release of
-	// PodLevelResources feature.
-	if err := corev1.Convert_core_PodSpec_To_v1_PodSpec(spec, v1PodSpec, nil); err != nil {
-		allErrs = append(allErrs, field.InternalError(fldPath, fmt.Errorf("invalid %q: %v", fldPath, err.Error())))
-	}
-
 	reqPath := fldPath.Child("requests")
 	// resourcehelper.AggregateContainerRequests method requires a Pod object to
 	// calculate the total requests requirements of a pod. Hence a Pod object using
-	// v1PodSpec i.e. (&v1.Pod{Spec: *v1PodSpec}, is created on the fly, and passed
-	// to the AggregateContainerRequests method to facilitate proper resource
-	// calculation without modifying AggregateContainerRequests method.
-	aggrContainerReqs := resourcehelper.AggregateContainerRequests(&v1.Pod{Spec: *v1PodSpec}, resourcehelper.PodResourcesOptions{})
+	// spec is created on the fly, and passed to the AggregateContainerRequests method.
+	aggrContainerReqs := resourcehelper.AggregateContainerRequests(&core.Pod{Spec: *spec}, resourcehelper.PodResourcesOptions{})
 
 	// Pod-level requests must be >= aggregate requests of all containers in a pod.
 	for resourceName, ctrReqs := range aggrContainerReqs {
 		// Skip if the pod-level request of the resource is not set.
-		podSpecRequests, exists := spec.Resources.Requests[core.ResourceName(resourceName.String())]
+		podSpecRequests, exists := spec.Resources.Requests[resourceName]
 		if !exists {
 			continue
 		}
 
-		fldPath := reqPath.Key(resourceName.String())
+		fldPath := reqPath.Key(string(resourceName))
 		if ctrReqs.Cmp(podSpecRequests) > 0 {
 			allErrs = append(allErrs, field.Invalid(fldPath, podSpecRequests.String(), fmt.Sprintf("must be greater than or equal to aggregate container requests of %s", ctrReqs.String())))
 		}
@@ -4813,13 +4800,13 @@ func validatePodResourceConsistency(spec *core.PodSpec, fldPath *field.Path) fie
 	// This is also why hugepages overcommitment is not allowed in pod level resources,
 	// the pod cgroup values must reflect the request/limit set at pod level, and the
 	// container level cgroup values must be within that limit.
-	aggrContainerLims := resourcehelper.AggregateContainerLimits(&v1.Pod{Spec: *v1PodSpec}, resourcehelper.PodResourcesOptions{})
+	aggrContainerLims := resourcehelper.AggregateContainerLimits(&core.Pod{Spec: *spec}, resourcehelper.PodResourcesOptions{})
 	for resourceName, ctrLims := range aggrContainerLims {
-		if !helper.IsHugePageResourceName(core.ResourceName(resourceName)) {
+		if !helper.IsHugePageResourceName(resourceName) {
 			continue
 		}
 
-		podSpecLimits, hasLimit := spec.Resources.Limits[core.ResourceName(resourceName)]
+		podSpecLimits, hasLimit := spec.Resources.Limits[resourceName]
 		if !hasLimit {
 			continue
 		}
@@ -6333,14 +6320,9 @@ func ValidatePodResize(newPod, oldPod *core.Pod, opts PodValidationOptions) fiel
 	// Part 2: Validate that changes between pod-level resources in oldPod.Spec.Resources and
 	// newPod.Spec.Resources are allowed.
 
-	isPodLevelResourcesSet := func(pod *core.Pod) bool {
-		return pod.Spec.Resources != nil &&
-			(len(pod.Spec.Resources.Requests)+len(pod.Spec.Resources.Limits) > 0)
-	}
-
 	newPodSpecCopy := *newPod.Spec.DeepCopy()
 
-	if isPodLevelResourcesSet(oldPod) || isPodLevelResourcesSet(newPod) {
+	if resourcehelper.IsPodLevelResourcesSet(oldPod) || resourcehelper.IsPodLevelResourcesSet(newPod) {
 		// pods with pod-level resources cannot be resized without
 		// InPlacePodLevelResourcesVerticalScaling feature gate being enabled.
 		if !opts.InPlacePodLevelResourcesVerticalScalingEnabled {
@@ -7569,7 +7551,7 @@ func validatePodResourceName(resourceName core.ResourceName, fldPath *field.Path
 		return allErrs
 	}
 
-	if !resourcehelper.IsSupportedPodLevelResource(v1.ResourceName(resourceName)) {
+	if !resourcehelper.IsSupportedPodLevelResource(resourceName) {
 		return append(allErrs, field.NotSupported(fldPath, resourceName, sets.List(resourcehelper.SupportedPodLevelResources())))
 	}
 

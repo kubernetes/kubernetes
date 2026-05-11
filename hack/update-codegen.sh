@@ -899,6 +899,11 @@ function indent() {
     done
 }
 
+function codegen::internal_helpers() {
+    kube::log::status "Generating helpers for internal types"
+    "${KUBE_ROOT}/hack/update-internal-helpers.sh"
+}
+
 function codegen::subprojects() {
     # Call generation on sub-projects.
     local subs=(

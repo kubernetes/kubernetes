@@ -3170,6 +3170,16 @@ const (
 	AllContainersRestarting PodConditionType = "AllContainersRestarting"
 )
 
+const (
+	// PodReasonDeferred reason in PodResizePending pod condition indicates the proposed resize is feasible in
+	// theory (it fits on this node) but is not possible right now.
+	PodReasonDeferred = "Deferred"
+
+	// PodReasonInfeasible reason in PodResizePending pod condition indicates the proposed resize is not
+	// feasible and is rejected; it may not be re-evaluated
+	PodReasonInfeasible = "Infeasible"
+)
+
 // PodCondition represents pod's condition
 type PodCondition struct {
 	Type PodConditionType
