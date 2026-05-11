@@ -1429,7 +1429,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleStat
 	defer cancel()
 	errCh := parallelize.NewResultChannel[error]()
 
-	if l := klog.FromContext(ctx); l.V(4).Enabled() {
+	if l := klog.FromContext(ctx).V(4); l.Enabled() {
 		ctx = klog.NewContext(ctx, klog.LoggerWithName(l, "Score"))
 	}
 	// Run Score method for each node in parallel.
@@ -1437,7 +1437,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleStat
 		nodeInfo := nodes[index]
 		nodeName := nodeInfo.Node().Name
 		nodeCtx := ctx
-		if l := klog.FromContext(nodeCtx); l.V(4).Enabled() {
+		if l := klog.FromContext(nodeCtx).V(4); l.Enabled() {
 			nodeCtx = klog.NewContext(nodeCtx,
 				klog.LoggerWithValues(l, "node", klog.ObjectRef{Name: nodeName}),
 			)
@@ -1482,7 +1482,7 @@ func (f *frameworkImpl) runRawScorePlugins(ctx context.Context, state fwk.CycleS
 	scores := make([]fwk.PluginScore, 0, len(plugins))
 	for _, pl := range plugins {
 		plCtx := ctx
-		if l := klog.FromContext(ctx); l.V(4).Enabled() {
+		if l := klog.FromContext(ctx).V(4); l.Enabled() {
 			plCtx = klog.NewContext(ctx, klog.LoggerWithName(l, pl.Name()))
 		}
 		score, status := f.runScorePlugin(plCtx, pl, state, pod, nodeInfo)
@@ -1561,9 +1561,9 @@ func (f *frameworkImpl) normalizeScores(ctx context.Context, state fwk.CycleStat
 		for i, pl := range plugins {
 			score := nodeScoreLists[i][index].Score
 
-			if score > fwk.MaxNodeScore || score < fwk.MinNodeScore {
+			if score > fwk.MaxScore || score < fwk.MinScore {
 				err := fmt.Errorf("plugin %q returns an invalid score %v, it should in the range of [%v, %v] after normalizing",
-					pl.Name(), score, fwk.MinNodeScore, fwk.MaxNodeScore)
+					pl.Name(), score, fwk.MinScore, fwk.MaxScore)
 				errCh.SendWithCancel(err, cancel)
 				return
 			}
