@@ -80,6 +80,7 @@ fi
 # These ideally run in less than 10s.
 QUICK_PATTERNS+=(
   "verify-api-groups.sh"
+  "verify-apigo.sh"
   "verify-boilerplate.sh"
   "verify-external-dependencies-version.sh"
   "verify-featuregates.sh"

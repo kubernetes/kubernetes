@@ -1,0 +1,12 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+options:
+  no_parent_owners: true
+approvers:
+  - aojea
+  - liggitt
+  - sig-api-machinery-approvers
+reviewers:
+  - aojea
+  - liggitt
+  - sig-api-machinery-reviewers

@@ -1,0 +1,505 @@
+
+# AUTO-GENERATED EXCEPTIONS FROM BOOTSTRAP
+# PR: Historical API Cleanups
+# MIGRATION: These APIs were removed in prior releases.
+pkg k8s.io/apimachinery/pkg/api/apitesting/fuzzer, func FuzzerFor(funcs FuzzerFuncs, src math/rand.Source, codecs k8s.io/apimachinery/pkg/runtime/serializer.CodecFactory) *github.com/google/gofuzz.Fuzzer
+pkg k8s.io/apimachinery/pkg/api/apitesting/roundtrip, func RoundTripExternalTypes(t *testing.T, scheme *k8s.io/apimachinery/pkg/runtime.Scheme, codecFactory k8s.io/apimachinery/pkg/runtime/serializer.CodecFactory, fuzzer *github.com/google/gofuzz.Fuzzer, nonRoundTrippableTypes map[k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind]bool)
+pkg k8s.io/apimachinery/pkg/api/apitesting/roundtrip, func RoundTripExternalTypesWithoutProtobuf(t *testing.T, scheme *k8s.io/apimachinery/pkg/runtime.Scheme, codecFactory k8s.io/apimachinery/pkg/runtime/serializer.CodecFactory, fuzzer *github.com/google/gofuzz.Fuzzer, nonRoundTrippableTypes map[k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind]bool)
+pkg k8s.io/apimachinery/pkg/api/apitesting/roundtrip, func RoundTripSpecificKind(t *testing.T, gvk k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind, scheme *k8s.io/apimachinery/pkg/runtime.Scheme, codecFactory k8s.io/apimachinery/pkg/runtime/serializer.CodecFactory, fuzzer *github.com/google/gofuzz.Fuzzer, nonRoundTrippableTypes map[k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind]bool)
+pkg k8s.io/apimachinery/pkg/api/apitesting/roundtrip, func RoundTripSpecificKindWithoutProtobuf(t *testing.T, gvk k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind, scheme *k8s.io/apimachinery/pkg/runtime.Scheme, codecFactory k8s.io/apimachinery/pkg/runtime/serializer.CodecFactory, fuzzer *github.com/google/gofuzz.Fuzzer, nonRoundTrippableTypes map[k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind]bool)
+pkg k8s.io/apimachinery/pkg/api/apitesting/roundtrip, func RoundTripTypes(t *testing.T, scheme *k8s.io/apimachinery/pkg/runtime.Scheme, codecFactory k8s.io/apimachinery/pkg/runtime/serializer.CodecFactory, fuzzer *github.com/google/gofuzz.Fuzzer, nonRoundTrippableTypes map[k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind]bool)
+pkg k8s.io/apimachinery/pkg/api/apitesting/roundtrip, func RoundTripTypesWithoutProtobuf(t *testing.T, scheme *k8s.io/apimachinery/pkg/runtime.Scheme, codecFactory k8s.io/apimachinery/pkg/runtime/serializer.CodecFactory, fuzzer *github.com/google/gofuzz.Fuzzer, nonRoundTrippableTypes map[k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind]bool)
+pkg k8s.io/apimachinery/pkg/api/apitesting/roundtrip, func RoundtripToUnstructured(t *testing.T, scheme *k8s.io/apimachinery/pkg/runtime.Scheme, funcs k8s.io/apimachinery/pkg/api/apitesting/fuzzer.FuzzerFuncs, skipped k8s.io/apimachinery/pkg/util/sets.Set[k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind])
+pkg k8s.io/apimachinery/pkg/api/operation, type Operation struct{Type Type; Options k8s.io/apimachinery/pkg/util/sets.Set[string]}
+pkg k8s.io/apimachinery/pkg/api/resource, method (Quantity) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/api/resource, method (Quantity) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/api/resource, method (Quantity) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/api/resource, method (Quantity) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/api/resource, method (Quantity) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/api/resource, method (Quantity) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/api/resource, method (Quantity) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/api/resource, method (QuantityValue) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/api/resource, method (QuantityValue) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/api/resource, method (QuantityValue) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/api/resource, method (QuantityValue) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/api/resource, method (QuantityValue) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/api/resource, method (QuantityValue) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/api/resource, method (QuantityValue) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/api/validate, func EachMapVal[K ~string, V any](ctx context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, newMap map[K]V, oldMap map[K]V, validator ValidateFunc[*V]) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func EachSliceVal[T any](ctx context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, newSlice []T, oldSlice []T, cmp CompareFunc[T], validator ValidateFunc[*T]) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func Enum[T ~string](_ context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, _ *T, symbols k8s.io/apimachinery/pkg/util/sets.Set[T]) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func ImmutableByCompare[T comparable](_ context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, oldValue *T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func ImmutableByReflect[T any](_ context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value T, oldValue T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func ImmutableNonComparable[T any](_ context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value T, oldValue T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func Immutable[T comparable](_ context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, oldValue *T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func NewDiscriminatedUnionMembership(discriminatorFieldName string, members ...[2]string) *UnionMembership
+pkg k8s.io/apimachinery/pkg/api/validate, func NewUnionMembership(member ...[2]string) *UnionMembership
+pkg k8s.io/apimachinery/pkg/api/validate, func Subfield[Tstruct, Tfield any](ctx context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, newStruct *Tstruct, oldStruct *Tstruct, fldName string, getField GetFieldFunc[Tstruct, Tfield], validator ValidateFunc[Tfield]) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, type CompareFunc func(T, T) bool
+pkg k8s.io/apimachinery/pkg/api/validate, type UnionMembership struct{discriminatorName string; members []member}
+pkg k8s.io/apimachinery/pkg/api/validation/path, func IsValidPathSegmentName(name string) []string
+pkg k8s.io/apimachinery/pkg/api/validation/path, func IsValidPathSegmentPrefix(name string) []string
+pkg k8s.io/apimachinery/pkg/api/validation/path, var NameMayNotBe []string
+pkg k8s.io/apimachinery/pkg/api/validation/path, var NameMayNotContain []string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, const InitialEventsListBlueprintAnnotationKey untyped string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIGroup) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIGroup) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIGroup) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIGroup) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIGroup) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIGroup) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIGroup) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIGroupList) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIGroupList) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIGroupList) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIGroupList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIGroupList) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIGroupList) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIGroupList) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIResource) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIResource) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIResource) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIResource) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIResource) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIResource) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIResource) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIResourceList) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIResourceList) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIResourceList) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIResourceList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIResourceList) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIResourceList) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIResourceList) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIVersions) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIVersions) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIVersions) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIVersions) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIVersions) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIVersions) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (APIVersions) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ApplyOptions) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ApplyOptions) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ApplyOptions) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ApplyOptions) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ApplyOptions) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ApplyOptions) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ApplyOptions) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Condition) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Condition) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Condition) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Condition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Condition) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Condition) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Condition) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (CreateOptions) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (CreateOptions) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (CreateOptions) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (CreateOptions) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (CreateOptions) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (CreateOptions) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (CreateOptions) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (DeleteOptions) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (DeleteOptions) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (DeleteOptions) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (DeleteOptions) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (DeleteOptions) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (DeleteOptions) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (DeleteOptions) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Duration) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Duration) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Duration) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Duration) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Duration) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Duration) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Duration) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldSelectorRequirement) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldSelectorRequirement) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldSelectorRequirement) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldSelectorRequirement) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldSelectorRequirement) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldSelectorRequirement) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldSelectorRequirement) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldsV1) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldsV1) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldsV1) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldsV1) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldsV1) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldsV1) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldsV1) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GetOptions) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GetOptions) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GetOptions) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GetOptions) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GetOptions) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GetOptions) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GetOptions) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupKind) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupKind) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupKind) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupKind) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupKind) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupKind) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupKind) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupResource) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupResource) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupResource) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupResource) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupResource) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupResource) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupResource) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersion) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersion) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersion) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersion) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersion) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersion) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersion) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersionForDiscovery) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersionForDiscovery) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersionForDiscovery) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersionForDiscovery) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersionForDiscovery) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersionForDiscovery) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersionForDiscovery) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersionKind) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersionKind) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersionKind) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersionKind) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersionKind) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersionKind) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersionKind) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersionResource) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersionResource) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersionResource) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersionResource) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersionResource) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersionResource) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (GroupVersionResource) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (LabelSelector) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (LabelSelector) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (LabelSelector) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (LabelSelector) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (LabelSelector) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (LabelSelector) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (LabelSelector) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (LabelSelectorRequirement) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (LabelSelectorRequirement) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (LabelSelectorRequirement) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (LabelSelectorRequirement) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (LabelSelectorRequirement) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (LabelSelectorRequirement) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (LabelSelectorRequirement) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (List) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (List) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (List) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (List) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (List) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (List) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (List) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ListMeta) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ListMeta) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ListMeta) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ListMeta) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ListMeta) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ListMeta) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ListMeta) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ListOptions) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ListOptions) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ListOptions) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ListOptions) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ListOptions) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ListOptions) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ListOptions) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ManagedFieldsEntry) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ManagedFieldsEntry) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ManagedFieldsEntry) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ManagedFieldsEntry) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ManagedFieldsEntry) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ManagedFieldsEntry) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ManagedFieldsEntry) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (MicroTime) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (MicroTime) Fuzz(c github.com/google/gofuzz.Continue)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (MicroTime) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (MicroTime) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (MicroTime) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (MicroTime) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (MicroTime) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (MicroTime) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ObjectMeta) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ObjectMeta) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ObjectMeta) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ObjectMeta) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ObjectMeta) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ObjectMeta) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ObjectMeta) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (OwnerReference) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (OwnerReference) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (OwnerReference) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (OwnerReference) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (OwnerReference) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (OwnerReference) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (OwnerReference) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (PartialObjectMetadata) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (PartialObjectMetadata) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (PartialObjectMetadata) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (PartialObjectMetadata) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (PartialObjectMetadata) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (PartialObjectMetadata) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (PartialObjectMetadata) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (PartialObjectMetadataList) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (PartialObjectMetadataList) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (PartialObjectMetadataList) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (PartialObjectMetadataList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (PartialObjectMetadataList) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (PartialObjectMetadataList) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (PartialObjectMetadataList) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Patch) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Patch) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Patch) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Patch) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Patch) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Patch) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Patch) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (PatchOptions) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (PatchOptions) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (PatchOptions) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (PatchOptions) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (PatchOptions) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (PatchOptions) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (PatchOptions) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Preconditions) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Preconditions) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Preconditions) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Preconditions) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Preconditions) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Preconditions) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Preconditions) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (RootPaths) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (RootPaths) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (RootPaths) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (RootPaths) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (RootPaths) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (RootPaths) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (RootPaths) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ServerAddressByClientCIDR) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ServerAddressByClientCIDR) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ServerAddressByClientCIDR) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ServerAddressByClientCIDR) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ServerAddressByClientCIDR) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ServerAddressByClientCIDR) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (ServerAddressByClientCIDR) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Status) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Status) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Status) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Status) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Status) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Status) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Status) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (StatusCause) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (StatusCause) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (StatusCause) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (StatusCause) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (StatusCause) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (StatusCause) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (StatusCause) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (StatusDetails) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (StatusDetails) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (StatusDetails) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (StatusDetails) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (StatusDetails) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (StatusDetails) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (StatusDetails) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (TableOptions) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (TableOptions) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (TableOptions) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (TableOptions) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (TableOptions) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (TableOptions) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (TableOptions) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Time) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Time) Fuzz(c github.com/google/gofuzz.Continue)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Time) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Time) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Time) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Time) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Time) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Time) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Timestamp) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Timestamp) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Timestamp) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Timestamp) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Timestamp) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Timestamp) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Timestamp) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (TypeMeta) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (TypeMeta) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (TypeMeta) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (TypeMeta) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (TypeMeta) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (TypeMeta) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (TypeMeta) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (UpdateOptions) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (UpdateOptions) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (UpdateOptions) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (UpdateOptions) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (UpdateOptions) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (UpdateOptions) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (UpdateOptions) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Verbs) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Verbs) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Verbs) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Verbs) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Verbs) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Verbs) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Verbs) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (WatchEvent) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (WatchEvent) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (WatchEvent) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (WatchEvent) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (WatchEvent) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (WatchEvent) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (WatchEvent) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, type DeleteOptions struct{TypeMeta "json:\",inline\""; GracePeriodSeconds *int64 "json:\"gracePeriodSeconds,omitempty\" protobuf:\"varint,1,opt,name=gracePeriodSeconds\""; Preconditions *Preconditions "json:\"preconditions,omitempty\" protobuf:\"bytes,2,opt,name=preconditions\""; OrphanDependents *bool "json:\"orphanDependents,omitempty\" protobuf:\"varint,3,opt,name=orphanDependents\""; PropagationPolicy *DeletionPropagation "json:\"propagationPolicy,omitempty\" protobuf:\"varint,4,opt,name=propagationPolicy\""; DryRun []string "json:\"dryRun,omitempty\" protobuf:\"bytes,5,rep,name=dryRun\""}
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, type ObjectMeta struct{Name string "json:\"name,omitempty\" protobuf:\"bytes,1,opt,name=name\""; GenerateName string "json:\"generateName,omitempty\" protobuf:\"bytes,2,opt,name=generateName\""; Namespace string "json:\"namespace,omitempty\" protobuf:\"bytes,3,opt,name=namespace\""; SelfLink string "json:\"selfLink,omitempty\" protobuf:\"bytes,4,opt,name=selfLink\""; UID k8s.io/apimachinery/pkg/types.UID "json:\"uid,omitempty\" protobuf:\"bytes,5,opt,name=uid,casttype=k8s.io/kubernetes/pkg/types.UID\""; ResourceVersion string "json:\"resourceVersion,omitempty\" protobuf:\"bytes,6,opt,name=resourceVersion\""; Generation int64 "json:\"generation,omitempty\" protobuf:\"varint,7,opt,name=generation\""; CreationTimestamp Time "json:\"creationTimestamp,omitempty\" protobuf:\"bytes,8,opt,name=creationTimestamp\""; DeletionTimestamp *Time "json:\"deletionTimestamp,omitempty\" protobuf:\"bytes,9,opt,name=deletionTimestamp\""; DeletionGracePeriodSeconds *int64 "json:\"deletionGracePeriodSeconds,omitempty\" protobuf:\"varint,10,opt,name=deletionGracePeriodSeconds\""; Labels map[string]string "json:\"labels,omitempty\" protobuf:\"bytes,11,rep,name=labels\""; Annotations map[string]string "json:\"annotations,omitempty\" protobuf:\"bytes,12,rep,name=annotations\""; OwnerReferences []OwnerReference "json:\"ownerReferences,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"uid\" protobuf:\"bytes,13,rep,name=ownerReferences\""; Finalizers []string "json:\"finalizers,omitempty\" patchStrategy:\"merge\" protobuf:\"bytes,14,rep,name=finalizers\""; ManagedFields []ManagedFieldsEntry "json:\"managedFields,omitempty\" protobuf:\"bytes,17,rep,name=managedFields\""}
+pkg k8s.io/apimachinery/pkg/apis/meta/v1/validation, type LabelSelectorValidationOptions struct{AllowInvalidLabelValueInSelector bool}
+pkg k8s.io/apimachinery/pkg/apis/meta/v1beta1, method (PartialObjectMetadataList) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1beta1, method (PartialObjectMetadataList) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1beta1, method (PartialObjectMetadataList) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1beta1, method (PartialObjectMetadataList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1beta1, method (PartialObjectMetadataList) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1beta1, method (PartialObjectMetadataList) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1beta1, method (PartialObjectMetadataList) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/testapigroup, type CarpStatus struct{Phase CarpPhase; Conditions []CarpCondition; Message string; Reason string; HostIP string; CarpIP string; StartTime *k8s.io/apimachinery/pkg/apis/meta/v1.Time}
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (Carp) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (Carp) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (Carp) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (Carp) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (Carp) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (Carp) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (Carp) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpCondition) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpCondition) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpCondition) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpCondition) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpCondition) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpCondition) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpCondition) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpInfo) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpInfo) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpInfo) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpInfo) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpInfo) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpInfo) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpInfo) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpList) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpList) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpList) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpList) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpList) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpList) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpList) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpSpec) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpSpec) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpSpec) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpSpec) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpSpec) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpSpec) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpStatus) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpStatus) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpStatus) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpStatus) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpStatus) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, method (CarpStatus) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, type CarpSpec struct{RestartPolicy RestartPolicy "json:\"restartPolicy,omitempty\" protobuf:\"bytes,3,opt,name=restartPolicy,casttype=RestartPolicy\""; TerminationGracePeriodSeconds *int64 "json:\"terminationGracePeriodSeconds,omitempty\" protobuf:\"varint,4,opt,name=terminationGracePeriodSeconds\""; ActiveDeadlineSeconds *int64 "json:\"activeDeadlineSeconds,omitempty\" protobuf:\"varint,5,opt,name=activeDeadlineSeconds\""; NodeSelector map[string]string "json:\"nodeSelector,omitempty\" protobuf:\"bytes,7,rep,name=nodeSelector\""; ServiceAccountName string "json:\"serviceAccountName,omitempty\" protobuf:\"bytes,8,opt,name=serviceAccountName\""; DeprecatedServiceAccount string "json:\"serviceAccount,omitempty\" protobuf:\"bytes,9,opt,name=serviceAccount\""; NodeName string "json:\"nodeName,omitempty\" protobuf:\"bytes,10,opt,name=nodeName\""; HostNetwork bool "json:\"hostNetwork,omitempty\" protobuf:\"varint,11,opt,name=hostNetwork\""; HostPID bool "json:\"hostPID,omitempty\" protobuf:\"varint,12,opt,name=hostPID\""; HostIPC bool "json:\"hostIPC,omitempty\" protobuf:\"varint,13,opt,name=hostIPC\""; Hostname string "json:\"hostname,omitempty\" protobuf:\"bytes,16,opt,name=hostname\""; Subdomain string "json:\"subdomain,omitempty\" protobuf:\"bytes,17,opt,name=subdomain\""; SchedulerName string "json:\"schedulername,omitempty\" protobuf:\"bytes,19,opt,name=schedulername\""}
+pkg k8s.io/apimachinery/pkg/apis/testapigroup/v1, type CarpStatus struct{Phase CarpPhase "json:\"phase,omitempty\" protobuf:\"bytes,1,opt,name=phase,casttype=CarpPhase\""; Conditions []CarpCondition "json:\"conditions,omitempty\" patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,2,rep,name=conditions\""; Message string "json:\"message,omitempty\" protobuf:\"bytes,3,opt,name=message\""; Reason string "json:\"reason,omitempty\" protobuf:\"bytes,4,opt,name=reason\""; HostIP string "json:\"hostIP,omitempty\" protobuf:\"bytes,5,opt,name=hostIP\""; CarpIP string "json:\"carpIP,omitempty\" protobuf:\"bytes,6,opt,name=carpIP\""; StartTime *k8s.io/apimachinery/pkg/apis/meta/v1.Time "json:\"startTime,omitempty\" protobuf:\"bytes,7,opt,name=startTime\""}
+pkg k8s.io/apimachinery/pkg/labels, type Labels interface{Get(label string) (value string); Has(label string) (exists bool)}
+pkg k8s.io/apimachinery/pkg/runtime, method (RawExtension) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/runtime, method (RawExtension) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/runtime, method (RawExtension) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/runtime, method (RawExtension) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/runtime, method (RawExtension) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/runtime, method (RawExtension) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/runtime, method (RawExtension) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/runtime, method (Scheme) AddValidationFunc(srcType Object, fn func(ctx context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, object interface{}, oldObject interface{}, subresources ...string) k8s.io/apimachinery/pkg/util/validation/field.ErrorList)
+pkg k8s.io/apimachinery/pkg/runtime, method (Scheme) Validate(ctx context.Context, options k8s.io/apimachinery/pkg/util/sets.Set[string], object Object, subresources ...string) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/runtime, method (Scheme) ValidateUpdate(ctx context.Context, options k8s.io/apimachinery/pkg/util/sets.Set[string], object Object, oldObject Object, subresources ...string) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/runtime, method (TypeMeta) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/runtime, method (TypeMeta) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/runtime, method (TypeMeta) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/runtime, method (TypeMeta) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/runtime, method (TypeMeta) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/runtime, method (TypeMeta) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/runtime, method (TypeMeta) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/runtime, method (Unknown) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/runtime, method (Unknown) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/runtime, method (Unknown) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/runtime, method (Unknown) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/runtime, method (Unknown) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/runtime, method (Unknown) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/runtime, method (Unknown) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/runtime, type ObjectVersioner interface{ConvertToVersion(in Object, gv GroupVersioner) (out Object, err error)}
+pkg k8s.io/apimachinery/pkg/runtime, type ProtobufMarshaller interface{MarshalTo(data []byte) (int, error)}
+pkg k8s.io/apimachinery/pkg/runtime, type ProtobufReverseMarshaller interface{MarshalToSizedBuffer(data []byte) (int, error)}
+pkg k8s.io/apimachinery/pkg/runtime, type Scheme struct{gvkToType map[k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind]reflect.Type; typeToGVK map[reflect.Type][]k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind; unversionedTypes map[reflect.Type]k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind; unversionedKinds map[string]reflect.Type; fieldLabelConversionFuncs map[k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind]FieldLabelConversionFunc; defaulterFuncs map[reflect.Type]func(interface{}); converter *k8s.io/apimachinery/pkg/conversion.Converter; versionPriority map[string][]string; observedVersions []k8s.io/apimachinery/pkg/runtime/schema.GroupVersion; schemeName string}
+pkg k8s.io/apimachinery/pkg/runtime, type Scheme struct{gvkToType map[k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind]reflect.Type; typeToGVK map[reflect.Type][]k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind; unversionedTypes map[reflect.Type]k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind; unversionedKinds map[string]reflect.Type; fieldLabelConversionFuncs map[k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind]FieldLabelConversionFunc; defaulterFuncs map[reflect.Type]func(interface{}); validationFuncs map[reflect.Type]func(ctx context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, object interface{}, oldObject interface{}, subresources ...string) k8s.io/apimachinery/pkg/util/validation/field.ErrorList; converter *k8s.io/apimachinery/pkg/conversion.Converter; versionPriority map[string][]string; observedVersions []k8s.io/apimachinery/pkg/runtime/schema.GroupVersion; schemeName string}
+pkg k8s.io/apimachinery/pkg/runtime/serializer, type CodecFactoryOptions struct{Strict bool; Pretty bool; serializers []func(k8s.io/apimachinery/pkg/runtime.ObjectCreater, k8s.io/apimachinery/pkg/runtime.ObjectTyper) k8s.io/apimachinery/pkg/runtime.SerializerInfo}
+pkg k8s.io/apimachinery/pkg/runtime/serializer, type CodecFactoryOptions struct{Strict bool; Pretty bool}
+pkg k8s.io/apimachinery/pkg/runtime/serializer/cbor, type Serializer interface{k8s.io/apimachinery/pkg/runtime.Serializer; k8s.io/apimachinery/pkg/runtime/serializer/recognizer.RecognizingDecoder}
+pkg k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct, func Marshal(src interface{}) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/runtime/serializer/cbor/direct, func Unmarshal(src []byte, dst interface{}) error
+pkg k8s.io/apimachinery/pkg/runtime/serializer/json, type SerializerOptions struct{Yaml bool; Pretty bool; Strict bool}
+pkg k8s.io/apimachinery/pkg/runtime/serializer/protobuf, type Serializer struct{prefix []byte; creater k8s.io/apimachinery/pkg/runtime.ObjectCreater; typer k8s.io/apimachinery/pkg/runtime.ObjectTyper}
+pkg k8s.io/apimachinery/pkg/runtime/testing, func RunStatusValidationForEachVersion(t *testing.T, scheme *k8s.io/apimachinery/pkg/runtime.Scheme, options k8s.io/apimachinery/pkg/util/sets.Set[string], unversioned k8s.io/apimachinery/pkg/runtime.Object, unversionedOld k8s.io/apimachinery/pkg/runtime.Object, fn VersionValidationRunner)
+pkg k8s.io/apimachinery/pkg/runtime/testing, func RunUpdateValidationForEachVersion(t *testing.T, scheme *k8s.io/apimachinery/pkg/runtime.Scheme, options []string, unversioned k8s.io/apimachinery/pkg/runtime.Object, unversionedOld k8s.io/apimachinery/pkg/runtime.Object, fn VersionValidationRunner, subresources ...string)
+pkg k8s.io/apimachinery/pkg/runtime/testing, func RunUpdateValidationForEachVersion(t *testing.T, scheme *k8s.io/apimachinery/pkg/runtime.Scheme, options k8s.io/apimachinery/pkg/util/sets.Set[string], unversioned k8s.io/apimachinery/pkg/runtime.Object, unversionedOld k8s.io/apimachinery/pkg/runtime.Object, fn VersionValidationRunner)
+pkg k8s.io/apimachinery/pkg/runtime/testing, func RunValidationForEachVersion(t *testing.T, scheme *k8s.io/apimachinery/pkg/runtime.Scheme, options []string, unversioned k8s.io/apimachinery/pkg/runtime.Object, fn VersionValidationRunner, subresources ...string)
+pkg k8s.io/apimachinery/pkg/runtime/testing, func RunValidationForEachVersion(t *testing.T, scheme *k8s.io/apimachinery/pkg/runtime.Scheme, options k8s.io/apimachinery/pkg/util/sets.Set[string], unversioned k8s.io/apimachinery/pkg/runtime.Object, fn VersionValidationRunner)
+pkg k8s.io/apimachinery/pkg/util/diff, func IgnoreUnset() github.com/google/go-cmp/cmp.Option
+pkg k8s.io/apimachinery/pkg/util/diff, func ObjectDiff(a interface{}, b interface{}) string
+pkg k8s.io/apimachinery/pkg/util/diff, func ObjectGoPrintDiff(a interface{}, b interface{}) string
+pkg k8s.io/apimachinery/pkg/util/diff, func ObjectReflectDiff(a interface{}, b interface{}) string
+pkg k8s.io/apimachinery/pkg/util/diff, func StringDiff(a string, b string) string
+pkg k8s.io/apimachinery/pkg/util/httpstream/wsstream, type Reader struct{err chan error; r io.Reader; ping bool; timeout time.Duration; protocols map[string]ReaderProtocolConfig; selectedProtocol string; handleCrash func(additionalHandlers ...func(interface{}))}
+pkg k8s.io/apimachinery/pkg/util/intstr, method (IntOrString) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/util/intstr, method (IntOrString) Fuzz(c github.com/google/gofuzz.Continue)
+pkg k8s.io/apimachinery/pkg/util/intstr, method (IntOrString) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/util/intstr, method (IntOrString) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/util/intstr, method (IntOrString) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/util/intstr, method (IntOrString) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/util/intstr, method (IntOrString) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/util/intstr, method (IntOrString) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/util/managedfields, func ExtractInto(object k8s.io/apimachinery/pkg/runtime.Object, objectType sigs.k8s.io/structured-merge-diff/v4/typed.ParseableType, fieldManager string, applyConfiguration interface{}, subresource string) error
+pkg k8s.io/apimachinery/pkg/util/managedfields, func NewDefaultCRDFieldManager(typeConverter TypeConverter, objectConverter k8s.io/apimachinery/pkg/runtime.ObjectConvertor, objectDefaulter k8s.io/apimachinery/pkg/runtime.ObjectDefaulter, objectCreater k8s.io/apimachinery/pkg/runtime.ObjectCreater, kind k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind, hub k8s.io/apimachinery/pkg/runtime/schema.GroupVersion, subresource string, resetFields map[sigs.k8s.io/structured-merge-diff/v4/fieldpath.APIVersion]*sigs.k8s.io/structured-merge-diff/v4/fieldpath.Set) (_ *FieldManager, err error)
+pkg k8s.io/apimachinery/pkg/util/managedfields, func NewDefaultCRDFieldManager(typeConverter TypeConverter, objectConverter k8s.io/apimachinery/pkg/runtime.ObjectConvertor, objectDefaulter k8s.io/apimachinery/pkg/runtime.ObjectDefaulter, objectCreater k8s.io/apimachinery/pkg/runtime.ObjectCreater, kind k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind, hub k8s.io/apimachinery/pkg/runtime/schema.GroupVersion, subresource string, resetFields map[sigs.k8s.io/structured-merge-diff/v4/fieldpath.APIVersion]sigs.k8s.io/structured-merge-diff/v4/fieldpath.Filter) (_ *FieldManager, err error)
+pkg k8s.io/apimachinery/pkg/util/managedfields, func NewDefaultFieldManager(typeConverter TypeConverter, objectConverter k8s.io/apimachinery/pkg/runtime.ObjectConvertor, objectDefaulter k8s.io/apimachinery/pkg/runtime.ObjectDefaulter, objectCreater k8s.io/apimachinery/pkg/runtime.ObjectCreater, kind k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind, hub k8s.io/apimachinery/pkg/runtime/schema.GroupVersion, subresource string, resetFields map[sigs.k8s.io/structured-merge-diff/v4/fieldpath.APIVersion]*sigs.k8s.io/structured-merge-diff/v4/fieldpath.Set) (*FieldManager, error)
+pkg k8s.io/apimachinery/pkg/util/managedfields, func NewDefaultFieldManager(typeConverter TypeConverter, objectConverter k8s.io/apimachinery/pkg/runtime.ObjectConvertor, objectDefaulter k8s.io/apimachinery/pkg/runtime.ObjectDefaulter, objectCreater k8s.io/apimachinery/pkg/runtime.ObjectCreater, kind k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind, hub k8s.io/apimachinery/pkg/runtime/schema.GroupVersion, subresource string, resetFields map[sigs.k8s.io/structured-merge-diff/v4/fieldpath.APIVersion]sigs.k8s.io/structured-merge-diff/v4/fieldpath.Filter) (*FieldManager, error)
+pkg k8s.io/apimachinery/pkg/util/managedfields, method (GvkParser) Type(gvk k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind) *sigs.k8s.io/structured-merge-diff/v4/typed.ParseableType
+pkg k8s.io/apimachinery/pkg/util/managedfields, type GvkParser struct{gvks map[k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind]string; parser sigs.k8s.io/structured-merge-diff/v4/typed.Parser}
+pkg k8s.io/apimachinery/pkg/util/managedfields, type ResourcePathMappings map[string]sigs.k8s.io/structured-merge-diff/v4/fieldpath.Path
+pkg k8s.io/apimachinery/pkg/util/managedfields, type TypeConverter interface{ObjectToTyped(k8s.io/apimachinery/pkg/runtime.Object, ...sigs.k8s.io/structured-merge-diff/v4/typed.ValidationOptions) (*sigs.k8s.io/structured-merge-diff/v4/typed.TypedValue, error); TypedToObject(*sigs.k8s.io/structured-merge-diff/v4/typed.TypedValue) (k8s.io/apimachinery/pkg/runtime.Object, error)}
+pkg k8s.io/apimachinery/pkg/util/net/testing, func NewHTTPProxyHandler(t TB, hook func(req *net/http.Request) bool) *HTTPProxyHandler
+pkg k8s.io/apimachinery/pkg/util/net/testing, type HTTPProxyHandler struct{handlerDone sync.WaitGroup; hook func(r *net/http.Request) bool; httpProxy net/http/httputil.ReverseProxy; t TB}
+pkg k8s.io/apimachinery/pkg/util/net/testing, type TB interface{Logf(format string, args ...any)}
+pkg k8s.io/apimachinery/pkg/util/runtime, var ErrorHandlers []func(error)
+pkg k8s.io/apimachinery/pkg/util/runtime, var PanicHandlers []func(interface{})
+pkg k8s.io/apimachinery/pkg/util/validation, func IsCIdentifier(value string) []string
+pkg k8s.io/apimachinery/pkg/util/validation, func IsQualifiedName(value string) []string
+pkg k8s.io/apimachinery/pkg/util/validation, func IsValidIPv4Address(fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value string) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/util/validation, func IsValidIPv6Address(fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value string) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/util/validation, func IsValidLabelValue(value string) []string
+pkg k8s.io/apimachinery/pkg/util/validation/field, func TooLong(field *Path, value interface{}, maxLength int) *Error
+pkg k8s.io/apimachinery/pkg/util/validation/field, type Error struct{Type ErrorType; Field string; BadValue interface{}; Detail string; Origin string; CoveredByDeclarative bool}
+pkg k8s.io/apimachinery/pkg/util/validation/field, type Error struct{Type ErrorType; Field string; BadValue interface{}; Detail string}
+pkg k8s.io/apimachinery/pkg/util/validation/field, type ErrorMatcher struct{matchType bool; matchField bool; matchValue bool; matchOrigin bool; matchDetail func(want string, got string) bool; requireOriginWhenInvalid bool; normalizationRules []NormalizationRule}
+pkg k8s.io/apimachinery/pkg/util/validation/field, type ErrorMatcher struct{matchType bool; matchField bool; matchValue bool; matchOrigin bool; matchDetail func(want string, got string) bool; requireOriginWhenInvalid bool}
+pkg k8s.io/apimachinery/pkg/util/validation/field, type TestIntf interface{Errorf(format string, args ...any); Helper(); Logf(format string, args ...any)}
+pkg k8s.io/apimachinery/pkg/util/version, type Version struct{components []uint; semver bool; preRelease string; buildMetadata string; info k8s.io/apimachinery/pkg/version.Info}
+pkg k8s.io/apimachinery/pkg/util/yaml, func GuessJSONStream(r io.Reader, size int) (io.Reader, []byte, bool)
+pkg k8s.io/apimachinery/pkg/util/yaml, type YAMLOrJSONDecoder struct{r io.Reader; bufferSize int; decoder decoder}
+pkg k8s.io/apimachinery/pkg/util/yaml, type YAMLToJSONDecoder struct{reader Reader}
+pkg k8s.io/apimachinery/pkg/version, type Info struct{Major string "json:\"major\""; Minor string "json:\"minor\""; GitVersion string "json:\"gitVersion\""; GitCommit string "json:\"gitCommit\""; GitTreeState string "json:\"gitTreeState\""; BuildDate string "json:\"buildDate\""; GoVersion string "json:\"goVersion\""; Compiler string "json:\"compiler\""; Platform string "json:\"platform\""}
+pkg k8s.io/apimachinery/pkg/watch, type FakeWatcher struct{result chan Event; stopped bool; sync.Mutex}
+pkg k8s.io/apimachinery/pkg/watch, type RaceFreeFakeWatcher struct{result chan Event; Stopped bool; sync.Mutex}
+pkg k8s.io/apimachinery/pkg/watch, type StreamWatcher struct{sync.Mutex; source Decoder; reporter Reporter; result chan Event; done chan struct{}}

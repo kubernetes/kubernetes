@@ -1,0 +1,63 @@
+pkg k8s.io/apimachinery/pkg/api/apitesting/roundtrip, func RoundtripToUnstructured(t *testing.T, scheme *k8s.io/apimachinery/pkg/runtime.Scheme, funcs k8s.io/apimachinery/pkg/api/apitesting/fuzzer.FuzzerFuncs, skipped k8s.io/apimachinery/pkg/util/sets.Set[k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind])
+pkg k8s.io/apimachinery/pkg/api/resource, method (Quantity) MarshalCBOR() ([]byte, error)
+pkg k8s.io/apimachinery/pkg/api/resource, method (Quantity) UnmarshalCBOR(value []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, const FieldSelectorOpDoesNotExist FieldSelectorOperator
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, const FieldSelectorOpExists FieldSelectorOperator
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, const FieldSelectorOpIn FieldSelectorOperator
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, const FieldSelectorOpNotIn FieldSelectorOperator
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldSelectorRequirement) DeepCopy() *FieldSelectorRequirement
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldSelectorRequirement) DeepCopyInto(out *FieldSelectorRequirement)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldSelectorRequirement) Descriptor() ([]byte, []int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldSelectorRequirement) Marshal() (dAtA []byte, err error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldSelectorRequirement) MarshalTo(dAtA []byte) (int, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldSelectorRequirement) MarshalToSizedBuffer(dAtA []byte) (int, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldSelectorRequirement) ProtoMessage()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldSelectorRequirement) Reset()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldSelectorRequirement) Size() (n int)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldSelectorRequirement) String() string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldSelectorRequirement) SwaggerDoc() map[string]string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldSelectorRequirement) Unmarshal(dAtA []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldSelectorRequirement) XXX_DiscardUnknown()
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldSelectorRequirement) XXX_Marshal(b []byte, deterministic bool) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldSelectorRequirement) XXX_Merge(src github.com/gogo/protobuf/proto.Message)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldSelectorRequirement) XXX_Size() int
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldSelectorRequirement) XXX_Unmarshal(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldsV1) MarshalCBOR() ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (FieldsV1) UnmarshalCBOR(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (MicroTime) MarshalCBOR() ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (MicroTime) UnmarshalCBOR(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Time) MarshalCBOR() ([]byte, error)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Time) UnmarshalCBOR(b []byte) error
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, type FieldSelectorOperator string
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, type FieldSelectorRequirement struct{Key string "json:\"key\" protobuf:\"bytes,1,opt,name=key\""; Operator FieldSelectorOperator "json:\"operator\" protobuf:\"bytes,2,opt,name=operator,casttype=FieldSelectorOperator\""; Values []string "json:\"values,omitempty\" protobuf:\"bytes,3,rep,name=values\""}
+pkg k8s.io/apimachinery/pkg/apis/meta/v1/validation, func ValidateFieldSelectorRequirement(requirement k8s.io/apimachinery/pkg/apis/meta/v1.FieldSelectorRequirement, opts FieldSelectorValidationOptions, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/apis/meta/v1/validation, type FieldSelectorValidationOptions struct{AllowUnknownOperatorInRequirement bool}
+pkg k8s.io/apimachinery/pkg/apis/meta/v1/validation, type LabelSelectorValidationOptions struct{AllowInvalidLabelValueInSelector bool; AllowUnknownOperatorInRequirement bool}
+pkg k8s.io/apimachinery/pkg/labels, method (Requirement) ValuesUnsorted() []string
+pkg k8s.io/apimachinery/pkg/labels, method (Requirements) String() string
+pkg k8s.io/apimachinery/pkg/runtime, const ContentTypeCBOR string
+pkg k8s.io/apimachinery/pkg/runtime, method (RawExtension) MarshalCBOR() ([]byte, error)
+pkg k8s.io/apimachinery/pkg/runtime, method (RawExtension) UnmarshalCBOR(in []byte) error
+pkg k8s.io/apimachinery/pkg/runtime/serializer/cbor, func NewFramer() k8s.io/apimachinery/pkg/runtime.Framer
+pkg k8s.io/apimachinery/pkg/util/intstr, method (IntOrString) MarshalCBOR() ([]byte, error)
+pkg k8s.io/apimachinery/pkg/util/intstr, method (IntOrString) UnmarshalCBOR(value []byte) error
+pkg k8s.io/apimachinery/pkg/util/runtime, func HandleCrashWithContext(ctx context.Context, additionalHandlers ...func(context.Context, interface{}))
+pkg k8s.io/apimachinery/pkg/util/runtime, func HandleErrorWithContext(ctx context.Context, err error, msg string, keysAndValues ...interface{})
+pkg k8s.io/apimachinery/pkg/util/runtime, type ErrorHandler func(ctx context.Context, err error, msg string, keysAndValues ...interface{})
+pkg k8s.io/apimachinery/pkg/util/runtime, var ErrorHandlers []ErrorHandler
+pkg k8s.io/apimachinery/pkg/util/runtime, var PanicHandlers []func(context.Context, interface{})
+pkg k8s.io/apimachinery/pkg/util/version, func MustParse(str string) *Version
+pkg k8s.io/apimachinery/pkg/util/version, func MustParseMajorMinor(str string) *Version
+pkg k8s.io/apimachinery/pkg/util/version, func Parse(str string) (*Version, error)
+pkg k8s.io/apimachinery/pkg/util/version, func ParseMajorMinor(str string) (*Version, error)
+pkg k8s.io/apimachinery/pkg/util/version, method (Version) AddMinor(diff uint) *Version
+pkg k8s.io/apimachinery/pkg/util/version, method (Version) EqualTo(other *Version) bool
+pkg k8s.io/apimachinery/pkg/util/version, method (Version) GreaterThan(other *Version) bool
+pkg k8s.io/apimachinery/pkg/util/version, method (Version) Info() *k8s.io/apimachinery/pkg/version.Info
+pkg k8s.io/apimachinery/pkg/util/version, method (Version) OffsetMinor(offset int) *Version
+pkg k8s.io/apimachinery/pkg/util/version, method (Version) SubtractMinor(diff uint) *Version
+pkg k8s.io/apimachinery/pkg/util/version, method (Version) WithInfo(info k8s.io/apimachinery/pkg/version.Info) *Version
+pkg k8s.io/apimachinery/pkg/util/version, type Version struct{components []uint; semver bool; preRelease string; buildMetadata string; info k8s.io/apimachinery/pkg/version.Info}
+pkg k8s.io/apimachinery/pkg/watch, method (MockWatcher) ResultChan() <-chan Event
+pkg k8s.io/apimachinery/pkg/watch, method (MockWatcher) Stop()
+pkg k8s.io/apimachinery/pkg/watch, type MockWatcher struct{StopFunc func(); ResultChanFunc func() <-chan Event}

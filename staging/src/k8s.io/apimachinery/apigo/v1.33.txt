@@ -1,0 +1,116 @@
+pkg k8s.io/apimachinery/pkg/api/apitesting/fuzzer, func FuzzerFor(funcs FuzzerFuncs, src math/rand.Source, codecs k8s.io/apimachinery/pkg/runtime/serializer.CodecFactory) *sigs.k8s.io/randfill.Filler
+pkg k8s.io/apimachinery/pkg/api/apitesting/roundtrip, func RoundTripExternalTypes(t *testing.T, scheme *k8s.io/apimachinery/pkg/runtime.Scheme, codecFactory k8s.io/apimachinery/pkg/runtime/serializer.CodecFactory, fuzzer *sigs.k8s.io/randfill.Filler, nonRoundTrippableTypes map[k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind]bool)
+pkg k8s.io/apimachinery/pkg/api/apitesting/roundtrip, func RoundTripExternalTypesWithoutProtobuf(t *testing.T, scheme *k8s.io/apimachinery/pkg/runtime.Scheme, codecFactory k8s.io/apimachinery/pkg/runtime/serializer.CodecFactory, fuzzer *sigs.k8s.io/randfill.Filler, nonRoundTrippableTypes map[k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind]bool)
+pkg k8s.io/apimachinery/pkg/api/apitesting/roundtrip, func RoundTripSpecificKind(t *testing.T, gvk k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind, scheme *k8s.io/apimachinery/pkg/runtime.Scheme, codecFactory k8s.io/apimachinery/pkg/runtime/serializer.CodecFactory, fuzzer *sigs.k8s.io/randfill.Filler, nonRoundTrippableTypes map[k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind]bool)
+pkg k8s.io/apimachinery/pkg/api/apitesting/roundtrip, func RoundTripSpecificKindWithoutProtobuf(t *testing.T, gvk k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind, scheme *k8s.io/apimachinery/pkg/runtime.Scheme, codecFactory k8s.io/apimachinery/pkg/runtime/serializer.CodecFactory, fuzzer *sigs.k8s.io/randfill.Filler, nonRoundTrippableTypes map[k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind]bool)
+pkg k8s.io/apimachinery/pkg/api/apitesting/roundtrip, func RoundTripTypes(t *testing.T, scheme *k8s.io/apimachinery/pkg/runtime.Scheme, codecFactory k8s.io/apimachinery/pkg/runtime/serializer.CodecFactory, fuzzer *sigs.k8s.io/randfill.Filler, nonRoundTrippableTypes map[k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind]bool)
+pkg k8s.io/apimachinery/pkg/api/apitesting/roundtrip, func RoundTripTypesWithoutProtobuf(t *testing.T, scheme *k8s.io/apimachinery/pkg/runtime.Scheme, codecFactory k8s.io/apimachinery/pkg/runtime/serializer.CodecFactory, fuzzer *sigs.k8s.io/randfill.Filler, nonRoundTrippableTypes map[k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind]bool)
+pkg k8s.io/apimachinery/pkg/api/operation, const Create Type
+pkg k8s.io/apimachinery/pkg/api/operation, const Update Type
+pkg k8s.io/apimachinery/pkg/api/operation, type Operation struct{Type Type; Options k8s.io/apimachinery/pkg/util/sets.Set[string]}
+pkg k8s.io/apimachinery/pkg/api/operation, type Type uint32
+pkg k8s.io/apimachinery/pkg/api/safe, func Cast[T any](value any) T
+pkg k8s.io/apimachinery/pkg/api/safe, func Field[V, R any](value *V, fn func(*V) R) R
+pkg k8s.io/apimachinery/pkg/api/validate, func EachMapKey[K ~string, T any](ctx context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, newMap map[K]T, oldMap map[K]T, validator ValidateFunc[*K]) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func EachMapVal[K ~string, V any](ctx context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, newMap map[K]V, oldMap map[K]V, validator ValidateFunc[*V]) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func EachSliceVal[T any](ctx context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, newSlice []T, oldSlice []T, cmp CompareFunc[T], validator ValidateFunc[*T]) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func FixedResult[T any](_ context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value T, _ T, result bool, arg string) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func ForbiddenMap[K comparable, T any](_ context.Context, _ k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value map[K]T, _ map[K]T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func ForbiddenPointer[T any](_ context.Context, _ k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, _ *T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func ForbiddenSlice[T any](_ context.Context, _ k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value []T, _ []T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func ForbiddenValue[T comparable](_ context.Context, _ k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, _ *T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func ImmutableNonComparable[T any](_ context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value T, oldValue T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func Immutable[T comparable](_ context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, oldValue *T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func Minimum[T k8s.io/apimachinery/pkg/api/validate/constraints.Integer](_ context.Context, _ k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, _ *T, min T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func OptionalMap[K comparable, T any](_ context.Context, _ k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value map[K]T, _ map[K]T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func OptionalPointer[T any](_ context.Context, _ k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, _ *T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func OptionalSlice[T any](_ context.Context, _ k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value []T, _ []T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func OptionalValue[T comparable](_ context.Context, _ k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, _ *T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func RequiredMap[K comparable, T any](_ context.Context, _ k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value map[K]T, _ map[K]T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func RequiredPointer[T any](_ context.Context, _ k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, _ *T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func RequiredSlice[T any](_ context.Context, _ k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value []T, _ []T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func RequiredValue[T comparable](_ context.Context, _ k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value *T, _ *T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, func Subfield[Tstruct, Tfield any](ctx context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, newStruct *Tstruct, oldStruct *Tstruct, fldName string, getField GetFieldFunc[Tstruct, Tfield], validator ValidateFunc[Tfield]) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate, type CompareFunc func(T, T) bool
+pkg k8s.io/apimachinery/pkg/api/validate, type GetFieldFunc func(*Tstruct) Tfield
+pkg k8s.io/apimachinery/pkg/api/validate, type ValidateFunc func(ctx context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, newValue T, oldValue T) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/api/validate/constraints, type Integer interface{Signed | Unsigned}
+pkg k8s.io/apimachinery/pkg/api/validate/constraints, type Signed interface{~int | ~int8 | ~int16 | ~int32 | ~int64}
+pkg k8s.io/apimachinery/pkg/api/validate/constraints, type Unsigned interface{~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr}
+pkg k8s.io/apimachinery/pkg/api/validate/content, func MinError[T k8s.io/apimachinery/pkg/api/validate/constraints.Integer](min T) string
+pkg k8s.io/apimachinery/pkg/apis/asn1, func X509UID() encoding/asn1.ObjectIdentifier
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (MicroTime) RandFill(r *math/rand.Rand)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1, method (Time) RandFill(r *math/rand.Rand)
+pkg k8s.io/apimachinery/pkg/apis/meta/v1/unstructured, func NestedNullCoercingStringMap(obj map[string]interface{}, fields ...string) (map[string]string, bool, error)
+pkg k8s.io/apimachinery/pkg/runtime, method (Scheme) AddValidationFunc(srcType Object, fn func(ctx context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, object interface{}, oldObject interface{}, subresources ...string) k8s.io/apimachinery/pkg/util/validation/field.ErrorList)
+pkg k8s.io/apimachinery/pkg/runtime, method (Scheme) Validate(ctx context.Context, options k8s.io/apimachinery/pkg/util/sets.Set[string], object Object, subresources ...string) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/runtime, method (Scheme) ValidateUpdate(ctx context.Context, options k8s.io/apimachinery/pkg/util/sets.Set[string], object Object, oldObject Object, subresources ...string) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/runtime, method (Unknown) MarshalToWriter(w io.Writer, rawSize int, writeRaw func(io.Writer) (int, error)) (int, error)
+pkg k8s.io/apimachinery/pkg/runtime, type ObjectVersioner interface{ConvertToVersion(in Object, gv GroupVersioner) (out Object, err error); PrioritizedVersionsForGroup(group string) []k8s.io/apimachinery/pkg/runtime/schema.GroupVersion}
+pkg k8s.io/apimachinery/pkg/runtime, type Scheme struct{gvkToType map[k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind]reflect.Type; typeToGVK map[reflect.Type][]k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind; unversionedTypes map[reflect.Type]k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind; unversionedKinds map[string]reflect.Type; fieldLabelConversionFuncs map[k8s.io/apimachinery/pkg/runtime/schema.GroupVersionKind]FieldLabelConversionFunc; defaulterFuncs map[reflect.Type]func(interface{}); validationFuncs map[reflect.Type]func(ctx context.Context, op k8s.io/apimachinery/pkg/api/operation.Operation, object interface{}, oldObject interface{}, subresources ...string) k8s.io/apimachinery/pkg/util/validation/field.ErrorList; converter *k8s.io/apimachinery/pkg/conversion.Converter; versionPriority map[string][]string; observedVersions []k8s.io/apimachinery/pkg/runtime/schema.GroupVersion; schemeName string}
+pkg k8s.io/apimachinery/pkg/runtime/serializer, func WithStreamingCollectionEncodingToJSON() CodecFactoryOptionsMutator
+pkg k8s.io/apimachinery/pkg/runtime/serializer, func WithStreamingCollectionEncodingToProtobuf() CodecFactoryOptionsMutator
+pkg k8s.io/apimachinery/pkg/runtime/serializer, type CodecFactoryOptions struct{Strict bool; Pretty bool; StreamingCollectionsEncodingToJSON bool; StreamingCollectionsEncodingToProtobuf bool; serializers []func(k8s.io/apimachinery/pkg/runtime.ObjectCreater, k8s.io/apimachinery/pkg/runtime.ObjectTyper) k8s.io/apimachinery/pkg/runtime.SerializerInfo}
+pkg k8s.io/apimachinery/pkg/runtime/serializer/json, type SerializerOptions struct{Yaml bool; Pretty bool; Strict bool; StreamingCollectionsEncoding bool}
+pkg k8s.io/apimachinery/pkg/runtime/serializer/protobuf, func NewSerializerWithOptions(creater k8s.io/apimachinery/pkg/runtime.ObjectCreater, typer k8s.io/apimachinery/pkg/runtime.ObjectTyper, opts SerializerOptions) *Serializer
+pkg k8s.io/apimachinery/pkg/runtime/serializer/protobuf, type Serializer struct{prefix []byte; creater k8s.io/apimachinery/pkg/runtime.ObjectCreater; typer k8s.io/apimachinery/pkg/runtime.ObjectTyper; options SerializerOptions}
+pkg k8s.io/apimachinery/pkg/runtime/serializer/protobuf, type SerializerOptions struct{StreamingCollectionsEncoding bool}
+pkg k8s.io/apimachinery/pkg/runtime/testing, func RunStatusValidationForEachVersion(t *testing.T, scheme *k8s.io/apimachinery/pkg/runtime.Scheme, options k8s.io/apimachinery/pkg/util/sets.Set[string], unversioned k8s.io/apimachinery/pkg/runtime.Object, unversionedOld k8s.io/apimachinery/pkg/runtime.Object, fn VersionValidationRunner)
+pkg k8s.io/apimachinery/pkg/runtime/testing, func RunUpdateValidationForEachVersion(t *testing.T, scheme *k8s.io/apimachinery/pkg/runtime.Scheme, options k8s.io/apimachinery/pkg/util/sets.Set[string], unversioned k8s.io/apimachinery/pkg/runtime.Object, unversionedOld k8s.io/apimachinery/pkg/runtime.Object, fn VersionValidationRunner)
+pkg k8s.io/apimachinery/pkg/runtime/testing, func RunValidationForEachVersion(t *testing.T, scheme *k8s.io/apimachinery/pkg/runtime.Scheme, options k8s.io/apimachinery/pkg/util/sets.Set[string], unversioned k8s.io/apimachinery/pkg/runtime.Object, fn VersionValidationRunner)
+pkg k8s.io/apimachinery/pkg/runtime/testing, type VersionValidationRunner func(t *testing.T, gv string, versionValidationErrors k8s.io/apimachinery/pkg/util/validation/field.ErrorList)
+pkg k8s.io/apimachinery/pkg/util/intstr, method (IntOrString) RandFill(c sigs.k8s.io/randfill.Continue)
+pkg k8s.io/apimachinery/pkg/util/net/testing, func MakeSocketNameForTest(t testing.TB, name string) string
+pkg k8s.io/apimachinery/pkg/util/net/testing, func NewHTTPProxyHandler(t testing.TB, hook func(req *net/http.Request) bool) *HTTPProxyHandler
+pkg k8s.io/apimachinery/pkg/util/net/testing, type HTTPProxyHandler struct{handlerDone sync.WaitGroup; hook func(r *net/http.Request) bool; httpProxy net/http/httputil.ReverseProxy; t testing.TB}
+pkg k8s.io/apimachinery/pkg/util/runtime, func HandleCrashWithLogger(logger k8s.io/klog/v2.Logger, additionalHandlers ...func(context.Context, interface{}))
+pkg k8s.io/apimachinery/pkg/util/runtime, func HandleErrorWithLogger(logger k8s.io/klog/v2.Logger, err error, msg string, keysAndValues ...interface{})
+pkg k8s.io/apimachinery/pkg/util/validation, func GetWarningsForCIDR(fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value string) []string
+pkg k8s.io/apimachinery/pkg/util/validation, func GetWarningsForIP(fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value string) []string
+pkg k8s.io/apimachinery/pkg/util/validation, func IsValidCIDRForLegacyField(fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value string, strictValidation bool, validOldCIDRs []string) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/util/validation, func IsValidIPForLegacyField(fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value string, strictValidation bool, validOldIPs []string) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/util/validation, func IsValidInterfaceAddress(fldPath *k8s.io/apimachinery/pkg/util/validation/field.Path, value string) k8s.io/apimachinery/pkg/util/validation/field.ErrorList
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (Error) MarkCoveredByDeclarative() *Error
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (Error) WithOrigin(o string) *Error
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (ErrorList) ExtractCoveredByDeclarative() ErrorList
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (ErrorList) MarkCoveredByDeclarative() ErrorList
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (ErrorList) RemoveCoveredByDeclarative() ErrorList
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (ErrorList) WithOrigin(origin string) ErrorList
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (ErrorMatcher) ByDetailExact() ErrorMatcher
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (ErrorMatcher) ByDetailRegexp() ErrorMatcher
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (ErrorMatcher) ByDetailSubstring() ErrorMatcher
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (ErrorMatcher) ByField() ErrorMatcher
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (ErrorMatcher) ByOrigin() ErrorMatcher
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (ErrorMatcher) ByType() ErrorMatcher
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (ErrorMatcher) ByValue() ErrorMatcher
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (ErrorMatcher) Exactly() ErrorMatcher
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (ErrorMatcher) Matches(want *Error, got *Error) bool
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (ErrorMatcher) Render(e *Error) string
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (ErrorMatcher) RequireOriginWhenInvalid() ErrorMatcher
+pkg k8s.io/apimachinery/pkg/util/validation/field, method (ErrorMatcher) Test(tb TestIntf, want ErrorList, got ErrorList)
+pkg k8s.io/apimachinery/pkg/util/validation/field, type Error struct{Type ErrorType; Field string; BadValue interface{}; Detail string; Origin string; CoveredByDeclarative bool}
+pkg k8s.io/apimachinery/pkg/util/validation/field, type ErrorMatcher struct{matchType bool; matchField bool; matchValue bool; matchOrigin bool; matchDetail func(want string, got string) bool; requireOriginWhenInvalid bool}
+pkg k8s.io/apimachinery/pkg/util/validation/field, type TestIntf interface{Errorf(format string, args ...any); Helper(); Logf(format string, args ...any)}
+pkg k8s.io/apimachinery/pkg/util/version, func Itoa(i uint) string
+pkg k8s.io/apimachinery/pkg/util/wait, func BackoffUntilWithContext(ctx context.Context, f func(ctx context.Context), backoff BackoffManager, sliding bool)
+pkg k8s.io/apimachinery/pkg/util/yaml, func GuessJSONStream(r io.Reader, size int) (*StreamReader, []byte, bool)
+pkg k8s.io/apimachinery/pkg/util/yaml, func NewStreamReader(r io.Reader, size int) *StreamReader
+pkg k8s.io/apimachinery/pkg/util/yaml, method (StreamReader) Consume(n int)
+pkg k8s.io/apimachinery/pkg/util/yaml, method (StreamReader) Consumed() int
+pkg k8s.io/apimachinery/pkg/util/yaml, method (StreamReader) Peek(n int) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/util/yaml, method (StreamReader) Read(p []byte) (n int, err error)
+pkg k8s.io/apimachinery/pkg/util/yaml, method (StreamReader) ReadN(want int) ([]byte, error)
+pkg k8s.io/apimachinery/pkg/util/yaml, method (StreamReader) Rewind()
+pkg k8s.io/apimachinery/pkg/util/yaml, method (StreamReader) RewindN(n int)
+pkg k8s.io/apimachinery/pkg/util/yaml, method (YAMLToJSONDecoder) InputOffset() int
+pkg k8s.io/apimachinery/pkg/util/yaml, type StreamReader struct{r io.Reader; buf []byte; head int; ttlConsumed int}
+pkg k8s.io/apimachinery/pkg/util/yaml, type YAMLOrJSONDecoder struct{json *encoding/json.Decoder; jsonConsumed int64; yaml *YAMLToJSONDecoder; yamlConsumed int64; stream *StreamReader; count int}
+pkg k8s.io/apimachinery/pkg/util/yaml, type YAMLToJSONDecoder struct{reader Reader; inputOffset int}
+pkg k8s.io/apimachinery/pkg/version, type Info struct{Major string "json:\"major\""; Minor string "json:\"minor\""; EmulationMajor string "json:\"emulationMajor,omitempty\""; EmulationMinor string "json:\"emulationMinor,omitempty\""; MinCompatibilityMajor string "json:\"minCompatibilityMajor,omitempty\""; MinCompatibilityMinor string "json:\"minCompatibilityMinor,omitempty\""; GitVersion string "json:\"gitVersion\""; GitCommit string "json:\"gitCommit\""; GitTreeState string "json:\"gitTreeState\""; BuildDate string "json:\"buildDate\""; GoVersion string "json:\"goVersion\""; Compiler string "json:\"compiler\""; Platform string "json:\"platform\""}
+pkg k8s.io/apimachinery/pkg/watch, func NewFakeWithOptions(options FakeOptions) *FakeWatcher
+pkg k8s.io/apimachinery/pkg/watch, func NewRaceFreeFakeWithLogger(logger k8s.io/klog/v2.Logger) *RaceFreeFakeWatcher
+pkg k8s.io/apimachinery/pkg/watch, func NewStreamWatcherWithLogger(logger k8s.io/klog/v2.Logger, d Decoder, r Reporter) *StreamWatcher
+pkg k8s.io/apimachinery/pkg/watch, type FakeOptions struct{Logger *k8s.io/klog/v2.Logger; ChannelSize int}
+pkg k8s.io/apimachinery/pkg/watch, type FakeWatcher struct{logger k8s.io/klog/v2.Logger; result chan Event; stopped bool; sync.Mutex}
+pkg k8s.io/apimachinery/pkg/watch, type RaceFreeFakeWatcher struct{logger k8s.io/klog/v2.Logger; result chan Event; Stopped bool; sync.Mutex}
+pkg k8s.io/apimachinery/pkg/watch, type StreamWatcher struct{logger k8s.io/klog/v2.Logger; sync.Mutex; source Decoder; reporter Reporter; result chan Event; done chan struct{}}
