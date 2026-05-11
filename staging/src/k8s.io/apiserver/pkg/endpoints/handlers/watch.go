@@ -17,10 +17,13 @@ limitations under the License.
 package handlers
 
 import (
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -254,15 +257,28 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}()
 
-	flusher, ok := w.(http.Flusher)
+	httpFlusher, ok := w.(http.Flusher)
 	if !ok {
 		err := fmt.Errorf("unable to start watch - can't get http.Flusher: %#v", w)
 		utilruntime.HandleErrorWithContext(req.Context(), err, "Unable to start watch")
 		s.Scope.err(errors.NewInternalError(err), w, req)
 		return
 	}
+	compressionFlusher := func() error { return nil }
+	var writer io.Writer = w
+	compressed := acceptsGzip(req)
+	if compressed {
+		gw := gzipPool.Get().(*gzip.Writer)
+		gw.Reset(w)
+		compressionFlusher = gw.Flush
+		writer = gw
+		defer func() {
+			gw.Close()
+			gzipPool.Put(gw)
+		}()
+	}
 
-	framer := s.Framer.NewFrameWriter(w)
+	framer := s.Framer.NewFrameWriter(writer)
 	if framer == nil {
 		// programmer error
 		err := fmt.Errorf("no stream framing support is available for media type %q", s.MediaType)
@@ -278,8 +294,11 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	// begin the stream
 	w.Header().Set("Content-Type", s.MediaType)
 	w.Header().Set("Transfer-Encoding", "chunked")
+	if compressed {
+		w.Header().Set("Content-Encoding", "gzip")
+	}
 	w.WriteHeader(http.StatusOK)
-	flusher.Flush()
+	httpFlusher.Flush()
 
 	gvr := s.Scope.Resource
 
@@ -340,7 +359,12 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 
 			if len(ch) == 0 {
 				flushStart := time.Now()
-				flusher.Flush()
+				err := compressionFlusher()
+				if err != nil {
+					utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to flush compression writer")
+					return
+				}
+				httpFlusher.Flush()
 				if isInitPhase {
 					totalFlushTime += time.Since(flushStart)
 				}
@@ -473,4 +497,25 @@ func shouldRecordWatchListLatency(ctx context.Context, event watch.Event) bool {
 		return false
 	}
 	return hasAnnotation
+}
+
+var gzipPool = &sync.Pool{
+	New: func() interface{} {
+		gw, err := gzip.NewWriterLevel(nil, defaultGzipContentEncodingLevel)
+		if err != nil {
+			panic(err)
+		}
+		return gw
+	},
+}
+
+const defaultGzipContentEncodingLevel = 1
+
+func acceptsGzip(req *http.Request) bool {
+	for _, enc := range strings.Split(req.Header.Get("Accept-Encoding"), ",") {
+		if strings.TrimSpace(enc) == "gzip" {
+			return true
+		}
+	}
+	return false
 }
