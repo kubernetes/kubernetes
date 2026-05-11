@@ -920,7 +920,7 @@ func NewMainKubelet(ctx context.Context,
 
 		// kubelet configuration that automatically rotates serving certs
 		if kubeCfg.ServerTLSBootstrap && utilfeature.DefaultFeatureGate.Enabled(features.RotateKubeletServerCertificate) {
-			klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(klet.kubeClient, kubeCfg, klet.nodeName, func() []v1.NodeAddress {
+			klet.serverCertificateManager, err = kubeletcertificate.NewKubeletServerCertificateManager(logger, klet.kubeClient, kubeCfg, klet.nodeName, func() []v1.NodeAddress {
 				return klet.getLastObservedNodeAddresses(ctx)
 			}, certDirectory)
 			if err != nil {
