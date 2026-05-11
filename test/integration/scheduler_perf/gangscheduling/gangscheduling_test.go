@@ -34,10 +34,10 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func TestSchedulerPerfGangScheduling(t *testing.T) {
+func TestSchedulerPerf(t *testing.T) {
 	perf.RunIntegrationPerfScheduling(t, "performance-config.yaml")
 }
 
-func BenchmarkPerfGangScheduling(b *testing.B) {
+func BenchmarkPerfScheduling(b *testing.B) {
 	perf.RunBenchmarkPerfScheduling(b, "performance-config.yaml", "gangscheduling", nil)
 }
