@@ -37,7 +37,8 @@ import (
 	"github.com/onsi/gomega"
 )
 
-// ExecOptions passed to ExecWithOptions
+// ExecOptions controls how [Exec] runs a command inside a pod container.
+// At minimum, Command, Namespace, and PodName must be set.
 type ExecOptions struct {
 	Command       []string
 	Namespace     string
@@ -51,25 +52,16 @@ type ExecOptions struct {
 	Quiet              bool
 }
 
-// ExecWithOptions executes a command in the specified container,
+// Exec executes a command in the specified container,
 // returning stdout, stderr and error. `options` allowed for
 // additional parameters to be passed.
-func ExecWithOptions(f *framework.Framework, options ExecOptions) (string, string, error) {
-	return ExecWithOptionsContext(context.Background(), f, options)
-}
-
-func ExecWithOptionsContext(ctx context.Context, f *framework.Framework, options ExecOptions) (string, string, error) {
-	return ExecWithOptionsTCtx(f.TContext(ctx), options)
-}
-
-func ExecWithOptionsTCtx(tCtx ktesting.TContext, options ExecOptions) (string, string, error) {
+func Exec(tCtx ktesting.TContext, options ExecOptions) (string, string, error) {
 	if !options.Quiet {
-		tCtx.Logf("ExecWithOptions %+v", options)
+		tCtx.Logf("Exec %+v", options)
 	}
 
 	const tty = false
-
-	tCtx.Logf("ExecWithOptions: Clientset creation")
+	tCtx.Logf("Exec: Clientset creation")
 	req := tCtx.Client().CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(options.PodName).
@@ -85,7 +77,7 @@ func ExecWithOptionsTCtx(tCtx ktesting.TContext, options ExecOptions) (string, s
 	}, scheme.ParameterCodec)
 
 	var stdout, stderr bytes.Buffer
-	tCtx.Logf("ExecWithOptions: execute(%s)", req.URL())
+	tCtx.Logf("Exec: execute(%s)", req.URL())
 	err := execute(tCtx, req.URL(), options.Stdin, &stdout, &stderr, tty)
 
 	if options.PreserveWhitespace {
@@ -98,7 +90,7 @@ func ExecWithOptionsTCtx(tCtx ktesting.TContext, options ExecOptions) (string, s
 // specified container and return stdout, stderr and error
 func ExecCommandInContainerWithFullOutput(f *framework.Framework, podName, containerName string, cmd ...string) (string, string, error) {
 	// TODO (pohly): add context support
-	return ExecWithOptions(f, ExecOptions{
+	return Exec(f.TContext(context.Background()), ExecOptions{
 		Command:            cmd,
 		Namespace:          f.Namespace.Name,
 		PodName:            podName,
@@ -125,28 +117,20 @@ func ExecShellInContainer(f *framework.Framework, podName, containerName string,
 	return ExecCommandInContainer(f, podName, containerName, "/bin/sh", "-c", cmd)
 }
 
-func execCommandInPod(ctx context.Context, f *framework.Framework, podName string, cmd ...string) string {
-	pod, err := NewPodClient(f).Get(ctx, podName, metav1.GetOptions{})
-	framework.ExpectNoError(err, "failed to get pod %v", podName)
-	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
-	return ExecCommandInContainer(f, podName, pod.Spec.Containers[0].Name, cmd...)
-}
-
-func execCommandInPodWithFullOutput(ctx context.Context, f *framework.Framework, podName string, cmd ...string) (string, string, error) {
-	pod, err := NewPodClient(f).Get(ctx, podName, metav1.GetOptions{})
-	framework.ExpectNoError(err, "failed to get pod %v", podName)
-	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
-	return ExecCommandInContainerWithFullOutput(f, podName, pod.Spec.Containers[0].Name, cmd...)
-}
-
 // ExecShellInPod executes the specified command on the pod.
 func ExecShellInPod(ctx context.Context, f *framework.Framework, podName string, cmd string) string {
-	return execCommandInPod(ctx, f, podName, "/bin/sh", "-c", cmd)
+	pod, err := NewPodClient(f).Get(ctx, podName, metav1.GetOptions{})
+	framework.ExpectNoError(err, "failed to get pod %v", podName)
+	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
+	return ExecCommandInContainer(f, podName, pod.Spec.Containers[0].Name, "/bin/sh", "-c", cmd)
 }
 
 // ExecShellInPodWithFullOutput executes the specified command on the Pod and returns stdout, stderr and error.
 func ExecShellInPodWithFullOutput(ctx context.Context, f *framework.Framework, podName string, cmd string) (string, string, error) {
-	return execCommandInPodWithFullOutput(ctx, f, podName, "/bin/sh", "-c", cmd)
+	pod, err := NewPodClient(f).Get(ctx, podName, metav1.GetOptions{})
+	framework.ExpectNoError(err, "failed to get pod %v", podName)
+	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
+	return ExecCommandInContainerWithFullOutput(f, podName, pod.Spec.Containers[0].Name, "/bin/sh", "-c", cmd)
 }
 
 // VerifyExecInPodSucceed verifies shell cmd in target pod succeed
