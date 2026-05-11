@@ -22,19 +22,17 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/url"
 	"strings"
+
+	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/remotecommand"
 	clientexec "k8s.io/client-go/util/exec"
+	"k8s.io/kubectl/pkg/cmd/exec"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
-	"k8s.io/streaming/pkg/httpstream"
-
-	"github.com/onsi/gomega"
 )
 
 // ExecOptions controls how [Exec] runs a command inside a pod container.
@@ -78,7 +76,8 @@ func Exec(tCtx ktesting.TContext, options ExecOptions) (string, string, error) {
 
 	var stdout, stderr bytes.Buffer
 	tCtx.Logf("Exec: execute(%s)", req.URL())
-	err := execute(tCtx, req.URL(), options.Stdin, &stdout, &stderr, tty)
+	executor := exec.DefaultRemoteExecutor{}
+	err := executor.ExecuteWithContext(tCtx, req.URL(), tCtx.RESTConfig(), options.Stdin, &stdout, &stderr, tty, nil)
 
 	if options.PreserveWhitespace {
 		return stdout.String(), stderr.String(), err
@@ -168,36 +167,4 @@ func VerifyExecInPodFail(ctx context.Context, f *framework.Framework, pod *v1.Po
 		}
 	}
 	return fmt.Errorf("%q should fail with exit code %d, but exit without error", shExec, exitCode)
-}
-
-func execute(tCtx ktesting.TContext, url *url.URL, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
-	config := tCtx.RESTConfig()
-	// WebSocketExecutor executor is default
-	// WebSocketExecutor must be "GET" method as described in RFC 6455 Sec. 4.1 (page 17).
-	websocketExec, err := remotecommand.NewWebSocketExecutor(config, "GET", url.String())
-	if err != nil {
-		return err
-	}
-	spdyExec, err := remotecommand.NewSPDYExecutor(config, "POST", url)
-	if err != nil {
-		return err
-	}
-	exec, err := remotecommand.NewFallbackExecutor(websocketExec, spdyExec, func(err error) bool {
-		if httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err) {
-			framework.Logf("fallback to secondary dialer from primary dialer err: %v", err)
-			return true
-		}
-		framework.Logf("unexpected error trying to use websockets for pod exec: %v", err)
-		return false
-	})
-	if err != nil {
-		return err
-	}
-
-	return exec.StreamWithContext(tCtx, remotecommand.StreamOptions{
-		Stdin:  stdin,
-		Stdout: stdout,
-		Stderr: stderr,
-		Tty:    tty,
-	})
 }
