@@ -14644,12 +14644,12 @@ func TestValidatePodUpdate(t *testing.T) {
 		}, {
 			new: *podtest.MakePod("pod",
 				podtest.SetSchedulingGroup(&core.PodSchedulingGroup{
-					PodGroupName: new("pg1"),
+					PodGroupName: ptr.To("pg1"),
 				}),
 			),
 			old: *podtest.MakePod("pod",
 				podtest.SetSchedulingGroup(&core.PodSchedulingGroup{
-					PodGroupName: new("pg2"),
+					PodGroupName: ptr.To("pg2"),
 				}),
 			),
 			err:  "pod updates may not change fields other than",
@@ -31084,7 +31084,7 @@ func TestValidateNodeDeclaredFeatures(t *testing.T) {
 func TestValidatePodSchedulingGroup(t *testing.T) {
 	successCases := map[string]*core.Pod{
 		"correct": podtest.MakePod("", podtest.SetSchedulingGroup(&core.PodSchedulingGroup{
-			PodGroupName: new("group"),
+			PodGroupName: ptr.To("group"),
 		})),
 	}
 	for name, pod := range successCases {
@@ -31097,13 +31097,13 @@ func TestValidatePodSchedulingGroup(t *testing.T) {
 	failureCases := map[string]*core.Pod{
 		"nil pod group name": podtest.MakePod("", podtest.SetSchedulingGroup(&core.PodSchedulingGroup{})),
 		"empty pod group name": podtest.MakePod("", podtest.SetSchedulingGroup(&core.PodSchedulingGroup{
-			PodGroupName: new(""),
+			PodGroupName: ptr.To(""),
 		})),
 		"incorrect pod group name": podtest.MakePod("", podtest.SetSchedulingGroup(&core.PodSchedulingGroup{
-			PodGroupName: new(".podGroup"),
+			PodGroupName: ptr.To(".podGroup"),
 		})),
 		"too long pod group name": podtest.MakePod("", podtest.SetSchedulingGroup(&core.PodSchedulingGroup{
-			PodGroupName: new(strings.Repeat("w", 254)),
+			PodGroupName: ptr.To(strings.Repeat("w", 254)),
 		})),
 	}
 	for name, pod := range failureCases {
