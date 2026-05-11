@@ -385,7 +385,7 @@ func TestPodGroupProtectionController(t *testing.T) {
 			informerFactory.WaitForCacheSync(ctx.Done())
 			go ctrl.Run(ctx, 1)
 
-			// Create a dummy pod to "warm up" the watch pipe.
+			// In order to reduce test flakiness, make sure that the pod-to-delete is visible in the client set. Create a dummy pod to "warm up" the watch pipe.
 			// Since it's created after LIST (WaitForCacheSync), the informer must see it via WATCH.
 			syncPod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "sync-pod", Namespace: defaultNS}}
 			_, err = client.CoreV1().Pods(defaultNS).Create(ctx, syncPod, metav1.CreateOptions{})
