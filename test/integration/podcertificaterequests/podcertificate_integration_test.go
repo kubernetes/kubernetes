@@ -743,13 +743,13 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 	}
 	// Creating the PCR could fail if there is informer lag in the
 	// noderestriction logic.  Poll until it succeeds.
-	var lastErrBarFoo string
+	var lastErr string
 	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
 		_, err = node1Client.CertificatesV1beta1().PodCertificateRequests("bar").Create(ctx, pcrBarFoo, metav1.CreateOptions{})
 		if err != nil {
-			if errStr := err.Error(); errStr != lastErrBarFoo {
+			if errStr := err.Error(); errStr != lastErr {
 				t.Logf("Create PodCertificateRequest bar/foo as node1 failed with error: %v, retrying...", err)
-				lastErrBarFoo = errStr
+				lastErr = errStr
 			}
 			return false, nil
 		}
@@ -781,13 +781,13 @@ func TestNodeAuthorizerNamespaceNameConfusion(t *testing.T) {
 	}
 	// Creating the PCR could fail if there is informer lag in the
 	// noderestriction logic.  Poll until it succeeds.
-	var lastErrFooBar string
+	lastErr = ""
 	err = wait.PollUntilContextTimeout(ctx, 1*time.Second, 15*time.Second, true, func(ctx context.Context) (bool, error) {
 		_, err = node2Client.CertificatesV1beta1().PodCertificateRequests("foo").Create(ctx, pcrFooBar, metav1.CreateOptions{})
 		if err != nil {
-			if errStr := err.Error(); errStr != lastErrFooBar {
+			if errStr := err.Error(); errStr != lastErr {
 				t.Logf("Create PodCertificateRequest foo/bar as node2 failed with error: %v, retrying...", err)
-				lastErrFooBar = errStr
+				lastErr = errStr
 			}
 			return false, nil
 		}
