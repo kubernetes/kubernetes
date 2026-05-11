@@ -290,8 +290,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local", func() {
 					e2epod.DeletePodOrFail(ctx, config.client, config.ns, pod2.Name)
 				})
 
-				f.It("should set different fsGroup for second pod if first pod is deleted", f.WithFlaky(), func(ctx context.Context) {
-					// TODO: Disabled temporarily, remove [Flaky] tag after #73168 is fixed.
+				f.It("should set different fsGroup for second pod if first pod is deleted", func(ctx context.Context) {
 					fsGroup1, fsGroup2 := int64(1234), int64(4321)
 					ginkgo.By("Create first pod and check fsGroup is set")
 					pod1 := createPodWithFsGroupTest(ctx, config, testVol, fsGroup1, fsGroup1)

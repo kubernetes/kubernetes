@@ -369,7 +369,7 @@ var _ = SIGDescribe("kubelet", func() {
 	})
 
 	// Test host cleanup when disrupting the volume environment.
-	f.Describe("host cleanup with volume mounts [HostCleanup]", f.WithFlaky(), func() {
+	f.Describe("host cleanup with volume mounts [HostCleanup]", func() {
 
 		type hostCleanupTest struct {
 			itDescr string
