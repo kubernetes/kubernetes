@@ -33,14 +33,27 @@ import (
 // newActivation creates an activation for CEL admission plugins from the given request, admission chain and
 // variable binding information.
 func newActivation(compositionCtx CompositionContext, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs OptionalVariableBindings, namespace *v1.Namespace) (*evaluationActivation, error) {
-	oldObjectVal, err := objectToResolveVal(versionedAttr.VersionedOldObject)
+
+	var oldObjectVal any
+	var err error
+
+	unstructuredOldObj, err := versionedAttr.GetUnstructuredOldObject()
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare oldObject variable for evaluation: %w", err)
 	}
-	objectVal, err := objectToResolveVal(versionedAttr.VersionedObject)
+	if unstructuredOldObj != nil {
+		oldObjectVal = unstructuredOldObj.Object
+	}
+
+	var objectVal any
+	unstructuredObj, err := versionedAttr.GetUnstructuredObject()
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare object variable for evaluation: %w", err)
 	}
+	if unstructuredObj != nil {
+		objectVal = unstructuredObj.Object
+	}
+
 	var paramsVal, authorizerVal, requestResourceAuthorizerVal any
 	if inputs.VersionedParams != nil {
 		paramsVal, err = objectToResolveVal(inputs.VersionedParams)

@@ -24,7 +24,6 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/cel/environment"
@@ -62,22 +61,11 @@ func NewCondition(compilationResults []CompilationResult) ConditionEvaluator {
 	}
 }
 
-func convertObjectToUnstructured(obj interface{}) (*unstructured.Unstructured, error) {
-	if obj == nil || reflect.ValueOf(obj).IsNil() {
-		return &unstructured.Unstructured{Object: nil}, nil
-	}
-	ret, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
-	if err != nil {
-		return nil, err
-	}
-	return &unstructured.Unstructured{Object: ret}, nil
-}
-
 func objectToResolveVal(r runtime.Object) (interface{}, error) {
 	if r == nil || reflect.ValueOf(r).IsNil() {
 		return nil, nil
 	}
-	v, err := convertObjectToUnstructured(r)
+	v, err := admission.ConvertObjectToUnstructured(r)
 	if err != nil {
 		return nil, err
 	}

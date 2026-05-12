@@ -358,6 +358,69 @@ func TestConvertVersionedAttributes(t *testing.T) {
 			if e, a := tc.ExpectedAttrs.Dirty, tc.Attrs.Dirty; !reflect.DeepEqual(e, a) {
 				t.Errorf("unexpected diff:\n%s", cmp.Diff(e, a))
 			}
+			if e, a := tc.ExpectedAttrs.unstructuredObject, tc.Attrs.unstructuredObject; !reflect.DeepEqual(e, a) {
+				t.Errorf("unexpected diff:\n%s", cmp.Diff(e, a))
+			}
+			if e, a := tc.ExpectedAttrs.unstructuredOldObject, tc.Attrs.unstructuredOldObject; !reflect.DeepEqual(e, a) {
+				t.Errorf("unexpected diff:\n%s", cmp.Diff(e, a))
+			}
 		})
 	}
+}
+
+func TestVersionedAttributesUnstructuredObjectCaching(t *testing.T) {
+	scheme := initiateScheme(t)
+	o := NewObjectInterfacesFromScheme(scheme)
+
+	oldRS := &example.ReplicaSet{ObjectMeta: metav1.ObjectMeta{Name: "old-rs"}}
+	newRS := &example.ReplicaSet{ObjectMeta: metav1.ObjectMeta{Name: "new-rs"}}
+	attrs := NewAttributesRecord(newRS, oldRS, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", "", nil, false, nil)
+
+	t.Run("lazy evaluation and cache clear on update", func(t *testing.T) {
+		vAttrs, err := NewVersionedAttributes(attrs, example2v1.SchemeGroupVersion.WithKind("ReplicaSet"), o)
+		require.NoError(t, err)
+		require.Nil(t, vAttrs.unstructuredObject)
+		require.Nil(t, vAttrs.unstructuredOldObject)
+
+		uObj, err := vAttrs.GetUnstructuredObject()
+		require.NoError(t, err)
+		require.NotNil(t, uObj)
+		require.Equal(t, "new-rs", uObj.GetName())
+
+		uOldObj, err := vAttrs.GetUnstructuredOldObject()
+		require.NoError(t, err)
+		require.NotNil(t, uOldObj)
+		require.Equal(t, "old-rs", uOldObj.GetName())
+
+		// 1. Update object
+		updateRS := &example2v1.ReplicaSet{
+			TypeMeta:   metav1.TypeMeta{APIVersion: "example2.apiserver.k8s.io/v1", Kind: "ReplicaSet"},
+			ObjectMeta: metav1.ObjectMeta{Name: "updated-rs"},
+		}
+		vAttrs.Dirty = true
+		err = vAttrs.UpdateObject(updateRS)
+		require.NoError(t, err)
+		// Cache is cleared on update
+		require.Nil(t, vAttrs.unstructuredObject)
+
+		uObj, err = vAttrs.GetUnstructuredObject()
+		require.NoError(t, err)
+		require.Equal(t, "updated-rs", uObj.GetName())
+
+		// 2. Convert GVK
+		targetGVK := example2v1.SchemeGroupVersion.WithKind("ReplicaSet")
+		vAttrs.VersionedKind = schema.GroupVersionKind{Group: "dummy", Version: "v1", Kind: "ReplicaSet"}
+		err = ConvertVersionedAttributes(vAttrs, targetGVK, o)
+		require.NoError(t, err)
+
+		uObj, err = vAttrs.GetUnstructuredObject()
+		require.NoError(t, err)
+		uOldObj, err = vAttrs.GetUnstructuredOldObject()
+		require.NoError(t, err)
+
+		require.Equal(t, "updated-rs", uObj.GetName())
+		require.Equal(t, "example2.apiserver.k8s.io/v1", uObj.GetAPIVersion())
+		require.Equal(t, "old-rs", uOldObj.GetName())
+		require.Equal(t, "example2.apiserver.k8s.io/v1", uOldObj.GetAPIVersion())
+	})
 }

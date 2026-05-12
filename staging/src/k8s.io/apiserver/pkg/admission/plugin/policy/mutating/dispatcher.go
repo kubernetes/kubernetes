@@ -272,10 +272,8 @@ func (d *dispatcher) dispatchOne(
 		}
 	}
 	o.GetObjectDefaulter().Default(newVersionedObject)
-
 	versionedAttributes.Dirty = true
-	versionedAttributes.VersionedObject = newVersionedObject
-	return nil
+	return versionedAttributes.UpdateObject(newVersionedObject)
 }
 
 func keyFor(invocation generic.PolicyInvocation[*Policy, *PolicyBinding, PolicyEvaluator]) (key, error) {

@@ -17,6 +17,10 @@ limitations under the License.
 package admission
 
 import (
+	"reflect"
+	"sync"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -29,13 +33,30 @@ type VersionedAttributes struct {
 	// VersionedOldObject holds Attributes.OldObject (if non-nil), converted to VersionedKind.
 	// It must never be mutated.
 	VersionedOldObject runtime.Object
+	// unstructuredOldObject lazily caches Attributes.OldObject (if non-nil) as Unstructured. This helps in avoiding its repeated construction.
+	unstructuredOldObject *unstructured.Unstructured
 	// VersionedObject holds Attributes.Object (if non-nil), converted to VersionedKind.
 	// If mutated, Dirty must be set to true by the mutator.
 	VersionedObject runtime.Object
+	// unstructuredObject lazily caches Attributes.Object (if non-nil) as Unstructured. This helps in avoiding its repeated construction.
+	unstructuredObject *unstructured.Unstructured
+
 	// VersionedKind holds the fully qualified kind
 	VersionedKind schema.GroupVersionKind
 	// Dirty indicates VersionedObject has been modified since being converted from Attributes.Object
 	Dirty bool
+
+	// unstructuredCacheMutex protects the lazy initialization and cache clearing of the UnstructuredObject and UnstructuredOldObject fields.
+	unstructuredCacheMutex sync.Mutex
+}
+
+func (v *VersionedAttributes) updateOldObject(out runtime.Object) error {
+	v.unstructuredCacheMutex.Lock()
+	defer v.unstructuredCacheMutex.Unlock()
+
+	v.VersionedOldObject = out
+	v.unstructuredOldObject = nil
+	return nil
 }
 
 // GetObject overrides the Attributes.GetObject()
@@ -87,7 +108,56 @@ func NewVersionedAttributes(attr Attributes, gvk schema.GroupVersionKind, o Obje
 		}
 		versionedAttr.VersionedObject = out
 	}
+
 	return versionedAttr, nil
+}
+
+// UpdateObject updates the VersionedObject and clears the cached UnstructuredObject.
+func (v *VersionedAttributes) UpdateObject(obj runtime.Object) error {
+	v.unstructuredCacheMutex.Lock()
+	defer v.unstructuredCacheMutex.Unlock()
+
+	v.VersionedObject = obj
+	v.unstructuredObject = nil
+	return nil
+}
+
+// GetUnstructuredObject lazily converts and returns the Unstructured representation of the object.
+func (v *VersionedAttributes) GetUnstructuredObject() (*unstructured.Unstructured, error) {
+	v.unstructuredCacheMutex.Lock()
+	defer v.unstructuredCacheMutex.Unlock()
+
+	if v.unstructuredObject != nil {
+		return v.unstructuredObject, nil
+	}
+	if v.VersionedObject == nil {
+		return nil, nil
+	}
+	unstructuredObj, err := ConvertObjectToUnstructured(v.VersionedObject)
+	if err != nil {
+		return nil, err
+	}
+	v.unstructuredObject = unstructuredObj
+	return v.unstructuredObject, nil
+}
+
+// GetUnstructuredOldObject lazily converts and returns the Unstructured representation of the old object.
+func (v *VersionedAttributes) GetUnstructuredOldObject() (*unstructured.Unstructured, error) {
+	v.unstructuredCacheMutex.Lock()
+	defer v.unstructuredCacheMutex.Unlock()
+
+	if v.unstructuredOldObject != nil {
+		return v.unstructuredOldObject, nil
+	}
+	if v.VersionedOldObject == nil {
+		return nil, nil
+	}
+	unstructuredObj, err := ConvertObjectToUnstructured(v.VersionedOldObject)
+	if err != nil {
+		return nil, err
+	}
+	v.unstructuredOldObject = unstructuredObj
+	return v.unstructuredOldObject, nil
 }
 
 // ConvertVersionedAttributes converts VersionedObject and VersionedOldObject to the specified kind, if needed.
@@ -108,7 +178,9 @@ func ConvertVersionedAttributes(attr *VersionedAttributes, gvk schema.GroupVersi
 		if err != nil {
 			return err
 		}
-		attr.VersionedOldObject = out
+		if err := attr.updateOldObject(out); err != nil {
+			return err
+		}
 	}
 
 	if attr.VersionedObject != nil {
@@ -125,7 +197,9 @@ func ConvertVersionedAttributes(attr *VersionedAttributes, gvk schema.GroupVersi
 		if err != nil {
 			return err
 		}
-		attr.VersionedObject = out
+		if err := attr.UpdateObject(out); err != nil {
+			return err
+		}
 	}
 
 	// Remember we converted to this version
@@ -133,4 +207,16 @@ func ConvertVersionedAttributes(attr *VersionedAttributes, gvk schema.GroupVersi
 	attr.Dirty = false
 
 	return nil
+}
+
+// ConvertObjectToUnstructured converts an object to an unstructured representation.
+func ConvertObjectToUnstructured(obj interface{}) (*unstructured.Unstructured, error) {
+	if obj == nil || reflect.ValueOf(obj).IsNil() {
+		return &unstructured.Unstructured{Object: nil}, nil
+	}
+	ret, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	if err != nil {
+		return nil, err
+	}
+	return &unstructured.Unstructured{Object: ret}, nil
 }

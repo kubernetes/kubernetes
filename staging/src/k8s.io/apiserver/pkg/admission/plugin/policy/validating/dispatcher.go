@@ -115,14 +115,9 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 	}
 
 	authz := admissionauthorizer.NewCachingAuthorizer(c.authz)
+	versionedAttrs := map[schema.GroupVersionKind]*admission.VersionedAttributes{}
 
 	for _, hook := range hooks {
-		// versionedAttributes will be set to non-nil inside of the loop, but
-		// is scoped outside of the param loop so we only convert once. We defer
-		// conversion so that it is only performed when we know a policy matches,
-		// saving the cost of converting non-matching requests.
-		var versionedAttr *admission.VersionedAttributes
-
 		definition := hook.Policy
 		matches, matchResource, matchKind, err := c.matcher.DefinitionMatches(a, o, NewValidatingAdmissionPolicyAccessor(definition))
 		if err != nil {
@@ -164,7 +159,10 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 			if err != nil {
 				addConfigError(err, definition, binding)
 				continue
-			} else if versionedAttr == nil && len(params) > 0 {
+			}
+
+			versionedAttr := versionedAttrs[matchKind]
+			if versionedAttr == nil && len(params) > 0 {
 				// As optimization versionedAttr creation is deferred until
 				// first use. Since > 0 params, we will validate
 				va, err := admission.NewVersionedAttributes(a, matchKind, o)
@@ -174,6 +172,7 @@ func (c *dispatcher) Dispatch(ctx context.Context, a admission.Attributes, o adm
 					continue
 				}
 				versionedAttr = va
+				versionedAttrs[matchKind] = va
 			}
 
 			var validationResults []ValidateResult
