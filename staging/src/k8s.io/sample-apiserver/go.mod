@@ -17,7 +17,7 @@ require (
 	k8s.io/kube-openapi v0.0.0-20260509150519-312035bf509b
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
 	sigs.k8s.io/randfill v1.0.0
-	sigs.k8s.io/structured-merge-diff/v6 v6.3.2
+	sigs.k8s.io/structured-merge-diff/v6 v6.3.3-0.20260511172715-0be5159fe38f
 )
 
 require (
@@ -128,4 +128,5 @@ replace (
 	k8s.io/component-base => ../component-base
 	k8s.io/kms => ../kms
 	k8s.io/streaming => ../streaming
+	sigs.k8s.io/structured-merge-diff/v6 => github.com/jpbetz/structured-merge-diff/v6 v6.3.3-0.20260511172715-0be5159fe38f
 )

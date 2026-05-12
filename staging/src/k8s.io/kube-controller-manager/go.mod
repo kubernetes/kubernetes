@@ -29,7 +29,7 @@ require (
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
-	sigs.k8s.io/structured-merge-diff/v6 v6.3.2 // indirect
+	sigs.k8s.io/structured-merge-diff/v6 v6.3.3-0.20260511172715-0be5159fe38f // indirect
 )
 
 replace (
@@ -43,4 +43,5 @@ replace (
 	k8s.io/controller-manager => ../controller-manager
 	k8s.io/kms => ../kms
 	k8s.io/streaming => ../streaming
+	sigs.k8s.io/structured-merge-diff/v6 => github.com/jpbetz/structured-merge-diff/v6 v6.3.3-0.20260511172715-0be5159fe38f
 )

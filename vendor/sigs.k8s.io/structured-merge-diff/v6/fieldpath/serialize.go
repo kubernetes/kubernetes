@@ -175,6 +175,17 @@ func (s *Set) FromJSON(r io.Reader) error {
 	} else {
 		*s = *found
 	}
+	if iter.Error != nil {
+		return iter.Error
+	}
+	if iter.WhatIsNext(); iter.Error == nil {
+		// Piggy back on scanner aware error reporting here.
+		iter.ReportError("managedFields parsing", "unexpected trailing data after JSON object")
+		return iter.Error
+	}
+	if iter.Error == io.EOF {
+		return nil
+	}
 	return iter.Error
 }
 

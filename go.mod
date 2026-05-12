@@ -119,7 +119,7 @@ require (
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730
 	sigs.k8s.io/knftables v0.0.21
 	sigs.k8s.io/randfill v1.0.0
-	sigs.k8s.io/structured-merge-diff/v6 v6.3.2
+	sigs.k8s.io/structured-merge-diff/v6 v6.3.3-0.20260511172715-0be5159fe38f
 	sigs.k8s.io/yaml v1.6.0
 )
 
@@ -260,4 +260,5 @@ replace (
 	k8s.io/sample-cli-plugin => ./staging/src/k8s.io/sample-cli-plugin
 	k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
 	k8s.io/streaming => ./staging/src/k8s.io/streaming
+	sigs.k8s.io/structured-merge-diff/v6 => github.com/jpbetz/structured-merge-diff/v6 v6.3.3-0.20260511172715-0be5159fe38f
 )

@@ -60,7 +60,7 @@ require (
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.34.0
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730
 	sigs.k8s.io/randfill v1.0.0
-	sigs.k8s.io/structured-merge-diff/v6 v6.3.2
+	sigs.k8s.io/structured-merge-diff/v6 v6.3.3-0.20260511172715-0be5159fe38f
 	sigs.k8s.io/yaml v1.6.0
 )
 
@@ -139,4 +139,5 @@ replace (
 	k8s.io/component-base => ../component-base
 	k8s.io/kms => ../kms
 	k8s.io/streaming => ../streaming
+	sigs.k8s.io/structured-merge-diff/v6 => github.com/jpbetz/structured-merge-diff/v6 v6.3.3-0.20260511172715-0be5159fe38f
 )
