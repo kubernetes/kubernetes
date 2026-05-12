@@ -395,7 +395,8 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		if o.GracePeriod >= 0 {
 			options = metav1.NewDeleteOptions(int64(o.GracePeriod))
 		}
-		if o.CascadingStrategy != "" {
+		// Skip setting PropagationPolicy to respect server-side propagation policy when --cascade flag is "none"
+		if len(o.CascadingStrategy) != 0 {
 			options.PropagationPolicy = &o.CascadingStrategy
 		}
 		if warnClusterScope && info.Mapping.Scope.Name() == meta.RESTScopeNameRoot {
