@@ -26,7 +26,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -164,7 +163,6 @@ const WaitSecondsValue = "5"
 
 // runner implements Interface in terms of exec("iptables").
 type runner struct {
-	mu       sync.Mutex
 	exec     utilexec.Interface
 	protocol Protocol
 }
@@ -212,9 +210,6 @@ func NewBestEffort() map[v1.IPFamily]Interface {
 func (runner *runner) EnsureChain(table Table, chain Chain) (bool, error) {
 	fullArgs := makeFullArgs(table, chain)
 
-	runner.mu.Lock()
-	defer runner.mu.Unlock()
-
 	out, err := runner.run(opCreateChain, fullArgs)
 	if err != nil {
 		if ee, ok := err.(utilexec.ExitError); ok {
@@ -231,9 +226,6 @@ func (runner *runner) EnsureChain(table Table, chain Chain) (bool, error) {
 func (runner *runner) FlushChain(table Table, chain Chain) error {
 	fullArgs := makeFullArgs(table, chain)
 
-	runner.mu.Lock()
-	defer runner.mu.Unlock()
-
 	out, err := runner.run(opFlushChain, fullArgs)
 	if err != nil {
 		return fmt.Errorf("error flushing chain %q: %v: %s", chain, err, out)
@@ -245,9 +237,6 @@ func (runner *runner) FlushChain(table Table, chain Chain) error {
 func (runner *runner) DeleteChain(table Table, chain Chain) error {
 	fullArgs := makeFullArgs(table, chain)
 
-	runner.mu.Lock()
-	defer runner.mu.Unlock()
-
 	out, err := runner.run(opDeleteChain, fullArgs)
 	if err != nil {
 		return fmt.Errorf("error deleting chain %q: %v: %s", chain, err, out)
@@ -258,9 +247,6 @@ func (runner *runner) DeleteChain(table Table, chain Chain) error {
 // EnsureRule is part of Interface.
 func (runner *runner) EnsureRule(position RulePosition, table Table, chain Chain, args ...string) (bool, error) {
 	fullArgs := makeFullArgs(table, chain, args...)
-
-	runner.mu.Lock()
-	defer runner.mu.Unlock()
 
 	exists, err := runner.checkRule(fullArgs)
 	if err != nil {
@@ -279,9 +265,6 @@ func (runner *runner) EnsureRule(position RulePosition, table Table, chain Chain
 // DeleteRule is part of Interface.
 func (runner *runner) DeleteRule(table Table, chain Chain, args ...string) error {
 	fullArgs := makeFullArgs(table, chain, args...)
-
-	runner.mu.Lock()
-	defer runner.mu.Unlock()
 
 	exists, err := runner.checkRule(fullArgs)
 	if err != nil {
@@ -307,9 +290,6 @@ func (runner *runner) Protocol() Protocol {
 
 // SaveInto is part of Interface.
 func (runner *runner) SaveInto(table Table, buffer *bytes.Buffer) error {
-	runner.mu.Lock()
-	defer runner.mu.Unlock()
-
 	trace := utiltrace.New("iptables save")
 	defer trace.LogIfLong(2 * time.Second)
 
@@ -345,9 +325,6 @@ func (runner *runner) RestoreAll(data []byte, flush FlushFlag, counters RestoreC
 
 // restoreInternal is the shared part of Restore/RestoreAll
 func (runner *runner) restoreInternal(args []string, data []byte, flush FlushFlag, counters RestoreCountersFlag) error {
-	runner.mu.Lock()
-	defer runner.mu.Unlock()
-
 	trace := utiltrace.New("iptables restore")
 	defer trace.LogIfLong(2 * time.Second)
 
@@ -494,9 +471,6 @@ func (runner *runner) Monitor(canary Chain, tables []Table, reloadFunc func(), i
 // ChainExists is part of Interface
 func (runner *runner) ChainExists(table Table, chain Chain) (bool, error) {
 	fullArgs := makeFullArgs(table, chain)
-
-	runner.mu.Lock()
-	defer runner.mu.Unlock()
 
 	trace := utiltrace.New("iptables ChainExists")
 	defer trace.LogIfLong(2 * time.Second)
