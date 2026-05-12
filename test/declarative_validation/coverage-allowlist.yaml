@@ -1,0 +1,47 @@
+# Suppressions for declarative-validation coverage.
+#
+# Every field is required. apiVersion matches exactly (use the standard
+# "<group>/<version>" form, or "<version>" for core). kind, path,
+# errorType, and origin match exactly OR wildcard with '*' (no implicit
+# wildcarding, so an entry can never silently overexclude). reason is
+# required.
+#
+# Example:
+#   - apiVersion: autoscaling/v1   # one specific rule
+#     kind: Scale
+#     path: spec.replicas
+#     errorType: FieldValueInvalid
+#     origin: minimum
+#     reason: tested separately
+#
+# Run hack/update-codegen.sh after editing.
+
+- apiVersion: extensions/v1beta1
+  kind: '*'
+  path: '*'
+  errorType: '*'
+  origin: '*'
+  reason: Not served by kube-apiserver.
+
+# Scale subresource: no dedicated Strategy in the new tree; tested separately
+# via VerifyVersionedValidationEquivalence (which doesn't populate the
+# in-process coverage accumulator). extensions/v1beta1/Scale is covered by
+# the group-level entry above.
+- apiVersion: autoscaling/v1
+  kind: Scale
+  path: '*'
+  errorType: '*'
+  origin: '*'
+  reason: Scale subresource has no dedicated Strategy; tested separately.
+- apiVersion: apps/v1beta1
+  kind: Scale
+  path: '*'
+  errorType: '*'
+  origin: '*'
+  reason: Scale subresource has no dedicated Strategy; tested separately.
+- apiVersion: apps/v1beta2
+  kind: Scale
+  path: '*'
+  errorType: '*'
+  origin: '*'
+  reason: Scale subresource has no dedicated Strategy; tested separately.

@@ -1,0 +1,11 @@
+apiVersion: resource.k8s.io/v1alpha3
+kind: DeviceTaintRule
+metadata:
+  name: taint-all-devices
+spec:
+  # Empty selector -> all devices!
+  deviceSelector:
+  taint:
+    key: example.com/taint
+    value: tainted
+    effect: NoSchedule

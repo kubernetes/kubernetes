@@ -1,0 +1,24 @@
+---
+apiVersion: kubectl.config.k8s.io/v1unknown1
+kind: Preference
+overrides:
+  - command: v1unknown1-apply
+    flags:
+      - name: server-side
+        default: "true"
+  - command: v1unknown1-delete
+    flags:
+      - name: interactive
+        default: "true"
+---
+apiVersion: kubectl.config.k8s.io/v1unknown2
+kind: Preference
+overrides:
+  - command: v1unknown2-apply
+    flags:
+      - name: server-side
+        default: "true"
+  - command: v1unknown2-delete
+    flags:
+      - name: interactive
+        default: "true"

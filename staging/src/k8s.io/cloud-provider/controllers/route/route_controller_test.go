@@ -1,0 +1,876 @@
+/*
+Copyright 2015 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package route
+
+import (
+	"context"
+	"net"
+	"testing"
+	"time"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/controller-manager/pkg/features"
+	_ "k8s.io/controller-manager/pkg/features/register"
+
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/kubernetes/scheme"
+	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/record"
+	cloudprovider "k8s.io/cloud-provider"
+	fakecloud "k8s.io/cloud-provider/fake"
+	nodeutil "k8s.io/component-helpers/node/util"
+	"k8s.io/klog/v2/ktesting"
+	netutils "k8s.io/utils/net"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func alwaysReady() bool { return true }
+
+func TestIsResponsibleForRoute(t *testing.T) {
+	myClusterName := "my-awesome-cluster"
+	myClusterRoute := "my-awesome-cluster-12345678-90ab-cdef-1234-567890abcdef"
+	testCases := []struct {
+		clusterCIDR         string
+		routeName           string
+		routeCIDR           string
+		expectedResponsible bool
+	}{
+		// Routes that belong to this cluster
+		{"10.244.0.0/16", myClusterRoute, "10.244.0.0/24", true},
+		{"10.244.0.0/16", myClusterRoute, "10.244.10.0/24", true},
+		{"10.244.0.0/16", myClusterRoute, "10.244.255.0/24", true},
+		{"10.244.0.0/14", myClusterRoute, "10.244.0.0/24", true},
+		{"10.244.0.0/14", myClusterRoute, "10.247.255.0/24", true},
+		{"a00:100::/10", myClusterRoute, "a00:100::/24", true},
+		// Routes that match our naming/tagging scheme, but are outside our cidr
+		{"10.244.0.0/16", myClusterRoute, "10.224.0.0/24", false},
+		{"10.244.0.0/16", myClusterRoute, "10.0.10.0/24", false},
+		{"10.244.0.0/16", myClusterRoute, "10.255.255.0/24", false},
+		{"10.244.0.0/14", myClusterRoute, "10.248.0.0/24", false},
+		{"10.244.0.0/14", myClusterRoute, "10.243.255.0/24", false},
+		{"a00:100::/10", myClusterRoute, "b00:100::/24", false},
+	}
+	for i, testCase := range testCases {
+		_, cidr, err := netutils.ParseCIDRSloppy(testCase.clusterCIDR)
+		if err != nil {
+			t.Errorf("%d. Error in test case: unparsable cidr %q", i, testCase.clusterCIDR)
+		}
+		client := fake.NewSimpleClientset()
+		informerFactory := informers.NewSharedInformerFactory(client, 0)
+		rc, err := New(nil, nil, informerFactory.Core().V1().Nodes(), myClusterName, []*net.IPNet{cidr})
+		require.NoError(t, err)
+		rc.nodeListerSynced = alwaysReady
+		route := &cloudprovider.Route{
+			Name:            testCase.routeName,
+			TargetNode:      types.NodeName("doesnt-matter-for-this-test"),
+			DestinationCIDR: testCase.routeCIDR,
+		}
+		if resp := rc.isResponsibleForRoute(route); resp != testCase.expectedResponsible {
+			t.Errorf("%d. isResponsibleForRoute() = %t; want %t", i, resp, testCase.expectedResponsible)
+		}
+	}
+}
+
+func TestReconcile(t *testing.T) {
+	cluster := "my-k8s"
+	node1 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", UID: "01"}, Spec: v1.NodeSpec{PodCIDR: "10.120.0.0/24", PodCIDRs: []string{"10.120.0.0/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}}}
+	// node1NoAddr := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", UID: "01"}, Spec: v1.NodeSpec{PodCIDR: "10.120.0.0/24", PodCIDRs: []string{"10.120.0.0/24"}}}
+	node2 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-2", UID: "02"}, Spec: v1.NodeSpec{PodCIDR: "10.120.1.0/24", PodCIDRs: []string{"10.120.1.0/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.2.1"}}}}
+	nodeNoCidr := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-2", UID: "02"}, Spec: v1.NodeSpec{PodCIDR: ""}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.5.1"}}}}
+
+	node3 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-3", UID: "03"}, Spec: v1.NodeSpec{PodCIDR: "10.120.0.0/24", PodCIDRs: []string{"10.120.0.0/24", "a00:100::/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.3.1"}}}}
+	node4 := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-4", UID: "04"}, Spec: v1.NodeSpec{PodCIDR: "10.120.1.0/24", PodCIDRs: []string{"10.120.1.0/24", "a00:200::/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}}}
+	nodeDuplicateCIDR := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-4", UID: "04"}, Spec: v1.NodeSpec{PodCIDR: "10.120.1.0/24", PodCIDRs: []string{"10.120.1.0/24", "10.120.1.0/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}}}
+
+	testCases := []struct {
+		description                string
+		nodes                      []*v1.Node
+		initialRoutes              []*cloudprovider.Route
+		expectedRoutes             []*cloudprovider.Route
+		expectedNetworkUnavailable []bool
+		clientset                  *fake.Clientset
+		dualStack                  bool
+		expectError                bool
+	}{
+		{
+			description: "routes have no TargetNodeAddresses at the beginning",
+			dualStack:   true,
+			nodes: []*v1.Node{
+				&node3,
+				&node4,
+			},
+			initialRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-3", DestinationCIDR: "10.120.0.0/24", Blackhole: false, EnableNodeAddresses: true},
+				{Name: cluster + "-02", TargetNode: "node-4", DestinationCIDR: "10.120.1.0/24", Blackhole: false, EnableNodeAddresses: true},
+
+				{Name: cluster + "-03", TargetNode: "node-3", DestinationCIDR: "a00:100::/24", Blackhole: false, EnableNodeAddresses: true},
+				{Name: cluster + "-04", TargetNode: "node-4", DestinationCIDR: "a00:200::/24", Blackhole: false, EnableNodeAddresses: true},
+			},
+			expectedRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-3", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.3.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false, EnableNodeAddresses: true},
+				{Name: cluster + "-02", TargetNode: "node-4", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}, DestinationCIDR: "10.120.1.0/24", Blackhole: false, EnableNodeAddresses: true},
+
+				{Name: cluster + "-03", TargetNode: "node-3", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.3.1"}}, DestinationCIDR: "a00:100::/24", Blackhole: false, EnableNodeAddresses: true},
+				{Name: cluster + "-04", TargetNode: "node-4", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}, DestinationCIDR: "a00:200::/24", Blackhole: false, EnableNodeAddresses: true},
+			},
+			expectedNetworkUnavailable: []bool{true, true},
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
+		},
+		{
+			description: "routes' TargetNodeAddresses changed",
+			dualStack:   true,
+			nodes: []*v1.Node{
+				&node3,
+				&node4,
+			},
+			initialRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-3", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.13.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false, EnableNodeAddresses: true},
+				{Name: cluster + "-02", TargetNode: "node-4", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.14.1"}}, DestinationCIDR: "10.120.1.0/24", Blackhole: false, EnableNodeAddresses: true},
+
+				{Name: cluster + "-03", TargetNode: "node-3", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.13.1"}}, DestinationCIDR: "a00:100::/24", Blackhole: false, EnableNodeAddresses: true},
+				{Name: cluster + "-04", TargetNode: "node-4", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.14.1"}}, DestinationCIDR: "a00:200::/24", Blackhole: false, EnableNodeAddresses: true},
+			},
+			expectedRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-3", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.3.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false, EnableNodeAddresses: true},
+				{Name: cluster + "-02", TargetNode: "node-4", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}, DestinationCIDR: "10.120.1.0/24", Blackhole: false, EnableNodeAddresses: true},
+
+				{Name: cluster + "-03", TargetNode: "node-3", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.3.1"}}, DestinationCIDR: "a00:100::/24", Blackhole: false, EnableNodeAddresses: true},
+				{Name: cluster + "-04", TargetNode: "node-4", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}, DestinationCIDR: "a00:200::/24", Blackhole: false, EnableNodeAddresses: true},
+			},
+			expectedNetworkUnavailable: []bool{true, true},
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
+		},
+		{
+			description: "multicidr 2 nodes and no routes",
+			dualStack:   true,
+			nodes: []*v1.Node{
+				&node3,
+				&node4,
+			},
+			initialRoutes: []*cloudprovider.Route{},
+			expectedRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-3", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.3.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-4", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}, DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+
+				{Name: cluster + "-03", TargetNode: "node-3", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.3.1"}}, DestinationCIDR: "a00:100::/24", Blackhole: false},
+				{Name: cluster + "-04", TargetNode: "node-4", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}, DestinationCIDR: "a00:200::/24", Blackhole: false},
+			},
+			expectedNetworkUnavailable: []bool{true, true},
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
+		},
+		{
+			description: "multicidr 2 nodes and all routes created",
+			dualStack:   true,
+			nodes: []*v1.Node{
+				&node3,
+				&node4,
+			},
+			initialRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-3", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.3.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-4", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}, DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+
+				{Name: cluster + "-03", TargetNode: "node-3", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.3.1"}}, DestinationCIDR: "a00:100::/24", Blackhole: false},
+				{Name: cluster + "-04", TargetNode: "node-4", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}, DestinationCIDR: "a00:200::/24", Blackhole: false},
+			},
+			expectedRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-3", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.3.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-4", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}, DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+
+				{Name: cluster + "-03", TargetNode: "node-3", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.3.1"}}, DestinationCIDR: "a00:100::/24", Blackhole: false},
+				{Name: cluster + "-04", TargetNode: "node-4", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}, DestinationCIDR: "a00:200::/24", Blackhole: false},
+			},
+			expectedNetworkUnavailable: []bool{true, true},
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
+		},
+		{
+			description: "multicidr 2 nodes and few wrong routes",
+			dualStack:   true,
+			nodes: []*v1.Node{
+				&node3,
+				&node4,
+			},
+			initialRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-3", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.3.1"}}, DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-4", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+
+				{Name: cluster + "-03", TargetNode: "node-3", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.3.1"}}, DestinationCIDR: "a00:200::/24", Blackhole: false},
+				{Name: cluster + "-04", TargetNode: "node-4", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}, DestinationCIDR: "a00:100::/24", Blackhole: false},
+			},
+			expectedRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-3", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.3.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-4", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}, DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+
+				{Name: cluster + "-03", TargetNode: "node-3", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.3.1"}}, DestinationCIDR: "a00:100::/24", Blackhole: false},
+				{Name: cluster + "-04", TargetNode: "node-4", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}, DestinationCIDR: "a00:200::/24", Blackhole: false},
+			},
+			expectedNetworkUnavailable: []bool{true, true},
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
+		},
+		{
+			description: "multicidr 2 nodes and some routes created",
+			dualStack:   true,
+			nodes: []*v1.Node{
+				&node3,
+				&node4,
+			},
+			initialRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-3", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.3.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-04", TargetNode: "node-4", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}, DestinationCIDR: "a00:200::/24", Blackhole: false},
+			},
+			expectedRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-3", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.3.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-4", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}, DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+
+				{Name: cluster + "-03", TargetNode: "node-3", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.3.1"}}, DestinationCIDR: "a00:100::/24", Blackhole: false},
+				{Name: cluster + "-04", TargetNode: "node-4", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}, DestinationCIDR: "a00:200::/24", Blackhole: false},
+			},
+			expectedNetworkUnavailable: []bool{true, true},
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
+		},
+		{
+			description: "multicidr 2 nodes and too many routes",
+			dualStack:   true,
+			nodes: []*v1.Node{
+				&node3,
+				&node4,
+			},
+			initialRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-3", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.3.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-4", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}, DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+				{Name: cluster + "-001", TargetNode: "node-x", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.5.1"}}, DestinationCIDR: "10.120.2.0/24", Blackhole: false},
+
+				{Name: cluster + "-03", TargetNode: "node-3", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.3.1"}}, DestinationCIDR: "a00:100::/24", Blackhole: false},
+				{Name: cluster + "-04", TargetNode: "node-4", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}, DestinationCIDR: "a00:200::/24", Blackhole: false},
+				{Name: cluster + "-0002", TargetNode: "node-y", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.6.1"}}, DestinationCIDR: "a00:300::/24", Blackhole: false},
+			},
+			expectedRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-3", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.3.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-4", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}, DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+
+				{Name: cluster + "-03", TargetNode: "node-3", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.3.1"}}, DestinationCIDR: "a00:100::/24", Blackhole: false},
+				{Name: cluster + "-04", TargetNode: "node-4", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}, DestinationCIDR: "a00:200::/24", Blackhole: false},
+			},
+			expectedNetworkUnavailable: []bool{true, true},
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
+		},
+		{
+			description: "single cidr 2 nodes and routes created",
+			nodes: []*v1.Node{
+				&node1,
+				&node2,
+			},
+			initialRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-1", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-2", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.2.1"}}, DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+			},
+			expectedRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-1", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-2", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.2.1"}}, DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+			},
+			expectedNetworkUnavailable: []bool{true, true},
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
+		},
+		{
+			description: "single cidr node ips changed so routes should be updated",
+			nodes: []*v1.Node{
+				&node1,
+				&node2,
+			},
+			initialRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-1", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.2"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false, EnableNodeAddresses: true},
+				{Name: cluster + "-02", TargetNode: "node-2", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.2.2"}}, DestinationCIDR: "10.120.1.0/24", Blackhole: false, EnableNodeAddresses: true},
+			},
+			expectedRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-1", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false, EnableNodeAddresses: true},
+				{Name: cluster + "-02", TargetNode: "node-2", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.2.1"}}, DestinationCIDR: "10.120.1.0/24", Blackhole: false, EnableNodeAddresses: true},
+			},
+			expectedNetworkUnavailable: []bool{true, true},
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
+		},
+		{
+			description: "single cidr 2 nodes and one route created",
+			nodes: []*v1.Node{
+				&node1,
+				&node2,
+			},
+			initialRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-1", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+			},
+			expectedRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-1", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-2", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.2.1"}}, DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+			},
+			expectedNetworkUnavailable: []bool{true, true},
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
+		},
+		{
+			description: "single cidr 2 nodes and no routes",
+			nodes: []*v1.Node{
+				&node1,
+				&node2,
+			},
+			initialRoutes: []*cloudprovider.Route{},
+			expectedRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-1", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-2", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.2.1"}}, DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+			},
+			expectedNetworkUnavailable: []bool{true, true},
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
+		},
+		{
+			description: "single cidr 2 nodes and too many routes",
+			nodes: []*v1.Node{
+				&node1,
+				&node2,
+			},
+			initialRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-1", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-2", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.2.1"}}, DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+				{Name: cluster + "-03", TargetNode: "node-3", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.3.1"}}, DestinationCIDR: "10.120.2.0/24", Blackhole: false},
+				{Name: cluster + "-04", TargetNode: "node-4", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.4.1"}}, DestinationCIDR: "10.120.3.0/24", Blackhole: false},
+			},
+			expectedRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-1", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-2", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.2.1"}}, DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+			},
+			expectedNetworkUnavailable: []bool{true, true},
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
+		},
+		{
+			description: "single cidr 2 nodes and 2 routes with 1 incorrect",
+			nodes: []*v1.Node{
+				&node1,
+				&node2,
+			},
+			initialRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-1", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-03", TargetNode: "node-3", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.2.1"}}, DestinationCIDR: "10.120.2.0/24", Blackhole: false},
+			},
+			expectedRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-1", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-2", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.2.1"}}, DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+			},
+			expectedNetworkUnavailable: []bool{true, true},
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
+		},
+		{
+			description: "single cidr 2 nodes and one node without cidr assigned",
+			nodes: []*v1.Node{
+				&node1,
+				&nodeNoCidr,
+			},
+			initialRoutes: []*cloudprovider.Route{},
+			expectedRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-1", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+			},
+			expectedNetworkUnavailable: []bool{true, false},
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, nodeNoCidr}}),
+		},
+		{
+			description: "single cidr 2 nodes and an extra blackhole route in our range",
+			nodes: []*v1.Node{
+				&node1,
+				&node2,
+			},
+			initialRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-1", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-2", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.2.1"}}, DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+				{Name: cluster + "-03", TargetNode: "", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.100.1"}}, DestinationCIDR: "10.120.2.0/24", Blackhole: true},
+			},
+			expectedRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-1", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-2", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.2.1"}}, DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+			},
+			expectedNetworkUnavailable: []bool{true, true},
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
+		},
+		{
+			description: "single cidr 2 nodes and an extra blackhole route not in our range",
+			nodes: []*v1.Node{
+				&node1,
+				&node2,
+			},
+			initialRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-1", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-2", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.2.1"}}, DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+				{Name: cluster + "-03", TargetNode: "", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.100.1"}}, DestinationCIDR: "10.1.2.0/24", Blackhole: true},
+			},
+			expectedRoutes: []*cloudprovider.Route{
+				{Name: cluster + "-01", TargetNode: "node-1", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}, DestinationCIDR: "10.120.0.0/24", Blackhole: false},
+				{Name: cluster + "-02", TargetNode: "node-2", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.2.1"}}, DestinationCIDR: "10.120.1.0/24", Blackhole: false},
+				{Name: cluster + "-03", TargetNode: "", TargetNodeAddresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.100.1"}}, DestinationCIDR: "10.1.2.0/24", Blackhole: true},
+			},
+			expectedNetworkUnavailable: []bool{true, true},
+			clientset:                  fake.NewSimpleClientset(&v1.NodeList{Items: []v1.Node{node1, node2}}),
+		},
+		{
+			description: "duplicate pod cidr",
+			nodes: []*v1.Node{
+				&nodeDuplicateCIDR,
+			},
+			initialRoutes:              []*cloudprovider.Route{},
+			expectedRoutes:             []*cloudprovider.Route{},
+			expectedNetworkUnavailable: []bool{true, false},
+			expectError:                true,
+			clientset:                  fake.NewClientset(&v1.NodeList{Items: []v1.Node{nodeDuplicateCIDR}}),
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			cloud := &fakecloud.Cloud{RouteMap: make(map[string]*fakecloud.Route)}
+			for _, route := range testCase.initialRoutes {
+				fakeRoute := &fakecloud.Route{}
+				fakeRoute.ClusterName = cluster
+				fakeRoute.Route = *route
+				cloud.RouteMap[route.Name] = fakeRoute
+			}
+			routes, ok := cloud.Routes()
+			assert.True(t, ok, "fakecloud failed to run Routes()")
+			cidrs := make([]*net.IPNet, 0)
+			_, cidr, _ := netutils.ParseCIDRSloppy("10.120.0.0/16")
+			cidrs = append(cidrs, cidr)
+			if testCase.dualStack {
+				_, cidrv6, _ := netutils.ParseCIDRSloppy("ace:cab:deca::/8")
+				cidrs = append(cidrs, cidrv6)
+			}
+
+			informerFactory := informers.NewSharedInformerFactory(testCase.clientset, 0)
+
+			rc, err := New(routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidrs)
+			require.NoError(t, err)
+
+			recorder := record.NewBroadcaster(record.WithContext(ctx))
+			rc.recorder = recorder.NewRecorder(scheme.Scheme, v1.EventSource{Component: "route_controller"})
+			e := recorder.StartEventWatcher(func(e *v1.Event) {
+				if e.InvolvedObject.APIVersion == "" {
+					t.Fatalf("event involvedObject.apiVersion is empty")
+				}
+			})
+			defer e.Stop()
+
+			rc.nodeListerSynced = alwaysReady
+			require.NoError(t, rc.reconcile(ctx, testCase.nodes, testCase.initialRoutes), "failed to reconcile")
+			for _, action := range testCase.clientset.Actions() {
+				if action.GetVerb() == "update" && action.GetResource().Resource == "nodes" {
+					node := action.(core.UpdateAction).GetObject().(*v1.Node)
+					_, condition := nodeutil.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
+					assert.NotEmpty(t, condition, "Missing NodeNetworkUnavailable condition for Node %q", node.Name)
+					check := func(index int) bool {
+						return (condition.Status == v1.ConditionFalse) == testCase.expectedNetworkUnavailable[index]
+					}
+					index := -1
+					for j := range testCase.nodes {
+						if testCase.nodes[j].Name == node.Name {
+							index = j
+						}
+					}
+					if index == -1 {
+						// Something's wrong
+						continue
+					}
+					assert.True(t, check(index), "Invalid NodeNetworkUnavailable condition for Node %q, expected %v, got %v",
+						node.Name, testCase.expectedNetworkUnavailable[index], (condition.Status == v1.ConditionFalse))
+				}
+			}
+			var finalRoutes []*cloudprovider.Route
+			timeoutChan := time.After(200 * time.Millisecond)
+			tick := time.NewTicker(10 * time.Millisecond)
+			defer tick.Stop()
+		poll:
+			for {
+				select {
+				case <-tick.C:
+					if finalRoutes, err = routes.ListRoutes(ctx, cluster); err == nil && routeListEqual(finalRoutes, testCase.expectedRoutes) {
+						break poll
+					}
+				case <-timeoutChan:
+					if !testCase.expectError {
+						t.Errorf("rc.reconcile() err is %v,\nfound routes:\n%v\nexpected routes:\n%v\n",
+							err, flatten(finalRoutes), flatten(testCase.expectedRoutes))
+					}
+					break poll
+				}
+			}
+		})
+
+	}
+}
+
+func TestHandleNodeUpdate(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CloudControllerManagerWatchBasedRoutesReconciliation, true)
+
+	cluster := "my-k8s"
+	node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", UID: "01"}, Spec: v1.NodeSpec{PodCIDR: "10.120.0.0/24", PodCIDRs: []string{"10.120.0.0/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}}}
+
+	testCases := []struct {
+		description           string
+		clientset             *fake.Clientset
+		updatedNode           v1.Node
+		expectedWorkqueueItem string
+	}{
+		{
+			description:           "internal IP updated",
+			clientset:             fake.NewClientset(&v1.NodeList{Items: []v1.Node{node}}),
+			updatedNode:           v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", UID: "01"}, Spec: v1.NodeSpec{PodCIDR: "10.120.0.0/24", PodCIDRs: []string{"10.120.0.0/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.2"}}}},
+			expectedWorkqueueItem: "routes",
+		},
+		{
+			description:           "pod CIDR updated",
+			clientset:             fake.NewClientset(&v1.NodeList{Items: []v1.Node{node}}),
+			updatedNode:           v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node-1", UID: "01"}, Spec: v1.NodeSpec{PodCIDR: "10.121.0.0/24", PodCIDRs: []string{"10.121.0.0/24"}}, Status: v1.NodeStatus{Addresses: []v1.NodeAddress{{Type: v1.NodeInternalIP, Address: "10.0.1.1"}}}},
+			expectedWorkqueueItem: "routes",
+		},
+		{
+			description: "node object not updated",
+			clientset:   fake.NewClientset(&v1.NodeList{Items: []v1.Node{node}}),
+			updatedNode: node,
+		},
+		{
+			description: "unrelated node update",
+			clientset:   fake.NewClientset(&v1.NodeList{Items: []v1.Node{node}}),
+			updatedNode: v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-1",
+					UID:  "01",
+				},
+				Spec: v1.NodeSpec{
+					PodCIDR:  "10.120.0.0/24",
+					PodCIDRs: []string{"10.120.0.0/24"},
+				},
+				Status: v1.NodeStatus{
+					Addresses: []v1.NodeAddress{
+						{
+							Type:    v1.NodeInternalIP,
+							Address: "10.0.1.1",
+						},
+					},
+					Images: []v1.ContainerImage{
+						{
+							Names: []string{
+								"registry.k8s.io/pause:latest",
+							},
+							SizeBytes: 239840,
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.description, func(t *testing.T) {
+			cloud := &fakecloud.Cloud{RouteMap: make(map[string]*fakecloud.Route)}
+			routes, ok := cloud.Routes()
+			assert.True(t, ok, "fakecloud failed to run Routes()")
+
+			cidrs := make([]*net.IPNet, 0)
+			_, cidr, _ := netutils.ParseCIDRSloppy("10.120.0.0/16")
+			cidrs = append(cidrs, cidr)
+
+			informerFactory := informers.NewSharedInformerFactory(testCase.clientset, 0)
+			rc, err := New(routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidrs)
+			require.NoError(t, err)
+			require.NotNil(t, rc.workqueue)
+
+			rc.handleNodeUpdate(&node, &testCase.updatedNode)
+
+			if testCase.expectedWorkqueueItem != "" {
+				item, shutdown := rc.workqueue.Get()
+				require.False(t, shutdown, "workqueue is shutdown")
+				assert.Equal(t, testCase.expectedWorkqueueItem, item, "unexpected item from workqueue")
+			}
+		})
+	}
+}
+
+func routeListEqual(list1, list2 []*cloudprovider.Route) bool {
+	if len(list1) != len(list2) {
+		return false
+	}
+
+	// nodename+cidr:bool
+	seen := make(map[string]bool)
+
+	for _, route1 := range list1 {
+		for _, route2 := range list2 {
+			if route1.DestinationCIDR == route2.DestinationCIDR && route1.TargetNode == route2.TargetNode &&
+				equalNodeAddrs(route1.TargetNodeAddresses, route2.TargetNodeAddresses) {
+				seen[string(route1.TargetNode)+route1.DestinationCIDR] = true
+				break
+			}
+		}
+	}
+	if len(seen) == len(list1) {
+		return true
+	}
+	return false
+}
+
+func flatten(list []*cloudprovider.Route) []cloudprovider.Route {
+	var structList []cloudprovider.Route
+	for _, route := range list {
+		structList = append(structList, *route)
+	}
+	return structList
+}
+
+func TestUpdateNetworkingCondition(t *testing.T) {
+	cluster := "test-cluster"
+	_, clusterCIDR, _ := netutils.ParseCIDRSloppy("10.244.0.0/16")
+
+	testCases := []struct {
+		description           string
+		existingCondition     *v1.NodeCondition
+		routesCreated         bool
+		expectedUpdate        bool
+		expectedConditionType v1.ConditionStatus
+		expectedReason        string
+		expectedMessage       string
+	}{
+		{
+			description:           "No existing condition, routes created - should update",
+			existingCondition:     nil,
+			routesCreated:         true,
+			expectedUpdate:        true,
+			expectedConditionType: v1.ConditionFalse,
+			expectedReason:        "RouteCreated",
+			expectedMessage:       "RouteController created a route",
+		},
+		{
+			description:           "No existing condition, routes not created - should update",
+			existingCondition:     nil,
+			routesCreated:         false,
+			expectedUpdate:        true,
+			expectedConditionType: v1.ConditionTrue,
+			expectedReason:        "NoRouteCreated",
+			expectedMessage:       "RouteController failed to create a route",
+		},
+		{
+			description: "Existing condition with same status and reason (RouteCreated) - should not update",
+			existingCondition: &v1.NodeCondition{
+				Type:    v1.NodeNetworkUnavailable,
+				Status:  v1.ConditionFalse,
+				Reason:  "RouteCreated",
+				Message: "RouteController created a route",
+			},
+			routesCreated:  true,
+			expectedUpdate: false,
+		},
+		{
+			description: "Existing condition with same status but different reason (CalicoIsUp) - should update",
+			existingCondition: &v1.NodeCondition{
+				Type:    v1.NodeNetworkUnavailable,
+				Status:  v1.ConditionFalse,
+				Reason:  "CalicoIsUp",
+				Message: "Calico is running on this node",
+			},
+			routesCreated:         true,
+			expectedUpdate:        true,
+			expectedConditionType: v1.ConditionFalse,
+			expectedReason:        "RouteCreated",
+			expectedMessage:       "RouteController created a route",
+		},
+		{
+			description: "Existing condition with Status=False but different reason - should update when routes created",
+			existingCondition: &v1.NodeCondition{
+				Type:    v1.NodeNetworkUnavailable,
+				Status:  v1.ConditionFalse,
+				Reason:  "ExternalCNI",
+				Message: "External CNI configured",
+			},
+			routesCreated:         true,
+			expectedUpdate:        true,
+			expectedConditionType: v1.ConditionFalse,
+			expectedReason:        "RouteCreated",
+			expectedMessage:       "RouteController created a route",
+		},
+		{
+			description: "Existing condition with Status=True and different reason - should update when routes not created",
+			existingCondition: &v1.NodeCondition{
+				Type:    v1.NodeNetworkUnavailable,
+				Status:  v1.ConditionTrue,
+				Reason:  "SomeOtherReason",
+				Message: "Some other message",
+			},
+			routesCreated:         false,
+			expectedUpdate:        true,
+			expectedConditionType: v1.ConditionTrue,
+			expectedReason:        "NoRouteCreated",
+			expectedMessage:       "RouteController failed to create a route",
+		},
+		{
+			description: "Existing condition with Status=False, transitioning to routes not created - should update",
+			existingCondition: &v1.NodeCondition{
+				Type:    v1.NodeNetworkUnavailable,
+				Status:  v1.ConditionFalse,
+				Reason:  "RouteCreated",
+				Message: "RouteController created a route",
+			},
+			routesCreated:         false,
+			expectedUpdate:        true,
+			expectedConditionType: v1.ConditionTrue,
+			expectedReason:        "NoRouteCreated",
+			expectedMessage:       "RouteController failed to create a route",
+		},
+		{
+			description: "Existing condition with Status=True and NoRouteCreated reason - should not update",
+			existingCondition: &v1.NodeCondition{
+				Type:    v1.NodeNetworkUnavailable,
+				Status:  v1.ConditionTrue,
+				Reason:  "NoRouteCreated",
+				Message: "RouteController failed to create a route",
+			},
+			routesCreated:  false,
+			expectedUpdate: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			node := &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-node",
+					UID:  "test-uid",
+				},
+				Spec: v1.NodeSpec{
+					PodCIDR:  "10.244.0.0/24",
+					PodCIDRs: []string{"10.244.0.0/24"},
+				},
+			}
+
+			// Set existing condition if specified
+			if tc.existingCondition != nil {
+				node.Status.Conditions = []v1.NodeCondition{*tc.existingCondition}
+			}
+
+			client := fake.NewClientset(node)
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+			rc, err := New(nil, client, informerFactory.Core().V1().Nodes(), cluster, []*net.IPNet{clusterCIDR})
+			require.NoError(t, err)
+			rc.nodeListerSynced = alwaysReady
+
+			// Call updateNetworkingCondition
+			err = rc.updateNetworkingCondition(node, tc.routesCreated)
+			require.NoError(t, err)
+
+			if tc.expectedUpdate {
+				// Verify that a patch was called
+				actions := client.Actions()
+				patchFound := false
+				for _, action := range actions {
+					if action.GetVerb() == "patch" {
+						patchFound = true
+						break
+					}
+				}
+				assert.True(t, patchFound, "Expected a patch action but none found")
+
+				// Get the updated node
+				updatedNode, err := client.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
+				require.NoError(t, err)
+
+				// Verify the condition was updated correctly
+				_, condition := nodeutil.GetNodeCondition(&updatedNode.Status, v1.NodeNetworkUnavailable)
+				require.NotNil(t, condition, "Expected NodeNetworkUnavailable condition to exist")
+				assert.Equal(t, tc.expectedConditionType, condition.Status, "Unexpected condition status")
+				assert.Equal(t, tc.expectedReason, condition.Reason, "Unexpected condition reason")
+				assert.Equal(t, tc.expectedMessage, condition.Message, "Unexpected condition message")
+			} else {
+				// Verify that no patch was called (or only initial operations)
+				actions := client.Actions()
+				patchCount := 0
+				for _, action := range actions {
+					if action.GetVerb() == "patch" {
+						patchCount++
+					}
+				}
+				assert.Equal(t, 0, patchCount, "Expected no patch action but found %d", patchCount)
+			}
+		})
+	}
+}
+
+func TestUpdateNetworkingConditionWithCalicoScenario(t *testing.T) {
+	// This test specifically covers the bug where Calico sets NetworkUnavailable=False
+	// and RouteController should still be able to update it with its own reason
+	cluster := "test-cluster"
+	_, clusterCIDR, _ := netutils.ParseCIDRSloppy("10.244.0.0/16")
+
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-node",
+			UID:  "test-uid",
+		},
+		Spec: v1.NodeSpec{
+			PodCIDR:  "10.244.0.0/24",
+			PodCIDRs: []string{"10.244.0.0/24"},
+		},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{
+				{
+					Type:    v1.NodeNetworkUnavailable,
+					Status:  v1.ConditionFalse,
+					Reason:  "CalicoIsUp",
+					Message: "Calico is running on this node",
+				},
+			},
+		},
+	}
+
+	client := fake.NewClientset(node)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+	rc, err := New(nil, client, informerFactory.Core().V1().Nodes(), cluster, []*net.IPNet{clusterCIDR})
+	require.NoError(t, err)
+	rc.nodeListerSynced = alwaysReady
+
+	// Call updateNetworkingCondition with routes created
+	err = rc.updateNetworkingCondition(node, true)
+	require.NoError(t, err)
+
+	// Verify that a patch was called
+	actions := client.Actions()
+	patchFound := false
+	for _, action := range actions {
+		if action.GetVerb() == "patch" {
+			patchFound = true
+			break
+		}
+	}
+	assert.True(t, patchFound, "Expected a patch action to update the condition")
+
+	// Get the updated node
+	updatedNode, err := client.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
+	require.NoError(t, err)
+
+	// Verify the condition was updated with RouteCreated reason
+	_, condition := nodeutil.GetNodeCondition(&updatedNode.Status, v1.NodeNetworkUnavailable)
+	require.NotNil(t, condition, "Expected NodeNetworkUnavailable condition to exist")
+	assert.Equal(t, v1.ConditionFalse, condition.Status, "Expected Status to remain False")
+	assert.Equal(t, "RouteCreated", condition.Reason, "Expected Reason to be updated to RouteCreated")
+	assert.Equal(t, "RouteController created a route", condition.Message, "Expected Message to be updated")
+}

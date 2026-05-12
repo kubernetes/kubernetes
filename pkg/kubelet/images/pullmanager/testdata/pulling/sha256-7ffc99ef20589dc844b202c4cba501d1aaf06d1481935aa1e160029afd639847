@@ -1,0 +1,1 @@
+{"kind":"ImagePullIntent","apiVersion":"kubelet.config.k8s.io/v1beta1","image":"testing@sha256:f24acc752be18b93b0504c86312bbaf482c9efb0c45e925bbccb0a591cebd7af"}

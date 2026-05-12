@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: SerializedReference
+reference:
+  apiVersion: apiVersionValue
+  fieldPath: fieldPathValue
+  kind: kindValue
+  name: nameValue
+  namespace: namespaceValue
+  resourceVersion: resourceVersionValue
+  uid: uidValue

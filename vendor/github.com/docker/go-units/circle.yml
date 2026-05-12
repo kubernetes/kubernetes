@@ -1,0 +1,11 @@
+dependencies:
+  post:
+    # install golint
+    - go get golang.org/x/lint/golint
+
+test:
+  pre:
+    # run analysis before tests
+    - go vet ./...
+    - test -z "$(golint ./... | tee /dev/stderr)"
+    - test -z "$(gofmt -s -l . | tee /dev/stderr)"

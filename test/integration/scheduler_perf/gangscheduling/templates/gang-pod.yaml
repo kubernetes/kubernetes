@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-gang-scheduling-{{.Index}}
+spec:
+  schedulingGroup:
+    # Three pods share the same pod group.
+    podGroupName: gang-{{DivideInt .Index .podsPerGroup}}
+  containers:
+  - image: registry.k8s.io/pause:3.10.1
+    name: pause
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi

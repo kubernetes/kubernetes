@@ -1,0 +1,47 @@
+{
+  "apiVersion": "v1",
+  "groupVersion": "admissionregistration.k8s.io/v1beta1",
+  "kind": "APIResourceList",
+  "resources": [
+    {
+      "categories": [
+        "api-extensions"
+      ],
+      "kind": "MutatingAdmissionPolicy",
+      "name": "mutatingadmissionpolicies",
+      "namespaced": false,
+      "singularName": "mutatingadmissionpolicy",
+      "storageVersionHash": "LYmCf+UMVdg=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "categories": [
+        "api-extensions"
+      ],
+      "kind": "MutatingAdmissionPolicyBinding",
+      "name": "mutatingadmissionpolicybindings",
+      "namespaced": false,
+      "singularName": "mutatingadmissionpolicybinding",
+      "storageVersionHash": "90V5FRZZ3Zg=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    }
+  ]
+}

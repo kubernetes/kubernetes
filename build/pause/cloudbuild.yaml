@@ -1,0 +1,14 @@
+# See https://cloud.google.com/cloud-build/docs/build-config
+timeout: 1200s
+options:
+  substitution_option: ALLOW_LOOSE
+  machineType: 'E2_HIGHCPU_8'
+steps:
+  - name: 'gcr.io/k8s-staging-test-infra/gcb-docker-gcloud:v20260108-7f313c340e@sha256:4d778a001ae3f4247b2b61d8a870319e71d66c87556969a6399b90972e4d0491'
+    dir: ./build/pause
+    env:
+      - REGISTRY=gcr.io/$PROJECT_ID
+      - IMAGE=gcr.io/$PROJECT_ID/pause
+    args:
+      - make 
+      - all-push
