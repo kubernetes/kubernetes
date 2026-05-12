@@ -17,7 +17,7 @@
    - Update `computePodResourceRequest(...)` to compute and set this boolean based on the incoming pod.
    - Keep resource request behavior unchanged for all other resources.
 
-4. Teach scheduler filter path to skip pod-count increment for exempt incoming pod
+4. ~~Teach scheduler filter path to skip pod-count increment for exempt incoming pod~~ **(done — see `step-4-handoff.md`)**
    - File: `pkg/scheduler/framework/plugins/noderesources/fit.go`
    - Update `fitsRequest(...)` signature to accept the exemption boolean (for example `excludeFromPodCount bool`).
    - Change `allowedPodNumber` check:

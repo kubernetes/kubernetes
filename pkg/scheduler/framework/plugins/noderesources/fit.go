@@ -587,12 +587,26 @@ func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo, opts ResourceRequestsOption
 func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.Set[string]) []InsufficientResource {
 	insufficientResources := make([]InsufficientResource, 0, 4)
 
+	// podCountIncrement is the contribution the incoming pod makes to the
+	// node's pod-count usage for the purposes of the allowedPodNumber check.
+	// Normally this is 1. If the incoming pod has opted out of the pod-count
+	// cap via ExcludeFromMaxPodCountAnnotationKey (resolved at PreFilter time
+	// and recorded on preFilterState.ExcludeFromPodCount), it is 0, meaning
+	// the pod will not be blocked by Allocatable.Pods. Only the pod-count
+	// dimension is affected; CPU, memory, ephemeral-storage and scalar /
+	// extended resources below are unchanged. See isExcludedFromMaxPodCount
+	// for the full contract.
+	podCountIncrement := 1
+	if podRequest.ExcludeFromPodCount {
+		podCountIncrement = 0
+	}
+
 	allowedPodNumber := nodeInfo.Allocatable.AllowedPodNumber
-	if len(nodeInfo.Pods)+1 > allowedPodNumber {
+	if len(nodeInfo.Pods)+podCountIncrement > allowedPodNumber {
 		insufficientResources = append(insufficientResources, InsufficientResource{
 			ResourceName: v1.ResourcePods,
 			Reason:       "Too many pods",
-			Requested:    1,
+			Requested:    int64(podCountIncrement),
 			Used:         int64(len(nodeInfo.Pods)),
 			Capacity:     int64(allowedPodNumber),
 		})
