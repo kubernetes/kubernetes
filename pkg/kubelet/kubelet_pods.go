@@ -2167,8 +2167,11 @@ func getEffectiveAllocatedResources(allocatedPod *v1.Pod) *v1.ResourceRequiremen
 	if allocatedResources == nil {
 		allocatedResources = &v1.ResourceRequirements{}
 	}
+	// Use explicit flags for requests and limits to avoid accidental inflation.
 	opts := resourcehelper.PodResourcesOptions{
-		SkipPodLevelResources: !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		SkipPodLevelResources:                               !utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources),
+		UseDRANodeAllocatableResourceClaimStatus: false,
+		UseDRANodeAllocatableResourceClaimStatusForLimits:   utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources),
 	}
 	allocatedResources.Requests = resourcehelper.PodRequests(allocatedPod, opts)
 	allocatedResources.Limits = resourcehelper.PodLimits(allocatedPod, opts)
@@ -2177,13 +2180,18 @@ func getEffectiveAllocatedResources(allocatedPod *v1.Pod) *v1.ResourceRequiremen
 
 func (kl *Kubelet) convertToAPIPodLevelResourcesStatus(logger klog.Logger, allocatedPod *v1.Pod, oldPodStatus v1.PodStatus) *v1.ResourceRequirements {
 	if allocatedPod.Status.Phase != v1.PodRunning {
+		// TODO: Reconsider this logic. Falling back to getEffectiveAllocatedResources when not running,
+		// can lead to inconsistency in reported limits when container limits
+		// are omitted. In not running case, we report sum of container limits and
+		// missing container is ignored. If the pod is running, the cgroup limits
+		// of the pod will be unlimited based on implementation in ResourceConfigForPod().
 		return getEffectiveAllocatedResources(allocatedPod)
 	}
 
 	// TODO(ndixita): Revisit the decision to output cgroup values in Pod Status.
 	// The internal rounding off logic can introduce minute variability, making the
 	// output inconsistent. We should decide if the information is useful enough to
-	//  outweigh the consistency issues,
+	// outweigh the consistency issues,
 	pcm := kl.containerManager.NewPodContainerManager()
 	memoryConfig, err := pcm.GetPodCgroupConfig(allocatedPod, v1.ResourceMemory)
 	if err != nil {
@@ -2419,8 +2427,40 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 		}
 
 		if cStatus.State != kubecontainer.ContainerStateRunning {
-			// If the container isn't running, just use the allocated resources.
-			return allocatedContainer.Resources.DeepCopy()
+			// If the container isn't running, just use the allocated resources + DRA.
+			resources := allocatedContainer.Resources.DeepCopy()
+
+			// Add DRA allocations to limits if applicable
+			if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) {
+				for _, claimStatus := range pod.Status.NodeAllocatableResourceClaimStatuses {
+					for _, cName := range claimStatus.Containers {
+						if cName == allocatedContainer.Name {
+							if cpuQuant, found := claimStatus.Resources[v1.ResourceCPU]; found {
+								// Only add if container spec limit was set
+								if !allocatedContainer.Resources.Limits.Cpu().IsZero() {
+									if resources.Limits == nil {
+										resources.Limits = make(v1.ResourceList)
+									}
+									q := resources.Limits[v1.ResourceCPU]
+									q.Add(cpuQuant)
+									resources.Limits[v1.ResourceCPU] = q
+								}
+							}
+							if memQuant, found := claimStatus.Resources[v1.ResourceMemory]; found {
+								if !allocatedContainer.Resources.Limits.Memory().IsZero() {
+									if resources.Limits == nil {
+										resources.Limits = make(v1.ResourceList)
+									}
+									q := resources.Limits[v1.ResourceMemory]
+									q.Add(memQuant)
+									resources.Limits[v1.ResourceMemory] = q
+								}
+							}
+						}
+					}
+				}
+			}
+			return resources
 		}
 		if oldStatus.Resources == nil {
 			oldStatus.Resources = &v1.ResourceRequirements{}

@@ -138,7 +138,8 @@ func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod
 
 	limits := resourcehelper.PodLimits(allocatedPod, resourcehelper.PodResourcesOptions{
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !podLevelResourcesEnabled,
+		SkipPodLevelResources:                             !podLevelResourcesEnabled,
+		UseDRANodeAllocatableResourceClaimStatusForLimits: utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources),
 		ContainerFn: func(res v1.ResourceList, containerType resourcehelper.ContainerType) {
 			if res.Cpu().IsZero() {
 				cpuLimitsDeclared = false
@@ -149,7 +150,8 @@ func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod
 		},
 	})
 
-	if podLevelResourcesEnabled && resourcehelper.IsPodLevelResourcesSet(allocatedPod) {
+	podLevelResourcesSet := podLevelResourcesEnabled && resourcehelper.IsPodLevelResourcesSet(allocatedPod)
+	if podLevelResourcesSet {
 		if !allocatedPod.Spec.Resources.Limits.Cpu().IsZero() {
 			cpuLimitsDeclared = true
 		}
@@ -158,8 +160,27 @@ func ResourceConfigForPod(allocatedPod *v1.Pod, enforceCPULimits bool, cpuPeriod
 			memoryLimitsDeclared = true
 		}
 	}
+
 	// map hugepage pagesize (bytes) to limits (bytes)
 	hugePageLimits := HugePageLimits(reqs)
+
+	// Include DRA allocations for HugePages
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources) {
+		for _, claimStatus := range allocatedPod.Status.NodeAllocatableResourceClaimStatuses {
+			// Unlike CPU and Memory where we default cgroup settings to "Unlimited" when skiped in the spec,
+			// Kubelet defaults omitted HugePages limits to 0 in cgroups.
+			// We must add DRA HugePages here unconditionally to prevent the pod-level
+			// cgroup from blocking the container's usage of allocated HugePages,
+			// even when Pod-Level Resources are enabled for other resources.
+			for resName, resQuant := range claimStatus.Resources {
+				if v1helper.IsHugePageResourceName(resName) {
+					pageSize, _ := v1helper.HugePageSizeFromResourceName(resName)
+					pageSizeBytes := pageSize.Value()
+					hugePageLimits[pageSizeBytes] = hugePageLimits[pageSizeBytes] + resQuant.Value()
+				}
+			}
+		}
+	}
 
 	cpuRequests := int64(0)
 	cpuLimits := int64(0)

@@ -136,6 +136,41 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 	memoryLimit := getMemoryLimit(pod, container)
 	cpuLimit := getCPULimit(pod, container)
 
+	// Add DRA allocations to limits if applicable
+	draHugePages := map[string]uint64{}
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DRANodeAllocatableResources) {
+		for _, claimStatus := range pod.Status.NodeAllocatableResourceClaimStatuses {
+			for _, cName := range claimStatus.Containers {
+				if cName == container.Name {
+					if cpuQuant, found := claimStatus.Resources[v1.ResourceCPU]; found {
+						// Only include DRA values only if limit is set in the container set.
+						// If pod-level resources are used and contianer-level limits are not set,
+						// we continue setting pod level limits as the ceiling for the container.
+						if !container.Resources.Limits.Cpu().IsZero() {
+							q := cpuLimit.DeepCopy()
+							q.Add(cpuQuant)
+							cpuLimit = &q
+						}
+					}
+					if memQuant, found := claimStatus.Resources[v1.ResourceMemory]; found {
+						if !container.Resources.Limits.Memory().IsZero() {
+							q := memoryLimit.DeepCopy()
+							q.Add(memQuant)
+							memoryLimit = &q
+						}
+					}
+					for resName, resQuant := range claimStatus.Resources {
+						if v1helper.IsHugePageResourceName(resName) {
+							pageSize, _ := v1helper.HugePageSizeFromResourceName(resName)
+							sizeString, _ := v1helper.HugePageUnitSizeFromByteSize(pageSize.Value())
+							draHugePages[sizeString] = uint64(resQuant.Value())
+						}
+					}
+				}
+			}
+		}
+	}
+
 	// If pod has exclusive cpu and the container in question has integer cpu requests
 	// the cfs quota will not be enforced
 	disableCPUQuota := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.DisableCPUQuotaWithExclusiveCPUs) && m.containerManager.ContainerHasExclusiveCPUs(pod, container)
@@ -146,6 +181,15 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 		int64(m.machineInfo.MemoryCapacity)))
 
 	lcr.HugepageLimits = GetHugepageLimitsFromResources(ctx, pod, container.Resources)
+
+	// Override with precomputed DRA HugePages
+	if len(draHugePages) > 0 {
+		for _, hpLimit := range lcr.HugepageLimits {
+			if limit, found := draHugePages[hpLimit.PageSize]; found {
+				hpLimit.Limit = limit
+			}
+		}
+	}
 
 	// Configure swap for the container
 	m.configureContainerSwapResources(ctx, lcr, pod, container)
