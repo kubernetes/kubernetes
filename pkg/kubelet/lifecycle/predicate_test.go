@@ -32,6 +32,7 @@ import (
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/utils/ptr"
 )
@@ -543,6 +544,101 @@ func TestPodAdmissionBasedOnSupplementalGroupsPolicy(t *testing.T) {
 			actualResult := rejectPodAdmissionBasedOnSupplementalGroupsPolicy(test.pod, test.node)
 			if test.expectRejection != actualResult {
 				t.Errorf("unexpected result, expected %v but got %v", test.expectRejection, actualResult)
+			}
+		})
+	}
+}
+
+// TestPredicateAdmitPodCountExemption exercises the OutOfPods admission
+// result mapping in predicateAdmitHandler.Admit when the node is at its
+// pod-count cap. It validates the kubelet-visible behaviour of the
+// pod-count exemption annotation plumbed through noderesources.Fits:
+//   - a normal (non-annotated) pod is rejected with reason OutOfPods,
+//   - a pod carrying ExcludeFromMaxPodCountAnnotationKey="true" is admitted,
+//   - a pod whose annotation value is non-truthy ("True", wrong case) is
+//     still rejected, locking in the fail-closed contract.
+//
+// The reason-mapping switch in Admit (v1.ResourcePods -> OutOfPods) is
+// not covered by the scheduler-side AdmissionCheck tests, so this is the
+// kubelet-specific coverage step 8 of the implementation plan calls for.
+func TestPredicateAdmitPodCountExemption(t *testing.T) {
+	// Node pinned to a single-pod cap so one existing pod saturates
+	// v1.ResourcePods. Other dimensions are generously sized so the
+	// pod-count check is the only thing that can fail.
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "test-node",
+			Labels: map[string]string{v1.LabelOSStable: goruntime.GOOS},
+		},
+		Status: v1.NodeStatus{
+			Capacity:    makeResources(10, 1<<30, 1, 0, 1<<30, 0),
+			Allocatable: makeAllocatableResources(10, 1<<30, 1, 0, 1<<30, 0),
+		},
+	}
+	getNode := func() (*v1.Node, error) { return node, nil }
+	noopPluginResourceUpdate := func(_ *schedulerframework.NodeInfo, _ *PodAdmitAttributes) error {
+		return nil
+	}
+	handler := NewPredicateAdmitHandler(getNode, NewAdmissionFailureHandlerStub(), noopPluginResourceUpdate)
+
+	existingPod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "existing", Namespace: "default"},
+		Spec:       v1.PodSpec{NodeName: "test-node"},
+	}
+
+	newPod := func(annotations map[string]string) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "incoming",
+				Namespace:   "default",
+				Annotations: annotations,
+			},
+		}
+	}
+
+	tests := []struct {
+		name        string
+		pod         *v1.Pod
+		wantAdmit   bool
+		wantReason  string
+	}{
+		{
+			name:       "normal pod is rejected with OutOfPods when node is at pod cap",
+			pod:        newPod(nil),
+			wantAdmit:  false,
+			wantReason: OutOfPods,
+		},
+		{
+			name: "exempt pod is admitted when node is at pod cap",
+			pod: newPod(map[string]string{
+				noderesources.ExcludeFromMaxPodCountAnnotationKey: "true",
+			}),
+			wantAdmit:  true,
+			wantReason: "",
+		},
+		{
+			name: "malformed annotation value is non-exempt (fail-closed)",
+			pod: newPod(map[string]string{
+				noderesources.ExcludeFromMaxPodCountAnnotationKey: "True",
+			}),
+			wantAdmit:  false,
+			wantReason: OutOfPods,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := handler.Admit(&PodAdmitAttributes{
+				Pod:       test.pod,
+				OtherPods: []*v1.Pod{existingPod},
+			})
+			if result.Admit != test.wantAdmit {
+				t.Errorf("unexpected Admit: want %v, got %v (reason=%q, message=%q)",
+					test.wantAdmit, result.Admit, result.Reason, result.Message)
+			}
+			if result.Reason != test.wantReason {
+				t.Errorf("unexpected Reason: want %q, got %q (message=%q)",
+					test.wantReason, result.Reason, result.Message)
 			}
 		})
 	}

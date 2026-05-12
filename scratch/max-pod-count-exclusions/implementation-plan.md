@@ -47,7 +47,7 @@
      - `AdmissionCheck(...)` does not return pod-limit failure for exempt pod
    - This validates kubelet behavior indirectly because kubelet uses `AdmissionCheck(...)`.
 
-8. Add kubelet predicate test for OutOfPods integration
+8. ~~Add kubelet predicate test for OutOfPods integration~~ **(done — see `step-8-handoff.md`)**
    - File: `pkg/kubelet/lifecycle/predicate_test.go`
    - Add tests where node is at pod cap:
      - normal pod yields `OutOfPods`
