@@ -584,7 +584,7 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			RemovedVersion:    "1.42",
 		},
 		gvr("scheduling.k8s.io", "v1alpha2", "podgroups"): {
-			Stub:              `{"metadata": {"name": "pg1"}, "spec": {"schedulingPolicy": {"basic": {}}}}`,
+			Stub:              `{"metadata": {"name": "pg1"}, "spec": {"podGroupTemplateRef": {"workload": {"podGroupTemplateName": "t", "workloadName": "w"}}, "schedulingPolicy": {"basic": {}}}}`,
 			ExpectedEtcdPath:  "/registry/podgroups/" + namespace + "/pg1",
 			IntroducedVersion: "1.36",
 			RemovedVersion:    "1.42",

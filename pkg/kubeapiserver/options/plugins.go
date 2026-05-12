@@ -48,7 +48,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/nodedeclaredfeatures"
 	"k8s.io/kubernetes/plugin/pkg/admission/noderestriction"
 	"k8s.io/kubernetes/plugin/pkg/admission/nodetaint"
-	"k8s.io/kubernetes/plugin/pkg/admission/podgroup"
 	"k8s.io/kubernetes/plugin/pkg/admission/podnodeselector"
 	"k8s.io/kubernetes/plugin/pkg/admission/podresize"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
@@ -103,7 +102,6 @@ var AllOrderedPlugins = []string{
 	defaultingressclass.PluginName,          // DefaultIngressClass
 	denyserviceexternalips.PluginName,       // DenyServiceExternalIPs
 	podtopologylabels.PluginName,            // PodTopologyLabels
-	podgroup.PluginName,                     // PodGroupWorkloadExists
 	nodedeclaredfeatures.PluginName,         // NodeDeclaredFeatureValidator
 	jobadmission.PluginName,                 // JobValidation, only active when feature gate WorkloadWithJob is enabled.
 	podresize.PluginName,                    // PodResizeValidator
@@ -160,7 +158,6 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	ctbattest.Register(plugins)
 	certsubjectrestriction.Register(plugins)
 	podtopologylabels.Register(plugins)
-	podgroup.Register(plugins)
 	nodedeclaredfeatures.Register(plugins)
 	jobadmission.Register(plugins)
 	podresize.Register(plugins)
@@ -192,7 +189,6 @@ func DefaultOffAdmissionPlugins() sets.Set[string] {
 		podtopologylabels.PluginName,            // PodTopologyLabels, only active when feature gate PodTopologyLabelsAdmission is enabled.
 		mutatingadmissionpolicy.PluginName,      // Mutatingadmissionpolicy, only active when feature gate MutatingAdmissionpolicy is enabled
 		validatingadmissionpolicy.PluginName,    // ValidatingAdmissionPolicy, only active when feature gate ValidatingAdmissionPolicy is enabled
-		podgroup.PluginName,                     // PodGroupWorkloadExists, only active when feature gate GenericWorkload is enabled
 		nodedeclaredfeatures.PluginName,         // NodeDeclaredFeatureValidator, only active when feature gate NodeDeclaredFeatures is enabled
 		jobadmission.PluginName,                 // JobValidation, only active when feature gate WorkloadWithJob is enabled
 		podresize.PluginName,                    // PodResizeValidator, only active when feature gate InPlacePodVerticalScaling is enabled
