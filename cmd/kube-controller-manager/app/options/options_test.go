@@ -218,8 +218,6 @@ func TestAddFlags(t *testing.T) {
 			KubeCloudSharedConfiguration: &cpconfig.KubeCloudSharedConfiguration{
 				UseServiceAccountCredentials: true,
 				RouteReconciliationPeriod:    metav1.Duration{Duration: 30 * time.Second},
-				NodeMonitorPeriod:            metav1.Duration{Duration: 10 * time.Second},
-				ConcurrentNodeLifecycleSyncs: 1,
 				ClusterName:                  "k8s",
 				ClusterCIDR:                  "1.2.3.4/24",
 				AllocateNodeCIDRs:            true,
@@ -363,6 +361,7 @@ func TestAddFlags(t *testing.T) {
 				NodeStartupGracePeriod:    metav1.Duration{Duration: 30 * time.Second},
 				LargeClusterSizeThreshold: 100,
 				UnhealthyZoneThreshold:    0.6,
+				NodeMonitorPeriod:         metav1.Duration{Duration: 10 * time.Second},
 			},
 		},
 		PersistentVolumeBinderController: &PersistentVolumeBinderControllerOptions{
@@ -588,8 +587,6 @@ func TestApplyTo(t *testing.T) {
 			KubeCloudShared: cpconfig.KubeCloudSharedConfiguration{
 				UseServiceAccountCredentials: true,
 				RouteReconciliationPeriod:    metav1.Duration{Duration: 30 * time.Second},
-				NodeMonitorPeriod:            metav1.Duration{Duration: 10 * time.Second},
-				ConcurrentNodeLifecycleSyncs: 1,
 				ClusterName:                  "k8s",
 				ClusterCIDR:                  "1.2.3.4/24",
 				AllocateNodeCIDRs:            true,
@@ -694,6 +691,7 @@ func TestApplyTo(t *testing.T) {
 				NodeStartupGracePeriod:    metav1.Duration{Duration: 30 * time.Second},
 				LargeClusterSizeThreshold: 100,
 				UnhealthyZoneThreshold:    0.6,
+				NodeMonitorPeriod:         metav1.Duration{Duration: 10 * time.Second},
 			},
 			PersistentVolumeBinderController: persistentvolumeconfig.PersistentVolumeBinderControllerConfiguration{
 				PVClaimBinderSyncPeriod: metav1.Duration{Duration: 30 * time.Second},

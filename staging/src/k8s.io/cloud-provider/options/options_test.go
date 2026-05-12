@@ -32,6 +32,7 @@ import (
 	appconfig "k8s.io/cloud-provider/app/config"
 	cpconfig "k8s.io/cloud-provider/config"
 	nodeconfig "k8s.io/cloud-provider/controllers/node/config"
+	nodelifecycleconfig "k8s.io/cloud-provider/controllers/nodelifecycle/config"
 	serviceconfig "k8s.io/cloud-provider/controllers/service/config"
 	cliflag "k8s.io/component-base/cli/flag"
 	componentbaseconfig "k8s.io/component-base/config"
@@ -83,14 +84,12 @@ func TestDefaultFlags(t *testing.T) {
 		},
 		KubeCloudShared: &KubeCloudSharedOptions{
 			KubeCloudSharedConfiguration: &cpconfig.KubeCloudSharedConfiguration{
-				RouteReconciliationPeriod:    metav1.Duration{Duration: 10 * time.Second},
-				NodeMonitorPeriod:            metav1.Duration{Duration: 5 * time.Second},
-				ConcurrentNodeLifecycleSyncs: 1,
-				ClusterName:                  "kubernetes",
-				ClusterCIDR:                  "",
-				AllocateNodeCIDRs:            false,
-				CIDRAllocatorType:            "",
-				ConfigureCloudRoutes:         true,
+				RouteReconciliationPeriod: metav1.Duration{Duration: 10 * time.Second},
+				ClusterName:               "kubernetes",
+				ClusterCIDR:               "",
+				AllocateNodeCIDRs:         false,
+				CIDRAllocatorType:         "",
+				ConfigureCloudRoutes:      true,
 			},
 			CloudProvider: &CloudProviderOptions{
 				CloudProviderConfiguration: &cpconfig.CloudProviderConfiguration{
@@ -102,6 +101,12 @@ func TestDefaultFlags(t *testing.T) {
 		NodeController: &NodeControllerOptions{
 			NodeControllerConfiguration: &nodeconfig.NodeControllerConfiguration{
 				ConcurrentNodeSyncs: 1,
+			},
+		},
+		NodeLifecycleController: &NodeLifecycleControllerOptions{
+			NodeLifecycleControllerConfiguration: &nodelifecycleconfig.NodeLifecycleControllerConfiguration{
+				ConcurrentNodeLifecycleSyncs: 1,
+				NodeMonitorPeriod:            metav1.Duration{Duration: 5 * time.Second},
 			},
 		},
 		ServiceController: &ServiceControllerOptions{
@@ -247,14 +252,12 @@ func TestAddFlags(t *testing.T) {
 		},
 		KubeCloudShared: &KubeCloudSharedOptions{
 			KubeCloudSharedConfiguration: &cpconfig.KubeCloudSharedConfiguration{
-				RouteReconciliationPeriod:    metav1.Duration{Duration: 30 * time.Second},
-				NodeMonitorPeriod:            metav1.Duration{Duration: 5 * time.Second},
-				ConcurrentNodeLifecycleSyncs: 1,
-				ClusterName:                  "k8s",
-				ClusterCIDR:                  "1.2.3.4/24",
-				AllocateNodeCIDRs:            true,
-				CIDRAllocatorType:            "RangeAllocator",
-				ConfigureCloudRoutes:         false,
+				RouteReconciliationPeriod: metav1.Duration{Duration: 30 * time.Second},
+				ClusterName:               "k8s",
+				ClusterCIDR:               "1.2.3.4/24",
+				AllocateNodeCIDRs:         true,
+				CIDRAllocatorType:         "RangeAllocator",
+				ConfigureCloudRoutes:      false,
 			},
 			CloudProvider: &CloudProviderOptions{
 				CloudProviderConfiguration: &cpconfig.CloudProviderConfiguration{
@@ -266,6 +269,12 @@ func TestAddFlags(t *testing.T) {
 		NodeController: &NodeControllerOptions{
 			NodeControllerConfiguration: &nodeconfig.NodeControllerConfiguration{
 				ConcurrentNodeSyncs: 5,
+			},
+		},
+		NodeLifecycleController: &NodeLifecycleControllerOptions{
+			NodeLifecycleControllerConfiguration: &nodelifecycleconfig.NodeLifecycleControllerConfiguration{
+				ConcurrentNodeLifecycleSyncs: 1,
+				NodeMonitorPeriod:            metav1.Duration{Duration: 5 * time.Second},
 			},
 		},
 		ServiceController: &ServiceControllerOptions{
@@ -423,14 +432,12 @@ func TestCreateConfig(t *testing.T) {
 				LeaderMigration: cmconfig.LeaderMigrationConfiguration{},
 			},
 			KubeCloudShared: cpconfig.KubeCloudSharedConfiguration{
-				RouteReconciliationPeriod:    metav1.Duration{Duration: 30 * time.Second},
-				NodeMonitorPeriod:            metav1.Duration{Duration: 5 * time.Second},
-				ConcurrentNodeLifecycleSyncs: 1,
-				ClusterName:                  "k8s",
-				ClusterCIDR:                  "1.2.3.4/24",
-				AllocateNodeCIDRs:            true,
-				CIDRAllocatorType:            "RangeAllocator",
-				ConfigureCloudRoutes:         false,
+				RouteReconciliationPeriod: metav1.Duration{Duration: 30 * time.Second},
+				ClusterName:               "k8s",
+				ClusterCIDR:               "1.2.3.4/24",
+				AllocateNodeCIDRs:         true,
+				CIDRAllocatorType:         "RangeAllocator",
+				ConfigureCloudRoutes:      false,
 				CloudProvider: cpconfig.CloudProviderConfiguration{
 					Name:            "aws",
 					CloudConfigFile: "",
@@ -443,6 +450,10 @@ func TestCreateConfig(t *testing.T) {
 				ConcurrentNodeSyncs: 1,
 				// ConcurrentNodeStatusUpdates should default to the value of ConcurrentNodeSyncs only at the stage of config creation
 				ConcurrentNodeStatusUpdates: 1,
+			},
+			NodeLifecycleController: nodelifecycleconfig.NodeLifecycleControllerConfiguration{
+				ConcurrentNodeLifecycleSyncs: 1,
+				NodeMonitorPeriod:            metav1.Duration{Duration: 5 * time.Second},
 			},
 			NodeStatusUpdateFrequency: metav1.Duration{Duration: 10 * time.Minute},
 			Webhook: cpconfig.WebhookConfiguration{
@@ -570,14 +581,12 @@ func TestCreateConfigWithoutWebHooks(t *testing.T) {
 				LeaderMigration: cmconfig.LeaderMigrationConfiguration{},
 			},
 			KubeCloudShared: cpconfig.KubeCloudSharedConfiguration{
-				RouteReconciliationPeriod:    metav1.Duration{Duration: 30 * time.Second},
-				NodeMonitorPeriod:            metav1.Duration{Duration: 5 * time.Second},
-				ConcurrentNodeLifecycleSyncs: 1,
-				ClusterName:                  "k8s",
-				ClusterCIDR:                  "1.2.3.4/24",
-				AllocateNodeCIDRs:            true,
-				CIDRAllocatorType:            "RangeAllocator",
-				ConfigureCloudRoutes:         false,
+				RouteReconciliationPeriod: metav1.Duration{Duration: 30 * time.Second},
+				ClusterName:               "k8s",
+				ClusterCIDR:               "1.2.3.4/24",
+				AllocateNodeCIDRs:         true,
+				CIDRAllocatorType:         "RangeAllocator",
+				ConfigureCloudRoutes:      false,
 				CloudProvider: cpconfig.CloudProviderConfiguration{
 					Name:            "aws",
 					CloudConfigFile: "",
@@ -589,6 +598,10 @@ func TestCreateConfigWithoutWebHooks(t *testing.T) {
 			NodeController: nodeconfig.NodeControllerConfiguration{
 				ConcurrentNodeSyncs:         1,
 				ConcurrentNodeStatusUpdates: 2,
+			},
+			NodeLifecycleController: nodelifecycleconfig.NodeLifecycleControllerConfiguration{
+				ConcurrentNodeLifecycleSyncs: 1,
+				NodeMonitorPeriod:            metav1.Duration{Duration: 5 * time.Second},
 			},
 			NodeStatusUpdateFrequency: metav1.Duration{Duration: 10 * time.Minute},
 			Webhook:                   cpconfig.WebhookConfiguration{},
