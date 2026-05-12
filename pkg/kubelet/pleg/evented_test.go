@@ -87,7 +87,8 @@ func TestUpdateRunningPodMetric(t *testing.T) {
 			},
 		}
 
-		pleg.updateRunningPodMetric(podStatuses[i])
+		cached, _ := pleg.cache.Get(podStatuses[i].ID)
+		pleg.updateRunningPodMetric(podStatuses[i], cached)
 		pleg.cache.Set(podStatuses[i].ID, podStatuses[i], nil, time.Now())
 
 	}
@@ -114,7 +115,8 @@ kubelet_running_pods 5
 			},
 		}
 
-		pleg.updateRunningPodMetric(&newPodStatus)
+		cached, _ := pleg.cache.Get(newPodStatus.ID)
+		pleg.updateRunningPodMetric(&newPodStatus, cached)
 		pleg.cache.Set(newPodStatus.ID, &newPodStatus, nil, time.Now())
 	}
 	pleg.cache.UpdateTime(time.Now())
@@ -134,8 +136,7 @@ func testMetric(t *testing.T, expectedMetric string, metricName string) {
 	}
 }
 
-func TestEventedPLEG_getPodIPs(t *testing.T) {
-	cache := kubecontainer.NewCache()
+func TestEventedPLEG_preservePodIPs(t *testing.T) {
 	type args struct {
 		pid    types.UID
 		status *kubecontainer.PodStatus
@@ -220,13 +221,9 @@ func TestEventedPLEG_getPodIPs(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		cache.Set(test.args.pid, test.oldstatus, nil, time.Time{})
-		e := &EventedPLEG{
-			cache: cache,
-		}
 		t.Run(test.name, func(t *testing.T) {
-			if got := e.getPodIPs(test.args.pid, test.args.status); !reflect.DeepEqual(got, test.expected) {
-				t.Errorf("EventedPLEG.getPodIPs() = %v, expected %v", got, test.expected)
+			if got := preservePodIPs(test.args.status, test.oldstatus); !reflect.DeepEqual(got, test.expected) {
+				t.Errorf("preservePodIPs() = %v, expected %v", got, test.expected)
 			}
 		})
 	}

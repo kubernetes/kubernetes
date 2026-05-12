@@ -180,14 +180,40 @@ func (e *EventedPLEG) Healthy() (bool, error) {
 	return true, nil
 }
 
+// streamRetryBackoff governs how aggressively we reconnect to the runtime's
+// container events stream after a failure. Without a backoff we would tight-loop
+// against an unhealthy CRI, burning CPU and producing log/metric spam — and any
+// successful reconnect would race the burst of retries.
+var streamRetryBackoff = wait.Backoff{
+	Duration: 250 * time.Millisecond,
+	Factor:   2.0,
+	Jitter:   0.2,
+	Cap:      30 * time.Second,
+}
+
 func (e *EventedPLEG) watchEventsChannel() {
 	containerEventsResponseCh := make(chan *runtimeapi.ContainerEventResponse, cap(e.eventChannel))
-	defer close(containerEventsResponseCh)
+	// close(containerEventsResponseCh) is owned by the producer goroutine below;
+	// it unblocks the consumer (processCRIEvents) once the producer gives up so
+	// this function can return and wait.Until can observe stopCh.
+
+	stopCh := e.stopCh
 
 	// Get the container events from the runtime.
 	go func() {
+		defer close(containerEventsResponseCh)
+		backoff := streamRetryBackoff
 		numAttempts := 0
 		for {
+			// Bail out promptly if the PLEG has been stopped; otherwise a
+			// long-running GetContainerEvents (or a backoff sleep) would keep
+			// this goroutine alive past Stop().
+			select {
+			case <-stopCh:
+				return
+			default:
+			}
+
 			if numAttempts >= e.eventedPlegMaxStreamRetries {
 				if isEventedPLEGInUse() {
 					// Fall back to Generic PLEG relisting since Evented PLEG is not working.
@@ -196,18 +222,32 @@ func (e *EventedPLEG) watchEventsChannel() {
 					e.genericPleg.Stop()       // Stop the existing Generic PLEG which runs with longer relisting period when Evented PLEG is in use.
 					e.Update(e.relistDuration) // Update the relisting period to the default value for the Generic PLEG.
 					e.genericPleg.Start()
-					break
+					return
 				}
+				return
 			}
 
 			err := e.runtimeService.GetContainerEvents(context.Background(), containerEventsResponseCh, func(runtimeapi.RuntimeService_GetContainerEventsClient) {
+				// A successful connection: reset the retry budget so a previously
+				// flaky stream doesn't cause us to fall back to Generic PLEG the
+				// next time it blips.
+				numAttempts = 0
+				backoff = streamRetryBackoff
 				metrics.EventedPLEGConn.Inc()
 			})
 			if err != nil {
 				metrics.EventedPLEGConnErr.Inc()
 				numAttempts++
 				e.Relist() // Force a relist to get the latest container and pods running metric.
-				e.logger.V(4).Info("Evented PLEG: Failed to get container events, retrying: ", "err", err)
+				e.logger.V(4).Info("Evented PLEG: Failed to get container events, retrying: ", "err", err, "attempt", numAttempts)
+
+				// Wait before reconnecting, but wake immediately on stop.
+				delay := backoff.Step()
+				select {
+				case <-stopCh:
+					return
+				case <-time.After(delay):
+				}
 			}
 		}
 	}()
@@ -241,14 +281,23 @@ func (e *EventedPLEG) processCRIEvents(containerEventsResponseCh chan *runtimeap
 		} else {
 			e.logger.V(4).Info("Evented PLEG: Generated pod status from the received event", "podUID", podID)
 		}
+
+		// Fetch the existing cached status once and reuse it for IP preservation
+		// and metric diffing. Prior to this, the cache was read up to three times
+		// per event under separate read locks.
+		cachedPodStatus, cacheErr := e.cache.Get(podID)
+		if cacheErr != nil {
+			e.logger.Error(cacheErr, "Evented PLEG: Get cache", "podID", podID)
+		}
+
 		// Preserve the pod IP across cache updates if the new IP is empty.
 		// When a pod is torn down, kubelet may race with PLEG and retrieve
 		// a pod status after network teardown, but the kubernetes API expects
 		// the completed pod's IP to be available after the pod is dead.
-		status.IPs = e.getPodIPs(podID, status)
+		status.IPs = preservePodIPs(status, cachedPodStatus)
 
-		e.updateRunningPodMetric(status)
-		e.updateRunningContainerMetric(status)
+		e.updateRunningPodMetric(status, cachedPodStatus)
+		e.updateRunningContainerMetric(status, cachedPodStatus)
 		e.updateLatencyMetric(event)
 
 		if event.ContainerEventType == runtimeapi.ContainerEventType_CONTAINER_DELETED_EVENT {
@@ -298,13 +347,16 @@ func (e *EventedPLEG) processCRIEvent(event *runtimeapi.ContainerEventResponse) 
 	}
 }
 
-func (e *EventedPLEG) getPodIPs(pid types.UID, status *kubecontainer.PodStatus) []string {
+// preservePodIPs returns the pod IPs to record on the new PodStatus, preferring
+// the freshly observed IPs and falling back to the cached IPs only when the new
+// status carries none and all sandboxes have left the READY state.
+//
+// cachedPodStatus may be nil if no cached entry was available.
+func preservePodIPs(status, cachedPodStatus *kubecontainer.PodStatus) []string {
 	if len(status.IPs) != 0 {
 		return status.IPs
 	}
-
-	oldStatus, err := e.cache.Get(pid)
-	if err != nil || len(oldStatus.IPs) == 0 {
+	if cachedPodStatus == nil || len(cachedPodStatus.IPs) == 0 {
 		return nil
 	}
 
@@ -317,7 +369,7 @@ func (e *EventedPLEG) getPodIPs(pid types.UID, status *kubecontainer.PodStatus) 
 
 	// For pods with no ready containers or sandboxes (like exited pods)
 	// use the old status' pod IP
-	return oldStatus.IPs
+	return cachedPodStatus.IPs
 }
 
 func (e *EventedPLEG) sendPodLifecycleEvent(event *PodLifecycleEvent) {
@@ -349,68 +401,92 @@ func getPodSandboxState(podStatus *kubecontainer.PodStatus) kubecontainer.State 
 	return kubecontainer.ContainerStateExited
 }
 
-func (e *EventedPLEG) updateRunningPodMetric(podStatus *kubecontainer.PodStatus) {
-	cachedPodStatus, err := e.cache.Get(podStatus.ID)
-	if err != nil {
-		e.logger.Error(err, "Evented PLEG: Get cache", "podID", podStatus.ID)
-	}
-	// cache miss condition: The pod status object will have empty state if missed in cache
-	if len(cachedPodStatus.SandboxStatuses) < 1 {
-		sandboxState := getPodSandboxState(podStatus)
-		if sandboxState == kubecontainer.ContainerStateRunning {
+// updateRunningPodMetric adjusts the running-pod gauge based on the difference
+// between the previously cached sandbox state and the freshly observed one.
+// cachedPodStatus may be nil (treated as a cache miss).
+func (e *EventedPLEG) updateRunningPodMetric(podStatus, cachedPodStatus *kubecontainer.PodStatus) {
+	// cache miss condition: cachedPodStatus is nil or has no sandbox statuses.
+	if cachedPodStatus == nil || len(cachedPodStatus.SandboxStatuses) < 1 {
+		if getPodSandboxState(podStatus) == kubecontainer.ContainerStateRunning {
 			metrics.RunningPodCount.Inc()
 		}
-	} else {
-		oldSandboxState := getPodSandboxState(cachedPodStatus)
-		currentSandboxState := getPodSandboxState(podStatus)
+		return
+	}
 
-		if oldSandboxState == kubecontainer.ContainerStateRunning && currentSandboxState != kubecontainer.ContainerStateRunning {
-			metrics.RunningPodCount.Dec()
-		} else if oldSandboxState != kubecontainer.ContainerStateRunning && currentSandboxState == kubecontainer.ContainerStateRunning {
-			metrics.RunningPodCount.Inc()
+	oldSandboxState := getPodSandboxState(cachedPodStatus)
+	currentSandboxState := getPodSandboxState(podStatus)
+
+	if oldSandboxState == kubecontainer.ContainerStateRunning && currentSandboxState != kubecontainer.ContainerStateRunning {
+		metrics.RunningPodCount.Dec()
+	} else if oldSandboxState != kubecontainer.ContainerStateRunning && currentSandboxState == kubecontainer.ContainerStateRunning {
+		metrics.RunningPodCount.Inc()
+	}
+}
+
+// trackedContainerStates lists the kubecontainer.State values we account for
+// in the RunningContainerCount metric. Indices are referenced by containerStateCounts.
+var trackedContainerStates = [...]kubecontainer.State{
+	kubecontainer.ContainerStateCreated,
+	kubecontainer.ContainerStateRunning,
+	kubecontainer.ContainerStateExited,
+	kubecontainer.ContainerStateUnknown,
+}
+
+// containerStateCounts is a fixed-size tally of container counts per tracked
+// state. Using an array avoids a heap allocation on every CRI event.
+type containerStateCounts [len(trackedContainerStates)]int
+
+// trackedStateIndex returns the index for a known state, or -1 for any state
+// that is not in the tracked set (so callers can keep behavior stable if the
+// runtime ever emits a state we don't recognize here).
+func trackedStateIndex(s kubecontainer.State) int {
+	switch s {
+	case kubecontainer.ContainerStateCreated:
+		return 0
+	case kubecontainer.ContainerStateRunning:
+		return 1
+	case kubecontainer.ContainerStateExited:
+		return 2
+	case kubecontainer.ContainerStateUnknown:
+		return 3
+	}
+	return -1
+}
+
+func countContainerStates(podStatus *kubecontainer.PodStatus, out *containerStateCounts) {
+	for _, c := range podStatus.ContainerStatuses {
+		if idx := trackedStateIndex(c.State); idx >= 0 {
+			out[idx]++
 		}
 	}
 }
 
-func getContainerStateCount(podStatus *kubecontainer.PodStatus) map[kubecontainer.State]int {
-	containerStateCount := make(map[kubecontainer.State]int)
-	for _, container := range podStatus.ContainerStatuses {
-		containerStateCount[container.State]++
+// updateRunningContainerMetric updates the running-container gauge as the
+// delta between the cached and the freshly observed container states. The
+// previous map-allocating implementation was a notable source of GC pressure
+// in the event hot path; this version uses a fixed-size array sized to the
+// known container states.
+func (e *EventedPLEG) updateRunningContainerMetric(podStatus, cachedPodStatus *kubecontainer.PodStatus) {
+	var current containerStateCounts
+	countContainerStates(podStatus, &current)
+
+	// cache miss condition: cachedPodStatus is nil or has no sandbox statuses.
+	if cachedPodStatus == nil || len(cachedPodStatus.SandboxStatuses) < 1 {
+		for i, count := range current {
+			if count == 0 {
+				continue
+			}
+			metrics.RunningContainerCount.WithLabelValues(string(trackedContainerStates[i])).Add(float64(count))
+		}
+		return
 	}
-	return containerStateCount
-}
 
-func (e *EventedPLEG) updateRunningContainerMetric(podStatus *kubecontainer.PodStatus) {
-	cachedPodStatus, err := e.cache.Get(podStatus.ID)
-	if err != nil {
-		e.logger.Error(err, "Evented PLEG: Get cache", "podID", podStatus.ID)
-	}
+	var old containerStateCounts
+	countContainerStates(cachedPodStatus, &old)
 
-	// cache miss condition: The pod status object will have empty state if missed in cache
-	if len(cachedPodStatus.SandboxStatuses) < 1 {
-		containerStateCount := getContainerStateCount(podStatus)
-		for state, count := range containerStateCount {
-			// add currently obtained count
-			metrics.RunningContainerCount.WithLabelValues(string(state)).Add(float64(count))
-		}
-	} else {
-		oldContainerStateCount := getContainerStateCount(cachedPodStatus)
-		currentContainerStateCount := getContainerStateCount(podStatus)
-
-		// old and new set of container states may vary;
-		// get a unique set of container states combining both
-		containerStates := make(map[kubecontainer.State]bool)
-		for state := range oldContainerStateCount {
-			containerStates[state] = true
-		}
-		for state := range currentContainerStateCount {
-			containerStates[state] = true
-		}
-
-		// update the metric via difference of old and current counts
-		for state := range containerStates {
-			diff := currentContainerStateCount[state] - oldContainerStateCount[state]
-			metrics.RunningContainerCount.WithLabelValues(string(state)).Add(float64(diff))
+	for i := range current {
+		if diff := current[i] - old[i]; diff != 0 {
+			metrics.RunningContainerCount.WithLabelValues(string(trackedContainerStates[i])).Add(float64(diff))
 		}
 	}
 }
