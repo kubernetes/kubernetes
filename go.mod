@@ -104,7 +104,7 @@ require (
 	k8s.io/kms v0.0.0
 	k8s.io/kube-aggregator v0.0.0
 	k8s.io/kube-controller-manager v0.0.0
-	k8s.io/kube-openapi v0.0.0-20260509150519-312035bf509b
+	k8s.io/kube-openapi v0.0.0-20260511211612-da4e56fe5676
 	k8s.io/kube-proxy v0.0.0
 	k8s.io/kube-scheduler v0.0.0
 	k8s.io/kubectl v0.0.0

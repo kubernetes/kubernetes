@@ -32,7 +32,6 @@ import (
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
 	openapi "k8s.io/kube-openapi/pkg/common"
-	"k8s.io/kube-openapi/pkg/generators/apidefinitions"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 
 	"k8s.io/klog/v2"
@@ -110,36 +109,13 @@ func apiTypeFilterFunc(c *generator.Context, t *types.Type) bool {
 		return false
 	}
 	pkg := c.Universe.Package(t.Name.Package)
-	if isOpenAPIEnabledForPackage(pkg) {
+	if hasOpenAPITagValue(pkg.Comments, tagValueTrue) {
 		return !hasOpenAPITagValue(t.CommentLines, tagValueFalse)
 	}
 	if hasOpenAPITagValue(t.CommentLines, tagValueTrue) {
 		return true
 	}
 	return false
-}
-
-// isOpenAPIEnabledForPackage reports whether openapi generation is
-// requested for pkg. apigroup.yaml and apiversion.yaml are authoritative when present.
-// The +k8s:openapi-gen=true tag is checked only when the API definition files
-// are absent.
-func isOpenAPIEnabledForPackage(pkg *types.Package) bool {
-	if pkg == nil {
-		return false
-	}
-	hasFalse := hasOpenAPITagValue(pkg.Comments, tagValueFalse)
-	hasTrue := hasOpenAPITagValue(pkg.Comments, tagValueTrue)
-	if hasFalse && !hasTrue { // For backward compatability
-		return false
-	}
-	av, err := apidefinitions.LoadAPIVersion(pkg.Dir)
-	if err != nil {
-		klog.Fatalf("Package %v: %v", pkg.Path, err)
-	}
-	if av != nil {
-		return true
-	}
-	return hasTrue
 }
 
 const (
@@ -346,7 +322,7 @@ func (g openAPITypeWriter) shouldUseOpenAPIModelName(t *types.Type) bool {
 		return true
 	}
 	pkg := g.context.Universe.Package(t.Name.Package)
-	value, err = resolvePackageModelPackage(pkg)
+	value, err = extractOpenAPISchemaNamePackage(pkg.Comments)
 	if err != nil {
 		klog.Fatalf("Package %v: invalid %s:%v", pkg, tagModelPackage, err)
 	}
@@ -1148,9 +1124,6 @@ func (g openAPITypeWriter) generateMapProperty(t *types.Type) error {
 
 	g.Do("Type: []string{\"object\"},\n", nil)
 	g.Do("AdditionalProperties: &spec.SchemaOrBool{\nAllows: true,\nSchema: &spec.Schema{\nSchemaProps: spec.SchemaProps{\n", nil)
-	if err := g.generateDefault(t.Elem.CommentLines, t.Elem, false, t.Elem); err != nil {
-		return err
-	}
 	typeString, format := openapi.OpenAPITypeFormat(elemType.String())
 	if typeString != "" {
 		g.generateSimpleProperty(typeString, format)
@@ -1185,9 +1158,6 @@ func (g openAPITypeWriter) generateSliceProperty(t *types.Type) error {
 	elemType := resolveAliasAndPtrType(t.Elem)
 	g.Do("Type: []string{\"array\"},\n", nil)
 	g.Do("Items: &spec.SchemaOrArray{\nSchema: &spec.Schema{\nSchemaProps: spec.SchemaProps{\n", nil)
-	if err := g.generateDefault(t.Elem.CommentLines, t.Elem, false, t.Elem); err != nil {
-		return err
-	}
 	typeString, format := openapi.OpenAPITypeFormat(elemType.String())
 	if typeString != "" {
 		g.generateSimpleProperty(typeString, format)
