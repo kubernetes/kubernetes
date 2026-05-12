@@ -35,34 +35,35 @@ var (
 		&metrics.GaugeOpts{
 			Subsystem:      EvictionRequestControllerSubsystem,
 			Name:           "responder_state",
-			Help:           "Whether the named responder is active for the EvictionRequest (1 = active)",
+			Help:           "The state of each responder for the EvictionRequest.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"namespace", "evictionrequest", "target", "state", "responder"},
+		[]string{"namespace", "evictionrequest", "target_name", "target_type", "responder", "state"},
 	)
 
-	// ActiveRequester tracks active requesters per EvictionRequest.
-	// The requester label identifies the requester by name (1 = active).
-	ActiveRequester = metrics.NewGaugeVec(
+	// RequesterIntent tracks requesters that have registered an intent to evict a pod.
+	// This intent can change over time (e.g. to a value Withdrawn).
+	// The requester label identifies the requester by name.
+	RequesterIntent = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      EvictionRequestControllerSubsystem,
-			Name:           "active_requester",
-			Help:           "Whether the named requester is active for the EvictionRequest (1 = active)",
+			Name:           "requester_intent",
+			Help:           "The intent of each requester per the EvictionRequest",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"namespace", "evictionrequest", "target", "requester"},
+		[]string{"namespace", "evictionrequest", "target_name", "target_type", "requester", "intent"},
 	)
 
-	// PodResponders tracks the number of available responders for the
+	// TargetResponders tracks the number of available responders for the
 	// target pod of an EvictionRequest.
-	PodResponders = metrics.NewGaugeVec(
+	TargetResponders = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      EvictionRequestControllerSubsystem,
 			Name:           "target_responders",
-			Help:           "Number of available responders for the target",
+			Help:           "The number of available responders for the target",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"namespace", "evictionrequest", "target"},
+		[]string{"namespace", "evictionrequest", "target_name", "target_type"},
 	)
 )
 
@@ -72,7 +73,7 @@ var registerMetrics sync.Once
 func Register() {
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(ResponderState)
-		legacyregistry.MustRegister(ActiveRequester)
-		legacyregistry.MustRegister(PodResponders)
+		legacyregistry.MustRegister(RequesterIntent)
+		legacyregistry.MustRegister(TargetResponders)
 	})
 }

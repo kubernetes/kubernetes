@@ -463,14 +463,15 @@ func (c *EvictionRequestController) computeStatus(
 	progressionResync := computeResponderProgression(now, evictionRequest, targetResponders, target, isGone, isTerminal, isCanceled)
 
 	// Report metrics per KEP-4563
+	targetEntityName := target.targetName()
 	targetEntityType := target.targetType()
-	for _, p := range targetResponders {
-		metrics.ResponderState.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name, targetEntityType.String(), string(p.State), p.Name).Set(1)
+	for _, r := range targetResponders {
+		metrics.ResponderState.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name, targetEntityName, targetEntityType.String(), r.Name, string(r.State)).Set(1)
 	}
 	for _, r := range evictionRequest.Spec.Requesters {
-		metrics.ActiveRequester.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name, targetEntityType.String(), r.Name).Set(1)
+		metrics.RequesterIntent.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name, targetEntityName, targetEntityType.String(), r.Name, string(r.Intent)).Set(1)
 	}
-	metrics.PodResponders.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name, targetEntityType.String()).Set(float64(len(targetResponders)))
+	metrics.TargetResponders.WithLabelValues(evictionRequest.Namespace, evictionRequest.Name, targetEntityName, targetEntityType.String()).Set(float64(len(targetResponders)))
 
 	for _, responder := range targetResponders {
 		statusApply.WithTargetResponders(coordinationapply.TargetResponder().
