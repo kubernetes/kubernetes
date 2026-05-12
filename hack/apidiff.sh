@@ -183,6 +183,10 @@ PATH="${GOBIN}:${PATH}"
 echo "Installing apidiff into ${GOBIN}."
 go install golang.org/x/exp/cmd/apidiff@latest
 
+# Build api-changelog tool
+echo "Building api-changelog tool."
+go install ./hack/api-changelog
+
 cd "${KUBE_ROOT}"
 
 # output_name targets a target directory and prints the base name of
@@ -337,6 +341,7 @@ compare () {
             incompatible=$(echo "$incompatible" | grep -v -E "${incompatible_filters[@]}") || true
             changes=$(echo "$changes" | head -n "$((sep-1))") || true
         fi
+        # One of these strings must contain some change.
         echo "$changes"
         if [ -n "$incompatible" ]; then
             echo "Incompatible changes:"
@@ -358,33 +363,24 @@ compare () {
         # If yes, then maybe it already contains this incompatible change.
         changelog="${what}/${CHANGELOG}"
         if [ -f "${changelog}" ]; then
-            # This checks that the incompatible change is in a verbatim text blog of the changelog.
-            # Any surrounding text (section header, human-readable explanation) must be checked
-            # by reviewers of the new changelog entry.
-            if [[ $(cat "${changelog}") = *"\`\`\`
-${incompatible}
-\`\`\`"* ]]; then
+            # Use api-changelog tool to verify that incompatible changes are documented.
+            # Exit codes: 0=success, 1=error, 2=verification failed
+            set +e
+            verify_output=$(api-changelog -verify -changelog="${changelog}" -changes="${incompatible}" 2>&1)
+            verify_result=$?
+            set -e
+            if [ ${verify_result} -eq 0 ]; then
                 # Documented => don't track it as a reason for failure.
                 return 0
+            elif [ ${verify_result} -eq 1 ]; then
+                # Unexpected error from api-changelog tool
+                echo "ERROR: api-changelog verification failed with unexpected error:" >&2
+                echo "${verify_output}" >&2
+                exit 1
             fi
+            # verify_result == 2 means changes not found, continue to handle below.
             if ${update_changelog}; then
-                # Add a new section before the earliest one or, if there is none, at the end.
-                # Add an empty line before or after the new text, depending on where we insert.
-                # This way the most recent information is directly visible.
-                line=$(grep -m 1 -n '^#' "${changelog}") || true
-                if [[ -z "${line}" ]]; then
-                    line=$(( $(wc -l <"${changelog}")  + 1 ))
-                    before="
-"
-                    after=""
-                else
-                    line=${line/:*/}
-                    before=""
-                    after="
-"
-                fi
-                head -n $((line - 1)) "${changelog}" >"${changelog}.tmp"
-                echo -n "${before}" >>"${changelog}.tmp"
+                # Use api-changelog tool to insert the changes into the changelog.
                 if ${from_merge_commit}; then
                     # Example for a body:
                     #
@@ -400,32 +396,11 @@ ${incompatible}
                     pr=${commit_summary[3]}
                     pr=${pr#?}
                     title=$(echo "${body}" | tail -n 1)
-                    cat >>"${changelog}.tmp" <<EOF
-### ${title}
-
-See [PR #${pr}](https://github.com/kubernetes/kubernetes/pull/${pr}).
-
-\`\`\`
-${incompatible}
-\`\`\`
-EOF
+                    description="See [PR #${pr}](https://github.com/kubernetes/kubernetes/pull/${pr})."
+                    api-changelog -insert -changelog="${changelog}" -changes="${incompatible}" -title="${title}" -description="${description}"
                 else
-                    cat >>"${changelog}.tmp" <<EOF
-### Replace with a short title
-
-Replace this text with a short summary of the change
-and how users of the package can deal with this breaking
-change. If users are not expected to be affected, then
-instead explain why.
-
-\`\`\`
-${incompatible}
-\`\`\`
-EOF
+                    api-changelog -insert -changelog="${changelog}" -changes="${incompatible}"
                 fi
-                echo -n "${after}" >>"${changelog}.tmp"
-                tail -n "+${line}" "${changelog}" >>"${changelog}.tmp"
-                mv "${changelog}.tmp" "${changelog}"
 
                 # Because we have updated the changelog as requested, we don't
                 # need to describe how to do that nor treat it as a failure.
