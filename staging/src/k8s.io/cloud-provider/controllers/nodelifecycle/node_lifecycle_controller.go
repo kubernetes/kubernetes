@@ -46,6 +46,10 @@ import (
 const (
 	deleteNodeEvent       = "DeletingNode"
 	deleteNodeFailedEvent = "DeletingNodeFailed"
+
+	instanceExistsOp   = "instance_exists"
+	instanceShutdownOp = "instance_shutdown"
+	instanceMetadataOp = "instance_metadata"
 )
 
 var ShutdownTaint = &v1.Taint{
@@ -79,6 +83,8 @@ func NewCloudNodeLifecycleController(
 	cloud cloudprovider.Interface,
 	nodeMonitorPeriod time.Duration,
 	concurrentNodeLifecycleSyncs int) (*CloudNodeLifecycleController, error) {
+
+	registerMetrics()
 
 	if kubeClient == nil {
 		return nil, errors.New("kubernetes client is nil")
@@ -138,6 +144,8 @@ func (c *CloudNodeLifecycleController) Run(ctx context.Context, controllerManage
 // or shutdown. If deleted, it deletes the node resource. If shutdown it
 // applies a shutdown taint to the node
 func (c *CloudNodeLifecycleController) MonitorNodes(ctx context.Context) {
+	startTime := time.Now()
+
 	nodes, err := c.nodeLister.List(labels.Everything())
 	if err != nil {
 		klog.Errorf("error listing nodes from cache: %s", err)
@@ -209,6 +217,9 @@ func (c *CloudNodeLifecycleController) MonitorNodes(ctx context.Context) {
 	}
 
 	workqueue.ParallelizeUntil(ctx, c.concurrentNodeLifecycleSyncs, len(nodes), processNode)
+
+	duration := time.Since(startTime).Seconds()
+	monitorNodesDuration.Observe(duration)
 }
 
 // getProviderID returns the provider ID for the node. If Node CR has no provider ID,
@@ -220,6 +231,7 @@ func (c *CloudNodeLifecycleController) getProviderID(ctx context.Context, node *
 
 	if instanceV2, ok := c.cloud.InstancesV2(); ok {
 		metadata, err := instanceV2.InstanceMetadata(ctx, node)
+		observeInstanceOp(instanceMetadataOp, err)
 		if err != nil {
 			return "", err
 		}
@@ -227,17 +239,19 @@ func (c *CloudNodeLifecycleController) getProviderID(ctx context.Context, node *
 	}
 
 	providerID, err := cloudprovider.GetInstanceProviderID(ctx, c.cloud, types.NodeName(node.Name))
+	observeInstanceOp(instanceMetadataOp, err)
 	if err != nil {
 		return "", err
 	}
-
 	return providerID, nil
 }
 
 // shutdownInCloudProvider returns true if the node is shutdown on the cloud provider
 func (c *CloudNodeLifecycleController) shutdownInCloudProvider(ctx context.Context, node *v1.Node) (bool, error) {
 	if instanceV2, ok := c.cloud.InstancesV2(); ok {
-		return instanceV2.InstanceShutdown(ctx, node)
+		shutdown, err := instanceV2.InstanceShutdown(ctx, node)
+		observeInstanceOp(instanceShutdownOp, err)
+		return shutdown, err
 	}
 
 	instances, ok := c.cloud.Instances()
@@ -247,14 +261,15 @@ func (c *CloudNodeLifecycleController) shutdownInCloudProvider(ctx context.Conte
 
 	providerID, err := c.getProviderID(ctx, node)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		if errors.Is(err, cloudprovider.InstanceNotFound) {
 			return false, nil
 		}
 		return false, err
 	}
 
 	shutdown, err := instances.InstanceShutdownByProviderID(ctx, providerID)
-	if err == cloudprovider.NotImplemented {
+	observeInstanceOp(instanceShutdownOp, err)
+	if errors.Is(err, cloudprovider.NotImplemented) {
 		return false, nil
 	}
 
@@ -264,7 +279,13 @@ func (c *CloudNodeLifecycleController) shutdownInCloudProvider(ctx context.Conte
 // ensureNodeExistsByProviderID checks if the instance exists by the provider id,
 func (c *CloudNodeLifecycleController) ensureNodeExistsByProviderID(ctx context.Context, node *v1.Node) (bool, error) {
 	if instanceV2, ok := c.cloud.InstancesV2(); ok {
-		return instanceV2.InstanceExists(ctx, node)
+		exists, err := instanceV2.InstanceExists(ctx, node)
+		if err == nil && !exists {
+			observeInstanceOp(instanceExistsOp, cloudprovider.InstanceNotFound)
+		} else {
+			observeInstanceOp(instanceExistsOp, err)
+		}
+		return exists, err
 	}
 
 	instances, ok := c.cloud.Instances()
@@ -274,11 +295,32 @@ func (c *CloudNodeLifecycleController) ensureNodeExistsByProviderID(ctx context.
 
 	providerID, err := c.getProviderID(ctx, node)
 	if err != nil {
-		if err == cloudprovider.InstanceNotFound {
+		if errors.Is(err, cloudprovider.InstanceNotFound) {
 			return false, nil
 		}
 		return false, err
 	}
 
-	return instances.InstanceExistsByProviderID(ctx, providerID)
+	exists, err := instances.InstanceExistsByProviderID(ctx, providerID)
+	if err == nil && !exists {
+		observeInstanceOp(instanceExistsOp, cloudprovider.InstanceNotFound)
+	} else {
+		observeInstanceOp(instanceExistsOp, err)
+	}
+	return exists, err
+}
+
+func observeInstanceOp(operation string, err error) {
+	result := "success"
+	switch {
+	case errors.Is(err, cloudprovider.NotImplemented):
+		result = "not_implemented"
+	case errors.Is(err, cloudprovider.InstanceNotFound):
+		result = "instance_not_found"
+	case errors.Is(err, context.Canceled):
+		result = "canceled"
+	case err != nil:
+		result = "error"
+	}
+	cloudProviderCalls.WithLabelValues(operation, result).Inc()
 }

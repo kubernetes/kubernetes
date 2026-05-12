@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
 	fakecloud "k8s.io/cloud-provider/fake"
+	k8stest "k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 )
@@ -1153,5 +1154,87 @@ func TestNewCloudNodeLifecycleController(t *testing.T) {
 				t.Errorf("expected concurrentNodeLifecycleSyncs to be %d, but got %d", tc.expectedWorkers, c.concurrentNodeLifecycleSyncs)
 			}
 		})
+	}
+}
+
+func TestMonitorNodesMetrics(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	clientset := fake.NewSimpleClientset()
+	informer := informers.NewSharedInformerFactory(clientset, time.Second)
+	nodeInformer := informer.Core().V1().Nodes()
+	fakeCloud := &fakecloud.Cloud{}
+
+	// Create 2 ready nodes and 1 not-ready node
+	node0 := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "node0"},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}},
+		},
+	}
+	node1 := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "node1"},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}},
+		},
+	}
+	node2 := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: "node2"},
+		Status: v1.NodeStatus{
+			Conditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionFalse}},
+		},
+	}
+
+	// Create nodes in API server via clientset
+	for _, node := range []*v1.Node{node0, node1, node2} {
+		_, err := clientset.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("failed to create node: %v", err)
+		}
+	}
+
+	// Sync node informer store with clientset to populate the cache
+	if err := syncNodeStore(ctx, nodeInformer, clientset); err != nil {
+		t.Fatalf("failed to sync node store: %v", err)
+	}
+
+	// Instantiate controller (registers metrics automatically)
+	c, err := NewCloudNodeLifecycleController(
+		nodeInformer,
+		clientset,
+		fakeCloud,
+		1*time.Second,
+		1, // workers = 1
+	)
+	if err != nil {
+		t.Fatalf("failed to create controller: %v", err)
+	}
+	c.broadcaster = record.NewBroadcaster(record.WithContext(ctx))
+	c.recorder = c.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-lifecycle-controller"})
+
+	// Setup fake cloud to report node2 still exists so it is processed under "cloud" path without deleting
+	fakeCloud.Exists = true
+	fakeCloud.ExistsByProviderID = true
+
+	// Reset metrics registry/vectors to clean state before running loop
+	cloudProviderCalls.Reset()
+
+	// Execute MonitorNodes loop
+	c.MonitorNodes(ctx)
+
+	// 1. Verify cloudProviderCalls {"operation": "instance_exists", "result": "success"} is exactly 1
+	existsCount, err := k8stest.GetCounterMetricValue(cloudProviderCalls.WithLabelValues(instanceExistsOp, "success"))
+	if err != nil {
+		t.Errorf("unexpected error getting %s count: %v", instanceExistsOp, err)
+	}
+	if existsCount != 1.0 {
+		t.Errorf("expected %s calls count to be 1.0, but got %f", instanceExistsOp, existsCount)
+	}
+
+	shutdownCount, err := k8stest.GetCounterMetricValue(cloudProviderCalls.WithLabelValues(instanceShutdownOp, "success"))
+	if err != nil {
+		t.Errorf("unexpected error getting %s count: %v", instanceShutdownOp, err)
+	}
+	if shutdownCount != 1.0 {
+		t.Errorf("expected %s calls count to be 1.0, but got %f", instanceShutdownOp, shutdownCount)
 	}
 }
