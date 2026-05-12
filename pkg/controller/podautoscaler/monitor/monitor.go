@@ -44,6 +44,7 @@ type Monitor interface {
 	ObserveHPAAddition()
 	ObserveHPADeletion()
 	ObserveDesiredReplicas(namespace, hpaName string, desiredReplicas int32)
+	ObserveHPARequeueSkips(group string, resource string)
 }
 
 type monitor struct{}
@@ -77,4 +78,8 @@ func (r *monitor) ObserveHPADeletion() {
 // ObserveDesiredReplicas records the desired replica count for an HPA object.
 func (r *monitor) ObserveDesiredReplicas(namespace, hpaName string, desiredReplicas int32) {
 	DesiredReplicasCount.WithLabelValues(namespace, hpaName).Set(float64(desiredReplicas))
+}
+
+func (r *monitor) ObserveHPARequeueSkips(group string, resource string) {
+	HPARequeueSkips.WithLabelValues(group, resource).Inc()
 }

@@ -1757,6 +1757,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.36"
+- name: StaleControllerConsistencyHPA
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: StaleControllerConsistencyJob
   versionedSpecs:
   - default: true

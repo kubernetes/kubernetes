@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -54,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/monitor"
+	consistencyutil "k8s.io/kubernetes/pkg/controller/util/consistency"
 	"k8s.io/kubernetes/pkg/controller/util/selectors"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -68,6 +70,13 @@ var (
 	// All such errors should have this error as a root error so that the upstream function can distinguish spec errors from internal errors.
 	// e.g., fmt.Errorf("invalid spec%w", errSpec)
 	errSpec error = errors.New("")
+)
+
+var (
+	horizontalGroupResource = schema.GroupResource{
+		Group:    "autoscaling",
+		Resource: "horizontalpodautoscalers",
+	}
 )
 
 type timestampedRecommendation struct {
@@ -123,6 +132,9 @@ type HorizontalController struct {
 	// Storage of HPAs and their selectors.
 	hpaSelectors    *selectors.BiMultimap
 	hpaSelectorsMux sync.Mutex
+
+	// consistencyStore is used to track the state of the controller's operations.
+	consistencyStore consistencyutil.ConsistencyStore
 }
 
 // NewHorizontalController creates a new HorizontalController.
@@ -145,6 +157,15 @@ func NewHorizontalController(
 	broadcaster.StartStructuredLogging(3)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: evtNamespacer.Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "horizontal-pod-autoscaler"})
+	var consistencyStore consistencyutil.ConsistencyStore
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.StaleControllerConsistencyHPA) {
+		consistencyStore = consistencyutil.NewConsistencyStore(map[schema.GroupResource]consistencyutil.LastSyncRVGetter{
+			horizontalGroupResource: hpaInformer.Informer().GetStore(),
+		})
+	} else {
+		consistencyStore = consistencyutil.NewNoopConsistencyStore()
+	}
 
 	hpaController := &HorizontalController{
 		eventRecorder:                recorder,
@@ -167,6 +188,7 @@ func NewHorizontalController(
 		scaleDownEvents:     map[string][]timestampedScaleEvent{},
 		scaleDownEventsLock: sync.RWMutex{},
 		hpaSelectors:        selectors.NewBiMultimap(),
+		consistencyStore:    consistencyStore,
 	}
 
 	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -290,6 +312,19 @@ func (a *HorizontalController) deleteHPA(obj interface{}) {
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
 		return
+	}
+
+	hpa, ok := obj.(*autoscalingv2.HorizontalPodAutoscaler)
+	if !ok {
+		if tombstone, isTombstone := obj.(cache.DeletedFinalStateUnknown); isTombstone {
+			hpa, _ = tombstone.Obj.(*autoscalingv2.HorizontalPodAutoscaler)
+		}
+	}
+	if hpa != nil {
+		a.consistencyStore.Clear(
+			types.NamespacedName{Namespace: hpa.Namespace, Name: hpa.Name},
+			hpa.UID,
+		)
 	}
 
 	// TODO: could we leak if we fail to get the key?
@@ -549,8 +584,24 @@ func (a *HorizontalController) reconcileKey(ctx context.Context, key string) (de
 
 	logger := klog.FromContext(ctx)
 
+	hpaNamespacedName := types.NamespacedName{
+		Namespace: namespace,
+		Name:      name,
+	}
+	if err := a.consistencyStore.EnsureReady(hpaNamespacedName); err != nil {
+		var consistencyErr *consistencyutil.ConsistencyError
+		if errors.As(err, &consistencyErr) {
+			a.monitor.ObserveHPARequeueSkips(
+				consistencyErr.GroupResource.Group,
+				consistencyErr.GroupResource.Resource,
+			)
+		}
+		return false, err
+	}
+
 	hpa, err := a.hpaLister.HorizontalPodAutoscalers(namespace).Get(name)
 	if k8serrors.IsNotFound(err) {
+		a.consistencyStore.Clear(hpaNamespacedName, "")
 		logger.Info("Horizontal Pod Autoscaler has been deleted", "HPA", klog.KRef(namespace, name))
 
 		a.recommendationsLock.Lock()
@@ -1535,11 +1586,17 @@ func (a *HorizontalController) updateStatusIfNeeded(ctx context.Context, oldStat
 
 // updateStatus actually does the update request for the status of the given HPA
 func (a *HorizontalController) updateStatus(ctx context.Context, hpa *autoscalingv2.HorizontalPodAutoscaler) error {
-	_, err := a.hpaNamespacer.HorizontalPodAutoscalers(hpa.Namespace).UpdateStatus(ctx, hpa, metav1.UpdateOptions{})
+	updatedHPA, err := a.hpaNamespacer.HorizontalPodAutoscalers(hpa.Namespace).UpdateStatus(ctx, hpa, metav1.UpdateOptions{})
 	if err != nil {
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedUpdateStatus", err.Error())
 		return fmt.Errorf("failed to update status for %s: %v", hpa.Name, err)
 	}
+	a.consistencyStore.WroteAt(
+		types.NamespacedName{Namespace: updatedHPA.Namespace, Name: updatedHPA.Name},
+		updatedHPA.UID,
+		horizontalGroupResource,
+		updatedHPA.ResourceVersion,
+	)
 	logger := klog.FromContext(ctx)
 	logger.V(2).Info("Successfully updated status", "HPA", klog.KObj(hpa))
 	return nil

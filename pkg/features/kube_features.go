@@ -994,6 +994,13 @@ const (
 	// owner: @michaelasp
 	// kep: http://kep.k8s.io/5647
 	//
+	// Introduces the ability for the HPA controller to be able to read its writes
+	// prior to running a reconcile on the same object.
+	StaleControllerConsistencyHPA featuregate.Feature = "StaleControllerConsistencyHPA"
+
+	// owner: @michaelasp
+	// kep: http://kep.k8s.io/5647
+	//
 	// Introduces the ability for the Job controller to be able to read its writes
 	// prior to running a reconcile on the same object.
 	StaleControllerConsistencyJob featuregate.Feature = "StaleControllerConsistencyJob"
@@ -1898,6 +1905,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	StaleControllerConsistencyHPA: {
+		{Version: version.MustParse("1.37"), Default: true, PreRelease: featuregate.Beta},
+	},
+
 	StaleControllerConsistencyJob: {
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 	},
@@ -2517,6 +2528,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	ServiceCIDRStatusFieldWiping: {},
 
 	StaleControllerConsistencyDaemonSet: {featuregate.Feature(clientfeatures.AtomicFIFO)},
+
+	StaleControllerConsistencyHPA: {featuregate.Feature(clientfeatures.AtomicFIFO)},
 
 	StaleControllerConsistencyJob: {featuregate.Feature(clientfeatures.AtomicFIFO)},
 
