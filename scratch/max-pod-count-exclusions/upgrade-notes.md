@@ -104,3 +104,26 @@ If a rebase preserves all of the above and the three targeted test
 suites (`pkg/scheduler/framework/plugins/noderesources/...`,
 `pkg/scheduler/...`, `pkg/kubelet/lifecycle/...`) pass, the rebase is
 complete.
+
+## 6. Validation results (initial landing, branch `exclude-jfs-from-max-pod-count`)
+
+Final post-step-10 validation run, all three targeted suites in one
+invocation:
+
+```
+go test ./pkg/scheduler/framework/plugins/noderesources/... \
+        ./pkg/scheduler/... \
+        ./pkg/kubelet/lifecycle/...
+```
+
+Result: exit 0. Every package returned `ok` (no `FAIL`, no `--- SKIP`,
+no `?` for any package that has test files). Notable packages in the
+output (full list in CI/output log):
+
+- `k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources` — `ok`
+- `k8s.io/kubernetes/pkg/scheduler` — `ok`
+- `k8s.io/kubernetes/pkg/scheduler/metrics` — `ok` (covers the new `PodCountExemptionAdmissionsTotal` counter registration)
+- `k8s.io/kubernetes/pkg/kubelet/lifecycle` — `ok` (covers `TestPredicateAdmitPodCountExemption`)
+
+Re-run this same command on every rebase. If anything goes red, the
+matching contract clause from §2 is where to start the diagnosis.
