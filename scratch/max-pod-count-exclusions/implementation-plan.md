@@ -31,7 +31,7 @@
    - Only adjust function calls/signatures in `AdmissionCheck(...)` if needed due to `Fits(...)` API changes.
    - Do not add separate kubelet-only exemption logic; keep single-source-of-truth in `noderesources`.
 
-6. Add scheduler unit tests for pod-count exemption behavior
+6. ~~Add scheduler unit tests for pod-count exemption behavior~~ **(done — see `step-6-handoff.md`)**
    - File: `pkg/scheduler/framework/plugins/noderesources/fit_test.go`
    - Add table-driven tests for:
      - normal pod blocked at max pod count

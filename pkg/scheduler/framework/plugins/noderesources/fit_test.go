@@ -27,6 +27,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2/ktesting"
 	_ "k8s.io/klog/v2/ktesting/init"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -718,6 +719,291 @@ func TestNotEnoughRequests(t *testing.T) {
 		})
 	}
 
+}
+
+// withExcludeFromMaxPodCountAnnotation sets the pod-count exemption annotation
+// on the given pod to the provided value (an empty string is treated as "no
+// annotation set" for the purposes of these tests).
+func withExcludeFromMaxPodCountAnnotation(pod *v1.Pod, value string) *v1.Pod {
+	if value == "" {
+		return pod
+	}
+	if pod.Annotations == nil {
+		pod.Annotations = map[string]string{}
+	}
+	pod.Annotations[ExcludeFromMaxPodCountAnnotationKey] = value
+	return pod
+}
+
+// TestExcludeFromMaxPodCount exercises the pod-count exemption surface added
+// in steps 2-4: the ExcludeFromMaxPodCountAnnotationKey annotation, plumbed
+// through preFilterState.ExcludeFromPodCount, and consumed by fitsRequest to
+// flip the allowedPodNumber increment from 1 to 0. The cases below cover the
+// full contract from contract.md:
+//
+//   - normal pod blocked at max pod count (baseline);
+//   - exempt pod admitted at max pod count (the actual feature);
+//   - non-pod resources still enforced for an exempt pod (scope is
+//     ResourcePods-only, see contract.md §2);
+//   - malformed / non-truthy annotation values treated as non-exempt (the
+//     fail-closed behaviour from contract.md §1).
+//
+// Each case is run through both the Filter extension point (which reads the
+// flag off the PreFilter-populated CycleState) and the direct Fits(...) path
+// (which is the one kubelet's AdmissionCheck consumes). Both paths must agree
+// on every input — that is what makes noderesources the single source of
+// truth for the exemption decision.
+func TestExcludeFromMaxPodCount(t *testing.T) {
+	tooManyPodsReason := "Too many pods"
+
+	// Build a node with Allocatable.Pods=1 so the very next pod hits the cap,
+	// plus CPU=10/Memory=20 for the "non-pod resources still enforced" cases.
+	makeAtCapNode := func() *v1.Node {
+		return &v1.Node{Status: v1.NodeStatus{
+			Capacity:    v1.ResourceList{},
+			Allocatable: makeAllocatableResources(10, 20, 1, 0, 0, 0),
+		}}
+	}
+	// One pod already occupying the node, so Allocatable.Pods is fully consumed.
+	makeAtCapNodeInfo := func() *framework.NodeInfo {
+		return framework.NewNodeInfo(newResourcePod(framework.Resource{MilliCPU: 1, Memory: 1}))
+	}
+
+	tests := []struct {
+		name             string
+		pod              *v1.Pod
+		nodeInfo         *framework.NodeInfo
+		wantFilterStatus *framework.Status
+		wantFitsReasons  []v1.ResourceName // resource names expected in Fits() output
+	}{
+		{
+			name:             "normal pod blocked at max pod count",
+			pod:              &v1.Pod{},
+			nodeInfo:         makeAtCapNodeInfo(),
+			wantFilterStatus: framework.NewStatus(framework.Unschedulable, tooManyPodsReason),
+			wantFitsReasons:  []v1.ResourceName{v1.ResourcePods},
+		},
+		{
+			name:             "exempt pod admitted at max pod count",
+			pod:              withExcludeFromMaxPodCountAnnotation(&v1.Pod{}, "true"),
+			nodeInfo:         makeAtCapNodeInfo(),
+			wantFilterStatus: nil,
+			wantFitsReasons:  nil,
+		},
+		{
+			name: "exempt pod still rejected when CPU exceeds node capacity",
+			pod: withExcludeFromMaxPodCountAnnotation(
+				newResourcePod(framework.Resource{MilliCPU: 100, Memory: 1}),
+				"true",
+			),
+			nodeInfo: makeAtCapNodeInfo(),
+			// Requested CPU (100) exceeds node Allocatable (10), so the
+			// insufficiency is Unresolvable (preemption cannot fix it).
+			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, getErrReason(v1.ResourceCPU)),
+			wantFitsReasons:  []v1.ResourceName{v1.ResourceCPU},
+		},
+		{
+			name: "exempt pod still rejected when memory exceeds node capacity",
+			pod: withExcludeFromMaxPodCountAnnotation(
+				newResourcePod(framework.Resource{MilliCPU: 1, Memory: 100}),
+				"true",
+			),
+			nodeInfo: makeAtCapNodeInfo(),
+			// Requested memory (100) exceeds node Allocatable (20), so the
+			// insufficiency is Unresolvable.
+			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, getErrReason(v1.ResourceMemory)),
+			wantFitsReasons:  []v1.ResourceName{v1.ResourceMemory},
+		},
+		{
+			name: "exempt pod still rejected for both pod-cap-unrelated resources",
+			pod: withExcludeFromMaxPodCountAnnotation(
+				newResourcePod(framework.Resource{MilliCPU: 100, Memory: 100}),
+				"true",
+			),
+			nodeInfo: makeAtCapNodeInfo(),
+			// Both CPU (100 > 10) and memory (100 > 20) exceed Allocatable, so
+			// both insufficiencies are Unresolvable.
+			wantFilterStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, getErrReason(v1.ResourceCPU), getErrReason(v1.ResourceMemory)),
+			wantFitsReasons:  []v1.ResourceName{v1.ResourceCPU, v1.ResourceMemory},
+		},
+		{
+			name: "exempt pod still rejected when CPU fits capacity but not remaining (resolvable)",
+			// Node Allocatable: CPU=10. Existing pod uses CPU=1. Requesting 10
+			// fits capacity (10<=10) but not remaining (10>10-1=9). So the
+			// insufficiency is reported as Unschedulable, not
+			// UnschedulableAndUnresolvable: preemption could free up space.
+			pod: withExcludeFromMaxPodCountAnnotation(
+				newResourcePod(framework.Resource{MilliCPU: 10, Memory: 1}),
+				"true",
+			),
+			nodeInfo:         makeAtCapNodeInfo(),
+			wantFilterStatus: framework.NewStatus(framework.Unschedulable, getErrReason(v1.ResourceCPU)),
+			wantFitsReasons:  []v1.ResourceName{v1.ResourceCPU},
+		},
+		{
+			name:             "malformed annotation value 'True' is non-exempt",
+			pod:              withExcludeFromMaxPodCountAnnotation(&v1.Pod{}, "True"),
+			nodeInfo:         makeAtCapNodeInfo(),
+			wantFilterStatus: framework.NewStatus(framework.Unschedulable, tooManyPodsReason),
+			wantFitsReasons:  []v1.ResourceName{v1.ResourcePods},
+		},
+		{
+			name:             "malformed annotation value '1' is non-exempt",
+			pod:              withExcludeFromMaxPodCountAnnotation(&v1.Pod{}, "1"),
+			nodeInfo:         makeAtCapNodeInfo(),
+			wantFilterStatus: framework.NewStatus(framework.Unschedulable, tooManyPodsReason),
+			wantFitsReasons:  []v1.ResourceName{v1.ResourcePods},
+		},
+		{
+			name:             "malformed annotation value 'yes' is non-exempt",
+			pod:              withExcludeFromMaxPodCountAnnotation(&v1.Pod{}, "yes"),
+			nodeInfo:         makeAtCapNodeInfo(),
+			wantFilterStatus: framework.NewStatus(framework.Unschedulable, tooManyPodsReason),
+			wantFitsReasons:  []v1.ResourceName{v1.ResourcePods},
+		},
+		{
+			name:             "malformed annotation value 'false' is non-exempt",
+			pod:              withExcludeFromMaxPodCountAnnotation(&v1.Pod{}, "false"),
+			nodeInfo:         makeAtCapNodeInfo(),
+			wantFilterStatus: framework.NewStatus(framework.Unschedulable, tooManyPodsReason),
+			wantFitsReasons:  []v1.ResourceName{v1.ResourcePods},
+		},
+		{
+			name:             "whitespace-padded 'true ' annotation value is non-exempt",
+			pod:              withExcludeFromMaxPodCountAnnotation(&v1.Pod{}, "true "),
+			nodeInfo:         makeAtCapNodeInfo(),
+			wantFilterStatus: framework.NewStatus(framework.Unschedulable, tooManyPodsReason),
+			wantFitsReasons:  []v1.ResourceName{v1.ResourcePods},
+		},
+		{
+			name:             "empty annotation value is non-exempt",
+			pod:              withExcludeFromMaxPodCountAnnotation(&v1.Pod{}, ""),
+			nodeInfo:         makeAtCapNodeInfo(),
+			wantFilterStatus: framework.NewStatus(framework.Unschedulable, tooManyPodsReason),
+			wantFitsReasons:  []v1.ResourceName{v1.ResourcePods},
+		},
+		{
+			name:             "annotation absent is non-exempt (sanity check)",
+			pod:              &v1.Pod{},
+			nodeInfo:         makeAtCapNodeInfo(),
+			wantFilterStatus: framework.NewStatus(framework.Unschedulable, tooManyPodsReason),
+			wantFitsReasons:  []v1.ResourceName{v1.ResourcePods},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			node := makeAtCapNode()
+			test.nodeInfo.SetNode(node)
+
+			p, err := NewFit(ctx, &config.NodeResourcesFitArgs{ScoringStrategy: defaultScoringStrategy}, nil, plfeature.Features{})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Filter path: exercises the PreFilter -> CycleState -> Filter wiring
+			// that real scheduling cycles use.
+			cycleState := framework.NewCycleState()
+			if _, preFilterStatus := p.(framework.PreFilterPlugin).PreFilter(ctx, cycleState, test.pod, nil); !preFilterStatus.IsSuccess() {
+				t.Fatalf("prefilter failed with status: %v", preFilterStatus)
+			}
+			gotFilterStatus := p.(framework.FilterPlugin).Filter(ctx, cycleState, test.pod, test.nodeInfo)
+			if diff := cmp.Diff(test.wantFilterStatus, gotFilterStatus); diff != "" {
+				t.Errorf("Filter status does not match (-want,+got):\n%s", diff)
+			}
+
+			// Direct Fits(...) path: this is the one kubelet's AdmissionCheck
+			// consumes via scheduler.AdmissionCheck, so it MUST agree with the
+			// Filter path above for every input.
+			gotInsufficient := Fits(test.pod, test.nodeInfo, ResourceRequestsOptions{})
+			var gotReasons []v1.ResourceName
+			for _, ir := range gotInsufficient {
+				gotReasons = append(gotReasons, ir.ResourceName)
+			}
+			if diff := cmp.Diff(test.wantFitsReasons, gotReasons); diff != "" {
+				t.Errorf("Fits() insufficient resource names do not match (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestIsExcludedFromMaxPodCount exercises the helper introduced in step 2 in
+// isolation, so that regressions in the annotation-parsing rules surface
+// independently of the broader Filter / Fits wiring. The cases below mirror
+// the fail-closed contract from contract.md §1: only the literal string
+// "true" opts in.
+func TestIsExcludedFromMaxPodCount(t *testing.T) {
+	tests := []struct {
+		name string
+		pod  *v1.Pod
+		want bool
+	}{
+		{
+			name: "nil pod is non-exempt",
+			pod:  nil,
+			want: false,
+		},
+		{
+			name: "pod without annotations is non-exempt",
+			pod:  &v1.Pod{},
+			want: false,
+		},
+		{
+			name: "annotation set to 'true' is exempt",
+			pod:  withExcludeFromMaxPodCountAnnotation(&v1.Pod{}, "true"),
+			want: true,
+		},
+		{
+			name: "annotation set to 'True' is non-exempt (case-sensitive)",
+			pod:  withExcludeFromMaxPodCountAnnotation(&v1.Pod{}, "True"),
+			want: false,
+		},
+		{
+			name: "annotation set to 'TRUE' is non-exempt",
+			pod:  withExcludeFromMaxPodCountAnnotation(&v1.Pod{}, "TRUE"),
+			want: false,
+		},
+		{
+			name: "annotation set to '1' is non-exempt",
+			pod:  withExcludeFromMaxPodCountAnnotation(&v1.Pod{}, "1"),
+			want: false,
+		},
+		{
+			name: "annotation set to 'yes' is non-exempt",
+			pod:  withExcludeFromMaxPodCountAnnotation(&v1.Pod{}, "yes"),
+			want: false,
+		},
+		{
+			name: "annotation set to 'false' is non-exempt",
+			pod:  withExcludeFromMaxPodCountAnnotation(&v1.Pod{}, "false"),
+			want: false,
+		},
+		{
+			name: "annotation set to whitespace-padded 'true ' is non-exempt",
+			pod:  withExcludeFromMaxPodCountAnnotation(&v1.Pod{}, "true "),
+			want: false,
+		},
+		{
+			name: "annotation set to empty string is non-exempt",
+			pod:  &v1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{ExcludeFromMaxPodCountAnnotationKey: ""}}},
+			want: false,
+		},
+		{
+			name: "unrelated annotation present, exemption annotation absent, is non-exempt",
+			pod:  &v1.Pod{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"unrelated/key": "true"}}},
+			want: false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := isExcludedFromMaxPodCount(test.pod); got != test.want {
+				t.Errorf("isExcludedFromMaxPodCount() = %v, want %v", got, test.want)
+			}
+		})
+	}
 }
 
 func TestStorageRequests(t *testing.T) {
