@@ -119,6 +119,15 @@ func (f *Fit) ScoreExtensions() framework.ScoreExtensions {
 // preFilterState computed at PreFilter and used at Filter.
 type preFilterState struct {
 	framework.Resource
+	// ExcludeFromPodCount indicates whether the incoming pod has opted out of
+	// the node-level pod-count cap (v1.ResourcePods / Allocatable.Pods) via
+	// the ExcludeFromMaxPodCountAnnotationKey annotation. It is computed once
+	// at PreFilter time (in computePodResourceRequest) and consumed at Filter
+	// time by fitsRequest, which is the single source of truth for the
+	// pod-count check. Only the allowedPodNumber comparison is affected; CPU,
+	// memory, ephemeral-storage, and scalar/extended resource accounting are
+	// unchanged. See isExcludedFromMaxPodCount for the full contract.
+	ExcludeFromPodCount bool
 }
 
 // Clone the prefilter state.
@@ -239,6 +248,11 @@ func computePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) *preFi
 	})
 	result := &preFilterState{}
 	result.SetMaxResource(reqs)
+	// Resolve the pod-count exemption decision once, at PreFilter time, so that
+	// every Filter invocation against this state observes the same value. This
+	// affects only the allowedPodNumber check in fitsRequest (step 4 wires it
+	// in); all other resource accounting above is intentionally unchanged.
+	result.ExcludeFromPodCount = isExcludedFromMaxPodCount(pod)
 	return result
 }
 

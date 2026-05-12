@@ -11,7 +11,7 @@
    - Initially implement annotation check and keep logic centralized so scheduler and kubelet paths consume the same decision path.
    - Add comments documenting security expectations and that policy enforcement is external (admission).
 
-3. Extend preFilter state to carry pod-count exemption
+3. ~~Extend preFilter state to carry pod-count exemption~~ **(done — see `step-3-handoff.md`)**
    - File: `pkg/scheduler/framework/plugins/noderesources/fit.go`
    - Extend `preFilterState` with a boolean (for example `ExcludeFromPodCount bool`).
    - Update `computePodResourceRequest(...)` to compute and set this boolean based on the incoming pod.
