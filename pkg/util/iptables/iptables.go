@@ -87,12 +87,6 @@ type Interface interface {
 	// a reload) it will log an error and stop monitoring.
 	// (This function should be called from a goroutine.)
 	Monitor(canary Chain, tables []Table, reloadFunc func(), interval time.Duration, stopCh <-chan struct{})
-	// HasRandomFully reveals whether `-j MASQUERADE` takes the
-	// `--random-fully` option.  This is helpful to work around a
-	// Linux kernel bug that sometimes causes multiple flows to get
-	// mapped to the same IP:PORT and consequently some suffer packet
-	// drops.
-	HasRandomFully() bool
 
 	// Present checks if the kernel supports the iptable interface
 	Present() error
@@ -163,10 +157,6 @@ const FlushTables FlushFlag = true
 // NoFlushTables a boolean false constant for option flag FlushFlag
 const NoFlushTables FlushFlag = false
 
-// RandomFullyMinVersion is the minimum version from which the --random-fully flag is supported,
-// used for port mapping to be fully randomized
-var RandomFullyMinVersion = utilversion.MustParseGeneric("1.6.2")
-
 // WaitString a constant for specifying the wait flag
 const WaitString = "-w"
 
@@ -175,10 +165,9 @@ const WaitSecondsValue = "5"
 
 // runner implements Interface in terms of exec("iptables").
 type runner struct {
-	mu             sync.Mutex
-	exec           utilexec.Interface
-	protocol       Protocol
-	hasRandomFully bool
+	mu       sync.Mutex
+	exec     utilexec.Interface
+	protocol Protocol
 }
 
 // newInternal returns a new Interface which will exec iptables
@@ -188,7 +177,7 @@ func newInternal(exec utilexec.Interface, protocol Protocol) Interface {
 		protocol: protocol,
 	}
 
-	version, err := getIPTablesVersion(exec, protocol)
+	_, err := getIPTablesVersion(exec, protocol)
 	if err != nil {
 		// The only likely error is "no such file or directory", in which case any
 		// further commands will fail the same way, so we don't need to do
@@ -196,7 +185,6 @@ func newInternal(exec utilexec.Interface, protocol Protocol) Interface {
 		return runner
 	}
 
-	runner.hasRandomFully = version.AtLeast(RandomFullyMinVersion)
 	return runner
 }
 
@@ -565,10 +553,6 @@ func getIPTablesVersion(exec utilexec.Interface, protocol Protocol) (*utilversio
 	}
 
 	return version, nil
-}
-
-func (runner *runner) HasRandomFully() bool {
-	return runner.hasRandomFully
 }
 
 // Present tests if iptable is supported on current kernel by checking the existence
