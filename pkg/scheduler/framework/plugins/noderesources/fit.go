@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -253,6 +254,35 @@ func computePodResourceRequest(pod *v1.Pod, opts ResourceRequestsOptions) *preFi
 	// affects only the allowedPodNumber check in fitsRequest (step 4 wires it
 	// in); all other resource accounting above is intentionally unchanged.
 	result.ExcludeFromPodCount = isExcludedFromMaxPodCount(pod)
+	if result.ExcludeFromPodCount {
+		// Temporary rollout observability: emit a verbose log line and a
+		// per-namespace counter whenever an exempt pod is observed so
+		// operators can grep scheduler / kubelet logs and Prometheus for
+		// unexpected use of the exemption during the staged rollout.
+		//
+		// The log is at V(4) so it costs nothing at default verbosity.
+		// The counter is exposed as
+		// scheduler_pod_count_exemption_admissions_total{namespace=...}.
+		//
+		// Both are intentionally temporary. The design note
+		// (scratch/max-pod-count-exclusions/design-note.md §3b) delegates
+		// production-grade exemption-usage telemetry to the admission
+		// webhook / audit log, so this counter and log are debugging aids
+		// for the initial rollout only and may be removed once the
+		// rollout has soaked. See also the upgrade-notes.md companion in
+		// the same directory for the touched-symbol list.
+		klog.V(4).InfoS("noderesources: pod opted out of max-pod-count cap",
+			"pod", klog.KObj(pod),
+			"annotation", ExcludeFromMaxPodCountAnnotationKey)
+		// Guard against the metric not being initialized (tests that
+		// exercise this plugin without calling metrics.Register, e.g.
+		// fit_test.go, leave the package-level CounterVec nil). Treat
+		// observability as best-effort: a missing metric must never
+		// short-circuit the admission decision.
+		if c := metrics.PodCountExemptionAdmissionsTotal; c != nil {
+			c.WithLabelValues(pod.Namespace).Inc()
+		}
+	}
 	return result
 }
 

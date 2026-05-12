@@ -62,7 +62,7 @@
      - expected impact on CNI/IPAM capacity
      - required observability and alerting for node pod density.
 
-10. Validate, gate rollout, and prepare upgrade guidance
+10. ~~Validate, gate rollout, and prepare upgrade guidance~~ **(done — see `step-10-handoff.md`)**
    - Run targeted tests:
      - `go test ./pkg/scheduler/framework/plugins/noderesources/...`
      - `go test ./pkg/scheduler/...`

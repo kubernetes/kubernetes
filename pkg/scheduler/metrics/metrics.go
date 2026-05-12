@@ -112,6 +112,21 @@ var (
 	unschedulableReasons  *metrics.GaugeVec
 	PluginEvaluationTotal *metrics.CounterVec
 
+	// PodCountExemptionAdmissionsTotal counts admissions of pods that carry
+	// the kubelet.datadoghq.com/exclude-from-max-pods="true" annotation, as
+	// observed by the noderesources PreFilter path (which is also reused by
+	// kubelet AdmissionCheck). Labelled by namespace so operators can
+	// reconcile actual exemption usage against the admission-policy
+	// allow-list during the staged rollout.
+	//
+	// This metric is intentionally temporary. The design note
+	// (scratch/max-pod-count-exclusions/design-note.md §3b) delegates
+	// production-grade exemption-usage telemetry to the admission
+	// webhook / audit-log scrape; this counter exists only to give
+	// operators an in-tree visibility hook during initial rollout and may
+	// be removed once the rollout has soaked.
+	PodCountExemptionAdmissionsTotal *metrics.CounterVec
+
 	// The below two are only available when the QHint feature gate is enabled.
 	queueingHintExecutionDuration *metrics.HistogramVec
 	SchedulerQueueIncomingPods    *metrics.CounterVec
@@ -334,6 +349,19 @@ func InitMetrics() {
 		},
 		[]string{"result"})
 
+	// Temporary rollout observability for the pod-count exemption
+	// annotation (kubelet.datadoghq.com/exclude-from-max-pods="true").
+	// See the comment on the package-level variable for the rationale
+	// and the conditions under which this metric may be removed.
+	PodCountExemptionAdmissionsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "pod_count_exemption_admissions_total",
+			Help:           "Number of pods observed at PreFilter time carrying the kubelet.datadoghq.com/exclude-from-max-pods=\"true\" annotation. Temporary rollout signal; see scratch/max-pod-count-exclusions/design-note.md.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"namespace"})
+
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,
 		schedulingLatency,
@@ -352,6 +380,7 @@ func InitMetrics() {
 		CacheSize,
 		unschedulableReasons,
 		PluginEvaluationTotal,
+		PodCountExemptionAdmissionsTotal,
 	}
 }
 
