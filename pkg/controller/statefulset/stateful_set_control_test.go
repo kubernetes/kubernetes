@@ -212,7 +212,7 @@ func CreatePods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset(set)
 	om, _, ssc := setupController(client)
 
-	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
+	if err := scaleUpStatefulSetControl(set, ssc, om, invariants, nil); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
 	var err error
@@ -259,11 +259,11 @@ func ScalesUp(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset(set)
 	om, _, ssc := setupController(client)
 
-	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
+	if err := scaleUpStatefulSetControl(set, ssc, om, invariants, nil); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
 	*set.Spec.Replicas = 4
-	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
+	if err := scaleUpStatefulSetControl(set, ssc, om, invariants, nil); err != nil {
 		t.Errorf("Failed to scale StatefulSet : %s", err)
 	}
 	var err error
@@ -286,7 +286,7 @@ func ScalesDown(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset(set)
 	om, _, ssc := setupController(client)
 
-	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
+	if err := scaleUpStatefulSetControl(set, ssc, om, invariants, nil); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
 	var err error
@@ -319,7 +319,7 @@ func ReplacesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc)
 	client := fake.NewSimpleClientset(set)
 	om, _, ssc := setupController(client)
 
-	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
+	if err := scaleUpStatefulSetControl(set, ssc, om, invariants, nil); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
 	var err error
@@ -378,7 +378,7 @@ func ReplacesPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc)
 		if err != nil {
 			t.Fatalf("Error getting updated StatefulSet: %v", err)
 		}
-		if _, err = om.setPodReadyCondition(set, i, true); err != nil {
+		if _, err = om.setPodReadyCondition(set, i, true, time.Now()); err != nil {
 			t.Error(err)
 		}
 	}
@@ -522,7 +522,7 @@ func CreatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantF
 	om, _, ssc := setupController(client)
 	om.SetCreateStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 2)
 
-	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); !isOrHasInternalError(err) {
+	if err := scaleUpStatefulSetControl(set, ssc, om, invariants, nil); !isOrHasInternalError(err) {
 		t.Errorf("StatefulSetControl did not return InternalError, found %s", err)
 	}
 	// Update so set.Status is set for the next scaleUpStatefulSetControl call.
@@ -531,7 +531,7 @@ func CreatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantF
 	if err != nil {
 		t.Fatalf("Error getting updated StatefulSet: %v", err)
 	}
-	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
+	if err := scaleUpStatefulSetControl(set, ssc, om, invariants, nil); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
 	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
@@ -555,7 +555,7 @@ func UpdatePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantF
 	om.SetUpdateStatefulPodError(apierrors.NewInternalError(errors.New("API server failed")), 0)
 
 	// have to have 1 successful loop first
-	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
+	if err := scaleUpStatefulSetControl(set, ssc, om, invariants, nil); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 	var err error
@@ -596,7 +596,7 @@ func UpdateSetStatusFailure(t *testing.T, set *apps.StatefulSet, invariants inva
 	om, ssu, ssc := setupController(client)
 	ssu.SetUpdateStatefulSetStatusError(apierrors.NewInternalError(errors.New("API server failed")), 2)
 
-	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); !isOrHasInternalError(err) {
+	if err := scaleUpStatefulSetControl(set, ssc, om, invariants, nil); !isOrHasInternalError(err) {
 		t.Errorf("StatefulSetControl did not return InternalError, found %s", err)
 	}
 	// Update so set.Status is set for the next scaleUpStatefulSetControl call.
@@ -605,7 +605,7 @@ func UpdateSetStatusFailure(t *testing.T, set *apps.StatefulSet, invariants inva
 	if err != nil {
 		t.Fatalf("Error getting updated StatefulSet: %v", err)
 	}
-	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
+	if err := scaleUpStatefulSetControl(set, ssc, om, invariants, nil); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
 	set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
@@ -626,7 +626,7 @@ func UpdateSetStatusFailure(t *testing.T, set *apps.StatefulSet, invariants inva
 func NewRevisionDeletePodFailure(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
 	client := fake.NewSimpleClientset(set)
 	om, _, ssc := setupController(client)
-	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
+	if err := scaleUpStatefulSetControl(set, ssc, om, invariants, nil); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
 	var err error
@@ -723,7 +723,7 @@ func CreatesPodsWithStartOrdinal(t *testing.T, set *apps.StatefulSet, invariants
 	client := fake.NewSimpleClientset(set)
 	om, _, ssc := setupController(client)
 
-	if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
+	if err := scaleUpStatefulSetControl(set, ssc, om, invariants, nil); err != nil {
 		t.Errorf("Failed to turn up StatefulSet : %s", err)
 	}
 	var err error
@@ -806,7 +806,7 @@ func TestStatefulSetControlScaleDownDeleteError(t *testing.T) {
 			client := fake.NewSimpleClientset(set)
 			om, _, ssc := setupController(client)
 
-			if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
+			if err := scaleUpStatefulSetControl(set, ssc, om, invariants, nil); err != nil {
 				t.Errorf("Failed to turn up StatefulSet : %s", err)
 			}
 			var err error
@@ -994,7 +994,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 
 		// if pod 4 ready, start to update pod 3.
 		spc.setPodRunning(set, 4)
-		originalPods, _ := spc.setPodReadyCondition(set, 4, true)
+		originalPods, _ := spc.setPodReadyCondition(set, 4, true, time.Now())
 		sort.Sort(ascendingOrdinal(originalPods))
 		if _, err := ssc.UpdateStatefulSet(context.TODO(), set, originalPods, time.Now()); err != nil {
 			t.Fatal(err)
@@ -1036,7 +1036,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 			t.Fatalf("Expected create pods 5, got pods %v", len(pods))
 		}
 		spc.setPodRunning(set, 4)
-		spc.setPodReadyCondition(set, 4, true)
+		spc.setPodReadyCondition(set, 4, true, time.Now()) // nolint:errcheck
 
 		// create new pod 4 (only one pod gets created at a time due to OrderedReady)
 		if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods, time.Now()); err != nil {
@@ -1086,7 +1086,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 
 		client := fake.NewSimpleClientset()
 		spc, _, ssc := setupController(client)
-		if err := scaleUpStatefulSetControl(set, ssc, spc, assertBurstInvariants); err != nil {
+		if err := scaleUpStatefulSetControl(set, ssc, spc, assertBurstInvariants, nil); err != nil {
 			t.Fatal(err)
 		}
 		set, err := spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
@@ -1137,8 +1137,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 		// pods 3/4/5 ready, should not update other pods
 		spc.setPodRunning(set, 3)
 		spc.setPodRunning(set, 5)
-		spc.setPodReadyCondition(set, 5, true)
-		originalPods, _ = spc.setPodReadyCondition(set, 3, true)
+		spc.setPodReadyCondition(set, 5, true, time.Now()) // nolint:errcheck
+		originalPods, _ = spc.setPodReadyCondition(set, 3, true, time.Now())
 		sort.Sort(ascendingOrdinal(originalPods))
 		if _, err = ssc.UpdateStatefulSet(context.TODO(), set, originalPods, time.Now()); err != nil {
 			t.Fatal(err)
@@ -1173,7 +1173,7 @@ func setupForInvariant(t *testing.T) (*apps.StatefulSet, *fakeObjectManager, Sta
 
 	client := fake.NewSimpleClientset()
 	spc, _, ssc := setupController(client)
-	if err := scaleUpStatefulSetControl(set, ssc, spc, assertBurstInvariants); err != nil {
+	if err := scaleUpStatefulSetControl(set, ssc, spc, assertBurstInvariants, nil); err != nil {
 		t.Fatal(err)
 	}
 	set, err := spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
@@ -1292,7 +1292,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			maxUnavailable:      intstr.FromInt32(1),
 			unavailableOrdinals: []int{0},
 			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false)
+				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
 				return err
 			},
 			expectedRemainingOrdinals: []int{},
@@ -1304,7 +1304,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			maxUnavailable:      intstr.FromInt32(1),
 			unavailableOrdinals: []int{2},
 			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false)
+				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1},
@@ -1316,7 +1316,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			maxUnavailable:      intstr.FromInt32(2),
 			unavailableOrdinals: []int{3, 4},
 			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false)
+				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1, 2},
@@ -1328,7 +1328,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			maxUnavailable:      intstr.FromInt32(1),
 			unavailableOrdinals: []int{0},
 			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false)
+				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
 				return err
 			},
 			expectedRemainingOrdinals: []int{0},
@@ -1340,7 +1340,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			maxUnavailable:      intstr.FromInt32(1),
 			unavailableOrdinals: []int{2},
 			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false)
+				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1, 2},
@@ -1352,7 +1352,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			maxUnavailable:      intstr.FromInt32(2),
 			unavailableOrdinals: []int{4},
 			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false)
+				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1, 2, 3},
@@ -1389,7 +1389,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			unavailableOrdinals: []int{3, 4},
 			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
 				if ordinal == 3 {
-					_, err := spc.setPodReadyCondition(set, ordinal, false)
+					_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
 					return err
 				}
 				_, err := spc.setPodTerminated(set, ordinal)
@@ -1431,7 +1431,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			unavailableOrdinals: []int{3, 4},
 			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
 				if ordinal == 3 {
-					_, err := spc.setPodReadyCondition(set, ordinal, false)
+					_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
 					return err
 				}
 				_, err := spc.setPodTerminated(set, ordinal)
@@ -1450,7 +1450,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 					_, err := spc.setPodTerminated(set, ordinal)
 					return err
 				}
-				_, err := spc.setPodReadyCondition(set, ordinal, false)
+				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1, 3},
@@ -1463,7 +1463,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			unavailableOrdinals: []int{3, 4},
 			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
 				if ordinal == 3 {
-					_, err := spc.setPodReadyCondition(set, ordinal, false)
+					_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
 					return err
 				}
 				_, err := spc.setPodTerminated(set, ordinal)
@@ -1482,7 +1482,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 					_, err := spc.setPodTerminated(set, ordinal)
 					return err
 				}
-				_, err := spc.setPodReadyCondition(set, ordinal, false)
+				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1, 2, 3},
@@ -1495,7 +1495,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			maxUnavailable:      intstr.FromInt32(1),
 			unavailableOrdinals: []int{4},
 			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false)
+				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1, 2, 3},
@@ -1508,7 +1508,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			maxUnavailable:      intstr.FromInt32(1),
 			unavailableOrdinals: []int{2},
 			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false)
+				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1, 3, 4},
@@ -1521,7 +1521,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			maxUnavailable:      intstr.FromInt32(1),
 			unavailableOrdinals: []int{1},
 			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false)
+				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1, 2, 3, 4},
@@ -1534,7 +1534,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			maxUnavailable:      intstr.FromInt32(1),
 			unavailableOrdinals: []int{4},
 			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false)
+				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1, 2, 3, 4},
@@ -1547,7 +1547,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			maxUnavailable:      intstr.FromInt32(2),
 			unavailableOrdinals: []int{3, 4},
 			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false)
+				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1, 2},
@@ -1560,7 +1560,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			maxUnavailable:      intstr.FromInt32(2),
 			unavailableOrdinals: []int{1, 4},
 			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false)
+				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1, 2, 3},
@@ -1572,7 +1572,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			maxUnavailable:      intstr.FromInt32(2),
 			unavailableOrdinals: []int{0, 1},
 			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false)
+				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
 				return err
 			},
 			expectedRemainingOrdinals: []int{2, 3},
@@ -1584,7 +1584,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			maxUnavailable:      intstr.FromInt32(3),
 			unavailableOrdinals: []int{0, 1},
 			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false)
+				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
 				return err
 			},
 			expectedRemainingOrdinals: []int{2, 3},
@@ -1604,7 +1604,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			}
 			client := fake.NewSimpleClientset()
 			spc, _, ssc := setupController(client)
-			if err := scaleUpStatefulSetControl(set, ssc, spc, assertBurstInvariants); err != nil {
+			if err := scaleUpStatefulSetControl(set, ssc, spc, assertBurstInvariants, fakeClock); err != nil {
 				t.Fatal(err)
 			}
 			set, err := spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
@@ -1694,7 +1694,7 @@ func TestStatefulSetControlRollingUpdate(t *testing.T) {
 		set := test.initial()
 		client := fake.NewSimpleClientset(set)
 		om, _, ssc := setupController(client)
-		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants); err != nil {
+		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants, nil); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		set, err := om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
@@ -1871,7 +1871,7 @@ func TestStatefulSetControlOnDeleteUpdate(t *testing.T) {
 		set.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{Type: apps.OnDeleteStatefulSetStrategyType}
 		client := fake.NewSimpleClientset(set)
 		om, _, ssc := setupController(client)
-		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants); err != nil {
+		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants, nil); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		set, err := om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
@@ -1951,7 +1951,7 @@ func TestStatefulSetControlOnDeleteUpdate(t *testing.T) {
 			}
 		}
 
-		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants); err != nil {
+		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants, nil); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		set, err = om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
@@ -2185,7 +2185,7 @@ func TestStatefulSetControlRollingUpdateWithPartition(t *testing.T) {
 		}
 		client := fake.NewSimpleClientset(set)
 		om, _, ssc := setupController(client)
-		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants); err != nil {
+		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants, nil); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		set, err := om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
@@ -2330,7 +2330,7 @@ func TestStatefulSetHonorRevisionHistoryLimit(t *testing.T) {
 		client := fake.NewSimpleClientset(set)
 		om, ssu, ssc := setupController(client)
 
-		if err := scaleUpStatefulSetControl(set, ssc, om, invariants); err != nil {
+		if err := scaleUpStatefulSetControl(set, ssc, om, invariants, nil); err != nil {
 			t.Errorf("Failed to turn up StatefulSet : %s", err)
 		}
 		var err error
@@ -2371,7 +2371,7 @@ func TestStatefulSetControlLimitsHistory(t *testing.T) {
 		set := test.initial()
 		client := fake.NewSimpleClientset(set)
 		om, _, ssc := setupController(client)
-		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants); err != nil {
+		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants, nil); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		set, err := om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
@@ -2480,7 +2480,7 @@ func TestStatefulSetControlRollback(t *testing.T) {
 		set := test.initial()
 		client := fake.NewSimpleClientset(set)
 		om, _, ssc := setupController(client)
-		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants); err != nil {
+		if err := scaleUpStatefulSetControl(set, ssc, om, test.invariants, nil); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		set, err := om.setsLister.StatefulSets(set.Namespace).Get(set.Name)
@@ -2740,7 +2740,7 @@ func TestStatefulSetAvailability(t *testing.T) {
 		set := test.inputSTS
 		client := fake.NewSimpleClientset(set)
 		spc, _, ssc := setupController(client)
-		if err := scaleUpStatefulSetControl(set, ssc, spc, assertBurstInvariants); err != nil {
+		if err := scaleUpStatefulSetControl(set, ssc, spc, assertBurstInvariants, nil); err != nil {
 			t.Fatalf("%s: %s", test.name, err)
 		}
 		selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
@@ -3057,7 +3057,21 @@ func (om *fakeObjectManager) setPodRunning(set *apps.StatefulSet, ordinal int) (
 	return om.podsLister.Pods(set.Namespace).List(selector)
 }
 
-func (om *fakeObjectManager) setPodReadyCondition(set *apps.StatefulSet, ordinal int, ready bool) ([]*v1.Pod, error) {
+func (om *fakeObjectManager) updatePodCondition(status *v1.PodStatus, condition *v1.PodCondition) {
+	// this method is very similar to podutil.UpdatePodCondition, but since we need
+	// to have control over injected LastTransitionTime, we're copying it here
+	conditionIndex, oldCondition := podutil.GetPodCondition(status, v1.PodReady)
+	if oldCondition == nil {
+		status.Conditions = append(status.Conditions, *condition)
+		return
+	}
+	if condition.Status == oldCondition.Status {
+		condition.LastTransitionTime = oldCondition.LastTransitionTime
+	}
+	status.Conditions[conditionIndex] = *condition
+}
+
+func (om *fakeObjectManager) setPodReadyCondition(set *apps.StatefulSet, ordinal int, ready bool, lastTransitionTime time.Time) ([]*v1.Pod, error) {
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return nil, err
@@ -3070,14 +3084,11 @@ func (om *fakeObjectManager) setPodReadyCondition(set *apps.StatefulSet, ordinal
 	if pod == nil {
 		return nil, fmt.Errorf("setPodReadyCondition: pod ordinal %d not found", ordinal)
 	}
-	var condition v1.PodCondition
+	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionFalse, LastTransitionTime: metav1.Time{Time: lastTransitionTime}}
 	if ready {
-		condition = v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
-	} else {
-		condition = v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionFalse}
+		condition.Status = v1.ConditionTrue
 	}
-
-	podutil.UpdatePodCondition(&pod.Status, &condition)
+	om.updatePodCondition(&pod.Status, &condition)
 	fakeResourceVersion(pod)
 	om.podsIndexer.Update(pod)
 	return om.podsLister.Pods(set.Namespace).List(selector)
@@ -3096,8 +3107,7 @@ func (om *fakeObjectManager) setPodAvailable(set *apps.StatefulSet, ordinal int,
 	if pod == nil {
 		return nil, fmt.Errorf("setPodAvailable: pod ordinal %d not found", ordinal)
 	}
-	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: metav1.Time{Time: lastTransitionTime}}
-	_, existingCondition := podutil.GetPodCondition(&pod.Status, condition.Type)
+	_, existingCondition := podutil.GetPodCondition(&pod.Status, v1.PodReady)
 	if existingCondition != nil {
 		existingCondition.Status = v1.ConditionTrue
 		existingCondition.LastTransitionTime = metav1.Time{Time: lastTransitionTime}
@@ -3109,7 +3119,6 @@ func (om *fakeObjectManager) setPodAvailable(set *apps.StatefulSet, ordinal int,
 		}
 		pod.Status.Conditions = append(pod.Status.Conditions, *existingCondition)
 	}
-	podutil.UpdatePodCondition(&pod.Status, &condition)
 	fakeResourceVersion(pod)
 	om.podsIndexer.Update(pod)
 	return om.podsLister.Pods(set.Namespace).List(selector)
@@ -3123,7 +3132,7 @@ func (om *fakeObjectManager) addTerminatingPod(set *apps.StatefulSet, ordinal in
 	pod.DeletionTimestamp = &deleted
 	condition := v1.PodCondition{Type: v1.PodReady, Status: v1.ConditionTrue}
 	fakeResourceVersion(pod)
-	podutil.UpdatePodCondition(&pod.Status, &condition)
+	om.updatePodCondition(&pod.Status, &condition)
 	om.podsIndexer.Update(pod)
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
@@ -3566,15 +3575,22 @@ func parallelScaleDownStatefulSetControl(set *apps.StatefulSet, ssc StatefulSetC
 	return nil
 }
 
-func scaleUpStatefulSetControl(set *apps.StatefulSet,
-	ssc StatefulSetControlInterface,
-	om *fakeObjectManager,
-	invariants invariantFunc) error {
+func scaleUpStatefulSetControl(set *apps.StatefulSet, ssc StatefulSetControlInterface, om *fakeObjectManager,
+	invariants invariantFunc, fakeClock *testingclock.FakeClock) error {
+	now := func() time.Time {
+		if fakeClock != nil {
+			return fakeClock.Now()
+		}
+		return time.Now()
+	}
 	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
 	if err != nil {
 		return err
 	}
 	for set.Status.ReadyReplicas < *set.Spec.Replicas {
+		if fakeClock != nil {
+			fakeClock.Step(10 * time.Second)
+		}
 		pods, err := om.podsLister.Pods(set.Namespace).List(selector)
 		if err != nil {
 			return err
@@ -3601,7 +3617,7 @@ func scaleUpStatefulSetControl(set *apps.StatefulSet,
 					return err
 				}
 			case v1.PodRunning:
-				if pods, err = om.setPodReadyCondition(set, getOrdinal(pod), true); err != nil {
+				if pods, err = om.setPodReadyCondition(set, getOrdinal(pod), true, now()); err != nil {
 					return err
 				}
 			default:
@@ -3609,7 +3625,7 @@ func scaleUpStatefulSetControl(set *apps.StatefulSet,
 			}
 		}
 		// run the controller once and check invariants
-		_, err = ssc.UpdateStatefulSet(context.TODO(), set, pods, time.Now())
+		_, err = ssc.UpdateStatefulSet(context.TODO(), set, pods, now())
 		if err != nil {
 			return err
 		}
@@ -3797,7 +3813,7 @@ func updateStatefulSetControl(set *apps.StatefulSet,
 					return err
 				}
 			case v1.PodRunning:
-				if pods, err = om.setPodReadyCondition(set, getOrdinal(pod), true); err != nil {
+				if pods, err = om.setPodReadyCondition(set, getOrdinal(pod), true, time.Now()); err != nil {
 					return err
 				}
 			default:
@@ -3929,7 +3945,8 @@ func TestStatefulSetScaleDownRespectsMinReadySeconds(t *testing.T) {
 	om, _, ssc := setupController(client)
 
 	// Scale up to 3 replicas first
-	if err := scaleUpStatefulSetControl(set, ssc, om, assertMonotonicInvariants); err != nil {
+	fakeClock := testingclock.NewFakeClock(time.Date(2026, time.May, 11, 10, 0, 0, 0, time.UTC))
+	if err := scaleUpStatefulSetControl(set, ssc, om, assertMonotonicInvariants, fakeClock); err != nil {
 		t.Fatalf("failed to scale up: %s", err)
 	}
 
@@ -3992,7 +4009,8 @@ func TestStatefulSetOnDeleteStrategyIgnoresMinReadySeconds(t *testing.T) {
 	om, _, ssc := setupController(client)
 
 	// Scale up first
-	if err := scaleUpStatefulSetControl(set, ssc, om, assertMonotonicInvariants); err != nil {
+	fakeClock := testingclock.NewFakeClock(time.Date(2026, time.May, 11, 10, 0, 0, 0, time.UTC))
+	if err := scaleUpStatefulSetControl(set, ssc, om, assertMonotonicInvariants, fakeClock); err != nil {
 		t.Fatalf("failed to scale up: %s", err)
 	}
 
@@ -4183,7 +4201,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 		spc, _, ssc := setupController(client)
 
 		// Scale up StatefulSet
-		if err := scaleUpStatefulSetControl(set, ssc, spc, assertBurstInvariants); err != nil {
+		if err := scaleUpStatefulSetControl(set, ssc, spc, assertBurstInvariants, nil); err != nil {
 			t.Fatal(err)
 		}
 		set, err := spc.setsLister.StatefulSets(set.Namespace).Get(set.Name)
@@ -4205,7 +4223,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 		for i := 0; i < test.unavailablePodCount; i++ {
 			if test.podManagementPolicy == apps.OrderedReadyPodManagement {
 				_, _ = spc.setPodRunning(set, i)
-				pods, _ = spc.setPodReadyCondition(set, i, false)
+				pods, _ = spc.setPodReadyCondition(set, i, false, time.Now())
 			} else {
 				pods, _ = spc.addTerminatingPod(set, i)
 			}
@@ -4214,7 +4232,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 		// Make remaining pods ready
 		for i := test.unavailablePodCount; i < int(test.totalPods); i++ {
 			_, _ = spc.setPodRunning(set, i)
-			pods, _ = spc.setPodReadyCondition(set, i, true)
+			pods, _ = spc.setPodReadyCondition(set, i, true, time.Now())
 		}
 		sort.Sort(ascendingOrdinal(pods))
 
