@@ -167,7 +167,7 @@ func (PriorityLevelConfiguration) SwaggerDoc() map[string]string {
 var map_PriorityLevelConfigurationCondition = map[string]string{
 	"":                   "PriorityLevelConfigurationCondition defines the condition of priority level.",
 	"type":               "`type` is the type of the condition. Required.",
-	"status":             "`status` is the status of the condition. Can be True, False, Unknown. Required.",
+	"status":             "`status` is the status of the condition. Should be specified and set to one of True, False, Unknown.",
 	"lastTransitionTime": "`lastTransitionTime` is the last time the condition transitioned from one status to another.",
 	"reason":             "`reason` is a unique, one-word, CamelCase reason for the condition's last transition.",
 	"message":            "`message` is a human-readable message indicating details about last transition.",
