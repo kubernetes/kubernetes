@@ -18,13 +18,13 @@ package certificate
 
 import (
 	"context"
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	cryptorand "crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"reflect"
@@ -202,6 +202,9 @@ type Config struct {
 	// CertifcateRenewFailure will record a metric that keeps track of
 	// certificate renewal failures.
 	CertificateRenewFailure Counter
+	// GenerateKey is an optional function to generate the private key for a new
+	// certificate signing request. If not set, an ECDSA P-256 key is generated.
+	GenerateKey func() (crypto.Signer, error)
 	// Name is an optional string that will be used when writing log output
 	// via logger.WithName or returning errors from manager methods.
 	//
@@ -269,6 +272,7 @@ type manager struct {
 	signerName                   string
 	requestedCertificateLifetime *time.Duration
 	getUsages                    func(privateKey interface{}) []certificates.KeyUsage
+	generateKey                  func() (crypto.Signer, error)
 	forceRotation                bool
 
 	certStore Store
@@ -322,6 +326,7 @@ func NewManager(config *Config) (Manager, error) {
 		signerName:                   config.SignerName,
 		requestedCertificateLifetime: config.RequestedCertificateLifetime,
 		getUsages:                    getUsages,
+		generateKey:                  config.GenerateKey,
 		certStore:                    config.CertificateStore,
 		certificateRotation:          config.CertificateRotation,
 		certificateRenewFailure:      config.CertificateRenewFailure,
@@ -762,18 +767,26 @@ func (m *manager) updateServerError(err error) error {
 	return nil
 }
 
+var generateKeyFunc = generateKeyFuncImpl
+
+func generateKeyFuncImpl() (crypto.Signer, error) {
+	return ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
+}
+
 func (m *manager) generateCSR() (template *x509.CertificateRequest, csrPEM []byte, keyPEM []byte, key interface{}, err error) {
+	generateKey := m.generateKey
+	if generateKey == nil {
+		generateKey = generateKeyFunc
+	}
 	// Generate a new private key.
-	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
+	privateKey, err := generateKey()
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("unable to generate a new private key: %w", err)
 	}
-	der, err := x509.MarshalECPrivateKey(privateKey)
+	keyPEM, err = keyutil.MarshalPrivateKeyToPEM(privateKey)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("unable to marshal the new key to DER: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("unable to marshal the new key to PEM: %w", err)
 	}
-
-	keyPEM = pem.EncodeToMemory(&pem.Block{Type: keyutil.ECPrivateKeyBlockType, Bytes: der})
 
 	template = m.getTemplate()
 	if template == nil {
