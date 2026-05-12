@@ -35,7 +35,7 @@ func TestLintRules(t *testing.T) {
 				"X": {
 					Kind: types.Struct,
 					Members: []types.Member{
-						{Name: "TypeMeta", Tags: `json:"` + jsonTag + `"`},
+						{Name: "TypeMeta", Embedded: true, Tags: `json:"` + jsonTag + `"`},
 					},
 				},
 			},
@@ -231,11 +231,15 @@ func TestLintRules(t *testing.T) {
 	}
 }
 
-func withTypeMeta(jsonTag string) *types.Type {
+func withTypeMeta(jsonTag *string) *types.Type {
+	tags := ""
+	if jsonTag != nil {
+		tags = `json:"` + *jsonTag + `"`
+	}
 	return &types.Type{
 		Kind: types.Struct,
 		Members: []types.Member{
-			{Name: "TypeMeta", Tags: `json:"` + jsonTag + `"`},
+			{Name: "TypeMeta", Embedded: true, Tags: tags},
 		},
 	}
 }
@@ -265,7 +269,7 @@ func TestClassifyPackage(t *testing.T) {
 				Path:     "k8s.io/api/apps/v1",
 				Comments: []string{"+groupName=apps"},
 				Types: map[string]*types.Type{
-					"Deployment": withTypeMeta(",inline"),
+					"Deployment": withTypeMeta(new(",inline")),
 				},
 			},
 			want: packageRoles{isExternalVersion: true},
@@ -287,7 +291,7 @@ func TestClassifyPackage(t *testing.T) {
 				Path:     "k8s.io/kubernetes/pkg/apis/apps",
 				Comments: []string{"+groupName=apps", "+k8s:deepcopy-gen=package"},
 				Types: map[string]*types.Type{
-					"Deployment": withTypeMeta(""),
+					"Deployment": withTypeMeta(nil),
 				},
 			},
 			want: packageRoles{isInternalGroup: true},
@@ -298,7 +302,7 @@ func TestClassifyPackage(t *testing.T) {
 				Path:     "k8s.io/api/apps",
 				Comments: []string{"+groupName=apps"},
 				Types: map[string]*types.Type{
-					"Deployment": withTypeMeta(",inline"),
+					"Deployment": withTypeMeta(new(",inline")),
 				},
 			},
 			want: packageRoles{isExternalGroup: true},
@@ -313,7 +317,7 @@ func TestClassifyPackage(t *testing.T) {
 					"+k8s:defaulter-gen=TypeMeta",
 				},
 				Types: map[string]*types.Type{
-					"Foo": withTypeMeta(""),
+					"Foo": withTypeMeta(nil),
 				},
 			},
 			want: packageRoles{isInternalVersion: true},
@@ -343,7 +347,7 @@ func TestClassifyPackage(t *testing.T) {
 				Path:     "k8s.io/api/foo/v1beta2",
 				Comments: []string{"+groupName=foo"},
 				Types: map[string]*types.Type{
-					"Foo": withTypeMeta(",inline"),
+					"Foo": withTypeMeta(new(",inline")),
 				},
 			},
 			want: packageRoles{isExternalVersion: true},
@@ -354,7 +358,7 @@ func TestClassifyPackage(t *testing.T) {
 				Path:     "k8s.io/api/special",
 				Comments: []string{"+groupName=special"},
 				Types: map[string]*types.Type{
-					"Special": withTypeMeta(",inline"),
+					"Special": withTypeMeta(new(",inline")),
 				},
 			},
 			want: packageRoles{isExternalGroup: true},

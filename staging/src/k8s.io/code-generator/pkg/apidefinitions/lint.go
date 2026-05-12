@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	"github.com/spf13/pflag"
+
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
 )
@@ -305,8 +306,10 @@ func looksLikeInternalVersionPackage(pkg *types.Package) bool {
 func looksLikeExternalVersionPackage(pkg *types.Package) bool {
 	for _, t := range pkg.Types {
 		for _, m := range t.Members {
-			if m.Name == "TypeMeta" {
-				if strings.Contains(reflect.StructTag(m.Tags).Get("json"), ",inline") {
+			if m.Name == "TypeMeta" && m.Embedded {
+				tag, exists := reflect.StructTag(m.Tags).Lookup("json")
+				name := strings.Split(tag, ",")[0]
+				if exists && name == "" {
 					return true
 				}
 			}
