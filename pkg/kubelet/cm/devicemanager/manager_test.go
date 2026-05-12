@@ -73,7 +73,8 @@ func newWrappedManagerImpl(logger klog.Logger, socketPath string, manager *Manag
 		callback:    manager.genericDeviceUpdateCallback,
 	}
 	w.socketdir, _ = filepath.Split(socketPath)
-	w.server, _ = plugin.NewServer(logger, socketPath, w, w)
+	srv, _ := plugin.NewServer(logger, socketPath, w, w)
+	w.servers = []plugin.Server{srv}
 	return w
 }
 
@@ -106,9 +107,79 @@ func TestNewManagerImpl(t *testing.T) {
 	t.Cleanup(func() {
 		require.NoErrorf(t, os.RemoveAll(socketDir), "unable to remove dir %s", socketDir)
 	})
-	_, err = newManagerImpl(logger, socketName, nil, topologyStore)
+	_, err = newManagerImpl(logger, []string{socketName}, nil, topologyStore)
 	require.NoError(t, err)
 	os.RemoveAll(socketDir)
+}
+
+func TestDevicePluginSocketPaths(t *testing.T) {
+	legacy := pluginapi.KubeletSocket
+	if goruntime.GOOS == "windows" {
+		legacy = os.Getenv("SYSTEMDRIVE") + pluginapi.KubeletSocketWindows
+	}
+
+	for _, tc := range []struct {
+		name    string
+		rootDir string
+		want    []string
+	}{
+		{
+			name:    "empty root dir falls back to legacy only",
+			rootDir: "",
+			want:    []string{legacy},
+		},
+		{
+			name:    "default root dir collapses to single legacy listener",
+			rootDir: filepath.Dir(filepath.Dir(legacy)),
+			want:    []string{legacy},
+		},
+		{
+			name:    "custom root dir exposes primary and legacy",
+			rootDir: filepath.Join(string(filepath.Separator), "var", "lib", "ci", "kubelet"),
+			want: []string{
+				filepath.Join(string(filepath.Separator), "var", "lib", "ci", "kubelet", "device-plugins", "kubelet.sock"),
+				legacy,
+			},
+		},
+		{
+			name:    "default root dir with trailing slash collapses",
+			rootDir: filepath.Dir(filepath.Dir(legacy)) + string(filepath.Separator),
+			want:    []string{legacy},
+		},
+		{
+			name:    "default root dir with dot segment collapses",
+			rootDir: filepath.Join(filepath.Dir(filepath.Dir(legacy)), ".", "."),
+			want:    []string{legacy},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := devicePluginSocketPaths(tc.rootDir)
+			require.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestNewManagerImplDualSockets(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	topologyStore := topologymanager.NewFakeManager(logger)
+
+	primaryDir, err := os.MkdirTemp("", "device_plugin_primary")
+	require.NoError(t, err)
+	defer os.RemoveAll(primaryDir)
+	compatDir, err := os.MkdirTemp("", "device_plugin_compat")
+	require.NoError(t, err)
+	defer os.RemoveAll(compatDir)
+
+	primarySocket := filepath.Join(primaryDir, "kubelet.sock")
+	compatSocket := filepath.Join(compatDir, "kubelet.sock")
+
+	m, err := newManagerImpl(logger, []string{primarySocket, compatSocket}, nil, topologyStore)
+	require.NoError(t, err)
+	require.Len(t, m.servers, 2)
+	require.Equal(t, primarySocket, m.servers[0].SocketPath())
+	require.Equal(t, compatSocket, m.servers[1].SocketPath())
+	// Checkpoint must live under the primary (rootdir-relative) directory.
+	require.Equal(t, primaryDir+string(filepath.Separator), m.checkpointdir)
 }
 
 func TestNewManagerImplStart(t *testing.T) {
@@ -301,7 +372,7 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 func setupDeviceManager(t *testing.T, devs []*pluginapi.Device, callback monitorCallback, socketName string,
 	topology []cadvisorapi.Node, logger klog.Logger) (Manager, <-chan interface{}) {
 	topologyStore := topologymanager.NewFakeManager(logger)
-	m, err := newManagerImpl(logger, socketName, topology, topologyStore)
+	m, err := newManagerImpl(logger, []string{socketName}, topology, topologyStore)
 	require.NoError(t, err)
 	updateChan := make(chan interface{})
 
@@ -382,7 +453,7 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 	t.Cleanup(func() {
 		require.NoErrorf(t, os.RemoveAll(socketDir), "unable to remove dir %s", socketDir)
 	})
-	testManager, err := newManagerImpl(logger, socketName, nil, topologyStore)
+	testManager, err := newManagerImpl(logger, []string{socketName}, nil, topologyStore)
 	as := assert.New(t)
 	as.NotNil(testManager)
 	as.NoError(err)
@@ -530,7 +601,7 @@ func TestGetAllocatableDevicesMultipleResources(t *testing.T) {
 	t.Cleanup(func() {
 		require.NoErrorf(t, os.RemoveAll(socketDir), "unable to remove dir %s", socketDir)
 	})
-	testManager, err := newManagerImpl(logger, socketName, nil, topologyStore)
+	testManager, err := newManagerImpl(logger, []string{socketName}, nil, topologyStore)
 	as := assert.New(t)
 	as.NotNil(testManager)
 	as.NoError(err)
@@ -574,7 +645,7 @@ func TestGetAllocatableDevicesHealthTransition(t *testing.T) {
 	t.Cleanup(func() {
 		require.NoErrorf(t, os.RemoveAll(socketDir), "unable to remove dir %s", socketDir)
 	})
-	testManager, err := newManagerImpl(logger, socketName, nil, topologyStore)
+	testManager, err := newManagerImpl(logger, []string{socketName}, nil, topologyStore)
 	as := assert.New(t)
 	as.NotNil(testManager)
 	as.NoError(err)
@@ -2274,7 +2345,7 @@ func TestEndpointSyncOnDisconnect(t *testing.T) {
 		}
 	}()
 
-	manager, err := newManagerImpl(logger, socketName, nil, nil)
+	manager, err := newManagerImpl(logger, []string{socketName}, nil, nil)
 	require.NoError(t, err)
 
 	resourceName := "domain1.com/resource1"

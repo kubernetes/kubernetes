@@ -188,7 +188,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 	}
 
 	logger.Info("Creating device plugin manager")
-	cm.deviceManager, err = devicemanager.NewManagerImpl(logger, nil, cm.topologyManager)
+	cm.deviceManager, err = devicemanager.NewManagerImpl(logger, nodeConfig.KubeletRootDir, nil, cm.topologyManager)
 	if err != nil {
 		return nil, err
 	}
