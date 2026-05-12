@@ -1667,8 +1667,7 @@ func schema_k8sio_api_admissionregistration_v1_MatchResources(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.NamedRuleWithOperations{}.OpenAPIModelName()),
+										Ref: ref(v1.NamedRuleWithOperations{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -1686,8 +1685,7 @@ func schema_k8sio_api_admissionregistration_v1_MatchResources(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.NamedRuleWithOperations{}.OpenAPIModelName()),
+										Ref: ref(v1.NamedRuleWithOperations{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -1835,8 +1833,7 @@ func schema_k8sio_api_admissionregistration_v1_MutatingAdmissionPolicyBindingLis
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.MutatingAdmissionPolicyBinding{}.OpenAPIModelName()),
+										Ref: ref(v1.MutatingAdmissionPolicyBinding{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -1920,8 +1917,7 @@ func schema_k8sio_api_admissionregistration_v1_MutatingAdmissionPolicyList(ref c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.MutatingAdmissionPolicy{}.OpenAPIModelName()),
+										Ref: ref(v1.MutatingAdmissionPolicy{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -1967,8 +1963,7 @@ func schema_k8sio_api_admissionregistration_v1_MutatingAdmissionPolicySpec(ref c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.Variable{}.OpenAPIModelName()),
+										Ref: ref(v1.Variable{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -1986,8 +1981,7 @@ func schema_k8sio_api_admissionregistration_v1_MutatingAdmissionPolicySpec(ref c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.Mutation{}.OpenAPIModelName()),
+										Ref: ref(v1.Mutation{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2018,8 +2012,7 @@ func schema_k8sio_api_admissionregistration_v1_MutatingAdmissionPolicySpec(ref c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.MatchCondition{}.OpenAPIModelName()),
+										Ref: ref(v1.MatchCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2075,8 +2068,7 @@ func schema_k8sio_api_admissionregistration_v1_MutatingWebhook(ref common.Refere
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.RuleWithOperations{}.OpenAPIModelName()),
+										Ref: ref(v1.RuleWithOperations{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2137,9 +2129,8 @@ func schema_k8sio_api_admissionregistration_v1_MutatingWebhook(ref common.Refere
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -2170,8 +2161,7 @@ func schema_k8sio_api_admissionregistration_v1_MutatingWebhook(ref common.Refere
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.MatchCondition{}.OpenAPIModelName()),
+										Ref: ref(v1.MatchCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2231,8 +2221,7 @@ func schema_k8sio_api_admissionregistration_v1_MutatingWebhookConfiguration(ref 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.MutatingWebhook{}.OpenAPIModelName()),
+										Ref: ref(v1.MutatingWebhook{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2281,8 +2270,7 @@ func schema_k8sio_api_admissionregistration_v1_MutatingWebhookConfigurationList(
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.MutatingWebhookConfiguration{}.OpenAPIModelName()),
+										Ref: ref(v1.MutatingWebhookConfiguration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2353,9 +2341,8 @@ func schema_k8sio_api_admissionregistration_v1_NamedRuleWithOperations(ref commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -2373,10 +2360,9 @@ func schema_k8sio_api_admissionregistration_v1_NamedRuleWithOperations(ref commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-										Enum:    []interface{}{"*", "CONNECT", "CREATE", "DELETE", "UPDATE"},
+										Type:   []string{"string"},
+										Format: "",
+										Enum:   []interface{}{"*", "CONNECT", "CREATE", "DELETE", "UPDATE"},
 									},
 								},
 							},
@@ -2394,9 +2380,8 @@ func schema_k8sio_api_admissionregistration_v1_NamedRuleWithOperations(ref commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -2414,9 +2399,8 @@ func schema_k8sio_api_admissionregistration_v1_NamedRuleWithOperations(ref commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -2434,9 +2418,8 @@ func schema_k8sio_api_admissionregistration_v1_NamedRuleWithOperations(ref commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -2559,9 +2542,8 @@ func schema_k8sio_api_admissionregistration_v1_Rule(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -2579,9 +2561,8 @@ func schema_k8sio_api_admissionregistration_v1_Rule(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -2599,9 +2580,8 @@ func schema_k8sio_api_admissionregistration_v1_Rule(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -2640,10 +2620,9 @@ func schema_k8sio_api_admissionregistration_v1_RuleWithOperations(ref common.Ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-										Enum:    []interface{}{"*", "CONNECT", "CREATE", "DELETE", "UPDATE"},
+										Type:   []string{"string"},
+										Format: "",
+										Enum:   []interface{}{"*", "CONNECT", "CREATE", "DELETE", "UPDATE"},
 									},
 								},
 							},
@@ -2661,9 +2640,8 @@ func schema_k8sio_api_admissionregistration_v1_RuleWithOperations(ref common.Ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -2681,9 +2659,8 @@ func schema_k8sio_api_admissionregistration_v1_RuleWithOperations(ref common.Ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -2701,9 +2678,8 @@ func schema_k8sio_api_admissionregistration_v1_RuleWithOperations(ref common.Ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -2786,8 +2762,7 @@ func schema_k8sio_api_admissionregistration_v1_TypeChecking(ref common.Reference
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.ExpressionWarning{}.OpenAPIModelName()),
+										Ref: ref(v1.ExpressionWarning{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2930,8 +2905,7 @@ func schema_k8sio_api_admissionregistration_v1_ValidatingAdmissionPolicyBindingL
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.ValidatingAdmissionPolicyBinding{}.OpenAPIModelName()),
+										Ref: ref(v1.ValidatingAdmissionPolicyBinding{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2984,10 +2958,9 @@ func schema_k8sio_api_admissionregistration_v1_ValidatingAdmissionPolicyBindingS
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-										Enum:    []interface{}{"Audit", "Deny", "Warn"},
+										Type:   []string{"string"},
+										Format: "",
+										Enum:   []interface{}{"Audit", "Deny", "Warn"},
 									},
 								},
 							},
@@ -3037,8 +3010,7 @@ func schema_k8sio_api_admissionregistration_v1_ValidatingAdmissionPolicyList(ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.ValidatingAdmissionPolicy{}.OpenAPIModelName()),
+										Ref: ref(v1.ValidatingAdmissionPolicy{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3084,8 +3056,7 @@ func schema_k8sio_api_admissionregistration_v1_ValidatingAdmissionPolicySpec(ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.Validation{}.OpenAPIModelName()),
+										Ref: ref(v1.Validation{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3111,8 +3082,7 @@ func schema_k8sio_api_admissionregistration_v1_ValidatingAdmissionPolicySpec(ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.AuditAnnotation{}.OpenAPIModelName()),
+										Ref: ref(v1.AuditAnnotation{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3135,8 +3105,7 @@ func schema_k8sio_api_admissionregistration_v1_ValidatingAdmissionPolicySpec(ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.MatchCondition{}.OpenAPIModelName()),
+										Ref: ref(v1.MatchCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3159,8 +3128,7 @@ func schema_k8sio_api_admissionregistration_v1_ValidatingAdmissionPolicySpec(ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.Variable{}.OpenAPIModelName()),
+										Ref: ref(v1.Variable{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3209,8 +3177,7 @@ func schema_k8sio_api_admissionregistration_v1_ValidatingAdmissionPolicyStatus(r
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
+										Ref: ref(metav1.Condition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3258,8 +3225,7 @@ func schema_k8sio_api_admissionregistration_v1_ValidatingWebhook(ref common.Refe
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.RuleWithOperations{}.OpenAPIModelName()),
+										Ref: ref(v1.RuleWithOperations{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3320,9 +3286,8 @@ func schema_k8sio_api_admissionregistration_v1_ValidatingWebhook(ref common.Refe
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -3345,8 +3310,7 @@ func schema_k8sio_api_admissionregistration_v1_ValidatingWebhook(ref common.Refe
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.MatchCondition{}.OpenAPIModelName()),
+										Ref: ref(v1.MatchCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3406,8 +3370,7 @@ func schema_k8sio_api_admissionregistration_v1_ValidatingWebhookConfiguration(re
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.ValidatingWebhook{}.OpenAPIModelName()),
+										Ref: ref(v1.ValidatingWebhook{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3456,8 +3419,7 @@ func schema_k8sio_api_admissionregistration_v1_ValidatingWebhookConfigurationLis
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.ValidatingWebhookConfiguration{}.OpenAPIModelName()),
+										Ref: ref(v1.ValidatingWebhookConfiguration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3745,8 +3707,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_MatchResources(ref common.R
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1alpha1.NamedRuleWithOperations{}.OpenAPIModelName()),
+										Ref: ref(v1alpha1.NamedRuleWithOperations{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3764,8 +3725,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_MatchResources(ref common.R
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1alpha1.NamedRuleWithOperations{}.OpenAPIModelName()),
+										Ref: ref(v1alpha1.NamedRuleWithOperations{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3913,8 +3873,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_MutatingAdmissionPolicyBind
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1alpha1.MutatingAdmissionPolicyBinding{}.OpenAPIModelName()),
+										Ref: ref(v1alpha1.MutatingAdmissionPolicyBinding{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3998,8 +3957,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_MutatingAdmissionPolicyList
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1alpha1.MutatingAdmissionPolicy{}.OpenAPIModelName()),
+										Ref: ref(v1alpha1.MutatingAdmissionPolicy{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -4045,8 +4003,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_MutatingAdmissionPolicySpec
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1alpha1.Variable{}.OpenAPIModelName()),
+										Ref: ref(v1alpha1.Variable{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -4064,8 +4021,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_MutatingAdmissionPolicySpec
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1alpha1.Mutation{}.OpenAPIModelName()),
+										Ref: ref(v1alpha1.Mutation{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -4096,8 +4052,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_MutatingAdmissionPolicySpec
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1alpha1.MatchCondition{}.OpenAPIModelName()),
+										Ref: ref(v1alpha1.MatchCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -4175,9 +4130,8 @@ func schema_k8sio_api_admissionregistration_v1alpha1_NamedRuleWithOperations(ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -4195,10 +4149,9 @@ func schema_k8sio_api_admissionregistration_v1alpha1_NamedRuleWithOperations(ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-										Enum:    []interface{}{"*", "CONNECT", "CREATE", "DELETE", "UPDATE"},
+										Type:   []string{"string"},
+										Format: "",
+										Enum:   []interface{}{"*", "CONNECT", "CREATE", "DELETE", "UPDATE"},
 									},
 								},
 							},
@@ -4216,9 +4169,8 @@ func schema_k8sio_api_admissionregistration_v1alpha1_NamedRuleWithOperations(ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -4236,9 +4188,8 @@ func schema_k8sio_api_admissionregistration_v1alpha1_NamedRuleWithOperations(ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -4256,9 +4207,8 @@ func schema_k8sio_api_admissionregistration_v1alpha1_NamedRuleWithOperations(ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -4382,8 +4332,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_TypeChecking(ref common.Ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1alpha1.ExpressionWarning{}.OpenAPIModelName()),
+										Ref: ref(v1alpha1.ExpressionWarning{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -4526,8 +4475,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicyBi
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1alpha1.ValidatingAdmissionPolicyBinding{}.OpenAPIModelName()),
+										Ref: ref(v1alpha1.ValidatingAdmissionPolicyBinding{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -4580,10 +4528,9 @@ func schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicyBi
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-										Enum:    []interface{}{"Audit", "Deny", "Warn"},
+										Type:   []string{"string"},
+										Format: "",
+										Enum:   []interface{}{"Audit", "Deny", "Warn"},
 									},
 								},
 							},
@@ -4633,8 +4580,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicyLi
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1alpha1.ValidatingAdmissionPolicy{}.OpenAPIModelName()),
+										Ref: ref(v1alpha1.ValidatingAdmissionPolicy{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -4680,8 +4626,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicySp
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1alpha1.Validation{}.OpenAPIModelName()),
+										Ref: ref(v1alpha1.Validation{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -4707,8 +4652,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicySp
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1alpha1.AuditAnnotation{}.OpenAPIModelName()),
+										Ref: ref(v1alpha1.AuditAnnotation{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -4731,8 +4675,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicySp
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1alpha1.MatchCondition{}.OpenAPIModelName()),
+										Ref: ref(v1alpha1.MatchCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -4755,8 +4698,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicySp
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1alpha1.Variable{}.OpenAPIModelName()),
+										Ref: ref(v1alpha1.Variable{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -4805,8 +4747,7 @@ func schema_k8sio_api_admissionregistration_v1alpha1_ValidatingAdmissionPolicySt
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
+										Ref: ref(metav1.Condition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -5054,8 +4995,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_MatchResources(ref common.Re
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta1.NamedRuleWithOperations{}.OpenAPIModelName()),
+										Ref: ref(v1beta1.NamedRuleWithOperations{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -5073,8 +5013,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_MatchResources(ref common.Re
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta1.NamedRuleWithOperations{}.OpenAPIModelName()),
+										Ref: ref(v1beta1.NamedRuleWithOperations{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -5221,8 +5160,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_MutatingAdmissionPolicyBindi
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta1.MutatingAdmissionPolicyBinding{}.OpenAPIModelName()),
+										Ref: ref(v1beta1.MutatingAdmissionPolicyBinding{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -5306,8 +5244,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_MutatingAdmissionPolicyList(
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta1.MutatingAdmissionPolicy{}.OpenAPIModelName()),
+										Ref: ref(v1beta1.MutatingAdmissionPolicy{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -5353,8 +5290,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_MutatingAdmissionPolicySpec(
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta1.Variable{}.OpenAPIModelName()),
+										Ref: ref(v1beta1.Variable{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -5372,8 +5308,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_MutatingAdmissionPolicySpec(
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta1.Mutation{}.OpenAPIModelName()),
+										Ref: ref(v1beta1.Mutation{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -5403,8 +5338,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_MutatingAdmissionPolicySpec(
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta1.MatchCondition{}.OpenAPIModelName()),
+										Ref: ref(v1beta1.MatchCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -5460,8 +5394,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_MutatingWebhook(ref common.R
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.RuleWithOperations{}.OpenAPIModelName()),
+										Ref: ref(v1.RuleWithOperations{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -5519,9 +5452,8 @@ func schema_k8sio_api_admissionregistration_v1beta1_MutatingWebhook(ref common.R
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -5552,8 +5484,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_MutatingWebhook(ref common.R
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta1.MatchCondition{}.OpenAPIModelName()),
+										Ref: ref(v1beta1.MatchCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -5613,8 +5544,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_MutatingWebhookConfiguration
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta1.MutatingWebhook{}.OpenAPIModelName()),
+										Ref: ref(v1beta1.MutatingWebhook{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -5663,8 +5593,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_MutatingWebhookConfiguration
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta1.MutatingWebhookConfiguration{}.OpenAPIModelName()),
+										Ref: ref(v1beta1.MutatingWebhookConfiguration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -5735,9 +5664,8 @@ func schema_k8sio_api_admissionregistration_v1beta1_NamedRuleWithOperations(ref 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -5755,10 +5683,9 @@ func schema_k8sio_api_admissionregistration_v1beta1_NamedRuleWithOperations(ref 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-										Enum:    []interface{}{"*", "CONNECT", "CREATE", "DELETE", "UPDATE"},
+										Type:   []string{"string"},
+										Format: "",
+										Enum:   []interface{}{"*", "CONNECT", "CREATE", "DELETE", "UPDATE"},
 									},
 								},
 							},
@@ -5776,9 +5703,8 @@ func schema_k8sio_api_admissionregistration_v1beta1_NamedRuleWithOperations(ref 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -5796,9 +5722,8 @@ func schema_k8sio_api_admissionregistration_v1beta1_NamedRuleWithOperations(ref 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -5816,9 +5741,8 @@ func schema_k8sio_api_admissionregistration_v1beta1_NamedRuleWithOperations(ref 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -5985,8 +5909,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_TypeChecking(ref common.Refe
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta1.ExpressionWarning{}.OpenAPIModelName()),
+										Ref: ref(v1beta1.ExpressionWarning{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -6129,8 +6052,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_ValidatingAdmissionPolicyBin
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta1.ValidatingAdmissionPolicyBinding{}.OpenAPIModelName()),
+										Ref: ref(v1beta1.ValidatingAdmissionPolicyBinding{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -6183,10 +6105,9 @@ func schema_k8sio_api_admissionregistration_v1beta1_ValidatingAdmissionPolicyBin
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-										Enum:    []interface{}{"Audit", "Deny", "Warn"},
+										Type:   []string{"string"},
+										Format: "",
+										Enum:   []interface{}{"Audit", "Deny", "Warn"},
 									},
 								},
 							},
@@ -6236,8 +6157,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_ValidatingAdmissionPolicyLis
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta1.ValidatingAdmissionPolicy{}.OpenAPIModelName()),
+										Ref: ref(v1beta1.ValidatingAdmissionPolicy{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -6283,8 +6203,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_ValidatingAdmissionPolicySpe
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta1.Validation{}.OpenAPIModelName()),
+										Ref: ref(v1beta1.Validation{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -6309,8 +6228,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_ValidatingAdmissionPolicySpe
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta1.AuditAnnotation{}.OpenAPIModelName()),
+										Ref: ref(v1beta1.AuditAnnotation{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -6333,8 +6251,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_ValidatingAdmissionPolicySpe
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta1.MatchCondition{}.OpenAPIModelName()),
+										Ref: ref(v1beta1.MatchCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -6357,8 +6274,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_ValidatingAdmissionPolicySpe
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta1.Variable{}.OpenAPIModelName()),
+										Ref: ref(v1beta1.Variable{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -6407,8 +6323,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_ValidatingAdmissionPolicySta
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
+										Ref: ref(metav1.Condition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -6456,8 +6371,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_ValidatingWebhook(ref common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1.RuleWithOperations{}.OpenAPIModelName()),
+										Ref: ref(v1.RuleWithOperations{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -6520,9 +6434,8 @@ func schema_k8sio_api_admissionregistration_v1beta1_ValidatingWebhook(ref common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -6545,8 +6458,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_ValidatingWebhook(ref common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta1.MatchCondition{}.OpenAPIModelName()),
+										Ref: ref(v1beta1.MatchCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -6606,8 +6518,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_ValidatingWebhookConfigurati
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta1.ValidatingWebhook{}.OpenAPIModelName()),
+										Ref: ref(v1beta1.ValidatingWebhook{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -6656,8 +6567,7 @@ func schema_k8sio_api_admissionregistration_v1beta1_ValidatingWebhookConfigurati
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta1.ValidatingWebhookConfiguration{}.OpenAPIModelName()),
+										Ref: ref(v1beta1.ValidatingWebhookConfiguration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -6828,8 +6738,7 @@ func schema_k8sio_api_apidiscovery_v2_APIGroupDiscovery(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v2.APIVersionDiscovery{}.OpenAPIModelName()),
+										Ref: ref(v2.APIVersionDiscovery{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -6878,8 +6787,7 @@ func schema_k8sio_api_apidiscovery_v2_APIGroupDiscoveryList(ref common.Reference
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v2.APIGroupDiscovery{}.OpenAPIModelName()),
+										Ref: ref(v2.APIGroupDiscovery{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -6943,9 +6851,8 @@ func schema_k8sio_api_apidiscovery_v2_APIResourceDiscovery(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -6963,9 +6870,8 @@ func schema_k8sio_api_apidiscovery_v2_APIResourceDiscovery(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -6983,9 +6889,8 @@ func schema_k8sio_api_apidiscovery_v2_APIResourceDiscovery(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -7006,8 +6911,7 @@ func schema_k8sio_api_apidiscovery_v2_APIResourceDiscovery(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v2.APISubresourceDiscovery{}.OpenAPIModelName()),
+										Ref: ref(v2.APISubresourceDiscovery{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -7060,8 +6964,7 @@ func schema_k8sio_api_apidiscovery_v2_APISubresourceDiscovery(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.GroupVersionKind{}.OpenAPIModelName()),
+										Ref: ref(metav1.GroupVersionKind{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -7079,9 +6982,8 @@ func schema_k8sio_api_apidiscovery_v2_APISubresourceDiscovery(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -7126,8 +7028,7 @@ func schema_k8sio_api_apidiscovery_v2_APIVersionDiscovery(ref common.ReferenceCa
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v2.APIResourceDiscovery{}.OpenAPIModelName()),
+										Ref: ref(v2.APIResourceDiscovery{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -7192,8 +7093,7 @@ func schema_k8sio_api_apidiscovery_v2beta1_APIGroupDiscovery(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v2beta1.APIVersionDiscovery{}.OpenAPIModelName()),
+										Ref: ref(v2beta1.APIVersionDiscovery{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -7242,8 +7142,7 @@ func schema_k8sio_api_apidiscovery_v2beta1_APIGroupDiscoveryList(ref common.Refe
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v2beta1.APIGroupDiscovery{}.OpenAPIModelName()),
+										Ref: ref(v2beta1.APIGroupDiscovery{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -7307,9 +7206,8 @@ func schema_k8sio_api_apidiscovery_v2beta1_APIResourceDiscovery(ref common.Refer
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -7327,9 +7225,8 @@ func schema_k8sio_api_apidiscovery_v2beta1_APIResourceDiscovery(ref common.Refer
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -7347,9 +7244,8 @@ func schema_k8sio_api_apidiscovery_v2beta1_APIResourceDiscovery(ref common.Refer
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -7370,8 +7266,7 @@ func schema_k8sio_api_apidiscovery_v2beta1_APIResourceDiscovery(ref common.Refer
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v2beta1.APISubresourceDiscovery{}.OpenAPIModelName()),
+										Ref: ref(v2beta1.APISubresourceDiscovery{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -7424,8 +7319,7 @@ func schema_k8sio_api_apidiscovery_v2beta1_APISubresourceDiscovery(ref common.Re
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.GroupVersionKind{}.OpenAPIModelName()),
+										Ref: ref(metav1.GroupVersionKind{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -7443,9 +7337,8 @@ func schema_k8sio_api_apidiscovery_v2beta1_APISubresourceDiscovery(ref common.Re
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -7490,8 +7383,7 @@ func schema_k8sio_api_apidiscovery_v2beta1_APIVersionDiscovery(ref common.Refere
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v2beta1.APIResourceDiscovery{}.OpenAPIModelName()),
+										Ref: ref(v2beta1.APIResourceDiscovery{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -7546,9 +7438,8 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_ServerStorageVersion(ref common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -7566,9 +7457,8 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_ServerStorageVersion(ref common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -7727,8 +7617,7 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_StorageVersionList(ref common.R
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiserverinternalv1alpha1.StorageVersion{}.OpenAPIModelName()),
+										Ref: ref(apiserverinternalv1alpha1.StorageVersion{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -7776,8 +7665,7 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_StorageVersionStatus(ref common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiserverinternalv1alpha1.ServerStorageVersion{}.OpenAPIModelName()),
+										Ref: ref(apiserverinternalv1alpha1.ServerStorageVersion{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -7805,8 +7693,7 @@ func schema_k8sio_api_apiserverinternal_v1alpha1_StorageVersionStatus(ref common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiserverinternalv1alpha1.StorageVersionCondition{}.OpenAPIModelName()),
+										Ref: ref(apiserverinternalv1alpha1.StorageVersionCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -7906,8 +7793,7 @@ func schema_k8sio_api_apps_v1_ControllerRevisionList(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(appsv1.ControllerRevision{}.OpenAPIModelName()),
+										Ref: ref(appsv1.ControllerRevision{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -8059,8 +7945,7 @@ func schema_k8sio_api_apps_v1_DaemonSetList(ref common.ReferenceCallback) common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(appsv1.DaemonSet{}.OpenAPIModelName()),
+										Ref: ref(appsv1.DaemonSet{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -8216,8 +8101,7 @@ func schema_k8sio_api_apps_v1_DaemonSetStatus(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(appsv1.DaemonSetCondition{}.OpenAPIModelName()),
+										Ref: ref(appsv1.DaemonSetCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -8404,8 +8288,7 @@ func schema_k8sio_api_apps_v1_DeploymentList(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(appsv1.Deployment{}.OpenAPIModelName()),
+										Ref: ref(appsv1.Deployment{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -8569,8 +8452,7 @@ func schema_k8sio_api_apps_v1_DeploymentStatus(ref common.ReferenceCallback) com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(appsv1.DeploymentCondition{}.OpenAPIModelName()),
+										Ref: ref(appsv1.DeploymentCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -8757,8 +8639,7 @@ func schema_k8sio_api_apps_v1_ReplicaSetList(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(appsv1.ReplicaSet{}.OpenAPIModelName()),
+										Ref: ref(appsv1.ReplicaSet{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -8883,8 +8764,7 @@ func schema_k8sio_api_apps_v1_ReplicaSetStatus(ref common.ReferenceCallback) com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(appsv1.ReplicaSetCondition{}.OpenAPIModelName()),
+										Ref: ref(appsv1.ReplicaSetCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -9118,8 +8998,7 @@ func schema_k8sio_api_apps_v1_StatefulSetList(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(appsv1.StatefulSet{}.OpenAPIModelName()),
+										Ref: ref(appsv1.StatefulSet{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -9221,8 +9100,7 @@ func schema_k8sio_api_apps_v1_StatefulSetSpec(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.PersistentVolumeClaim{}.OpenAPIModelName()),
+										Ref: ref(corev1.PersistentVolumeClaim{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -9367,8 +9245,7 @@ func schema_k8sio_api_apps_v1_StatefulSetStatus(ref common.ReferenceCallback) co
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(appsv1.StatefulSetCondition{}.OpenAPIModelName()),
+										Ref: ref(appsv1.StatefulSetCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -9506,8 +9383,7 @@ func schema_k8sio_api_apps_v1beta1_ControllerRevisionList(ref common.ReferenceCa
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(appsv1beta1.ControllerRevision{}.OpenAPIModelName()),
+										Ref: ref(appsv1beta1.ControllerRevision{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -9665,8 +9541,7 @@ func schema_k8sio_api_apps_v1beta1_DeploymentList(ref common.ReferenceCallback) 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(appsv1beta1.Deployment{}.OpenAPIModelName()),
+										Ref: ref(appsv1beta1.Deployment{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -9718,9 +9593,8 @@ func schema_k8sio_api_apps_v1beta1_DeploymentRollback(ref common.ReferenceCallba
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -9897,8 +9771,7 @@ func schema_k8sio_api_apps_v1beta1_DeploymentStatus(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(appsv1beta1.DeploymentCondition{}.OpenAPIModelName()),
+										Ref: ref(appsv1beta1.DeploymentCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -10116,9 +9989,8 @@ func schema_k8sio_api_apps_v1beta1_ScaleStatus(ref common.ReferenceCallback) com
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -10272,8 +10144,7 @@ func schema_k8sio_api_apps_v1beta1_StatefulSetList(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(appsv1beta1.StatefulSet{}.OpenAPIModelName()),
+										Ref: ref(appsv1beta1.StatefulSet{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -10375,8 +10246,7 @@ func schema_k8sio_api_apps_v1beta1_StatefulSetSpec(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.PersistentVolumeClaim{}.OpenAPIModelName()),
+										Ref: ref(corev1.PersistentVolumeClaim{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -10520,8 +10390,7 @@ func schema_k8sio_api_apps_v1beta1_StatefulSetStatus(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(appsv1beta1.StatefulSetCondition{}.OpenAPIModelName()),
+										Ref: ref(appsv1beta1.StatefulSetCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -10658,8 +10527,7 @@ func schema_k8sio_api_apps_v1beta2_ControllerRevisionList(ref common.ReferenceCa
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta2.ControllerRevision{}.OpenAPIModelName()),
+										Ref: ref(v1beta2.ControllerRevision{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -10811,8 +10679,7 @@ func schema_k8sio_api_apps_v1beta2_DaemonSetList(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta2.DaemonSet{}.OpenAPIModelName()),
+										Ref: ref(v1beta2.DaemonSet{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -10968,8 +10835,7 @@ func schema_k8sio_api_apps_v1beta2_DaemonSetStatus(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta2.DaemonSetCondition{}.OpenAPIModelName()),
+										Ref: ref(v1beta2.DaemonSetCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -11155,8 +11021,7 @@ func schema_k8sio_api_apps_v1beta2_DeploymentList(ref common.ReferenceCallback) 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta2.Deployment{}.OpenAPIModelName()),
+										Ref: ref(v1beta2.Deployment{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -11320,8 +11185,7 @@ func schema_k8sio_api_apps_v1beta2_DeploymentStatus(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta2.DeploymentCondition{}.OpenAPIModelName()),
+										Ref: ref(v1beta2.DeploymentCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -11507,8 +11371,7 @@ func schema_k8sio_api_apps_v1beta2_ReplicaSetList(ref common.ReferenceCallback) 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta2.ReplicaSet{}.OpenAPIModelName()),
+										Ref: ref(v1beta2.ReplicaSet{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -11633,8 +11496,7 @@ func schema_k8sio_api_apps_v1beta2_ReplicaSetStatus(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta2.ReplicaSetCondition{}.OpenAPIModelName()),
+										Ref: ref(v1beta2.ReplicaSetCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -11830,9 +11692,8 @@ func schema_k8sio_api_apps_v1beta2_ScaleStatus(ref common.ReferenceCallback) com
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -11986,8 +11847,7 @@ func schema_k8sio_api_apps_v1beta2_StatefulSetList(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta2.StatefulSet{}.OpenAPIModelName()),
+										Ref: ref(v1beta2.StatefulSet{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -12089,8 +11949,7 @@ func schema_k8sio_api_apps_v1beta2_StatefulSetSpec(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.PersistentVolumeClaim{}.OpenAPIModelName()),
+										Ref: ref(corev1.PersistentVolumeClaim{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -12234,8 +12093,7 @@ func schema_k8sio_api_apps_v1beta2_StatefulSetStatus(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta2.StatefulSetCondition{}.OpenAPIModelName()),
+										Ref: ref(v1beta2.StatefulSetCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -12461,9 +12319,8 @@ func schema_k8sio_api_authentication_v1_TokenRequestSpec(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -12596,9 +12453,8 @@ func schema_k8sio_api_authentication_v1_TokenReviewSpec(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -12644,9 +12500,8 @@ func schema_k8sio_api_authentication_v1_TokenReviewStatus(ref common.ReferenceCa
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -12700,9 +12555,8 @@ func schema_k8sio_api_authentication_v1_UserInfo(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -12720,9 +12574,8 @@ func schema_k8sio_api_authentication_v1_UserInfo(ref common.ReferenceCallback) c
 										Items: &spec.SchemaOrArray{
 											Schema: &spec.Schema{
 												SchemaProps: spec.SchemaProps{
-													Default: "",
-													Type:    []string{"string"},
-													Format:  "",
+													Type:   []string{"string"},
+													Format: "",
 												},
 											},
 										},
@@ -12944,9 +12797,8 @@ func schema_k8sio_api_authentication_v1beta1_TokenReviewSpec(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -12992,9 +12844,8 @@ func schema_k8sio_api_authentication_v1beta1_TokenReviewStatus(ref common.Refere
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -13048,9 +12899,8 @@ func schema_k8sio_api_authentication_v1beta1_UserInfo(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -13068,9 +12918,8 @@ func schema_k8sio_api_authentication_v1beta1_UserInfo(ref common.ReferenceCallba
 										Items: &spec.SchemaOrArray{
 											Schema: &spec.Schema{
 												SchemaProps: spec.SchemaProps{
-													Default: "",
-													Type:    []string{"string"},
-													Format:  "",
+													Type:   []string{"string"},
+													Format: "",
 												},
 											},
 										},
@@ -13111,8 +12960,7 @@ func schema_k8sio_api_authorization_v1_FieldSelectorAttributes(ref common.Refere
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.FieldSelectorRequirement{}.OpenAPIModelName()),
+										Ref: ref(metav1.FieldSelectorRequirement{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -13152,8 +13000,7 @@ func schema_k8sio_api_authorization_v1_LabelSelectorAttributes(ref common.Refere
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.LabelSelectorRequirement{}.OpenAPIModelName()),
+										Ref: ref(metav1.LabelSelectorRequirement{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -13264,9 +13111,8 @@ func schema_k8sio_api_authorization_v1_NonResourceRule(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -13284,9 +13130,8 @@ func schema_k8sio_api_authorization_v1_NonResourceRule(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -13394,9 +13239,8 @@ func schema_k8sio_api_authorization_v1_ResourceRule(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -13414,9 +13258,8 @@ func schema_k8sio_api_authorization_v1_ResourceRule(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -13434,9 +13277,8 @@ func schema_k8sio_api_authorization_v1_ResourceRule(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -13454,9 +13296,8 @@ func schema_k8sio_api_authorization_v1_ResourceRule(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -13707,9 +13548,8 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReviewSpec(ref common.Refere
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -13727,9 +13567,8 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReviewSpec(ref common.Refere
 										Items: &spec.SchemaOrArray{
 											Schema: &spec.Schema{
 												SchemaProps: spec.SchemaProps{
-													Default: "",
-													Type:    []string{"string"},
-													Format:  "",
+													Type:   []string{"string"},
+													Format: "",
 												},
 											},
 										},
@@ -13815,8 +13654,7 @@ func schema_k8sio_api_authorization_v1_SubjectRulesReviewStatus(ref common.Refer
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(authorizationv1.ResourceRule{}.OpenAPIModelName()),
+										Ref: ref(authorizationv1.ResourceRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -13834,8 +13672,7 @@ func schema_k8sio_api_authorization_v1_SubjectRulesReviewStatus(ref common.Refer
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(authorizationv1.NonResourceRule{}.OpenAPIModelName()),
+										Ref: ref(authorizationv1.NonResourceRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -13962,9 +13799,8 @@ func schema_k8sio_api_authorization_v1beta1_NonResourceRule(ref common.Reference
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -13982,9 +13818,8 @@ func schema_k8sio_api_authorization_v1beta1_NonResourceRule(ref common.Reference
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -14092,9 +13927,8 @@ func schema_k8sio_api_authorization_v1beta1_ResourceRule(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -14112,9 +13946,8 @@ func schema_k8sio_api_authorization_v1beta1_ResourceRule(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -14132,9 +13965,8 @@ func schema_k8sio_api_authorization_v1beta1_ResourceRule(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -14152,9 +13984,8 @@ func schema_k8sio_api_authorization_v1beta1_ResourceRule(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -14405,9 +14236,8 @@ func schema_k8sio_api_authorization_v1beta1_SubjectAccessReviewSpec(ref common.R
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -14425,9 +14255,8 @@ func schema_k8sio_api_authorization_v1beta1_SubjectAccessReviewSpec(ref common.R
 										Items: &spec.SchemaOrArray{
 											Schema: &spec.Schema{
 												SchemaProps: spec.SchemaProps{
-													Default: "",
-													Type:    []string{"string"},
-													Format:  "",
+													Type:   []string{"string"},
+													Format: "",
 												},
 											},
 										},
@@ -14513,8 +14342,7 @@ func schema_k8sio_api_authorization_v1beta1_SubjectRulesReviewStatus(ref common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(authorizationv1beta1.ResourceRule{}.OpenAPIModelName()),
+										Ref: ref(authorizationv1beta1.ResourceRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -14532,8 +14360,7 @@ func schema_k8sio_api_authorization_v1beta1_SubjectRulesReviewStatus(ref common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(authorizationv1beta1.NonResourceRule{}.OpenAPIModelName()),
+										Ref: ref(authorizationv1beta1.NonResourceRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -14917,8 +14744,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerList(ref common.Refe
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(autoscalingv1.HorizontalPodAutoscaler{}.OpenAPIModelName()),
+										Ref: ref(autoscalingv1.HorizontalPodAutoscaler{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -15730,8 +15556,7 @@ func schema_k8sio_api_autoscaling_v2_HPAScalingRules(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(autoscalingv2.HPAScalingPolicy{}.OpenAPIModelName()),
+										Ref: ref(autoscalingv2.HPAScalingPolicy{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -15916,8 +15741,7 @@ func schema_k8sio_api_autoscaling_v2_HorizontalPodAutoscalerList(ref common.Refe
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(autoscalingv2.HorizontalPodAutoscaler{}.OpenAPIModelName()),
+										Ref: ref(autoscalingv2.HorizontalPodAutoscaler{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -15973,8 +15797,7 @@ func schema_k8sio_api_autoscaling_v2_HorizontalPodAutoscalerSpec(ref common.Refe
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(autoscalingv2.MetricSpec{}.OpenAPIModelName()),
+										Ref: ref(autoscalingv2.MetricSpec{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -16042,8 +15865,7 @@ func schema_k8sio_api_autoscaling_v2_HorizontalPodAutoscalerStatus(ref common.Re
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(autoscalingv2.MetricStatus{}.OpenAPIModelName()),
+										Ref: ref(autoscalingv2.MetricStatus{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -16066,8 +15888,7 @@ func schema_k8sio_api_autoscaling_v2_HorizontalPodAutoscalerStatus(ref common.Re
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(autoscalingv2.HorizontalPodAutoscalerCondition{}.OpenAPIModelName()),
+										Ref: ref(autoscalingv2.HorizontalPodAutoscalerCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -16579,8 +16400,7 @@ func schema_k8sio_api_batch_v1_CronJobList(ref common.ReferenceCallback) common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(batchv1.CronJob{}.OpenAPIModelName()),
+										Ref: ref(batchv1.CronJob{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -16688,8 +16508,7 @@ func schema_k8sio_api_batch_v1_CronJobStatus(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ObjectReference{}.OpenAPIModelName()),
+										Ref: ref(corev1.ObjectReference{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -16858,8 +16677,7 @@ func schema_k8sio_api_batch_v1_JobList(ref common.ReferenceCallback) common.Open
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(batchv1.Job{}.OpenAPIModelName()),
+										Ref: ref(batchv1.Job{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -17022,8 +16840,7 @@ func schema_k8sio_api_batch_v1_JobStatus(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(batchv1.JobCondition{}.OpenAPIModelName()),
+										Ref: ref(batchv1.JobCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -17152,8 +16969,7 @@ func schema_k8sio_api_batch_v1_PodFailurePolicy(ref common.ReferenceCallback) co
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(batchv1.PodFailurePolicyRule{}.OpenAPIModelName()),
+										Ref: ref(batchv1.PodFailurePolicyRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -17203,9 +17019,8 @@ func schema_k8sio_api_batch_v1_PodFailurePolicyOnExitCodesRequirement(ref common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: 0,
-										Type:    []string{"integer"},
-										Format:  "int32",
+										Type:   []string{"integer"},
+										Format: "int32",
 									},
 								},
 							},
@@ -17282,8 +17097,7 @@ func schema_k8sio_api_batch_v1_PodFailurePolicyRule(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(batchv1.PodFailurePolicyOnPodConditionsPattern{}.OpenAPIModelName()),
+										Ref: ref(batchv1.PodFailurePolicyOnPodConditionsPattern{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -17317,8 +17131,7 @@ func schema_k8sio_api_batch_v1_SuccessPolicy(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(batchv1.SuccessPolicyRule{}.OpenAPIModelName()),
+										Ref: ref(batchv1.SuccessPolicyRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -17379,9 +17192,8 @@ func schema_k8sio_api_batch_v1_UncountedTerminatedPods(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -17399,9 +17211,8 @@ func schema_k8sio_api_batch_v1_UncountedTerminatedPods(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -17499,8 +17310,7 @@ func schema_k8sio_api_batch_v1beta1_CronJobList(ref common.ReferenceCallback) co
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(batchv1beta1.CronJob{}.OpenAPIModelName()),
+										Ref: ref(batchv1beta1.CronJob{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -17607,8 +17417,7 @@ func schema_k8sio_api_batch_v1beta1_CronJobStatus(ref common.ReferenceCallback) 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ObjectReference{}.OpenAPIModelName()),
+										Ref: ref(corev1.ObjectReference{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -17805,8 +17614,7 @@ func schema_k8sio_api_certificates_v1_CertificateSigningRequestList(ref common.R
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(certificatesv1.CertificateSigningRequest{}.OpenAPIModelName()),
+										Ref: ref(certificatesv1.CertificateSigningRequest{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -17862,10 +17670,9 @@ func schema_k8sio_api_certificates_v1_CertificateSigningRequestSpec(ref common.R
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-										Enum:    []interface{}{"any", "cert sign", "client auth", "code signing", "content commitment", "crl sign", "data encipherment", "decipher only", "digital signature", "email protection", "encipher only", "ipsec end system", "ipsec tunnel", "ipsec user", "key agreement", "key encipherment", "microsoft sgc", "netscape sgc", "ocsp signing", "s/mime", "server auth", "signing", "timestamping"},
+										Type:   []string{"string"},
+										Format: "",
+										Enum:   []interface{}{"any", "cert sign", "client auth", "code signing", "content commitment", "crl sign", "data encipherment", "decipher only", "digital signature", "email protection", "encipher only", "ipsec end system", "ipsec tunnel", "ipsec user", "key agreement", "key encipherment", "microsoft sgc", "netscape sgc", "ocsp signing", "s/mime", "server auth", "signing", "timestamping"},
 									},
 								},
 							},
@@ -17897,9 +17704,8 @@ func schema_k8sio_api_certificates_v1_CertificateSigningRequestSpec(ref common.R
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -17917,9 +17723,8 @@ func schema_k8sio_api_certificates_v1_CertificateSigningRequestSpec(ref common.R
 										Items: &spec.SchemaOrArray{
 											Schema: &spec.Schema{
 												SchemaProps: spec.SchemaProps{
-													Default: "",
-													Type:    []string{"string"},
-													Format:  "",
+													Type:   []string{"string"},
+													Format: "",
 												},
 											},
 										},
@@ -17957,8 +17762,7 @@ func schema_k8sio_api_certificates_v1_CertificateSigningRequestStatus(ref common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(certificatesv1.CertificateSigningRequestCondition{}.OpenAPIModelName()),
+										Ref: ref(certificatesv1.CertificateSigningRequestCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -18058,8 +17862,7 @@ func schema_k8sio_api_certificates_v1alpha1_ClusterTrustBundleList(ref common.Re
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(certificatesv1alpha1.ClusterTrustBundle{}.OpenAPIModelName()),
+										Ref: ref(certificatesv1alpha1.ClusterTrustBundle{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -18242,8 +18045,7 @@ func schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestList(ref com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(certificatesv1beta1.CertificateSigningRequest{}.OpenAPIModelName()),
+										Ref: ref(certificatesv1beta1.CertificateSigningRequest{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -18298,9 +18100,8 @@ func schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestSpec(ref com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -18332,9 +18133,8 @@ func schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestSpec(ref com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -18352,9 +18152,8 @@ func schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestSpec(ref com
 										Items: &spec.SchemaOrArray{
 											Schema: &spec.Schema{
 												SchemaProps: spec.SchemaProps{
-													Default: "",
-													Type:    []string{"string"},
-													Format:  "",
+													Type:   []string{"string"},
+													Format: "",
 												},
 											},
 										},
@@ -18391,8 +18190,7 @@ func schema_k8sio_api_certificates_v1beta1_CertificateSigningRequestStatus(ref c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(certificatesv1beta1.CertificateSigningRequestCondition{}.OpenAPIModelName()),
+										Ref: ref(certificatesv1beta1.CertificateSigningRequestCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -18492,8 +18290,7 @@ func schema_k8sio_api_certificates_v1beta1_ClusterTrustBundleList(ref common.Ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(certificatesv1beta1.ClusterTrustBundle{}.OpenAPIModelName()),
+										Ref: ref(certificatesv1beta1.ClusterTrustBundle{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -18623,8 +18420,7 @@ func schema_k8sio_api_certificates_v1beta1_PodCertificateRequestList(ref common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(certificatesv1beta1.PodCertificateRequest{}.OpenAPIModelName()),
+										Ref: ref(certificatesv1beta1.PodCertificateRequest{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -18739,9 +18535,8 @@ func schema_k8sio_api_certificates_v1beta1_PodCertificateRequestSpec(ref common.
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -18778,8 +18573,7 @@ func schema_k8sio_api_certificates_v1beta1_PodCertificateRequestStatus(ref commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
+										Ref: ref(metav1.Condition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -18896,8 +18690,7 @@ func schema_k8sio_api_coordination_v1_LeaseList(ref common.ReferenceCallback) co
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(coordinationv1.Lease{}.OpenAPIModelName()),
+										Ref: ref(coordinationv1.Lease{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -19053,8 +18846,7 @@ func schema_k8sio_api_coordination_v1alpha2_LeaseCandidateList(ref common.Refere
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1alpha2.LeaseCandidate{}.OpenAPIModelName()),
+										Ref: ref(v1alpha2.LeaseCandidate{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -19249,8 +19041,7 @@ func schema_k8sio_api_coordination_v1beta1_LeaseCandidateList(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(coordinationv1beta1.LeaseCandidate{}.OpenAPIModelName()),
+										Ref: ref(coordinationv1beta1.LeaseCandidate{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -19358,8 +19149,7 @@ func schema_k8sio_api_coordination_v1beta1_LeaseList(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(coordinationv1beta1.Lease{}.OpenAPIModelName()),
+										Ref: ref(coordinationv1beta1.Lease{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -19603,8 +19393,7 @@ func schema_k8sio_api_core_v1_AvoidPods(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.PreferAvoidPodsEntry{}.OpenAPIModelName()),
+										Ref: ref(corev1.PreferAvoidPodsEntry{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -19852,9 +19641,8 @@ func schema_k8sio_api_core_v1_CSIPersistentVolumeSource(ref common.ReferenceCall
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -19936,9 +19724,8 @@ func schema_k8sio_api_core_v1_CSIVolumeSource(ref common.ReferenceCallback) comm
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -19978,9 +19765,8 @@ func schema_k8sio_api_core_v1_Capabilities(ref common.ReferenceCallback) common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -19998,9 +19784,8 @@ func schema_k8sio_api_core_v1_Capabilities(ref common.ReferenceCallback) common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -20031,9 +19816,8 @@ func schema_k8sio_api_core_v1_CephFSPersistentVolumeSource(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -20101,9 +19885,8 @@ func schema_k8sio_api_core_v1_CephFSVolumeSource(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -20400,8 +20183,7 @@ func schema_k8sio_api_core_v1_ComponentStatus(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ComponentCondition{}.OpenAPIModelName()),
+										Ref: ref(corev1.ComponentCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -20450,8 +20232,7 @@ func schema_k8sio_api_core_v1_ComponentStatusList(ref common.ReferenceCallback) 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ComponentStatus{}.OpenAPIModelName()),
+										Ref: ref(corev1.ComponentStatus{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -20509,9 +20290,8 @@ func schema_k8sio_api_core_v1_ConfigMap(ref common.ReferenceCallback) common.Ope
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -20645,8 +20425,7 @@ func schema_k8sio_api_core_v1_ConfigMapList(ref common.ReferenceCallback) common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ConfigMap{}.OpenAPIModelName()),
+										Ref: ref(corev1.ConfigMap{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -20740,8 +20519,7 @@ func schema_k8sio_api_core_v1_ConfigMapProjection(ref common.ReferenceCallback) 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.KeyToPath{}.OpenAPIModelName()),
+										Ref: ref(corev1.KeyToPath{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -20789,8 +20567,7 @@ func schema_k8sio_api_core_v1_ConfigMapVolumeSource(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.KeyToPath{}.OpenAPIModelName()),
+										Ref: ref(corev1.KeyToPath{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -20852,9 +20629,8 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -20872,9 +20648,8 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -20905,8 +20680,7 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ContainerPort{}.OpenAPIModelName()),
+										Ref: ref(corev1.ContainerPort{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -20924,8 +20698,7 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.EnvFromSource{}.OpenAPIModelName()),
+										Ref: ref(corev1.EnvFromSource{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -20948,8 +20721,7 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.EnvVar{}.OpenAPIModelName()),
+										Ref: ref(corev1.EnvVar{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -20974,8 +20746,7 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ContainerResizePolicy{}.OpenAPIModelName()),
+										Ref: ref(corev1.ContainerResizePolicy{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -21000,8 +20771,7 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ContainerRestartRule{}.OpenAPIModelName()),
+										Ref: ref(corev1.ContainerRestartRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -21024,8 +20794,7 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.VolumeMount{}.OpenAPIModelName()),
+										Ref: ref(corev1.VolumeMount{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -21048,8 +20817,7 @@ func schema_k8sio_api_core_v1_Container(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.VolumeDevice{}.OpenAPIModelName()),
+										Ref: ref(corev1.VolumeDevice{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -21195,9 +20963,8 @@ func schema_k8sio_api_core_v1_ContainerImage(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -21353,9 +21120,8 @@ func schema_k8sio_api_core_v1_ContainerRestartRuleOnExitCodes(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: 0,
-										Type:    []string{"integer"},
-										Format:  "int32",
+										Type:   []string{"integer"},
+										Format: "int32",
 									},
 								},
 							},
@@ -21625,8 +21391,7 @@ func schema_k8sio_api_core_v1_ContainerStatus(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.VolumeMountStatus{}.OpenAPIModelName()),
+										Ref: ref(corev1.VolumeMountStatus{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -21655,8 +21420,7 @@ func schema_k8sio_api_core_v1_ContainerStatus(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ResourceStatus{}.OpenAPIModelName()),
+										Ref: ref(corev1.ResourceStatus{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -21741,8 +21505,7 @@ func schema_k8sio_api_core_v1_DownwardAPIProjection(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.DownwardAPIVolumeFile{}.OpenAPIModelName()),
+										Ref: ref(corev1.DownwardAPIVolumeFile{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -21818,8 +21581,7 @@ func schema_k8sio_api_core_v1_DownwardAPIVolumeSource(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.DownwardAPIVolumeFile{}.OpenAPIModelName()),
+										Ref: ref(corev1.DownwardAPIVolumeFile{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -21985,8 +21747,7 @@ func schema_k8sio_api_core_v1_EndpointSubset(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.EndpointAddress{}.OpenAPIModelName()),
+										Ref: ref(corev1.EndpointAddress{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -22004,8 +21765,7 @@ func schema_k8sio_api_core_v1_EndpointSubset(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.EndpointAddress{}.OpenAPIModelName()),
+										Ref: ref(corev1.EndpointAddress{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -22023,8 +21783,7 @@ func schema_k8sio_api_core_v1_EndpointSubset(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.EndpointPort{}.OpenAPIModelName()),
+										Ref: ref(corev1.EndpointPort{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -22078,8 +21837,7 @@ func schema_k8sio_api_core_v1_Endpoints(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.EndpointSubset{}.OpenAPIModelName()),
+										Ref: ref(corev1.EndpointSubset{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -22128,8 +21886,7 @@ func schema_k8sio_api_core_v1_EndpointsList(ref common.ReferenceCallback) common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.Endpoints{}.OpenAPIModelName()),
+										Ref: ref(corev1.Endpoints{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -22294,9 +22051,8 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -22314,9 +22070,8 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -22347,8 +22102,7 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ContainerPort{}.OpenAPIModelName()),
+										Ref: ref(corev1.ContainerPort{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -22366,8 +22120,7 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.EnvFromSource{}.OpenAPIModelName()),
+										Ref: ref(corev1.EnvFromSource{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -22390,8 +22143,7 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.EnvVar{}.OpenAPIModelName()),
+										Ref: ref(corev1.EnvVar{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -22416,8 +22168,7 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ContainerResizePolicy{}.OpenAPIModelName()),
+										Ref: ref(corev1.ContainerResizePolicy{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -22442,8 +22193,7 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ContainerRestartRule{}.OpenAPIModelName()),
+										Ref: ref(corev1.ContainerRestartRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -22466,8 +22216,7 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.VolumeMount{}.OpenAPIModelName()),
+										Ref: ref(corev1.VolumeMount{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -22490,8 +22239,7 @@ func schema_k8sio_api_core_v1_EphemeralContainer(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.VolumeDevice{}.OpenAPIModelName()),
+										Ref: ref(corev1.VolumeDevice{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -22621,9 +22369,8 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -22641,9 +22388,8 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -22674,8 +22420,7 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ContainerPort{}.OpenAPIModelName()),
+										Ref: ref(corev1.ContainerPort{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -22693,8 +22438,7 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.EnvFromSource{}.OpenAPIModelName()),
+										Ref: ref(corev1.EnvFromSource{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -22717,8 +22461,7 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.EnvVar{}.OpenAPIModelName()),
+										Ref: ref(corev1.EnvVar{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -22743,8 +22486,7 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ContainerResizePolicy{}.OpenAPIModelName()),
+										Ref: ref(corev1.ContainerResizePolicy{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -22769,8 +22511,7 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ContainerRestartRule{}.OpenAPIModelName()),
+										Ref: ref(corev1.ContainerRestartRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -22793,8 +22534,7 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.VolumeMount{}.OpenAPIModelName()),
+										Ref: ref(corev1.VolumeMount{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -22817,8 +22557,7 @@ func schema_k8sio_api_core_v1_EphemeralContainerCommon(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.VolumeDevice{}.OpenAPIModelName()),
+										Ref: ref(corev1.VolumeDevice{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -23095,8 +22834,7 @@ func schema_k8sio_api_core_v1_EventList(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.Event{}.OpenAPIModelName()),
+										Ref: ref(corev1.Event{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -23185,9 +22923,8 @@ func schema_k8sio_api_core_v1_ExecAction(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -23218,9 +22955,8 @@ func schema_k8sio_api_core_v1_FCVolumeSource(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -23259,9 +22995,8 @@ func schema_k8sio_api_core_v1_FCVolumeSource(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -23367,9 +23102,8 @@ func schema_k8sio_api_core_v1_FlexPersistentVolumeSource(ref common.ReferenceCal
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -23427,9 +23161,8 @@ func schema_k8sio_api_core_v1_FlexVolumeSource(ref common.ReferenceCallback) com
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -23708,8 +23441,7 @@ func schema_k8sio_api_core_v1_HTTPGetAction(ref common.ReferenceCallback) common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.HTTPHeader{}.OpenAPIModelName()),
+										Ref: ref(corev1.HTTPHeader{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -23781,9 +23513,8 @@ func schema_k8sio_api_core_v1_HostAlias(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -23913,9 +23644,8 @@ func schema_k8sio_api_core_v1_ISCSIPersistentVolumeSource(ref common.ReferenceCa
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -24022,9 +23752,8 @@ func schema_k8sio_api_core_v1_ISCSIVolumeSource(ref common.ReferenceCallback) co
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -24398,8 +24127,7 @@ func schema_k8sio_api_core_v1_LimitRangeList(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.LimitRange{}.OpenAPIModelName()),
+										Ref: ref(corev1.LimitRange{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -24433,8 +24161,7 @@ func schema_k8sio_api_core_v1_LimitRangeSpec(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.LimitRangeItem{}.OpenAPIModelName()),
+										Ref: ref(corev1.LimitRangeItem{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -24484,9 +24211,8 @@ func schema_k8sio_api_core_v1_LinuxContainerUser(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: 0,
-										Type:    []string{"integer"},
-										Format:  "int64",
+										Type:   []string{"integer"},
+										Format: "int64",
 									},
 								},
 							},
@@ -24589,8 +24315,7 @@ func schema_k8sio_api_core_v1_LoadBalancerIngress(ref common.ReferenceCallback) 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.PortStatus{}.OpenAPIModelName()),
+										Ref: ref(corev1.PortStatus{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -24623,8 +24348,7 @@ func schema_k8sio_api_core_v1_LoadBalancerStatus(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.LoadBalancerIngress{}.OpenAPIModelName()),
+										Ref: ref(corev1.LoadBalancerIngress{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -24897,8 +24621,7 @@ func schema_k8sio_api_core_v1_NamespaceList(ref common.ReferenceCallback) common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.Namespace{}.OpenAPIModelName()),
+										Ref: ref(corev1.Namespace{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -24932,9 +24655,8 @@ func schema_k8sio_api_core_v1_NamespaceSpec(ref common.ReferenceCallback) common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -24978,8 +24700,7 @@ func schema_k8sio_api_core_v1_NamespaceStatus(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.NamespaceCondition{}.OpenAPIModelName()),
+										Ref: ref(corev1.NamespaceCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -25098,8 +24819,7 @@ func schema_k8sio_api_core_v1_NodeAffinity(ref common.ReferenceCallback) common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.PreferredSchedulingTerm{}.OpenAPIModelName()),
+										Ref: ref(corev1.PreferredSchedulingTerm{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -25140,9 +24860,8 @@ func schema_k8sio_api_core_v1_NodeAllocatableResourceClaimStatus(ref common.Refe
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -25367,8 +25086,7 @@ func schema_k8sio_api_core_v1_NodeList(ref common.ReferenceCallback) common.Open
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.Node{}.OpenAPIModelName()),
+										Ref: ref(corev1.Node{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -25492,8 +25210,7 @@ func schema_k8sio_api_core_v1_NodeSelector(ref common.ReferenceCallback) common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.NodeSelectorTerm{}.OpenAPIModelName()),
+										Ref: ref(corev1.NodeSelectorTerm{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -25549,9 +25266,8 @@ func schema_k8sio_api_core_v1_NodeSelectorRequirement(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -25583,8 +25299,7 @@ func schema_k8sio_api_core_v1_NodeSelectorTerm(ref common.ReferenceCallback) com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.NodeSelectorRequirement{}.OpenAPIModelName()),
+										Ref: ref(corev1.NodeSelectorRequirement{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -25602,8 +25317,7 @@ func schema_k8sio_api_core_v1_NodeSelectorTerm(ref common.ReferenceCallback) com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.NodeSelectorRequirement{}.OpenAPIModelName()),
+										Ref: ref(corev1.NodeSelectorRequirement{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -25649,9 +25363,8 @@ func schema_k8sio_api_core_v1_NodeSpec(ref common.ReferenceCallback) common.Open
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -25683,8 +25396,7 @@ func schema_k8sio_api_core_v1_NodeSpec(ref common.ReferenceCallback) common.Open
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.Taint{}.OpenAPIModelName()),
+										Ref: ref(corev1.Taint{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -25771,8 +25483,7 @@ func schema_k8sio_api_core_v1_NodeStatus(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.NodeCondition{}.OpenAPIModelName()),
+										Ref: ref(corev1.NodeCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -25795,8 +25506,7 @@ func schema_k8sio_api_core_v1_NodeStatus(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.NodeAddress{}.OpenAPIModelName()),
+										Ref: ref(corev1.NodeAddress{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -25828,8 +25538,7 @@ func schema_k8sio_api_core_v1_NodeStatus(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ContainerImage{}.OpenAPIModelName()),
+										Ref: ref(corev1.ContainerImage{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -25847,9 +25556,8 @@ func schema_k8sio_api_core_v1_NodeStatus(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -25867,8 +25575,7 @@ func schema_k8sio_api_core_v1_NodeStatus(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.AttachedVolume{}.OpenAPIModelName()),
+										Ref: ref(corev1.AttachedVolume{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -25892,8 +25599,7 @@ func schema_k8sio_api_core_v1_NodeStatus(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.NodeRuntimeHandler{}.OpenAPIModelName()),
+										Ref: ref(corev1.NodeRuntimeHandler{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -25917,9 +25623,8 @@ func schema_k8sio_api_core_v1_NodeStatus(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -26349,8 +26054,7 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimList(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.PersistentVolumeClaim{}.OpenAPIModelName()),
+										Ref: ref(corev1.PersistentVolumeClaim{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -26384,10 +26088,9 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimSpec(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-										Enum:    []interface{}{"ReadOnlyMany", "ReadWriteMany", "ReadWriteOnce", "ReadWriteOncePod"},
+										Type:   []string{"string"},
+										Format: "",
+										Enum:   []interface{}{"ReadOnlyMany", "ReadWriteMany", "ReadWriteOnce", "ReadWriteOncePod"},
 									},
 								},
 							},
@@ -26482,10 +26185,9 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimStatus(ref common.ReferenceCa
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-										Enum:    []interface{}{"ReadOnlyMany", "ReadWriteMany", "ReadWriteOnce", "ReadWriteOncePod"},
+										Type:   []string{"string"},
+										Format: "",
+										Enum:   []interface{}{"ReadOnlyMany", "ReadWriteMany", "ReadWriteOnce", "ReadWriteOncePod"},
 									},
 								},
 							},
@@ -26522,8 +26224,7 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimStatus(ref common.ReferenceCa
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.PersistentVolumeClaimCondition{}.OpenAPIModelName()),
+										Ref: ref(corev1.PersistentVolumeClaimCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -26556,10 +26257,9 @@ func schema_k8sio_api_core_v1_PersistentVolumeClaimStatus(ref common.ReferenceCa
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-										Enum:    []interface{}{"ControllerResizeInProgress", "ControllerResizeInfeasible", "NodeResizeInProgress", "NodeResizeInfeasible", "NodeResizePending"},
+										Type:   []string{"string"},
+										Format: "",
+										Enum:   []interface{}{"ControllerResizeInProgress", "ControllerResizeInfeasible", "NodeResizeInProgress", "NodeResizeInfeasible", "NodeResizePending"},
 									},
 								},
 							},
@@ -26680,8 +26380,7 @@ func schema_k8sio_api_core_v1_PersistentVolumeList(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.PersistentVolume{}.OpenAPIModelName()),
+										Ref: ref(corev1.PersistentVolume{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -27008,10 +26707,9 @@ func schema_k8sio_api_core_v1_PersistentVolumeSpec(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-										Enum:    []interface{}{"ReadOnlyMany", "ReadWriteMany", "ReadWriteOnce", "ReadWriteOncePod"},
+										Type:   []string{"string"},
+										Format: "",
+										Enum:   []interface{}{"ReadOnlyMany", "ReadWriteMany", "ReadWriteOnce", "ReadWriteOncePod"},
 									},
 								},
 							},
@@ -27055,9 +26753,8 @@ func schema_k8sio_api_core_v1_PersistentVolumeSpec(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -27233,8 +26930,7 @@ func schema_k8sio_api_core_v1_PodAffinity(ref common.ReferenceCallback) common.O
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.PodAffinityTerm{}.OpenAPIModelName()),
+										Ref: ref(corev1.PodAffinityTerm{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -27252,8 +26948,7 @@ func schema_k8sio_api_core_v1_PodAffinity(ref common.ReferenceCallback) common.O
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.WeightedPodAffinityTerm{}.OpenAPIModelName()),
+										Ref: ref(corev1.WeightedPodAffinityTerm{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -27292,9 +26987,8 @@ func schema_k8sio_api_core_v1_PodAffinityTerm(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -27326,9 +27020,8 @@ func schema_k8sio_api_core_v1_PodAffinityTerm(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -27346,9 +27039,8 @@ func schema_k8sio_api_core_v1_PodAffinityTerm(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -27382,8 +27074,7 @@ func schema_k8sio_api_core_v1_PodAntiAffinity(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.PodAffinityTerm{}.OpenAPIModelName()),
+										Ref: ref(corev1.PodAffinityTerm{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -27401,8 +27092,7 @@ func schema_k8sio_api_core_v1_PodAntiAffinity(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.WeightedPodAffinityTerm{}.OpenAPIModelName()),
+										Ref: ref(corev1.WeightedPodAffinityTerm{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -27535,9 +27225,8 @@ func schema_k8sio_api_core_v1_PodCertificateProjection(ref common.ReferenceCallb
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -27634,9 +27323,8 @@ func schema_k8sio_api_core_v1_PodDNSConfig(ref common.ReferenceCallback) common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -27654,9 +27342,8 @@ func schema_k8sio_api_core_v1_PodDNSConfig(ref common.ReferenceCallback) common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -27674,8 +27361,7 @@ func schema_k8sio_api_core_v1_PodDNSConfig(ref common.ReferenceCallback) common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.PodDNSConfigOption{}.OpenAPIModelName()),
+										Ref: ref(corev1.PodDNSConfigOption{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -27784,9 +27470,8 @@ func schema_k8sio_api_core_v1_PodExecOptions(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -27818,8 +27503,7 @@ func schema_k8sio_api_core_v1_PodExtendedResourceClaimStatus(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ContainerExtendedResourceRequest{}.OpenAPIModelName()),
+										Ref: ref(corev1.ContainerExtendedResourceRequest{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -27899,8 +27583,7 @@ func schema_k8sio_api_core_v1_PodList(ref common.ReferenceCallback) common.OpenA
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.Pod{}.OpenAPIModelName()),
+										Ref: ref(corev1.Pod{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -28068,9 +27751,8 @@ func schema_k8sio_api_core_v1_PodPortForwardOptions(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: 0,
-										Type:    []string{"integer"},
-										Format:  "int32",
+										Type:   []string{"integer"},
+										Format: "int32",
 									},
 								},
 							},
@@ -28308,9 +27990,8 @@ func schema_k8sio_api_core_v1_PodSecurityContext(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: 0,
-										Type:    []string{"integer"},
-										Format:  "int64",
+										Type:   []string{"integer"},
+										Format: "int64",
 									},
 								},
 							},
@@ -28343,8 +28024,7 @@ func schema_k8sio_api_core_v1_PodSecurityContext(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.Sysctl{}.OpenAPIModelName()),
+										Ref: ref(corev1.Sysctl{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -28430,8 +28110,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.Volume{}.OpenAPIModelName()),
+										Ref: ref(corev1.Volume{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -28454,8 +28133,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.Container{}.OpenAPIModelName()),
+										Ref: ref(corev1.Container{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -28478,8 +28156,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.Container{}.OpenAPIModelName()),
+										Ref: ref(corev1.Container{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -28502,8 +28179,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.EphemeralContainer{}.OpenAPIModelName()),
+										Ref: ref(corev1.EphemeralContainer{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -28552,9 +28228,8 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -28639,8 +28314,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.LocalObjectReference{}.OpenAPIModelName()),
+										Ref: ref(corev1.LocalObjectReference{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -28685,8 +28359,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.Toleration{}.OpenAPIModelName()),
+										Ref: ref(corev1.Toleration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -28709,8 +28382,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.HostAlias{}.OpenAPIModelName()),
+										Ref: ref(corev1.HostAlias{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -28748,8 +28420,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.PodReadinessGate{}.OpenAPIModelName()),
+										Ref: ref(corev1.PodReadinessGate{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -28809,8 +28480,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.TopologySpreadConstraint{}.OpenAPIModelName()),
+										Ref: ref(corev1.TopologySpreadConstraint{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -28853,8 +28523,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.PodSchedulingGate{}.OpenAPIModelName()),
+										Ref: ref(corev1.PodSchedulingGate{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -28877,8 +28546,7 @@ func schema_k8sio_api_core_v1_PodSpec(ref common.ReferenceCallback) common.OpenA
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.PodResourceClaim{}.OpenAPIModelName()),
+										Ref: ref(corev1.PodResourceClaim{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -28951,8 +28619,7 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.PodCondition{}.OpenAPIModelName()),
+										Ref: ref(corev1.PodCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -29000,8 +28667,7 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.HostIP{}.OpenAPIModelName()),
+										Ref: ref(corev1.HostIP{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -29031,8 +28697,7 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.PodIP{}.OpenAPIModelName()),
+										Ref: ref(corev1.PodIP{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -29056,8 +28721,7 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ContainerStatus{}.OpenAPIModelName()),
+										Ref: ref(corev1.ContainerStatus{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -29075,8 +28739,7 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ContainerStatus{}.OpenAPIModelName()),
+										Ref: ref(corev1.ContainerStatus{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -29102,8 +28765,7 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ContainerStatus{}.OpenAPIModelName()),
+										Ref: ref(corev1.ContainerStatus{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -29133,8 +28795,7 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.PodResourceClaimStatus{}.OpenAPIModelName()),
+										Ref: ref(corev1.PodResourceClaimStatus{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -29178,8 +28839,7 @@ func schema_k8sio_api_core_v1_PodStatus(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.NodeAllocatableResourceClaimStatus{}.OpenAPIModelName()),
+										Ref: ref(corev1.NodeAllocatableResourceClaimStatus{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -29271,8 +28931,7 @@ func schema_k8sio_api_core_v1_PodTemplateList(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.PodTemplate{}.OpenAPIModelName()),
+										Ref: ref(corev1.PodTemplate{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -29603,8 +29262,7 @@ func schema_k8sio_api_core_v1_ProjectedVolumeSource(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.VolumeProjection{}.OpenAPIModelName()),
+										Ref: ref(corev1.VolumeProjection{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -29702,9 +29360,8 @@ func schema_k8sio_api_core_v1_RBDPersistentVolumeSource(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -29790,9 +29447,8 @@ func schema_k8sio_api_core_v1_RBDVolumeSource(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -30048,8 +29704,7 @@ func schema_k8sio_api_core_v1_ReplicationControllerList(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ReplicationController{}.OpenAPIModelName()),
+										Ref: ref(corev1.ReplicationController{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -30100,9 +29755,8 @@ func schema_k8sio_api_core_v1_ReplicationControllerSpec(ref common.ReferenceCall
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -30182,8 +29836,7 @@ func schema_k8sio_api_core_v1_ReplicationControllerStatus(ref common.ReferenceCa
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ReplicationControllerCondition{}.OpenAPIModelName()),
+										Ref: ref(corev1.ReplicationControllerCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -30390,8 +30043,7 @@ func schema_k8sio_api_core_v1_ResourceQuotaList(ref common.ReferenceCallback) co
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ResourceQuota{}.OpenAPIModelName()),
+										Ref: ref(corev1.ResourceQuota{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -30439,10 +30091,9 @@ func schema_k8sio_api_core_v1_ResourceQuotaSpec(ref common.ReferenceCallback) co
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-										Enum:    []interface{}{"BestEffort", "CrossNamespacePodAffinity", "NotBestEffort", "NotTerminating", "PriorityClass", "Terminating", "VolumeAttributesClass"},
+										Type:   []string{"string"},
+										Format: "",
+										Enum:   []interface{}{"BestEffort", "CrossNamespacePodAffinity", "NotBestEffort", "NotTerminating", "PriorityClass", "Terminating", "VolumeAttributesClass"},
 									},
 								},
 							},
@@ -30555,8 +30206,7 @@ func schema_k8sio_api_core_v1_ResourceRequirements(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ResourceClaim{}.OpenAPIModelName()),
+										Ref: ref(corev1.ResourceClaim{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -30600,8 +30250,7 @@ func schema_k8sio_api_core_v1_ResourceStatus(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ResourceHealth{}.OpenAPIModelName()),
+										Ref: ref(corev1.ResourceHealth{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -30854,8 +30503,7 @@ func schema_k8sio_api_core_v1_ScopeSelector(ref common.ReferenceCallback) common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ScopedResourceSelectorRequirement{}.OpenAPIModelName()),
+										Ref: ref(corev1.ScopedResourceSelectorRequirement{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -30911,9 +30559,8 @@ func schema_k8sio_api_core_v1_ScopedResourceSelectorRequirement(ref common.Refer
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -31026,9 +30673,8 @@ func schema_k8sio_api_core_v1_Secret(ref common.ReferenceCallback) common.OpenAP
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -31154,8 +30800,7 @@ func schema_k8sio_api_core_v1_SecretList(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.Secret{}.OpenAPIModelName()),
+										Ref: ref(corev1.Secret{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -31197,8 +30842,7 @@ func schema_k8sio_api_core_v1_SecretProjection(ref common.ReferenceCallback) com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.KeyToPath{}.OpenAPIModelName()),
+										Ref: ref(corev1.KeyToPath{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -31277,8 +30921,7 @@ func schema_k8sio_api_core_v1_SecretVolumeSource(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.KeyToPath{}.OpenAPIModelName()),
+										Ref: ref(corev1.KeyToPath{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -31532,8 +31175,7 @@ func schema_k8sio_api_core_v1_ServiceAccount(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ObjectReference{}.OpenAPIModelName()),
+										Ref: ref(corev1.ObjectReference{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -31551,8 +31193,7 @@ func schema_k8sio_api_core_v1_ServiceAccount(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.LocalObjectReference{}.OpenAPIModelName()),
+										Ref: ref(corev1.LocalObjectReference{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -31608,8 +31249,7 @@ func schema_k8sio_api_core_v1_ServiceAccountList(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ServiceAccount{}.OpenAPIModelName()),
+										Ref: ref(corev1.ServiceAccount{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -31695,8 +31335,7 @@ func schema_k8sio_api_core_v1_ServiceList(ref common.ReferenceCallback) common.O
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.Service{}.OpenAPIModelName()),
+										Ref: ref(corev1.Service{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -31830,8 +31469,7 @@ func schema_k8sio_api_core_v1_ServiceSpec(ref common.ReferenceCallback) common.O
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.ServicePort{}.OpenAPIModelName()),
+										Ref: ref(corev1.ServicePort{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -31850,9 +31488,8 @@ func schema_k8sio_api_core_v1_ServiceSpec(ref common.ReferenceCallback) common.O
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -31877,9 +31514,8 @@ func schema_k8sio_api_core_v1_ServiceSpec(ref common.ReferenceCallback) common.O
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -31905,9 +31541,8 @@ func schema_k8sio_api_core_v1_ServiceSpec(ref common.ReferenceCallback) common.O
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -31940,9 +31575,8 @@ func schema_k8sio_api_core_v1_ServiceSpec(ref common.ReferenceCallback) common.O
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -31995,10 +31629,9 @@ func schema_k8sio_api_core_v1_ServiceSpec(ref common.ReferenceCallback) common.O
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-										Enum:    []interface{}{"", "IPv4", "IPv6"},
+										Type:   []string{"string"},
+										Format: "",
+										Enum:   []interface{}{"", "IPv4", "IPv6"},
 									},
 								},
 							},
@@ -32080,8 +31713,7 @@ func schema_k8sio_api_core_v1_ServiceStatus(ref common.ReferenceCallback) common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
+										Ref: ref(metav1.Condition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -32418,9 +32050,8 @@ func schema_k8sio_api_core_v1_TopologySelectorLabelRequirement(ref common.Refere
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -32452,8 +32083,7 @@ func schema_k8sio_api_core_v1_TopologySelectorTerm(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.TopologySelectorLabelRequirement{}.OpenAPIModelName()),
+										Ref: ref(corev1.TopologySelectorLabelRequirement{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -32545,9 +32175,8 @@ func schema_k8sio_api_core_v1_TopologySpreadConstraint(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -33465,9 +33094,8 @@ func schema_k8sio_api_discovery_v1_Endpoint(ref common.ReferenceCallback) common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -33501,9 +33129,8 @@ func schema_k8sio_api_discovery_v1_Endpoint(ref common.ReferenceCallback) common
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -33591,8 +33218,7 @@ func schema_k8sio_api_discovery_v1_EndpointHints(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(discoveryv1.ForZone{}.OpenAPIModelName()),
+										Ref: ref(discoveryv1.ForZone{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -33610,8 +33236,7 @@ func schema_k8sio_api_discovery_v1_EndpointHints(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(discoveryv1.ForNode{}.OpenAPIModelName()),
+										Ref: ref(discoveryv1.ForNode{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -33721,8 +33346,7 @@ func schema_k8sio_api_discovery_v1_EndpointSlice(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(discoveryv1.Endpoint{}.OpenAPIModelName()),
+										Ref: ref(discoveryv1.Endpoint{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -33740,8 +33364,7 @@ func schema_k8sio_api_discovery_v1_EndpointSlice(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(discoveryv1.EndpointPort{}.OpenAPIModelName()),
+										Ref: ref(discoveryv1.EndpointPort{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -33791,8 +33414,7 @@ func schema_k8sio_api_discovery_v1_EndpointSliceList(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(discoveryv1.EndpointSlice{}.OpenAPIModelName()),
+										Ref: ref(discoveryv1.EndpointSlice{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -33870,9 +33492,8 @@ func schema_k8sio_api_discovery_v1beta1_Endpoint(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -33906,9 +33527,8 @@ func schema_k8sio_api_discovery_v1beta1_Endpoint(ref common.ReferenceCallback) c
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -33989,8 +33609,7 @@ func schema_k8sio_api_discovery_v1beta1_EndpointHints(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(discoveryv1beta1.ForZone{}.OpenAPIModelName()),
+										Ref: ref(discoveryv1beta1.ForZone{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -34008,8 +33627,7 @@ func schema_k8sio_api_discovery_v1beta1_EndpointHints(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(discoveryv1beta1.ForNode{}.OpenAPIModelName()),
+										Ref: ref(discoveryv1beta1.ForNode{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -34114,8 +33732,7 @@ func schema_k8sio_api_discovery_v1beta1_EndpointSlice(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(discoveryv1beta1.Endpoint{}.OpenAPIModelName()),
+										Ref: ref(discoveryv1beta1.Endpoint{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -34133,8 +33750,7 @@ func schema_k8sio_api_discovery_v1beta1_EndpointSlice(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(discoveryv1beta1.EndpointPort{}.OpenAPIModelName()),
+										Ref: ref(discoveryv1beta1.EndpointPort{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -34184,8 +33800,7 @@ func schema_k8sio_api_discovery_v1beta1_EndpointSliceList(ref common.ReferenceCa
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(discoveryv1beta1.EndpointSlice{}.OpenAPIModelName()),
+										Ref: ref(discoveryv1beta1.EndpointSlice{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -34409,8 +34024,7 @@ func schema_k8sio_api_events_v1_EventList(ref common.ReferenceCallback) common.O
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(eventsv1.Event{}.OpenAPIModelName()),
+										Ref: ref(eventsv1.Event{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -34620,8 +34234,7 @@ func schema_k8sio_api_events_v1beta1_EventList(ref common.ReferenceCallback) com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(eventsv1beta1.Event{}.OpenAPIModelName()),
+										Ref: ref(eventsv1beta1.Event{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -34803,8 +34416,7 @@ func schema_k8sio_api_extensions_v1beta1_DaemonSetList(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(extensionsv1beta1.DaemonSet{}.OpenAPIModelName()),
+										Ref: ref(extensionsv1beta1.DaemonSet{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -34967,8 +34579,7 @@ func schema_k8sio_api_extensions_v1beta1_DaemonSetStatus(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(extensionsv1beta1.DaemonSetCondition{}.OpenAPIModelName()),
+										Ref: ref(extensionsv1beta1.DaemonSetCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -35154,8 +34765,7 @@ func schema_k8sio_api_extensions_v1beta1_DeploymentList(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(extensionsv1beta1.Deployment{}.OpenAPIModelName()),
+										Ref: ref(extensionsv1beta1.Deployment{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -35207,9 +34817,8 @@ func schema_k8sio_api_extensions_v1beta1_DeploymentRollback(ref common.Reference
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -35386,8 +34995,7 @@ func schema_k8sio_api_extensions_v1beta1_DeploymentStatus(ref common.ReferenceCa
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(extensionsv1beta1.DeploymentCondition{}.OpenAPIModelName()),
+										Ref: ref(extensionsv1beta1.DeploymentCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -35492,8 +35100,7 @@ func schema_k8sio_api_extensions_v1beta1_HTTPIngressRuleValue(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(extensionsv1beta1.HTTPIngressPath{}.OpenAPIModelName()),
+										Ref: ref(extensionsv1beta1.HTTPIngressPath{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -35535,9 +35142,8 @@ func schema_k8sio_api_extensions_v1beta1_IPBlock(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -35669,8 +35275,7 @@ func schema_k8sio_api_extensions_v1beta1_IngressList(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(extensionsv1beta1.Ingress{}.OpenAPIModelName()),
+										Ref: ref(extensionsv1beta1.Ingress{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -35718,8 +35323,7 @@ func schema_k8sio_api_extensions_v1beta1_IngressLoadBalancerIngress(ref common.R
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(extensionsv1beta1.IngressPortStatus{}.OpenAPIModelName()),
+										Ref: ref(extensionsv1beta1.IngressPortStatus{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -35752,8 +35356,7 @@ func schema_k8sio_api_extensions_v1beta1_IngressLoadBalancerStatus(ref common.Re
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(extensionsv1beta1.IngressLoadBalancerIngress{}.OpenAPIModelName()),
+										Ref: ref(extensionsv1beta1.IngressLoadBalancerIngress{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -35886,8 +35489,7 @@ func schema_k8sio_api_extensions_v1beta1_IngressSpec(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(extensionsv1beta1.IngressTLS{}.OpenAPIModelName()),
+										Ref: ref(extensionsv1beta1.IngressTLS{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -35905,8 +35507,7 @@ func schema_k8sio_api_extensions_v1beta1_IngressSpec(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(extensionsv1beta1.IngressRule{}.OpenAPIModelName()),
+										Ref: ref(extensionsv1beta1.IngressRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -35961,9 +35562,8 @@ func schema_k8sio_api_extensions_v1beta1_IngressTLS(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -36044,8 +35644,7 @@ func schema_k8sio_api_extensions_v1beta1_NetworkPolicyEgressRule(ref common.Refe
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(extensionsv1beta1.NetworkPolicyPort{}.OpenAPIModelName()),
+										Ref: ref(extensionsv1beta1.NetworkPolicyPort{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -36063,8 +35662,7 @@ func schema_k8sio_api_extensions_v1beta1_NetworkPolicyEgressRule(ref common.Refe
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(extensionsv1beta1.NetworkPolicyPeer{}.OpenAPIModelName()),
+										Ref: ref(extensionsv1beta1.NetworkPolicyPeer{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -36097,8 +35695,7 @@ func schema_k8sio_api_extensions_v1beta1_NetworkPolicyIngressRule(ref common.Ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(extensionsv1beta1.NetworkPolicyPort{}.OpenAPIModelName()),
+										Ref: ref(extensionsv1beta1.NetworkPolicyPort{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -36116,8 +35713,7 @@ func schema_k8sio_api_extensions_v1beta1_NetworkPolicyIngressRule(ref common.Ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(extensionsv1beta1.NetworkPolicyPeer{}.OpenAPIModelName()),
+										Ref: ref(extensionsv1beta1.NetworkPolicyPeer{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -36166,8 +35762,7 @@ func schema_k8sio_api_extensions_v1beta1_NetworkPolicyList(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(extensionsv1beta1.NetworkPolicy{}.OpenAPIModelName()),
+										Ref: ref(extensionsv1beta1.NetworkPolicy{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -36277,8 +35872,7 @@ func schema_k8sio_api_extensions_v1beta1_NetworkPolicySpec(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(extensionsv1beta1.NetworkPolicyIngressRule{}.OpenAPIModelName()),
+										Ref: ref(extensionsv1beta1.NetworkPolicyIngressRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -36296,8 +35890,7 @@ func schema_k8sio_api_extensions_v1beta1_NetworkPolicySpec(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(extensionsv1beta1.NetworkPolicyEgressRule{}.OpenAPIModelName()),
+										Ref: ref(extensionsv1beta1.NetworkPolicyEgressRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -36315,9 +35908,8 @@ func schema_k8sio_api_extensions_v1beta1_NetworkPolicySpec(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -36469,8 +36061,7 @@ func schema_k8sio_api_extensions_v1beta1_ReplicaSetList(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(extensionsv1beta1.ReplicaSet{}.OpenAPIModelName()),
+										Ref: ref(extensionsv1beta1.ReplicaSet{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -36594,8 +36185,7 @@ func schema_k8sio_api_extensions_v1beta1_ReplicaSetStatus(ref common.ReferenceCa
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(extensionsv1beta1.ReplicaSetCondition{}.OpenAPIModelName()),
+										Ref: ref(extensionsv1beta1.ReplicaSetCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -36783,9 +36373,8 @@ func schema_k8sio_api_extensions_v1beta1_ScaleStatus(ref common.ReferenceCallbac
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -36988,8 +36577,7 @@ func schema_k8sio_api_flowcontrol_v1_FlowSchemaList(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(flowcontrolv1.FlowSchema{}.OpenAPIModelName()),
+										Ref: ref(flowcontrolv1.FlowSchema{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -37044,8 +36632,7 @@ func schema_k8sio_api_flowcontrol_v1_FlowSchemaSpec(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(flowcontrolv1.PolicyRulesWithSubjects{}.OpenAPIModelName()),
+										Ref: ref(flowcontrolv1.PolicyRulesWithSubjects{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -37084,8 +36671,7 @@ func schema_k8sio_api_flowcontrol_v1_FlowSchemaStatus(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(flowcontrolv1.FlowSchemaCondition{}.OpenAPIModelName()),
+										Ref: ref(flowcontrolv1.FlowSchemaCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -37225,9 +36811,8 @@ func schema_k8sio_api_flowcontrol_v1_NonResourcePolicyRule(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -37245,9 +36830,8 @@ func schema_k8sio_api_flowcontrol_v1_NonResourcePolicyRule(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -37279,8 +36863,7 @@ func schema_k8sio_api_flowcontrol_v1_PolicyRulesWithSubjects(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(flowcontrolv1.Subject{}.OpenAPIModelName()),
+										Ref: ref(flowcontrolv1.Subject{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -37298,8 +36881,7 @@ func schema_k8sio_api_flowcontrol_v1_PolicyRulesWithSubjects(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(flowcontrolv1.ResourcePolicyRule{}.OpenAPIModelName()),
+										Ref: ref(flowcontrolv1.ResourcePolicyRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -37317,8 +36899,7 @@ func schema_k8sio_api_flowcontrol_v1_PolicyRulesWithSubjects(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(flowcontrolv1.NonResourcePolicyRule{}.OpenAPIModelName()),
+										Ref: ref(flowcontrolv1.NonResourcePolicyRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -37467,8 +37048,7 @@ func schema_k8sio_api_flowcontrol_v1_PriorityLevelConfigurationList(ref common.R
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(flowcontrolv1.PriorityLevelConfiguration{}.OpenAPIModelName()),
+										Ref: ref(flowcontrolv1.PriorityLevelConfiguration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -37578,8 +37158,7 @@ func schema_k8sio_api_flowcontrol_v1_PriorityLevelConfigurationStatus(ref common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(flowcontrolv1.PriorityLevelConfigurationCondition{}.OpenAPIModelName()),
+										Ref: ref(flowcontrolv1.PriorityLevelConfigurationCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -37649,9 +37228,8 @@ func schema_k8sio_api_flowcontrol_v1_ResourcePolicyRule(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -37669,9 +37247,8 @@ func schema_k8sio_api_flowcontrol_v1_ResourcePolicyRule(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -37689,9 +37266,8 @@ func schema_k8sio_api_flowcontrol_v1_ResourcePolicyRule(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -37716,9 +37292,8 @@ func schema_k8sio_api_flowcontrol_v1_ResourcePolicyRule(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -38022,8 +37597,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_FlowSchemaList(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(flowcontrolv1beta1.FlowSchema{}.OpenAPIModelName()),
+										Ref: ref(flowcontrolv1beta1.FlowSchema{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -38078,8 +37652,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_FlowSchemaSpec(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(flowcontrolv1beta1.PolicyRulesWithSubjects{}.OpenAPIModelName()),
+										Ref: ref(flowcontrolv1beta1.PolicyRulesWithSubjects{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -38116,8 +37689,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_FlowSchemaStatus(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(flowcontrolv1beta1.FlowSchemaCondition{}.OpenAPIModelName()),
+										Ref: ref(flowcontrolv1beta1.FlowSchemaCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -38258,9 +37830,8 @@ func schema_k8sio_api_flowcontrol_v1beta1_NonResourcePolicyRule(ref common.Refer
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -38278,9 +37849,8 @@ func schema_k8sio_api_flowcontrol_v1beta1_NonResourcePolicyRule(ref common.Refer
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -38312,8 +37882,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_PolicyRulesWithSubjects(ref common.Ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(flowcontrolv1beta1.Subject{}.OpenAPIModelName()),
+										Ref: ref(flowcontrolv1beta1.Subject{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -38331,8 +37900,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_PolicyRulesWithSubjects(ref common.Ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(flowcontrolv1beta1.ResourcePolicyRule{}.OpenAPIModelName()),
+										Ref: ref(flowcontrolv1beta1.ResourcePolicyRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -38350,8 +37918,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_PolicyRulesWithSubjects(ref common.Ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(flowcontrolv1beta1.NonResourcePolicyRule{}.OpenAPIModelName()),
+										Ref: ref(flowcontrolv1beta1.NonResourcePolicyRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -38500,8 +38067,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_PriorityLevelConfigurationList(ref com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(flowcontrolv1beta1.PriorityLevelConfiguration{}.OpenAPIModelName()),
+										Ref: ref(flowcontrolv1beta1.PriorityLevelConfiguration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -38609,8 +38175,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_PriorityLevelConfigurationStatus(ref c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(flowcontrolv1beta1.PriorityLevelConfigurationCondition{}.OpenAPIModelName()),
+										Ref: ref(flowcontrolv1beta1.PriorityLevelConfigurationCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -38680,9 +38245,8 @@ func schema_k8sio_api_flowcontrol_v1beta1_ResourcePolicyRule(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -38700,9 +38264,8 @@ func schema_k8sio_api_flowcontrol_v1beta1_ResourcePolicyRule(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -38720,9 +38283,8 @@ func schema_k8sio_api_flowcontrol_v1beta1_ResourcePolicyRule(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -38747,9 +38309,8 @@ func schema_k8sio_api_flowcontrol_v1beta1_ResourcePolicyRule(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -39053,8 +38614,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_FlowSchemaList(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(flowcontrolv1beta2.FlowSchema{}.OpenAPIModelName()),
+										Ref: ref(flowcontrolv1beta2.FlowSchema{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -39109,8 +38669,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_FlowSchemaSpec(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(flowcontrolv1beta2.PolicyRulesWithSubjects{}.OpenAPIModelName()),
+										Ref: ref(flowcontrolv1beta2.PolicyRulesWithSubjects{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -39147,8 +38706,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_FlowSchemaStatus(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(flowcontrolv1beta2.FlowSchemaCondition{}.OpenAPIModelName()),
+										Ref: ref(flowcontrolv1beta2.FlowSchemaCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -39289,9 +38847,8 @@ func schema_k8sio_api_flowcontrol_v1beta2_NonResourcePolicyRule(ref common.Refer
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -39309,9 +38866,8 @@ func schema_k8sio_api_flowcontrol_v1beta2_NonResourcePolicyRule(ref common.Refer
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -39343,8 +38899,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_PolicyRulesWithSubjects(ref common.Ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(flowcontrolv1beta2.Subject{}.OpenAPIModelName()),
+										Ref: ref(flowcontrolv1beta2.Subject{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -39362,8 +38917,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_PolicyRulesWithSubjects(ref common.Ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(flowcontrolv1beta2.ResourcePolicyRule{}.OpenAPIModelName()),
+										Ref: ref(flowcontrolv1beta2.ResourcePolicyRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -39381,8 +38935,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_PolicyRulesWithSubjects(ref common.Ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(flowcontrolv1beta2.NonResourcePolicyRule{}.OpenAPIModelName()),
+										Ref: ref(flowcontrolv1beta2.NonResourcePolicyRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -39531,8 +39084,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_PriorityLevelConfigurationList(ref com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(flowcontrolv1beta2.PriorityLevelConfiguration{}.OpenAPIModelName()),
+										Ref: ref(flowcontrolv1beta2.PriorityLevelConfiguration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -39640,8 +39192,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_PriorityLevelConfigurationStatus(ref c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(flowcontrolv1beta2.PriorityLevelConfigurationCondition{}.OpenAPIModelName()),
+										Ref: ref(flowcontrolv1beta2.PriorityLevelConfigurationCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -39711,9 +39262,8 @@ func schema_k8sio_api_flowcontrol_v1beta2_ResourcePolicyRule(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -39731,9 +39281,8 @@ func schema_k8sio_api_flowcontrol_v1beta2_ResourcePolicyRule(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -39751,9 +39300,8 @@ func schema_k8sio_api_flowcontrol_v1beta2_ResourcePolicyRule(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -39778,9 +39326,8 @@ func schema_k8sio_api_flowcontrol_v1beta2_ResourcePolicyRule(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -40084,8 +39631,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_FlowSchemaList(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta3.FlowSchema{}.OpenAPIModelName()),
+										Ref: ref(v1beta3.FlowSchema{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -40140,8 +39686,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_FlowSchemaSpec(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta3.PolicyRulesWithSubjects{}.OpenAPIModelName()),
+										Ref: ref(v1beta3.PolicyRulesWithSubjects{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -40180,8 +39725,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_FlowSchemaStatus(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta3.FlowSchemaCondition{}.OpenAPIModelName()),
+										Ref: ref(v1beta3.FlowSchemaCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -40322,9 +39866,8 @@ func schema_k8sio_api_flowcontrol_v1beta3_NonResourcePolicyRule(ref common.Refer
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -40342,9 +39885,8 @@ func schema_k8sio_api_flowcontrol_v1beta3_NonResourcePolicyRule(ref common.Refer
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -40376,8 +39918,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_PolicyRulesWithSubjects(ref common.Ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta3.Subject{}.OpenAPIModelName()),
+										Ref: ref(v1beta3.Subject{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -40395,8 +39936,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_PolicyRulesWithSubjects(ref common.Ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta3.ResourcePolicyRule{}.OpenAPIModelName()),
+										Ref: ref(v1beta3.ResourcePolicyRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -40414,8 +39954,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_PolicyRulesWithSubjects(ref common.Ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta3.NonResourcePolicyRule{}.OpenAPIModelName()),
+										Ref: ref(v1beta3.NonResourcePolicyRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -40564,8 +40103,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_PriorityLevelConfigurationList(ref com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta3.PriorityLevelConfiguration{}.OpenAPIModelName()),
+										Ref: ref(v1beta3.PriorityLevelConfiguration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -40675,8 +40213,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_PriorityLevelConfigurationStatus(ref c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1beta3.PriorityLevelConfigurationCondition{}.OpenAPIModelName()),
+										Ref: ref(v1beta3.PriorityLevelConfigurationCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -40746,9 +40283,8 @@ func schema_k8sio_api_flowcontrol_v1beta3_ResourcePolicyRule(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -40766,9 +40302,8 @@ func schema_k8sio_api_flowcontrol_v1beta3_ResourcePolicyRule(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -40786,9 +40321,8 @@ func schema_k8sio_api_flowcontrol_v1beta3_ResourcePolicyRule(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -40813,9 +40347,8 @@ func schema_k8sio_api_flowcontrol_v1beta3_ResourcePolicyRule(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -41025,8 +40558,7 @@ func schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewSpec(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(imagepolicyv1alpha1.ImageReviewContainerSpec{}.OpenAPIModelName()),
+										Ref: ref(imagepolicyv1alpha1.ImageReviewContainerSpec{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -41040,9 +40572,8 @@ func schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewSpec(ref common.ReferenceC
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -41093,9 +40624,8 @@ func schema_k8sio_api_imagepolicy_v1alpha1_ImageReviewStatus(ref common.Referenc
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -41164,8 +40694,7 @@ func schema_k8sio_api_networking_v1_HTTPIngressRuleValue(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(networkingv1.HTTPIngressPath{}.OpenAPIModelName()),
+										Ref: ref(networkingv1.HTTPIngressPath{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -41259,8 +40788,7 @@ func schema_k8sio_api_networking_v1_IPAddressList(ref common.ReferenceCallback) 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(networkingv1.IPAddress{}.OpenAPIModelName()),
+										Ref: ref(networkingv1.IPAddress{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -41324,9 +40852,8 @@ func schema_k8sio_api_networking_v1_IPBlock(ref common.ReferenceCallback) common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -41494,8 +41021,7 @@ func schema_k8sio_api_networking_v1_IngressClassList(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(networkingv1.IngressClass{}.OpenAPIModelName()),
+										Ref: ref(networkingv1.IngressClass{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -41624,8 +41150,7 @@ func schema_k8sio_api_networking_v1_IngressList(ref common.ReferenceCallback) co
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(networkingv1.Ingress{}.OpenAPIModelName()),
+										Ref: ref(networkingv1.Ingress{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -41673,8 +41198,7 @@ func schema_k8sio_api_networking_v1_IngressLoadBalancerIngress(ref common.Refere
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(networkingv1.IngressPortStatus{}.OpenAPIModelName()),
+										Ref: ref(networkingv1.IngressPortStatus{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -41707,8 +41231,7 @@ func schema_k8sio_api_networking_v1_IngressLoadBalancerStatus(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(networkingv1.IngressLoadBalancerIngress{}.OpenAPIModelName()),
+										Ref: ref(networkingv1.IngressLoadBalancerIngress{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -41870,8 +41393,7 @@ func schema_k8sio_api_networking_v1_IngressSpec(ref common.ReferenceCallback) co
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(networkingv1.IngressTLS{}.OpenAPIModelName()),
+										Ref: ref(networkingv1.IngressTLS{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -41889,8 +41411,7 @@ func schema_k8sio_api_networking_v1_IngressSpec(ref common.ReferenceCallback) co
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(networkingv1.IngressRule{}.OpenAPIModelName()),
+										Ref: ref(networkingv1.IngressRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -41945,9 +41466,8 @@ func schema_k8sio_api_networking_v1_IngressTLS(ref common.ReferenceCallback) com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -42028,8 +41548,7 @@ func schema_k8sio_api_networking_v1_NetworkPolicyEgressRule(ref common.Reference
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(networkingv1.NetworkPolicyPort{}.OpenAPIModelName()),
+										Ref: ref(networkingv1.NetworkPolicyPort{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -42047,8 +41566,7 @@ func schema_k8sio_api_networking_v1_NetworkPolicyEgressRule(ref common.Reference
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(networkingv1.NetworkPolicyPeer{}.OpenAPIModelName()),
+										Ref: ref(networkingv1.NetworkPolicyPeer{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -42081,8 +41599,7 @@ func schema_k8sio_api_networking_v1_NetworkPolicyIngressRule(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(networkingv1.NetworkPolicyPort{}.OpenAPIModelName()),
+										Ref: ref(networkingv1.NetworkPolicyPort{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -42100,8 +41617,7 @@ func schema_k8sio_api_networking_v1_NetworkPolicyIngressRule(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(networkingv1.NetworkPolicyPeer{}.OpenAPIModelName()),
+										Ref: ref(networkingv1.NetworkPolicyPeer{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -42150,8 +41666,7 @@ func schema_k8sio_api_networking_v1_NetworkPolicyList(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(networkingv1.NetworkPolicy{}.OpenAPIModelName()),
+										Ref: ref(networkingv1.NetworkPolicy{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -42261,8 +41776,7 @@ func schema_k8sio_api_networking_v1_NetworkPolicySpec(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(networkingv1.NetworkPolicyIngressRule{}.OpenAPIModelName()),
+										Ref: ref(networkingv1.NetworkPolicyIngressRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -42280,8 +41794,7 @@ func schema_k8sio_api_networking_v1_NetworkPolicySpec(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(networkingv1.NetworkPolicyEgressRule{}.OpenAPIModelName()),
+										Ref: ref(networkingv1.NetworkPolicyEgressRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -42299,10 +41812,9 @@ func schema_k8sio_api_networking_v1_NetworkPolicySpec(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
-										Enum:    []interface{}{"Egress", "Ingress"},
+										Type:   []string{"string"},
+										Format: "",
+										Enum:   []interface{}{"Egress", "Ingress"},
 									},
 								},
 							},
@@ -42475,8 +41987,7 @@ func schema_k8sio_api_networking_v1_ServiceCIDRList(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(networkingv1.ServiceCIDR{}.OpenAPIModelName()),
+										Ref: ref(networkingv1.ServiceCIDR{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -42510,9 +42021,8 @@ func schema_k8sio_api_networking_v1_ServiceCIDRSpec(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -42548,8 +42058,7 @@ func schema_k8sio_api_networking_v1_ServiceCIDRStatus(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
+										Ref: ref(metav1.Condition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -42619,8 +42128,7 @@ func schema_k8sio_api_networking_v1beta1_HTTPIngressRuleValue(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(networkingv1beta1.HTTPIngressPath{}.OpenAPIModelName()),
+										Ref: ref(networkingv1beta1.HTTPIngressPath{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -42714,8 +42222,7 @@ func schema_k8sio_api_networking_v1beta1_IPAddressList(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(networkingv1beta1.IPAddress{}.OpenAPIModelName()),
+										Ref: ref(networkingv1beta1.IPAddress{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -42914,8 +42421,7 @@ func schema_k8sio_api_networking_v1beta1_IngressClassList(ref common.ReferenceCa
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(networkingv1beta1.IngressClass{}.OpenAPIModelName()),
+										Ref: ref(networkingv1beta1.IngressClass{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -43044,8 +42550,7 @@ func schema_k8sio_api_networking_v1beta1_IngressList(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(networkingv1beta1.Ingress{}.OpenAPIModelName()),
+										Ref: ref(networkingv1beta1.Ingress{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -43093,8 +42598,7 @@ func schema_k8sio_api_networking_v1beta1_IngressLoadBalancerIngress(ref common.R
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(networkingv1beta1.IngressPortStatus{}.OpenAPIModelName()),
+										Ref: ref(networkingv1beta1.IngressPortStatus{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -43127,8 +42631,7 @@ func schema_k8sio_api_networking_v1beta1_IngressLoadBalancerStatus(ref common.Re
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(networkingv1beta1.IngressLoadBalancerIngress{}.OpenAPIModelName()),
+										Ref: ref(networkingv1beta1.IngressLoadBalancerIngress{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -43259,8 +42762,7 @@ func schema_k8sio_api_networking_v1beta1_IngressSpec(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(networkingv1beta1.IngressTLS{}.OpenAPIModelName()),
+										Ref: ref(networkingv1beta1.IngressTLS{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -43278,8 +42780,7 @@ func schema_k8sio_api_networking_v1beta1_IngressSpec(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(networkingv1beta1.IngressRule{}.OpenAPIModelName()),
+										Ref: ref(networkingv1beta1.IngressRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -43334,9 +42835,8 @@ func schema_k8sio_api_networking_v1beta1_IngressTLS(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -43482,8 +42982,7 @@ func schema_k8sio_api_networking_v1beta1_ServiceCIDRList(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(networkingv1beta1.ServiceCIDR{}.OpenAPIModelName()),
+										Ref: ref(networkingv1beta1.ServiceCIDR{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -43517,9 +43016,8 @@ func schema_k8sio_api_networking_v1beta1_ServiceCIDRSpec(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -43555,8 +43053,7 @@ func schema_k8sio_api_networking_v1beta1_ServiceCIDRStatus(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
+										Ref: ref(metav1.Condition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -43691,8 +43188,7 @@ func schema_k8sio_api_node_v1_RuntimeClassList(ref common.ReferenceCallback) com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(nodev1.RuntimeClass{}.OpenAPIModelName()),
+										Ref: ref(nodev1.RuntimeClass{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -43727,9 +43223,8 @@ func schema_k8sio_api_node_v1_Scheduling(ref common.ReferenceCallback) common.Op
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -43747,8 +43242,7 @@ func schema_k8sio_api_node_v1_Scheduling(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.Toleration{}.OpenAPIModelName()),
+										Ref: ref(corev1.Toleration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -43870,8 +43364,7 @@ func schema_k8sio_api_node_v1alpha1_RuntimeClassList(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(nodev1alpha1.RuntimeClass{}.OpenAPIModelName()),
+										Ref: ref(nodev1alpha1.RuntimeClass{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -43942,9 +43435,8 @@ func schema_k8sio_api_node_v1alpha1_Scheduling(ref common.ReferenceCallback) com
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -43962,8 +43454,7 @@ func schema_k8sio_api_node_v1alpha1_Scheduling(ref common.ReferenceCallback) com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.Toleration{}.OpenAPIModelName()),
+										Ref: ref(corev1.Toleration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -44098,8 +43589,7 @@ func schema_k8sio_api_node_v1beta1_RuntimeClassList(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(nodev1beta1.RuntimeClass{}.OpenAPIModelName()),
+										Ref: ref(nodev1beta1.RuntimeClass{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -44134,9 +43624,8 @@ func schema_k8sio_api_node_v1beta1_Scheduling(ref common.ReferenceCallback) comm
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -44154,8 +43643,7 @@ func schema_k8sio_api_node_v1beta1_Scheduling(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.Toleration{}.OpenAPIModelName()),
+										Ref: ref(corev1.Toleration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -44296,8 +43784,7 @@ func schema_k8sio_api_policy_v1_PodDisruptionBudgetList(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(policyv1.PodDisruptionBudget{}.OpenAPIModelName()),
+										Ref: ref(policyv1.PodDisruptionBudget{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -44435,8 +43922,7 @@ func schema_k8sio_api_policy_v1_PodDisruptionBudgetStatus(ref common.ReferenceCa
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
+										Ref: ref(metav1.Condition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -44577,8 +44063,7 @@ func schema_k8sio_api_policy_v1beta1_PodDisruptionBudgetList(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(policyv1beta1.PodDisruptionBudget{}.OpenAPIModelName()),
+										Ref: ref(policyv1beta1.PodDisruptionBudget{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -44711,8 +44196,7 @@ func schema_k8sio_api_policy_v1beta1_PodDisruptionBudgetStatus(ref common.Refere
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
+										Ref: ref(metav1.Condition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -44745,8 +44229,7 @@ func schema_k8sio_api_rbac_v1_AggregationRule(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.LabelSelector{}.OpenAPIModelName()),
+										Ref: ref(metav1.LabelSelector{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -44800,8 +44283,7 @@ func schema_k8sio_api_rbac_v1_ClusterRole(ref common.ReferenceCallback) common.O
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(rbacv1.PolicyRule{}.OpenAPIModelName()),
+										Ref: ref(rbacv1.PolicyRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -44861,8 +44343,7 @@ func schema_k8sio_api_rbac_v1_ClusterRoleBinding(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(rbacv1.Subject{}.OpenAPIModelName()),
+										Ref: ref(rbacv1.Subject{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -44919,8 +44400,7 @@ func schema_k8sio_api_rbac_v1_ClusterRoleBindingList(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(rbacv1.ClusterRoleBinding{}.OpenAPIModelName()),
+										Ref: ref(rbacv1.ClusterRoleBinding{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -44970,8 +44450,7 @@ func schema_k8sio_api_rbac_v1_ClusterRoleList(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(rbacv1.ClusterRole{}.OpenAPIModelName()),
+										Ref: ref(rbacv1.ClusterRole{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -45005,9 +44484,8 @@ func schema_k8sio_api_rbac_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -45025,9 +44503,8 @@ func schema_k8sio_api_rbac_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -45045,9 +44522,8 @@ func schema_k8sio_api_rbac_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -45065,9 +44541,8 @@ func schema_k8sio_api_rbac_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -45085,9 +44560,8 @@ func schema_k8sio_api_rbac_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -45140,8 +44614,7 @@ func schema_k8sio_api_rbac_v1_Role(ref common.ReferenceCallback) common.OpenAPID
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(rbacv1.PolicyRule{}.OpenAPIModelName()),
+										Ref: ref(rbacv1.PolicyRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -45195,8 +44668,7 @@ func schema_k8sio_api_rbac_v1_RoleBinding(ref common.ReferenceCallback) common.O
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(rbacv1.Subject{}.OpenAPIModelName()),
+										Ref: ref(rbacv1.Subject{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -45253,8 +44725,7 @@ func schema_k8sio_api_rbac_v1_RoleBindingList(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(rbacv1.RoleBinding{}.OpenAPIModelName()),
+										Ref: ref(rbacv1.RoleBinding{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -45304,8 +44775,7 @@ func schema_k8sio_api_rbac_v1_RoleList(ref common.ReferenceCallback) common.Open
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(rbacv1.Role{}.OpenAPIModelName()),
+										Ref: ref(rbacv1.Role{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -45431,8 +44901,7 @@ func schema_k8sio_api_rbac_v1alpha1_AggregationRule(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.LabelSelector{}.OpenAPIModelName()),
+										Ref: ref(metav1.LabelSelector{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -45486,8 +44955,7 @@ func schema_k8sio_api_rbac_v1alpha1_ClusterRole(ref common.ReferenceCallback) co
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(rbacv1alpha1.PolicyRule{}.OpenAPIModelName()),
+										Ref: ref(rbacv1alpha1.PolicyRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -45547,8 +45015,7 @@ func schema_k8sio_api_rbac_v1alpha1_ClusterRoleBinding(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(rbacv1alpha1.Subject{}.OpenAPIModelName()),
+										Ref: ref(rbacv1alpha1.Subject{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -45605,8 +45072,7 @@ func schema_k8sio_api_rbac_v1alpha1_ClusterRoleBindingList(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(rbacv1alpha1.ClusterRoleBinding{}.OpenAPIModelName()),
+										Ref: ref(rbacv1alpha1.ClusterRoleBinding{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -45656,8 +45122,7 @@ func schema_k8sio_api_rbac_v1alpha1_ClusterRoleList(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(rbacv1alpha1.ClusterRole{}.OpenAPIModelName()),
+										Ref: ref(rbacv1alpha1.ClusterRole{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -45691,9 +45156,8 @@ func schema_k8sio_api_rbac_v1alpha1_PolicyRule(ref common.ReferenceCallback) com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -45711,9 +45175,8 @@ func schema_k8sio_api_rbac_v1alpha1_PolicyRule(ref common.ReferenceCallback) com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -45731,9 +45194,8 @@ func schema_k8sio_api_rbac_v1alpha1_PolicyRule(ref common.ReferenceCallback) com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -45751,9 +45213,8 @@ func schema_k8sio_api_rbac_v1alpha1_PolicyRule(ref common.ReferenceCallback) com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -45771,9 +45232,8 @@ func schema_k8sio_api_rbac_v1alpha1_PolicyRule(ref common.ReferenceCallback) com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -45826,8 +45286,7 @@ func schema_k8sio_api_rbac_v1alpha1_Role(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(rbacv1alpha1.PolicyRule{}.OpenAPIModelName()),
+										Ref: ref(rbacv1alpha1.PolicyRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -45881,8 +45340,7 @@ func schema_k8sio_api_rbac_v1alpha1_RoleBinding(ref common.ReferenceCallback) co
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(rbacv1alpha1.Subject{}.OpenAPIModelName()),
+										Ref: ref(rbacv1alpha1.Subject{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -45939,8 +45397,7 @@ func schema_k8sio_api_rbac_v1alpha1_RoleBindingList(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(rbacv1alpha1.RoleBinding{}.OpenAPIModelName()),
+										Ref: ref(rbacv1alpha1.RoleBinding{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -45990,8 +45447,7 @@ func schema_k8sio_api_rbac_v1alpha1_RoleList(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(rbacv1alpha1.Role{}.OpenAPIModelName()),
+										Ref: ref(rbacv1alpha1.Role{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -46107,8 +45563,7 @@ func schema_k8sio_api_rbac_v1beta1_AggregationRule(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.LabelSelector{}.OpenAPIModelName()),
+										Ref: ref(metav1.LabelSelector{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -46162,8 +45617,7 @@ func schema_k8sio_api_rbac_v1beta1_ClusterRole(ref common.ReferenceCallback) com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(rbacv1beta1.PolicyRule{}.OpenAPIModelName()),
+										Ref: ref(rbacv1beta1.PolicyRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -46223,8 +45677,7 @@ func schema_k8sio_api_rbac_v1beta1_ClusterRoleBinding(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(rbacv1beta1.Subject{}.OpenAPIModelName()),
+										Ref: ref(rbacv1beta1.Subject{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -46281,8 +45734,7 @@ func schema_k8sio_api_rbac_v1beta1_ClusterRoleBindingList(ref common.ReferenceCa
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(rbacv1beta1.ClusterRoleBinding{}.OpenAPIModelName()),
+										Ref: ref(rbacv1beta1.ClusterRoleBinding{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -46332,8 +45784,7 @@ func schema_k8sio_api_rbac_v1beta1_ClusterRoleList(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(rbacv1beta1.ClusterRole{}.OpenAPIModelName()),
+										Ref: ref(rbacv1beta1.ClusterRole{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -46367,9 +45818,8 @@ func schema_k8sio_api_rbac_v1beta1_PolicyRule(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -46387,9 +45837,8 @@ func schema_k8sio_api_rbac_v1beta1_PolicyRule(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -46407,9 +45856,8 @@ func schema_k8sio_api_rbac_v1beta1_PolicyRule(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -46427,9 +45875,8 @@ func schema_k8sio_api_rbac_v1beta1_PolicyRule(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -46447,9 +45894,8 @@ func schema_k8sio_api_rbac_v1beta1_PolicyRule(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -46502,8 +45948,7 @@ func schema_k8sio_api_rbac_v1beta1_Role(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(rbacv1beta1.PolicyRule{}.OpenAPIModelName()),
+										Ref: ref(rbacv1beta1.PolicyRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -46557,8 +46002,7 @@ func schema_k8sio_api_rbac_v1beta1_RoleBinding(ref common.ReferenceCallback) com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(rbacv1beta1.Subject{}.OpenAPIModelName()),
+										Ref: ref(rbacv1beta1.Subject{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -46615,8 +46059,7 @@ func schema_k8sio_api_rbac_v1beta1_RoleBindingList(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(rbacv1beta1.RoleBinding{}.OpenAPIModelName()),
+										Ref: ref(rbacv1beta1.RoleBinding{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -46666,8 +46109,7 @@ func schema_k8sio_api_rbac_v1beta1_RoleList(ref common.ReferenceCallback) common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(rbacv1beta1.Role{}.OpenAPIModelName()),
+										Ref: ref(rbacv1beta1.Role{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -46817,8 +46259,7 @@ func schema_k8sio_api_resource_v1_AllocatedDeviceStatus(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
+										Ref: ref(metav1.Condition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -47054,8 +46495,7 @@ func schema_k8sio_api_resource_v1_CounterSet(ref common.ReferenceCallback) commo
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.Counter{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.Counter{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -47093,8 +46533,7 @@ func schema_k8sio_api_resource_v1_Device(ref common.ReferenceCallback) common.Op
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.DeviceAttribute{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.DeviceAttribute{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -47108,8 +46547,7 @@ func schema_k8sio_api_resource_v1_Device(ref common.ReferenceCallback) common.Op
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.DeviceCapacity{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.DeviceCapacity{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -47127,8 +46565,7 @@ func schema_k8sio_api_resource_v1_Device(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.DeviceCounterConsumption{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.DeviceCounterConsumption{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -47166,8 +46603,7 @@ func schema_k8sio_api_resource_v1_Device(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.DeviceTaint{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.DeviceTaint{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -47192,9 +46628,8 @@ func schema_k8sio_api_resource_v1_Device(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -47212,9 +46647,8 @@ func schema_k8sio_api_resource_v1_Device(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -47235,8 +46669,7 @@ func schema_k8sio_api_resource_v1_Device(ref common.ReferenceCallback) common.Op
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.NodeAllocatableResourceMapping{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.NodeAllocatableResourceMapping{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -47279,9 +46712,8 @@ func schema_k8sio_api_resource_v1_DeviceAllocationConfiguration(ref common.Refer
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -47321,8 +46753,7 @@ func schema_k8sio_api_resource_v1_DeviceAllocationResult(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.DeviceRequestAllocationResult{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.DeviceRequestAllocationResult{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -47340,8 +46771,7 @@ func schema_k8sio_api_resource_v1_DeviceAllocationResult(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.DeviceAllocationConfiguration{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.DeviceAllocationConfiguration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -47402,9 +46832,8 @@ func schema_k8sio_api_resource_v1_DeviceAttribute(ref common.ReferenceCallback) 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: 0,
-										Type:    []string{"integer"},
-										Format:  "int64",
+										Type:   []string{"integer"},
+										Format: "int64",
 									},
 								},
 							},
@@ -47422,9 +46851,8 @@ func schema_k8sio_api_resource_v1_DeviceAttribute(ref common.ReferenceCallback) 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: false,
-										Type:    []string{"boolean"},
-										Format:  "",
+										Type:   []string{"boolean"},
+										Format: "",
 									},
 								},
 							},
@@ -47442,9 +46870,8 @@ func schema_k8sio_api_resource_v1_DeviceAttribute(ref common.ReferenceCallback) 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -47462,9 +46889,8 @@ func schema_k8sio_api_resource_v1_DeviceAttribute(ref common.ReferenceCallback) 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -47523,8 +46949,7 @@ func schema_k8sio_api_resource_v1_DeviceClaim(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.DeviceRequest{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.DeviceRequest{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -47542,8 +46967,7 @@ func schema_k8sio_api_resource_v1_DeviceClaim(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.DeviceConstraint{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.DeviceConstraint{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -47561,8 +46985,7 @@ func schema_k8sio_api_resource_v1_DeviceClaim(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.DeviceClaimConfiguration{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.DeviceClaimConfiguration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -47595,9 +47018,8 @@ func schema_k8sio_api_resource_v1_DeviceClaimConfiguration(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -47716,8 +47138,7 @@ func schema_k8sio_api_resource_v1_DeviceClassList(ref common.ReferenceCallback) 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.DeviceClass{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.DeviceClass{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -47751,8 +47172,7 @@ func schema_k8sio_api_resource_v1_DeviceClassSpec(ref common.ReferenceCallback) 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.DeviceSelector{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.DeviceSelector{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -47770,8 +47190,7 @@ func schema_k8sio_api_resource_v1_DeviceClassSpec(ref common.ReferenceCallback) 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.DeviceClassConfiguration{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.DeviceClassConfiguration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -47832,9 +47251,8 @@ func schema_k8sio_api_resource_v1_DeviceConstraint(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -47883,8 +47301,7 @@ func schema_k8sio_api_resource_v1_DeviceCounterConsumption(ref common.ReferenceC
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.Counter{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.Counter{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -47932,8 +47349,7 @@ func schema_k8sio_api_resource_v1_DeviceRequest(ref common.ReferenceCallback) co
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.DeviceSubRequest{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.DeviceSubRequest{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -48006,8 +47422,7 @@ func schema_k8sio_api_resource_v1_DeviceRequestAllocationResult(ref common.Refer
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.DeviceToleration{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.DeviceToleration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -48025,9 +47440,8 @@ func schema_k8sio_api_resource_v1_DeviceRequestAllocationResult(ref common.Refer
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -48045,9 +47459,8 @@ func schema_k8sio_api_resource_v1_DeviceRequestAllocationResult(ref common.Refer
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -48139,8 +47552,7 @@ func schema_k8sio_api_resource_v1_DeviceSubRequest(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.DeviceSelector{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.DeviceSelector{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -48173,8 +47585,7 @@ func schema_k8sio_api_resource_v1_DeviceSubRequest(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.DeviceToleration{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.DeviceToleration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -48319,8 +47730,7 @@ func schema_k8sio_api_resource_v1_ExactDeviceRequest(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.DeviceSelector{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.DeviceSelector{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -48360,8 +47770,7 @@ func schema_k8sio_api_resource_v1_ExactDeviceRequest(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.DeviceToleration{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.DeviceToleration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -48408,9 +47817,8 @@ func schema_k8sio_api_resource_v1_NetworkDeviceData(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -48617,8 +48025,7 @@ func schema_k8sio_api_resource_v1_ResourceClaimList(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.ResourceClaim{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.ResourceClaim{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -48685,8 +48092,7 @@ func schema_k8sio_api_resource_v1_ResourceClaimStatus(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.ResourceClaimConsumerReference{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.ResourceClaimConsumerReference{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -48710,8 +48116,7 @@ func schema_k8sio_api_resource_v1_ResourceClaimStatus(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.AllocatedDeviceStatus{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.AllocatedDeviceStatus{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -48803,8 +48208,7 @@ func schema_k8sio_api_resource_v1_ResourceClaimTemplateList(ref common.Reference
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.ResourceClaimTemplate{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.ResourceClaimTemplate{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -48965,8 +48369,7 @@ func schema_k8sio_api_resource_v1_ResourceSliceList(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.ResourceSlice{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.ResourceSlice{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -49035,8 +48438,7 @@ func schema_k8sio_api_resource_v1_ResourceSliceSpec(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.Device{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.Device{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -49061,8 +48463,7 @@ func schema_k8sio_api_resource_v1_ResourceSliceSpec(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1.CounterSet{}.OpenAPIModelName()),
+										Ref: ref(resourcev1.CounterSet{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -49252,8 +48653,7 @@ func schema_k8sio_api_resource_v1alpha3_DeviceTaintRuleList(ref common.Reference
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1alpha3.DeviceTaintRule{}.OpenAPIModelName()),
+										Ref: ref(v1alpha3.DeviceTaintRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -49321,8 +48721,7 @@ func schema_k8sio_api_resource_v1alpha3_DeviceTaintRuleStatus(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
+										Ref: ref(metav1.Condition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -49540,8 +48939,7 @@ func schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequestList(ref common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1alpha3.ResourcePoolStatusRequest{}.OpenAPIModelName()),
+										Ref: ref(v1alpha3.ResourcePoolStatusRequest{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -49619,8 +49017,7 @@ func schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequestStatus(ref comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(v1alpha3.PoolStatus{}.OpenAPIModelName()),
+										Ref: ref(v1alpha3.PoolStatus{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -49643,8 +49040,7 @@ func schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequestStatus(ref comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
+										Ref: ref(metav1.Condition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -49712,8 +49108,7 @@ func schema_k8sio_api_resource_v1beta1_AllocatedDeviceStatus(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
+										Ref: ref(metav1.Condition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -49789,8 +49184,7 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.DeviceAttribute{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.DeviceAttribute{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -49804,8 +49198,7 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.DeviceCapacity{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.DeviceCapacity{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -49823,8 +49216,7 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.DeviceCounterConsumption{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.DeviceCounterConsumption{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -49862,8 +49254,7 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.DeviceTaint{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.DeviceTaint{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -49888,9 +49279,8 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -49908,9 +49298,8 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -49931,8 +49320,7 @@ func schema_k8sio_api_resource_v1beta1_BasicDevice(ref common.ReferenceCallback)
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.NodeAllocatableResourceMapping{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.NodeAllocatableResourceMapping{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -50121,8 +49509,7 @@ func schema_k8sio_api_resource_v1beta1_CounterSet(ref common.ReferenceCallback) 
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.Counter{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.Counter{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -50195,9 +49582,8 @@ func schema_k8sio_api_resource_v1beta1_DeviceAllocationConfiguration(ref common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -50237,8 +49623,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceAllocationResult(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.DeviceRequestAllocationResult{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.DeviceRequestAllocationResult{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -50256,8 +49641,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceAllocationResult(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.DeviceAllocationConfiguration{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.DeviceAllocationConfiguration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -50318,9 +49702,8 @@ func schema_k8sio_api_resource_v1beta1_DeviceAttribute(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: 0,
-										Type:    []string{"integer"},
-										Format:  "int64",
+										Type:   []string{"integer"},
+										Format: "int64",
 									},
 								},
 							},
@@ -50338,9 +49721,8 @@ func schema_k8sio_api_resource_v1beta1_DeviceAttribute(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: false,
-										Type:    []string{"boolean"},
-										Format:  "",
+										Type:   []string{"boolean"},
+										Format: "",
 									},
 								},
 							},
@@ -50358,9 +49740,8 @@ func schema_k8sio_api_resource_v1beta1_DeviceAttribute(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -50378,9 +49759,8 @@ func schema_k8sio_api_resource_v1beta1_DeviceAttribute(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -50439,8 +49819,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceClaim(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.DeviceRequest{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.DeviceRequest{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -50458,8 +49837,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceClaim(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.DeviceConstraint{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.DeviceConstraint{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -50477,8 +49855,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceClaim(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.DeviceClaimConfiguration{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.DeviceClaimConfiguration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -50511,9 +49888,8 @@ func schema_k8sio_api_resource_v1beta1_DeviceClaimConfiguration(ref common.Refer
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -50632,8 +50008,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceClassList(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.DeviceClass{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.DeviceClass{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -50667,8 +50042,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceClassSpec(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.DeviceSelector{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.DeviceSelector{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -50686,8 +50060,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceClassSpec(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.DeviceClassConfiguration{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.DeviceClassConfiguration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -50748,9 +50121,8 @@ func schema_k8sio_api_resource_v1beta1_DeviceConstraint(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -50799,8 +50171,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceCounterConsumption(ref common.Refer
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.Counter{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.Counter{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -50850,8 +50221,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceRequest(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.DeviceSelector{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.DeviceSelector{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -50891,8 +50261,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceRequest(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.DeviceSubRequest{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.DeviceSubRequest{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -50910,8 +50279,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceRequest(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.DeviceToleration{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.DeviceToleration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -50990,8 +50358,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceRequestAllocationResult(ref common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.DeviceToleration{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.DeviceToleration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -51009,9 +50376,8 @@ func schema_k8sio_api_resource_v1beta1_DeviceRequestAllocationResult(ref common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -51029,9 +50395,8 @@ func schema_k8sio_api_resource_v1beta1_DeviceRequestAllocationResult(ref common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -51123,8 +50488,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceSubRequest(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.DeviceSelector{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.DeviceSelector{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -51157,8 +50521,7 @@ func schema_k8sio_api_resource_v1beta1_DeviceSubRequest(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.DeviceToleration{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.DeviceToleration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -51302,9 +50665,8 @@ func schema_k8sio_api_resource_v1beta1_NetworkDeviceData(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -51511,8 +50873,7 @@ func schema_k8sio_api_resource_v1beta1_ResourceClaimList(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.ResourceClaim{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.ResourceClaim{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -51579,8 +50940,7 @@ func schema_k8sio_api_resource_v1beta1_ResourceClaimStatus(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.ResourceClaimConsumerReference{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.ResourceClaimConsumerReference{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -51604,8 +50964,7 @@ func schema_k8sio_api_resource_v1beta1_ResourceClaimStatus(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.AllocatedDeviceStatus{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.AllocatedDeviceStatus{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -51697,8 +51056,7 @@ func schema_k8sio_api_resource_v1beta1_ResourceClaimTemplateList(ref common.Refe
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.ResourceClaimTemplate{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.ResourceClaimTemplate{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -51859,8 +51217,7 @@ func schema_k8sio_api_resource_v1beta1_ResourceSliceList(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.ResourceSlice{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.ResourceSlice{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -51929,8 +51286,7 @@ func schema_k8sio_api_resource_v1beta1_ResourceSliceSpec(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.Device{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.Device{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -51955,8 +51311,7 @@ func schema_k8sio_api_resource_v1beta1_ResourceSliceSpec(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta1.CounterSet{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta1.CounterSet{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -52024,8 +51379,7 @@ func schema_k8sio_api_resource_v1beta2_AllocatedDeviceStatus(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
+										Ref: ref(metav1.Condition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -52261,8 +51615,7 @@ func schema_k8sio_api_resource_v1beta2_CounterSet(ref common.ReferenceCallback) 
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.Counter{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.Counter{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -52300,8 +51653,7 @@ func schema_k8sio_api_resource_v1beta2_Device(ref common.ReferenceCallback) comm
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.DeviceAttribute{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.DeviceAttribute{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -52315,8 +51667,7 @@ func schema_k8sio_api_resource_v1beta2_Device(ref common.ReferenceCallback) comm
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.DeviceCapacity{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.DeviceCapacity{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -52334,8 +51685,7 @@ func schema_k8sio_api_resource_v1beta2_Device(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.DeviceCounterConsumption{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.DeviceCounterConsumption{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -52373,8 +51723,7 @@ func schema_k8sio_api_resource_v1beta2_Device(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.DeviceTaint{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.DeviceTaint{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -52399,9 +51748,8 @@ func schema_k8sio_api_resource_v1beta2_Device(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -52419,9 +51767,8 @@ func schema_k8sio_api_resource_v1beta2_Device(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -52442,8 +51789,7 @@ func schema_k8sio_api_resource_v1beta2_Device(ref common.ReferenceCallback) comm
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.NodeAllocatableResourceMapping{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.NodeAllocatableResourceMapping{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -52486,9 +51832,8 @@ func schema_k8sio_api_resource_v1beta2_DeviceAllocationConfiguration(ref common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -52528,8 +51873,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceAllocationResult(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.DeviceRequestAllocationResult{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.DeviceRequestAllocationResult{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -52547,8 +51891,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceAllocationResult(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.DeviceAllocationConfiguration{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.DeviceAllocationConfiguration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -52609,9 +51952,8 @@ func schema_k8sio_api_resource_v1beta2_DeviceAttribute(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: 0,
-										Type:    []string{"integer"},
-										Format:  "int64",
+										Type:   []string{"integer"},
+										Format: "int64",
 									},
 								},
 							},
@@ -52629,9 +51971,8 @@ func schema_k8sio_api_resource_v1beta2_DeviceAttribute(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: false,
-										Type:    []string{"boolean"},
-										Format:  "",
+										Type:   []string{"boolean"},
+										Format: "",
 									},
 								},
 							},
@@ -52649,9 +51990,8 @@ func schema_k8sio_api_resource_v1beta2_DeviceAttribute(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -52669,9 +52009,8 @@ func schema_k8sio_api_resource_v1beta2_DeviceAttribute(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -52730,8 +52069,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceClaim(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.DeviceRequest{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.DeviceRequest{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -52749,8 +52087,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceClaim(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.DeviceConstraint{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.DeviceConstraint{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -52768,8 +52105,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceClaim(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.DeviceClaimConfiguration{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.DeviceClaimConfiguration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -52802,9 +52138,8 @@ func schema_k8sio_api_resource_v1beta2_DeviceClaimConfiguration(ref common.Refer
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -52923,8 +52258,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceClassList(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.DeviceClass{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.DeviceClass{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -52958,8 +52292,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceClassSpec(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.DeviceSelector{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.DeviceSelector{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -52977,8 +52310,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceClassSpec(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.DeviceClassConfiguration{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.DeviceClassConfiguration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -53039,9 +52371,8 @@ func schema_k8sio_api_resource_v1beta2_DeviceConstraint(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -53090,8 +52421,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceCounterConsumption(ref common.Refer
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.Counter{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.Counter{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -53139,8 +52469,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceRequest(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.DeviceSubRequest{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.DeviceSubRequest{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -53213,8 +52542,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceRequestAllocationResult(ref common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.DeviceToleration{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.DeviceToleration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -53232,9 +52560,8 @@ func schema_k8sio_api_resource_v1beta2_DeviceRequestAllocationResult(ref common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -53252,9 +52579,8 @@ func schema_k8sio_api_resource_v1beta2_DeviceRequestAllocationResult(ref common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -53346,8 +52672,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceSubRequest(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.DeviceSelector{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.DeviceSelector{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -53380,8 +52705,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceSubRequest(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.DeviceToleration{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.DeviceToleration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -53534,8 +52858,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceTaintRuleList(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.DeviceTaintRule{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.DeviceTaintRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -53603,8 +52926,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceTaintRuleStatus(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
+										Ref: ref(metav1.Condition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -53730,8 +53052,7 @@ func schema_k8sio_api_resource_v1beta2_ExactDeviceRequest(ref common.ReferenceCa
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.DeviceSelector{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.DeviceSelector{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -53771,8 +53092,7 @@ func schema_k8sio_api_resource_v1beta2_ExactDeviceRequest(ref common.ReferenceCa
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.DeviceToleration{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.DeviceToleration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -53819,9 +53139,8 @@ func schema_k8sio_api_resource_v1beta2_NetworkDeviceData(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -54028,8 +53347,7 @@ func schema_k8sio_api_resource_v1beta2_ResourceClaimList(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.ResourceClaim{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.ResourceClaim{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -54096,8 +53414,7 @@ func schema_k8sio_api_resource_v1beta2_ResourceClaimStatus(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.ResourceClaimConsumerReference{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.ResourceClaimConsumerReference{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -54121,8 +53438,7 @@ func schema_k8sio_api_resource_v1beta2_ResourceClaimStatus(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.AllocatedDeviceStatus{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.AllocatedDeviceStatus{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -54214,8 +53530,7 @@ func schema_k8sio_api_resource_v1beta2_ResourceClaimTemplateList(ref common.Refe
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.ResourceClaimTemplate{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.ResourceClaimTemplate{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -54376,8 +53691,7 @@ func schema_k8sio_api_resource_v1beta2_ResourceSliceList(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.ResourceSlice{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.ResourceSlice{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -54446,8 +53760,7 @@ func schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.Device{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.Device{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -54472,8 +53785,7 @@ func schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(resourcev1beta2.CounterSet{}.OpenAPIModelName()),
+										Ref: ref(resourcev1beta2.CounterSet{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -54589,8 +53901,7 @@ func schema_k8sio_api_scheduling_v1_PriorityClassList(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(schedulingv1.PriorityClass{}.OpenAPIModelName()),
+										Ref: ref(schedulingv1.PriorityClass{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -54724,8 +54035,7 @@ func schema_k8sio_api_scheduling_v1alpha2_PodGroupList(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(schedulingv1alpha2.PodGroup{}.OpenAPIModelName()),
+										Ref: ref(schedulingv1alpha2.PodGroup{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -54824,8 +54134,7 @@ func schema_k8sio_api_scheduling_v1alpha2_PodGroupSchedulingConstraints(ref comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(schedulingv1alpha2.TopologyConstraint{}.OpenAPIModelName()),
+										Ref: ref(schedulingv1alpha2.TopologyConstraint{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -54921,8 +54230,7 @@ func schema_k8sio_api_scheduling_v1alpha2_PodGroupSpec(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(schedulingv1alpha2.PodGroupResourceClaim{}.OpenAPIModelName()),
+										Ref: ref(schedulingv1alpha2.PodGroupResourceClaim{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -54984,8 +54292,7 @@ func schema_k8sio_api_scheduling_v1alpha2_PodGroupStatus(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
+										Ref: ref(metav1.Condition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -55008,8 +54315,7 @@ func schema_k8sio_api_scheduling_v1alpha2_PodGroupStatus(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(schedulingv1alpha2.PodGroupResourceClaimStatus{}.OpenAPIModelName()),
+										Ref: ref(schedulingv1alpha2.PodGroupResourceClaimStatus{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -55068,8 +54374,7 @@ func schema_k8sio_api_scheduling_v1alpha2_PodGroupTemplate(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(schedulingv1alpha2.PodGroupResourceClaim{}.OpenAPIModelName()),
+										Ref: ref(schedulingv1alpha2.PodGroupResourceClaim{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -55276,8 +54581,7 @@ func schema_k8sio_api_scheduling_v1alpha2_WorkloadList(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(schedulingv1alpha2.Workload{}.OpenAPIModelName()),
+										Ref: ref(schedulingv1alpha2.Workload{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -55350,8 +54654,7 @@ func schema_k8sio_api_scheduling_v1alpha2_WorkloadSpec(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(schedulingv1alpha2.PodGroupTemplate{}.OpenAPIModelName()),
+										Ref: ref(schedulingv1alpha2.PodGroupTemplate{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -55467,8 +54770,7 @@ func schema_k8sio_api_scheduling_v1beta1_PriorityClassList(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(schedulingv1beta1.PriorityClass{}.OpenAPIModelName()),
+										Ref: ref(schedulingv1beta1.PriorityClass{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -55562,8 +54864,7 @@ func schema_k8sio_api_storage_v1_CSIDriverList(ref common.ReferenceCallback) com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(storagev1.CSIDriver{}.OpenAPIModelName()),
+										Ref: ref(storagev1.CSIDriver{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -55611,9 +54912,8 @@ func schema_k8sio_api_storage_v1_CSIDriverSpec(ref common.ReferenceCallback) com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -55645,8 +54945,7 @@ func schema_k8sio_api_storage_v1_CSIDriverSpec(ref common.ReferenceCallback) com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(storagev1.TokenRequest{}.OpenAPIModelName()),
+										Ref: ref(storagev1.TokenRequest{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -55774,9 +55073,8 @@ func schema_k8sio_api_storage_v1_CSINodeDriver(ref common.ReferenceCallback) com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -55832,8 +55130,7 @@ func schema_k8sio_api_storage_v1_CSINodeList(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(storagev1.CSINode{}.OpenAPIModelName()),
+										Ref: ref(storagev1.CSINode{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -55872,8 +55169,7 @@ func schema_k8sio_api_storage_v1_CSINodeSpec(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(storagev1.CSINodeDriver{}.OpenAPIModelName()),
+										Ref: ref(storagev1.CSINodeDriver{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -55986,8 +55282,7 @@ func schema_k8sio_api_storage_v1_CSIStorageCapacityList(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(storagev1.CSIStorageCapacity{}.OpenAPIModelName()),
+										Ref: ref(storagev1.CSIStorageCapacity{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -56046,9 +55341,8 @@ func schema_k8sio_api_storage_v1_StorageClass(ref common.ReferenceCallback) comm
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -56074,9 +55368,8 @@ func schema_k8sio_api_storage_v1_StorageClass(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -56109,8 +55402,7 @@ func schema_k8sio_api_storage_v1_StorageClass(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.TopologySelectorTerm{}.OpenAPIModelName()),
+										Ref: ref(corev1.TopologySelectorTerm{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -56160,8 +55452,7 @@ func schema_k8sio_api_storage_v1_StorageClassList(ref common.ReferenceCallback) 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(storagev1.StorageClass{}.OpenAPIModelName()),
+										Ref: ref(storagev1.StorageClass{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -56291,8 +55582,7 @@ func schema_k8sio_api_storage_v1_VolumeAttachmentList(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(storagev1.VolumeAttachment{}.OpenAPIModelName()),
+										Ref: ref(storagev1.VolumeAttachment{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -56397,9 +55687,8 @@ func schema_k8sio_api_storage_v1_VolumeAttachmentStatus(ref common.ReferenceCall
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -56470,9 +55759,8 @@ func schema_k8sio_api_storage_v1_VolumeAttributesClass(ref common.ReferenceCallb
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -56522,8 +55810,7 @@ func schema_k8sio_api_storage_v1_VolumeAttributesClassList(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(storagev1.VolumeAttributesClass{}.OpenAPIModelName()),
+										Ref: ref(storagev1.VolumeAttributesClass{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -56691,8 +55978,7 @@ func schema_k8sio_api_storage_v1alpha1_CSIStorageCapacityList(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(storagev1alpha1.CSIStorageCapacity{}.OpenAPIModelName()),
+										Ref: ref(storagev1alpha1.CSIStorageCapacity{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -56793,8 +56079,7 @@ func schema_k8sio_api_storage_v1alpha1_VolumeAttachmentList(ref common.Reference
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(storagev1alpha1.VolumeAttachment{}.OpenAPIModelName()),
+										Ref: ref(storagev1alpha1.VolumeAttachment{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -56899,9 +56184,8 @@ func schema_k8sio_api_storage_v1alpha1_VolumeAttachmentStatus(ref common.Referen
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -56972,9 +56256,8 @@ func schema_k8sio_api_storage_v1alpha1_VolumeAttributesClass(ref common.Referenc
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -57024,8 +56307,7 @@ func schema_k8sio_api_storage_v1alpha1_VolumeAttributesClassList(ref common.Refe
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(storagev1alpha1.VolumeAttributesClass{}.OpenAPIModelName()),
+										Ref: ref(storagev1alpha1.VolumeAttributesClass{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -57154,8 +56436,7 @@ func schema_k8sio_api_storage_v1beta1_CSIDriverList(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(storagev1beta1.CSIDriver{}.OpenAPIModelName()),
+										Ref: ref(storagev1beta1.CSIDriver{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -57203,9 +56484,8 @@ func schema_k8sio_api_storage_v1beta1_CSIDriverSpec(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -57237,8 +56517,7 @@ func schema_k8sio_api_storage_v1beta1_CSIDriverSpec(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(storagev1beta1.TokenRequest{}.OpenAPIModelName()),
+										Ref: ref(storagev1beta1.TokenRequest{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -57366,9 +56645,8 @@ func schema_k8sio_api_storage_v1beta1_CSINodeDriver(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -57424,8 +56702,7 @@ func schema_k8sio_api_storage_v1beta1_CSINodeList(ref common.ReferenceCallback) 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(storagev1beta1.CSINode{}.OpenAPIModelName()),
+										Ref: ref(storagev1beta1.CSINode{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -57464,8 +56741,7 @@ func schema_k8sio_api_storage_v1beta1_CSINodeSpec(ref common.ReferenceCallback) 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(storagev1beta1.CSINodeDriver{}.OpenAPIModelName()),
+										Ref: ref(storagev1beta1.CSINodeDriver{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -57578,8 +56854,7 @@ func schema_k8sio_api_storage_v1beta1_CSIStorageCapacityList(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(storagev1beta1.CSIStorageCapacity{}.OpenAPIModelName()),
+										Ref: ref(storagev1beta1.CSIStorageCapacity{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -57638,9 +56913,8 @@ func schema_k8sio_api_storage_v1beta1_StorageClass(ref common.ReferenceCallback)
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -57666,9 +56940,8 @@ func schema_k8sio_api_storage_v1beta1_StorageClass(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -57700,8 +56973,7 @@ func schema_k8sio_api_storage_v1beta1_StorageClass(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.TopologySelectorTerm{}.OpenAPIModelName()),
+										Ref: ref(corev1.TopologySelectorTerm{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -57751,8 +57023,7 @@ func schema_k8sio_api_storage_v1beta1_StorageClassList(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(storagev1beta1.StorageClass{}.OpenAPIModelName()),
+										Ref: ref(storagev1beta1.StorageClass{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -57882,8 +57153,7 @@ func schema_k8sio_api_storage_v1beta1_VolumeAttachmentList(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(storagev1beta1.VolumeAttachment{}.OpenAPIModelName()),
+										Ref: ref(storagev1beta1.VolumeAttachment{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -57988,9 +57258,8 @@ func schema_k8sio_api_storage_v1beta1_VolumeAttachmentStatus(ref common.Referenc
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -58061,9 +57330,8 @@ func schema_k8sio_api_storage_v1beta1_VolumeAttributesClass(ref common.Reference
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -58113,8 +57381,7 @@ func schema_k8sio_api_storage_v1beta1_VolumeAttributesClassList(ref common.Refer
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(storagev1beta1.VolumeAttributesClass{}.OpenAPIModelName()),
+										Ref: ref(storagev1beta1.VolumeAttributesClass{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -58269,8 +57536,7 @@ func schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigrationList(ref c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(storagemigrationv1beta1.StorageVersionMigration{}.OpenAPIModelName()),
+										Ref: ref(storagemigrationv1beta1.StorageVersionMigration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -58332,8 +57598,7 @@ func schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigrationStatus(ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
+										Ref: ref(metav1.Condition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -58728,8 +57993,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionList(ref common.Re
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1.CustomResourceDefinition{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1.CustomResourceDefinition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -58778,9 +58042,8 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionNames(ref common.R
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -58813,9 +58076,8 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionNames(ref common.R
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -58870,8 +58132,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionSpec(ref common.Re
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1.CustomResourceDefinitionVersion{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1.CustomResourceDefinitionVersion{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -58921,8 +58182,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionStatus(ref common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1.CustomResourceDefinitionCondition{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1.CustomResourceDefinitionCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -58947,9 +58207,8 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionStatus(ref common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -59039,8 +58298,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionVersion(ref common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1.CustomResourceColumnDefinition{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1.CustomResourceColumnDefinition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -59058,8 +58316,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionVersion(ref common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1.SelectableField{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1.SelectableField{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -59369,9 +58626,8 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -59393,8 +58649,7 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1.JSONSchemaProps{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1.JSONSchemaProps{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -59411,8 +58666,7 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1.JSONSchemaProps{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1.JSONSchemaProps{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -59429,8 +58683,7 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1.JSONSchemaProps{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1.JSONSchemaProps{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -59448,8 +58701,7 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1.JSONSchemaProps{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1.JSONSchemaProps{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -59467,8 +58719,7 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1.JSONSchemaProps{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1.JSONSchemaProps{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -59499,8 +58750,7 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1.JSONSchemaProps{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1.JSONSchemaProps{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -59555,9 +58805,8 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -59594,8 +58843,7 @@ func schema_pkg_apis_apiextensions_v1_JSONSchemaProps(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1.ValidationRule{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1.ValidationRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -59829,9 +59077,8 @@ func schema_pkg_apis_apiextensions_v1_WebhookConversion(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -60078,9 +59325,8 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceConversion(ref common.R
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -60240,8 +59486,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionList(ref comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1beta1.CustomResourceDefinition{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1beta1.CustomResourceDefinition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -60290,9 +59535,8 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionNames(ref com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -60325,9 +59569,8 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionNames(ref com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -60401,8 +59644,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionSpec(ref comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1beta1.CustomResourceDefinitionVersion{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1beta1.CustomResourceDefinitionVersion{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -60420,8 +59662,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionSpec(ref comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1beta1.CustomResourceColumnDefinition{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1beta1.CustomResourceColumnDefinition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -60439,8 +59680,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionSpec(ref comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1beta1.SelectableField{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1beta1.SelectableField{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -60490,8 +59730,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionStatus(ref co
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1beta1.CustomResourceDefinitionCondition{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1beta1.CustomResourceDefinitionCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -60516,9 +59755,8 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionStatus(ref co
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -60608,8 +59846,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionVersion(ref c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1beta1.CustomResourceColumnDefinition{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1beta1.CustomResourceColumnDefinition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -60627,8 +59864,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionVersion(ref c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1beta1.SelectableField{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1beta1.SelectableField{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -60938,9 +60174,8 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -60962,8 +60197,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1beta1.JSONSchemaProps{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1beta1.JSONSchemaProps{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -60980,8 +60214,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1beta1.JSONSchemaProps{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1beta1.JSONSchemaProps{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -60998,8 +60231,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1beta1.JSONSchemaProps{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1beta1.JSONSchemaProps{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -61017,8 +60249,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1beta1.JSONSchemaProps{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1beta1.JSONSchemaProps{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -61036,8 +60267,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1beta1.JSONSchemaProps{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1beta1.JSONSchemaProps{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -61068,8 +60298,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1beta1.JSONSchemaProps{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1beta1.JSONSchemaProps{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -61124,9 +60353,8 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -61163,8 +60391,7 @@ func schema_pkg_apis_apiextensions_v1beta1_JSONSchemaProps(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiextensionsv1beta1.ValidationRule{}.OpenAPIModelName()),
+										Ref: ref(apiextensionsv1beta1.ValidationRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -61462,8 +60689,7 @@ func schema_pkg_apis_meta_v1_APIGroup(ref common.ReferenceCallback) common.OpenA
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.GroupVersionForDiscovery{}.OpenAPIModelName()),
+										Ref: ref(metav1.GroupVersionForDiscovery{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -61488,8 +60714,7 @@ func schema_pkg_apis_meta_v1_APIGroup(ref common.ReferenceCallback) common.OpenA
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.ServerAddressByClientCIDR{}.OpenAPIModelName()),
+										Ref: ref(metav1.ServerAddressByClientCIDR{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -61537,8 +60762,7 @@ func schema_pkg_apis_meta_v1_APIGroupList(ref common.ReferenceCallback) common.O
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.APIGroup{}.OpenAPIModelName()),
+										Ref: ref(metav1.APIGroup{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -61613,9 +60837,8 @@ func schema_pkg_apis_meta_v1_APIResource(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -61633,9 +60856,8 @@ func schema_pkg_apis_meta_v1_APIResource(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -61653,9 +60875,8 @@ func schema_pkg_apis_meta_v1_APIResource(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -61716,8 +60937,7 @@ func schema_pkg_apis_meta_v1_APIResourceList(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.APIResource{}.OpenAPIModelName()),
+										Ref: ref(metav1.APIResource{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -61765,9 +60985,8 @@ func schema_pkg_apis_meta_v1_APIVersions(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -61785,8 +61004,7 @@ func schema_pkg_apis_meta_v1_APIVersions(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.ServerAddressByClientCIDR{}.OpenAPIModelName()),
+										Ref: ref(metav1.ServerAddressByClientCIDR{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -61834,9 +61052,8 @@ func schema_pkg_apis_meta_v1_ApplyOptions(ref common.ReferenceCallback) common.O
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -61959,9 +61176,8 @@ func schema_pkg_apis_meta_v1_CreateOptions(ref common.ReferenceCallback) common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -62047,9 +61263,8 @@ func schema_pkg_apis_meta_v1_DeleteOptions(ref common.ReferenceCallback) common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -62117,9 +61332,8 @@ func schema_pkg_apis_meta_v1_FieldSelectorRequirement(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -62402,9 +61616,8 @@ func schema_pkg_apis_meta_v1_LabelSelector(ref common.ReferenceCallback) common.
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -62422,8 +61635,7 @@ func schema_pkg_apis_meta_v1_LabelSelector(ref common.ReferenceCallback) common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.LabelSelectorRequirement{}.OpenAPIModelName()),
+										Ref: ref(metav1.LabelSelectorRequirement{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -62477,9 +61689,8 @@ func schema_pkg_apis_meta_v1_LabelSelectorRequirement(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -62852,9 +62063,8 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -62868,9 +62078,8 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -62893,8 +62102,7 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.OwnerReference{}.OpenAPIModelName()),
+										Ref: ref(metav1.OwnerReference{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -62913,9 +62121,8 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -62933,8 +62140,7 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.ManagedFieldsEntry{}.OpenAPIModelName()),
+										Ref: ref(metav1.ManagedFieldsEntry{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -63084,8 +62290,7 @@ func schema_pkg_apis_meta_v1_PartialObjectMetadataList(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.PartialObjectMetadata{}.OpenAPIModelName()),
+										Ref: ref(metav1.PartialObjectMetadata{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -63144,9 +62349,8 @@ func schema_pkg_apis_meta_v1_PatchOptions(ref common.ReferenceCallback) common.O
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -63225,9 +62429,8 @@ func schema_pkg_apis_meta_v1_RootPaths(ref common.ReferenceCallback) common.Open
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -63443,8 +62646,7 @@ func schema_pkg_apis_meta_v1_StatusDetails(ref common.ReferenceCallback) common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.StatusCause{}.OpenAPIModelName()),
+										Ref: ref(metav1.StatusCause{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -63505,8 +62707,7 @@ func schema_pkg_apis_meta_v1_Table(ref common.ReferenceCallback) common.OpenAPID
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.TableColumnDefinition{}.OpenAPIModelName()),
+										Ref: ref(metav1.TableColumnDefinition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -63524,8 +62725,7 @@ func schema_pkg_apis_meta_v1_Table(ref common.ReferenceCallback) common.OpenAPID
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.TableRow{}.OpenAPIModelName()),
+										Ref: ref(metav1.TableRow{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -63666,8 +62866,7 @@ func schema_pkg_apis_meta_v1_TableRow(ref common.ReferenceCallback) common.OpenA
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.TableRowCondition{}.OpenAPIModelName()),
+										Ref: ref(metav1.TableRowCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -63834,9 +63033,8 @@ func schema_pkg_apis_meta_v1_UpdateOptions(ref common.ReferenceCallback) common.
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -63926,8 +63124,7 @@ func schema_pkg_apis_meta_v1beta1_PartialObjectMetadataList(ref common.Reference
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metav1.PartialObjectMetadata{}.OpenAPIModelName()),
+										Ref: ref(metav1.PartialObjectMetadata{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -64128,8 +63325,7 @@ func schema_pkg_apis_testapigroup_v1_CarpList(ref common.ReferenceCallback) comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(testapigroupv1.Carp{}.OpenAPIModelName()),
+										Ref: ref(testapigroupv1.Carp{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -64180,9 +63376,8 @@ func schema_pkg_apis_testapigroup_v1_CarpSpec(ref common.ReferenceCallback) comm
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -64288,8 +63483,7 @@ func schema_pkg_apis_testapigroup_v1_CarpStatus(ref common.ReferenceCallback) co
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(testapigroupv1.CarpCondition{}.OpenAPIModelName()),
+										Ref: ref(testapigroupv1.CarpCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -64346,8 +63540,7 @@ func schema_pkg_apis_testapigroup_v1_CarpStatus(ref common.ReferenceCallback) co
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(testapigroupv1.CarpInfo{}.OpenAPIModelName()),
+										Ref: ref(testapigroupv1.CarpInfo{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -64677,9 +63870,8 @@ func schema_pkg_apis_audit_v1_Event(ref common.ReferenceCallback) common.OpenAPI
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -64736,9 +63928,8 @@ func schema_pkg_apis_audit_v1_Event(ref common.ReferenceCallback) common.OpenAPI
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -64786,8 +63977,7 @@ func schema_pkg_apis_audit_v1_EventList(ref common.ReferenceCallback) common.Ope
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(auditv1.Event{}.OpenAPIModelName()),
+										Ref: ref(auditv1.Event{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -64828,9 +64018,8 @@ func schema_pkg_apis_audit_v1_GroupResources(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -64848,9 +64037,8 @@ func schema_pkg_apis_audit_v1_GroupResources(ref common.ReferenceCallback) commo
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -64965,8 +64153,7 @@ func schema_pkg_apis_audit_v1_Policy(ref common.ReferenceCallback) common.OpenAP
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(auditv1.PolicyRule{}.OpenAPIModelName()),
+										Ref: ref(auditv1.PolicyRule{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -64984,9 +64171,8 @@ func schema_pkg_apis_audit_v1_Policy(ref common.ReferenceCallback) common.OpenAP
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -65041,8 +64227,7 @@ func schema_pkg_apis_audit_v1_PolicyList(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(auditv1.Policy{}.OpenAPIModelName()),
+										Ref: ref(auditv1.Policy{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -65084,9 +64269,8 @@ func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -65104,9 +64288,8 @@ func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -65124,9 +64307,8 @@ func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -65144,8 +64326,7 @@ func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(auditv1.GroupResources{}.OpenAPIModelName()),
+										Ref: ref(auditv1.GroupResources{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -65163,9 +64344,8 @@ func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -65183,9 +64363,8 @@ func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -65203,9 +64382,8 @@ func schema_pkg_apis_audit_v1_PolicyRule(ref common.ReferenceCallback) common.Op
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -65263,9 +64441,8 @@ func schema_server_flagz_api_v1alpha1_Flagz(ref common.ReferenceCallback) common
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -65315,9 +64492,8 @@ func schema_server_flagz_api_v1beta1_Flagz(ref common.ReferenceCallback) common.
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -65408,9 +64584,8 @@ func schema_server_statusz_api_v1alpha1_Statusz(ref common.ReferenceCallback) co
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -65502,9 +64677,8 @@ func schema_server_statusz_api_v1beta1_Statusz(ref common.ReferenceCallback) com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -66106,9 +65280,8 @@ func schema_k8sio_cloud_provider_config_v1alpha1_WebhookConfiguration(ref common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -66432,9 +65605,8 @@ func schema_k8sio_controller_manager_config_v1alpha1_GenericControllerManagerCon
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -66515,8 +65687,7 @@ func schema_k8sio_controller_manager_config_v1alpha1_LeaderMigrationConfiguratio
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(controllermanagerconfigv1alpha1.ControllerLeaderConfiguration{}.OpenAPIModelName()),
+										Ref: ref(controllermanagerconfigv1alpha1.ControllerLeaderConfiguration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -66610,8 +65781,7 @@ func schema_k8sio_controller_manager_config_v1beta1_LeaderMigrationConfiguration
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(configv1beta1.ControllerLeaderConfiguration{}.OpenAPIModelName()),
+										Ref: ref(configv1beta1.ControllerLeaderConfiguration{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -66763,8 +65933,7 @@ func schema_pkg_apis_apiregistration_v1_APIServiceList(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiregistrationv1.APIService{}.OpenAPIModelName()),
+										Ref: ref(apiregistrationv1.APIService{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -66874,8 +66043,7 @@ func schema_pkg_apis_apiregistration_v1_APIServiceStatus(ref common.ReferenceCal
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiregistrationv1.APIServiceCondition{}.OpenAPIModelName()),
+										Ref: ref(apiregistrationv1.APIServiceCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -67060,8 +66228,7 @@ func schema_pkg_apis_apiregistration_v1beta1_APIServiceList(ref common.Reference
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiregistrationv1beta1.APIService{}.OpenAPIModelName()),
+										Ref: ref(apiregistrationv1beta1.APIService{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -67171,8 +66338,7 @@ func schema_pkg_apis_apiregistration_v1beta1_APIServiceStatus(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(apiregistrationv1beta1.APIServiceCondition{}.OpenAPIModelName()),
+										Ref: ref(apiregistrationv1beta1.APIServiceCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -67610,8 +66776,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_GarbageCollectorContro
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(kubecontrollermanagerconfigv1alpha1.GroupResource{}.OpenAPIModelName()),
+										Ref: ref(kubecontrollermanagerconfigv1alpha1.GroupResource{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -68578,9 +67743,8 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConfiguration(ref common.R
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: false,
-										Type:    []string{"boolean"},
-										Format:  "",
+										Type:   []string{"boolean"},
+										Format: "",
 									},
 								},
 							},
@@ -68722,9 +67886,8 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConfiguration(ref common.R
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -68920,9 +68083,8 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyIPVSConfiguration(ref comm
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -69231,8 +68393,7 @@ func schema_k8sio_kube_scheduler_config_v1_Extender(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(configv1.ExtenderManagedResource{}.OpenAPIModelName()),
+										Ref: ref(configv1.ExtenderManagedResource{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -69502,8 +68663,7 @@ func schema_k8sio_kube_scheduler_config_v1_KubeSchedulerConfiguration(ref common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(configv1.KubeSchedulerProfile{}.OpenAPIModelName()),
+										Ref: ref(configv1.KubeSchedulerProfile{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -69521,8 +68681,7 @@ func schema_k8sio_kube_scheduler_config_v1_KubeSchedulerConfiguration(ref common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(configv1.Extender{}.OpenAPIModelName()),
+										Ref: ref(configv1.Extender{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -69586,8 +68745,7 @@ func schema_k8sio_kube_scheduler_config_v1_KubeSchedulerProfile(ref common.Refer
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(configv1.PluginConfig{}.OpenAPIModelName()),
+										Ref: ref(configv1.PluginConfig{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -69672,8 +68830,7 @@ func schema_k8sio_kube_scheduler_config_v1_NodeResourcesBalancedAllocationArgs(r
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(configv1.ResourceSpec{}.OpenAPIModelName()),
+										Ref: ref(configv1.ResourceSpec{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -69720,9 +68877,8 @@ func schema_k8sio_kube_scheduler_config_v1_NodeResourcesFitArgs(ref common.Refer
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -69740,9 +68896,8 @@ func schema_k8sio_kube_scheduler_config_v1_NodeResourcesFitArgs(ref common.Refer
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -69840,8 +68995,7 @@ func schema_k8sio_kube_scheduler_config_v1_PluginSet(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(configv1.Plugin{}.OpenAPIModelName()),
+										Ref: ref(configv1.Plugin{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -69862,8 +69016,7 @@ func schema_k8sio_kube_scheduler_config_v1_PluginSet(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(configv1.Plugin{}.OpenAPIModelName()),
+										Ref: ref(configv1.Plugin{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -70030,8 +69183,7 @@ func schema_k8sio_kube_scheduler_config_v1_PodTopologySpreadArgs(ref common.Refe
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.TopologySpreadConstraint{}.OpenAPIModelName()),
+										Ref: ref(corev1.TopologySpreadConstraint{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -70071,8 +69223,7 @@ func schema_k8sio_kube_scheduler_config_v1_RequestedToCapacityRatioParam(ref com
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(configv1.UtilizationShapePoint{}.OpenAPIModelName()),
+										Ref: ref(configv1.UtilizationShapePoint{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -70144,8 +69295,7 @@ func schema_k8sio_kube_scheduler_config_v1_ScoringStrategy(ref common.ReferenceC
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(configv1.ResourceSpec{}.OpenAPIModelName()),
+										Ref: ref(configv1.ResourceSpec{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -70235,8 +69385,7 @@ func schema_k8sio_kube_scheduler_config_v1_VolumeBindingArgs(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(configv1.UtilizationShapePoint{}.OpenAPIModelName()),
+										Ref: ref(configv1.UtilizationShapePoint{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -70285,9 +69434,8 @@ func schema_kubectl_pkg_config_v1alpha1_AliasOverride(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -70305,9 +69453,8 @@ func schema_kubectl_pkg_config_v1alpha1_AliasOverride(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -70325,8 +69472,7 @@ func schema_kubectl_pkg_config_v1alpha1_AliasOverride(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(pkgconfigv1alpha1.CommandOptionDefault{}.OpenAPIModelName()),
+										Ref: ref(pkgconfigv1alpha1.CommandOptionDefault{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -70368,8 +69514,7 @@ func schema_kubectl_pkg_config_v1alpha1_CommandDefaults(ref common.ReferenceCall
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(pkgconfigv1alpha1.CommandOptionDefault{}.OpenAPIModelName()),
+										Ref: ref(pkgconfigv1alpha1.CommandOptionDefault{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -70447,8 +69592,7 @@ func schema_kubectl_pkg_config_v1alpha1_Preference(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(pkgconfigv1alpha1.CommandDefaults{}.OpenAPIModelName()),
+										Ref: ref(pkgconfigv1alpha1.CommandDefaults{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -70466,8 +69610,7 @@ func schema_kubectl_pkg_config_v1alpha1_Preference(ref common.ReferenceCallback)
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(pkgconfigv1alpha1.AliasOverride{}.OpenAPIModelName()),
+										Ref: ref(pkgconfigv1alpha1.AliasOverride{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -70517,9 +69660,8 @@ func schema_kubectl_pkg_config_v1beta1_AliasOverride(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -70537,9 +69679,8 @@ func schema_kubectl_pkg_config_v1beta1_AliasOverride(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -70557,8 +69698,7 @@ func schema_kubectl_pkg_config_v1beta1_AliasOverride(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(pkgconfigv1beta1.CommandOptionDefault{}.OpenAPIModelName()),
+										Ref: ref(pkgconfigv1beta1.CommandOptionDefault{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -70627,8 +69767,7 @@ func schema_kubectl_pkg_config_v1beta1_CommandDefaults(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(pkgconfigv1beta1.CommandOptionDefault{}.OpenAPIModelName()),
+										Ref: ref(pkgconfigv1beta1.CommandOptionDefault{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -70706,8 +69845,7 @@ func schema_kubectl_pkg_config_v1beta1_Preference(ref common.ReferenceCallback) 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(pkgconfigv1beta1.CommandDefaults{}.OpenAPIModelName()),
+										Ref: ref(pkgconfigv1beta1.CommandDefaults{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -70725,8 +69863,7 @@ func schema_kubectl_pkg_config_v1beta1_Preference(ref common.ReferenceCallback) 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(pkgconfigv1beta1.AliasOverride{}.OpenAPIModelName()),
+										Ref: ref(pkgconfigv1beta1.AliasOverride{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -70751,8 +69888,7 @@ func schema_kubectl_pkg_config_v1beta1_Preference(ref common.ReferenceCallback) 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(pkgconfigv1beta1.AllowlistEntry{}.OpenAPIModelName()),
+										Ref: ref(pkgconfigv1beta1.AllowlistEntry{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -70789,9 +69925,8 @@ func schema_k8sio_kubelet_config_v1_CredentialProvider(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -70818,9 +69953,8 @@ func schema_k8sio_kubelet_config_v1_CredentialProvider(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -70833,8 +69967,7 @@ func schema_k8sio_kubelet_config_v1_CredentialProvider(ref common.ReferenceCallb
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(kubeletconfigv1.ExecEnvVar{}.OpenAPIModelName()),
+										Ref: ref(kubeletconfigv1.ExecEnvVar{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -70883,8 +70016,7 @@ func schema_k8sio_kubelet_config_v1_CredentialProviderConfig(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(kubeletconfigv1.CredentialProvider{}.OpenAPIModelName()),
+										Ref: ref(kubeletconfigv1.CredentialProvider{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -70969,9 +70101,8 @@ func schema_k8sio_kubelet_config_v1_ServiceAccountTokenAttributes(ref common.Ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -70989,9 +70120,8 @@ func schema_k8sio_kubelet_config_v1_ServiceAccountTokenAttributes(ref common.Ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -71026,9 +70156,8 @@ func schema_k8sio_kubelet_config_v1alpha1_CredentialProvider(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -71055,9 +70184,8 @@ func schema_k8sio_kubelet_config_v1alpha1_CredentialProvider(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -71070,8 +70198,7 @@ func schema_k8sio_kubelet_config_v1alpha1_CredentialProvider(ref common.Referenc
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(kubeletconfigv1alpha1.ExecEnvVar{}.OpenAPIModelName()),
+										Ref: ref(kubeletconfigv1alpha1.ExecEnvVar{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -71114,8 +70241,7 @@ func schema_k8sio_kubelet_config_v1alpha1_CredentialProviderConfig(ref common.Re
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(kubeletconfigv1alpha1.CredentialProvider{}.OpenAPIModelName()),
+										Ref: ref(kubeletconfigv1alpha1.CredentialProvider{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -71177,8 +70303,7 @@ func schema_k8sio_kubelet_config_v1alpha1_ImagePullCredentials(ref common.Refere
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(kubeletconfigv1alpha1.ImagePullSecret{}.OpenAPIModelName()),
+										Ref: ref(kubeletconfigv1alpha1.ImagePullSecret{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -71196,8 +70321,7 @@ func schema_k8sio_kubelet_config_v1alpha1_ImagePullCredentials(ref common.Refere
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(kubeletconfigv1alpha1.ImagePullServiceAccount{}.OpenAPIModelName()),
+										Ref: ref(kubeletconfigv1alpha1.ImagePullServiceAccount{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -71375,8 +70499,7 @@ func schema_k8sio_kubelet_config_v1alpha1_ImagePulledRecord(ref common.Reference
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(kubeletconfigv1alpha1.ImagePullCredentials{}.OpenAPIModelName()),
+										Ref: ref(kubeletconfigv1alpha1.ImagePullCredentials{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -71433,9 +70556,8 @@ func schema_k8sio_kubelet_config_v1beta1_CredentialProvider(ref common.Reference
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -71462,9 +70584,8 @@ func schema_k8sio_kubelet_config_v1beta1_CredentialProvider(ref common.Reference
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -71477,8 +70598,7 @@ func schema_k8sio_kubelet_config_v1beta1_CredentialProvider(ref common.Reference
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(kubeletconfigv1beta1.ExecEnvVar{}.OpenAPIModelName()),
+										Ref: ref(kubeletconfigv1beta1.ExecEnvVar{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -71521,8 +70641,7 @@ func schema_k8sio_kubelet_config_v1beta1_CredentialProviderConfig(ref common.Ref
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(kubeletconfigv1beta1.CredentialProvider{}.OpenAPIModelName()),
+										Ref: ref(kubeletconfigv1beta1.CredentialProvider{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -71584,8 +70703,7 @@ func schema_k8sio_kubelet_config_v1beta1_ImagePullCredentials(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(kubeletconfigv1beta1.ImagePullSecret{}.OpenAPIModelName()),
+										Ref: ref(kubeletconfigv1beta1.ImagePullSecret{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -71603,8 +70721,7 @@ func schema_k8sio_kubelet_config_v1beta1_ImagePullCredentials(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(kubeletconfigv1beta1.ImagePullServiceAccount{}.OpenAPIModelName()),
+										Ref: ref(kubeletconfigv1beta1.ImagePullServiceAccount{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -71782,8 +70899,7 @@ func schema_k8sio_kubelet_config_v1beta1_ImagePulledRecord(ref common.ReferenceC
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(kubeletconfigv1beta1.ImagePullCredentials{}.OpenAPIModelName()),
+										Ref: ref(kubeletconfigv1beta1.ImagePullCredentials{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -71959,9 +71075,8 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 										Items: &spec.SchemaOrArray{
 											Schema: &spec.Schema{
 												SchemaProps: spec.SchemaProps{
-													Default: "",
-													Type:    []string{"string"},
-													Format:  "",
+													Type:   []string{"string"},
+													Format: "",
 												},
 											},
 										},
@@ -72012,9 +71127,8 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -72027,9 +71141,8 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: 0,
-										Type:    []string{"integer"},
-										Format:  "int32",
+										Type:   []string{"integer"},
+										Format: "int32",
 									},
 								},
 							},
@@ -72103,9 +71216,8 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -72174,9 +71286,8 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -72296,9 +71407,8 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -72339,9 +71449,8 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -72355,9 +71464,8 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -72481,9 +71589,8 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -72497,9 +71604,8 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -72513,9 +71619,8 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -72542,9 +71647,8 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -72607,9 +71711,8 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: false,
-										Type:    []string{"boolean"},
-										Format:  "",
+										Type:   []string{"boolean"},
+										Format: "",
 									},
 								},
 							},
@@ -72671,9 +71774,8 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -72687,9 +71789,8 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -72730,9 +71831,8 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -72745,9 +71845,8 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -72814,8 +71913,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(kubeletconfigv1beta1.ShutdownGracePeriodByPodPriority{}.OpenAPIModelName()),
+										Ref: ref(kubeletconfigv1beta1.ShutdownGracePeriodByPodPriority{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -72835,8 +71933,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(kubeletconfigv1beta1.MemoryReservation{}.OpenAPIModelName()),
+										Ref: ref(kubeletconfigv1beta1.MemoryReservation{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -72884,8 +71981,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(corev1.Taint{}.OpenAPIModelName()),
+										Ref: ref(corev1.Taint{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -73405,8 +72501,7 @@ func schema_pkg_apis_custom_metrics_v1beta1_MetricValueList(ref common.Reference
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(custommetricsv1beta1.MetricValue{}.OpenAPIModelName()),
+										Ref: ref(custommetricsv1beta1.MetricValue{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -73588,8 +72683,7 @@ func schema_pkg_apis_custom_metrics_v1beta2_MetricValueList(ref common.Reference
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(custommetricsv1beta2.MetricValue{}.OpenAPIModelName()),
+										Ref: ref(custommetricsv1beta2.MetricValue{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -73641,9 +72735,8 @@ func schema_pkg_apis_external_metrics_v1beta1_ExternalMetricValue(ref common.Ref
 								Allows: true,
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: "",
-										Type:    []string{"string"},
-										Format:  "",
+										Type:   []string{"string"},
+										Format: "",
 									},
 								},
 							},
@@ -73711,8 +72804,7 @@ func schema_pkg_apis_external_metrics_v1beta1_ExternalMetricValueList(ref common
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(externalmetricsv1beta1.ExternalMetricValue{}.OpenAPIModelName()),
+										Ref: ref(externalmetricsv1beta1.ExternalMetricValue{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -73862,8 +72954,7 @@ func schema_pkg_apis_metrics_v1alpha1_NodeMetricsList(ref common.ReferenceCallba
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metricsv1alpha1.NodeMetrics{}.OpenAPIModelName()),
+										Ref: ref(metricsv1alpha1.NodeMetrics{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -73929,8 +73020,7 @@ func schema_pkg_apis_metrics_v1alpha1_PodMetrics(ref common.ReferenceCallback) c
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metricsv1alpha1.ContainerMetrics{}.OpenAPIModelName()),
+										Ref: ref(metricsv1alpha1.ContainerMetrics{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -73980,8 +73070,7 @@ func schema_pkg_apis_metrics_v1alpha1_PodMetricsList(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metricsv1alpha1.PodMetrics{}.OpenAPIModelName()),
+										Ref: ref(metricsv1alpha1.PodMetrics{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -74131,8 +73220,7 @@ func schema_pkg_apis_metrics_v1beta1_NodeMetricsList(ref common.ReferenceCallbac
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metricsv1beta1.NodeMetrics{}.OpenAPIModelName()),
+										Ref: ref(metricsv1beta1.NodeMetrics{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -74198,8 +73286,7 @@ func schema_pkg_apis_metrics_v1beta1_PodMetrics(ref common.ReferenceCallback) co
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metricsv1beta1.ContainerMetrics{}.OpenAPIModelName()),
+										Ref: ref(metricsv1beta1.ContainerMetrics{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -74249,8 +73336,7 @@ func schema_pkg_apis_metrics_v1beta1_PodMetricsList(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Default: map[string]interface{}{},
-										Ref:     ref(metricsv1beta1.PodMetrics{}.OpenAPIModelName()),
+										Ref: ref(metricsv1beta1.PodMetrics{}.OpenAPIModelName()),
 									},
 								},
 							},

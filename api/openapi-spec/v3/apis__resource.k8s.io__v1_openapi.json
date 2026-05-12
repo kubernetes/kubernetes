@@ -7,12 +7,7 @@
           "nodeSelectorTerms": {
             "description": "Required. A list of node selector terms. The terms are ORed.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorTerm"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorTerm"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -40,7 +35,6 @@
           "values": {
             "description": "An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. If the operator is Gt or Lt, the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -59,12 +53,7 @@
           "matchExpressions": {
             "description": "A list of node selector requirements by node's labels.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorRequirement"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorRequirement"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -72,12 +61,7 @@
           "matchFields": {
             "description": "A list of node selector requirements by node's fields.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorRequirement"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorRequirement"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -92,12 +76,7 @@
           "conditions": {
             "description": "Conditions contains the latest observation of the device's state. If the device has been configured according to the class and claim config references, the `Ready` condition should be True.\n\nMust not contain more than 8 entries.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
             },
             "type": "array",
             "x-kubernetes-list-map-keys": [
@@ -291,12 +270,7 @@
         "properties": {
           "counters": {
             "additionalProperties": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.Counter"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.Counter"
             },
             "description": "Counters defines the set of counters for this CounterSet The name of each counter must be unique in that set and must be a DNS label.\n\nThe maximum number of counters is 32.",
             "type": "object"
@@ -326,12 +300,7 @@
           },
           "attributes": {
             "additionalProperties": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceAttribute"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceAttribute"
             },
             "description": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
             "type": "object"
@@ -339,7 +308,6 @@
           "bindingConditions": {
             "description": "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -348,7 +316,6 @@
           "bindingFailureConditions": {
             "description": "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is set to \"True\", a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -360,12 +327,7 @@
           },
           "capacity": {
             "additionalProperties": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceCapacity"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceCapacity"
             },
             "description": "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
             "type": "object"
@@ -373,12 +335,7 @@
           "consumesCounters": {
             "description": "ConsumesCounters defines a list of references to sharedCounters and the set of counters that the device will consume from those counter sets.\n\nThere can only be a single entry per counterSet.\n\nThe maximum number of device counter consumptions per device is 2.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceCounterConsumption"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceCounterConsumption"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -390,12 +347,7 @@
           },
           "nodeAllocatableResourceMappings": {
             "additionalProperties": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.NodeAllocatableResourceMapping"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.NodeAllocatableResourceMapping"
             },
             "description": "NodeAllocatableResourceMappings defines the mapping of node resources that are managed by the DRA driver exposing this device. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages. In addition to standard requests made through the Pod `spec`, these resources can also be requested through claims and allocated by the DRA driver. For example, a CPU DRA driver might allocate exclusive CPUs or auxiliary node memory dependencies of an accelerator device. The keys of this map are the node-allocatable resource names (e.g., \"cpu\", \"memory\"). Extended resource names are not permitted as keys.",
             "type": "object"
@@ -415,12 +367,7 @@
           "taints": {
             "description": "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 16. If taints are set for any device in a ResourceSlice, then the maximum number of allowed devices per ResourceSlice is 64 instead of 128.\n\nThis is a beta field and requires enabling the DRADeviceTaints feature gate.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceTaint"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceTaint"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -445,7 +392,6 @@
           "requests": {
             "description": "Requests lists the names of requests where the configuration applies. If empty, its applies to all requests.\n\nReferences to subrequests must include the name of the main request and may include the subrequest using the format <main request>[/<subrequest>]. If just the main request is given, the configuration applies to all subrequests.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -468,12 +414,7 @@
           "config": {
             "description": "This field is a combination of all the claim and class configuration parameters. Drivers can distinguish between those based on a flag.\n\nThis includes configuration parameters for drivers which have no allocated devices in the result because it is up to the drivers which configuration parameters they support. They can silently ignore unknown configuration parameters.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceAllocationConfiguration"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceAllocationConfiguration"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -481,12 +422,7 @@
           "results": {
             "description": "Results lists all allocated devices.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceRequestAllocationResult"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceRequestAllocationResult"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -504,7 +440,6 @@
           "bools": {
             "description": "BoolValues is a non-empty list of true/false values.",
             "items": {
-              "default": false,
               "type": "boolean"
             },
             "type": "array",
@@ -518,7 +453,6 @@
           "ints": {
             "description": "IntValues is a non-empty list of numbers.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
             "items": {
-              "default": 0,
               "format": "int64",
               "type": "integer"
             },
@@ -532,7 +466,6 @@
           "strings": {
             "description": "StringValues is a non-empty list of strings. Each string must not be longer than 64 characters.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -545,7 +478,6 @@
           "versions": {
             "description": "VersionValues is a non-empty list of semantic versions according to semver.org spec 2.0.0. Each version string must not be longer than 64 characters.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -585,12 +517,7 @@
           "config": {
             "description": "This field holds configuration for multiple potential drivers which could satisfy requests in this claim. It is ignored while allocating the claim.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceClaimConfiguration"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceClaimConfiguration"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -598,12 +525,7 @@
           "constraints": {
             "description": "These constraints must be satisfied by the set of devices that get allocated for the claim.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceConstraint"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceConstraint"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -611,12 +533,7 @@
           "requests": {
             "description": "Requests represent individual requests for distinct devices which must all be satisfied. If empty, nothing needs to be allocated.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceRequest"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceRequest"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -638,7 +555,6 @@
           "requests": {
             "description": "Requests lists the names of requests where the configuration applies. If empty, it applies to all requests.\n\nReferences to subrequests must include the name of the main request and may include the subrequest using the format <main request>[/<subrequest>]. If just the main request is given, the configuration applies to all subrequests.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -710,12 +626,7 @@
           "items": {
             "description": "Items is the list of resource classes.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceClass"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceClass"
             },
             "type": "array"
           },
@@ -751,12 +662,7 @@
           "config": {
             "description": "Config defines configuration parameters that apply to each device that is claimed via this class. Some classses may potentially be satisfied by multiple drivers, so each instance of a vendor configuration applies to exactly one driver.\n\nThey are passed to the driver, but are not considered while allocating the claim.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceClassConfiguration"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceClassConfiguration"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -768,12 +674,7 @@
           "selectors": {
             "description": "Each selector must be satisfied by a device which is claimed via this class.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceSelector"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceSelector"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -795,7 +696,6 @@
           "requests": {
             "description": "Requests is a list of the one or more requests in this claim which must co-satisfy this constraint. If a request is fulfilled by multiple devices, then all of the devices must satisfy the constraint. If this is not specified, this constraint applies to all requests in this claim.\n\nReferences to subrequests must include the name of the main request and may include the subrequest using the format <main request>[/<subrequest>]. If just the main request is given, the constraint applies to all subrequests.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -814,12 +714,7 @@
           },
           "counters": {
             "additionalProperties": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.Counter"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.Counter"
             },
             "description": "Counters defines the counters that will be consumed by the device.\n\nThe maximum number of counters is 32.",
             "type": "object"
@@ -845,12 +740,7 @@
           "firstAvailable": {
             "description": "FirstAvailable contains subrequests, of which exactly one will be selected by the scheduler. It tries to satisfy them in the order in which they are listed here. So if there are two entries in the list, the scheduler will only check the second one if it determines that the first one can not be used.\n\nDRA does not yet implement scoring, so the scheduler will select the first set of devices that satisfies all the requests in the claim. And if the requirements can be satisfied on more than one node, other scheduling features will determine which node is chosen. This means that the set of devices allocated to a claim might not be the optimal set available to the cluster. Scoring will be implemented later.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceSubRequest"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceSubRequest"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -876,7 +766,6 @@
           "bindingConditions": {
             "description": "BindingConditions contains a copy of the BindingConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -885,7 +774,6 @@
           "bindingFailureConditions": {
             "description": "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -925,12 +813,7 @@
           "tolerations": {
             "description": "A copy of all tolerations specified in the request at the time when the device got allocated.\n\nThe maximum number of tolerations is 16.\n\nThis is a beta field and requires enabling the DRADeviceTaints feature gate.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceToleration"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceToleration"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -991,12 +874,7 @@
           "selectors": {
             "description": "Selectors define criteria which must be satisfied by a specific device in order for that device to be considered for this subrequest. All selectors must be satisfied for a device to be considered.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceSelector"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceSelector"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -1004,12 +882,7 @@
           "tolerations": {
             "description": "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis is a beta field and requires enabling the DRADeviceTaints feature gate.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceToleration"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceToleration"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -1113,12 +986,7 @@
           "selectors": {
             "description": "Selectors define criteria which must be satisfied by a specific device in order for that device to be considered for this request. All selectors must be satisfied for a device to be considered.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceSelector"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceSelector"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -1126,12 +994,7 @@
           "tolerations": {
             "description": "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis is a beta field and requires enabling the DRADeviceTaints feature gate.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceToleration"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.DeviceToleration"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -1156,7 +1019,6 @@
           "ips": {
             "description": "IPs lists the network addresses assigned to the device's network interface. This can include both IPv4 and IPv6 addresses. The IPs are in the CIDR notation, which includes both the address and the associated subnet mask. e.g.: \"192.0.2.5/24\" for IPv4 and \"2001:db8::5/64\" for IPv6.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -1294,12 +1156,7 @@
           "items": {
             "description": "Items is the list of resource claims.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.ResourceClaim"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.ResourceClaim"
             },
             "type": "array"
           },
@@ -1358,12 +1215,7 @@
           "devices": {
             "description": "Devices contains the status of each device allocated for this claim, as reported by the driver. This can include driver-specific information. Entries are owned by their respective drivers.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.AllocatedDeviceStatus"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.AllocatedDeviceStatus"
             },
             "type": "array",
             "x-kubernetes-list-map-keys": [
@@ -1377,12 +1229,7 @@
           "reservedFor": {
             "description": "ReservedFor indicates which entities are currently allowed to use the claim. A Pod which references a ResourceClaim which is not reserved for that Pod will not be started. A claim that is in use or might be in use because it has been reserved must not get deallocated.\n\nIn a cluster with multiple scheduler instances, two pods might get scheduled concurrently by different schedulers. When they reference the same ResourceClaim which already has reached its maximum number of consumers, only one pod can be scheduled.\n\nBoth schedulers try to add their pod to the claim.status.reservedFor field, but only the update that reaches the API server first gets stored. The other one fails with an error and the scheduler which issued it knows that it must put the pod back into the queue, waiting for the ResourceClaim to become usable again.\n\nThere can be at most 256 such reservations. This may get increased in the future, but not reduced.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.ResourceClaimConsumerReference"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.ResourceClaimConsumerReference"
             },
             "type": "array",
             "x-kubernetes-list-map-keys": [
@@ -1444,12 +1291,7 @@
           "items": {
             "description": "Items is the list of resource claim templates.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.ResourceClaimTemplate"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.ResourceClaimTemplate"
             },
             "type": "array"
           },
@@ -1583,12 +1425,7 @@
           "items": {
             "description": "Items is the list of resource ResourceSlices.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.ResourceSlice"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.ResourceSlice"
             },
             "type": "array"
           },
@@ -1628,12 +1465,7 @@
           "devices": {
             "description": "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries. If any device uses taints or consumes counters the limit is 64.\n\nOnly one of Devices and SharedCounters can be set in a ResourceSlice.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.Device"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.Device"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -1671,12 +1503,7 @@
           "sharedCounters": {
             "description": "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the counter sets must be unique in the ResourcePool.\n\nOnly one of Devices and SharedCounters can be set in a ResourceSlice.\n\nThe maximum number of counter sets is 8.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.resource.v1.CounterSet"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.resource.v1.CounterSet"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -1705,7 +1532,6 @@
           "categories": {
             "description": "categories is a list of the grouped resources this resource belongs to (e.g. 'all')",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -1733,7 +1559,6 @@
           "shortNames": {
             "description": "shortNames is a list of suggested short names of the resource.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -1751,7 +1576,6 @@
           "verbs": {
             "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array"
@@ -1789,12 +1613,7 @@
           "resources": {
             "description": "resources contains the name of the resources and if they are namespaced.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -1869,7 +1688,6 @@
           "dryRun": {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -2001,7 +1819,6 @@
         "properties": {
           "annotations": {
             "additionalProperties": {
-              "default": "",
               "type": "string"
             },
             "description": "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations",
@@ -2031,7 +1848,6 @@
           "finalizers": {
             "description": "Must be empty before the object is deleted from the registry. Each entry is an identifier for the responsible component that will remove the entry from the list. If the deletionTimestamp of the object is non-nil, entries in this list can only be removed. Finalizers may be processed and removed in any order.  Order is NOT enforced because it introduces significant risk of stuck finalizers. finalizers is a shared field, any actor with permission can reorder it. If the finalizer list is processed in order, then this can lead to a situation in which the component responsible for the first finalizer in the list is waiting for a signal (field value, external system, or other) produced by a component responsible for a finalizer later in the list, resulting in a deadlock. Without enforced ordering finalizers are free to order amongst themselves and are not vulnerable to ordering changes in the list.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -2049,7 +1865,6 @@
           },
           "labels": {
             "additionalProperties": {
-              "default": "",
               "type": "string"
             },
             "description": "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels",
@@ -2058,12 +1873,7 @@
           "managedFields": {
             "description": "ManagedFields maps workflow-id and version to the set of fields that are managed by that workflow. This is mostly for internal housekeeping, and users typically shouldn't need to set or understand this field. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". The set of fields is always in the version that the workflow used when modifying the object.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -2079,12 +1889,7 @@
           "ownerReferences": {
             "description": "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
             },
             "type": "array",
             "x-kubernetes-list-map-keys": [
@@ -2261,12 +2066,7 @@
           "causes": {
             "description": "The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.StatusCause"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.StatusCause"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
