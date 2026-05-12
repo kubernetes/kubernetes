@@ -173,37 +173,19 @@ const WaitString = "-w"
 // WaitSecondsValue a constant for specifying the default wait seconds
 const WaitSecondsValue = "5"
 
-// LockfilePath16x is the iptables 1.6.x lock file acquired by any process that's making any change in the iptable rule
-const LockfilePath16x = "/run/xtables.lock"
-
-// LockfilePath14x is the iptables 1.4.x lock file acquired by any process that's making any change in the iptable rule
-const LockfilePath14x = "@xtables"
-
 // runner implements Interface in terms of exec("iptables").
 type runner struct {
-	mu              sync.Mutex
-	exec            utilexec.Interface
-	protocol        Protocol
-	hasRandomFully  bool
-	lockfilePath14x string
-	lockfilePath16x string
+	mu             sync.Mutex
+	exec           utilexec.Interface
+	protocol       Protocol
+	hasRandomFully bool
 }
 
-// newInternal returns a new Interface which will exec iptables, and allows the
-// caller to change the iptables-restore lockfile path
-func newInternal(exec utilexec.Interface, protocol Protocol, lockfilePath14x, lockfilePath16x string) Interface {
-	if lockfilePath16x == "" {
-		lockfilePath16x = LockfilePath16x
-	}
-	if lockfilePath14x == "" {
-		lockfilePath14x = LockfilePath14x
-	}
-
+// newInternal returns a new Interface which will exec iptables
+func newInternal(exec utilexec.Interface, protocol Protocol) Interface {
 	runner := &runner{
-		exec:            exec,
-		protocol:        protocol,
-		lockfilePath14x: lockfilePath14x,
-		lockfilePath16x: lockfilePath16x,
+		exec:     exec,
+		protocol: protocol,
 	}
 
 	version, err := getIPTablesVersion(exec, protocol)
@@ -222,16 +204,16 @@ func newInternal(exec utilexec.Interface, protocol Protocol, lockfilePath14x, lo
 // Note that this function will return a single iptables Interface *and* an error, if only
 // a single family is supported.
 func New(protocol Protocol) Interface {
-	return newInternal(utilexec.New(), protocol, "", "")
+	return newInternal(utilexec.New(), protocol)
 }
 
 func newDualStackInternal(exec utilexec.Interface) map[v1.IPFamily]Interface {
 	interfaces := map[v1.IPFamily]Interface{}
-	iptv4 := newInternal(exec, ProtocolIPv4, "", "")
+	iptv4 := newInternal(exec, ProtocolIPv4)
 	if presentErr := iptv4.Present(); presentErr == nil {
 		interfaces[v1.IPv4Protocol] = iptv4
 	}
-	iptv6 := newInternal(exec, ProtocolIPv6, "", "")
+	iptv6 := newInternal(exec, ProtocolIPv6)
 	if presentErr := iptv6.Present(); presentErr == nil {
 		interfaces[v1.IPv6Protocol] = iptv6
 	}
@@ -380,10 +362,6 @@ func (runner *runner) RestoreAll(data []byte, flush FlushFlag, counters RestoreC
 	// setup args
 	args := make([]string, 0)
 	return runner.restoreInternal(args, data, flush, counters)
-}
-
-type iptablesLocker interface {
-	Close() error
 }
 
 // restoreInternal is the shared part of Restore/RestoreAll
