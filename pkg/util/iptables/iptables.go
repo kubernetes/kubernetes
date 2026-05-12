@@ -167,15 +167,6 @@ const NoFlushTables FlushFlag = false
 // used for port mapping to be fully randomized
 var RandomFullyMinVersion = utilversion.MustParseGeneric("1.6.2")
 
-// WaitMinVersion a minimum iptables versions supporting the -w and -w<seconds> flags
-var WaitMinVersion = utilversion.MustParseGeneric("1.4.20")
-
-// WaitSecondsMinVersion a minimum iptables versions supporting the wait seconds
-var WaitSecondsMinVersion = utilversion.MustParseGeneric("1.4.22")
-
-// WaitRestoreMinVersion a minimum iptables versions supporting the wait restore seconds
-var WaitRestoreMinVersion = utilversion.MustParseGeneric("1.6.2")
-
 // WaitString a constant for specifying the wait flag
 const WaitString = "-w"
 
@@ -194,8 +185,6 @@ type runner struct {
 	exec            utilexec.Interface
 	protocol        Protocol
 	hasRandomFully  bool
-	waitFlag        []string
-	restoreWaitFlag []string
 	lockfilePath14x string
 	lockfilePath16x string
 }
@@ -226,8 +215,6 @@ func newInternal(exec utilexec.Interface, protocol Protocol, lockfilePath14x, lo
 	}
 
 	runner.hasRandomFully = version.AtLeast(RandomFullyMinVersion)
-	runner.waitFlag = getIPTablesWaitFlag(version)
-	runner.restoreWaitFlag = getIPTablesRestoreWaitFlag(version, exec, protocol)
 	return runner
 }
 
@@ -414,24 +401,8 @@ func (runner *runner) restoreInternal(args []string, data []byte, flush FlushFla
 		args = append(args, "--counters")
 	}
 
-	// Grab the iptables lock to prevent iptables-restore and iptables
-	// from stepping on each other.  iptables-restore 1.6.2 will have
-	// a --wait option like iptables itself, but that's not widely deployed.
-	if len(runner.restoreWaitFlag) == 0 {
-		locker, err := grabIptablesLocks(runner.lockfilePath14x, runner.lockfilePath16x)
-		if err != nil {
-			return err
-		}
-		trace.Step("Locks grabbed")
-		defer func(locker iptablesLocker) {
-			if err := locker.Close(); err != nil {
-				klog.ErrorS(err, "Failed to close iptables locks")
-			}
-		}(locker)
-	}
-
 	// run the command and return the output or an error including the output and error
-	fullArgs := append(runner.restoreWaitFlag, args...)
+	fullArgs := append([]string{WaitString, WaitSecondsValue}, args...)
 	iptablesRestoreCmd := iptablesRestoreCommand(runner.protocol)
 	klog.V(4).InfoS("Running", "command", iptablesRestoreCmd, "arguments", fullArgs)
 	cmd := runner.exec.Command(iptablesRestoreCmd, fullArgs...)
@@ -474,8 +445,7 @@ func (runner *runner) run(op operation, args []string) ([]byte, error) {
 
 func (runner *runner) runContext(ctx context.Context, op operation, args []string) ([]byte, error) {
 	iptablesCmd := iptablesCommand(runner.protocol)
-	fullArgs := append(runner.waitFlag, string(op))
-	fullArgs = append(fullArgs, args...)
+	fullArgs := append([]string{WaitString, WaitSecondsValue, string(op)}, args...)
 	klog.V(5).InfoS("Running", "command", iptablesCmd, "arguments", fullArgs)
 	if ctx == nil {
 		return runner.exec.Command(iptablesCmd, fullArgs...).CombinedOutput()
@@ -617,61 +587,6 @@ func getIPTablesVersion(exec utilexec.Interface, protocol Protocol) (*utilversio
 	}
 
 	return version, nil
-}
-
-// Checks if iptables version has a "wait" flag
-func getIPTablesWaitFlag(version *utilversion.Version) []string {
-	switch {
-	case version.AtLeast(WaitSecondsMinVersion):
-		return []string{WaitString, WaitSecondsValue}
-	case version.AtLeast(WaitMinVersion):
-		return []string{WaitString}
-	default:
-		return nil
-	}
-}
-
-// Checks if iptables-restore has a "wait" flag
-func getIPTablesRestoreWaitFlag(version *utilversion.Version, exec utilexec.Interface, protocol Protocol) []string {
-	if version.AtLeast(WaitRestoreMinVersion) {
-		return []string{WaitString, WaitSecondsValue}
-	}
-
-	// Older versions may have backported features; if iptables-restore supports
-	// --version, assume it also supports --wait
-	vstring, err := getIPTablesRestoreVersionString(exec, protocol)
-	if err != nil || vstring == "" {
-		klog.V(3).InfoS("Couldn't get iptables-restore version; assuming it doesn't support --wait")
-		return nil
-	}
-	if _, err := utilversion.ParseGeneric(vstring); err != nil {
-		klog.V(3).InfoS("Couldn't parse iptables-restore version; assuming it doesn't support --wait")
-		return nil
-	}
-	return []string{WaitString}
-}
-
-// getIPTablesRestoreVersionString runs "iptables-restore --version" to get the version string
-// in the form "X.X.X"
-func getIPTablesRestoreVersionString(exec utilexec.Interface, protocol Protocol) (string, error) {
-	// this doesn't access mutable state so we don't need to use the interface / runner
-
-	// iptables-restore hasn't always had --version, and worse complains
-	// about unrecognized commands but doesn't exit when it gets them.
-	// Work around that by setting stdin to nothing so it exits immediately.
-	iptablesRestoreCmd := iptablesRestoreCommand(protocol)
-	cmd := exec.Command(iptablesRestoreCmd, "--version")
-	cmd.SetStdin(bytes.NewReader([]byte{}))
-	bytes, err := cmd.CombinedOutput()
-	if err != nil {
-		return "", err
-	}
-	versionMatcher := regexp.MustCompile(iptablesVersionPattern)
-	match := versionMatcher.FindStringSubmatch(string(bytes))
-	if match == nil {
-		return "", fmt.Errorf("no iptables version found in string: %s", bytes)
-	}
-	return match[1], nil
 }
 
 func (runner *runner) HasRandomFully() bool {
