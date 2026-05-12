@@ -236,13 +236,31 @@ ret=0
 # to ensure that modules that aren't part of the workspace and/or are
 # not dependencies are checked too.
 # . and staging are listed explicitly here to avoid _output
-for module in ./go.mod ./staging/**/go.mod; do
-  module="${module%/go.mod}"
-  if [ -d "$module/hack" ]; then
-    kube::util::run-in "$module" run-checks "hack/verify-*.sh" bash
-    kube::util::run-in "$module" run-checks "hack/verify-*.py" python3
+# Wrap each script in a single juLog testcase across all modules.
+function run-across-modules {
+  local script
+  script="$(basename "$1")"
+  local runner
+  if [[ "$script" == *.py ]]; then
+    runner=python3
+  else
+    runner=bash
   fi
-done
+  local rc=0
+  for module in ./go.mod ./staging/**/go.mod; do
+    module="${module%/go.mod}"
+    if [[ ! -f "$module/hack/$script" ]]; then
+      continue
+    fi
+    echo "=== ${module#./} ==="
+    if ! kube::util::run-in "$module" "$runner" "hack/$script"; then
+      rc=1
+    fi
+  done
+  return "$rc"
+}
+run-checks "hack/verify-*.sh" run-across-modules
+run-checks "hack/verify-*.py" run-across-modules
 missing-target-checks
 
 if [[ ${ret} -eq 1 ]]; then
