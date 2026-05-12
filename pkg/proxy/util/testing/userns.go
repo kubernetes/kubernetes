@@ -1,4 +1,4 @@
-//go:build linux
+//go:build linux && usernstest
 
 /*
 Copyright The Kubernetes Authors.
@@ -82,7 +82,7 @@ func RunInUserNS(t *testing.T, f func(t *testing.T), extraFlags ...uintptr) {
 	}
 
 	if !UsernsSupported() {
-		t.Skip("skipping: unprivileged user namespaces are not available on this host " +
+		t.Fail("unprivileged user namespaces are not available on this host " +
 			"(on Ubuntu 24.04: sysctl -w kernel.apparmor_restrict_unprivileged_userns=0)")
 	}
 
@@ -119,4 +119,3 @@ func RunInUserNS(t *testing.T, f func(t *testing.T), extraFlags ...uintptr) {
 		t.Fatalf("userns subprocess failed: %v", err)
 	}
 }
-
