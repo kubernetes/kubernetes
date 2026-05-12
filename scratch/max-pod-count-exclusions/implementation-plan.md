@@ -25,7 +25,7 @@
      - target: use `+0` for exempt incoming pods and `+1` for normal pods.
    - Update all internal callers (`Filter`, `Fits`, and `isFit`) to pass the right value.
 
-5. Keep kubelet admission aligned through shared AdmissionCheck path
+5. ~~Keep kubelet admission aligned through shared AdmissionCheck path~~ **(done — see `step-5-handoff.md`)**
    - Files: `pkg/scheduler/eventhandlers.go`, `pkg/kubelet/lifecycle/predicate.go` (minimal or no direct logic change expected)
    - Validate that `scheduler.AdmissionCheck(...)` still routes to `noderesources.Fits(...)` and now benefits from the same exemption decision.
    - Only adjust function calls/signatures in `AdmissionCheck(...)` if needed due to `Fits(...)` API changes.

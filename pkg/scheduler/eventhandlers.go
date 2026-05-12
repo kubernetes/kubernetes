@@ -645,6 +645,15 @@ func preCheckForNode(nodeInfo *framework.NodeInfo) queue.PreEnqueueCheck {
 // and returns the failure reasons. It's used in kubelet(pkg/kubelet/lifecycle/predicate.go) and scheduler.
 // It returns the first failure if `includeAllFailures` is set to false; otherwise
 // returns all failures.
+//
+// The pod-count exemption opt-in (see noderesources.ExcludeFromMaxPodCountAnnotationKey
+// and noderesources.isExcludedFromMaxPodCount) is honoured here transparently:
+// noderesources.Fits below resolves the annotation inside
+// computePodResourceRequest and feeds the resulting flag into fitsRequest's
+// allowedPodNumber check. Both the scheduler filter path and the kubelet
+// admission path go through this function, so they share a single source of
+// truth for the exemption decision -- there is intentionally no kubelet-only
+// branch.
 func AdmissionCheck(pod *v1.Pod, nodeInfo *framework.NodeInfo, includeAllFailures bool) []AdmissionResult {
 	var admissionResults []AdmissionResult
 	insufficientResources := noderesources.Fits(pod, nodeInfo, noderesources.ResourceRequestsOptions{
