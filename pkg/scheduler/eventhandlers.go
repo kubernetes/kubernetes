@@ -519,8 +519,9 @@ func addAllEventHandlers(
 
 	for gvk, at := range gvkMap {
 		switch gvk {
-		case fwk.Node, fwk.Pod:
-			// Do nothing.
+		case fwk.Node, fwk.Pod, fwk.AssignedPod, fwk.UnscheduledPod, fwk.TargetPod:
+			// Do nothing. Pod sub-types (AssignedPod, UnscheduledPod, TargetPod)
+			// share the Pod informer registered separately and don't need their own handler.
 		case fwk.CSINode:
 			if handlerRegistration, err = informerFactory.Storage().V1().CSINodes().Informer().AddEventHandler(
 				buildEvtResHandler(at, fwk.CSINode),
