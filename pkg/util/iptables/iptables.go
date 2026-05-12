@@ -30,7 +30,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	utilexec "k8s.io/utils/exec"
@@ -175,14 +174,6 @@ func newInternal(exec utilexec.Interface, protocol Protocol) Interface {
 	runner := &runner{
 		exec:     exec,
 		protocol: protocol,
-	}
-
-	_, err := getIPTablesVersion(exec, protocol)
-	if err != nil {
-		// The only likely error is "no such file or directory", in which case any
-		// further commands will fail the same way, so we don't need to do
-		// anything special here.
-		return runner
 	}
 
 	return runner
@@ -530,29 +521,6 @@ const (
 
 func makeFullArgs(table Table, chain Chain, args ...string) []string {
 	return append([]string{string(chain), "-t", string(table)}, args...)
-}
-
-const iptablesVersionPattern = `v([0-9]+(\.[0-9]+)+)`
-
-// getIPTablesVersion runs "iptables --version" and parses the returned version
-func getIPTablesVersion(exec utilexec.Interface, protocol Protocol) (*utilversion.Version, error) {
-	// this doesn't access mutable state so we don't need to use the interface / runner
-	iptablesCmd := iptablesCommand(protocol)
-	bytes, err := exec.Command(iptablesCmd, "--version").CombinedOutput()
-	if err != nil {
-		return nil, err
-	}
-	versionMatcher := regexp.MustCompile(iptablesVersionPattern)
-	match := versionMatcher.FindStringSubmatch(string(bytes))
-	if match == nil {
-		return nil, fmt.Errorf("no iptables version found in string: %s", bytes)
-	}
-	version, err := utilversion.ParseGeneric(match[1])
-	if err != nil {
-		return nil, fmt.Errorf("iptables version %q is not a valid version string: %v", match[1], err)
-	}
-
-	return version, nil
 }
 
 // Present tests if iptable is supported on current kernel by checking the existence
