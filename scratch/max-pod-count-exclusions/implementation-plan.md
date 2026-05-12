@@ -54,7 +54,7 @@
      - exempt pod is admitted (or at least not rejected for pod-count)
    - Keep coverage focused on admission result mapping and avoid duplicating scheduler tests.
 
-9. Add policy and rollout artifacts (recommended for production)
+9. ~~Add policy and rollout artifacts (recommended for production)~~ **(done — see `step-9-handoff.md`)**
    - Add an admission policy (in your cluster config repo, not necessarily this code repo) to:
      - enforce immutable exemption annotation
      - restrict usage to trusted namespaces/service accounts

@@ -1,0 +1,177 @@
+# Reference ValidatingAdmissionPolicy for the
+# kubelet.datadoghq.com/exclude-from-max-pods annotation.
+#
+# This file is intended to be lifted into the cluster-config repo (Datadog:
+# k8s-resources / equivalent) and adapted to the cluster's allow-list. It is
+# kept in this repo as a reference artifact alongside the in-tree contract
+# so future reviewers chasing the exemption from either side find the
+# matching policy shape.
+#
+# What this enforces, in order of importance:
+#
+#   1. Annotation is immutable post-creation. UPDATE operations that change
+#      or remove the annotation value are rejected.
+#   2. Only an explicit allow-list of namespaces may carry the annotation.
+#   3. Only an explicit allow-list of service accounts may set the
+#      annotation on CREATE.
+#
+# What this does NOT enforce (operators must layer separately if needed):
+#   - The exemption's pre-flight checks (CNI/IPAM capacity, conntrack,
+#     kubelet --max-pods) — those are infrastructure concerns, not pod-spec
+#     concerns. See design-note.md §2.
+#   - Audit-log scraping for exemption use — configure via apiserver audit
+#     policy. See design-note.md §3b.
+#
+# Tested against Kubernetes 1.30+ (ValidatingAdmissionPolicy GA). For
+# clusters on older versions, port the same CEL expressions into an
+# admission webhook (e.g. kyverno, gatekeeper, or a bespoke webhook).
+#
+# IMPORTANT: ship this with failurePolicy: Fail. failurePolicy: Ignore
+# silently widens the trust boundary during an admission outage.
+
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: exclude-from-max-pods-annotation
+  annotations:
+    # Cross-link to the in-tree contract so reviewers can chase from either
+    # side.
+    contract.datadoghq.com/source: "pkg/scheduler/framework/plugins/noderesources/fit.go::ExcludeFromMaxPodCountAnnotationKey"
+    contract.datadoghq.com/design-note: "scratch/max-pod-count-exclusions/design-note.md"
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+  paramKind:
+    apiVersion: v1
+    kind: ConfigMap
+  variables:
+    - name: annotationKey
+      expression: "'kubelet.datadoghq.com/exclude-from-max-pods'"
+    - name: incomingValue
+      # Empty string if absent. Used uniformly across CREATE/UPDATE branches.
+      expression: |
+        has(object.metadata.annotations) &&
+        variables.annotationKey in object.metadata.annotations
+          ? object.metadata.annotations[variables.annotationKey] : ''
+    - name: previousValue
+      expression: |
+        request.operation == 'UPDATE' &&
+        has(oldObject.metadata.annotations) &&
+        variables.annotationKey in oldObject.metadata.annotations
+          ? oldObject.metadata.annotations[variables.annotationKey] : ''
+    - name: allowedNamespaces
+      # ConfigMap key 'allowedNamespaces' is a comma-separated list. We
+      # tolerate whitespace.
+      expression: |
+        has(params.data) && 'allowedNamespaces' in params.data
+          ? params.data.allowedNamespaces.split(',').map(s, s.trim())
+          : []
+    - name: allowedServiceAccounts
+      # Same shape as allowedNamespaces. Entries are
+      # "<namespace>/<serviceAccountName>".
+      expression: |
+        has(params.data) && 'allowedServiceAccounts' in params.data
+          ? params.data.allowedServiceAccounts.split(',').map(s, s.trim())
+          : []
+    - name: requestSA
+      # system:serviceaccount:<ns>:<sa>  ->  <ns>/<sa>
+      # For non-SA users this remains the original username, which will not
+      # match any "<ns>/<sa>" allow-list entry — i.e. fail-closed.
+      expression: |
+        request.userInfo.username.startsWith('system:serviceaccount:')
+          ? request.userInfo.username.substring('system:serviceaccount:'.size())
+              .replace(':', '/')
+          : request.userInfo.username
+  validations:
+    # 1. Annotation is immutable post-creation.
+    - expression: |
+        !(request.operation == 'UPDATE' &&
+          variables.incomingValue != variables.previousValue)
+      reason: Forbidden
+      messageExpression: |
+        'annotation ' + variables.annotationKey +
+        ' is immutable; cannot change "' + variables.previousValue +
+        '" -> "' + variables.incomingValue + '"'
+
+    # 2. If the annotation is set, the namespace must be on the allow-list.
+    #    (Empty allow-list -> all annotated pods rejected. This is intended:
+    #    the policy ships in deny-all mode and operators opt clusters in.)
+    - expression: |
+        variables.incomingValue == '' ||
+        object.metadata.namespace in variables.allowedNamespaces
+      reason: Forbidden
+      messageExpression: |
+        'namespace ' + object.metadata.namespace +
+        ' is not authorised to use ' + variables.annotationKey +
+        '; allow-list is managed via the policy ConfigMap parameter'
+
+    # 3. On CREATE with the annotation set, the requesting service account
+    #    must be on the allow-list. On UPDATE we already enforced
+    #    immutability, so we do not re-check the SA (otherwise a kubelet
+    #    status update from a non-allowed SA would be rejected just for
+    #    carrying the unchanged annotation).
+    - expression: |
+        !(request.operation == 'CREATE' && variables.incomingValue != '') ||
+        variables.requestSA in variables.allowedServiceAccounts
+      reason: Forbidden
+      messageExpression: |
+        'service account ' + variables.requestSA +
+        ' is not authorised to set ' + variables.annotationKey +
+        '; allow-list is managed via the policy ConfigMap parameter'
+
+    # 4. Only the literal "true" is meaningful in-tree (see contract.md §1).
+    #    Reject anything else proactively so operators do not ship pods that
+    #    look exempt but are not. This is a UX guardrail, not a security one.
+    - expression: |
+        variables.incomingValue == '' ||
+        variables.incomingValue == 'true'
+      reason: Invalid
+      messageExpression: |
+        'annotation ' + variables.annotationKey +
+        ' only accepts the literal value "true"; received "' +
+        variables.incomingValue + '"'
+
+---
+# Parameter ConfigMap. Edit the data fields to grant a namespace / SA the
+# ability to use the exemption. Both lists are comma-separated; whitespace
+# around entries is tolerated.
+#
+# Ship this with both lists EMPTY in production and add entries via
+# explicit, reviewable PRs. The empty default means the policy is in
+# deny-all mode the moment it lands — no workload can accidentally use the
+# exemption before the operator has explicitly authorised it.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: exclude-from-max-pods-allowlist
+  namespace: kube-system
+data:
+  allowedNamespaces: ""
+  allowedServiceAccounts: ""
+
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: exclude-from-max-pods-annotation
+spec:
+  policyName: exclude-from-max-pods-annotation
+  validationActions:
+    - Deny
+    # Audit produces an annotation on the admission decision that surfaces
+    # in the audit log. Keep this on even after the policy is stable so
+    # the audit trail captures every exemption-related decision.
+    - Audit
+  paramRef:
+    name: exclude-from-max-pods-allowlist
+    namespace: kube-system
+    parameterNotFoundAction: Deny
+  # Apply to all pods. Per-pod scoping is via the annotation itself, not via
+  # label selectors on the binding — using a selector here would let a
+  # caller un-bind the policy from their pod by removing a label.
