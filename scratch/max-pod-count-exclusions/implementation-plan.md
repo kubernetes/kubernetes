@@ -40,7 +40,7 @@
      - malformed annotation values treated as non-exempt
    - Ensure tests cover `Filter` and direct `Fits(...)` paths.
 
-7. Add admission-check tests to verify kubelet-visible behavior
+7. ~~Add admission-check tests to verify kubelet-visible behavior~~ **(done — see `step-7-handoff.md`)**
    - File: `pkg/scheduler/eventhandlers_test.go`
    - Add/extend `TestAdmissionCheck` cases that show:
      - `AdmissionCheck(...)` returns pod-limit failure for normal pod

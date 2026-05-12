@@ -613,6 +613,10 @@ func TestAdmissionCheck(t *testing.T) {
 	nodenameError := AdmissionResult{Name: nodename.Name, Reason: nodename.ErrReason}
 	nodeportsError := AdmissionResult{Name: nodeports.Name, Reason: nodeports.ErrReason}
 	podOverheadError := AdmissionResult{InsufficientResource: &noderesources.InsufficientResource{ResourceName: v1.ResourceCPU, Reason: "Insufficient cpu", Requested: 2000, Used: 7000, Capacity: 8000}}
+	tooManyPodsError := AdmissionResult{InsufficientResource: &noderesources.InsufficientResource{ResourceName: v1.ResourcePods, Reason: "Too many pods", Requested: 1, Used: 1, Capacity: 1}}
+	// onePod sets the node's pod capacity (and allocatable) to 1, so a single
+	// existing pod saturates the pod-count dimension.
+	onePod := map[v1.ResourceName]string{v1.ResourcePods: "1"}
 	cpu := map[v1.ResourceName]string{v1.ResourceCPU: "8"}
 	tests := []struct {
 		name                 string
@@ -647,6 +651,47 @@ func TestAdmissionCheck(t *testing.T) {
 				st.MakePod().Name("pod1").HostPort(80).Node("fake-node").Obj(),
 			},
 			wantAdmissionResults: [][]AdmissionResult{{nodenameError, nodeportsError}, {nodenameError}},
+		},
+		{
+			// Baseline: a non-exempt pod arriving at a node whose pod-count
+			// cap is already saturated must be rejected with the standard
+			// "Too many pods" InsufficientResource entry from noderesources.
+			// This pins the kubelet-visible failure shape that the exemption
+			// case below has to suppress.
+			name: "pod-count exemption: normal pod rejected when node is at pod cap",
+			node: st.MakeNode().Name("fake-node").Capacity(onePod).Obj(),
+			pod:  st.MakePod().Name("pod2").Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Node("fake-node").Obj(),
+			},
+			wantAdmissionResults: [][]AdmissionResult{{tooManyPodsError}, {tooManyPodsError}},
+		},
+		{
+			// Feature: a pod carrying the exemption annotation with the
+			// truthy value MUST NOT be rejected for pod-count even when the
+			// node is already at its pod cap. AdmissionCheck is the shared
+			// seam between scheduler and kubelet, so an empty result here
+			// is what proves the exemption is honoured on the kubelet path.
+			name: "pod-count exemption: exempt pod admitted when node is at pod cap",
+			node: st.MakeNode().Name("fake-node").Capacity(onePod).Obj(),
+			pod:  st.MakePod().Name("pod2").Annotation(noderesources.ExcludeFromMaxPodCountAnnotationKey, "true").Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Node("fake-node").Obj(),
+			},
+			wantAdmissionResults: [][]AdmissionResult{nil, nil},
+		},
+		{
+			// Guardrail: the exemption is fail-closed -- only the literal
+			// "true" opts in. A non-truthy annotation value must leave the
+			// pod-count check fully in effect, mirroring the helper-level
+			// coverage in fit_test.go but exercised through AdmissionCheck.
+			name: "pod-count exemption: malformed annotation value is non-exempt",
+			node: st.MakeNode().Name("fake-node").Capacity(onePod).Obj(),
+			pod:  st.MakePod().Name("pod2").Annotation(noderesources.ExcludeFromMaxPodCountAnnotationKey, "True").Obj(),
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("pod1").Node("fake-node").Obj(),
+			},
+			wantAdmissionResults: [][]AdmissionResult{{tooManyPodsError}, {tooManyPodsError}},
 		},
 	}
 	for _, tt := range tests {
