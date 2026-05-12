@@ -30,7 +30,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
@@ -164,11 +163,6 @@ const FlushTables FlushFlag = true
 // NoFlushTables a boolean false constant for option flag FlushFlag
 const NoFlushTables FlushFlag = false
 
-// MinCheckVersion minimum version to be checked
-// Versions of iptables less than this do not support the -C / --check flag
-// (test whether a rule exists).
-var MinCheckVersion = utilversion.MustParseGeneric("1.4.11")
-
 // RandomFullyMinVersion is the minimum version from which the --random-fully flag is supported,
 // used for port mapping to be fully randomized
 var RandomFullyMinVersion = utilversion.MustParseGeneric("1.6.2")
@@ -199,7 +193,6 @@ type runner struct {
 	mu              sync.Mutex
 	exec            utilexec.Interface
 	protocol        Protocol
-	hasCheck        bool
 	hasRandomFully  bool
 	waitFlag        []string
 	restoreWaitFlag []string
@@ -232,7 +225,6 @@ func newInternal(exec utilexec.Interface, protocol Protocol, lockfilePath14x, lo
 		return runner
 	}
 
-	runner.hasCheck = version.AtLeast(MinCheckVersion)
 	runner.hasRandomFully = version.AtLeast(RandomFullyMinVersion)
 	runner.waitFlag = getIPTablesWaitFlag(version)
 	runner.restoreWaitFlag = getIPTablesRestoreWaitFlag(version, exec, protocol)
@@ -322,7 +314,7 @@ func (runner *runner) EnsureRule(position RulePosition, table Table, chain Chain
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
 
-	exists, err := runner.checkRule(table, chain, args...)
+	exists, err := runner.checkRule(fullArgs)
 	if err != nil {
 		return false, err
 	}
@@ -343,7 +335,7 @@ func (runner *runner) DeleteRule(table Table, chain Chain, args ...string) error
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
 
-	exists, err := runner.checkRule(table, chain, args...)
+	exists, err := runner.checkRule(fullArgs)
 	if err != nil {
 		return err
 	}
@@ -494,71 +486,7 @@ func (runner *runner) runContext(ctx context.Context, op operation, args []strin
 
 // Returns (bool, nil) if it was able to check the existence of the rule, or
 // (<undefined>, error) if the process of checking failed.
-func (runner *runner) checkRule(table Table, chain Chain, args ...string) (bool, error) {
-	if runner.hasCheck {
-		return runner.checkRuleUsingCheck(makeFullArgs(table, chain, args...))
-	}
-	return runner.checkRuleWithoutCheck(table, chain, args...)
-}
-
-var hexnumRE = regexp.MustCompile("0x0+([0-9])")
-
-func trimhex(s string) string {
-	return hexnumRE.ReplaceAllString(s, "0x$1")
-}
-
-// Executes the rule check without using the "-C" flag, instead parsing iptables-save.
-// Present for compatibility with <1.4.11 versions of iptables.  This is full
-// of hack and half-measures.  We should nix this ASAP.
-func (runner *runner) checkRuleWithoutCheck(table Table, chain Chain, args ...string) (bool, error) {
-	iptablesSaveCmd := iptablesSaveCommand(runner.protocol)
-	klog.V(1).InfoS("Running", "command", iptablesSaveCmd, "table", string(table))
-	out, err := runner.exec.Command(iptablesSaveCmd, "-t", string(table)).CombinedOutput()
-	if err != nil {
-		return false, fmt.Errorf("error checking rule: %v", err)
-	}
-
-	// Sadly, iptables has inconsistent quoting rules for comments. Just remove all quotes.
-	// Also, quoted multi-word comments (which are counted as a single arg)
-	// will be unpacked into multiple args,
-	// in order to compare against iptables-save output (which will be split at whitespace boundary)
-	// e.g. a single arg('"this must be before the NodePort rules"') will be unquoted and unpacked into 7 args.
-	var argsCopy []string
-	for i := range args {
-		tmpField := strings.Trim(args[i], "\"")
-		tmpField = trimhex(tmpField)
-		argsCopy = append(argsCopy, strings.Fields(tmpField)...)
-	}
-	argset := sets.New(argsCopy...)
-
-	for _, line := range strings.Split(string(out), "\n") {
-		fields := strings.Fields(line)
-
-		// Check that this is a rule for the correct chain, and that it has
-		// the correct number of argument (+2 for "-A <chain name>")
-		if !strings.HasPrefix(line, fmt.Sprintf("-A %s", string(chain))) || len(fields) != len(argsCopy)+2 {
-			continue
-		}
-
-		// Sadly, iptables has inconsistent quoting rules for comments.
-		// Just remove all quotes.
-		for i := range fields {
-			fields[i] = strings.Trim(fields[i], "\"")
-			fields[i] = trimhex(fields[i])
-		}
-
-		// TODO: This misses reorderings e.g. "-x foo ! -y bar" will match "! -x foo -y bar"
-		if sets.New(fields...).IsSuperset(argset) {
-			return true, nil
-		}
-		klog.V(5).InfoS("DBG: fields is not a superset of args", "fields", fields, "arguments", args)
-	}
-
-	return false, nil
-}
-
-// Executes the rule check using the "-C" flag
-func (runner *runner) checkRuleUsingCheck(args []string) (bool, error) {
+func (runner *runner) checkRule(args []string) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
