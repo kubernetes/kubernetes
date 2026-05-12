@@ -139,16 +139,8 @@ func TestDeleteObjectByTuple(t *testing.T) {
 	}
 }
 
-func isPropagationPolicyEmpty(body io.ReadCloser) bool {
-	if body == nil {
-		return false
-	}
-	var parsedBody metav1.DeleteOptions
-	rawBody, _ := io.ReadAll(body)
-	json.Unmarshal(rawBody, &parsedBody)
-	return parsedBody.PropagationPolicy == nil
-}
-
+// hasExpectedPropagationPolicy checks whether the PropagationPolicy in the request body matches the expected policy.
+// Note: When policy is "" (--cascade is none), this function expects PropagationPolicy to be nil.
 func hasExpectedPropagationPolicy(body io.ReadCloser, policy *metav1.DeletionPropagation) bool {
 	if body == nil || policy == nil {
 		return body == nil && policy == nil
@@ -156,6 +148,9 @@ func hasExpectedPropagationPolicy(body io.ReadCloser, policy *metav1.DeletionPro
 	var parsedBody metav1.DeleteOptions
 	rawBody, _ := io.ReadAll(body)
 	json.Unmarshal(rawBody, &parsedBody)
+	if *policy == "" {
+                 return parsedBody.PropagationPolicy == nil
+        }
 	if parsedBody.PropagationPolicy == nil {
 		return false
 	}
@@ -179,9 +174,6 @@ func TestCascadingStrategy(t *testing.T) {
 			switch p, m, b := req.URL.Path, req.Method, req.Body; {
 
 			case p == "/namespaces/test/secrets/mysecret" && m == "DELETE" && hasExpectedPropagationPolicy(b, policy):
-
-				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
-			case p == "/namespaces/test/secrets/mysecret-server" && m == "DELETE" && isPropagationPolicyEmpty(b):
 
 				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &rc.Items[0])}, nil
 			default:
@@ -228,14 +220,17 @@ func TestCascadingStrategy(t *testing.T) {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 
-	// DeleteOptions.PropagationPolicy shouldn't be set, when cascading strategy is server.
+	// Test that delete options shouldn't be set when cascading strategy is none.
+	// Note: Cast string to DeletionPropagation type because the policy requires pointer to DeletionPropagation.
+	nonePolicy := metav1.DeletionPropagation("")
+	policy = &nonePolicy
 	streams, _, buf, _ = genericiooptions.NewTestIOStreams()
 	cmd = NewCmdDelete(tf, streams)
 	cmd.Flags().Set("namespace", "test")
-	cmd.Flags().Set("cascade", "server")
+	cmd.Flags().Set("cascade", "none")
 	cmd.Flags().Set("output", "name")
-	cmd.Run(cmd, []string{"secrets/mysecret-server"})
-	if buf.String() != "secret/mysecret-server\n" {
+	cmd.Run(cmd, []string{"secrets/mysecret"})
+	if buf.String() != "secret/mysecret\n" {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 

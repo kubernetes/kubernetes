@@ -80,13 +80,10 @@ func (f *DeleteFlags) ToOptions(dynamicClient dynamic.Interface, streams generic
 		options.DeleteAllNamespaces = *f.AllNamespaces
 	}
 	if f.CascadingStrategy != nil {
-		// Skip to set CascadingStrategy when CascadingFlag is "server"
-		if *f.CascadingStrategy != "server" {
-			var err error
-			options.CascadingStrategy, err = parseCascadingFlag(streams, *f.CascadingStrategy)
-			if err != nil {
-				return nil, err
-			}
+		var err error
+		options.CascadingStrategy, err = parseCascadingFlag(streams, *f.CascadingStrategy)
+		if err != nil {
+			return nil, err
 		}
 	}
 	if f.Force != nil {
@@ -139,8 +136,7 @@ func (f *DeleteFlags) AddFlags(cmd *cobra.Command) {
 			f.CascadingStrategy,
 			"cascade",
 			*f.CascadingStrategy,
-			`Must be "background", "orphan", "foreground" or "server". Selects the deletion cascading strategy for the dependents (e.g. Pods created by a ReplicationController). Defaults to background.`)
-		cmd.Flags().Lookup("cascade").NoOptDefVal = "background"
+			`Must be "background", "orphan", "foreground" or "none". Selects the deletion cascading strategy for the dependents (e.g. Pods created by a ReplicationController). Defaults to background. When --cascade is none, deletion cascading strategy respects server-side propagation policy.`)
 	}
 	if f.Now != nil {
 		cmd.Flags().BoolVar(f.Now, "now", *f.Now, "If true, resources are signaled for immediate shutdown (same as --grace-period=1).")
@@ -250,8 +246,11 @@ func parseCascadingFlag(streams genericiooptions.IOStreams, cascadingFlag string
 			return metav1.DeletePropagationForeground, nil
 		case "background":
 			return metav1.DeletePropagationBackground, nil
+		case "none":
+			// Represents respecting the server-side propagation policy as an empty string.
+			return "", nil
 		default:
-			return metav1.DeletePropagationBackground, fmt.Errorf(`invalid cascade value (%v). Must be "background", "foreground", or "orphan"`, cascadingFlag)
+			return metav1.DeletePropagationBackground, fmt.Errorf(`invalid cascade value (%v). Must be "background", "foreground", "orphan", or "none"`, cascadingFlag)
 		}
 	}
 	// The flag was a boolean
