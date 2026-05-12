@@ -53,6 +53,22 @@ const (
 
 	// preScoreStateKey is the key in CycleState to NodeResourcesFit pre-computed data for Scoring.
 	preScoreStateKey = "PreScore" + Name
+
+	// ExcludeFromMaxPodCountAnnotationKey is the pod annotation that opts an
+	// individual pod out of the kubelet/scheduler node-level pod-count cap
+	// (v1.ResourcePods / NodeStatus.Allocatable.Pods).
+	//
+	// The annotation is honoured if and only if its value is the literal
+	// string "true". Any other value -- empty, missing, "false", "1", "True",
+	// or otherwise malformed -- is treated as non-exempt. This fail-closed
+	// behaviour is intentional: see isExcludedFromMaxPodCount.
+	ExcludeFromMaxPodCountAnnotationKey = "kubelet.datadoghq.com/exclude-from-max-pods"
+
+	// excludeFromMaxPodCountAnnotationValue is the only value that activates
+	// the exemption. Keep this as a private constant so callers are forced
+	// through isExcludedFromMaxPodCount and cannot accidentally accept other
+	// truthy-looking spellings.
+	excludeFromMaxPodCountAnnotationValue = "true"
 )
 
 // nodeResourceStrategyTypeMap maps strategy to scorer implementation
@@ -436,6 +452,55 @@ func haveAnyRequestedResourcesIncreased(pod *v1.Pod, originalNode, modifiedNode 
 		}
 	}
 	return false
+}
+
+// isExcludedFromMaxPodCount reports whether pod has opted out of the node-level
+// pod-count cap (v1.ResourcePods / NodeStatus.Allocatable.Pods) via the
+// ExcludeFromMaxPodCountAnnotationKey annotation.
+//
+// Contract (see scratch/max-pod-count-exclusions/contract.md):
+//
+//  1. The opt-in surface is the pod annotation
+//     ExcludeFromMaxPodCountAnnotationKey. Labels are intentionally not
+//     supported: labels are selector-visible and routinely mutated by
+//     controllers, so an accidental selector match could enable the
+//     exemption without an explicit operator decision.
+//
+//  2. Only the literal value "true" opts in. Empty, missing, "false", "1",
+//     "yes", "True", whitespace-padded, or otherwise malformed values are
+//     treated as non-exempt. This is fail-closed by design: anyone wanting
+//     the exemption must spell it exactly.
+//
+//  3. The exemption scope is strictly v1.ResourcePods accounting -- i.e. the
+//     allowedPodNumber comparison in fitsRequest. It does NOT relax CPU,
+//     memory, ephemeral-storage, scalar/extended resource, taint, affinity,
+//     topology, volume-limits, or any other scheduler/admission check. An
+//     exempt pod whose CPU/memory request exceeds node capacity is still
+//     rejected.
+//
+//  4. There is NO in-tree policy enforcement of who may set this annotation.
+//     The scheduler and kubelet honour the annotation if present and truthy.
+//     Cluster operators are expected to gate usage via a
+//     ValidatingAdmissionPolicy / admission webhook / mutating layer that
+//     strips the annotation from untrusted callers. Treat the presence of
+//     this annotation as an explicit operator decision delivered via the
+//     admission stack.
+//
+//  5. CNI / IPAM / conntrack / node-local resource pools are sized
+//     independently of the kubelet pod cap. Bypassing the cap can saturate
+//     them and cause secondary failures (IP exhaustion, conntrack overflow,
+//     etc.) that the scheduler cannot observe. Operators MUST add
+//     observability and alerting for node pod density before enabling this
+//     annotation in production.
+//
+// Both the scheduler filter path and the kubelet admission path consume this
+// helper indirectly via noderesources.Fits / scheduler.AdmissionCheck, so it
+// is the single source of truth for the exemption decision.
+func isExcludedFromMaxPodCount(pod *v1.Pod) bool {
+	if pod == nil {
+		return false
+	}
+	return pod.Annotations[ExcludeFromMaxPodCountAnnotationKey] == excludeFromMaxPodCountAnnotationValue
 }
 
 // isFit checks if the pod fits the node. If the node is nil, it returns false.

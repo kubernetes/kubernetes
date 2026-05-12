@@ -5,7 +5,7 @@
    - Define hard restrictions in code docs: only specific namespaces or service accounts are allowed to use the exemption.
    - Add clear non-goals: exemption affects only pod-count (`ResourcePods`), not CPU/memory/storage/resource requests.
 
-2. Add shared pod-exemption helper in node resources plugin
+2. ~~Add shared pod-exemption helper in node resources plugin~~ **(done — see `step-2-handoff.md`)**
    - File: `pkg/scheduler/framework/plugins/noderesources/fit.go`
    - Add a helper function (for example `isExcludedFromMaxPodCount(pod *v1.Pod) bool`) near existing fit logic.
    - Initially implement annotation check and keep logic centralized so scheduler and kubelet paths consume the same decision path.
