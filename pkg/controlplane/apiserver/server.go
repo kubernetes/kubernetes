@@ -142,7 +142,7 @@ func (c completedConfig) New(name string, delegationTarget genericapiserver.Dele
 	}
 	if len(c.SystemNamespaces) > 0 {
 		s.GenericAPIServer.AddPostStartHookOrDie("start-system-namespaces-controller", func(hookContext genericapiserver.PostStartHookContext) error {
-			go systemnamespaces.NewController(c.SystemNamespaces, client, s.VersionedInformers.Core().V1().Namespaces()).Run(hookContext.Done())
+			go systemnamespaces.NewController(c.SystemNamespaces, client, s.VersionedInformers.Core().V1().Namespaces()).Run(hookContext)
 			return nil
 		})
 	}

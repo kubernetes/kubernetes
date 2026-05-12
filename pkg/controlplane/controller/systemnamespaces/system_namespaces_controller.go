@@ -18,7 +18,6 @@ package systemnamespaces
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -30,7 +29,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-
 	"k8s.io/klog/v2"
 )
 
@@ -59,32 +57,32 @@ func NewController(systemNamespaces []string, clientset kubernetes.Interface, na
 }
 
 // Run starts one worker.
-func (c *Controller) Run(stopCh <-chan struct{}) {
-	defer utilruntime.HandleCrash()
-	defer klog.Infof("Shutting down system namespaces controller")
+func (c *Controller) Run(ctx context.Context) {
+	defer utilruntime.HandleCrashWithContext(ctx)
+	logger := klog.FromContext(ctx)
+	defer logger.Info("Shutting down system namespaces controller")
 
-	klog.Infof("Starting system namespaces controller")
+	logger.Info("Starting system namespaces controller")
 
-	if !cache.WaitForCacheSync(stopCh, c.namespaceSynced) {
-		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.namespaceSynced) {
 		return
 	}
 
-	go wait.Until(c.sync, c.interval, stopCh)
+	go wait.UntilWithContext(ctx, c.sync, c.interval)
 
-	<-stopCh
+	<-ctx.Done()
 }
 
-func (c *Controller) sync() {
+func (c *Controller) sync(ctx context.Context) {
 	// Loop the system namespace list, and create them if they do not exist
 	for _, ns := range c.systemNamespaces {
-		if err := c.createNamespaceIfNeeded(ns); err != nil {
-			utilruntime.HandleError(fmt.Errorf("unable to create required kubernetes system Namespace %s: %v", ns, err))
+		if err := c.createNamespaceIfNeeded(ctx, ns); err != nil {
+			utilruntime.HandleErrorWithContext(ctx, err, "Unable to create required kubernetes system namespace", "namespace", ns)
 		}
 	}
 }
 
-func (c *Controller) createNamespaceIfNeeded(ns string) error {
+func (c *Controller) createNamespaceIfNeeded(ctx context.Context, ns string) error {
 	if _, err := c.namespaceLister.Get(ns); err == nil {
 		// the namespace already exists
 		return nil
@@ -95,7 +93,7 @@ func (c *Controller) createNamespaceIfNeeded(ns string) error {
 			Namespace: "",
 		},
 	}
-	_, err := c.client.CoreV1().Namespaces().Create(context.TODO(), newNs, metav1.CreateOptions{})
+	_, err := c.client.CoreV1().Namespaces().Create(ctx, newNs, metav1.CreateOptions{})
 	if err != nil && errors.IsAlreadyExists(err) {
 		err = nil
 	}

@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // Test_Controller validates the garbage collection logic for the apiserverleasegc controller.
@@ -87,6 +88,7 @@ func Test_Controller(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
 			objs := []runtime.Object{}
 			for _, ns := range test.namespaces {
 				objs = append(objs,
@@ -114,7 +116,7 @@ func Test_Controller(t *testing.T) {
 				return true, create.GetObject(), nil
 			})
 
-			controller.sync()
+			controller.sync(ctx)
 
 			expectAction(t, clientset.Actions(), test.actions)
 			namespaces, err := controller.namespaceLister.List(labels.Everything())
