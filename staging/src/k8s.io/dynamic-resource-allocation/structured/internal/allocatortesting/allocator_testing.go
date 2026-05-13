@@ -5388,6 +5388,57 @@ func TestAllocator(t *testing.T,
 				deviceRequestAllocationResult(req1SubReq1, driverA, pool1, device3).withConsumedCapacity(&fixedShareID, map[resourceapi.QualifiedName]resource.Quantity{"memory": resource.MustParse("4Gi")}),
 			)},
 		},
+		"allow-multiple-allocations-with-shared-device-counter-cross-cycle": {
+			features: Features{
+				PartitionableDevices: true,
+				ConsumableCapacity:   true,
+			},
+			claimsToAllocate: objects(
+				claim(claim0).withRequests(
+					deviceRequest(req0, classA, 1).
+						withCapacityRequest(ptr.To(one)).
+						withSelectors(resourceapi.DeviceSelector{
+							CEL: &resourceapi.CELDeviceSelector{
+								Expression: fmt.Sprintf(`device.attributes["%s"].mode == "b"`, driverA),
+							},
+						}),
+				),
+			),
+			allocatedSharedDeviceIDs: sets.New(
+				internal.MakeSharedDeviceID(MakeDeviceID(driverA, pool1, device1), &fixedShareID),
+			),
+			allocatedCapacityDevices: ConsumedCapacityCollection{
+				MakeDeviceID(driverA, pool1, device1): ConsumedCapacity{
+					capacity0: ptr.To(one),
+				},
+			},
+			classes: objects(classWithAllowMultipleAllocations(classA, driverA, true)),
+			slices: unwrapResourceSlices(
+				sliceWithDevices(slice1, node1, resourcePool(pool1, 2), driverA,
+					device(device1, fromCounters, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"mode": {StringValue: ptr.To("a")},
+					}).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+							capacity0: one,
+						}),
+					).withAllowMultipleAllocations(),
+					device(device2, fromCounters, map[resourceapi.QualifiedName]resourceapi.DeviceAttribute{
+						"mode": {StringValue: ptr.To("b")},
+					}).withDeviceCounterConsumption(
+						deviceCounterConsumption(counterSet1, map[string]resource.Quantity{
+							capacity0: one,
+						}),
+					).withAllowMultipleAllocations(),
+				),
+				sliceWithCounterSets(slice2, node1, resourcePool(pool1, 2), driverA,
+					counterSet(counterSet1, map[string]resource.Quantity{
+						capacity0: one,
+					}),
+				),
+			),
+			node:          node(node1, region1),
+			expectResults: []any{},
+		},
 		"consumable-capacity-with-partitionable-device-multiple-capacity-pools": {
 			// This test case combines integration of PrioritizedList, PartitionableDevices, and ConsumableCapacity features.
 			features: Features{
