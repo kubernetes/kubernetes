@@ -3094,3 +3094,95 @@ func getPodStatus() v1.PodStatus {
 		Message: "Message",
 	}
 }
+
+// TestSyncBatchReSignalsAfterDroppedReadinessUpdates verifies that syncBatch
+// re-signals podStatusChannel when a newer status version has accumulated in
+// m.podStatuses while a syncPod API call was in flight
+func TestSyncBatchReSignalsAfterDroppedReadinessUpdates(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+
+	const numContainers = 2
+	pod := getTestPod()
+	pod.Spec.Containers = make([]v1.Container, numContainers)
+	containerIDs := make([]kubecontainer.ContainerID, numContainers)
+	containerStatuses := make([]v1.ContainerStatus, numContainers)
+	for i := 0; i < numContainers; i++ {
+		pod.Spec.Containers[i] = v1.Container{Name: fmt.Sprintf("c%d", i)}
+		containerIDs[i] = kubecontainer.ContainerID{Type: "test", ID: fmt.Sprintf("%d", i)}
+		containerStatuses[i] = v1.ContainerStatus{
+			Name:        fmt.Sprintf("c%d", i),
+			ContainerID: containerIDs[i].String(),
+			Ready:       true,
+		}
+	}
+	initialStatus := v1.PodStatus{
+		ContainerStatuses: containerStatuses,
+		Conditions: []v1.PodCondition{{
+			Type:   v1.PodReady,
+			Status: v1.ConditionTrue,
+		}},
+	}
+
+	client := fake.NewSimpleClientset(pod)
+	m := newTestManager(client)
+	m.podManager.(mutablePodManager).AddPod(pod)
+
+	// establish initial status so m.podStatuses and apiStatusVersions are in sync.
+	m.SetPodStatus(logger, pod, initialStatus)
+	_, ctx2 := ktesting.NewTestContext(t)
+	m.syncBatch(ctx2, true)
+
+	// drain the channel so it is empty.
+	for len(m.podStatusChannel) > 0 {
+		<-m.podStatusChannel
+	}
+
+	// pre-fill the channel with a sentinel so subsequent
+	// SetContainerReadiness calls cannot send their signal.
+	m.podStatusChannel <- struct{}{}
+
+	// mark both containers not-ready, signals are dropped (channel full).
+	for i := 0; i < numContainers; i++ {
+		m.SetContainerReadiness(logger, pod.UID, containerIDs[i], false)
+	}
+
+	// drain the sentinel, channel is now empty, but m.podStatuses is
+	// ahead of apiStatusVersions.
+	<-m.podStatusChannel
+	require.Equal(t, 0, len(m.podStatusChannel), "channel should be empty before syncBatch")
+
+	// snapshot the current latest version so we can verify the precondition.
+	m.podStatusesLock.RLock()
+	versionBeforeSync := m.podStatuses[pod.UID].version
+	m.podStatusesLock.RUnlock()
+
+	statusUID := kubetypes.MirrorPodUID(pod.UID)
+
+	// reactor that simulates a new update arriving while syncPod is
+	// blocked on the API call.
+	client.PrependReactor("patch", "pods", func(action core.Action) (bool, runtime.Object, error) {
+		m.podStatusesLock.Lock()
+		if s, ok := m.podStatuses[pod.UID]; ok {
+			s.version++
+			m.podStatuses[pod.UID] = s
+		}
+		m.podStatusesLock.Unlock()
+		return true, pod.DeepCopy(), nil
+	})
+
+	// also need a GET reactor so syncPod can retrieve the pod.
+	client.PrependReactor("get", "pods", func(action core.Action) (bool, runtime.Object, error) {
+		return true, pod.DeepCopy(), nil
+	})
+
+	// confirm precondition: apiStatusVersions < versionBeforeSync (dropped signals).
+	require.Less(t, m.apiStatusVersions[statusUID], versionBeforeSync,
+		"apiStatusVersions should be behind podStatuses before syncBatch")
+
+	// checks for a newer version and re-signals the channel.
+	m.syncBatch(ctx, false)
+
+	// assert that the channel received a re-signal.
+	require.Equal(t, 1, len(m.podStatusChannel),
+		"syncBatch should have re-signalled podStatusChannel for the version bumped inside syncPod")
+}

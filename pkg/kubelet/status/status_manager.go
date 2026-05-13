@@ -1142,6 +1142,19 @@ func (m *manager) syncBatch(ctx context.Context, all bool) int {
 	for _, update := range updatedStatuses {
 		logger.V(5).Info("Sync pod status", "podUID", update.podUID, "statusUID", update.statusUID, "version", update.status.version)
 		m.syncPod(ctx, update.podUID, update.status)
+		// Re-signal the channel so the sync goroutine picks up any versions
+		// that were not yet sent to the API server.
+		m.podStatusesLock.RLock()
+		latestStatus, exists := m.podStatuses[update.podUID]
+		m.podStatusesLock.RUnlock()
+		if exists &&
+			m.apiStatusVersions[update.statusUID] >= update.status.version &&
+			m.apiStatusVersions[update.statusUID] < latestStatus.version {
+			select {
+			case m.podStatusChannel <- struct{}{}:
+			default:
+			}
+		}
 	}
 
 	return len(updatedStatuses)
