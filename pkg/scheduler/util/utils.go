@@ -47,6 +47,12 @@ func GetPodFullName(pod *v1.Pod) string {
 	return pod.Name + "_" + pod.Namespace
 }
 
+// GetPodFullNameFromNamespacedName returns the same result as GetPodFullName
+// but accepts a NamespacedName instead of a full Pod object.
+func GetPodFullNameFromNamespacedName(nn types.NamespacedName) string {
+	return nn.Name + "_" + nn.Namespace
+}
+
 // GetPodStartTime returns start time of the given pod or current timestamp
 // if it hasn't started yet.
 func GetPodStartTime(pod *v1.Pod) *metav1.Time {

@@ -5031,7 +5031,7 @@ func testGatherAllocatedState(tCtx ktesting.TContext) {
 
 }
 
-func TestClaimPreQueueingHint(t *testing.T) {
+func TestPreQueueingHint(t *testing.T) {
 	tests := map[string]struct {
 		oldObj, newObj interface{}
 		wantKeys       sets.Set[string]
@@ -5046,7 +5046,7 @@ func TestClaimPreQueueingHint(t *testing.T) {
 					},
 				},
 			},
-			wantKeys: sets.New("pod-1_ns1"),
+			wantKeys: sets.New[string](), // no pod in indexer
 		},
 		"shared claim returns nil": {
 			newObj: &resourceapi.ResourceClaim{
@@ -5055,7 +5055,7 @@ func TestClaimPreQueueingHint(t *testing.T) {
 					Namespace: "ns1",
 				},
 			},
-			wantKeys: nil,
+			wantKeys: sets.New[string](), // no pod in indexer
 		},
 		"non-pod owner returns nil": {
 			newObj: &resourceapi.ResourceClaim{
@@ -5067,7 +5067,7 @@ func TestClaimPreQueueingHint(t *testing.T) {
 					},
 				},
 			},
-			wantKeys: nil,
+			wantKeys: sets.New[string](), // no pod in indexer
 		},
 		"delete event uses oldObj": {
 			oldObj: &resourceapi.ResourceClaim{
@@ -5080,7 +5080,31 @@ func TestClaimPreQueueingHint(t *testing.T) {
 				},
 			},
 			newObj:   nil,
-			wantKeys: sets.New("pod-2_ns2"),
+			wantKeys: sets.New[string](), // no pod in indexer
+		},
+		"deallocation returns nil to evaluate all pods": {
+			oldObj: &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "claim-4",
+					Namespace: "ns1",
+					OwnerReferences: []metav1.OwnerReference{
+						{Kind: "Pod", APIVersion: "v1", Name: "pod-a"},
+					},
+				},
+				Status: resourceapi.ResourceClaimStatus{
+					Allocation: &resourceapi.AllocationResult{},
+				},
+			},
+			newObj: &resourceapi.ResourceClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "claim-4",
+					Namespace: "ns1",
+					OwnerReferences: []metav1.OwnerReference{
+						{Kind: "Pod", APIVersion: "v1", Name: "pod-a"},
+					},
+				},
+			},
+			wantKeys: nil,
 		},
 		"non-claim object returns nil": {
 			newObj:   "not-a-claim",
@@ -5091,7 +5115,8 @@ func TestClaimPreQueueingHint(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			logger := klog.Background()
-			got := claimPreQueueingHint(logger, tc.oldObj, tc.newObj)
+			pl := &DynamicResources{podIndexer: cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{podResourceClaimIndex: podResourceClaimIndexFunc})}
+			got := pl.preQueueingHint(logger, tc.oldObj, tc.newObj)
 			if tc.wantKeys == nil {
 				if got != nil {
 					t.Errorf("expected nil, got %v", got)

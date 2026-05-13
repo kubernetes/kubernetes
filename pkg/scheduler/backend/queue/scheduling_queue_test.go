@@ -7299,22 +7299,31 @@ func TestPriorityQueue_PreQueueingHint(t *testing.T) {
 
 			for _, pod := range tt.pods {
 				q.Add(ctx, pod)
-				p, err := q.Pop(logger)
+				entity, err := q.Pop(logger)
 				if err != nil {
 					t.Fatalf("Pop failed: %v", err)
 				}
-				pInfo := &framework.QueuedPodInfo{PodInfo: p.PodInfo, UnschedulablePlugins: sets.New("foo")}
-				if err := q.AddUnschedulableIfNotPresent(logger, pInfo, q.SchedulingCycle()); err != nil {
-					t.Fatalf("AddUnschedulableIfNotPresent failed: %v", err)
+				pInfo := entity.(*framework.QueuedPodInfo)
+				pInfo.UnschedulablePlugins = sets.New[string]("foo")
+				if err := q.AddUnschedulablePodIfNotPresent(logger, pInfo, q.SchedulingCycle()); err != nil {
+					t.Fatalf("AddUnschedulablePodIfNotPresent failed: %v", err)
 				}
 			}
 
 			q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, nil, nil)
 
 			moved := sets.New[string]()
+			unschedPods := q.UnschedulablePods()
 			for _, pod := range tt.pods {
 				key := pod.Name + "_" + pod.Namespace
-				if q.unschedulablePods.get(pod) == nil {
+				found := false
+				for _, up := range unschedPods {
+					if up.Name == pod.Name && up.Namespace == pod.Namespace {
+						found = true
+						break
+					}
+				}
+				if !found {
 					moved.Insert(key)
 				}
 			}

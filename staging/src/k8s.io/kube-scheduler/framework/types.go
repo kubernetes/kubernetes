@@ -206,6 +206,7 @@ type ClusterEventWithHint struct {
 //   - For example, the given event is "Node deleted", the `oldObj` will be that deleted Node.
 //   - `oldObj` is nil if the event is add event.
 //   - `newObj` is nil if the event is delete event.
+//
 // PreQueueingHintFn is called once per event before iterating unschedulable pods.
 // It returns a set of pod keys (in "name_namespace" format, matching
 // util.GetPodFullName (i.e., name_namespace)) that should be evaluated
