@@ -690,53 +690,88 @@ func AssertStateEqual(t *testing.T, sf State, sm State) {
 	}
 }
 
-func TestCPUManagerCheckpointV2_MarshalCheckpoint_ForwardCompatibility(t *testing.T) {
-	// 1. Create a V2 checkpoint using the struct defined in the current codebase (1.36+)
-	currentCheckpoint := &CPUManagerCheckpointV2{
-		PolicyName:    "none",
-		DefaultCPUSet: "1-3",
-		Entries:       make(map[string]map[string]string),
+func TestCPUManagerCheckpoint_MarshalCheckpoint_HashCompatibility(t *testing.T) {
+	testCases := []struct {
+		name                   string
+		currentCheckpoint      any
+		expectedLegacyChecksum func() checksum.Checksum
+	}{
+		{
+			name: "V2 checkpoint",
+			currentCheckpoint: &CPUManagerCheckpointV2{
+				PolicyName:    "none",
+				DefaultCPUSet: "1-3",
+				Entries:       make(map[string]map[string]string),
+			},
+			expectedLegacyChecksum: func() checksum.Checksum {
+				type CPUManagerCheckpoint struct {
+					PolicyName    string                       `json:"policyName"`
+					DefaultCPUSet string                       `json:"defaultCpuSet"`
+					Entries       map[string]map[string]string `json:"entries,omitempty"`
+					Checksum      checksum.Checksum            `json:"checksum"`
+				}
+				return checksum.New(&CPUManagerCheckpoint{
+					PolicyName:    "none",
+					DefaultCPUSet: "1-3",
+					Entries:       make(map[string]map[string]string),
+				})
+			},
+		},
+		{
+			name: "V3 checkpoint",
+			currentCheckpoint: &CPUManagerCheckpointV3{
+				PolicyName:    "none",
+				DefaultCPUSet: "1-3",
+				Entries:       make(map[string]map[string]string),
+				PodEntries:    PodCPUAssignments{"pod": PodEntry{cpuset.New(4, 5)}},
+			},
+			expectedLegacyChecksum: func() checksum.Checksum {
+				type CPUManagerCheckpoint struct {
+					PolicyName    string                       `json:"policyName"`
+					DefaultCPUSet string                       `json:"defaultCpuSet"`
+					Entries       map[string]map[string]string `json:"entries,omitempty"`
+					PodEntries    PodCPUAssignments            `json:"podEntries,omitempty"`
+					Checksum      checksum.Checksum            `json:"checksum"`
+				}
+				return checksum.New(&CPUManagerCheckpoint{
+					PolicyName:    "none",
+					DefaultCPUSet: "1-3",
+					Entries:       make(map[string]map[string]string),
+					PodEntries:    PodCPUAssignments{"pod": PodEntry{cpuset.New(4, 5)}},
+				})
+			},
+		},
 	}
 
-	// Marshal it using the logic that forces the "CPUManagerCheckpoint" name
-	data, err := currentCheckpoint.MarshalCheckpoint()
-	if err != nil {
-		t.Fatalf("Failed to marshal checkpoint: %v", err)
-	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// 1. Marshal the checkpoint using the logic that forces the "CPUManagerCheckpoint" name
+			data, err := tc.currentCheckpoint.(interface{ MarshalCheckpoint() ([]byte, error) }).MarshalCheckpoint()
+			if err != nil {
+				t.Fatalf("Failed to marshal checkpoint: %v", err)
+			}
 
-	// 2. Unmarshal the raw JSON to extract the checksum that was actually written to the file
-	var result map[string]interface{}
-	if err := json.Unmarshal(data, &result); err != nil {
-		t.Fatalf("Failed to unmarshal JSON: %v", err)
-	}
+			// 2. Unmarshal the raw JSON to extract the checksum that was actually written to the file
+			var result map[string]interface{}
+			if err := json.Unmarshal(data, &result); err != nil {
+				t.Fatalf("Failed to unmarshal JSON: %v", err)
+			}
 
-	actualChecksumFloat, ok := result["checksum"].(float64)
-	if !ok {
-		t.Fatalf("Checksum field missing or invalid type")
-	}
-	writtenChecksum := checksum.Checksum(uint64(actualChecksumFloat))
+			actualChecksumFloat, ok := result["checksum"].(float64)
+			if !ok {
+				t.Fatalf("Checksum field missing or invalid type")
+			}
+			writtenChecksum := checksum.Checksum(uint64(actualChecksumFloat))
 
-	// 3. Reconstruct how versions 1.35 and earlier would calculate the checksum
-	// by defining a struct with the exact legacy name and fields.
-	type CPUManagerCheckpoint struct {
-		PolicyName    string                       `json:"policyName"`
-		DefaultCPUSet string                       `json:"defaultCpuSet"`
-		Entries       map[string]map[string]string `json:"entries,omitempty"`
-		Checksum      checksum.Checksum            `json:"checksum"`
-	}
+			// 3. Compute the expected legacy checksum
+			expectedLegacyChecksum := tc.expectedLegacyChecksum()
 
-	legacyCheckpoint := &CPUManagerCheckpoint{
-		PolicyName:    currentCheckpoint.PolicyName,
-		DefaultCPUSet: currentCheckpoint.DefaultCPUSet,
-		Entries:       currentCheckpoint.Entries,
-	}
-
-	expectedLegacyChecksum := checksum.New(legacyCheckpoint)
-
-	// 4. Assert that the checksum written by our 1.36+ code matches
-	// what a 1.35 Kubelet would expect to see.
-	if writtenChecksum != expectedLegacyChecksum {
-		t.Errorf("Written Checksum %d does not match legacy calculation %d. Forward compatibility broken.", writtenChecksum, expectedLegacyChecksum)
+			// 4. Assert that the checksum written by our 1.36+ code matches
+			// what a 1.35 Kubelet would expect to see.
+			if writtenChecksum != expectedLegacyChecksum {
+				t.Errorf("Written Checksum %d does not match legacy calculation %d. Forward compatibility broken.", writtenChecksum, expectedLegacyChecksum)
+			}
+		})
 	}
 }
 
