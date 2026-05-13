@@ -596,7 +596,7 @@ func TestPlacementFeasible(t *testing.T) {
 			}
 
 			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(pg), 0)
-			informerFactory.Scheduling().V1alpha2().PodGroups().Informer()
+			informerFactory.Scheduling().V1alpha3().PodGroups().Informer()
 			informerFactory.StartWithContext(ctx)
 			informerFactory.WaitForCacheSyncWithContext(ctx)
 

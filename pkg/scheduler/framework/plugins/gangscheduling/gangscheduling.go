@@ -234,7 +234,7 @@ func getPlacementFeasibleState(placementCycleState fwk.PodGroupCycleState) *plac
 	return state.(*placementFeasibleState)
 }
 
-// PlacementFeasible is responsible for enforcing the gang's MinCount constraint.
+// PlacementFeasible is responsible for enforcing the gang's MinCount constraint in the pod group scheduling cycle.
 // The function will only return success once the gang's MinCount is satisfied or if the pod group is not using gang scheduling policy.
 // In case there are not enough remaining pods to satisfy the gang's MinCount, it returns UnschedulableAndUnresolvable which will terminate the pod group scheduling cycle early.
 func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleState fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo) *fwk.Status {
