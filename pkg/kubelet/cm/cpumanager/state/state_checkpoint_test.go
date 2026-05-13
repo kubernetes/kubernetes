@@ -18,13 +18,17 @@ package state
 
 import (
 	"encoding/json"
+	"fmt"
+	"maps"
 	"os"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
@@ -37,27 +41,96 @@ import (
 
 const testingCheckpoint = "cpumanager_checkpoint_test"
 
+type FeatureGateCombination map[featuregate.Feature]bool
+
+// allFeatureGateCombinations generates all combinations of provided feature gates.
+// Each combination is represented as a map of feature name to its state (enabled/disabled).
+// Combinations are constructed:
+//   - starting with single empty combination
+//   - then for each feature gate all combinations are appended twice to new slice
+//     (once with feature disabled and once with feature enabled)
+//   - combination list is replaced with new slice
+//
+// For example, given two features A and B, allFeatureGateCombinations will build combinations:
+// * Initial: `[{}]`
+// * After A: `[{A: false}, {A: true}]`
+// * After B: `[{A: false, B: false}, {A: false, B: true}, {A: true, B: false}, {A: true, B: true}]`
+func allFeatureGateCombinations(gates []featuregate.Feature) []FeatureGateCombination {
+	combinations := []FeatureGateCombination{make(FeatureGateCombination)}
+	for _, gate := range gates {
+		var newCombinations []FeatureGateCombination
+		for _, combination := range combinations {
+			// Append combination copy with the feature disabled
+			disabled := maps.Clone(combination)
+			disabled[gate] = false
+			newCombinations = append(newCombinations, disabled)
+
+			// Append combination with the feature enabled
+			combination[gate] = true
+			newCombinations = append(newCombinations, combination)
+		}
+		combinations = newCombinations
+	}
+	return combinations
+}
+
+func describe(comb FeatureGateCombination) string {
+	keys := slices.Sorted(maps.Keys(comb))
+	if len(keys) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "%s=%v", keys[0], comb[keys[0]])
+	for _, key := range keys[1:] {
+		fmt.Fprintf(&sb, ",%s=%v", key, comb[key])
+	}
+	return sb.String()
+}
+
 func TestCheckpointStateRestore(t *testing.T) {
 	testCases := []struct {
-		description                     string
-		checkpointContent               string
-		policyName                      string
-		initialContainers               containermap.ContainerMap
-		expectedError                   string
-		expectedState                   *stateMemory
-		podLevelResourceManagersEnabled bool
+		description       string
+		fgRequirements    FeatureGateCombination
+		checkpointContent string
+		policyName        string
+		initialContainers containermap.ContainerMap
+		expectedError     string
+		expectedState     *stateMemory
 	}{
 		{
 			"Restore non-existing checkpoint",
+			nil,
 			"",
 			"none",
 			containermap.ContainerMap{},
 			"",
 			&stateMemory{},
-			false,
+		},
+		{
+			"Fail to restore checkpoint without data section",
+			nil,
+			`{
+				"checksum": 1234
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"checkpoint is corrupted",
+			nil,
+		},
+		{
+			"Fail to restore checkpoint without checksum section (fall back to empty v2 version)",
+			nil,
+			`{
+				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"4-6\"}"
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			`configured policy "none" differs from state checkpoint policy ""`,
+			nil,
 		},
 		{
 			"Restore default cpu set",
+			nil,
 			`{
 				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"4-6\"}",
 				"checksum": 657950972
@@ -68,10 +141,10 @@ func TestCheckpointStateRestore(t *testing.T) {
 			&stateMemory{
 				defaultCPUSet: cpuset.New(4, 5, 6),
 			},
-			false,
 		},
 		{
 			"Restore valid checkpoint",
+			nil,
 			`{
 				"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"7-9\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"1-3\"}}}",
 				"checksum": 1420829534
@@ -88,10 +161,10 @@ func TestCheckpointStateRestore(t *testing.T) {
 				},
 				defaultCPUSet: cpuset.New(7, 8, 9),
 			},
-			false,
 		},
 		{
-			"Restore checkpoint with invalid checksum",
+			"Fail to restore checkpoint with invalid checksum",
+			nil,
 			`{
 				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"4-6\"}",
 				"checksum": 1234
@@ -99,20 +172,20 @@ func TestCheckpointStateRestore(t *testing.T) {
 			"none",
 			containermap.ContainerMap{},
 			"checkpoint is corrupted",
-			&stateMemory{},
-			false,
+			nil,
 		},
 		{
-			"Restore checkpoint with invalid JSON",
+			"Fail to restore checkpoint with invalid JSON",
+			nil,
 			`{`,
 			"none",
 			containermap.ContainerMap{},
 			"unexpected end of JSON input",
-			&stateMemory{},
-			false,
+			nil,
 		},
 		{
-			"Restore checkpoint with invalid policy name",
+			"Fail to restore checkpoint with invalid policy name",
+			nil,
 			`{
 				"data": "{\"policyName\":\"other\",\"defaultCPUSet\":\"1-3\"}",
 				"checksum": 2380595610
@@ -120,11 +193,11 @@ func TestCheckpointStateRestore(t *testing.T) {
 			"none",
 			containermap.ContainerMap{},
 			`configured policy "none" differs from state checkpoint policy "other"`,
-			&stateMemory{},
-			false,
+			nil,
 		},
 		{
-			"Restore checkpoint with unparsable default cpu set",
+			"Fail to restore checkpoint with unparsable default cpu set",
+			nil,
 			`{
 				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"1.3\"}",
 				"checksum": 3033143655
@@ -132,11 +205,11 @@ func TestCheckpointStateRestore(t *testing.T) {
 			"none",
 			containermap.ContainerMap{},
 			`could not parse default cpu set "1.3": strconv.Atoi: parsing "1.3": invalid syntax`,
-			&stateMemory{},
-			false,
+			nil,
 		},
 		{
-			"Restore checkpoint with unparsable assignment entry",
+			"Fail to restore checkpoint with unparsable assignment entry",
+			nil,
 			`{
 				"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"asd\"}}}",
 				"checksum": 3794806925
@@ -144,11 +217,25 @@ func TestCheckpointStateRestore(t *testing.T) {
 			"static",
 			containermap.ContainerMap{},
 			`could not parse cpuset "asd" for container "container2" in pod "pod": strconv.Atoi: parsing "asd": invalid syntax`,
-			&stateMemory{},
-			false,
+			nil,
+		},
+		{
+			"Restore checkpoint ignoring unknown fields in data section",
+			nil,
+			`{
+				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"4-6\",\"unknownField\":\"value\"}",
+				"checksum": 3492408555
+			}`,
+			"none",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				defaultCPUSet: cpuset.New(4, 5, 6),
+			},
 		},
 		{
 			"Restore checkpoint from checkpoint with v1 checksum",
+			nil,
 			`{
 				"policyName": "none",
 				"defaultCPUSet": "1-3",
@@ -160,10 +247,10 @@ func TestCheckpointStateRestore(t *testing.T) {
 			&stateMemory{
 				defaultCPUSet: cpuset.New(1, 2, 3),
 			},
-			false,
 		},
 		{
-			"Restore checkpoint with migration",
+			"Restore checkpoint from v1 (migration)",
+			nil,
 			`{
 				"policyName": "static",
 				"defaultCPUSet": "7-9",
@@ -190,40 +277,10 @@ func TestCheckpointStateRestore(t *testing.T) {
 				},
 				defaultCPUSet: cpuset.New(7, 8, 9),
 			},
-			false,
 		},
 		{
-			"Restore checkpoint from v1 (migration) with PodLevelResourceManagers enabled",
-			`{
-				"policyName": "none",
-				"defaultCPUSet": "1-3",
-				"entries": {
-					"containerID1": "4-6",
-					"containerID2": "1-3"
-				},
-				"checksum": 3680390589
-			}`,
-			"none",
-			func() containermap.ContainerMap {
-				cm := containermap.NewContainerMap()
-				cm.Add("pod", "container1", "containerID1")
-				cm.Add("pod", "container2", "containerID2")
-				return cm
-			}(),
-			"",
-			&stateMemory{
-				assignments: ContainerCPUAssignments{
-					"pod": map[string]cpuset.CPUSet{
-						"container1": cpuset.New(4, 5, 6),
-						"container2": cpuset.New(1, 2, 3),
-					},
-				},
-				defaultCPUSet: cpuset.New(1, 2, 3),
-			},
-			true,
-		},
-		{
-			"Restore checkpoint from v2 (migration) with PodLevelResourceManagers enabled",
+			"Restore checkpoint from v2 (migration)",
+			nil,
 			`{
 				"policyName": "static",
 				"defaultCPUSet": "7-9",
@@ -247,10 +304,42 @@ func TestCheckpointStateRestore(t *testing.T) {
 				},
 				defaultCPUSet: cpuset.New(7, 8, 9),
 			},
-			true,
+		},
+		{
+			"Restore checkpoint from v3 (migration) with PodLevelResourceManagers disabled",
+			FeatureGateCombination{features.PodLevelResourceManagers: false},
+			`{
+				"policyName": "static",
+				"defaultCPUSet": "1-2",
+				"entries": {
+					"pod1": {
+						"container1": "5-6",
+						"container2": "3-4"
+					}
+				},
+				"podEntries": {
+					"pod2": {
+						"cpuSet":"7-9"
+					}
+				},
+				"checksum": 2284712151
+			}`,
+			"static",
+			containermap.ContainerMap{},
+			"",
+			&stateMemory{
+				assignments: ContainerCPUAssignments{
+					"pod1": map[string]cpuset.CPUSet{
+						"container1": cpuset.New(5, 6),
+						"container2": cpuset.New(3, 4),
+					},
+				},
+				defaultCPUSet: cpuset.New(1, 2),
+			},
 		},
 		{
 			"Restore checkpoint from v3 (migration) with PodLevelResourceManagers enabled",
+			FeatureGateCombination{features.PodLevelResourceManagers: true},
 			`{
 				"policyName": "static",
 				"defaultCPUSet": "1-2",
@@ -284,20 +373,13 @@ func TestCheckpointStateRestore(t *testing.T) {
 					},
 				},
 			},
-			true,
 		},
 		{
-			"Restore checkpoint from v2 (migration) with PodLevelResourceManagers disabled",
+			"Restore valid v4 checkpoint with PodLevelResourceManagers disabled",
+			FeatureGateCombination{features.PodLevelResourceManagers: false},
 			`{
-				"policyName": "none",
-				"defaultCPUSet": "1-2",
-				"entries": {
-					"pod": {
-						"container1": "5-6",
-						"container2": "3-4"
-					}
-				},
-				"checksum": 3610638499
+				"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"7-9\"}},\"podEntries\":{\"pod\":{\"cpuSet\":\"4-10\"}}}",
+				"checksum": 2328898362
 			}`,
 			"static",
 			containermap.ContainerMap{},
@@ -305,48 +387,16 @@ func TestCheckpointStateRestore(t *testing.T) {
 			&stateMemory{
 				assignments: ContainerCPUAssignments{
 					"pod": map[string]cpuset.CPUSet{
-						"container1": cpuset.New(5, 6),
-						"container2": cpuset.New(3, 4),
-					},
-				},
-				defaultCPUSet: cpuset.New(1, 2),
-			},
-			false,
-		},
-		{
-			"Restore checkpoint from v3 (migration) with PodLevelResourceManagers disabled",
-			`{
-				"policyName": "none",
-				"defaultCPUSet": "1-3",
-				"entries": {
-					"pod1": {
-						"container1": "4-6",
-						"container2": "1-3"
-					}
-				},
-				"podEntries": {
-					"pod2": {
-						"cpuSet":"7-9"
-					}
-				},
-				"checksum": 751755688
-			}`,
-			"none",
-			containermap.ContainerMap{},
-			"",
-			&stateMemory{
-				assignments: ContainerCPUAssignments{
-					"pod1": map[string]cpuset.CPUSet{
 						"container1": cpuset.New(4, 5, 6),
-						"container2": cpuset.New(1, 2, 3),
+						"container2": cpuset.New(7, 8, 9),
 					},
 				},
 				defaultCPUSet: cpuset.New(1, 2, 3),
 			},
-			false,
 		},
 		{
-			"Restore valid v4 checkpoint",
+			"Restore valid v4 checkpoint with PodLevelResourceManagers enabled",
+			FeatureGateCombination{features.PodLevelResourceManagers: true},
 			`{
 				"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"7-9\"}},\"podEntries\":{\"pod\":{\"cpuSet\":\"4-10\"}}}",
 				"checksum": 2328898362
@@ -368,84 +418,6 @@ func TestCheckpointStateRestore(t *testing.T) {
 					},
 				},
 			},
-			true,
-		},
-		{
-			"Restore valid v4 checkpoint with PodLevelResourceManagers disabled",
-			`{
-				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"1-3\"}},\"podEntries\":{\"pod\":{\"cpuSet\":\"4-6\"}}}",
-				"checksum": 3246418529
-			}`,
-			"none",
-			containermap.ContainerMap{},
-			"",
-			&stateMemory{
-				assignments: ContainerCPUAssignments{
-					"pod": map[string]cpuset.CPUSet{
-						"container1": cpuset.New(4, 5, 6),
-						"container2": cpuset.New(1, 2, 3),
-					},
-				},
-				defaultCPUSet: cpuset.New(1, 2, 3),
-			},
-			false,
-		},
-		{
-			"Restore non-existing checkpoint with PodLevelResourceManagers enabled",
-			"",
-			"none",
-			containermap.ContainerMap{},
-			"",
-			&stateMemory{},
-			true,
-		},
-		{
-			"Restore corrupt checkpoint with PodLevelResourceManagers enabled",
-			`{
-				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"4-6\"}",
-				"checksum": 1234
-			}`,
-			"none",
-			containermap.ContainerMap{},
-			"checkpoint is corrupted",
-			&stateMemory{},
-			true,
-		},
-		{
-			"Restore checkpoint without data section",
-			`{
-				"checksum": 1234
-			}`,
-			"none",
-			containermap.ContainerMap{},
-			"checkpoint is corrupted",
-			&stateMemory{},
-			false,
-		},
-		{
-			"Restore checkpoint without checksum section falls back to empty v2 version",
-			`{
-				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"4-6\"}"
-			}`,
-			"none",
-			containermap.ContainerMap{},
-			`configured policy "none" differs from state checkpoint policy ""`,
-			&stateMemory{},
-			false,
-		},
-		{
-			"Restore checkpoint ignoring unknown fields in data section",
-			`{
-				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"4-6\",\"unknownField\":\"value\"}",
-				"checksum": 3492408555
-			}`,
-			"none",
-			containermap.ContainerMap{},
-			"",
-			&stateMemory{
-				defaultCPUSet: cpuset.New(4, 5, 6),
-			},
-			false,
 		},
 	}
 
@@ -457,36 +429,57 @@ func TestCheckpointStateRestore(t *testing.T) {
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
 	require.NoErrorf(t, err, "could not create testing checkpoint manager: %v", err)
 
-	for _, tc := range testCases {
-		t.Run(tc.description, func(t *testing.T) {
-			if tc.podLevelResourceManagersEnabled {
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, true)
+	// list of all features verified in this test
+	featureGateList := []featuregate.Feature{
+		features.PodLevelResourceManagers,
+	}
+	// iterate over all possible enabled/disabled feature combinations
+	for _, fgComb := range allFeatureGateCombinations(featureGateList) {
+		// run all testcases for current feature combination
+		t.Run(describe(fgComb), func(t *testing.T) {
+			for _, key := range slices.Sorted(maps.Keys(fgComb)) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, key, fgComb[key])
 			}
 
-			// ensure there is no previous checkpoint
-			cpm.RemoveCheckpoint(testingCheckpoint)
+			for _, tc := range testCases {
+				// verify feature gate requirements for testcase
+				skip := false
+				for fg, requiredState := range tc.fgRequirements {
+					state, exist := fgComb[fg]
+					if !exist || requiredState != state {
+						skip = true
+					}
+				}
+				if skip {
+					continue
+				}
 
-			// prepare checkpoint for testing
-			if strings.TrimSpace(tc.checkpointContent) != "" {
-				checkpoint := &testutil.MockCheckpoint{Content: tc.checkpointContent}
-				err = cpm.CreateCheckpoint(testingCheckpoint, checkpoint)
-				require.NoErrorf(t, err, "could not create testing checkpoint: %v", err)
+				t.Run(tc.description, func(t *testing.T) {
+					// ensure there is no previous checkpoint
+					err = cpm.RemoveCheckpoint(testingCheckpoint)
+					require.NoErrorf(t, err, "could not remove previous checkpoint: %v", err)
+
+					// prepare checkpoint for testing
+					if strings.TrimSpace(tc.checkpointContent) != "" {
+						checkpoint := &testutil.MockCheckpoint{Content: tc.checkpointContent}
+						err = cpm.CreateCheckpoint(testingCheckpoint, checkpoint)
+						require.NoErrorf(t, err, "could not create testing checkpoint: %v", err)
+					}
+
+					logger, _ := ktesting.NewTestContext(t)
+					restoredState, err := NewCheckpointState(logger, testingDir, testingCheckpoint, tc.policyName, tc.initialContainers)
+					if strings.TrimSpace(tc.expectedError) == "" {
+						require.NoError(t, err)
+					} else {
+						require.Error(t, err)
+						require.ErrorContains(t, err, "could not restore state from checkpoint")
+						require.ErrorContains(t, err, tc.expectedError)
+						return
+					}
+
+					AssertStateEqual(t, restoredState, tc.expectedState)
+				})
 			}
-
-			logger, _ := ktesting.NewTestContext(t)
-			restoredState, err := NewCheckpointState(logger, testingDir, testingCheckpoint, tc.policyName, tc.initialContainers)
-			if strings.TrimSpace(tc.expectedError) == "" {
-				require.NoError(t, err)
-			} else {
-				require.Error(t, err)
-				require.ErrorContains(t, err, "could not restore state from checkpoint")
-				require.ErrorContains(t, err, tc.expectedError)
-				return
-			}
-
-			// compare state after restoration with the one expected
-			AssertStateEqual(t, restoredState, tc.expectedState)
 		})
 	}
 }
