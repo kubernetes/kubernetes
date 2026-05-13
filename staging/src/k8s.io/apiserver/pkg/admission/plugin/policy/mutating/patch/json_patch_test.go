@@ -341,6 +341,20 @@ func TestJSONPatch(t *testing.T) {
 			}}},
 		},
 		{
+			name: "jsonPatch add list of CEL initializers as value",
+			expression: `[
+					JSONPatch{op: "add", path: "/spec/template/spec/containers", value: [
+						Object.spec.template.spec.containers{name: "a"},
+						Object.spec.template.spec.containers{name: "b"},
+					]},
+				]`,
+			gvr:    deploymentGVR,
+			object: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{}},
+			expectedResult: &appsv1.Deployment{Spec: appsv1.DeploymentSpec{Template: corev1.PodTemplateSpec{Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "a"}, {Name: "b"}},
+			}}}},
+		},
+		{
 			name: "jsonPatch with CEL initializer",
 			expression: `[
 					JSONPatch{op: "add", path: "/spec/template/spec/containers/-", value: Object.spec.template.spec.containers{
