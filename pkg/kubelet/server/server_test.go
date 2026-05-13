@@ -102,7 +102,7 @@ type fakeKubelet struct {
 	runningPodsFunc     func(ctx context.Context) ([]*v1.Pod, error)
 	logFunc             func(w http.ResponseWriter, req *http.Request)
 	runFunc             func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error)
-	getExecCheck        func(string, types.UID, string, []string, remotecommandserver.Options)
+	getExecCheck        func(string, types.UID, string, []string, []string, remotecommandserver.Options)
 	getAttachCheck      func(string, types.UID, string, remotecommandserver.Options)
 	getPortForwardCheck func(string, string, types.UID, portforward.V4Options)
 
@@ -182,13 +182,13 @@ func (fk *fakeKubelet) SyncLoopHealthCheck(req *http.Request) error {
 }
 
 type fakeRuntime struct {
-	execFunc        func(string, []string, io.Reader, io.WriteCloser, io.WriteCloser, bool, <-chan remotecommandserver.TerminalSize) error
+	execFunc        func(string, []string, []string, io.Reader, io.WriteCloser, io.WriteCloser, bool, <-chan remotecommandserver.TerminalSize) error
 	attachFunc      func(string, io.Reader, io.WriteCloser, io.WriteCloser, bool, <-chan remotecommandserver.TerminalSize) error
 	portForwardFunc func(string, int32, io.ReadWriteCloser) error
 }
 
-func (f *fakeRuntime) Exec(_ context.Context, containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommandserver.TerminalSize) error {
-	return f.execFunc(containerID, cmd, stdin, stdout, stderr, tty, resize)
+func (f *fakeRuntime) Exec(_ context.Context, containerID string, cmd []string, env []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommandserver.TerminalSize) error {
+	return f.execFunc(containerID, cmd, env, stdin, stdout, stderr, tty, resize)
 }
 
 func (f *fakeRuntime) Attach(_ context.Context, containerID string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommandserver.TerminalSize) error {
@@ -234,14 +234,15 @@ func newTestStreamingServer(streamIdleTimeout time.Duration) (s *testStreamingSe
 	return s, nil
 }
 
-func (fk *fakeKubelet) GetExec(_ context.Context, podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error) {
+func (fk *fakeKubelet) GetExec(_ context.Context, podFullName string, podUID types.UID, containerName string, cmd []string, env []string, streamOpts remotecommandserver.Options) (*url.URL, error) {
 	if fk.getExecCheck != nil {
-		fk.getExecCheck(podFullName, podUID, containerName, cmd, streamOpts)
+		fk.getExecCheck(podFullName, podUID, containerName, cmd, env, streamOpts)
 	}
 	// Always use testContainerID
 	resp, err := fk.streamingRuntime.GetExec(&runtimeapi.ExecRequest{
 		ContainerId: testContainerID,
 		Cmd:         cmd,
+		Env:         env,
 		Tty:         streamOpts.TTY,
 		Stdin:       streamOpts.Stdin,
 		Stdout:      streamOpts.Stdout,
@@ -1534,9 +1535,10 @@ func testExecAttach(t *testing.T, verb string) {
 				assert.Equal(t, !test.tty && test.stderr, streamOpts.Stderr, "stderr")
 			}
 
-			fw.fakeKubelet.getExecCheck = func(podFullName string, uid types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) {
+			fw.fakeKubelet.getExecCheck = func(podFullName string, uid types.UID, containerName string, cmd []string, env []string, streamOpts remotecommandserver.Options) {
 				execInvoked = true
 				assert.Equal(t, expectedCommand, strings.Join(cmd, " "), "cmd")
+				assert.Nil(t, env, "env")
 				checkStream(podFullName, uid, containerName, streamOpts)
 			}
 
@@ -1576,8 +1578,9 @@ func testExecAttach(t *testing.T, verb string) {
 				return nil
 			}
 
-			ss.fakeRuntime.execFunc = func(containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommandserver.TerminalSize) error {
+			ss.fakeRuntime.execFunc = func(containerID string, cmd []string, env []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommandserver.TerminalSize) error {
 				assert.Equal(t, expectedCommand, strings.Join(cmd, " "), "cmd")
+				assert.Nil(t, env, "env")
 				return testStream(containerID, stdin, stdout, stderr, tty, done)
 			}
 
@@ -2303,7 +2306,7 @@ func TestGetExecWebSocketHandlerSelection(t *testing.T) {
 
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExtendWebSocketsToKubelet, tt.enableExtendWebSockets)
 
-			ss.fakeRuntime.execFunc = func(_ string, _ []string, _ io.Reader, stdout, _ io.WriteCloser, _ bool, _ <-chan remotecommandserver.TerminalSize) error {
+			ss.fakeRuntime.execFunc = func(_ string, _ []string, _ []string, _ io.Reader, stdout, _ io.WriteCloser, _ bool, _ <-chan remotecommandserver.TerminalSize) error {
 				stdout.Close() //nolint:errcheck
 				return nil
 			}

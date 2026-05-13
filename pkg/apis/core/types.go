@@ -6773,6 +6773,8 @@ const (
 	ExecTTYParam = "tty"
 	// Command to run for remote command execution
 	ExecCommandParam = "command"
+	// Env is a repeated query parameter for environment variables passed to remote exec
+	ExecEnvParam = "env"
 
 	// Name of header that specifies stream type
 	StreamType = "streamType"

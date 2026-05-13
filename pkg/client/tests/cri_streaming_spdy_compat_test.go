@@ -53,7 +53,7 @@ const (
 
 type fakeStreamingRuntime struct{}
 
-func (*fakeStreamingRuntime) Exec(ctx context.Context, containerID string, cmd []string, in io.Reader, out, errStream io.WriteCloser, tty bool, resize <-chan remotecommandserver.TerminalSize) error {
+func (*fakeStreamingRuntime) Exec(ctx context.Context, containerID string, cmd []string, env []string, in io.Reader, out, errStream io.WriteCloser, tty bool, resize <-chan remotecommandserver.TerminalSize) error {
 	if containerID != execContainerID {
 		return fmt.Errorf("unexpected exec container ID: %q", containerID)
 	}

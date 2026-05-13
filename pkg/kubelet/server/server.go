@@ -318,7 +318,7 @@ type HostInterface interface {
 	GetKubeletContainerLogs(ctx context.Context, podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
 	ServeLogs(w http.ResponseWriter, req *http.Request)
 	SyncLoopHealthCheck(req *http.Request) error
-	GetExec(ctx context.Context, podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error)
+	GetExec(ctx context.Context, podFullName string, podUID types.UID, containerName string, cmd []string, env []string, streamOpts remotecommandserver.Options) (*url.URL, error)
 	GetAttach(ctx context.Context, podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error)
 	GetPortForward(ctx context.Context, podName, podNamespace string, podUID types.UID, portForwardOpts portforward.V4Options) (*url.URL, error)
 	ListMetricDescriptors(ctx context.Context) ([]*runtimeapi.MetricDescriptor, error)
@@ -970,6 +970,7 @@ type execRequestParams struct {
 	podUID        types.UID
 	containerName string
 	cmd           []string
+	env           []string
 }
 
 func getExecRequestParams(req *restful.Request) execRequestParams {
@@ -979,6 +980,7 @@ func getExecRequestParams(req *restful.Request) execRequestParams {
 		podUID:        types.UID(req.PathParameter("uid")),
 		containerName: req.PathParameter("containerName"),
 		cmd:           req.Request.URL.Query()[api.ExecCommandParam],
+		env:           req.Request.URL.Query()[api.ExecEnvParam],
 	}
 }
 
@@ -1059,7 +1061,7 @@ func (s *Server) getExec(request *restful.Request, response *restful.Response) {
 	}
 
 	podFullName := kubecontainer.GetPodFullName(pod)
-	url, err := s.host.GetExec(request.Request.Context(), podFullName, params.podUID, params.containerName, params.cmd, *streamOpts)
+	url, err := s.host.GetExec(request.Request.Context(), podFullName, params.podUID, params.containerName, params.cmd, params.env, *streamOpts)
 	if err != nil {
 		streaming.WriteError(err, response.ResponseWriter)
 		return
