@@ -29,9 +29,9 @@ package v1beta1
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_CronJob = map[string]string{
 	"":         "CronJob represents the configuration of a single cron job.",
-	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-	"spec":     "Specification of the desired behavior of a cron job, including the schedule. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-	"status":   "Current status of a cron job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+	"metadata": "metadata is the standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec specifies the desired behavior of a cron job, including the schedule. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+	"status":   "status reports the current status of a cron job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 }
 
 func (CronJob) SwaggerDoc() map[string]string {
@@ -50,14 +50,14 @@ func (CronJobList) SwaggerDoc() map[string]string {
 
 var map_CronJobSpec = map[string]string{
 	"":                           "CronJobSpec describes how the job execution will look like and when it will actually run.",
-	"schedule":                   "The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",
-	"timeZone":                   "The time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. If not specified, this will default to the time zone of the kube-controller-manager process. The set of valid time zone names and the time zone offset is loaded from the system-wide time zone database by the API server during CronJob validation and the controller manager during execution. If no system-wide time zone database can be found a bundled version of the database is used instead. If the time zone name becomes invalid during the lifetime of a CronJob or due to a change in host configuration, the controller will stop creating new new Jobs and will create a system event with the reason UnknownTimeZone. More information can be found in https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones",
-	"startingDeadlineSeconds":    "Optional deadline in seconds for starting the job if it misses scheduled time for any reason.  Missed jobs executions will be counted as failed ones.",
-	"concurrencyPolicy":          "Specifies how to treat concurrent executions of a Job. Valid values are:\n\n- \"Allow\" (default): allows CronJobs to run concurrently; - \"Forbid\": forbids concurrent runs, skipping next run if previous run hasn't finished yet; - \"Replace\": cancels currently running job and replaces it with a new one",
-	"suspend":                    "This flag tells the controller to suspend subsequent executions, it does not apply to already started executions.  Defaults to false.",
-	"jobTemplate":                "Specifies the job that will be created when executing a CronJob.",
-	"successfulJobsHistoryLimit": "The number of successful finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified. Defaults to 3.",
-	"failedJobsHistoryLimit":     "The number of failed finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
+	"schedule":                   "schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.",
+	"timeZone":                   "timeZone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. If not specified, this will default to the time zone of the kube-controller-manager process. The set of valid time zone names and the time zone offset is loaded from the system-wide time zone database by the API server during CronJob validation and the controller manager during execution. If no system-wide time zone database can be found a bundled version of the database is used instead. If the time zone name becomes invalid during the lifetime of a CronJob or due to a change in host configuration, the controller will stop creating new Jobs and will create a system event with the reason UnknownTimeZone. More information can be found in https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#time-zones",
+	"startingDeadlineSeconds":    "startingDeadlineSeconds is an optional deadline in seconds for starting the job if it misses scheduled time for any reason. Missed jobs executions will be counted as failed ones.",
+	"concurrencyPolicy":          "concurrencyPolicy specifies how to treat concurrent executions of a Job. Valid values are:\n\n- \"Allow\" (default): allows CronJobs to run concurrently; - \"Forbid\": forbids concurrent runs, skipping next run if previous run hasn't finished yet; - \"Replace\": cancels currently running job and replaces it with a new one",
+	"suspend":                    "suspend is a flag, telling the controller to suspend subsequent executions, it does not apply to already started executions. Defaults to false.",
+	"jobTemplate":                "jobTemplate specifies the job that will be created when executing a CronJob.",
+	"successfulJobsHistoryLimit": "successfulJobsHistoryLimit specifies the number of successful finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified. Defaults to 3.",
+	"failedJobsHistoryLimit":     "failedJobsHistoryLimit specifies the number of failed finished jobs to retain. This is a pointer to distinguish between explicit zero and not specified. Defaults to 1.",
 }
 
 func (CronJobSpec) SwaggerDoc() map[string]string {
@@ -77,8 +77,8 @@ func (CronJobStatus) SwaggerDoc() map[string]string {
 
 var map_JobTemplateSpec = map[string]string{
 	"":         "JobTemplateSpec describes the data a Job should have when created from a template",
-	"metadata": "Standard object's metadata of the jobs created from this template. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-	"spec":     "Specification of the desired behavior of the job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
+	"metadata": "metadata is the standard object metadata of the jobs created from this template. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec specifies the desired behavior of a job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
 }
 
 func (JobTemplateSpec) SwaggerDoc() map[string]string {
