@@ -57,10 +57,11 @@ type Logger interface {
 // PolicyTestContext is everything you need to unit test a policy plugin
 type PolicyTestContext[P runtime.Object, B runtime.Object, E Evaluator] struct {
 	context.Context
-	Logger Logger
-	Plugin *Plugin[PolicyHook[P, B, E]]
-	Source Source[PolicyHook[P, B, E]]
-	Start  func() error
+	Logger        Logger
+	Plugin        *Plugin[PolicyHook[P, B, E]]
+	Source        Source[PolicyHook[P, B, E]]
+	Start         func() error
+	DynamicClient dynamic.Interface
 
 	scheme     *runtime.Scheme
 	restMapper *meta.DefaultRESTMapper
@@ -225,10 +226,11 @@ func NewPolicyTestContext[P, B runtime.Object, E Evaluator](
 	}
 
 	res := &PolicyTestContext[P, B, E]{
-		Logger:  logger,
-		Context: testContext,
-		Plugin:  plugin,
-		Source:  source,
+		Logger:        logger,
+		Context:       testContext,
+		Plugin:        plugin,
+		Source:        source,
+		DynamicClient: dynamicClient,
 
 		restMapper:              fakeRestMapper,
 		scheme:                  policySourceTestScheme,
