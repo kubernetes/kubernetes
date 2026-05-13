@@ -136,6 +136,8 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 				oldObj       apps.Deployment
 				updateObj    apps.Deployment
 				expectedErrs field.ErrorList
+				skipVersions []string
+				allRulesOnly bool
 			}{
 				"valid update": {
 					oldObj:    mkValidDeployment(),
@@ -155,9 +157,34 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 						}, "field is immutable").WithOrigin("immutable").MarkAlpha(),
 					},
 				},
+				"immutable selector set from unset": {
+					oldObj:    mkValidDeployment(tweakSelector(nil)),
+					updateObj: mkValidDeployment(),
+					expectedErrs: field.ErrorList{
+						field.Invalid(field.NewPath("spec", "selector"), &metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "test"},
+						}, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+					},
+				},
+				"immutable selector unset from set": {
+					oldObj:    mkValidDeployment(),
+					updateObj: mkValidDeployment(tweakSelector(nil)),
+					expectedErrs: field.ErrorList{
+						field.Required(field.NewPath("spec", "selector"), "").MarkAlpha(),
+						field.Invalid(field.NewPath("spec", "template", "metadata", "labels"), nil, "").MarkFromImperative(),
+						field.Invalid(field.NewPath("spec", "selector"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+					},
+					skipVersions: []string{"v1beta1"},
+					allRulesOnly: true,
+				},
 			}
 			for name, tc := range testCases {
 				t.Run(name, func(t *testing.T) {
+					for _, version := range tc.skipVersions {
+						if apiVersion == version {
+							t.Skipf("not applicable to %s", apiVersion)
+						}
+					}
 					ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 						APIPrefix:         "apis",
 						APIGroup:          "apps",
@@ -169,11 +196,42 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 					})
 					tc.oldObj.ResourceVersion = "1"
 					tc.updateObj.ResourceVersion = "2"
+					if tc.allRulesOnly {
+						verifyDeclarativeValidateUpdateAllRules(t, ctx, apiVersion, &tc.updateObj, &tc.oldObj, tc.expectedErrs)
+						return
+					}
 					apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, registry.Strategy, tc.expectedErrs)
 				})
 			}
 		})
 	}
+}
+
+func verifyDeclarativeValidateUpdateAllRules(t *testing.T, ctx context.Context, apiVersion string, updateObj, oldObj *apps.Deployment, expectedErrs field.ErrorList) {
+	t.Helper()
+
+	testCtx := rest.WithAllDeclarativeEnforcedForTest(ctx)
+	legacyregistry.Reset()
+	defer legacyregistry.Reset()
+	validationmetrics.ResetValidationMetricsInstance()
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.DeclarativeValidation:     true,
+		features.DeclarativeValidationBeta: true,
+	})
+
+	errs := registry.Strategy.ValidateUpdate(testCtx, updateObj, oldObj)
+	errs = registry.Strategy.ValidateDeclaratively(
+		testCtx,
+		updateObj,
+		oldObj,
+		errs,
+		operation.Update,
+		registry.Strategy.DeclarativeValidationConfig(testCtx, updateObj, oldObj),
+	)
+
+	field.ErrorMatcher{}.ByType().ByOrigin().ByField().ByValidationStabilityLevel().BySource().Test(t, expectedErrs, errs)
+	coverage.RecordObservedRules(schema.GroupVersionKind{Group: "apps", Version: apiVersion, Kind: "Deployment"}, errs)
+	testutil.AssertVectorCount(t, "apiserver_validation_declarative_validation_mismatch_total", nil, 0)
 }
 
 func mkValidDeployment(tweaks ...func(*apps.Deployment)) apps.Deployment {
