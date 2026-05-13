@@ -24,22 +24,29 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	registry "k8s.io/kubernetes/pkg/registry/core/node"
 )
 
 // Smoke test that create requests are wired through declarative validation.
 func TestDeclarativeValidateNodeCreateWiring(t *testing.T) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "",
-		APIVersion: "v1",
+		APIGroup:          "",
+		APIVersion:        "v1",
+		Resource:          "nodes",
+		IsResourceRequest: true,
+		Verb:              "create",
 	})
 	obj := mkValidNode()
-	apitesting.VerifyValidationEquivalence(t, ctx, &obj, Strategy.Validate, field.ErrorList{})
+	apitesting.VerifyValidationEquivalence(t, ctx, &obj, registry.Strategy, field.ErrorList{})
 }
 
 func TestDeclarativeValidateNodeUpdate(t *testing.T) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:   "",
-		APIVersion: "v1",
+		APIGroup:          "",
+		APIVersion:        "v1",
+		Resource:          "nodes",
+		IsResourceRequest: true,
+		Verb:              "update",
 	})
 	testCases := map[string]struct {
 		old          api.Node
@@ -89,7 +96,7 @@ func TestDeclarativeValidateNodeUpdate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tc.old.ObjectMeta.ResourceVersion = "1"
 			tc.update.ObjectMeta.ResourceVersion = "1"
-			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, Strategy.ValidateUpdate, tc.expectedErrs)
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, registry.Strategy, tc.expectedErrs)
 		})
 	}
 }

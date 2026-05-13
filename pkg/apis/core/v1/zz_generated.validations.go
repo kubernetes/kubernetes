@@ -41,13 +41,20 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
 	// type Node
-	scheme.AddValidationFunc((*corev1.Node)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_Node(ctx, op, nil /* fldPath */, obj.(*corev1.Node), safe.Cast[*corev1.Node](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*corev1.Node)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/", "/proxy", "/status":
+				return Validate_Node(
+					ctx, op, nil, /* fldPath */
+					obj.(*corev1.Node),
+					safe.Cast[*corev1.Node](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type ReplicationController
 	scheme.AddValidationFunc(
 		(*corev1.ReplicationController)(nil),
@@ -68,21 +75,34 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 
 // Validate_Node validates an instance of Node according
 // to declarative validation rules in the API schema.
-func Validate_Node(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.Node) (errs field.ErrorList) {
+func Validate_Node(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.Node) (errs field.ErrorList) {
+
 	// field corev1.Node.TypeMeta has no validation
 	// field corev1.Node.ObjectMeta has no validation
 
-	// field corev1.Node.Spec
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *corev1.NodeSpec, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field corev1.Node.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.NodeSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_NodeSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *corev1.Node) *corev1.NodeSpec { return &oldObj.Spec }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.Node) *corev1.NodeSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
 
 	// field corev1.Node.Status has no validation
 	return errs
@@ -90,23 +110,30 @@ func Validate_Node(ctx context.Context, op operation.Operation, fldPath *field.P
 
 // Validate_NodeSpec validates an instance of NodeSpec according
 // to declarative validation rules in the API schema.
-func Validate_NodeSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.NodeSpec) (errs field.ErrorList) {
+func Validate_NodeSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.NodeSpec) (errs field.ErrorList) {
+
 	// field corev1.NodeSpec.PodCIDR has no validation
 	// field corev1.NodeSpec.PodCIDRs has no validation
 
-	// field corev1.NodeSpec.ProviderID
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field corev1.NodeSpec.ProviderID
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
-			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoUnset, validate.NoModify).MarkAlpha(); len(e) != 0 {
+			if e := validate.UpdateValueByCompare(ctx, op, fldPath, obj, oldObj, validate.NoUnset, validate.NoModify).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -114,7 +141,13 @@ func Validate_NodeSpec(ctx context.Context, op operation.Operation, fldPath *fie
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("providerID"), &obj.ProviderID, safe.Field(oldObj, func(oldObj *corev1.NodeSpec) *string { return &oldObj.ProviderID }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.NodeSpec) *string {
+				return &oldObj.ProviderID
+			})
+		errs = append(errs, fn(fldPath.Child("providerID"), &obj.ProviderID, oldVal, oldObj != nil)...)
+	}
 
 	// field corev1.NodeSpec.Unschedulable has no validation
 	// field corev1.NodeSpec.Taints has no validation
