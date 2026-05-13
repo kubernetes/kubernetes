@@ -98,7 +98,7 @@ func fieldName(field *ast.Field) string {
 	jsonTag := ""
 	if field.Tag != nil {
 		jsonTag = reflect.StructTag(field.Tag.Value[1 : len(field.Tag.Value)-1]).Get("json") // Delete first and last quotation
-		if strings.Contains(jsonTag, "inline") {
+		if hasJSONTagOption(jsonTag, "inline") {
 			return "-"
 		}
 	}
@@ -111,6 +111,21 @@ func fieldName(field *ast.Field) string {
 		return field.Type.(*ast.Ident).Name
 	}
 	return jsonTag
+}
+
+// hasJSONTagOption reports whether option appears as a comma-separated
+// JSON tag option (e.g. "inline" in `json:",inline"`). The first comma-
+// separated component is the JSON field name, never an option, and is
+// skipped. This avoids substring false-positives such as a field named
+// inlineVolumeSpec being mistaken for a `,inline` embedded struct.
+func hasJSONTagOption(jsonTag, option string) bool {
+	parts := strings.Split(jsonTag, ",")
+	for _, part := range parts[1:] {
+		if part == option {
+			return true
+		}
+	}
+	return false
 }
 
 // A buffer of lines that will be written.
