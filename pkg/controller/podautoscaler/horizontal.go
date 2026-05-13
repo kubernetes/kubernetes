@@ -1060,29 +1060,27 @@ func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpaShare
 }
 
 // stabilizeRecommendation:
-// - replaces old recommendation with the newest recommendation,
+// - removes all outdated recommendations and appends the newest one,
 // - returns max of recommendations that are not older than downscaleStabilisationWindow.
 func (a *HorizontalController) stabilizeRecommendation(key string, prenormalizedDesiredReplicas int32) int32 {
 	maxRecommendation := prenormalizedDesiredReplicas
-	foundOldSample := false
-	oldSampleIndex := 0
 	cutoff := time.Now().Add(-a.downscaleStabilisationWindow)
 
 	a.recommendationsLock.Lock()
 	defer a.recommendationsLock.Unlock()
-	for i, rec := range a.recommendations[key] {
+	// Remove all outdated recommendations and find the max of the remaining ones.
+	kept := a.recommendations[key][:0]
+	for _, rec := range a.recommendations[key] {
 		if rec.timestamp.Before(cutoff) {
-			foundOldSample = true
-			oldSampleIndex = i
-		} else if rec.recommendation > maxRecommendation {
+			continue
+		}
+		if rec.recommendation > maxRecommendation {
 			maxRecommendation = rec.recommendation
 		}
+		kept = append(kept, rec)
 	}
-	if foundOldSample {
-		a.recommendations[key][oldSampleIndex] = timestampedRecommendation{prenormalizedDesiredReplicas, time.Now()}
-	} else {
-		a.recommendations[key] = append(a.recommendations[key], timestampedRecommendation{prenormalizedDesiredReplicas, time.Now()})
-	}
+	kept = append(kept, timestampedRecommendation{prenormalizedDesiredReplicas, time.Now()})
+	a.recommendations[key] = kept
 	return maxRecommendation
 }
 
@@ -1183,64 +1181,47 @@ func (a *HorizontalController) getUnableComputeReplicaCountCondition(hpa runtime
 	}
 }
 
-// storeScaleEvent stores (adds or replaces outdated) scale event.
-// outdated events to be replaced were marked as outdated in the `markScaleEventsOutdated` function
+// storeScaleEvent stores the new scale event and removes all outdated events.
+// Outdated events are identified by the `markScaleEventsOutdated` function.
 func (a *HorizontalController) storeScaleEvent(behavior *autoscalingv2.HorizontalPodAutoscalerBehavior, key string, prevReplicas, newReplicas int32) {
 	if behavior == nil {
 		return // we should not store any event as they will not be used
 	}
-	var oldSampleIndex int
-	var longestPolicyPeriod int32
-	foundOldSample := false
 	if newReplicas > prevReplicas {
-		longestPolicyPeriod = getLongestPolicyPeriod(behavior.ScaleUp)
+		longestPolicyPeriod := getLongestPolicyPeriod(behavior.ScaleUp)
 
 		a.scaleUpEventsLock.Lock()
 		defer a.scaleUpEventsLock.Unlock()
 		markScaleEventsOutdated(a.scaleUpEvents[key], longestPolicyPeriod)
-		replicaChange := newReplicas - prevReplicas
-		for i, event := range a.scaleUpEvents[key] {
-			if event.outdated {
-				foundOldSample = true
-				oldSampleIndex = i
-			}
-		}
-		newEvent := timestampedScaleEvent{replicaChange, time.Now(), false}
-		if foundOldSample {
-			a.scaleUpEvents[key][oldSampleIndex] = newEvent
-		} else {
-			a.scaleUpEvents[key] = append(a.scaleUpEvents[key], newEvent)
-		}
+		a.scaleUpEvents[key] = compactScaleEvents(a.scaleUpEvents[key])
+		a.scaleUpEvents[key] = append(a.scaleUpEvents[key], timestampedScaleEvent{newReplicas - prevReplicas, time.Now(), false})
 	} else {
-		longestPolicyPeriod = getLongestPolicyPeriod(behavior.ScaleDown)
+		longestPolicyPeriod := getLongestPolicyPeriod(behavior.ScaleDown)
 
 		a.scaleDownEventsLock.Lock()
 		defer a.scaleDownEventsLock.Unlock()
 		markScaleEventsOutdated(a.scaleDownEvents[key], longestPolicyPeriod)
-		replicaChange := prevReplicas - newReplicas
-		for i, event := range a.scaleDownEvents[key] {
-			if event.outdated {
-				foundOldSample = true
-				oldSampleIndex = i
-			}
-		}
-		newEvent := timestampedScaleEvent{replicaChange, time.Now(), false}
-		if foundOldSample {
-			a.scaleDownEvents[key][oldSampleIndex] = newEvent
-		} else {
-			a.scaleDownEvents[key] = append(a.scaleDownEvents[key], newEvent)
-		}
+		a.scaleDownEvents[key] = compactScaleEvents(a.scaleDownEvents[key])
+		a.scaleDownEvents[key] = append(a.scaleDownEvents[key], timestampedScaleEvent{prevReplicas - newReplicas, time.Now(), false})
 	}
 }
 
+// compactScaleEvents removes all outdated events from the slice, reusing the backing array.
+func compactScaleEvents(events []timestampedScaleEvent) []timestampedScaleEvent {
+	kept := events[:0]
+	for _, e := range events {
+		if !e.outdated {
+			kept = append(kept, e)
+		}
+	}
+	return kept
+}
+
 // stabilizeRecommendationWithBehaviors:
-// - replaces old recommendation with the newest recommendation,
+// - removes all outdated recommendations and appends the newest one,
 // - returns {max,min} of recommendations that are not older than constraints.Scale{Up,Down}.DelaySeconds
 func (a *HorizontalController) stabilizeRecommendationWithBehaviors(args NormalizationArg) (int32, string, string) {
 	now := time.Now()
-
-	foundOldSample := false
-	oldSampleIndex := 0
 
 	upRecommendation := args.DesiredReplicas
 	upDelaySeconds := *args.ScaleUpBehavior.StabilizationWindowSeconds
@@ -1250,20 +1231,22 @@ func (a *HorizontalController) stabilizeRecommendationWithBehaviors(args Normali
 	downDelaySeconds := *args.ScaleDownBehavior.StabilizationWindowSeconds
 	downCutoff := now.Add(-time.Second * time.Duration(downDelaySeconds))
 
-	// Calculate the upper and lower stabilization limits.
+	// Calculate the upper and lower stabilization limits,
+	// removing recommendations that are outdated for both windows.
 	a.recommendationsLock.Lock()
 	defer a.recommendationsLock.Unlock()
-	for i, rec := range a.recommendations[args.Key] {
+	kept := a.recommendations[args.Key][:0]
+	for _, rec := range a.recommendations[args.Key] {
+		if rec.timestamp.Before(upCutoff) && rec.timestamp.Before(downCutoff) {
+			continue
+		}
 		if rec.timestamp.After(upCutoff) {
 			upRecommendation = min(rec.recommendation, upRecommendation)
 		}
 		if rec.timestamp.After(downCutoff) {
 			downRecommendation = max(rec.recommendation, downRecommendation)
 		}
-		if rec.timestamp.Before(upCutoff) && rec.timestamp.Before(downCutoff) {
-			foundOldSample = true
-			oldSampleIndex = i
-		}
+		kept = append(kept, rec)
 	}
 
 	// Bring the recommendation to within the upper and lower limits (stabilize).
@@ -1276,11 +1259,8 @@ func (a *HorizontalController) stabilizeRecommendationWithBehaviors(args Normali
 	}
 
 	// Record the unstabilized recommendation.
-	if foundOldSample {
-		a.recommendations[args.Key][oldSampleIndex] = timestampedRecommendation{args.DesiredReplicas, time.Now()}
-	} else {
-		a.recommendations[args.Key] = append(a.recommendations[args.Key], timestampedRecommendation{args.DesiredReplicas, time.Now()})
-	}
+	kept = append(kept, timestampedRecommendation{args.DesiredReplicas, time.Now()})
+	a.recommendations[args.Key] = kept
 
 	// Determine a human-friendly message.
 	var reason, message string

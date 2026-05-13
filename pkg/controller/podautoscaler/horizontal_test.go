@@ -4335,7 +4335,7 @@ func TestNormalizeDesiredReplicas(t *testing.T) {
 			},
 			3,
 			3,
-			2,
+			1,
 		},
 		{
 			"stabilize - old recommendations",
@@ -4348,7 +4348,7 @@ func TestNormalizeDesiredReplicas(t *testing.T) {
 			},
 			3,
 			5,
-			4,
+			3,
 		},
 	}
 	for _, tc := range tests {
@@ -4365,6 +4365,35 @@ func TestNormalizeDesiredReplicas(t *testing.T) {
 		if len(hc.recommendations[tc.key]) != tc.expectedLogLength {
 			t.Errorf("[%s] after  stabilization recommendations log has %d entries, expected %d", tc.name, len(hc.recommendations[tc.key]), tc.expectedLogLength)
 		}
+	}
+}
+
+func TestStabilizeRecommendationRemovesAllOutdated(t *testing.T) {
+	hc := HorizontalController{
+		downscaleStabilisationWindow: 5 * time.Minute,
+		recommendations:              map[string][]timestampedRecommendation{},
+	}
+	key := "test-ns/test-hpa"
+
+	// Simulate many reconciliations producing recommendations that later age out.
+	// All entries are older than the 5-minute stabilization window.
+	outdatedCount := 100
+	oldRecs := make([]timestampedRecommendation, outdatedCount)
+	for i := range oldRecs {
+		oldRecs[i] = timestampedRecommendation{
+			recommendation: int32(10 + i),
+			timestamp:      time.Now().Add(-time.Duration(10+i) * time.Minute),
+		}
+	}
+	hc.recommendations[key] = oldRecs
+
+	// A single call should remove all outdated entries and keep only the new one.
+	r := hc.stabilizeRecommendation(key, 5)
+	if r != 5 {
+		t.Errorf("expected stabilized replicas 5, got %d", r)
+	}
+	if got := len(hc.recommendations[key]); got != 1 {
+		t.Errorf("expected 1 recommendation after cleanup, got %d (outdated entries leaked)", got)
 	}
 }
 
@@ -4906,32 +4935,31 @@ func TestStoreScaleEvents(t *testing.T) {
 			expectedReplicasChange: 7,
 		},
 		{
-			name:          "two entries, one of them to be replaced",
+			name:          "two entries, one of them outdated and removed",
 			replicaChange: 5,
 			prevScaleEvents: []timestampedScaleEvent{
-				{7, time.Now().Add(-time.Second * time.Duration(61)), false}, // outdated event, should be replaced
+				{7, time.Now().Add(-time.Second * time.Duration(61)), false}, // outdated event, should be removed
 				{6, time.Now().Add(-time.Second * time.Duration(59)), false},
 			},
 			newScaleEvents: []timestampedScaleEvent{
-				{5, time.Now(), false},
 				{6, time.Now(), false},
+				{5, time.Now(), false},
 			},
 			scalingRules:           generateScalingRules(10, 60, 0, 0, 0),
 			expectedReplicasChange: 6,
 		},
 		{
-			name:          "replace one entry, use policies with different periods",
+			name:          "remove outdated entries, use policies with different periods",
 			replicaChange: 5,
 			prevScaleEvents: []timestampedScaleEvent{
 				{8, time.Now().Add(-time.Second * time.Duration(29)), false},
 				{6, time.Now().Add(-time.Second * time.Duration(59)), false},
-				{7, time.Now().Add(-time.Second * time.Duration(61)), false}, // outdated event, should be marked as outdated
-				{9, time.Now().Add(-time.Second * time.Duration(61)), false}, // outdated event, should be replaced
+				{7, time.Now().Add(-time.Second * time.Duration(61)), false}, // outdated event, should be removed
+				{9, time.Now().Add(-time.Second * time.Duration(61)), false}, // outdated event, should be removed
 			},
 			newScaleEvents: []timestampedScaleEvent{
 				{8, time.Now(), false},
 				{6, time.Now(), false},
-				{7, time.Now(), true},
 				{5, time.Now(), false},
 			},
 			scalingRules:           generateScalingRules(10, 60, 100, 30, 0),
@@ -5096,7 +5124,7 @@ func TestNormalizeDesiredReplicasWithBehavior(t *testing.T) {
 			scaleDownStabilizationWindowSeconds: 60 * 5,
 		},
 		{
-			name: "no scale down stabilization, reuse recommendation element",
+			name: "no scale down stabilization, remove obsolete recommendations",
 			key:  "",
 			recommendations: []timestampedRecommendation{
 				{10, now.Add(-10 * time.Minute)},
@@ -5105,12 +5133,11 @@ func TestNormalizeDesiredReplicasWithBehavior(t *testing.T) {
 			prenormalizedDesiredReplicas: 3,
 			expectedStabilizedReplicas:   3,
 			expectedRecommendations: []timestampedRecommendation{
-				{10, now},
 				{3, now},
 			},
 		},
 		{
-			name: "no scale up stabilization, reuse recommendation element",
+			name: "no scale up stabilization, remove obsolete recommendations",
 			key:  "",
 			recommendations: []timestampedRecommendation{
 				{10, now.Add(-10 * time.Minute)},
@@ -5119,12 +5146,11 @@ func TestNormalizeDesiredReplicasWithBehavior(t *testing.T) {
 			prenormalizedDesiredReplicas: 100,
 			expectedStabilizedReplicas:   100,
 			expectedRecommendations: []timestampedRecommendation{
-				{10, now},
 				{100, now},
 			},
 		},
 		{
-			name: "scale down stabilization, reuse one of obsolete recommendation element",
+			name: "scale down stabilization, remove obsolete recommendations",
 			key:  "",
 			recommendations: []timestampedRecommendation{
 				{10, now.Add(-10 * time.Minute)},
@@ -5135,7 +5161,6 @@ func TestNormalizeDesiredReplicasWithBehavior(t *testing.T) {
 			prenormalizedDesiredReplicas: 3,
 			expectedStabilizedReplicas:   5,
 			expectedRecommendations: []timestampedRecommendation{
-				{10, now},
 				{4, now},
 				{5, now},
 				{3, now},
@@ -5143,10 +5168,7 @@ func TestNormalizeDesiredReplicasWithBehavior(t *testing.T) {
 			scaleDownStabilizationWindowSeconds: 3 * 60,
 		},
 		{
-			// we can reuse only the first recommendation element
-			// as the scale up delay = 150 (set in test), scale down delay = 300 (by default)
-			// hence, only the first recommendation is obsolete for both scale up and scale down
-			name: "scale up stabilization, reuse one of obsolete recommendation element",
+			name: "scale up stabilization, remove obsolete recommendations",
 			key:  "",
 			recommendations: []timestampedRecommendation{
 				{10, now.Add(-100 * time.Minute)},
@@ -5157,10 +5179,10 @@ func TestNormalizeDesiredReplicasWithBehavior(t *testing.T) {
 			prenormalizedDesiredReplicas: 100,
 			expectedStabilizedReplicas:   5,
 			expectedRecommendations: []timestampedRecommendation{
-				{100, now},
 				{6, now},
 				{5, now},
 				{9, now},
+				{100, now},
 			},
 			scaleUpStabilizationWindowSeconds: 300,
 		}, {
