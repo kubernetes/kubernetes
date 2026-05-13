@@ -22,22 +22,17 @@ limitations under the License.
 package mutatingadmissionpolicy
 
 import (
-	fmt "fmt"
-	os "os"
-	testing "testing"
-
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	coverage "k8s.io/apimachinery/pkg/test/coverage"
 )
 
-var apiVersions = []string{"v1", "v1alpha1", "v1beta1"}
-
-func TestMain(m *testing.M) {
-	code := m.Run()
-	if err := coverage.AssertDeclarativeCoverage(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		if code == 0 {
-			code = 1
-		}
-	}
-	os.Exit(code)
+func init() {
+	coverage.RegisterDeclaredRules(
+		schema.GroupVersionKind{Group: "admissionregistration.k8s.io", Version: "v1alpha1", Kind: "MutatingAdmissionPolicy"},
+		coverage.FieldRules{
+			"spec.variables": {
+				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
+			},
+		},
+	)
 }
