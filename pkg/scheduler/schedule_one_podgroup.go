@@ -182,7 +182,7 @@ type podSchedulingContext struct {
 }
 
 // initPodSchedulingContext initializes the scheduling context of a single pod for pod group scheduling cycle.
-func initPodSchedulingContext(ctx context.Context, pod *v1.Pod, podGroupState *framework.CycleState, placementCycleState fwk.PlacementCycleState, postFilterMode podGroupPostFilterMode) *podSchedulingContext {
+func initPodSchedulingContext(ctx context.Context, pod *v1.Pod, podGroupState *framework.CycleState, placementCycleState *framework.CycleState, postFilterMode podGroupPostFilterMode) *podSchedulingContext {
 	logger := klog.FromContext(ctx)
 	// TODO(knelasevero): Remove duplicated keys from log entry calls
 	// When contextualized logging hits GA
@@ -441,7 +441,7 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 
 // podGroupPodSchedulingAlgorithm runs a scheduling algorithm for individual pod from a pod group.
 // It returns the algorithm result together with the revert function.
-func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, placementCycleState fwk.PlacementCycleState, podGroupInfo *framework.QueuedPodGroupInfo, podInfo *framework.QueuedPodInfo, postFilterMode podGroupPostFilterMode) (algorithmResult, func()) {
+func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, placementCycleState *framework.CycleState, podGroupInfo *framework.QueuedPodGroupInfo, podInfo *framework.QueuedPodInfo, postFilterMode podGroupPostFilterMode) (algorithmResult, func()) {
 	pod := podInfo.Pod
 	podCtx := initPodSchedulingContext(ctx, pod, podGroupCycleState, placementCycleState, postFilterMode)
 	logger := podCtx.logger

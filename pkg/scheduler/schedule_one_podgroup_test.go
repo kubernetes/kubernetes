@@ -2747,13 +2747,12 @@ func (p *placementStateTracker) ScorePlacement(ctx context.Context, state fwk.Po
 	}
 
 	data, err := placement.PlacementCycleState.Read(placementStateKey)
+	if err != nil {
+		return 0, fwk.NewStatus(fwk.Error, fmt.Sprintf("failed to read PlacementCycleState for %s: %v", placement.Name, err))
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if err != nil {
-		p.scoreReadValues[placement.Name] = "<not found>"
-	} else {
-		p.scoreReadValues[placement.Name] = data.(*placementStateData).value
-	}
+	p.scoreReadValues[placement.Name] = data.(*placementStateData).value
 	return 1, nil
 }
 
@@ -2767,15 +2766,15 @@ func (p *placementStateTracker) GeneratePlacements(ctx context.Context, state fw
 		parentNodes[node.Node().Name] = node
 	}
 
-	placements := make([]*fwk.Placement, 0, len(p.generatePlacementsResult))
+	resultPlacements := make([]*fwk.Placement, 0, len(p.generatePlacementsResult))
 	for placementName, nodeNames := range p.generatePlacementsResult {
 		placement := &fwk.Placement{Name: placementName}
 		for _, nodeName := range nodeNames {
 			placement.Nodes = append(placement.Nodes, parentNodes[nodeName])
 		}
-		placements = append(placements, placement)
+		resultPlacements = append(resultPlacements, placement)
 	}
-	return &fwk.GeneratePlacementsResult{Placements: placements}, nil
+	return &fwk.GeneratePlacementsResult{Placements: resultPlacements}, nil
 }
 
 func TestPlacementCycleStateLifecycle(t *testing.T) {
@@ -2789,7 +2788,7 @@ func TestPlacementCycleStateLifecycle(t *testing.T) {
 	// - ScorePlacement reads from PodGroupAssignments.PlacementCycleState after all simulations.
 	// Assertions verify:
 	//   1. Each placement's scorer reads only the value its own simulation wrote (isolation).
-	//   2. The value is readable at all during scoring (continuity from simulation to scoring).
+	//   2. Data written during each placement's simulation remains readable during its scoring (continuity from simulation to scoring).
 
 	nodes := []*v1.Node{
 		st.MakeNode().Name("node1").Obj(),
@@ -2873,13 +2872,11 @@ func TestPlacementCycleStateLifecycle(t *testing.T) {
 	defer tracker.mu.Unlock()
 
 	// Continuity: ScorePlacement must have been called and able to read simulation data.
+	// ScorePlacement returns an error status if the read fails, so a failed read would
+	// already have been caught by the result.status check above.
 	for _, placementName := range []string{"placementA", "placementB"} {
-		readValue, ok := tracker.scoreReadValues[placementName]
-		if !ok {
+		if _, ok := tracker.scoreReadValues[placementName]; !ok {
 			t.Fatalf("placement %s: ScorePlacement was not called", placementName)
-		}
-		if readValue == "<not found>" {
-			t.Fatalf("placement %s: ScorePlacement could not read state written during simulation", placementName)
 		}
 	}
 
