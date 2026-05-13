@@ -163,12 +163,12 @@ type IngressLoadBalancerIngress struct {
 // IngressPortStatus represents the error condition of a service port
 type IngressPortStatus struct {
 	// port is the port number of the ingress port.
-	// +required
+	// +optional
 	Port int32 `json:"port" protobuf:"varint,1,opt,name=port"`
 
 	// protocol is the protocol of the ingress port.
 	// The supported values are: "TCP", "UDP", "SCTP"
-	// +required
+	// +optional
 	Protocol v1.Protocol `json:"protocol" protobuf:"bytes,2,opt,name=protocol,casttype=Protocol"`
 
 	// error is to record the problem with the service port
