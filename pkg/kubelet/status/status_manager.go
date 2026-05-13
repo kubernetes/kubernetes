@@ -45,7 +45,6 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	kubeutil "k8s.io/kubernetes/pkg/kubelet/util"
 	statusutil "k8s.io/kubernetes/pkg/util/pod"
-	"k8s.io/utils/clock"
 )
 
 // A wrapper around v1.PodStatus that includes a version to enforce that stale pod statuses are
@@ -86,9 +85,6 @@ type manager struct {
 	// podStatusDeferrals tracks the expiration time of delayed status updates.
 	// Guarded by podStatusesLock.
 	podStatusDeferrals map[types.UID]time.Time
-
-	// clock is used to schedule defers and calculate durations
-	clock clock.Clock
 }
 
 type podResizeConditions struct {
@@ -249,7 +245,6 @@ func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeleti
 		podDeletionSafety:       podDeletionSafety,
 		podStartupLatencyHelper: podStartupLatencyHelper,
 		podStatusDeferrals:      make(map[types.UID]time.Time),
-		clock:                   clock.RealClock{},
 	}
 }
 
@@ -1096,13 +1091,13 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 	// so we track the time from the first status update until we retire it to
 	// the API.
 	if cachedStatus.at.IsZero() {
-		newStatus.at = m.clock.Now()
+		newStatus.at = time.Now()
 	} else {
 		newStatus.at = cachedStatus.at
 	}
 
 	expiration, hasActiveDeferral := m.podStatusDeferrals[pod.UID]
-	if hasActiveDeferral && !m.clock.Now().Before(expiration) {
+	if hasActiveDeferral && !time.Now().Before(expiration) {
 		hasActiveDeferral = false
 	}
 	shouldDefer := m.isEligibleForInitDeferral(&oldStatus, &status, hasActiveDeferral)
@@ -1111,11 +1106,11 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 
 	if shouldDefer {
 		if !hasActiveDeferral {
-			m.podStatusDeferrals[pod.UID] = m.clock.Now().Add(initContainerStatusDeferralWindow)
+			m.podStatusDeferrals[pod.UID] = time.Now().Add(initContainerStatusDeferralWindow)
 
 			// Spawn a lightweight timer to wake up the syncBatch loop if nothing else does
 			go func() {
-				<-m.clock.After(initContainerStatusDeferralWindow)
+				<-time.After(initContainerStatusDeferralWindow)
 				select {
 				case m.podStatusChannel <- struct{}{}:
 				default:
@@ -1251,7 +1246,7 @@ func (m *manager) syncBatch(ctx context.Context, all bool) int {
 			// pod can wait for the next bulk check (which performs reconciliation as well)
 
 			if expiration, deferred := m.podStatusDeferrals[uid]; deferred {
-				if m.clock.Now().Before(expiration) {
+				if time.Now().Before(expiration) {
 					// The deferral window hasn't expired yet. Skip syncing this pod.
 					continue
 				}

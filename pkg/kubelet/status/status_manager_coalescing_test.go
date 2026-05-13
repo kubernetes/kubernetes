@@ -18,15 +18,14 @@ package status
 
 import (
 	"testing"
+	"testing/synctest"
 	"time"
 
-	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientgofake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/klog/v2/ktesting"
-	testingclock "k8s.io/utils/clock/testing"
 )
 
 func TestInitContainerStatusCoalescing(t *testing.T) {
@@ -347,47 +346,44 @@ func TestInitContainerStatusCoalescing_PhaseChange(t *testing.T) {
 }
 
 func TestInitContainerStatusCoalescing_TimerExpiration(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	fakeClient := &clientgofake.Clientset{}
-	manager := newTestManager(fakeClient)
+	synctest.Test(t, func(t *testing.T) {
+		logger, ctx := ktesting.NewTestContext(t)
+		fakeClient := &clientgofake.Clientset{}
+		manager := newTestManager(fakeClient)
 
-	// Inject a FakeClock so we can instantly fast-forward time
-	fakeClock := testingclock.NewFakeClock(time.Now())
-	manager.clock = fakeClock
+		pod := getTestPod()
+		pod.Spec.InitContainers = []v1.Container{{Name: "init1"}}
 
-	pod := getTestPod()
-	pod.Spec.InitContainers = []v1.Container{{Name: "init1"}}
+		status := v1.PodStatus{
+			Phase: v1.PodPending,
+			InitContainerStatuses: []v1.ContainerStatus{
+				{Name: "init1", State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}},
+			},
+		}
+		manager.SetPodStatus(logger, pod, status)
+		verifyUpdates(t, manager, 1)
 
-	status := v1.PodStatus{
-		Phase: v1.PodPending,
-		InitContainerStatuses: []v1.ContainerStatus{
-			{Name: "init1", State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}},
-		},
-	}
-	manager.SetPodStatus(logger, pod, status)
-	verifyUpdates(t, manager, 1)
+		// Start Running
+		status.InitContainerStatuses[0].State = v1.ContainerState{
+			Running: &v1.ContainerStateRunning{StartedAt: metav1.Now()},
+		}
+		manager.SetPodStatus(logger, pod, status)
+		if numUpdates := manager.consumeUpdates(ctx); numUpdates != 0 {
+			t.Fatalf("Expected deferral, got %d updates", numUpdates)
+		}
 
-	// Start Running
-	status.InitContainerStatuses[0].State = v1.ContainerState{
-		Running: &v1.ContainerStateRunning{StartedAt: metav1.Now()},
-	}
-	manager.SetPodStatus(logger, pod, status)
-	if numUpdates := manager.consumeUpdates(ctx); numUpdates != 0 {
-		t.Fatalf("Expected deferral, got %d updates", numUpdates)
-	}
+		// Wait for the timer's goroutine to register its waiter
+		synctest.Wait()
 
-	// Wait for the timer's goroutine to register its waiter
-	require.Eventually(t, func() bool {
-		return fakeClock.HasWaiters()
-	}, 5*time.Second, 10*time.Millisecond, "Expected timer to be registered")
+		// Instantly advance the virtual clock past the deferral window
+		time.Sleep(initContainerStatusDeferralWindow + 100*time.Millisecond)
 
-	// Instantly advance the virtual clock past the deferral window
-	fakeClock.Step(initContainerStatusDeferralWindow + 100*time.Millisecond)
-
-	// Wait for the lightweight timer to fire and queue the update
-	require.Eventually(t, func() bool {
-		return manager.consumeUpdates(ctx) == 1
-	}, 5*time.Second, 10*time.Millisecond, "Expected 1 update after timer expiration")
+		// Wait for the lightweight timer to fire and queue the update
+		synctest.Wait()
+		if numUpdates := manager.consumeUpdates(ctx); numUpdates != 1 {
+			t.Fatalf("Expected 1 update after timer expiration, got %d", numUpdates)
+		}
+	})
 }
 
 func TestInitContainerStatusCoalescing_AllInitComplete(t *testing.T) {
@@ -466,63 +462,60 @@ func TestInitContainerStatusCoalescing_ExpiredDeferral(t *testing.T) {
 	// podStatusDeferrals map. If a deferral expired, the map entry remained, causing subsequent
 	// updates to incorrectly assume an active deferral was still running and fail to start a new
 	// timer. We verify that after an expiration, a new status update properly triggers a NEW timer.
-	logger, ctx := ktesting.NewTestContext(t)
-	fakeClient := &clientgofake.Clientset{}
-	manager := newTestManager(fakeClient)
+	synctest.Test(t, func(t *testing.T) {
+		logger, ctx := ktesting.NewTestContext(t)
+		fakeClient := &clientgofake.Clientset{}
+		manager := newTestManager(fakeClient)
 
-	fakeClock := testingclock.NewFakeClock(time.Now())
-	manager.clock = fakeClock
+		pod := getTestPod()
+		pod.Spec.InitContainers = []v1.Container{{Name: "init1"}, {Name: "init2"}}
 
-	pod := getTestPod()
-	pod.Spec.InitContainers = []v1.Container{{Name: "init1"}, {Name: "init2"}}
+		status := v1.PodStatus{
+			Phase: v1.PodPending,
+			InitContainerStatuses: []v1.ContainerStatus{
+				{Name: "init1", State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}},
+				{Name: "init2", State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}},
+			},
+		}
+		manager.SetPodStatus(logger, pod, status)
+		verifyUpdates(t, manager, 1)
 
-	status := v1.PodStatus{
-		Phase: v1.PodPending,
-		InitContainerStatuses: []v1.ContainerStatus{
-			{Name: "init1", State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}},
-			{Name: "init2", State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}},
-		},
-	}
-	manager.SetPodStatus(logger, pod, status)
-	verifyUpdates(t, manager, 1)
+		// 1. Init1 starts Running
+		status.InitContainerStatuses[0].State = v1.ContainerState{
+			Running: &v1.ContainerStateRunning{StartedAt: metav1.Now()},
+		}
+		manager.SetPodStatus(logger, pod, status)
 
-	// 1. Init1 starts Running
-	status.InitContainerStatuses[0].State = v1.ContainerState{
-		Running: &v1.ContainerStateRunning{StartedAt: metav1.Now()},
-	}
-	manager.SetPodStatus(logger, pod, status)
+		synctest.Wait()
 
-	require.Eventually(t, func() bool {
-		return fakeClock.HasWaiters()
-	}, 5*time.Second, 10*time.Millisecond, "Expected timer to be registered")
+		// 2. Expire the deferral window
+		time.Sleep(initContainerStatusDeferralWindow + 100*time.Millisecond)
 
-	// 2. Expire the deferral window
-	fakeClock.Step(initContainerStatusDeferralWindow + 100*time.Millisecond)
+		synctest.Wait()
+		if numUpdates := manager.consumeUpdates(ctx); numUpdates != 1 {
+			t.Fatalf("Expected flush after first expiration, got %d", numUpdates)
+		}
 
-	require.Eventually(t, func() bool {
-		return manager.consumeUpdates(ctx) == 1
-	}, 5*time.Second, 10*time.Millisecond, "Expected flush after first expiration")
+		// 3. Init1 terminates, Init2 starts Running
+		status.InitContainerStatuses[0].State = v1.ContainerState{
+			Terminated: &v1.ContainerStateTerminated{ExitCode: 0},
+		}
+		status.InitContainerStatuses[1].State = v1.ContainerState{
+			Running: &v1.ContainerStateRunning{StartedAt: metav1.Now()},
+		}
+		manager.SetPodStatus(logger, pod, status)
 
-	// 3. Init1 terminates, Init2 starts Running
-	status.InitContainerStatuses[0].State = v1.ContainerState{
-		Terminated: &v1.ContainerStateTerminated{ExitCode: 0},
-	}
-	status.InitContainerStatuses[1].State = v1.ContainerState{
-		Running: &v1.ContainerStateRunning{StartedAt: metav1.Now()},
-	}
-	manager.SetPodStatus(logger, pod, status)
+		// 4. If the bug was present, no new timer would be created because the old deferral
+		// entry was still in the map, so hasActiveDeferral would be true, skipping timer creation.
+		// With the fix, we check if it expired and create a new timer.
+		synctest.Wait()
 
-	// 4. If the bug was present, no new timer would be created because the old deferral
-	// entry was still in the map, so hasActiveDeferral would be true, skipping timer creation.
-	// With the fix, we check if it expired and create a new timer.
-	require.Eventually(t, func() bool {
-		return fakeClock.HasWaiters()
-	}, 5*time.Second, 10*time.Millisecond, "Expected NEW timer to be registered for Init2")
+		// 5. Expire the second deferral window
+		time.Sleep(initContainerStatusDeferralWindow + 100*time.Millisecond)
 
-	// 5. Expire the second deferral window
-	fakeClock.Step(initContainerStatusDeferralWindow + 100*time.Millisecond)
-
-	require.Eventually(t, func() bool {
-		return manager.consumeUpdates(ctx) == 1
-	}, 5*time.Second, 10*time.Millisecond, "Expected flush after second expiration")
+		synctest.Wait()
+		if numUpdates := manager.consumeUpdates(ctx); numUpdates != 1 {
+			t.Fatalf("Expected flush after second expiration, got %d", numUpdates)
+		}
+	})
 }
