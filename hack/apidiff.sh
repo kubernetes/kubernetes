@@ -264,7 +264,7 @@ inWorktree "${KUBE_TEMP}/base" "${base}" run "${KUBE_TEMP}/before"
 #
 # The report is Markdown-formatted and can be copied into a PR comment verbatim.
 failures=()
-can_update_changelog=false
+declare -A changelog_updates
 echo
 compare () {
     what="$1"
@@ -348,35 +348,40 @@ compare () {
                 echo "${verify_output}" >&2
                 exit 1
             fi
-            # verify_result == 2 means changes not found, continue to handle below.
-            if ${update_changelog}; then
-                # Use api-changelog tool to insert the changes into the changelog.
-                if ${from_merge_commit}; then
-                    # Example for a body:
-                    #
-                    # Merge pull request #137170 from pohly/dra-device-taints-beta
-                    #
-                    # DRA device taints: graduate to beta
-                    #
-                    # Parsing this is good enough for actual merge commits in Kubernetes 1.36.
-                    # It's not meant to catch errors or unexpected body content.
-                    body=$(git show --no-patch --format=%B "${merge_commit}")
-                    # shellcheck disable=SC2207 # Here we intentionally split into words.
-                    commit_summary=( $(echo "${body}" | head -n 1) )
-                    pr=${commit_summary[3]}
-                    pr=${pr#?}
-                    title=$(echo "${body}" | tail -n 1)
-                    description="See [PR #${pr}](https://github.com/kubernetes/kubernetes/pull/${pr})."
-                    api-changelog -insert -changelog="${changelog}" -changes="${incompatible}" -title="${title}" -description="${description}"
-                else
-                    api-changelog -insert -changelog="${changelog}" -changes="${incompatible}"
-                fi
 
-                # Because we have updated the changelog as requested, we don't
-                # need to describe how to do that nor treat it as a failure.
-                return 0
+            # verify_result == 2 means changes not found, so let's add it.
+            # Copy the original changelog to a temp location and update it there.
+            temp_changelog="${KUBE_TEMP}/${changelog}"
+            mkdir -p "$(dirname "${temp_changelog}")"
+            cp "${changelog}" "${temp_changelog}"
+            if ${from_merge_commit}; then
+                # Example for a body:
+                #
+                # Merge pull request #137170 from pohly/dra-device-taints-beta
+                #
+                # DRA device taints: graduate to beta
+                #
+                # Parsing this is good enough for actual merge commits in Kubernetes 1.36.
+                # It's not meant to catch errors or unexpected body content.
+                body=$(git show --no-patch --format=%B "${merge_commit}")
+                # shellcheck disable=SC2207 # Here we intentionally split into words.
+                commit_summary=( $(echo "${body}" | head -n 1) )
+                pr=${commit_summary[3]}
+                pr=${pr#?}
+                title=$(echo "${body}" | tail -n 1)
+                description="See [PR #${pr}](https://github.com/kubernetes/kubernetes/pull/${pr})."
+                api-changelog -insert -changelog="${temp_changelog}" -changes="${incompatible}" -title="${title}" -description="${description}"
+            else
+                api-changelog -insert -changelog="${temp_changelog}" -changes="${incompatible}"
             fi
-            can_update_changelog=true
+
+            # When updating in-place, copy back. Otherwise remember that we have an updated changelog
+            # for printing a patch at the end.
+            if ${update_changelog}; then
+                cp "${temp_changelog}" "${changelog}"
+            else
+                changelog_updates["${changelog}"]="${temp_changelog}"
+            fi
         fi
         failures+=("${what}")
     fi
@@ -479,17 +484,27 @@ EOF
         done
     fi
 
-    if ${can_update_changelog}; then
+    if [[ -n "${!changelog_updates[*]}" ]]; then
         cat <<EOF
 
-Run the following command to add add the incompatible changes to
+Run the following command to add the incompatible changes to
 the ${CHANGELOG} file(s), edit the modified file(s) to
 replace the template text in the new section at the top
 with and explanation of the changes, then include the result
 in the pull request for review:
 
     hack/apidiff.sh -u -r ${base} ${target:+-t ${target} }${targets[*]}
+
+Alternatively, apply the following diff by piping it into "patch -p0":
+
+vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 EOF
+        for changelog in "${!changelog_updates[@]}"; do
+            temp_changelog="${changelog_updates[$changelog]}"
+            diff -c "${changelog}" "${temp_changelog}" || true
+        done
+        echo "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"
+        echo
     fi
 fi
 
