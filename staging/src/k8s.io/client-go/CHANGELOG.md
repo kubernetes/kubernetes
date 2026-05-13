@@ -7,6 +7,19 @@ Go API changes are typically not included in the Kubernetes release notes, so
 non-breaking noteworthy Go API changes *may* be documented here if they are
 useful to know about for developers.
 
+### Embed proper interface in TransformingStore to ensure DeltaFIFO and RealFIFO are implementing it
+
+See [PR #135580](https://github.com/kubernetes/kubernetes/pull/135580).
+
+```
+- ./tools/cache.Store.Get, method set of TransformingStore: removed
+- ./tools/cache.Store.GetByKey, method set of TransformingStore: removed
+- ./tools/cache.Store.List, method set of TransformingStore: removed
+- ./tools/cache.Store.ListKeys, method set of TransformingStore: removed
+- ./tools/cache.TransformingStore: no longer implements ./tools/cache.KeyListerGetter
+- ./util/consistencydetector.CheckDataConsistency: changed from func(context.Context, string, string, ListFunc[T], k8s.io/apimachinery/pkg/apis/meta/v1.ListOptions, RetrieveItemsFunc[U]) to func(context.Context, string, string, ListFunc[T], TransformFunc, k8s.io/apimachinery/pkg/apis/meta/v1.ListOptions, RetrieveItemsFunc[U])
+```
+
 ### Add GC to client-go TLS cache
 
 See [PR #136355](https://github.com/kubernetes/kubernetes/pull/136355).
