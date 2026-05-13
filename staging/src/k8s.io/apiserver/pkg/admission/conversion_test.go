@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
@@ -358,17 +359,17 @@ func TestConvertVersionedAttributes(t *testing.T) {
 			if e, a := tc.ExpectedAttrs.Dirty, tc.Attrs.Dirty; !reflect.DeepEqual(e, a) {
 				t.Errorf("unexpected diff:\n%s", cmp.Diff(e, a))
 			}
-			if e, a := tc.ExpectedAttrs.unstructuredObject, tc.Attrs.unstructuredObject; !reflect.DeepEqual(e, a) {
+			if e, a := tc.ExpectedAttrs.celObjectVal, tc.Attrs.celObjectVal; !reflect.DeepEqual(e, a) {
 				t.Errorf("unexpected diff:\n%s", cmp.Diff(e, a))
 			}
-			if e, a := tc.ExpectedAttrs.unstructuredOldObject, tc.Attrs.unstructuredOldObject; !reflect.DeepEqual(e, a) {
+			if e, a := tc.ExpectedAttrs.celOldObjectVal, tc.Attrs.celOldObjectVal; !reflect.DeepEqual(e, a) {
 				t.Errorf("unexpected diff:\n%s", cmp.Diff(e, a))
 			}
 		})
 	}
 }
 
-func TestVersionedAttributesUnstructuredObjectCaching(t *testing.T) {
+func TestVersionedAttributesCELObjectsCaching(t *testing.T) {
 	scheme := initiateScheme(t)
 	o := NewObjectInterfacesFromScheme(scheme)
 
@@ -379,18 +380,18 @@ func TestVersionedAttributesUnstructuredObjectCaching(t *testing.T) {
 	t.Run("lazy evaluation and cache clear on update", func(t *testing.T) {
 		vAttrs, err := NewVersionedAttributes(attrs, example2v1.SchemeGroupVersion.WithKind("ReplicaSet"), o)
 		require.NoError(t, err)
-		require.Nil(t, vAttrs.unstructuredObject)
-		require.Nil(t, vAttrs.unstructuredOldObject)
+		require.Nil(t, vAttrs.celObjectVal)
+		require.Nil(t, vAttrs.celOldObjectVal)
 
-		uObj, err := vAttrs.GetUnstructuredObject()
+		uObj, err := vAttrs.GetCELObjectVal()
 		require.NoError(t, err)
 		require.NotNil(t, uObj)
-		require.Equal(t, "new-rs", uObj.GetName())
+		require.Equal(t, "new-rs", getMetaName(uObj))
 
-		uOldObj, err := vAttrs.GetUnstructuredOldObject()
+		uOldObj, err := vAttrs.GetCELOldObjectVal()
 		require.NoError(t, err)
 		require.NotNil(t, uOldObj)
-		require.Equal(t, "old-rs", uOldObj.GetName())
+		require.Equal(t, "old-rs", getMetaName(uOldObj))
 
 		// 1. Update object
 		updateRS := &example2v1.ReplicaSet{
@@ -401,11 +402,11 @@ func TestVersionedAttributesUnstructuredObjectCaching(t *testing.T) {
 		err = vAttrs.UpdateObject(updateRS)
 		require.NoError(t, err)
 		// Cache is cleared on update
-		require.Nil(t, vAttrs.unstructuredObject)
+		require.Nil(t, vAttrs.celObjectVal)
 
-		uObj, err = vAttrs.GetUnstructuredObject()
+		uObj, err = vAttrs.GetCELObjectVal()
 		require.NoError(t, err)
-		require.Equal(t, "updated-rs", uObj.GetName())
+		require.Equal(t, "updated-rs", getMetaName(uObj))
 
 		// 2. Convert GVK
 		targetGVK := example2v1.SchemeGroupVersion.WithKind("ReplicaSet")
@@ -413,14 +414,44 @@ func TestVersionedAttributesUnstructuredObjectCaching(t *testing.T) {
 		err = ConvertVersionedAttributes(vAttrs, targetGVK, o)
 		require.NoError(t, err)
 
-		uObj, err = vAttrs.GetUnstructuredObject()
+		uObj, err = vAttrs.GetCELObjectVal()
 		require.NoError(t, err)
-		uOldObj, err = vAttrs.GetUnstructuredOldObject()
+		uOldObj, err = vAttrs.GetCELOldObjectVal()
 		require.NoError(t, err)
 
-		require.Equal(t, "updated-rs", uObj.GetName())
-		require.Equal(t, "example2.apiserver.k8s.io/v1", uObj.GetAPIVersion())
-		require.Equal(t, "old-rs", uOldObj.GetName())
-		require.Equal(t, "example2.apiserver.k8s.io/v1", uOldObj.GetAPIVersion())
+		require.Equal(t, "updated-rs", getMetaName(uObj))
+		require.Equal(t, "example2.apiserver.k8s.io/v1", getAPIVersion(uObj))
+		require.Equal(t, "old-rs", getMetaName(uOldObj))
+		require.Equal(t, "example2.apiserver.k8s.io/v1", getAPIVersion(uOldObj))
 	})
+}
+
+func getMetaName(val ref.Val) string {
+	if val == nil {
+		return ""
+	}
+	m, ok := val.Value().(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	metadata, ok := m["metadata"].(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	return metadata["name"].(string)
+}
+
+func getAPIVersion(val ref.Val) string {
+	if val == nil {
+		return ""
+	}
+	m, ok := val.Value().(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	apiVersion, ok := m["apiVersion"].(string)
+	if !ok {
+		return ""
+	}
+	return apiVersion
 }

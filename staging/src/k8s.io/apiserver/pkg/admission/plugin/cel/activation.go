@@ -19,9 +19,10 @@ package cel
 import (
 	"context"
 	"fmt"
-	"github.com/google/cel-go/interpreter"
 	"math"
 	"time"
+
+	"github.com/google/cel-go/interpreter"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	v1 "k8s.io/api/core/v1"
@@ -33,25 +34,14 @@ import (
 // newActivation creates an activation for CEL admission plugins from the given request, admission chain and
 // variable binding information.
 func newActivation(compositionCtx CompositionContext, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs OptionalVariableBindings, namespace *v1.Namespace) (*evaluationActivation, error) {
-
-	var oldObjectVal any
-	var err error
-
-	unstructuredOldObj, err := versionedAttr.GetUnstructuredOldObject()
+	celOldObjVal, err := versionedAttr.GetCELOldObjectVal()
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare oldObject variable for evaluation: %w", err)
 	}
-	if unstructuredOldObj != nil {
-		oldObjectVal = unstructuredOldObj.Object
-	}
 
-	var objectVal any
-	unstructuredObj, err := versionedAttr.GetUnstructuredObject()
+	celObjVal, err := versionedAttr.GetCELObjectVal()
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare object variable for evaluation: %w", err)
-	}
-	if unstructuredObj != nil {
-		objectVal = unstructuredObj.Object
 	}
 
 	var paramsVal, authorizerVal, requestResourceAuthorizerVal any
@@ -67,7 +57,7 @@ func newActivation(compositionCtx CompositionContext, versionedAttr *admission.V
 		requestResourceAuthorizerVal = library.NewResourceAuthorizerVal(versionedAttr.GetUserInfo(), inputs.Authorizer, versionedAttr)
 	}
 
-	requestVal, err := convertObjectToUnstructured(request)
+	requestVal, err := admission.ConvertObjectToUnstructured(request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare request variable for evaluation: %w", err)
 	}
@@ -76,8 +66,8 @@ func newActivation(compositionCtx CompositionContext, versionedAttr *admission.V
 		return nil, fmt.Errorf("failed to prepare namespace variable for evaluation: %w", err)
 	}
 	va := &evaluationActivation{
-		object:                    objectVal,
-		oldObject:                 oldObjectVal,
+		object:                    celObjVal,
+		oldObject:                 celOldObjVal,
 		params:                    paramsVal,
 		request:                   requestVal.Object,
 		namespace:                 namespaceVal,
