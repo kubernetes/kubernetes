@@ -187,10 +187,10 @@ type PlacementFeasiblePlugin interface {
 
 	// PlacementFeasible is called after each pod in a pod group is evaluated.
 	// Use placementCycleState to accumulate the results from the evaluated pods in current cycle.
-	// Return Unschedulable status if the pod group cannot be scheduled in the current state, but may become schedulable once more pods are evaluated.
+	// Return Unschedulable status if the pod group cannot be scheduled in the current partially evaluated placement, but may become schedulable once more pods are evaluated.
 	// Return UnschedulableAndUnresolvable status if the pod group cannot be scheduled in the current placement.
 	// The scheduler will give up this placement and won't even evaluate remaining pods. The placement will remain eligible for preemption.
-	// Return Success status if the pod group can be scheduled in the current state.
+	// Return Success status if the pod group can be scheduled in the current partially evaluated placement.
 	// After returning Success, the plugin should keep returning Success for the remaining pods.
 	PlacementFeasible(ctx context.Context, placementCycleState fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo) *fwk.Status
 }
