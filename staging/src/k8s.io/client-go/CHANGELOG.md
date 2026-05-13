@@ -7,6 +7,6 @@ Go API changes are typically not included in the Kubernetes release notes, so
 non-breaking noteworthy Go API changes *may* be documented here if they are
 useful to know about for developers.
 
-### Changes before Kubernetes 1.36
+### Changes for Kubernetes <= 1.34
 
 For older changes refer to the commit messages and PR descriptions.
