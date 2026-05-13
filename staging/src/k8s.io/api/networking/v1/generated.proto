@@ -54,10 +54,12 @@ message HTTPIngressPath {
   //   the IngressClass. Implementations can treat this as a separate PathType
   //   or treat it identically to Prefix or Exact path types.
   // Implementations are required to support all path types.
+  // +required
   optional string pathType = 3;
 
   // backend defines the referenced service endpoint to which the traffic
   // will be forwarded to.
+  // +optional
   optional IngressBackend backend = 2;
 }
 
@@ -69,6 +71,7 @@ message HTTPIngressPath {
 message HTTPIngressRuleValue {
   // paths is a collection of paths that map requests to backends.
   // +listType=atomic
+  // +required
   repeated HTTPIngressPath paths = 1;
 }
 
@@ -233,6 +236,7 @@ message IngressClassSpec {
   // same implementing controller. This should be specified as a
   // domain-prefixed path no more than 250 characters in length, e.g.
   // "acme.io/ingress-controller". This field is immutable.
+  // +optional
   optional string controller = 1;
 
   // parameters is a link to a custom resource containing additional
@@ -281,10 +285,12 @@ message IngressLoadBalancerStatus {
 // IngressPortStatus represents the error condition of a service port
 message IngressPortStatus {
   // port is the port number of the ingress port.
+  // +required
   optional int32 port = 1;
 
   // protocol is the protocol of the ingress port.
   // The supported values are: "TCP", "UDP", "SCTP"
+  // +required
   optional string protocol = 2;
 
   // error is to record the problem with the service port
@@ -353,10 +359,12 @@ message IngressRuleValue {
 message IngressServiceBackend {
   // name is the referenced service. The service must exist in
   // the same namespace as the Ingress object.
+  // +required
   optional string name = 1;
 
   // port of the referenced service. A port name or port number
   // is required for a IngressServiceBackend.
+  // +optional
   optional ServiceBackendPort port = 2;
 }
 

@@ -163,10 +163,12 @@ type IngressLoadBalancerIngress struct {
 // IngressPortStatus represents the error condition of a service port
 type IngressPortStatus struct {
 	// port is the port number of the ingress port.
+	// +required
 	Port int32 `json:"port" protobuf:"varint,1,opt,name=port"`
 
 	// protocol is the protocol of the ingress port.
 	// The supported values are: "TCP", "UDP", "SCTP"
+	// +required
 	Protocol v1.Protocol `json:"protocol" protobuf:"bytes,2,opt,name=protocol,casttype=Protocol"`
 
 	// error is to record the problem with the service port
@@ -245,6 +247,7 @@ type IngressRuleValue struct {
 type HTTPIngressRuleValue struct {
 	// paths is a collection of paths that map requests to backends.
 	// +listType=atomic
+	// +required
 	Paths []HTTPIngressPath `json:"paths" protobuf:"bytes,1,rep,name=paths"`
 	// TODO: Consider adding fields for ingress-type specific global
 	// options usable by a loadbalancer, like http keep-alive.
@@ -305,10 +308,12 @@ type HTTPIngressPath struct {
 	//   or treat it identically to Prefix or Exact path types.
 	// Implementations are required to support all path types.
 	// Defaults to ImplementationSpecific.
+	// +optional
 	PathType *PathType `json:"pathType,omitempty" protobuf:"bytes,3,opt,name=pathType"`
 
 	// backend defines the referenced service endpoint to which the traffic
 	// will be forwarded to.
+	// +optional
 	Backend IngressBackend `json:"backend" protobuf:"bytes,2,opt,name=backend"`
 }
 
@@ -363,6 +368,7 @@ type IngressClassSpec struct {
 	// same implementing controller. This should be specified as a
 	// domain-prefixed path no more than 250 characters in length, e.g.
 	// "acme.io/ingress-controller". This field is immutable.
+	// +optional
 	Controller string `json:"controller,omitempty" protobuf:"bytes,1,opt,name=controller"`
 
 	// parameters is a link to a custom resource containing additional
@@ -403,6 +409,7 @@ type IngressClassParametersReference struct {
 
 	// scope represents if this refers to a cluster or namespace scoped resource.
 	// This may be set to "Cluster" (default) or "Namespace".
+	// +optional
 	Scope *string `json:"scope" protobuf:"bytes,4,opt,name=scope"`
 
 	// namespace is the namespace of the resource being referenced. This field is
