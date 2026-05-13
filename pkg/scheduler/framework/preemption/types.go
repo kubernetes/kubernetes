@@ -83,23 +83,22 @@ type domain struct {
 	allPossibleVictims []*victim
 }
 
-// isPodGroupPreemptiblePod checks if a pod is a part of a pod group that should
-// be treated as a single unit for preemption purposes.
-// If the pod is a part of such a pod group, it returns the pod group and true.
-// In all other cases, it returns nil and false.
-func isPodGroupPreemptiblePod(p *v1.Pod, pgLister schedulinglisters.PodGroupLister) (*schedulingapi.PodGroup, bool) {
+// getPodGroup checks if a pod specifies a scheduling group and returns the corresponding PodGroup object if found.
+func getPodGroup(p *v1.Pod, pgLister schedulinglisters.PodGroupLister) *schedulingapi.PodGroup {
 	if p.Spec.SchedulingGroup == nil {
-		return nil, false
+		return nil
 	}
 	pgName := p.Spec.SchedulingGroup.PodGroupName
 	pg, err := pgLister.PodGroups(p.Namespace).Get(*pgName)
 	if err != nil {
-		return nil, false
+		return nil
 	}
-	if mode := pg.Spec.DisruptionMode; mode == nil || *mode != schedulingapi.DisruptionModePodGroup {
-		return nil, false
-	}
-	return pg, true
+	return pg
+}
+
+// isDisruptionModePodGroup checks if the PodGroup disruption mode is set to PodGroup.
+func isDisruptionModePodGroup(pg *schedulingapi.PodGroup) bool {
+	return pg != nil && pg.Spec.DisruptionMode != nil && *pg.Spec.DisruptionMode == schedulingapi.DisruptionModePodGroup
 }
 
 // newDomainForWorkloadPreemption creates a new domain for workload preemption.
@@ -107,6 +106,8 @@ func isPodGroupPreemptiblePod(p *v1.Pod, pgLister schedulinglisters.PodGroupList
 // on the pods and their scheduling groups.
 // Pods that are part of a pod group with the PodGroup disruption mode are grouped
 // together into a single victim. Otherwise, they are treated as individual victims.
+// In both cases, the priority of the victim is determined by the PodGroup priority
+// if the pod belongs to a PodGroup.
 func newDomainForWorkloadPreemption(nodes []fwk.NodeInfo, pgLister schedulinglisters.PodGroupLister, name string) *domain {
 	victimMap := map[types.UID]*victim{}
 	for _, node := range nodes {
@@ -114,9 +115,13 @@ func newDomainForWorkloadPreemption(nodes []fwk.NodeInfo, pgLister schedulinglis
 			// TODO: Calling the lister here is not ideal given we do this
 			// for every pod in the cluster. Instead, we should be getting
 			// this information from the snapshot.
-			pg, ok := isPodGroupPreemptiblePod(p.GetPod(), pgLister)
-			if !ok {
+			pg := getPodGroup(p.GetPod(), pgLister)
+			if pg == nil {
 				victimMap[p.GetPod().UID] = newVictim([]fwk.PodInfo{p}, corev1helpers.PodPriority(p.GetPod()), []fwk.NodeInfo{node})
+				continue
+			}
+			if !isDisruptionModePodGroup(pg) {
+				victimMap[p.GetPod().UID] = newVictim([]fwk.PodInfo{p}, util.PodGroupPriority(pg), []fwk.NodeInfo{node})
 				continue
 			}
 			victim, ok := victimMap[pg.UID]

@@ -88,8 +88,8 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				st.MakePod().Name("p3").UID("v3").Node("node3").Priority(lowPriority).PodGroupName("pg2").Obj(),
 			},
 			initPodGroups: []*schedulingapi.PodGroup{
-				st.MakePodGroup().Name("pg1").UID("pg1").DisruptionMode(schedulingapi.DisruptionModePod).Obj(),
-				st.MakePodGroup().Name("pg2").UID("pg2").DisruptionMode(schedulingapi.DisruptionModePod).Obj(),
+				st.MakePodGroup().Name("pg1").UID("pg1").DisruptionMode(schedulingapi.DisruptionModePod).Priority(lowPriority).Obj(),
+				st.MakePodGroup().Name("pg2").UID("pg2").DisruptionMode(schedulingapi.DisruptionModePod).Priority(lowPriority).Obj(),
 			},
 			preemptor: newPodGroupPreemptor(
 				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
@@ -112,7 +112,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				st.MakePod().Name("p3").UID("v3").Node("node3").Priority(midPriority).Obj(),
 			},
 			initPodGroups: []*schedulingapi.PodGroup{
-				st.MakePodGroup().Name("pg1").UID("pg1").DisruptionMode(schedulingapi.DisruptionModePod).Obj(),
+				st.MakePodGroup().Name("pg1").UID("pg1").DisruptionMode(schedulingapi.DisruptionModePod).Priority(lowPriority).Obj(),
 			},
 			preemptor: newPodGroupPreemptor(
 				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
@@ -134,7 +134,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				st.MakePod().Name("p2").UID("v2").Node("node2").Priority(lowPriority).PodGroupName("pg1").StartTime(metav1.Unix(0, 0)).Obj(),
 			},
 			initPodGroups: []*schedulingapi.PodGroup{
-				st.MakePodGroup().Name("pg1").UID("pg1").DisruptionMode(schedulingapi.DisruptionModePod).Obj(),
+				st.MakePodGroup().Name("pg1").UID("pg1").DisruptionMode(schedulingapi.DisruptionModePod).Priority(lowPriority).Obj(),
 			},
 			preemptor: newPodGroupPreemptor(
 				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
@@ -158,9 +158,9 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				st.MakePod().Name("p5").UID("v5").Node("node5").Priority(highPriority).PodGroupName("pg3").StartTime(metav1.Unix(0, 0)).Obj(),
 			},
 			initPodGroups: []*schedulingapi.PodGroup{
-				st.MakePodGroup().Name("pg1").UID("pg1").DisruptionMode(schedulingapi.DisruptionModePod).Obj(),
-				st.MakePodGroup().Name("pg2").UID("pg2").DisruptionMode(schedulingapi.DisruptionModePod).Obj(),
-				st.MakePodGroup().Name("pg3").UID("pg3").DisruptionMode(schedulingapi.DisruptionModePod).Obj(),
+				st.MakePodGroup().Name("pg1").UID("pg1").DisruptionMode(schedulingapi.DisruptionModePod).Priority(lowPriority).Obj(),
+				st.MakePodGroup().Name("pg2").UID("pg2").DisruptionMode(schedulingapi.DisruptionModePod).Priority(lowPriority).Obj(),
+				st.MakePodGroup().Name("pg3").UID("pg3").DisruptionMode(schedulingapi.DisruptionModePod).Priority(highPriority).Obj(),
 			},
 			preemptor: newPodGroupPreemptor(
 				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),

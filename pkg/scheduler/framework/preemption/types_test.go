@@ -29,65 +29,77 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-func TestIsPodGroupPreemptiblePod(t *testing.T) {
+func TestGetPodGroup(t *testing.T) {
 	tests := []struct {
 		name         string
 		pod          *v1.Pod
 		podGroups    map[string]*schedulingapi.PodGroup
 		wantPodGroup *schedulingapi.PodGroup
-		wantOk       bool
 	}{
 		{
 			name:         "pod without scheduling group",
 			pod:          st.MakePod().Name("p1").Namespace("default").Obj(),
 			wantPodGroup: nil,
-			wantOk:       false,
 		},
 		{
 			name:         "pod group not found",
 			pod:          st.MakePod().Name("p1").Namespace("default").PodGroupName("pg1").Obj(),
 			podGroups:    map[string]*schedulingapi.PodGroup{},
 			wantPodGroup: nil,
-			wantOk:       false,
 		},
 		{
-			name: "pod group with nil disruption mode",
+			name: "pod group found",
 			pod:  st.MakePod().Name("p1").Namespace("default").PodGroupName("pg1").Obj(),
 			podGroups: map[string]*schedulingapi.PodGroup{
 				"pg1": st.MakePodGroup().Name("pg1").Namespace("default").Obj(),
 			},
-			wantPodGroup: nil,
-			wantOk:       false,
-		},
-		{
-			name: "pod group with DisruptionModePod",
-			pod:  st.MakePod().Name("p1").Namespace("default").PodGroupName("pg1").Obj(),
-			podGroups: map[string]*schedulingapi.PodGroup{
-				"pg1": st.MakePodGroup().Name("pg1").Namespace("default").DisruptionMode(schedulingapi.DisruptionModePod).Obj(),
-			},
-			wantPodGroup: nil,
-			wantOk:       false,
-		},
-		{
-			name: "pod group with DisruptionModePodGroup",
-			pod:  st.MakePod().Name("p1").Namespace("default").PodGroupName("pg1").Obj(),
-			podGroups: map[string]*schedulingapi.PodGroup{
-				"pg1": st.MakePodGroup().Name("pg1").Namespace("default").DisruptionMode(schedulingapi.DisruptionModePodGroup).Obj(),
-			},
-			wantPodGroup: st.MakePodGroup().Name("pg1").Namespace("default").DisruptionMode(schedulingapi.DisruptionModePodGroup).Obj(),
-			wantOk:       true,
+			wantPodGroup: st.MakePodGroup().Name("pg1").Namespace("default").Obj(),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pgLister := &mockPodGroupLister{podGroups: tt.podGroups}
-			podGroup, ok := isPodGroupPreemptiblePod(tt.pod, pgLister)
-			if ok != tt.wantOk {
-				t.Errorf("isPodGroupPreemptiblePod() gotOk = %v, want %v", ok, tt.wantOk)
-			}
+			podGroup := getPodGroup(tt.pod, pgLister)
 			if diff := cmp.Diff(tt.wantPodGroup, podGroup); diff != "" {
-				t.Errorf("isPodGroupPreemptiblePod() gotPodGroup mismatch (-want +got):\n%s", diff)
+				t.Errorf("getPodGroup() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestIsDisruptionModePodGroup(t *testing.T) {
+	tests := []struct {
+		name       string
+		pg         *schedulingapi.PodGroup
+		wantModePG bool
+	}{
+		{
+			name:       "nil pod group",
+			pg:         nil,
+			wantModePG: false,
+		},
+		{
+			name:       "pod group with nil disruption mode",
+			pg:         st.MakePodGroup().Name("pg1").Namespace("default").Obj(),
+			wantModePG: false,
+		},
+		{
+			name:       "pod group with DisruptionModePod",
+			pg:         st.MakePodGroup().Name("pg1").Namespace("default").DisruptionMode(schedulingapi.DisruptionModePod).Obj(),
+			wantModePG: false,
+		},
+		{
+			name:       "pod group with DisruptionModePodGroup",
+			pg:         st.MakePodGroup().Name("pg1").Namespace("default").DisruptionMode(schedulingapi.DisruptionModePodGroup).Obj(),
+			wantModePG: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if gotModePG := isDisruptionModePodGroup(tt.pg); gotModePG != tt.wantModePG {
+				t.Errorf("isDisruptionModePodGroup() = %v, want %v", gotModePG, tt.wantModePG)
 			}
 		})
 	}
@@ -168,8 +180,8 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 			},
 			domainName: "test-domain",
 			wantVictims: []expectedVictim{
-				{pods: sets.New("p1"), affectedNodes: sets.New("node1"), priority: 10},
-				{pods: sets.New("p2"), affectedNodes: sets.New("node2"), priority: 20},
+				{pods: sets.New("p1"), affectedNodes: sets.New("node1"), priority: 50},
+				{pods: sets.New("p2"), affectedNodes: sets.New("node2"), priority: 50},
 			},
 		},
 		{
@@ -191,7 +203,7 @@ func TestNewDomainForWorkloadPreemption(t *testing.T) {
 			domainName: "test-domain",
 			wantVictims: []expectedVictim{
 				{pods: sets.New("p1", "p2"), affectedNodes: sets.New("node1", "node2"), priority: 50},
-				{pods: sets.New("p3"), affectedNodes: sets.New("node1"), priority: 20},
+				{pods: sets.New("p3"), affectedNodes: sets.New("node1"), priority: 60},
 				{pods: sets.New("p4"), affectedNodes: sets.New("node2"), priority: 30},
 			},
 		},
