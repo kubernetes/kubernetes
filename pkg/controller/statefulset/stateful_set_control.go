@@ -878,8 +878,15 @@ func (ssc *defaultStatefulSetControl) updateStatefulSetStatus(
 		metrics.MaxUnavailable.WithLabelValues(set.Namespace, set.Name, podManagementPolicy).Set(float64(maxUnavailable))
 	}
 
-	// Set Available condition
-	minAvailable := max(int32(replicaCount-maxUnavailable), 0)
+	// Set Available condition: default maxUnavailable is 1 regardless of
+	// whether the MaxUnavailableStatefulSet feature gate is enabled.
+	availMaxUnavailable := 1
+	if utilfeature.DefaultFeatureGate.Enabled(features.MaxUnavailableStatefulSet) && set.Spec.UpdateStrategy.RollingUpdate != nil {
+		if mu, err := getStatefulSetMaxUnavailable(set.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable, replicaCount); err == nil {
+			availMaxUnavailable = mu
+		}
+	}
+	minAvailable := max(int32(replicaCount-availMaxUnavailable), 0)
 	if status.AvailableReplicas >= minAvailable {
 		condition := NewStatefulSetCondition(
 			apps.StatefulSetAvailable,
