@@ -17,14 +17,26 @@ limitations under the License.
 package volumeattachment
 
 import (
+	"context"
 	"strings"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
+	apistoragev1 "k8s.io/api/storage/v1"
+	apistoragev1alpha1 "k8s.io/api/storage/v1alpha1"
+	apistoragev1beta1 "k8s.io/api/storage/v1beta1"
+	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/test/coverage"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	storage "k8s.io/kubernetes/pkg/apis/storage"
+	validationstoragev1 "k8s.io/kubernetes/pkg/apis/storage/v1"
+	validationstoragev1alpha1 "k8s.io/kubernetes/pkg/apis/storage/v1alpha1"
+	validationstoragev1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	registry "k8s.io/kubernetes/pkg/registry/storage/volumeattachment"
 	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
@@ -43,6 +55,30 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 			testDeclarativeValidateUpdate(t, apiVersion)
 		})
 	}
+}
+
+func TestDeclarativeValidateInlineVolumeSpecVolumeMode(t *testing.T) {
+	blockMode := corev1.PersistentVolumeBlock
+	filesystemMode := corev1.PersistentVolumeFilesystem
+	ctx := rest.WithAllDeclarativeEnforcedForTest(context.Background())
+	op := operation.Operation{Type: operation.Update}
+	fldPath := field.NewPath("spec", "source")
+
+	t.Run("v1", func(t *testing.T) {
+		oldObj := &apistoragev1.VolumeAttachmentSource{InlineVolumeSpec: mkVersionedInlineVolumeSpec(&filesystemMode)}
+		newObj := &apistoragev1.VolumeAttachmentSource{InlineVolumeSpec: mkVersionedInlineVolumeSpec(&blockMode)}
+		assertInlineVolumeSpecVolumeMode(t, "v1", validationstoragev1.Validate_VolumeAttachmentSource(ctx, op, fldPath, newObj, oldObj))
+	})
+	t.Run("v1alpha1", func(t *testing.T) {
+		oldObj := &apistoragev1alpha1.VolumeAttachmentSource{InlineVolumeSpec: mkVersionedInlineVolumeSpec(&filesystemMode)}
+		newObj := &apistoragev1alpha1.VolumeAttachmentSource{InlineVolumeSpec: mkVersionedInlineVolumeSpec(&blockMode)}
+		assertInlineVolumeSpecVolumeMode(t, "v1alpha1", validationstoragev1alpha1.Validate_VolumeAttachmentSource(ctx, op, fldPath, newObj, oldObj))
+	})
+	t.Run("v1beta1", func(t *testing.T) {
+		oldObj := &apistoragev1beta1.VolumeAttachmentSource{InlineVolumeSpec: mkVersionedInlineVolumeSpec(&filesystemMode)}
+		newObj := &apistoragev1beta1.VolumeAttachmentSource{InlineVolumeSpec: mkVersionedInlineVolumeSpec(&blockMode)}
+		assertInlineVolumeSpecVolumeMode(t, "v1beta1", validationstoragev1beta1.Validate_VolumeAttachmentSource(ctx, op, fldPath, newObj, oldObj))
+	})
 }
 
 func testDeclarativeValidate(t *testing.T, apiVersion string) {
@@ -159,4 +195,30 @@ func mkValidVolumeAttachment(tweaks ...func(obj *storage.VolumeAttachment)) stor
 		tweak(&obj)
 	}
 	return obj
+}
+
+func mkVersionedInlineVolumeSpec(volumeMode *corev1.PersistentVolumeMode) *corev1.PersistentVolumeSpec {
+	return &corev1.PersistentVolumeSpec{
+		AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+		PersistentVolumeSource: corev1.PersistentVolumeSource{
+			CSI: &corev1.CSIPersistentVolumeSource{
+				Driver:       "com.test.foo",
+				VolumeHandle: "valid-volume",
+			},
+		},
+		VolumeMode: volumeMode,
+	}
+}
+
+func assertInlineVolumeSpecVolumeMode(t *testing.T, apiVersion string, errs field.ErrorList) {
+	t.Helper()
+	expectedErrs := field.ErrorList{
+		field.Invalid(field.NewPath("spec", "source", "inlineVolumeSpec", "volumeMode"), nil, "").WithOrigin("immutable").MarkAlpha(),
+	}
+	field.ErrorMatcher{}.ByType().ByOrigin().ByField().ByValidationStabilityLevel().BySource().Test(t, expectedErrs, errs)
+	coverage.RecordObservedRules(schema.GroupVersionKind{
+		Group:   "storage.k8s.io",
+		Version: apiVersion,
+		Kind:    "VolumeAttachment",
+	}, errs)
 }
