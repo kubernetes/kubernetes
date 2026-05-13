@@ -307,17 +307,19 @@ func (c *ReplicaCalculator) getUsageRatioReplicaCount(currentReplicas int32, usa
 }
 
 // GetObjectPerPodMetricReplicas calculates the desired replica count based on a target metric usage (as a milli-value)
-// for the given object in the given namespace, and the current replica count.
-func (c *ReplicaCalculator) GetObjectPerPodMetricReplicas(statusReplicas int32, targetAverageUsage int64, metricName string, tolerances Tolerances, namespace string, objectRef *autoscaling.CrossVersionObjectReference, metricSelector labels.Selector) (replicaCount int32, usage int64, timestamp time.Time, err error) {
+// for the given object in the given namespace. statusReplicas divides the usage ratio so it reflects actual load
+// distribution; specReplicas is returned when within tolerance so transient surges (e.g. rolling updates where
+// status > spec) do not drift spec upward.
+func (c *ReplicaCalculator) GetObjectPerPodMetricReplicas(statusReplicas, specReplicas int32, targetAverageUsage int64, metricName string, tolerances Tolerances, namespace string, objectRef *autoscaling.CrossVersionObjectReference, metricSelector labels.Selector) (replicaCount int32, usage int64, timestamp time.Time, err error) {
 	usage, timestamp, err = c.metricsClient.GetObjectMetric(metricName, namespace, objectRef, metricSelector)
 	if err != nil {
 		return 0, 0, time.Time{}, fmt.Errorf("unable to get metric %s: %v on %s %s/%s", metricName, objectRef.Kind, namespace, objectRef.Name, err)
 	}
 
-	replicaCount = statusReplicas
-	usageRatio := float64(usage) / (float64(targetAverageUsage) * float64(replicaCount))
-	if !tolerances.isWithin(usageRatio) {
-		// update number of replicas if change is large enough
+	usageRatio := float64(usage) / (float64(targetAverageUsage) * float64(statusReplicas))
+	if tolerances.isWithin(usageRatio) {
+		replicaCount = specReplicas
+	} else {
 		replicaCount = int32(math.Ceil(float64(usage) / float64(targetAverageUsage)))
 	}
 	usage = int64(math.Ceil(float64(usage) / float64(statusReplicas)))
@@ -376,10 +378,11 @@ func (c *ReplicaCalculator) GetExternalMetricReplicas(currentReplicas int32, tar
 	return replicaCount, usage, timestamp, err
 }
 
-// GetExternalPerPodMetricReplicas calculates the desired replica count based on a
-// target metric value per pod (as a milli-value) for the external metric in the
-// given namespace, and the current replica count.
-func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(statusReplicas int32, targetUsagePerPod int64, metricName string, tolerances Tolerances, namespace string, metricSelector *metav1.LabelSelector) (replicaCount int32, usage int64, timestamp time.Time, err error) {
+// GetExternalPerPodMetricReplicas calculates the desired replica count based on a target metric value per pod
+// (as a milli-value) for the external metric in the given namespace. statusReplicas divides the usage ratio so
+// it reflects actual load distribution; specReplicas is returned when within tolerance so transient surges
+// (e.g. rolling updates where status > spec) do not drift spec upward.
+func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(statusReplicas, specReplicas int32, targetUsagePerPod int64, metricName string, tolerances Tolerances, namespace string, metricSelector *metav1.LabelSelector) (replicaCount int32, usage int64, timestamp time.Time, err error) {
 	metricLabelSelector, err := metav1.LabelSelectorAsSelector(metricSelector)
 	if err != nil {
 		return 0, 0, time.Time{}, err
@@ -398,10 +401,10 @@ func (c *ReplicaCalculator) GetExternalPerPodMetricReplicas(statusReplicas int32
 		}
 	}
 
-	replicaCount = statusReplicas
-	usageRatio := float64(usage) / (float64(targetUsagePerPod) * float64(replicaCount))
-	if !tolerances.isWithin(usageRatio) {
-		// update number of replicas if the change is large enough
+	usageRatio := float64(usage) / (float64(targetUsagePerPod) * float64(statusReplicas))
+	if tolerances.isWithin(usageRatio) {
+		replicaCount = specReplicas
+	} else {
 		replicaCountResult := math.Ceil(float64(usage) / float64(targetUsagePerPod))
 		// Ensure that the result exceeds the bounds of an int32
 		if replicaCountResult > float64(math.MaxInt32) {
