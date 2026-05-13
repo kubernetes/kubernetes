@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
@@ -37,49 +38,73 @@ import (
 )
 
 func TestCreate(t *testing.T) {
-	storage, server := newInsecureStorage(t)
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).ClusterScope()
-	configuration := validMutatingAdmissionPolicy()
-	test.TestCreate(
-		// valid
-		configuration,
-		// invalid
-		newMutatingAdmissionPolicy(""),
-	)
+	for _, apiVersion := range []string{"v1", "v1beta1", "v1alpha1"} {
+		storage, server := newInsecureStorage(t)
+		defer server.Terminate(t)
+		defer storage.Store.DestroyFunc()
+		test := genericregistrytest.New(t, storage.Store).ClusterScope()
+		test.SetRequestInfo(&request.RequestInfo{
+			IsResourceRequest: true,
+			APIGroup:          "admissionregistration.k8s.io",
+			APIVersion:        apiVersion,
+			Resource:          "mutatingadmissionpolicies",
+		})
+		configuration := validMutatingAdmissionPolicy()
+		test.TestCreate(
+			// valid
+			configuration,
+			// invalid
+			newMutatingAdmissionPolicy(""),
+		)
+	}
 }
 
 func TestUpdate(t *testing.T) {
-	storage, server := newInsecureStorage(t)
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).ClusterScope()
+	for _, apiVersion := range []string{"v1", "v1beta1", "v1alpha1"} {
+		storage, server := newInsecureStorage(t)
+		defer server.Terminate(t)
+		defer storage.Store.DestroyFunc()
+		test := genericregistrytest.New(t, storage.Store).ClusterScope()
+		test.SetRequestInfo(&request.RequestInfo{
+			IsResourceRequest: true,
+			APIGroup:          "admissionregistration.k8s.io",
+			APIVersion:        apiVersion,
+			Resource:          "mutatingadmissionpolicies",
+		})
 
-	test.TestUpdate(
-		// valid
-		validMutatingAdmissionPolicy(),
-		// updateFunc
-		func(obj runtime.Object) runtime.Object {
-			object := obj.(*admissionregistration.MutatingAdmissionPolicy)
-			object.Labels = map[string]string{"c": "d"}
-			return object
-		},
-		// invalid updateFunc
-		func(obj runtime.Object) runtime.Object {
-			object := obj.(*admissionregistration.MutatingAdmissionPolicy)
-			object.Name = ""
-			return object
-		},
-	)
+		test.TestUpdate(
+			// valid
+			validMutatingAdmissionPolicy(),
+			// updateFunc
+			func(obj runtime.Object) runtime.Object {
+				object := obj.(*admissionregistration.MutatingAdmissionPolicy)
+				object.Labels = map[string]string{"c": "d"}
+				return object
+			},
+			// invalid updateFunc
+			func(obj runtime.Object) runtime.Object {
+				object := obj.(*admissionregistration.MutatingAdmissionPolicy)
+				object.Name = ""
+				return object
+			},
+		)
+	}
 }
 
 func TestGet(t *testing.T) {
-	storage, server := newInsecureStorage(t)
-	defer server.Terminate(t)
-	defer storage.Store.DestroyFunc()
-	test := genericregistrytest.New(t, storage.Store).ClusterScope()
-	test.TestGet(validMutatingAdmissionPolicy())
+	for _, apiVersion := range []string{"v1", "v1beta1", "v1alpha1"} {
+		storage, server := newInsecureStorage(t)
+		defer server.Terminate(t)
+		defer storage.Store.DestroyFunc()
+		test := genericregistrytest.New(t, storage.Store).ClusterScope()
+		test.SetRequestInfo(&request.RequestInfo{
+			IsResourceRequest: true,
+			APIGroup:          "admissionregistration.k8s.io",
+			APIVersion:        apiVersion,
+			Resource:          "mutatingadmissionpolicies",
+		})
+		test.TestGet(validMutatingAdmissionPolicy())
+	}
 }
 
 func TestList(t *testing.T) {
