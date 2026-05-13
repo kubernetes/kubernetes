@@ -43,6 +43,7 @@ import (
 // +k8s:supportsSubresource="/approval"
 type CertificateSigningRequest struct {
 	metav1.TypeMeta `json:",inline"`
+	// metadata is the standard object metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 

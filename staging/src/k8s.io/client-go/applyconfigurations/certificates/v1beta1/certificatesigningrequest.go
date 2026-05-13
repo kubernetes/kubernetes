@@ -32,13 +32,14 @@ import (
 //
 // Describes a certificate signing request
 type CertificateSigningRequestApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
+	// metadata is the standard object metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// spec contains the certificate request, and is immutable after creation.
 	// Only the request, signerName, expirationSeconds, and usages fields can be set on creation.
 	// Other fields are derived by Kubernetes and cannot be modified by users.
 	Spec *CertificateSigningRequestSpecApplyConfiguration `json:"spec,omitempty"`
-	// Derived information about the request.
+	// status holds derived information about the request.
 	Status *CertificateSigningRequestStatusApplyConfiguration `json:"status,omitempty"`
 }
 
