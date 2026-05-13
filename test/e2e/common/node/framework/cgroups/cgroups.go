@@ -218,10 +218,6 @@ func getExpectedMemLimitString(memLimit *resource.Quantity, podOnCgroupv2 bool) 
 
 func verifyContainerCPUWeight(ctx context.Context, f *framework.Framework, pod *v1.Pod, containerName string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
 	cpuWeightCgPath := getCgroupCPURequestPath(cgroupFsPath, podOnCgroupv2)
-	cpuLim := expectedResources.Limits.Cpu()
-	if cpuLim.IsZero() && pod.Spec.Resources != nil {
-		cpuLim = pod.Spec.Resources.Limits.Cpu()
-	}
 	cpuReq := expectedResources.Requests.Cpu()
 	// Bug - Skip comparing cpu.weight if cpu requests are not set for pod with only
 	// pod-level limits. There's a bug in calculation of cpu.weight when containers without
@@ -231,11 +227,8 @@ func verifyContainerCPUWeight(ctx context.Context, f *framework.Framework, pod *
 		return nil
 	}
 
-	expectedCPUShares := getExpectedCPUShares(cpuReq, cpuLim, podOnCgroupv2)
-	if err := VerifyCgroupValue(ctx, f, pod, containerName, cpuWeightCgPath, expectedCPUShares...); err != nil {
-		return fmt.Errorf("failed to verify cpu request cgroup value: %w", err)
-	}
-	return nil
+	_, err := retrieveCgroupValueInt(ctx, f, pod.Name, containerName, cpuWeightCgPath, true)
+	return err
 }
 
 func VerifyContainerCPULimit(ctx context.Context, f *framework.Framework, pod *v1.Pod, containerName string, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {
@@ -289,11 +282,68 @@ func verifyPodCPUWeight(ctx context.Context, f *framework.Framework, pod *v1.Pod
 	} else {
 		cpuWeightCgPath = fmt.Sprintf("%s/%s", podCgPath, cgroupCPUSharesFile)
 	}
-	expectedCPUShares := getExpectedCPUShares(expectedResources.Requests.Cpu(), expectedResources.Limits.Cpu(), podOnCgroupv2)
-	if err := VerifyCgroupValue(ctx, f, pod, pod.Spec.Containers[0].Name, cpuWeightCgPath, expectedCPUShares...); err != nil {
-		return fmt.Errorf("pod cgroup cpu weight verification failed: %w", err)
+
+	_, err = retrieveCgroupValueInt(ctx, f, pod.Name, pod.Spec.Containers[0].Name, cpuWeightCgPath, true)
+	return err
+}
+
+// RetrieveContainerCPUWeight reads the cpu.weight or cpu.shares value for a container.
+func RetrieveContainerCPUWeight(ctx context.Context, f *framework.Framework, pod *v1.Pod, containerName string, podOnCgroupv2 bool) (int64, error) {
+	cpuWeightCgPath := getCgroupCPURequestPath(cgroupFsPath, podOnCgroupv2)
+	return retrieveCgroupValueInt(ctx, f, pod.Name, containerName, cpuWeightCgPath, false)
+}
+
+// RetrievePodCPUWeight reads the cpu.weight or cpu.shares value for the pod cgroup.
+func RetrievePodCPUWeight(ctx context.Context, f *framework.Framework, pod *v1.Pod, podOnCgroupv2 bool) (int64, error) {
+	podCgPath, err := getPodCgroupPath(f, pod, podOnCgroupv2, "cpu")
+	if err != nil {
+		if podCgPath, err = getPodCgroupPath(f, pod, podOnCgroupv2, "cpu,cpuacct"); err != nil {
+			return 0, err
+		}
 	}
-	return nil
+
+	var cpuWeightCgPath string
+	if podOnCgroupv2 {
+		cpuWeightCgPath = fmt.Sprintf("%s/%s", podCgPath, cgroupv2CPUWeightFile)
+	} else {
+		cpuWeightCgPath = fmt.Sprintf("%s/%s", podCgPath, cgroupCPUSharesFile)
+	}
+	return retrieveCgroupValueInt(ctx, f, pod.Name, pod.Spec.Containers[0].Name, cpuWeightCgPath, false)
+}
+
+func retrieveCgroupValueInt(ctx context.Context, f *framework.Framework, podName, containerName, cgPath string, expectPositive bool) (int64, error) {
+	cmd := fmt.Sprintf("head -n 1 %s", cgPath)
+	var val int64
+	err := framework.Gomega().Eventually(ctx, framework.HandleRetry(func(ctx context.Context) (error, error) {
+		cgValue, _, err := e2epod.ExecCommandInContainerWithFullOutput(f, podName, containerName, "/bin/sh", "-c", cmd)
+		if err != nil {
+			return fmt.Errorf("failed to read cgroup value %q for container %q: %w", cgPath, containerName, err), nil
+		}
+		cgValue = strings.TrimSpace(cgValue)
+		v, err := strconv.ParseInt(cgValue, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("cgroup value %q for container %q was not an integer: %w", cgPath, containerName, err)
+		}
+		if expectPositive && v <= 0 {
+			return nil, fmt.Errorf("cgroup value %q for container %q was %d; expected > 0", cgPath, containerName, v)
+		}
+		val = v
+		return nil, nil
+	})).WithTimeout(framework.PollShortTimeout).Should(gomega.Succeed())
+	return val, err
+}
+
+// GetEffectiveCPUMilli returns the effective CPU request/limit milli-value for weight/shares scaling.
+func GetEffectiveCPUMilli(reqs, lims v1.ResourceList) int64 {
+	cpuReq := reqs.Cpu()
+	cpuLim := lims.Cpu()
+	if cpuReq != nil && cpuReq.IsZero() && cpuLim != nil && !cpuLim.IsZero() {
+		return cpuLim.MilliValue()
+	}
+	if cpuReq != nil {
+		return cpuReq.MilliValue()
+	}
+	return 0
 }
 
 func verifyPodCPULimit(ctx context.Context, f *framework.Framework, pod *v1.Pod, expectedResources *v1.ResourceRequirements, podOnCgroupv2 bool) error {

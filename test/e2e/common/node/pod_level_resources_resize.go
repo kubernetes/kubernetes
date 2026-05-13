@@ -700,6 +700,30 @@ func doPatchAndRollbackPLR(ctx context.Context, f *framework.Framework, original
 }
 
 func patchAndVerifyPLR(ctx context.Context, f *framework.Framework, podClient *e2epod.PodClient, newPod *v1.Pod, originalContainers, expectedContainers []podresize.ResizableContainerInfo, originalPodResources, expectedPodResources *v1.ResourceRequirements, opStr string) {
+	onCgroupv2 := cgroups.IsPodOnCgroupv2Node(f, newPod.Name, newPod.Spec.Containers[0].Name)
+	oldWeights := make(map[string]int64)
+	for _, ci := range originalContainers {
+		if ci.Resources != nil {
+			req := ci.Resources.ResourceRequirements()
+			if req != nil {
+				cpuReq := req.Requests.Cpu()
+				if cpuReq == nil || !cpuReq.IsZero() || newPod.Spec.Resources == nil {
+					w, err := cgroups.RetrieveContainerCPUWeight(ctx, f, newPod, ci.Name, onCgroupv2)
+					if err == nil {
+						oldWeights[ci.Name] = w
+					}
+				}
+			}
+		}
+	}
+	var oldPodWeight int64
+	if originalPodResources != nil {
+		w, err := cgroups.RetrievePodCPUWeight(ctx, f, newPod, onCgroupv2)
+		if err == nil {
+			oldPodWeight = w
+		}
+	}
+
 	patch := podresize.MakeResizePatch(originalContainers, expectedContainers, originalPodResources, expectedPodResources)
 	patchedPod, pErr := f.ClientSet.CoreV1().Pods(newPod.Namespace).Patch(ctx, newPod.Name,
 		types.StrategicMergePatchType, patch, metav1.PatchOptions{}, "resize")
@@ -716,6 +740,45 @@ func patchAndVerifyPLR(ctx context.Context, f *framework.Framework, podClient *e
 	// framework.ExpectNoError(VerifyPodLevelStatus(resizedPod))
 	if expectedPodResources != nil {
 		framework.ExpectNoError(podresize.VerifyPodCgroupValues(ctx, f, resizedPod))
+	}
+
+	// Verify CPU weight moved in the right direction
+	for i, ci := range expectedContainers {
+		oldW, ok := oldWeights[ci.Name]
+		if !ok {
+			continue
+		}
+		newW, err := cgroups.RetrieveContainerCPUWeight(ctx, f, resizedPod, ci.Name, onCgroupv2)
+		if err != nil {
+			continue
+		}
+
+		if originalContainers[i].Resources != nil && ci.Resources != nil {
+			oldReq := originalContainers[i].Resources.ResourceRequirements()
+			newReq := ci.Resources.ResourceRequirements()
+			if oldReq != nil && newReq != nil {
+				oldMilli := cgroups.GetEffectiveCPUMilli(oldReq.Requests, oldReq.Limits)
+				newMilli := cgroups.GetEffectiveCPUMilli(newReq.Requests, newReq.Limits)
+				if newMilli > oldMilli {
+					gomega.Expect(newW).To(gomega.BeNumerically(">=", oldW), fmt.Sprintf("cpu weight for %s should not decrease when requested CPU increases", ci.Name))
+				} else if newMilli < oldMilli {
+					gomega.Expect(newW).To(gomega.BeNumerically("<=", oldW), fmt.Sprintf("cpu weight for %s should not increase when requested CPU decreases", ci.Name))
+				}
+			}
+		}
+	}
+
+	if originalPodResources != nil && expectedPodResources != nil && oldPodWeight > 0 {
+		newPodW, err := cgroups.RetrievePodCPUWeight(ctx, f, resizedPod, onCgroupv2)
+		if err == nil {
+			oldMilli := cgroups.GetEffectiveCPUMilli(originalPodResources.Requests, originalPodResources.Limits)
+			newMilli := cgroups.GetEffectiveCPUMilli(expectedPodResources.Requests, expectedPodResources.Limits)
+			if newMilli > oldMilli {
+				gomega.Expect(newPodW).To(gomega.BeNumerically(">=", oldPodWeight), "pod cpu weight should not decrease when requested Pod CPU increases")
+			} else if newMilli < oldMilli {
+				gomega.Expect(newPodW).To(gomega.BeNumerically("<=", oldPodWeight), "pod cpu weight should not increase when requested Pod CPU decreases")
+			}
+		}
 	}
 }
 
