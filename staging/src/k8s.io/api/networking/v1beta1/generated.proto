@@ -270,12 +270,12 @@ message IngressLoadBalancerStatus {
 // IngressPortStatus represents the error condition of a service port
 message IngressPortStatus {
   // port is the port number of the ingress port.
-  // +required
+  // +optional
   optional int32 port = 1;
 
   // protocol is the protocol of the ingress port.
   // The supported values are: "TCP", "UDP", "SCTP"
-  // +required
+  // +optional
   optional string protocol = 2;
 
   // error is to record the problem with the service port
@@ -477,4 +477,3 @@ message ServiceCIDRStatus {
   // +listMapKey=type
   repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
 }
-
