@@ -483,6 +483,12 @@ func (m *manager) SetAllocatedResources(pod *v1.Pod) error {
 	return m.allocated.SetPodResourceInfo(logger, pod.UID, allocationFromPod(pod))
 }
 
+// hasPodAllocatedResources returns whether a pod has been allocated.
+func (m *manager) hasPodAllocatedResources(pod *v1.Pod) bool {
+	_, allocated := m.allocated.GetPodResourceInfo(pod.UID)
+	return allocated
+}
+
 func allocationFromPod(pod *v1.Pod) state.PodResourceInfo {
 	var podAlloc state.PodResourceInfo
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) && pod.Spec.Resources != nil {
@@ -620,9 +626,14 @@ func (m *manager) getAllocatedPods(activePods []*v1.Pod) []*v1.Pod {
 		return activePods
 	}
 
-	allocatedPods := make([]*v1.Pod, len(activePods))
-	for i, pod := range activePods {
-		allocatedPods[i], _ = m.UpdatePodFromAllocation(pod)
+	allocatedPods := make([]*v1.Pod, 0, len(activePods))
+	for _, pod := range activePods {
+		// Filter out pods that don't yet have an allocation, which will filter pods that
+		// are potentially going to be denied at admission.
+		if m.hasPodAllocatedResources(pod) {
+			allocatedPod, _ := m.UpdatePodFromAllocation(pod)
+			allocatedPods = append(allocatedPods, allocatedPod)
+		}
 	}
 	return allocatedPods
 }
