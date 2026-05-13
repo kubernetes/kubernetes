@@ -16,6 +16,7 @@ package wal
 
 import (
 	"encoding/binary"
+	"errors"
 	"hash"
 	"io"
 	"os"
@@ -61,11 +62,15 @@ func newFileEncoder(f *os.File, prevCrc uint32) (*encoder, error) {
 }
 
 func (e *encoder) encode(rec *walpb.Record) error {
+	if rec.Type == nil {
+		return errors.New("record is missing type")
+	}
+
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
 	e.crc.Write(rec.Data)
-	rec.Crc = e.crc.Sum32()
+	rec.Crc = new(e.crc.Sum32())
 	var (
 		data []byte
 		err  error

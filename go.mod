@@ -53,9 +53,9 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/vishvananda/netlink v1.3.1
 	github.com/vishvananda/netns v0.0.5
-	go.etcd.io/etcd/api/v3 v3.6.11
-	go.etcd.io/etcd/client/pkg/v3 v3.6.11
-	go.etcd.io/etcd/client/v3 v3.6.11
+	go.etcd.io/etcd/api/v3 v3.6.0-alpha.0.0.20260513114709-9c420dfa0eb7
+	go.etcd.io/etcd/client/pkg/v3 v3.6.0-alpha.0.0.20260513114709-9c420dfa0eb7
+	go.etcd.io/etcd/client/v3 v3.6.0-alpha.0.0.20260513114709-9c420dfa0eb7
 	go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful v0.68.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0
 	go.opentelemetry.io/otel v1.43.0
@@ -168,7 +168,7 @@ require (
 	github.com/go-openapi/swag/yamlutils v0.25.4 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-jwt/jwt/v5 v5.3.0 // indirect
+	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/pprof v0.0.0-20260402051712-545e8a4df936 // indirect
@@ -197,7 +197,7 @@ require (
 	github.com/prometheus/client_golang v1.23.2 // indirect
 	github.com/prometheus/procfs v0.19.2 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	github.com/sirupsen/logrus v1.9.3 // indirect
+	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/soheilhy/cmux v0.1.5 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20220101234140-673ab2c3ae75 // indirect
@@ -205,8 +205,8 @@ require (
 	github.com/xiang90/probing v0.0.0-20221125231312-a49e3df8f510 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
 	go.etcd.io/bbolt v1.4.3 // indirect
-	go.etcd.io/etcd/pkg/v3 v3.6.11 // indirect
-	go.etcd.io/etcd/server/v3 v3.6.11 // indirect
+	go.etcd.io/etcd/pkg/v3 v3.6.0-alpha.0.0.20260513114709-9c420dfa0eb7 // indirect
+	go.etcd.io/etcd/server/v3 v3.6.0-alpha.0.0.20260513114709-9c420dfa0eb7 // indirect
 	go.etcd.io/raft/v3 v3.6.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.68.0 // indirect

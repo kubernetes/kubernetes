@@ -16,35 +16,15 @@ package storage
 
 import (
 	"encoding/json"
-	"fmt"
 	"sort"
 
 	"go.uber.org/zap"
 
 	"go.etcd.io/etcd/client/pkg/v3/types"
 	"go.etcd.io/etcd/pkg/v3/pbutil"
-	"go.etcd.io/etcd/server/v3/config"
 	"go.etcd.io/etcd/server/v3/etcdserver/api/membership"
-	"go.etcd.io/etcd/server/v3/etcdserver/api/v2store"
 	"go.etcd.io/raft/v3/raftpb"
 )
-
-// AssertNoV2StoreContent -> depending on the deprecation stage, warns or report an error
-// if the v2store contains custom content.
-func AssertNoV2StoreContent(lg *zap.Logger, st v2store.Store, deprecationStage config.V2DeprecationEnum) error {
-	metaOnly, err := membership.IsMetaStoreOnly(st)
-	if err != nil {
-		return err
-	}
-	if metaOnly {
-		return nil
-	}
-	if deprecationStage.IsAtLeast(config.V2Depr1WriteOnly) {
-		return fmt.Errorf("detected disallowed custom content in v2store for stage --v2-deprecation=%s", deprecationStage)
-	}
-	lg.Warn("detected custom v2store content. Etcd v3.5 is the last version allowing to access it using API v2. Please remove the content.")
-	return nil
-}
 
 // CreateConfigChangeEnts creates a series of Raft entries (i.e.
 // EntryConfChange) to remove the set of given IDs from the cluster. The ID
@@ -107,16 +87,6 @@ func CreateConfigChangeEnts(lg *zap.Logger, ids []uint64, self uint64, term, ind
 	}
 
 	return ents
-}
-
-// GetEffectiveNodeIdsFromWalEntries returns an ordered set of IDs included in the given snapshot and
-// the entries.
-//
-// Deprecated: use GetEffectiveNodeIDsFromWALEntries instead.
-//
-//revive:disable-next-line:var-naming
-func GetEffectiveNodeIdsFromWalEntries(lg *zap.Logger, snap *raftpb.Snapshot, ents []raftpb.Entry) []uint64 {
-	return GetEffectiveNodeIDsFromWALEntries(lg, snap, ents)
 }
 
 // GetEffectiveNodeIDsFromWALEntries returns an ordered set of IDs included in the given snapshot and

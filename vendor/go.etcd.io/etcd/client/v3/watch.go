@@ -33,8 +33,8 @@ import (
 )
 
 const (
-	EventTypeDelete = mvccpb.DELETE
-	EventTypePut    = mvccpb.PUT
+	EventTypeDelete = mvccpb.Event_DELETE
+	EventTypePut    = mvccpb.Event_PUT
 
 	closeSendErrTimeout = 250 * time.Millisecond
 
@@ -46,9 +46,16 @@ const (
 	InvalidWatchID = -1
 )
 
-type Event mvccpb.Event
+type Event = mvccpb.Event
 
 type WatchChan <-chan WatchResponse
+
+func ensureWatchHeader(hdr *pb.ResponseHeader) *pb.ResponseHeader {
+	if hdr != nil {
+		return hdr
+	}
+	return &pb.ResponseHeader{}
+}
 
 type Watcher interface {
 	// Watch watches on a key or prefix. The watched events will be returned
@@ -89,7 +96,7 @@ type Watcher interface {
 }
 
 type WatchResponse struct {
-	Header pb.ResponseHeader
+	Header *pb.ResponseHeader
 	Events []*Event
 
 	// CompactRevision is the minimum revision the watcher may receive.
@@ -105,18 +112,8 @@ type WatchResponse struct {
 
 	closeErr error
 
-	// cancelReason is a reason of canceling watch
-	cancelReason string
-}
-
-// IsCreate returns true if the event tells that the key is newly created.
-func (e *Event) IsCreate() bool {
-	return e.Type == EventTypePut && e.Kv.CreateRevision == e.Kv.ModRevision
-}
-
-// IsModify returns true if the event tells that a new value is put on existing key.
-func (e *Event) IsModify() bool {
-	return e.Type == EventTypePut && e.Kv.CreateRevision != e.Kv.ModRevision
+	// CancelReason is a reason of canceling watch
+	CancelReason string
 }
 
 // Err is the error value if this WatchResponse holds an error.
@@ -127,8 +124,8 @@ func (wr *WatchResponse) Err() error {
 	case wr.CompactRevision != 0:
 		return v3rpc.ErrCompacted
 	case wr.Canceled:
-		if len(wr.cancelReason) != 0 {
-			return v3rpc.Error(status.Error(codes.FailedPrecondition, wr.cancelReason))
+		if len(wr.CancelReason) != 0 {
+			return v3rpc.Error(status.Error(codes.FailedPrecondition, wr.CancelReason))
 		}
 		return v3rpc.ErrFutureRev
 	}
@@ -137,7 +134,7 @@ func (wr *WatchResponse) Err() error {
 
 // IsProgressNotify returns true if the WatchResponse is progress notification.
 func (wr *WatchResponse) IsProgressNotify() bool {
-	return len(wr.Events) == 0 && !wr.Canceled && !wr.Created && wr.CompactRevision == 0 && wr.Header.Revision != 0
+	return len(wr.Events) == 0 && !wr.Canceled && !wr.Created && wr.CompactRevision == 0 && wr.Header.GetRevision() != 0
 }
 
 // watcher implements the Watcher interface
@@ -254,7 +251,7 @@ func NewWatchFromWatchClient(wc pb.WatchClient, c *Client) Watcher {
 	}
 	if c != nil {
 		w.callOpts = c.callOpts
-		w.lg = c.lg
+		w.lg = c.GetLogger()
 	}
 	return w
 }
@@ -296,7 +293,7 @@ func (w *watcher) newWatcherGRPCStream(inctx context.Context) *watchGRPCStream {
 
 // Watch posts a watch request to run() and waits for a new watcher channel
 func (w *watcher) Watch(ctx context.Context, key string, opts ...OpOption) WatchChan {
-	ow := opWatch(key, opts...)
+	ow := OpWatch(key, opts...)
 
 	var filters []pb.WatchCreateRequest_FilterType
 	if ow.filterPut {
@@ -356,7 +353,7 @@ func (w *watcher) Watch(ctx context.Context, key string, opts ...OpOption) Watch
 		case <-donec:
 			ok = false
 			if wgs.closeErr != nil {
-				closeCh <- WatchResponse{Canceled: true, closeErr: wgs.closeErr}
+				closeCh <- WatchResponse{Header: &pb.ResponseHeader{}, Canceled: true, closeErr: wgs.closeErr}
 				break
 			}
 			// retry; may have dropped stream from no ctxs
@@ -371,7 +368,7 @@ func (w *watcher) Watch(ctx context.Context, key string, opts ...OpOption) Watch
 			case <-ctx.Done():
 			case <-donec:
 				if wgs.closeErr != nil {
-					closeCh <- WatchResponse{Canceled: true, closeErr: wgs.closeErr}
+					closeCh <- WatchResponse{Header: &pb.ResponseHeader{}, Canceled: true, closeErr: wgs.closeErr}
 					break
 				}
 				// retry; may have dropped stream from no ctxs
@@ -485,7 +482,7 @@ func (w *watchGRPCStream) closeSubstream(ws *watcherStream) {
 	}
 	// close subscriber's channel
 	if closeErr := w.closeErr; closeErr != nil && ws.initReq.ctx.Err() == nil {
-		go w.sendCloseSubstream(ws, &WatchResponse{Canceled: true, closeErr: w.closeErr})
+		go w.sendCloseSubstream(ws, &WatchResponse{Header: &pb.ResponseHeader{}, Canceled: true, closeErr: w.closeErr})
 	} else if ws.outc != nil {
 		close(ws.outc)
 	}
@@ -580,7 +577,7 @@ func (w *watchGRPCStream) run() {
 		case pbresp := <-w.respc:
 			if cur == nil || pbresp.Created || pbresp.Canceled {
 				cur = pbresp
-			} else if cur != nil && cur.WatchId == pbresp.WatchId {
+			} else if cur.WatchId == pbresp.WatchId {
 				// merge new events
 				cur.Events = append(cur.Events, pbresp.Events...)
 				// update "Fragment" field; last response with "Fragment" == false
@@ -712,18 +709,14 @@ func (w *watchGRPCStream) nextResume() *watcherStream {
 
 // dispatchEvent sends a WatchResponse to the appropriate watcher stream
 func (w *watchGRPCStream) dispatchEvent(pbresp *pb.WatchResponse) bool {
-	events := make([]*Event, len(pbresp.Events))
-	for i, ev := range pbresp.Events {
-		events[i] = (*Event)(ev)
-	}
 	// TODO: return watch ID?
 	wr := &WatchResponse{
-		Header:          *pbresp.Header,
-		Events:          events,
+		Header:          ensureWatchHeader(pbresp.Header),
+		Events:          pbresp.Events,
 		CompactRevision: pbresp.CompactRevision,
 		Created:         pbresp.Created,
 		Canceled:        pbresp.Canceled,
-		cancelReason:    pbresp.CancelReason,
+		CancelReason:    pbresp.CancelReason,
 	}
 
 	// watch IDs are zero indexed, so request notify watch responses are assigned a watch ID of InvalidWatchID to
@@ -799,7 +792,7 @@ func (w *watchGRPCStream) serveSubstream(ws *watcherStream, resumec chan struct{
 		w.wg.Done()
 	}()
 
-	emptyWr := &WatchResponse{}
+	emptyWr := &WatchResponse{Header: &pb.ResponseHeader{}}
 	for {
 		curWr := emptyWr
 		outc := ws.outc
@@ -896,7 +889,7 @@ func (w *watchGRPCStream) newWatchClient() (pb.Watch_WatchClient, error) {
 	w.resuming = resuming
 	w.substreams = make(map[int64]*watcherStream)
 
-	// connect to grpc stream while accepting watcher cancelation
+	// connect to grpc stream while accepting watcher cancellation
 	stopc := make(chan struct{})
 	donec := w.waitCancelSubstreams(stopc)
 	wc, err := w.openWatchClient()

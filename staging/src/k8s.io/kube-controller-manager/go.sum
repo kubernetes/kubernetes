@@ -78,9 +78,9 @@ github.com/stretchr/testify v1.11.1 h1:7s2iGBzp5EwR7/aIZr8ao5+dra3wiQyKjjFuvgVKu
 github.com/stretchr/testify v1.11.1/go.mod h1:wZwfW3scLgRK+23gO65QZefKpKQRnfz6sD981Nm4B6U=
 github.com/x448/float16 v0.8.4 h1:qLwI1I70+NjRFUR3zs1JPUCgaCXSh3SW62uAKT1mSBM=
 github.com/x448/float16 v0.8.4/go.mod h1:14CWIYCyZA/cWjXOioeEpHeN/83MdbZDRQHoFcYsOfg=
-go.etcd.io/etcd/api/v3 v3.6.11/go.mod h1:HYfTh0jyh+uFgp6gMbxJteIDYY97yMuYz85Rnw6Gy9o=
-go.etcd.io/etcd/client/pkg/v3 v3.6.11/go.mod h1:DysuMe/inqRyC/1tjRR6hReH/VV9Lufs27YKSKBWWJg=
-go.etcd.io/etcd/client/v3 v3.6.11/go.mod h1:vOTDMCo+fGPEClJqcFEFSqZ+8e7WKV7AyqJjX//HR2w=
+go.etcd.io/etcd/api/v3 v3.6.0-alpha.0.0.20260513114709-9c420dfa0eb7/go.mod h1:BFaHAQT41x0S1rI76e7To+nCnJZZnbXpYW2NfEde0kE=
+go.etcd.io/etcd/client/pkg/v3 v3.6.0-alpha.0.0.20260513114709-9c420dfa0eb7/go.mod h1:tqhkYG0A5/Hc2/VMpDByNLlhX73FdK+RTHtvy1Lqysk=
+go.etcd.io/etcd/client/v3 v3.6.0-alpha.0.0.20260513114709-9c420dfa0eb7/go.mod h1:ntrX0W19vQfTg6/FpeXLydNotiUeUWEqe0LYXp6bfUM=
 go.opentelemetry.io/auto/sdk v1.2.1/go.mod h1:KRTj+aOaElaLi+wW1kO/DZRXwkF4C5xPbEe3ZiIhN7Y=
 go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.68.0/go.mod h1:Sje3i3MjSPKTSPvVWCaL8ugBzJwik3u4smCjUeuupqg=
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0/go.mod h1:BuhAPThV8PBHBvg8ZzZ/Ok3idOdhWIodywz2xEcRbJo=

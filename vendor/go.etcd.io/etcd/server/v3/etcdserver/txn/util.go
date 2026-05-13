@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/proto" //nolint:staticcheck // TODO: remove for a supported version
 	"go.uber.org/zap"
 
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"

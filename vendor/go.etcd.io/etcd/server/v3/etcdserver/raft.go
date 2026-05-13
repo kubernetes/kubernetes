@@ -444,3 +444,7 @@ func (r *raftNode) advanceTicks(ticks int) {
 		r.tick()
 	}
 }
+
+func (r *raftNode) ReadState() <-chan raft.ReadState {
+	return r.readStateC
+}

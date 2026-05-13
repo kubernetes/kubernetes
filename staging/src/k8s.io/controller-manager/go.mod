@@ -71,9 +71,9 @@ require (
 	github.com/prometheus/procfs v0.19.2 // indirect
 	github.com/spf13/cobra v1.10.2 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	go.etcd.io/etcd/api/v3 v3.6.11 // indirect
-	go.etcd.io/etcd/client/pkg/v3 v3.6.11 // indirect
-	go.etcd.io/etcd/client/v3 v3.6.11 // indirect
+	go.etcd.io/etcd/api/v3 v3.6.0-alpha.0.0.20260513114709-9c420dfa0eb7 // indirect
+	go.etcd.io/etcd/client/pkg/v3 v3.6.0-alpha.0.0.20260513114709-9c420dfa0eb7 // indirect
+	go.etcd.io/etcd/client/v3 v3.6.0-alpha.0.0.20260513114709-9c420dfa0eb7 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.68.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0 // indirect

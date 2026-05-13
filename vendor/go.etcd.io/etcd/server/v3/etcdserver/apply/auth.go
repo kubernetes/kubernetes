@@ -20,6 +20,7 @@ import (
 	pb "go.etcd.io/etcd/api/v3/etcdserverpb"
 	"go.etcd.io/etcd/pkg/v3/traceutil"
 	"go.etcd.io/etcd/server/v3/auth"
+	"go.etcd.io/etcd/server/v3/etcdserver/api/membership"
 	"go.etcd.io/etcd/server/v3/lease"
 )
 
@@ -39,7 +40,7 @@ func newAuthApplierV3(as auth.AuthStore, base applierV3, lessor lease.Lessor) *a
 	return &authApplierV3{applierV3: base, as: as, lessor: lessor}
 }
 
-func (aa *authApplierV3) Apply(r *pb.InternalRaftRequest, applyFunc applyFunc) *Result {
+func (aa *authApplierV3) Apply(r *pb.InternalRaftRequest, shouldApplyV3 membership.ShouldApplyV3, applyFunc applyFunc) *Result {
 	aa.mu.Lock()
 	defer aa.mu.Unlock()
 	if r.Header != nil {
@@ -55,7 +56,7 @@ func (aa *authApplierV3) Apply(r *pb.InternalRaftRequest, applyFunc applyFunc) *
 			return &Result{Err: err}
 		}
 	}
-	ret := aa.applierV3.Apply(r, applyFunc)
+	ret := aa.applierV3.Apply(r, shouldApplyV3, applyFunc)
 	aa.authInfo.Username = ""
 	aa.authInfo.Revision = 0
 	return ret
@@ -245,8 +246,6 @@ func needAdminPermission(r *pb.InternalRaftRequest) bool {
 	case r.AuthEnable != nil:
 		return true
 	case r.AuthDisable != nil:
-		return true
-	case r.AuthStatus != nil:
 		return true
 	case r.AuthUserAdd != nil:
 		return true

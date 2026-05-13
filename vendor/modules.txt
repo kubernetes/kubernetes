@@ -260,7 +260,7 @@ github.com/gogo/protobuf/protoc-gen-gogo/plugin
 github.com/gogo/protobuf/sortkeys
 github.com/gogo/protobuf/vanity
 github.com/gogo/protobuf/vanity/command
-# github.com/golang-jwt/jwt/v5 v5.3.0
+# github.com/golang-jwt/jwt/v5 v5.3.1
 ## explicit; go 1.21
 github.com/golang-jwt/jwt/v5
 # github.com/golang/protobuf v1.5.4
@@ -561,8 +561,8 @@ github.com/robfig/cron/v3
 # github.com/russross/blackfriday/v2 v2.1.0
 ## explicit
 github.com/russross/blackfriday/v2
-# github.com/sirupsen/logrus v1.9.3
-## explicit; go 1.13
+# github.com/sirupsen/logrus v1.9.4
+## explicit; go 1.17
 github.com/sirupsen/logrus
 # github.com/soheilhy/cmux v0.1.5
 ## explicit; go 1.11
@@ -608,8 +608,8 @@ go.etcd.io/bbolt
 go.etcd.io/bbolt/errors
 go.etcd.io/bbolt/internal/common
 go.etcd.io/bbolt/internal/freelist
-# go.etcd.io/etcd/api/v3 v3.6.11
-## explicit; go 1.25.0
+# go.etcd.io/etcd/api/v3 v3.6.0-alpha.0.0.20260513114709-9c420dfa0eb7
+## explicit; go 1.26
 go.etcd.io/etcd/api/v3/authpb
 go.etcd.io/etcd/api/v3/etcdserverpb
 go.etcd.io/etcd/api/v3/etcdserverpb/gw
@@ -618,27 +618,26 @@ go.etcd.io/etcd/api/v3/mvccpb
 go.etcd.io/etcd/api/v3/v3rpc/rpctypes
 go.etcd.io/etcd/api/v3/version
 go.etcd.io/etcd/api/v3/versionpb
-# go.etcd.io/etcd/client/pkg/v3 v3.6.11
-## explicit; go 1.25.0
+# go.etcd.io/etcd/client/pkg/v3 v3.6.0-alpha.0.0.20260513114709-9c420dfa0eb7
+## explicit; go 1.26
 go.etcd.io/etcd/client/pkg/v3/fileutil
 go.etcd.io/etcd/client/pkg/v3/logutil
-go.etcd.io/etcd/client/pkg/v3/pathutil
 go.etcd.io/etcd/client/pkg/v3/srv
 go.etcd.io/etcd/client/pkg/v3/systemd
 go.etcd.io/etcd/client/pkg/v3/tlsutil
 go.etcd.io/etcd/client/pkg/v3/transport
 go.etcd.io/etcd/client/pkg/v3/types
 go.etcd.io/etcd/client/pkg/v3/verify
-# go.etcd.io/etcd/client/v3 v3.6.11
-## explicit; go 1.25.0
+# go.etcd.io/etcd/client/v3 v3.6.0-alpha.0.0.20260513114709-9c420dfa0eb7
+## explicit; go 1.26
 go.etcd.io/etcd/client/v3
 go.etcd.io/etcd/client/v3/concurrency
 go.etcd.io/etcd/client/v3/credentials
 go.etcd.io/etcd/client/v3/internal/endpoint
 go.etcd.io/etcd/client/v3/internal/resolver
 go.etcd.io/etcd/client/v3/kubernetes
-# go.etcd.io/etcd/pkg/v3 v3.6.11
-## explicit; go 1.25.0
+# go.etcd.io/etcd/pkg/v3 v3.6.0-alpha.0.0.20260513114709-9c420dfa0eb7
+## explicit; go 1.26
 go.etcd.io/etcd/pkg/v3/adt
 go.etcd.io/etcd/pkg/v3/contention
 go.etcd.io/etcd/pkg/v3/cpuutil
@@ -656,8 +655,8 @@ go.etcd.io/etcd/pkg/v3/runtime
 go.etcd.io/etcd/pkg/v3/schedule
 go.etcd.io/etcd/pkg/v3/traceutil
 go.etcd.io/etcd/pkg/v3/wait
-# go.etcd.io/etcd/server/v3 v3.6.11
-## explicit; go 1.25.0
+# go.etcd.io/etcd/server/v3 v3.6.0-alpha.0.0.20260513114709-9c420dfa0eb7
+## explicit; go 1.26
 go.etcd.io/etcd/server/v3/auth
 go.etcd.io/etcd/server/v3/config
 go.etcd.io/etcd/server/v3/embed
@@ -669,7 +668,6 @@ go.etcd.io/etcd/server/v3/etcdserver/api/membership
 go.etcd.io/etcd/server/v3/etcdserver/api/rafthttp
 go.etcd.io/etcd/server/v3/etcdserver/api/snap
 go.etcd.io/etcd/server/v3/etcdserver/api/snap/snappb
-go.etcd.io/etcd/server/v3/etcdserver/api/v2discovery
 go.etcd.io/etcd/server/v3/etcdserver/api/v2error
 go.etcd.io/etcd/server/v3/etcdserver/api/v2stats
 go.etcd.io/etcd/server/v3/etcdserver/api/v2store
@@ -687,10 +685,10 @@ go.etcd.io/etcd/server/v3/etcdserver/api/v3rpc
 go.etcd.io/etcd/server/v3/etcdserver/apply
 go.etcd.io/etcd/server/v3/etcdserver/cindex
 go.etcd.io/etcd/server/v3/etcdserver/errors
+go.etcd.io/etcd/server/v3/etcdserver/read
 go.etcd.io/etcd/server/v3/etcdserver/txn
 go.etcd.io/etcd/server/v3/etcdserver/version
 go.etcd.io/etcd/server/v3/features
-go.etcd.io/etcd/server/v3/internal/clientv2
 go.etcd.io/etcd/server/v3/lease
 go.etcd.io/etcd/server/v3/lease/leasehttp
 go.etcd.io/etcd/server/v3/lease/leasepb
@@ -739,7 +737,6 @@ go.opentelemetry.io/otel/internal/baggage
 go.opentelemetry.io/otel/internal/errorhandler
 go.opentelemetry.io/otel/internal/global
 go.opentelemetry.io/otel/propagation
-go.opentelemetry.io/otel/semconv/v1.17.0
 go.opentelemetry.io/otel/semconv/v1.37.0
 go.opentelemetry.io/otel/semconv/v1.37.0/rpcconv
 go.opentelemetry.io/otel/semconv/v1.40.0

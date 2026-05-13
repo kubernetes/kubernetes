@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net"
 	"net/url"
-	"reflect"
 	"sort"
 	"time"
 
@@ -154,7 +153,7 @@ func urlsEqual(ctx context.Context, lg *zap.Logger, a []url.URL, b []url.URL) (b
 	sort.Sort(types.URLs(b))
 	var needResolve bool
 	for i := range a {
-		if !reflect.DeepEqual(a[i], b[i]) {
+		if !urlsHostNormalizedEqual(a[i], b[i]) {
 			needResolve = true
 			break
 		}
@@ -172,7 +171,7 @@ func urlsEqual(ctx context.Context, lg *zap.Logger, a []url.URL, b []url.URL) (b
 	sort.Sort(types.URLs(a))
 	sort.Sort(types.URLs(b))
 	for i := range a {
-		if !reflect.DeepEqual(a[i], b[i]) {
+		if !urlsHostNormalizedEqual(a[i], b[i]) {
 			return false, fmt.Errorf("resolved urls: %q != %q", a[i].String(), b[i].String())
 		}
 	}
