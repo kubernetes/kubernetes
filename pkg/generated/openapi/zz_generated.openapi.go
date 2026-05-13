@@ -7839,14 +7839,14 @@ func schema_k8sio_api_apps_v1_DaemonSet(ref common.ReferenceCallback) common.Ope
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The desired behavior of this daemon set. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"template": map[string]interface{}{}},
 							Ref:         ref(appsv1.DaemonSetSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The current status of this daemon set. This data may be out of date by some window of time. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"currentNumberScheduled": 0, "desiredNumberScheduled": 0, "numberMisscheduled": 0, "numberReady": 0},
 							Ref:         ref(appsv1.DaemonSetStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -8176,7 +8176,7 @@ func schema_k8sio_api_apps_v1_Deployment(ref common.ReferenceCallback) common.Op
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Specification of the desired behavior of the Deployment.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"template": map[string]interface{}{}},
 							Ref:         ref(appsv1.DeploymentSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -8540,7 +8540,7 @@ func schema_k8sio_api_apps_v1_ReplicaSet(ref common.ReferenceCallback) common.Op
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Status is the most recently observed status of the ReplicaSet. This data may be out of date by some window of time. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"replicas": 0},
 							Ref:         ref(appsv1.ReplicaSetStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -8892,14 +8892,14 @@ func schema_k8sio_api_apps_v1_StatefulSet(ref common.ReferenceCallback) common.O
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Spec defines the desired identities of pods in this set.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"template": map[string]interface{}{}},
 							Ref:         ref(appsv1.StatefulSetSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Status is the current status of Pods in this StatefulSet. This data may be out of date by some window of time.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"replicas": 0},
 							Ref:         ref(appsv1.StatefulSetStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -9429,7 +9429,7 @@ func schema_k8sio_api_apps_v1beta1_Deployment(ref common.ReferenceCallback) comm
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Specification of the desired behavior of the Deployment.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"template": map[string]interface{}{}},
 							Ref:         ref(appsv1beta1.DeploymentSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -9933,7 +9933,7 @@ func schema_k8sio_api_apps_v1beta1_Scale(ref common.ReferenceCallback) common.Op
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "status defines current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"replicas": 0},
 							Ref:         ref(appsv1beta1.ScaleStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -10040,14 +10040,14 @@ func schema_k8sio_api_apps_v1beta1_StatefulSet(ref common.ReferenceCallback) com
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Spec defines the desired identities of pods in this set.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"template": map[string]interface{}{}},
 							Ref:         ref(appsv1beta1.StatefulSetSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Status is the current status of Pods in this StatefulSet. This data may be out of date by some window of time.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"replicas": 0},
 							Ref:         ref(appsv1beta1.StatefulSetStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -10573,14 +10573,14 @@ func schema_k8sio_api_apps_v1beta2_DaemonSet(ref common.ReferenceCallback) commo
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The desired behavior of this daemon set. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"template": map[string]interface{}{}},
 							Ref:         ref(v1beta2.DaemonSetSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The current status of this daemon set. This data may be out of date by some window of time. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"currentNumberScheduled": 0, "desiredNumberScheduled": 0, "numberMisscheduled": 0, "numberReady": 0},
 							Ref:         ref(v1beta2.DaemonSetStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -10909,7 +10909,7 @@ func schema_k8sio_api_apps_v1beta2_Deployment(ref common.ReferenceCallback) comm
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Specification of the desired behavior of the Deployment.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"template": map[string]interface{}{}},
 							Ref:         ref(v1beta2.DeploymentSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -11272,7 +11272,7 @@ func schema_k8sio_api_apps_v1beta2_ReplicaSet(ref common.ReferenceCallback) comm
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Status is the most recently observed status of the ReplicaSet. This data may be out of date by some window of time. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"replicas": 0},
 							Ref:         ref(v1beta2.ReplicaSetStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -11631,7 +11631,7 @@ func schema_k8sio_api_apps_v1beta2_Scale(ref common.ReferenceCallback) common.Op
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"replicas": 0},
 							Ref:         ref(v1beta2.ScaleStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -11743,14 +11743,14 @@ func schema_k8sio_api_apps_v1beta2_StatefulSet(ref common.ReferenceCallback) com
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Spec defines the desired identities of pods in this set.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"template": map[string]interface{}{}},
 							Ref:         ref(v1beta2.StatefulSetSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Status is the current status of Pods in this StatefulSet. This data may be out of date by some window of time.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"replicas": 0},
 							Ref:         ref(v1beta2.StatefulSetStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -13052,7 +13052,7 @@ func schema_k8sio_api_authorization_v1_LocalSubjectAccessReview(ref common.Refer
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "status is filled in by the server and indicates whether the request is allowed or not",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"allowed": false},
 							Ref:         ref(authorizationv1.SubjectAccessReviewStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -13348,7 +13348,7 @@ func schema_k8sio_api_authorization_v1_SelfSubjectAccessReview(ref common.Refere
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "status is filled in by the server and indicates whether the request is allowed or not",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"allowed": false},
 							Ref:         ref(authorizationv1.SubjectAccessReviewStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -13426,7 +13426,7 @@ func schema_k8sio_api_authorization_v1_SelfSubjectRulesReview(ref common.Referen
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "status is filled in by the server and indicates the set of actions a user can perform.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"incomplete": false},
 							Ref:         ref(authorizationv1.SubjectRulesReviewStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -13497,7 +13497,7 @@ func schema_k8sio_api_authorization_v1_SubjectAccessReview(ref common.ReferenceC
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "status is filled in by the server and indicates whether the request is allowed or not",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"allowed": false},
 							Ref:         ref(authorizationv1.SubjectAccessReviewStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -13740,7 +13740,7 @@ func schema_k8sio_api_authorization_v1beta1_LocalSubjectAccessReview(ref common.
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "status is filled in by the server and indicates whether the request is allowed or not",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"allowed": false},
 							Ref:         ref(authorizationv1beta1.SubjectAccessReviewStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -14036,7 +14036,7 @@ func schema_k8sio_api_authorization_v1beta1_SelfSubjectAccessReview(ref common.R
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "status is filled in by the server and indicates whether the request is allowed or not",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"allowed": false},
 							Ref:         ref(authorizationv1beta1.SubjectAccessReviewStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -14114,7 +14114,7 @@ func schema_k8sio_api_authorization_v1beta1_SelfSubjectRulesReview(ref common.Re
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "status is filled in by the server and indicates the set of actions a user can perform.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"incomplete": false},
 							Ref:         ref(authorizationv1beta1.SubjectRulesReviewStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -14185,7 +14185,7 @@ func schema_k8sio_api_authorization_v1beta1_SubjectAccessReview(ref common.Refer
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "status is filled in by the server and indicates whether the request is allowed or not",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"allowed": false},
 							Ref:         ref(authorizationv1beta1.SubjectAccessReviewStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -14637,14 +14637,14 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscaler(ref common.Referenc
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "spec defines the behaviour of autoscaler. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"maxReplicas": 0, "scaleTargetRef": map[string]interface{}{"kind": "", "name": ""}},
 							Ref:         ref(autoscalingv1.HorizontalPodAutoscalerSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "status is the current information about the autoscaler.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"currentReplicas": 0, "desiredReplicas": 0},
 							Ref:         ref(autoscalingv1.HorizontalPodAutoscalerStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -14769,7 +14769,7 @@ func schema_k8sio_api_autoscaling_v1_HorizontalPodAutoscalerSpec(ref common.Refe
 					"scaleTargetRef": {
 						SchemaProps: spec.SchemaProps{
 							Description: "reference to scaled resource; horizontal pod autoscaler will learn the current resource consumption and will set the desired number of pods by using its Scale subresource.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"kind": "", "name": ""},
 							Ref:         ref(autoscalingv1.CrossVersionObjectReference{}.OpenAPIModelName()),
 						},
 					},
@@ -14976,7 +14976,7 @@ func schema_k8sio_api_autoscaling_v1_ObjectMetricSource(ref common.ReferenceCall
 					"target": {
 						SchemaProps: spec.SchemaProps{
 							Description: "target is the described Kubernetes object.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"kind": "", "name": ""},
 							Ref:         ref(autoscalingv1.CrossVersionObjectReference{}.OpenAPIModelName()),
 						},
 					},
@@ -15025,7 +15025,7 @@ func schema_k8sio_api_autoscaling_v1_ObjectMetricStatus(ref common.ReferenceCall
 					"target": {
 						SchemaProps: spec.SchemaProps{
 							Description: "target is the described Kubernetes object.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"kind": "", "name": ""},
 							Ref:         ref(autoscalingv1.CrossVersionObjectReference{}.OpenAPIModelName()),
 						},
 					},
@@ -15248,7 +15248,7 @@ func schema_k8sio_api_autoscaling_v1_Scale(ref common.ReferenceCallback) common.
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "status is the current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"replicas": 0},
 							Ref:         ref(autoscalingv1.ScaleStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -15328,7 +15328,7 @@ func schema_k8sio_api_autoscaling_v2_ContainerResourceMetricSource(ref common.Re
 					"target": {
 						SchemaProps: spec.SchemaProps{
 							Description: "target specifies the target value for the given metric",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"type": ""},
 							Ref:         ref(autoscalingv2.MetricTarget{}.OpenAPIModelName()),
 						},
 					},
@@ -15435,14 +15435,14 @@ func schema_k8sio_api_autoscaling_v2_ExternalMetricSource(ref common.ReferenceCa
 					"metric": {
 						SchemaProps: spec.SchemaProps{
 							Description: "metric identifies the target metric by name and selector",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"name": ""},
 							Ref:         ref(autoscalingv2.MetricIdentifier{}.OpenAPIModelName()),
 						},
 					},
 					"target": {
 						SchemaProps: spec.SchemaProps{
 							Description: "target specifies the target value for the given metric",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"type": ""},
 							Ref:         ref(autoscalingv2.MetricTarget{}.OpenAPIModelName()),
 						},
 					},
@@ -15465,7 +15465,7 @@ func schema_k8sio_api_autoscaling_v2_ExternalMetricStatus(ref common.ReferenceCa
 					"metric": {
 						SchemaProps: spec.SchemaProps{
 							Description: "metric identifies the target metric by name and selector",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"name": ""},
 							Ref:         ref(autoscalingv2.MetricIdentifier{}.OpenAPIModelName()),
 						},
 					},
@@ -15607,14 +15607,14 @@ func schema_k8sio_api_autoscaling_v2_HorizontalPodAutoscaler(ref common.Referenc
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "spec is the specification for the behaviour of the autoscaler. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"maxReplicas": 0, "scaleTargetRef": map[string]interface{}{"kind": "", "name": ""}},
 							Ref:         ref(autoscalingv2.HorizontalPodAutoscalerSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "status is the current information about the autoscaler.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"desiredReplicas": 0},
 							Ref:         ref(autoscalingv2.HorizontalPodAutoscalerStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -15766,7 +15766,7 @@ func schema_k8sio_api_autoscaling_v2_HorizontalPodAutoscalerSpec(ref common.Refe
 					"scaleTargetRef": {
 						SchemaProps: spec.SchemaProps{
 							Description: "scaleTargetRef points to the target resource to scale, and is used to the pods for which metrics should be collected, as well as to actually change the replica count.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"kind": "", "name": ""},
 							Ref:         ref(autoscalingv2.CrossVersionObjectReference{}.OpenAPIModelName()),
 						},
 					},
@@ -16128,21 +16128,21 @@ func schema_k8sio_api_autoscaling_v2_ObjectMetricSource(ref common.ReferenceCall
 					"describedObject": {
 						SchemaProps: spec.SchemaProps{
 							Description: "describedObject specifies the descriptions of a object,such as kind,name apiVersion",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"kind": "", "name": ""},
 							Ref:         ref(autoscalingv2.CrossVersionObjectReference{}.OpenAPIModelName()),
 						},
 					},
 					"target": {
 						SchemaProps: spec.SchemaProps{
 							Description: "target specifies the target value for the given metric",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"type": ""},
 							Ref:         ref(autoscalingv2.MetricTarget{}.OpenAPIModelName()),
 						},
 					},
 					"metric": {
 						SchemaProps: spec.SchemaProps{
 							Description: "metric identifies the target metric by name and selector",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"name": ""},
 							Ref:         ref(autoscalingv2.MetricIdentifier{}.OpenAPIModelName()),
 						},
 					},
@@ -16165,7 +16165,7 @@ func schema_k8sio_api_autoscaling_v2_ObjectMetricStatus(ref common.ReferenceCall
 					"metric": {
 						SchemaProps: spec.SchemaProps{
 							Description: "metric identifies the target metric by name and selector",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"name": ""},
 							Ref:         ref(autoscalingv2.MetricIdentifier{}.OpenAPIModelName()),
 						},
 					},
@@ -16179,7 +16179,7 @@ func schema_k8sio_api_autoscaling_v2_ObjectMetricStatus(ref common.ReferenceCall
 					"describedObject": {
 						SchemaProps: spec.SchemaProps{
 							Description: "DescribedObject specifies the descriptions of a object,such as kind,name apiVersion",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"kind": "", "name": ""},
 							Ref:         ref(autoscalingv2.CrossVersionObjectReference{}.OpenAPIModelName()),
 						},
 					},
@@ -16202,14 +16202,14 @@ func schema_k8sio_api_autoscaling_v2_PodsMetricSource(ref common.ReferenceCallba
 					"metric": {
 						SchemaProps: spec.SchemaProps{
 							Description: "metric identifies the target metric by name and selector",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"name": ""},
 							Ref:         ref(autoscalingv2.MetricIdentifier{}.OpenAPIModelName()),
 						},
 					},
 					"target": {
 						SchemaProps: spec.SchemaProps{
 							Description: "target specifies the target value for the given metric",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"type": ""},
 							Ref:         ref(autoscalingv2.MetricTarget{}.OpenAPIModelName()),
 						},
 					},
@@ -16232,7 +16232,7 @@ func schema_k8sio_api_autoscaling_v2_PodsMetricStatus(ref common.ReferenceCallba
 					"metric": {
 						SchemaProps: spec.SchemaProps{
 							Description: "metric identifies the target metric by name and selector",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"name": ""},
 							Ref:         ref(autoscalingv2.MetricIdentifier{}.OpenAPIModelName()),
 						},
 					},
@@ -16270,7 +16270,7 @@ func schema_k8sio_api_autoscaling_v2_ResourceMetricSource(ref common.ReferenceCa
 					"target": {
 						SchemaProps: spec.SchemaProps{
 							Description: "target specifies the target value for the given metric",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"type": ""},
 							Ref:         ref(autoscalingv2.MetricTarget{}.OpenAPIModelName()),
 						},
 					},
@@ -16345,7 +16345,7 @@ func schema_k8sio_api_batch_v1_CronJob(ref common.ReferenceCallback) common.Open
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Specification of the desired behavior of a cron job, including the schedule. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"jobTemplate": map[string]interface{}{}, "schedule": ""},
 							Ref:         ref(batchv1.CronJobSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -16565,7 +16565,7 @@ func schema_k8sio_api_batch_v1_Job(ref common.ReferenceCallback) common.OpenAPID
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Specification of the desired behavior of a job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"template": map[string]interface{}{}},
 							Ref:         ref(batchv1.JobSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -16938,7 +16938,7 @@ func schema_k8sio_api_batch_v1_JobTemplateSpec(ref common.ReferenceCallback) com
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Specification of the desired behavior of the job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"template": map[string]interface{}{}},
 							Ref:         ref(batchv1.JobSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -17255,7 +17255,7 @@ func schema_k8sio_api_batch_v1beta1_CronJob(ref common.ReferenceCallback) common
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Specification of the desired behavior of a cron job, including the schedule. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"jobTemplate": map[string]interface{}{}, "schedule": ""},
 							Ref:         ref(batchv1beta1.CronJobSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -17460,7 +17460,7 @@ func schema_k8sio_api_batch_v1beta1_JobTemplateSpec(ref common.ReferenceCallback
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Specification of the desired behavior of the job. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"template": map[string]interface{}{}},
 							Ref:         ref(batchv1.JobSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -17502,7 +17502,7 @@ func schema_k8sio_api_certificates_v1_CertificateSigningRequest(ref common.Refer
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "spec contains the certificate request, and is immutable after creation. Only the request, signerName, expirationSeconds, and usages fields can be set on creation. Other fields are derived by Kubernetes and cannot be modified by users.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"signerName": ""},
 							Ref:         ref(certificatesv1.CertificateSigningRequestSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -17814,7 +17814,7 @@ func schema_k8sio_api_certificates_v1alpha1_ClusterTrustBundle(ref common.Refere
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "spec contains the signer (if any) and trust anchors.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"trustBundle": ""},
 							Ref:         ref(certificatesv1alpha1.ClusterTrustBundleSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -18242,7 +18242,7 @@ func schema_k8sio_api_certificates_v1beta1_ClusterTrustBundle(ref common.Referen
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "spec contains the signer (if any) and trust anchors.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"trustBundle": ""},
 							Ref:         ref(certificatesv1beta1.ClusterTrustBundleSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -18365,7 +18365,7 @@ func schema_k8sio_api_certificates_v1beta1_PodCertificateRequest(ref common.Refe
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "spec contains the details about the certificate being requested.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"nodeName": "", "nodeUID": "", "podName": "", "podUID": "", "serviceAccountName": "", "serviceAccountUID": "", "signerName": ""},
 							Ref:         ref(certificatesv1beta1.PodCertificateRequestSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -18798,7 +18798,7 @@ func schema_k8sio_api_coordination_v1alpha2_LeaseCandidate(ref common.ReferenceC
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "spec contains the specification of the Lease. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"binaryVersion": "", "leaseName": ""},
 							Ref:         ref(v1alpha2.LeaseCandidateSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -18993,7 +18993,7 @@ func schema_k8sio_api_coordination_v1beta1_LeaseCandidate(ref common.ReferenceCa
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "spec contains the specification of the Lease. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"binaryVersion": "", "leaseName": ""},
 							Ref:         ref(coordinationv1beta1.LeaseCandidateSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -25019,7 +25019,7 @@ func schema_k8sio_api_core_v1_NodeDaemonEndpoints(ref common.ReferenceCallback) 
 					"kubeletEndpoint": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Endpoint on which Kubelet is listening.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"Port": 0},
 							Ref:         ref(corev1.DaemonEndpoint{}.OpenAPIModelName()),
 						},
 					},
@@ -25522,7 +25522,7 @@ func schema_k8sio_api_core_v1_NodeStatus(ref common.ReferenceCallback) common.Op
 					"nodeInfo": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Set of ids/uuids to uniquely identify the node. More info: https://kubernetes.io/docs/reference/node/node-status/#info",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"architecture": "", "bootID": "", "containerRuntimeVersion": "", "kernelVersion": "", "kubeProxyVersion": "", "kubeletVersion": "", "machineID": "", "operatingSystem": "", "osImage": "", "systemUUID": ""},
 							Ref:         ref(corev1.NodeSystemInfo{}.OpenAPIModelName()),
 						},
 					},
@@ -29605,7 +29605,7 @@ func schema_k8sio_api_core_v1_ReplicationController(ref common.ReferenceCallback
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Status is the most recently observed status of the replication controller. This data may be out of date by some window of time. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"replicas": 0},
 							Ref:         ref(corev1.ReplicationControllerStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -33021,7 +33021,7 @@ func schema_k8sio_api_core_v1_WeightedPodAffinityTerm(ref common.ReferenceCallba
 					"podAffinityTerm": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Required. A pod affinity term, associated with the corresponding weight.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"topologyKey": ""},
 							Ref:         ref(corev1.PodAffinityTerm{}.OpenAPIModelName()),
 						},
 					},
@@ -34310,14 +34310,14 @@ func schema_k8sio_api_extensions_v1beta1_DaemonSet(ref common.ReferenceCallback)
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The desired behavior of this daemon set. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"template": map[string]interface{}{}},
 							Ref:         ref(extensionsv1beta1.DaemonSetSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The current status of this daemon set. This data may be out of date by some window of time. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"currentNumberScheduled": 0, "desiredNumberScheduled": 0, "numberMisscheduled": 0, "numberReady": 0},
 							Ref:         ref(extensionsv1beta1.DaemonSetStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -34653,7 +34653,7 @@ func schema_k8sio_api_extensions_v1beta1_Deployment(ref common.ReferenceCallback
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Specification of the desired behavior of the Deployment.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"template": map[string]interface{}{}},
 							Ref:         ref(extensionsv1beta1.DeploymentSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -35613,7 +35613,7 @@ func schema_k8sio_api_extensions_v1beta1_NetworkPolicy(ref common.ReferenceCallb
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Specification of the desired behavior for this NetworkPolicy.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"podSelector": map[string]interface{}{}},
 							Ref:         ref(extensionsv1beta1.NetworkPolicySpec{}.OpenAPIModelName()),
 						},
 					},
@@ -35962,7 +35962,7 @@ func schema_k8sio_api_extensions_v1beta1_ReplicaSet(ref common.ReferenceCallback
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Status is the most recently observed status of the ReplicaSet. This data may be out of date by some window of time. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"replicas": 0},
 							Ref:         ref(extensionsv1beta1.ReplicaSetStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -36312,7 +36312,7 @@ func schema_k8sio_api_extensions_v1beta1_Scale(ref common.ReferenceCallback) com
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"replicas": 0},
 							Ref:         ref(extensionsv1beta1.ScaleStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -36474,7 +36474,7 @@ func schema_k8sio_api_flowcontrol_v1_FlowSchema(ref common.ReferenceCallback) co
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "`spec` is the specification of the desired behavior of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"priorityLevelConfiguration": map[string]interface{}{"name": ""}},
 							Ref:         ref(flowcontrolv1.FlowSchemaSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -36602,7 +36602,7 @@ func schema_k8sio_api_flowcontrol_v1_FlowSchemaSpec(ref common.ReferenceCallback
 					"priorityLevelConfiguration": {
 						SchemaProps: spec.SchemaProps{
 							Description: "`priorityLevelConfiguration` should reference a PriorityLevelConfiguration in the cluster. If the reference cannot be resolved, the FlowSchema will be ignored and marked as invalid in its status. Required.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"name": ""},
 							Ref:         ref(flowcontrolv1.PriorityLevelConfigurationReference{}.OpenAPIModelName()),
 						},
 					},
@@ -36766,7 +36766,7 @@ func schema_k8sio_api_flowcontrol_v1_LimitedPriorityLevelConfiguration(ref commo
 					"limitResponse": {
 						SchemaProps: spec.SchemaProps{
 							Description: "`limitResponse` indicates what to do with requests that can not be executed right now",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"type": ""},
 							Ref:         ref(flowcontrolv1.LimitResponse{}.OpenAPIModelName()),
 						},
 					},
@@ -36945,7 +36945,7 @@ func schema_k8sio_api_flowcontrol_v1_PriorityLevelConfiguration(ref common.Refer
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "`spec` is the specification of the desired behavior of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"type": ""},
 							Ref:         ref(flowcontrolv1.PriorityLevelConfigurationSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -37494,7 +37494,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_FlowSchema(ref common.ReferenceCallbac
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "`spec` is the specification of the desired behavior of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"priorityLevelConfiguration": map[string]interface{}{"name": ""}},
 							Ref:         ref(flowcontrolv1beta1.FlowSchemaSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -37622,7 +37622,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_FlowSchemaSpec(ref common.ReferenceCal
 					"priorityLevelConfiguration": {
 						SchemaProps: spec.SchemaProps{
 							Description: "`priorityLevelConfiguration` should reference a PriorityLevelConfiguration in the cluster. If the reference cannot be resolved, the FlowSchema will be ignored and marked as invalid in its status. Required.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"name": ""},
 							Ref:         ref(flowcontrolv1beta1.PriorityLevelConfigurationReference{}.OpenAPIModelName()),
 						},
 					},
@@ -37785,7 +37785,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_LimitedPriorityLevelConfiguration(ref 
 					"limitResponse": {
 						SchemaProps: spec.SchemaProps{
 							Description: "`limitResponse` indicates what to do with requests that can not be executed right now",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"type": ""},
 							Ref:         ref(flowcontrolv1beta1.LimitResponse{}.OpenAPIModelName()),
 						},
 					},
@@ -37964,7 +37964,7 @@ func schema_k8sio_api_flowcontrol_v1beta1_PriorityLevelConfiguration(ref common.
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "`spec` is the specification of the desired behavior of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"type": ""},
 							Ref:         ref(flowcontrolv1beta1.PriorityLevelConfigurationSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -38511,7 +38511,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_FlowSchema(ref common.ReferenceCallbac
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "`spec` is the specification of the desired behavior of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"priorityLevelConfiguration": map[string]interface{}{"name": ""}},
 							Ref:         ref(flowcontrolv1beta2.FlowSchemaSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -38639,7 +38639,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_FlowSchemaSpec(ref common.ReferenceCal
 					"priorityLevelConfiguration": {
 						SchemaProps: spec.SchemaProps{
 							Description: "`priorityLevelConfiguration` should reference a PriorityLevelConfiguration in the cluster. If the reference cannot be resolved, the FlowSchema will be ignored and marked as invalid in its status. Required.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"name": ""},
 							Ref:         ref(flowcontrolv1beta2.PriorityLevelConfigurationReference{}.OpenAPIModelName()),
 						},
 					},
@@ -38802,7 +38802,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_LimitedPriorityLevelConfiguration(ref 
 					"limitResponse": {
 						SchemaProps: spec.SchemaProps{
 							Description: "`limitResponse` indicates what to do with requests that can not be executed right now",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"type": ""},
 							Ref:         ref(flowcontrolv1beta2.LimitResponse{}.OpenAPIModelName()),
 						},
 					},
@@ -38981,7 +38981,7 @@ func schema_k8sio_api_flowcontrol_v1beta2_PriorityLevelConfiguration(ref common.
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "`spec` is the specification of the desired behavior of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"type": ""},
 							Ref:         ref(flowcontrolv1beta2.PriorityLevelConfigurationSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -39528,7 +39528,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_FlowSchema(ref common.ReferenceCallbac
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "`spec` is the specification of the desired behavior of a FlowSchema. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"priorityLevelConfiguration": map[string]interface{}{"name": ""}},
 							Ref:         ref(v1beta3.FlowSchemaSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -39656,7 +39656,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_FlowSchemaSpec(ref common.ReferenceCal
 					"priorityLevelConfiguration": {
 						SchemaProps: spec.SchemaProps{
 							Description: "`priorityLevelConfiguration` should reference a PriorityLevelConfiguration in the cluster. If the reference cannot be resolved, the FlowSchema will be ignored and marked as invalid in its status. Required.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"name": ""},
 							Ref:         ref(v1beta3.PriorityLevelConfigurationReference{}.OpenAPIModelName()),
 						},
 					},
@@ -39821,7 +39821,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_LimitedPriorityLevelConfiguration(ref 
 					"limitResponse": {
 						SchemaProps: spec.SchemaProps{
 							Description: "`limitResponse` indicates what to do with requests that can not be executed right now",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"type": ""},
 							Ref:         ref(v1beta3.LimitResponse{}.OpenAPIModelName()),
 						},
 					},
@@ -40000,7 +40000,7 @@ func schema_k8sio_api_flowcontrol_v1beta3_PriorityLevelConfiguration(ref common.
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "`spec` is the specification of the desired behavior of a \"request-priority\". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"type": ""},
 							Ref:         ref(v1beta3.PriorityLevelConfigurationSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -43316,7 +43316,7 @@ func schema_k8sio_api_node_v1alpha1_RuntimeClass(ref common.ReferenceCallback) c
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "spec represents specification of the RuntimeClass More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"runtimeHandler": ""},
 							Ref:         ref(nodev1alpha1.RuntimeClassSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -44352,7 +44352,7 @@ func schema_k8sio_api_rbac_v1_ClusterRoleBinding(ref common.ReferenceCallback) c
 					"roleRef": {
 						SchemaProps: spec.SchemaProps{
 							Description: "RoleRef can only reference a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error. This field is immutable.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"kind": "", "name": ""},
 							Ref:         ref(rbacv1.RoleRef{}.OpenAPIModelName()),
 						},
 					},
@@ -44677,7 +44677,7 @@ func schema_k8sio_api_rbac_v1_RoleBinding(ref common.ReferenceCallback) common.O
 					"roleRef": {
 						SchemaProps: spec.SchemaProps{
 							Description: "RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error. This field is immutable.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"kind": "", "name": ""},
 							Ref:         ref(rbacv1.RoleRef{}.OpenAPIModelName()),
 						},
 					},
@@ -45024,7 +45024,7 @@ func schema_k8sio_api_rbac_v1alpha1_ClusterRoleBinding(ref common.ReferenceCallb
 					"roleRef": {
 						SchemaProps: spec.SchemaProps{
 							Description: "RoleRef can only reference a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"kind": "", "name": ""},
 							Ref:         ref(rbacv1alpha1.RoleRef{}.OpenAPIModelName()),
 						},
 					},
@@ -45349,7 +45349,7 @@ func schema_k8sio_api_rbac_v1alpha1_RoleBinding(ref common.ReferenceCallback) co
 					"roleRef": {
 						SchemaProps: spec.SchemaProps{
 							Description: "RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"kind": "", "name": ""},
 							Ref:         ref(rbacv1alpha1.RoleRef{}.OpenAPIModelName()),
 						},
 					},
@@ -45686,7 +45686,7 @@ func schema_k8sio_api_rbac_v1beta1_ClusterRoleBinding(ref common.ReferenceCallba
 					"roleRef": {
 						SchemaProps: spec.SchemaProps{
 							Description: "RoleRef can only reference a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"kind": "", "name": ""},
 							Ref:         ref(rbacv1beta1.RoleRef{}.OpenAPIModelName()),
 						},
 					},
@@ -46011,7 +46011,7 @@ func schema_k8sio_api_rbac_v1beta1_RoleBinding(ref common.ReferenceCallback) com
 					"roleRef": {
 						SchemaProps: spec.SchemaProps{
 							Description: "RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"kind": "", "name": ""},
 							Ref:         ref(rbacv1beta1.RoleRef{}.OpenAPIModelName()),
 						},
 					},
@@ -48321,7 +48321,7 @@ func schema_k8sio_api_resource_v1_ResourceSlice(ref common.ReferenceCallback) co
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Contains the information published by the driver.\n\nChanging the spec automatically increments the metadata.generation number.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"driver": "", "pool": map[string]interface{}{"generation": 0, "name": "", "resourceSliceCount": 0}},
 							Ref:         ref(resourcev1.ResourceSliceSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -48402,7 +48402,7 @@ func schema_k8sio_api_resource_v1_ResourceSliceSpec(ref common.ReferenceCallback
 					"pool": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Pool describes the pool that this ResourceSlice belongs to.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"generation": 0, "name": "", "resourceSliceCount": 0},
 							Ref:         ref(resourcev1.ResourcePool{}.OpenAPIModelName()),
 						},
 					},
@@ -48598,7 +48598,7 @@ func schema_k8sio_api_resource_v1alpha3_DeviceTaintRule(ref common.ReferenceCall
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Spec specifies the selector and one taint.\n\nChanging the spec automatically increments the metadata.generation number.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"taint": map[string]interface{}{"effect": "", "key": ""}},
 							Ref:         ref(v1alpha3.DeviceTaintRuleSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -48684,7 +48684,7 @@ func schema_k8sio_api_resource_v1alpha3_DeviceTaintRuleSpec(ref common.Reference
 					"taint": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The taint that gets applied to matching devices.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"effect": "", "key": ""},
 							Ref:         ref(v1alpha3.DeviceTaint{}.OpenAPIModelName()),
 						},
 					},
@@ -48885,7 +48885,7 @@ func schema_k8sio_api_resource_v1alpha3_ResourcePoolStatusRequest(ref common.Ref
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Spec defines the filters for which pools to include in the status. The spec is immutable once created.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"driver": ""},
 							Ref:         ref(v1alpha3.ResourcePoolStatusRequestSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -51169,7 +51169,7 @@ func schema_k8sio_api_resource_v1beta1_ResourceSlice(ref common.ReferenceCallbac
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Contains the information published by the driver.\n\nChanging the spec automatically increments the metadata.generation number.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"driver": "", "pool": map[string]interface{}{"generation": 0, "name": "", "resourceSliceCount": 0}},
 							Ref:         ref(resourcev1beta1.ResourceSliceSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -51250,7 +51250,7 @@ func schema_k8sio_api_resource_v1beta1_ResourceSliceSpec(ref common.ReferenceCal
 					"pool": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Pool describes the pool that this ResourceSlice belongs to.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"generation": 0, "name": "", "resourceSliceCount": 0},
 							Ref:         ref(resourcev1beta1.ResourcePool{}.OpenAPIModelName()),
 						},
 					},
@@ -52803,7 +52803,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceTaintRule(ref common.ReferenceCallb
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Spec specifies the selector and one taint.\n\nChanging the spec automatically increments the metadata.generation number.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"taint": map[string]interface{}{"effect": "", "key": ""}},
 							Ref:         ref(resourcev1beta2.DeviceTaintRuleSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -52889,7 +52889,7 @@ func schema_k8sio_api_resource_v1beta2_DeviceTaintRuleSpec(ref common.ReferenceC
 					"taint": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The taint that gets applied to matching devices.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"effect": "", "key": ""},
 							Ref:         ref(resourcev1beta2.DeviceTaint{}.OpenAPIModelName()),
 						},
 					},
@@ -53643,7 +53643,7 @@ func schema_k8sio_api_resource_v1beta2_ResourceSlice(ref common.ReferenceCallbac
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Contains the information published by the driver.\n\nChanging the spec automatically increments the metadata.generation number.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"driver": "", "pool": map[string]interface{}{"generation": 0, "name": "", "resourceSliceCount": 0}},
 							Ref:         ref(resourcev1beta2.ResourceSliceSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -53724,7 +53724,7 @@ func schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref common.ReferenceCal
 					"pool": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Pool describes the pool that this ResourceSlice belongs to.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"generation": 0, "name": "", "resourceSliceCount": 0},
 							Ref:         ref(resourcev1beta2.ResourcePool{}.OpenAPIModelName()),
 						},
 					},
@@ -53980,7 +53980,7 @@ func schema_k8sio_api_scheduling_v1alpha2_PodGroup(ref common.ReferenceCallback)
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Spec defines the desired state of the PodGroup.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"schedulingPolicy": map[string]interface{}{}},
 							Ref:         ref(schedulingv1alpha2.PodGroupSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -55527,14 +55527,14 @@ func schema_k8sio_api_storage_v1_VolumeAttachment(ref common.ReferenceCallback) 
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "spec represents specification of the desired attach/detach volume behavior. Populated by the Kubernetes system.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"attacher": "", "nodeName": "", "source": map[string]interface{}{}},
 							Ref:         ref(storagev1.VolumeAttachmentSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "status represents status of the VolumeAttachment request. Populated by the entity completing the attach or detach operation, i.e. the external-attacher.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"attached": false},
 							Ref:         ref(storagev1.VolumeAttachmentStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -56024,14 +56024,14 @@ func schema_k8sio_api_storage_v1alpha1_VolumeAttachment(ref common.ReferenceCall
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "spec represents specification of the desired attach/detach volume behavior. Populated by the Kubernetes system.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"attacher": "", "nodeName": "", "source": map[string]interface{}{}},
 							Ref:         ref(storagev1alpha1.VolumeAttachmentSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "status represents status of the VolumeAttachment request. Populated by the entity completing the attach or detach operation, i.e. the external-attacher.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"attached": false},
 							Ref:         ref(storagev1alpha1.VolumeAttachmentStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -57098,14 +57098,14 @@ func schema_k8sio_api_storage_v1beta1_VolumeAttachment(ref common.ReferenceCallb
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "spec represents specification of the desired attach/detach volume behavior. Populated by the Kubernetes system.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"attacher": "", "nodeName": "", "source": map[string]interface{}{}},
 							Ref:         ref(storagev1beta1.VolumeAttachmentSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "status represents status of the VolumeAttachment request. Populated by the entity completing the attach or detach operation, i.e. the external-attacher.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"attached": false},
 							Ref:         ref(storagev1beta1.VolumeAttachmentStatus{}.OpenAPIModelName()),
 						},
 					},
@@ -57482,7 +57482,7 @@ func schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigration(ref commo
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Specification of the migration.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"resource": map[string]interface{}{"group": "", "resource": ""}},
 							Ref:         ref(storagemigrationv1beta1.StorageVersionMigrationSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -57561,7 +57561,7 @@ func schema_k8sio_api_storagemigration_v1beta1_StorageVersionMigrationSpec(ref c
 					"resource": {
 						SchemaProps: spec.SchemaProps{
 							Description: "The resource that is being migrated. The migrator sends requests to the endpoint serving the resource. Immutable.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"group": "", "resource": ""},
 							Ref:         ref(metav1.GroupResource{}.OpenAPIModelName()),
 						},
 					},
@@ -57879,7 +57879,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinition(ref common.Refere
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "spec describes how the user wants the resources to appear",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"group": "", "names": map[string]interface{}{"kind": "", "plural": ""}, "scope": ""},
 							Ref:         ref(apiextensionsv1.CustomResourceDefinitionSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -58108,7 +58108,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionSpec(ref common.Re
 					"names": {
 						SchemaProps: spec.SchemaProps{
 							Description: "names specify the resource and kind names for the custom resource.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"kind": "", "plural": ""},
 							Ref:         ref(apiextensionsv1.CustomResourceDefinitionNames{}.OpenAPIModelName()),
 						},
 					},
@@ -58191,7 +58191,7 @@ func schema_pkg_apis_apiextensions_v1_CustomResourceDefinitionStatus(ref common.
 					"acceptedNames": {
 						SchemaProps: spec.SchemaProps{
 							Description: "acceptedNames are the names that are actually being used to serve discovery. They may be different than the names in spec.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"kind": "", "plural": ""},
 							Ref:         ref(apiextensionsv1.CustomResourceDefinitionNames{}.OpenAPIModelName()),
 						},
 					},
@@ -59372,7 +59372,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinition(ref common.R
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "spec describes how the user wants the resources to appear",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"group": "", "names": map[string]interface{}{"kind": "", "plural": ""}, "scope": ""},
 							Ref:         ref(apiextensionsv1beta1.CustomResourceDefinitionSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -59608,7 +59608,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionSpec(ref comm
 					"names": {
 						SchemaProps: spec.SchemaProps{
 							Description: "names specify the resource and kind names for the custom resource.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"kind": "", "plural": ""},
 							Ref:         ref(apiextensionsv1beta1.CustomResourceDefinitionNames{}.OpenAPIModelName()),
 						},
 					},
@@ -59739,7 +59739,7 @@ func schema_pkg_apis_apiextensions_v1beta1_CustomResourceDefinitionStatus(ref co
 					"acceptedNames": {
 						SchemaProps: spec.SchemaProps{
 							Description: "acceptedNames are the names that are actually being used to serve discovery. They may be different than the names in spec.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"kind": "", "plural": ""},
 							Ref:         ref(apiextensionsv1beta1.CustomResourceDefinitionNames{}.OpenAPIModelName()),
 						},
 					},
@@ -60698,7 +60698,7 @@ func schema_pkg_apis_meta_v1_APIGroup(ref common.ReferenceCallback) common.OpenA
 					"preferredVersion": {
 						SchemaProps: spec.SchemaProps{
 							Description: "preferredVersion is the version preferred by the API server, which probably is the storage version.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"groupVersion": "", "version": ""},
 							Ref:         ref(metav1.GroupVersionForDiscovery{}.OpenAPIModelName()),
 						},
 					},
@@ -64787,7 +64787,7 @@ func schema_pkg_apis_clientauthentication_v1_ExecCredential(ref common.Reference
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Spec holds information passed to the plugin by the transport.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"interactive": false},
 							Ref:         ref(clientauthenticationv1.ExecCredentialSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -64971,7 +64971,7 @@ func schema_pkg_apis_clientauthentication_v1beta1_ExecCredential(ref common.Refe
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Spec holds information passed to the plugin by the transport.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"interactive": false},
 							Ref:         ref(clientauthenticationv1beta1.ExecCredentialSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -65085,28 +65085,28 @@ func schema_k8sio_cloud_provider_config_v1alpha1_CloudControllerManagerConfigura
 					"Generic": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Generic holds configuration for a generic controller-manager",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"Address": "", "ClientConnection": map[string]interface{}{"acceptContentTypes": "", "burst": 0, "contentType": "", "kubeconfig": "", "qps": 0}, "Debugging": map[string]interface{}{}, "LeaderElection": map[string]interface{}{"resourceLock": "", "resourceName": "", "resourceNamespace": ""}, "LeaderMigration": map[string]interface{}{"leaderName": "", "resourceLock": ""}, "LeaderMigrationEnabled": false, "Port": 0},
 							Ref:         ref(controllermanagerconfigv1alpha1.GenericControllerManagerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"KubeCloudShared": {
 						SchemaProps: spec.SchemaProps{
 							Description: "KubeCloudSharedConfiguration holds configuration for shared related features both in cloud controller manager and kube-controller manager.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"AllocateNodeCIDRs": false, "AllowUntaggedCloud": false, "CIDRAllocatorType": "", "CloudProvider": map[string]interface{}{"CloudConfigFile": "", "Name": ""}, "ClusterCIDR": "", "ClusterName": "", "ExternalCloudVolumePlugin": "", "UseServiceAccountCredentials": false},
 							Ref:         ref(configv1alpha1.KubeCloudSharedConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"NodeController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "NodeController holds configuration for node controller related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"ConcurrentNodeStatusUpdates": 0, "ConcurrentNodeSyncs": 0},
 							Ref:         ref(nodeconfigv1alpha1.NodeControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"ServiceController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "ServiceControllerConfiguration holds configuration for ServiceController related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"ConcurrentServiceSyncs": 0},
 							Ref:         ref(serviceconfigv1alpha1.ServiceControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
@@ -65172,7 +65172,7 @@ func schema_k8sio_cloud_provider_config_v1alpha1_KubeCloudSharedConfiguration(re
 					"CloudProvider": {
 						SchemaProps: spec.SchemaProps{
 							Description: "CloudProviderConfiguration holds configuration for CloudProvider related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"CloudConfigFile": "", "Name": ""},
 							Ref:         ref(configv1alpha1.CloudProviderConfiguration{}.OpenAPIModelName()),
 						},
 					},
@@ -65581,7 +65581,7 @@ func schema_k8sio_controller_manager_config_v1alpha1_GenericControllerManagerCon
 					"ClientConnection": {
 						SchemaProps: spec.SchemaProps{
 							Description: "ClientConnection specifies the kubeconfig file and client connection settings for the proxy server to use when communicating with the apiserver.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"acceptContentTypes": "", "burst": 0, "contentType": "", "kubeconfig": "", "qps": 0},
 							Ref:         ref(componentbaseconfigv1alpha1.ClientConnectionConfiguration{}.OpenAPIModelName()),
 						},
 					},
@@ -65594,7 +65594,7 @@ func schema_k8sio_controller_manager_config_v1alpha1_GenericControllerManagerCon
 					"LeaderElection": {
 						SchemaProps: spec.SchemaProps{
 							Description: "leaderElection defines the configuration of leader election client.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"resourceLock": "", "resourceName": "", "resourceNamespace": ""},
 							Ref:         ref(componentbaseconfigv1alpha1.LeaderElectionConfiguration{}.OpenAPIModelName()),
 						},
 					},
@@ -65630,7 +65630,7 @@ func schema_k8sio_controller_manager_config_v1alpha1_GenericControllerManagerCon
 					"LeaderMigration": {
 						SchemaProps: spec.SchemaProps{
 							Description: "LeaderMigration holds the configuration for Leader Migration.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"leaderName": "", "resourceLock": ""},
 							Ref:         ref(controllermanagerconfigv1alpha1.LeaderMigrationConfiguration{}.OpenAPIModelName()),
 						},
 					},
@@ -65827,7 +65827,7 @@ func schema_pkg_apis_apiregistration_v1_APIService(ref common.ReferenceCallback)
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Spec contains information for locating and communicating with a server",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"groupPriorityMinimum": 0, "versionPriority": 0},
 							Ref:         ref(apiregistrationv1.APIServiceSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -66122,7 +66122,7 @@ func schema_pkg_apis_apiregistration_v1beta1_APIService(ref common.ReferenceCall
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Spec contains information for locating and communicating with a server",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"groupPriorityMinimum": 0, "versionPriority": 0},
 							Ref:         ref(apiregistrationv1beta1.APIServiceSpec{}.OpenAPIModelName()),
 						},
 					},
@@ -66480,28 +66480,28 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_CSRSigningControllerCo
 					"KubeletServingSignerConfiguration": {
 						SchemaProps: spec.SchemaProps{
 							Description: "kubeletServingSignerConfiguration holds the certificate and key used to issue certificates for the kubernetes.io/kubelet-serving signer",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"CertFile": "", "KeyFile": ""},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.CSRSigningConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"KubeletClientSignerConfiguration": {
 						SchemaProps: spec.SchemaProps{
 							Description: "kubeletClientSignerConfiguration holds the certificate and key used to issue certificates for the kubernetes.io/kube-apiserver-client-kubelet",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"CertFile": "", "KeyFile": ""},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.CSRSigningConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"KubeAPIServerClientSignerConfiguration": {
 						SchemaProps: spec.SchemaProps{
 							Description: "kubeAPIServerClientSignerConfiguration holds the certificate and key used to issue certificates for the kubernetes.io/kube-apiserver-client",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"CertFile": "", "KeyFile": ""},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.CSRSigningConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"LegacyUnknownSignerConfiguration": {
 						SchemaProps: spec.SchemaProps{
 							Description: "legacyUnknownSignerConfiguration holds the certificate and key used to issue certificates for the kubernetes.io/legacy-unknown",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"CertFile": "", "KeyFile": ""},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.CSRSigningConfiguration{}.OpenAPIModelName()),
 						},
 					},
@@ -66923,49 +66923,49 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_KubeControllerManagerC
 					"Generic": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Generic holds configuration for a generic controller-manager",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"Address": "", "ClientConnection": map[string]interface{}{"acceptContentTypes": "", "burst": 0, "contentType": "", "kubeconfig": "", "qps": 0}, "Debugging": map[string]interface{}{}, "LeaderElection": map[string]interface{}{"resourceLock": "", "resourceName": "", "resourceNamespace": ""}, "LeaderMigration": map[string]interface{}{"leaderName": "", "resourceLock": ""}, "LeaderMigrationEnabled": false, "Port": 0},
 							Ref:         ref(controllermanagerconfigv1alpha1.GenericControllerManagerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"KubeCloudShared": {
 						SchemaProps: spec.SchemaProps{
 							Description: "KubeCloudSharedConfiguration holds configuration for shared related features both in cloud controller manager and kube-controller manager.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"AllocateNodeCIDRs": false, "AllowUntaggedCloud": false, "CIDRAllocatorType": "", "CloudProvider": map[string]interface{}{"CloudConfigFile": "", "Name": ""}, "ClusterCIDR": "", "ClusterName": "", "ExternalCloudVolumePlugin": "", "UseServiceAccountCredentials": false},
 							Ref:         ref(configv1alpha1.KubeCloudSharedConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"AttachDetachController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "AttachDetachControllerConfiguration holds configuration for AttachDetachController related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"DisableAttachDetachReconcilerSync": false, "disableForceDetachOnTimeout": false},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.AttachDetachControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"CSRSigningController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "CSRSigningControllerConfiguration holds configuration for CSRSigningController related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"ClusterSigningCertFile": "", "ClusterSigningKeyFile": "", "KubeAPIServerClientSignerConfiguration": map[string]interface{}{"CertFile": "", "KeyFile": ""}, "KubeletClientSignerConfiguration": map[string]interface{}{"CertFile": "", "KeyFile": ""}, "KubeletServingSignerConfiguration": map[string]interface{}{"CertFile": "", "KeyFile": ""}, "LegacyUnknownSignerConfiguration": map[string]interface{}{"CertFile": "", "KeyFile": ""}},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.CSRSigningControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"DaemonSetController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "DaemonSetControllerConfiguration holds configuration for DaemonSetController related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"ConcurrentDaemonSetSyncs": 0},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.DaemonSetControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"DeploymentController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "DeploymentControllerConfiguration holds configuration for DeploymentController related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"ConcurrentDeploymentSyncs": 0},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.DeploymentControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"StatefulSetController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "StatefulSetControllerConfiguration holds configuration for StatefulSetController related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"ConcurrentStatefulSetSyncs": 0},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.StatefulSetControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
@@ -66979,56 +66979,56 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_KubeControllerManagerC
 					"EndpointController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "EndpointControllerConfiguration holds configuration for EndpointController related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"ConcurrentEndpointSyncs": 0},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.EndpointControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"EndpointSliceController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "EndpointSliceControllerConfiguration holds configuration for EndpointSliceController related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"ConcurrentServiceEndpointSyncs": 0, "MaxEndpointsPerSlice": 0},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.EndpointSliceControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"EndpointSliceMirroringController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "EndpointSliceMirroringControllerConfiguration holds configuration for EndpointSliceMirroringController related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"MirroringConcurrentServiceEndpointSyncs": 0, "MirroringMaxEndpointsPerSubset": 0},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.EndpointSliceMirroringControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"EphemeralVolumeController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "EphemeralVolumeControllerConfiguration holds configuration for EphemeralVolumeController related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"ConcurrentEphemeralVolumeSyncs": 0},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.EphemeralVolumeControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"GarbageCollectorController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "GarbageCollectorControllerConfiguration holds configuration for GarbageCollectorController related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"ConcurrentGCSyncs": 0},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.GarbageCollectorControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"HPAController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "HPAControllerConfiguration holds configuration for HPAController related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"ConcurrentHorizontalPodAutoscalerSyncs": 0, "HorizontalPodAutoscalerTolerance": 0},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.HPAControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"JobController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "JobControllerConfiguration holds configuration for JobController related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"ConcurrentJobSyncs": 0},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.JobControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"CronJobController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "CronJobControllerConfiguration holds configuration for CronJobController related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"ConcurrentCronJobSyncs": 0},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.CronJobControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
@@ -67042,98 +67042,98 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_KubeControllerManagerC
 					"NamespaceController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "NamespaceControllerConfiguration holds configuration for NamespaceController related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"ConcurrentNamespaceSyncs": 0},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.NamespaceControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"NodeIPAMController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "NodeIPAMControllerConfiguration holds configuration for NodeIPAMController related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"NodeCIDRMaskSize": 0, "NodeCIDRMaskSizeIPv4": 0, "NodeCIDRMaskSizeIPv6": 0, "SecondaryServiceCIDR": "", "ServiceCIDR": ""},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.NodeIPAMControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"NodeLifecycleController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "NodeLifecycleControllerConfiguration holds configuration for NodeLifecycleController related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"LargeClusterSizeThreshold": 0, "NodeEvictionRate": 0, "SecondaryNodeEvictionRate": 0, "UnhealthyZoneThreshold": 0},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.NodeLifecycleControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"PersistentVolumeBinderController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "PersistentVolumeBinderControllerConfiguration holds configuration for PersistentVolumeBinderController related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"VolumeConfiguration": map[string]interface{}{"FlexVolumePluginDir": "", "PersistentVolumeRecyclerConfiguration": map[string]interface{}{"IncrementTimeoutHostPath": 0, "IncrementTimeoutNFS": 0, "MaximumRetry": 0, "MinimumTimeoutHostPath": 0, "MinimumTimeoutNFS": 0, "PodTemplateFilePathHostPath": "", "PodTemplateFilePathNFS": ""}}},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.PersistentVolumeBinderControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"PodGCController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "PodGCControllerConfiguration holds configuration for PodGCController related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"TerminatedPodGCThreshold": 0},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.PodGCControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"ReplicaSetController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "ReplicaSetControllerConfiguration holds configuration for ReplicaSet related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"ConcurrentRSSyncs": 0},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.ReplicaSetControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"ReplicationController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "ReplicationControllerConfiguration holds configuration for ReplicationController related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"ConcurrentRCSyncs": 0},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.ReplicationControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"ResourceQuotaController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "ResourceQuotaControllerConfiguration holds configuration for ResourceQuotaController related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"ConcurrentResourceQuotaSyncs": 0},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.ResourceQuotaControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"SAController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "SAControllerConfiguration holds configuration for ServiceAccountController related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"ConcurrentSATokenSyncs": 0, "RootCAFile": "", "ServiceAccountKeyFile": ""},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.SAControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"ServiceController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "ServiceControllerConfiguration holds configuration for ServiceController related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"ConcurrentServiceSyncs": 0},
 							Ref:         ref(serviceconfigv1alpha1.ServiceControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"TTLAfterFinishedController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "TTLAfterFinishedControllerConfiguration holds configuration for TTLAfterFinishedController related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"ConcurrentTTLSyncs": 0},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.TTLAfterFinishedControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"ValidatingAdmissionPolicyStatusController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "ValidatingAdmissionPolicyStatusControllerConfiguration holds configuration for ValidatingAdmissionPolicyStatusController related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"ConcurrentPolicySyncs": 0},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.ValidatingAdmissionPolicyStatusControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"DeviceTaintEvictionController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "DeviceTaintEvictionControllerConfiguration contains elements configuring the device taint eviction controller.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"ConcurrentSyncs": 0},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.DeviceTaintEvictionControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"ResourceClaimController": {
 						SchemaProps: spec.SchemaProps{
 							Description: "ResourceClaimControllerConfiguration contains elements configuring the resource claim controller.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"ConcurrentSyncs": 0},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.ResourceClaimControllerConfiguration{}.OpenAPIModelName()),
 						},
 					},
@@ -67334,7 +67334,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_PersistentVolumeBinder
 					"VolumeConfiguration": {
 						SchemaProps: spec.SchemaProps{
 							Description: "volumeConfiguration holds configuration for volume related features.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"FlexVolumePluginDir": "", "PersistentVolumeRecyclerConfiguration": map[string]interface{}{"IncrementTimeoutHostPath": 0, "IncrementTimeoutNFS": 0, "MaximumRetry": 0, "MinimumTimeoutHostPath": 0, "MinimumTimeoutNFS": 0, "PodTemplateFilePathHostPath": "", "PodTemplateFilePathNFS": ""}},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.VolumeConfiguration{}.OpenAPIModelName()),
 						},
 					},
@@ -67663,7 +67663,7 @@ func schema_k8sio_kube_controller_manager_config_v1alpha1_VolumeConfiguration(re
 					"PersistentVolumeRecyclerConfiguration": {
 						SchemaProps: spec.SchemaProps{
 							Description: "persistentVolumeRecyclerConfiguration holds configuration for persistent volume plugins.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"IncrementTimeoutHostPath": 0, "IncrementTimeoutNFS": 0, "MaximumRetry": 0, "MinimumTimeoutHostPath": 0, "MinimumTimeoutNFS": 0, "PodTemplateFilePathHostPath": "", "PodTemplateFilePathNFS": ""},
 							Ref:         ref(kubecontrollermanagerconfigv1alpha1.PersistentVolumeRecyclerConfiguration{}.OpenAPIModelName()),
 						},
 					},
@@ -67753,14 +67753,14 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConfiguration(ref common.R
 					"clientConnection": {
 						SchemaProps: spec.SchemaProps{
 							Description: "clientConnection specifies the kubeconfig file and client connection settings for the proxy server to use when communicating with the apiserver.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"acceptContentTypes": "", "burst": 0, "contentType": "", "kubeconfig": "", "qps": 0},
 							Ref:         ref(componentbaseconfigv1alpha1.ClientConnectionConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"logging": {
 						SchemaProps: spec.SchemaProps{
 							Description: "logging specifies the options of logging. Refer to [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go) for more information.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"verbosity": 0},
 							Ref:         ref(logsapiv1.LoggingConfiguration{}.OpenAPIModelName()),
 						},
 					},
@@ -67831,28 +67831,28 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConfiguration(ref common.R
 					"iptables": {
 						SchemaProps: spec.SchemaProps{
 							Description: "iptables contains iptables-related configuration options.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"masqueradeAll": false},
 							Ref:         ref(kubeproxyconfigv1alpha1.KubeProxyIPTablesConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"ipvs": {
 						SchemaProps: spec.SchemaProps{
 							Description: "ipvs contains ipvs-related configuration options.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"scheduler": "", "strictARP": false},
 							Ref:         ref(kubeproxyconfigv1alpha1.KubeProxyIPVSConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"nftables": {
 						SchemaProps: spec.SchemaProps{
 							Description: "nftables contains nftables-related configuration options.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"masqueradeAll": false},
 							Ref:         ref(kubeproxyconfigv1alpha1.KubeProxyNFTablesConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"winkernel": {
 						SchemaProps: spec.SchemaProps{
 							Description: "winkernel contains winkernel-related configuration options.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"enableDSR": false, "forwardHealthCheckVip": false, "networkName": "", "rootHnsEndpointName": "", "sourceVip": ""},
 							Ref:         ref(kubeproxyconfigv1alpha1.KubeProxyWinkernelConfiguration{}.OpenAPIModelName()),
 						},
 					},
@@ -67867,7 +67867,7 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConfiguration(ref common.R
 					"detectLocal": {
 						SchemaProps: spec.SchemaProps{
 							Description: "detectLocal contains optional configuration settings related to DetectLocalMode.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"bridgeInterface": "", "interfaceNamePrefix": ""},
 							Ref:         ref(kubeproxyconfigv1alpha1.DetectLocalConfiguration{}.OpenAPIModelName()),
 						},
 					},
@@ -67903,7 +67903,7 @@ func schema_k8sio_kube_proxy_config_v1alpha1_KubeProxyConfiguration(ref common.R
 					"conntrack": {
 						SchemaProps: spec.SchemaProps{
 							Description: "conntrack contains conntrack-related configuration options.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"tcpBeLiberal": false},
 							Ref:         ref(kubeproxyconfigv1alpha1.KubeProxyConntrackConfiguration{}.OpenAPIModelName()),
 						},
 					},
@@ -68602,14 +68602,14 @@ func schema_k8sio_kube_scheduler_config_v1_KubeSchedulerConfiguration(ref common
 					"leaderElection": {
 						SchemaProps: spec.SchemaProps{
 							Description: "LeaderElection defines the configuration of leader election client.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"resourceLock": "", "resourceName": "", "resourceNamespace": ""},
 							Ref:         ref(componentbaseconfigv1alpha1.LeaderElectionConfiguration{}.OpenAPIModelName()),
 						},
 					},
 					"clientConnection": {
 						SchemaProps: spec.SchemaProps{
 							Description: "ClientConnection specifies the kubeconfig file and client connection settings for the proxy server to use when communicating with the apiserver.",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"acceptContentTypes": "", "burst": 0, "contentType": "", "kubeconfig": "", "qps": 0},
 							Ref:         ref(componentbaseconfigv1alpha1.ClientConnectionConfiguration{}.OpenAPIModelName()),
 						},
 					},
@@ -71876,7 +71876,7 @@ func schema_k8sio_kubelet_config_v1beta1_KubeletConfiguration(ref common.Referen
 					"logging": {
 						SchemaProps: spec.SchemaProps{
 							Description: "logging specifies the options of logging. Refer to [Logs Options](https://github.com/kubernetes/component-base/blob/master/logs/options.go) for more information. Default:\n  Format: text",
-							Default:     map[string]interface{}{},
+							Default:     map[string]interface{}{"verbosity": 0},
 							Ref:         ref(logsapiv1.LoggingConfiguration{}.OpenAPIModelName()),
 						},
 					},
@@ -72617,7 +72617,7 @@ func schema_pkg_apis_custom_metrics_v1beta2_MetricValue(ref common.ReferenceCall
 					},
 					"metric": {
 						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
+							Default: map[string]interface{}{"name": ""},
 							Ref:     ref(custommetricsv1beta2.MetricIdentifier{}.OpenAPIModelName()),
 						},
 					},
