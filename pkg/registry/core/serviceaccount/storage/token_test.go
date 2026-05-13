@@ -33,6 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	genericfeatures "k8s.io/apiserver/pkg/features"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/warning"
@@ -121,9 +122,7 @@ func TestCreate_Token_WithExpiryCap(t *testing.T) {
 			defer server.Terminate(t)
 			defer storage.Store.DestroyFunc()
 
-			ctx := context.Background()
-			// add the namespace to the context as it is required
-			ctx = request.WithNamespace(ctx, serviceAccount.Namespace)
+			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, serviceAccount.Namespace)
 
 			// Enable ExternalServiceAccountTokenSigner feature
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExternalServiceAccountTokenSigner, true)

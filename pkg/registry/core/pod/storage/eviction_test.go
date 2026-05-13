@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/client-go/kubernetes/fake"
 	podapi "k8s.io/kubernetes/pkg/api/pod"
@@ -176,10 +177,10 @@ func TestEvictionWithETCD(t *testing.T) {
 					pdbsCopy = append(pdbsCopy, pdbCopy)
 				}
 
-				testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 				storage, _, statusStorage, server := newStorage(t)
 				defer server.Terminate(t)
 				defer storage.Store.DestroyFunc()
+				testContext := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 
 				pod := validNewPod()
 				pod.Name = tc.podName
@@ -632,7 +633,9 @@ func TestEviction(t *testing.T) {
 					pdbsCopy = append(pdbsCopy, pdbCopy)
 				}
 
-				testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
+				testContext := genericapirequest.WithRequestInfo(
+					genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault),
+					&genericapirequest.RequestInfo{APIGroup: "", APIVersion: "v1", Resource: "pods"})
 				ms := &mockStore{
 					deleteCount: 0,
 				}
@@ -731,10 +734,10 @@ func TestEvictionWithDeleteOptions(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 			storage, _, _, server := newStorage(t)
 			defer server.Terminate(t)
 			defer storage.Store.DestroyFunc()
+			testContext := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 
 			pod := validNewPod()
 			pod.Labels = map[string]string{"a": "true"}
@@ -803,10 +806,10 @@ func TestEvictionPDBStatus(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
 			storage, _, statusStorage, server := newStorage(t)
 			defer server.Terminate(t)
 			defer storage.Store.DestroyFunc()
+			testContext := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 
 			client := fake.NewSimpleClientset(tc.pdb)
 			for _, podName := range []string{"foo-1", "foo-2"} {
@@ -903,11 +906,10 @@ func TestAddConditionAndDelete(t *testing.T) {
 		},
 	}
 
-	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), metav1.NamespaceDefault)
-
 	storage, _, _, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
+	testContext := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 
 	client := fake.NewSimpleClientset()
 	evictionRest := newEvictionStorage(storage.Store, client.PolicyV1())
