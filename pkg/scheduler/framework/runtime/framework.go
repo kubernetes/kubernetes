@@ -78,6 +78,7 @@ type frameworkImpl struct {
 	podGroupPostFilterPlugins []framework.PodGroupPostFilterPlugin
 
 	placementGeneratePlugins   []fwk.PlacementGeneratePlugin
+	placementFeasiblePlugins   []framework.PlacementFeasiblePlugin
 	placementScorePlugins      []fwk.PlacementScorePlugin
 	placementScorePluginWeight map[string]int
 
@@ -484,6 +485,17 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 			}
 		} else {
 			logger.V(2).Info("Workload Aware Preemption is enabled, but default preemption plugin is not set. Workload Aware Preemption will not be used.")
+		}
+	}
+
+	// Use GangScheduling plugin as the only PlacementFeasiblePlugin.
+	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
+		if gs, ok := f.pluginsMap[names.GangScheduling]; ok {
+			if p, ok := gs.(framework.PlacementFeasiblePlugin); ok {
+				f.placementFeasiblePlugins = append(f.placementFeasiblePlugins, p)
+			} else {
+				logger.V(2).Info("GenericWorkload is enabled, but GangScheduling plugin does not fulfill PlacementFeasiblePlugin interface.")
+			}
 		}
 	}
 
@@ -1994,6 +2006,49 @@ func (f *frameworkImpl) runPermitPlugin(ctx context.Context, pl fwk.PermitPlugin
 	status, timeout := pl.Permit(ctx, state, pod, nodeName)
 	f.metricsRecorder.ObservePluginDurationAsync(metrics.Permit, pl.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
 	return status, timeout
+}
+
+// RunPlacementFeasiblePlugins runs the set of configured Permit plugins that implement PlacementFeasible interface.
+// The result will be Success if all plugins return Success.
+// The only other valid statuses are UnschedulableAndUnresolvable and Unschedulable.
+// If any plugin returns invalid status, the result will be Error and the remaining plugins won't be invoked.
+// Otherwise, if at least 1 plugin returns UnschedulableAndUnresolvable, the remaining plugins won't be invoked and the result will be UnschdulableAndUnresolvable.
+// Otherwise, if at least 1 plugin returns Unschedulable, the remaining plugins will be invoked and the result will be Unschedulable.
+func (f *frameworkImpl) RunPlacementFeasiblePlugins(ctx context.Context, placementCycleState fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo) (status *fwk.Status) {
+	startTime := time.Now()
+	defer func() {
+		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PlacementFeasible, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
+	}()
+
+	for _, pl := range f.placementFeasiblePlugins {
+		plStatus := f.runPlacementFeasiblePlugin(ctx, pl, placementCycleState, podGroupInfo)
+		if plStatus.IsSuccess() {
+			continue
+		}
+		if plStatus.Code() == fwk.Unschedulable {
+			status = plStatus.WithPlugin(pl.Name())
+			continue
+		}
+		if plStatus.Code() == fwk.UnschedulableAndUnresolvable {
+			return plStatus.WithPlugin(pl.Name())
+		}
+		if plStatus.IsError() {
+			return fwk.AsStatus(fmt.Errorf("running PlacementFeasible plugin: %w", plStatus.AsError())).WithPlugin(pl.Name())
+		}
+		return fwk.AsStatus(fmt.Errorf("unexpected status from PlacementFeasible plugin: %v", plStatus.Code())).WithPlugin(pl.Name())
+	}
+
+	return status
+}
+
+func (f *frameworkImpl) runPlacementFeasiblePlugin(ctx context.Context, pl framework.PlacementFeasiblePlugin, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo) *fwk.Status {
+	if !state.ShouldRecordPluginMetrics() {
+		return pl.PlacementFeasible(ctx, state, podGroup)
+	}
+	startTime := time.Now()
+	status := pl.PlacementFeasible(ctx, state, podGroup)
+	f.metricsRecorder.ObservePluginDurationAsync(metrics.PlacementFeasible, pl.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
+	return status
 }
 
 // AddWaitingPod creates a waiting pod instance and adds it to the framework.

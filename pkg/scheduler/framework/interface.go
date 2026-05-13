@@ -180,6 +180,21 @@ type PodGroupPostFilterPlugin interface {
 	PodGroupPostFilter(ctx context.Context, pg *v1alpha3.PodGroup, pods []*v1.Pod, pgSchedulingFunc PodGroupSchedulingFunc) (*PodGroupPostFilterResult, *fwk.Status)
 }
 
+// PlacementFeasiblePlugin is an interface for plugins that are called after each pod in a pod group is evaluated.
+// It is used to determine if a pod group is schedulable, may become schedulable or will not become schedulable regardless of the scheduling result of the remaining pods in the pod group.
+type PlacementFeasiblePlugin interface {
+	fwk.Plugin
+
+	// PlacementFeasible is called after each pod in a pod group is evaluated.
+	// Use placementCycleState to accumulate the results from the evaluated pods in current cycle.
+	// Return Unschedulable status if the pod group cannot be scheduled in the current state, but may become schedulable once more pods are evaluated.
+	// Return UnschedulableAndUnresolvable status if the pod group cannot be scheduled in the current placement.
+	// The scheduler will give up this placement and won't even evaluate remaining pods. The placement will remain eligible for preemption.
+	// Return Success status if the pod group can be scheduled in the current state.
+	// After returning Success, the plugin should keep returning Success for the remaining pods.
+	PlacementFeasible(ctx context.Context, placementCycleState fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo) *fwk.Status
+}
+
 // Framework manages the set of plugins in use by the scheduling framework.
 // Configured plugins are called at specified points in a scheduling context.
 type Framework interface {
@@ -261,6 +276,14 @@ type Framework interface {
 	// plugins returns "Wait", then this function will construct the pluginsWaitTime and return status with "Wait" code.
 	// This function itself will NOT create a waiting pod object and the caller should call AddWaitingPod method to do this.
 	RunPermitPlugins(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (pluginsWaitTime map[string]time.Duration, status *fwk.Status)
+
+	// RunPlacementFeasiblePlugins runs the set of configured Permit plugins that implement PlacementFeasible interface.
+	// The result will be Success if all plugins return Success.
+	// The only other valid statuses are UnschedulableAndUnresolvable and Unschedulable.
+	// If any plugin returns invalid status, the result will be Error and the remaining plugins won't be invoked.
+	// Otherwise, if at least 1 plugin returns UnschedulableAndUnresolvable, the remaining plugins won't be invoked and the result will be UnschdulableAndUnresolvable. The placement will remain eligible for preemption.
+	// Otherwise, if at least 1 plugin returns Unschedulable, the remaining plugins will be invoked and the result will be Unschedulable.
+	RunPlacementFeasiblePlugins(ctx context.Context, placementCycleState fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo) *fwk.Status
 
 	// AddWaitingPod creates a waiting pod instance and adds it to the framework.
 	// It takes the pluginsWaitTime map returned by the RunPermitPlugins.

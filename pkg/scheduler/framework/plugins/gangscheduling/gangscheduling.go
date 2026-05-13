@@ -28,6 +28,7 @@ import (
 	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha3"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -54,6 +55,7 @@ type GangScheduling struct {
 var _ fwk.EnqueueExtensions = &GangScheduling{}
 var _ fwk.PreEnqueuePlugin = &GangScheduling{}
 var _ fwk.PermitPlugin = &GangScheduling{}
+var _ framework.PlacementFeasiblePlugin = &GangScheduling{}
 
 // New initializes a new plugin and returns it.
 func New(_ context.Context, _ runtime.Object, fh fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
@@ -182,15 +184,7 @@ func (pl *GangScheduling) Permit(ctx context.Context, state fwk.CycleState, pod 
 		return nil, 0
 	}
 
-	// Select a lister for the pod group state based on the currently executed scheduling phase.
-	// In the pod group scheduling cycle, it reads from the snapshot.
-	// Otherwise, it reads the runtime state of the pod group from the cache.
-	var podGroupStateLister fwk.PodGroupStateLister
-	if state.IsPodGroupSchedulingCycle() {
-		podGroupStateLister = pl.snapshotLister.PodGroupStates()
-	} else {
-		podGroupStateLister = pl.podGroupManager.PodGroupStates()
-	}
+	podGroupStateLister := pl.podGroupManager.PodGroupStates()
 	podGroupState, err := podGroupStateLister.Get(namespace, *schedulingGroup.PodGroupName)
 	if err != nil {
 		return fwk.AsStatus(err), 0
@@ -216,4 +210,72 @@ func (pl *GangScheduling) Permit(ctx context.Context, state fwk.CycleState, pod 
 	}
 
 	return nil, 0
+}
+
+const placementFeasibleStateKey = "PlacementFeasible" + Name
+
+type placementFeasibleState struct {
+	evaluated, succeeded int
+}
+
+func (s *placementFeasibleState) Clone() fwk.StateData {
+	return &placementFeasibleState{
+		evaluated: s.evaluated,
+		succeeded: s.succeeded,
+	}
+}
+
+func getPlacementFeasibleState(placementCycleState fwk.PodGroupCycleState) *placementFeasibleState {
+	state, err := placementCycleState.Read(placementFeasibleStateKey)
+	if err != nil {
+		state = &placementFeasibleState{}
+		placementCycleState.Write(placementFeasibleStateKey, state)
+	}
+	return state.(*placementFeasibleState)
+}
+
+// PlacementFeasible is responsible for enforcing the gang's MinCount constraint.
+// The function will only return success once the gang's MinCount is satisfied or if the pod group is not using gang scheduling policy.
+// In case there are not enough remaining pods to satisfy the gang's MinCount, it returns UnschedulableAndUnresolvable which will terminate the pod group scheduling cycle early.
+func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleState fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo) *fwk.Status {
+	pg, err := pl.podGroupLister.PodGroups(podGroupInfo.GetNamespace()).Get(podGroupInfo.GetName())
+	if err != nil {
+		return fwk.AsStatus(fmt.Errorf("failed to get podGroup %s to compute gang feasibility: %w", klog.KObj(podGroupInfo), err))
+	}
+
+	gangPolicy := pg.Spec.SchedulingPolicy.Gang
+	// This plugin only cares about pods with a Gang scheduling policy.
+	if gangPolicy == nil {
+		return nil
+	}
+
+	podGroupState, err := pl.snapshotLister.PodGroupStates().Get(podGroupInfo.GetNamespace(), podGroupInfo.GetName())
+	if err != nil {
+		return fwk.AsStatus(fmt.Errorf("failed to get podGroup state for podGroup %s to compute gang feasibility: %w", klog.KObj(pg), err))
+	}
+
+	// We need to keep track of how many pods have already been evaluated in the current PodGroup scheduling cycle.
+	pgState := getPlacementFeasibleState(placementCycleState)
+	pgState.evaluated++
+
+	// remaining is the number of unscheduled pods that haven't been evaluated yet in the current PodGroup scheduling cycle.
+	remaining := len(podGroupInfo.GetUnscheduledPods()) - pgState.evaluated
+
+	// scheduled includes the pods that are assigned or assumed in the current PodGroup scheduling cycle.
+	scheduled := podGroupState.ScheduledPodsCount()
+
+	minCount := int(gangPolicy.MinCount)
+
+	if remaining+scheduled < minCount {
+		// minCount can't be satisfied because there are not enough remaining pods.
+		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("minCount (%d) cannot be satisfied: %d scheduled, %d remaining", minCount, scheduled, remaining))
+	}
+
+	if scheduled < minCount {
+		// minCount might be satisfied once more remaining pods are evaluated.
+		return fwk.NewStatus(fwk.Unschedulable, fmt.Sprintf("minCount (%d) is not yet satisfied: %d scheduled, %d remaining", minCount, scheduled, remaining))
+	}
+
+	// minCount is satisfied.
+	return nil
 }

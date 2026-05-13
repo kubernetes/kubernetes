@@ -228,6 +228,10 @@ func (pl *TestPlugin) PreFilter(ctx context.Context, state fwk.CycleState, p *v1
 	return pl.inj.PreFilterResult, fwk.NewStatus(fwk.Code(pl.inj.PreFilterStatus), injectReason)
 }
 
+func (pl *TestPlugin) PlacementFeasible(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo) *fwk.Status {
+	return fwk.NewStatus(fwk.Code(pl.inj.PlacementFeasibleStatus), injectReason)
+}
+
 func (pl *TestPlugin) PreFilterExtensions() fwk.PreFilterExtensions {
 	return pl
 }
@@ -781,6 +785,116 @@ func TestPodGroupPostFilterPlugins(t *testing.T) {
 		})
 	}
 
+}
+
+type mockPlacementFeasiblePlugin struct {
+	name   string
+	status *fwk.Status
+	called bool
+}
+
+func (p *mockPlacementFeasiblePlugin) Name() string { return p.name }
+
+func (p *mockPlacementFeasiblePlugin) PlacementFeasible(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo) *fwk.Status {
+	p.called = true
+	return p.status
+}
+
+func TestRunPlacementFeasiblePlugins(t *testing.T) {
+	tests := []struct {
+		name           string
+		plugins        []*mockPlacementFeasiblePlugin
+		expectedStatus *fwk.Status
+		expectedCalled []bool
+	}{
+		{
+			name: "All plugins succeed",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: nil},
+				{name: "p2", status: nil},
+			},
+			expectedStatus: nil,
+			expectedCalled: []bool{true, true},
+		},
+		{
+			name: "First plugin returns Unschedulable, continues",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.Unschedulable, "unschedulable")},
+				{name: "p2", status: nil},
+			},
+			expectedStatus: fwk.NewStatus(fwk.Unschedulable, "unschedulable").WithPlugin("p1"),
+			expectedCalled: []bool{true, true},
+		},
+		{
+			name: "First plugin returns UnschedulableAndUnresolvable, breaks",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "unresolvable")},
+				{name: "p2", status: nil},
+			},
+			expectedStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "unresolvable").WithPlugin("p1"),
+			expectedCalled: []bool{true, false},
+		},
+		{
+			name: "First plugin returns Unschedulable, second returns UnschedulableAndUnresolvable, returns unresolvable",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.Unschedulable, "unschedulable")},
+				{name: "p2", status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "unresolvable")},
+			},
+			expectedStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "unresolvable").WithPlugin("p2"),
+			expectedCalled: []bool{true, true},
+		},
+		{
+			name: "First plugin returns Unschedulable, second returns Unschedulable, returns last unschedulable",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.Unschedulable, "unschedulable1")},
+				{name: "p2", status: fwk.NewStatus(fwk.Unschedulable, "unschedulable2")},
+			},
+			expectedStatus: fwk.NewStatus(fwk.Unschedulable, "unschedulable2").WithPlugin("p2"),
+			expectedCalled: []bool{true, true},
+		},
+		{
+			name: "Plugin returns Error, breaks",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.Error, "error")},
+				{name: "p2", status: nil},
+			},
+			expectedStatus: fwk.AsStatus(fmt.Errorf("running PlacementFeasible plugin: %w", errors.New("error"))).WithPlugin("p1"),
+			expectedCalled: []bool{true, false},
+		},
+		{
+			name: "Plugin returns unexpected status, breaks",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.Skip, "error")},
+				{name: "p2", status: nil},
+			},
+			expectedStatus: fwk.AsStatus(fmt.Errorf("unexpected status from PlacementFeasible plugin: Skip")).WithPlugin("p1"),
+			expectedCalled: []bool{true, false},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			f := &frameworkImpl{
+				placementFeasiblePlugins: make([]framework.PlacementFeasiblePlugin, len(tc.plugins)),
+			}
+			for i, p := range tc.plugins {
+				f.placementFeasiblePlugins[i] = p
+			}
+
+			status := f.RunPlacementFeasiblePlugins(ctx, framework.NewCycleState(), nil)
+
+			if diff := cmp.Diff(tc.expectedStatus, status, statusCmpOpts...); diff != "" {
+				t.Errorf("Unexpected status (-want, +got):\n%s", diff)
+			}
+
+			for i, p := range tc.plugins {
+				if p.called != tc.expectedCalled[i] {
+					t.Errorf("Expected plugin %s called=%v, got %v", p.name, tc.expectedCalled[i], p.called)
+				}
+			}
+		})
+	}
 }
 
 func TestNewFrameworkMultiPointExpansion(t *testing.T) {
@@ -3557,6 +3671,14 @@ func TestRecordingMetrics(t *testing.T) {
 			wantExtensionPoint: "PlacementScore",
 			wantStatus:         fwk.Success,
 		},
+		{
+			name: "PlacementFeasible - Success",
+			action: func(ctx context.Context, f framework.Framework) {
+				f.RunPlacementFeasiblePlugins(ctx, state, nil)
+			},
+			wantExtensionPoint: "PlacementFeasible",
+			wantStatus:         fwk.Success,
+		},
 
 		{
 			name:               "PreFilter - Error",
@@ -3634,6 +3756,15 @@ func TestRecordingMetrics(t *testing.T) {
 			wantExtensionPoint: "PlacementScore",
 			wantStatus:         fwk.Error,
 		},
+		{
+			name: "PlacementFeasible - Error",
+			action: func(ctx context.Context, f framework.Framework) {
+				f.RunPlacementFeasiblePlugins(ctx, state, nil)
+			},
+			inject:             injectedResult{PlacementFeasibleStatus: int(fwk.Error)},
+			wantExtensionPoint: "PlacementFeasible",
+			wantStatus:         fwk.Error,
+		},
 	}
 
 	for _, tt := range tests {
@@ -3682,6 +3813,10 @@ func TestRecordingMetrics(t *testing.T) {
 			defer func() {
 				_ = f.Close()
 			}()
+
+			if tt.wantExtensionPoint == "PlacementFeasible" {
+				f.(*frameworkImpl).placementFeasiblePlugins = []framework.PlacementFeasiblePlugin{plugin}
+			}
 
 			tt.action(ctx, f)
 
@@ -4074,6 +4209,7 @@ type injectedResult struct {
 	GeneratePlacementsResult []*fwk.Placement     `json:"generatePlacementsResult,omitempty"`
 	GeneratePlacementsStatus int                  `json:"generatePlacementsStatus,omitempty"`
 	PlacementScoreStatus     int                  `json:"placementScoreStatus,omitempty"`
+	PlacementFeasibleStatus  int                  `json:"placementFeasibleStatus,omitempty"`
 }
 
 func setScoreRes(inj injectedResult) (int64, *fwk.Status) {

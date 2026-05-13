@@ -830,11 +830,12 @@ func TestPostFilterInvocationCount(t *testing.T) {
 		}
 	}
 
-	// 5. Verify that MockPostFilter was called exactly 3 times
-	// It should be called for each pod from pod group in pod group cycle
+	// 5. Verify that MockPostFilter was called exactly once
+	// It should be called for each evaluated pod from pod group in pod group cycle
 	// but should not be called in WAP.
+	// Only one pod is evaluated for pod group because minCount=3 can't be satisfied with the remaining 2 pods.
 	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
-		if mockPlugin.count == 3 {
+		if mockPlugin.count == 1 {
 			return true, nil
 		}
 		return false, nil

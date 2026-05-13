@@ -65,6 +65,7 @@ var ExtensionPoints = []string{
 	Permit,
 	Sign,
 	PlacementGenerate,
+	PlacementFeasible,
 }
 
 const (
@@ -85,6 +86,7 @@ const (
 	Permit                           = "Permit"
 	Sign                             = "Sign"
 	PlacementGenerate                = "PlacementGenerate"
+	PlacementFeasible                = "PlacementFeasible"
 	PlacementScore                   = "PlacementScore"
 	PlacementScoreExtensionNormalize = "PlacementScoreExtensionNormalize"
 )
