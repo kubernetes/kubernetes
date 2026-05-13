@@ -52,7 +52,13 @@
                 "$ref": "#/components/schemas/io.k8s.api.autoscaling.v1.HorizontalPodAutoscalerSpec"
               }
             ],
-            "default": {},
+            "default": {
+              "maxReplicas": 0,
+              "scaleTargetRef": {
+                "kind": "",
+                "name": ""
+              }
+            },
             "description": "spec defines the behaviour of autoscaler. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status."
           },
           "status": {
@@ -61,7 +67,10 @@
                 "$ref": "#/components/schemas/io.k8s.api.autoscaling.v1.HorizontalPodAutoscalerStatus"
               }
             ],
-            "default": {},
+            "default": {
+              "currentReplicas": 0,
+              "desiredReplicas": 0
+            },
             "description": "status is the current information about the autoscaler."
           }
         },
@@ -137,7 +146,10 @@
                 "$ref": "#/components/schemas/io.k8s.api.autoscaling.v1.CrossVersionObjectReference"
               }
             ],
-            "default": {},
+            "default": {
+              "kind": "",
+              "name": ""
+            },
             "description": "reference to scaled resource; horizontal pod autoscaler will learn the current resource consumption and will set the desired number of pods by using its Scale subresource."
           },
           "targetCPUUtilizationPercentage": {

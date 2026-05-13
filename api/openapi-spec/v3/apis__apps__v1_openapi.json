@@ -114,7 +114,9 @@
                 "$ref": "#/components/schemas/io.k8s.api.apps.v1.DaemonSetSpec"
               }
             ],
-            "default": {},
+            "default": {
+              "template": {}
+            },
             "description": "The desired behavior of this daemon set. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
           },
           "status": {
@@ -123,7 +125,12 @@
                 "$ref": "#/components/schemas/io.k8s.api.apps.v1.DaemonSetStatus"
               }
             ],
-            "default": {},
+            "default": {
+              "currentNumberScheduled": 0,
+              "desiredNumberScheduled": 0,
+              "numberMisscheduled": 0,
+              "numberReady": 0
+            },
             "description": "The current status of this daemon set. This data may be out of date by some window of time. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
           }
         },
@@ -376,7 +383,9 @@
                 "$ref": "#/components/schemas/io.k8s.api.apps.v1.DeploymentSpec"
               }
             ],
-            "default": {},
+            "default": {
+              "template": {}
+            },
             "description": "Specification of the desired behavior of the Deployment."
           },
           "status": {
@@ -655,7 +664,9 @@
                 "$ref": "#/components/schemas/io.k8s.api.apps.v1.ReplicaSetStatus"
               }
             ],
-            "default": {},
+            "default": {
+              "replicas": 0
+            },
             "description": "Status is the most recently observed status of the ReplicaSet. This data may be out of date by some window of time. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
           }
         },
@@ -922,7 +933,9 @@
                 "$ref": "#/components/schemas/io.k8s.api.apps.v1.StatefulSetSpec"
               }
             ],
-            "default": {},
+            "default": {
+              "template": {}
+            },
             "description": "Spec defines the desired identities of pods in this set."
           },
           "status": {
@@ -931,7 +944,9 @@
                 "$ref": "#/components/schemas/io.k8s.api.apps.v1.StatefulSetStatus"
               }
             ],
-            "default": {},
+            "default": {
+              "replicas": 0
+            },
             "description": "Status is the current status of Pods in this StatefulSet. This data may be out of date by some window of time."
           }
         },
@@ -1250,7 +1265,9 @@
                 "$ref": "#/components/schemas/io.k8s.api.autoscaling.v1.ScaleStatus"
               }
             ],
-            "default": {},
+            "default": {
+              "replicas": 0
+            },
             "description": "status is the current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only."
           }
         },
@@ -5233,7 +5250,9 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.PodAffinityTerm"
               }
             ],
-            "default": {},
+            "default": {
+              "topologyKey": ""
+            },
             "description": "Required. A pod affinity term, associated with the corresponding weight."
           },
           "weight": {

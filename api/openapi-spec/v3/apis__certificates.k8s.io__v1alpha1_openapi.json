@@ -27,7 +27,9 @@
                 "$ref": "#/components/schemas/io.k8s.api.certificates.v1alpha1.ClusterTrustBundleSpec"
               }
             ],
-            "default": {},
+            "default": {
+              "trustBundle": ""
+            },
             "description": "spec contains the signer (if any) and trust anchors."
           }
         },

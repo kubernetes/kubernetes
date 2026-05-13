@@ -1399,7 +1399,14 @@
                 "$ref": "#/components/schemas/io.k8s.api.resource.v1.ResourceSliceSpec"
               }
             ],
-            "default": {},
+            "default": {
+              "driver": "",
+              "pool": {
+                "generation": 0,
+                "name": "",
+                "resourceSliceCount": 0
+              }
+            },
             "description": "Contains the information published by the driver.\n\nChanging the spec automatically increments the metadata.generation number."
           }
         },
@@ -1497,7 +1504,11 @@
                 "$ref": "#/components/schemas/io.k8s.api.resource.v1.ResourcePool"
               }
             ],
-            "default": {},
+            "default": {
+              "generation": 0,
+              "name": "",
+              "resourceSliceCount": 0
+            },
             "description": "Pool describes the pool that this ResourceSlice belongs to."
           },
           "sharedCounters": {

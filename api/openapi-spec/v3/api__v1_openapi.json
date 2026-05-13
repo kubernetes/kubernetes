@@ -152,7 +152,9 @@
                 "$ref": "#/components/schemas/io.k8s.api.autoscaling.v1.ScaleStatus"
               }
             ],
-            "default": {},
+            "default": {
+              "replicas": 0
+            },
             "description": "status is the current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only."
           }
         },
@@ -3744,7 +3746,9 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.DaemonEndpoint"
               }
             ],
-            "default": {},
+            "default": {
+              "Port": 0
+            },
             "description": "Endpoint on which Kubelet is listening."
           }
         },
@@ -4039,7 +4043,18 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSystemInfo"
               }
             ],
-            "default": {},
+            "default": {
+              "architecture": "",
+              "bootID": "",
+              "containerRuntimeVersion": "",
+              "kernelVersion": "",
+              "kubeProxyVersion": "",
+              "kubeletVersion": "",
+              "machineID": "",
+              "operatingSystem": "",
+              "osImage": "",
+              "systemUUID": ""
+            },
             "description": "Set of ids/uuids to uniquely identify the node. More info: https://kubernetes.io/docs/reference/node/node-status/#info"
           },
           "phase": {
@@ -6329,7 +6344,9 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.ReplicationControllerStatus"
               }
             ],
-            "default": {},
+            "default": {
+              "replicas": 0
+            },
             "description": "Status is the most recently observed status of the replication controller. This data may be out of date by some window of time. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
           }
         },
@@ -8423,7 +8440,9 @@
                 "$ref": "#/components/schemas/io.k8s.api.core.v1.PodAffinityTerm"
               }
             ],
-            "default": {},
+            "default": {
+              "topologyKey": ""
+            },
             "description": "Required. A pod affinity term, associated with the corresponding weight."
           },
           "weight": {

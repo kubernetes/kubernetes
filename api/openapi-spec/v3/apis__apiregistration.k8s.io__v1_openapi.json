@@ -593,7 +593,10 @@
                 "$ref": "#/components/schemas/io.k8s.kube-aggregator.pkg.apis.apiregistration.v1.APIServiceSpec"
               }
             ],
-            "default": {},
+            "default": {
+              "groupPriorityMinimum": 0,
+              "versionPriority": 0
+            },
             "description": "Spec contains information for locating and communicating with a server"
           },
           "status": {
