@@ -80,11 +80,11 @@ func NewReplicaCalculator(metricsClient metricsclient.MetricsClient, podLister c
 func (c *ReplicaCalculator) GetResourceReplicas(ctx context.Context, currentReplicas int32, targetUtilization int32, resource v1.ResourceName, tolerances Tolerances, namespace string, selector labels.Selector, container string) (replicaCount int32, utilization int32, rawUtilization int64, timestamp time.Time, err error) {
 	metrics, timestamp, err := c.metricsClient.GetResourceMetric(ctx, resource, namespace, selector, container)
 	if err != nil {
-		return 0, 0, 0, time.Time{}, fmt.Errorf("unable to get metrics for resource %s: %v", resource, err)
+		return 0, 0, 0, time.Time{}, fmt.Errorf("unable to get metrics for resource %s: %w", resource, err)
 	}
 	podList, err := c.podLister.Pods(namespace).List(selector)
 	if err != nil {
-		return 0, 0, 0, time.Time{}, fmt.Errorf("unable to get pods while calculating replica count: %v", err)
+		return 0, 0, 0, time.Time{}, fmt.Errorf("unable to get pods while calculating replica count: %w", err)
 	}
 	if len(podList) == 0 {
 		return 0, 0, 0, time.Time{}, fmt.Errorf("no pods returned by selector while calculating replica count")
@@ -169,7 +169,7 @@ func (c *ReplicaCalculator) GetResourceReplicas(ctx context.Context, currentRepl
 func (c *ReplicaCalculator) GetRawResourceReplicas(ctx context.Context, currentReplicas int32, targetUsage int64, resource v1.ResourceName, tolerances Tolerances, namespace string, selector labels.Selector, container string) (replicaCount int32, usage int64, timestamp time.Time, err error) {
 	metrics, timestamp, err := c.metricsClient.GetResourceMetric(ctx, resource, namespace, selector, container)
 	if err != nil {
-		return 0, 0, time.Time{}, fmt.Errorf("unable to get metrics for resource %s: %v", resource, err)
+		return 0, 0, time.Time{}, fmt.Errorf("unable to get metrics for resource %s: %w", resource, err)
 	}
 
 	replicaCount, usage, err = c.calcPlainMetricReplicas(metrics, currentReplicas, targetUsage, tolerances, namespace, selector, resource)
@@ -182,7 +182,7 @@ func (c *ReplicaCalculator) GetRawResourceReplicas(ctx context.Context, currentR
 func (c *ReplicaCalculator) GetMetricReplicas(currentReplicas int32, targetUsage int64, metricName string, tolerances Tolerances, namespace string, selector labels.Selector, metricSelector labels.Selector) (replicaCount int32, usage int64, timestamp time.Time, err error) {
 	metrics, timestamp, err := c.metricsClient.GetRawMetric(metricName, namespace, selector, metricSelector)
 	if err != nil {
-		return 0, 0, time.Time{}, fmt.Errorf("unable to get metric %s: %v", metricName, err)
+		return 0, 0, time.Time{}, fmt.Errorf("unable to get metric %s: %w", metricName, err)
 	}
 
 	replicaCount, usage, err = c.calcPlainMetricReplicas(metrics, currentReplicas, targetUsage, tolerances, namespace, selector, "")
@@ -194,7 +194,7 @@ func (c *ReplicaCalculator) calcPlainMetricReplicas(metrics metricsclient.PodMet
 
 	podList, err := c.podLister.Pods(namespace).List(selector)
 	if err != nil {
-		return 0, 0, fmt.Errorf("unable to get pods while calculating replica count: %v", err)
+		return 0, 0, fmt.Errorf("unable to get pods while calculating replica count: %w", err)
 	}
 
 	if len(podList) == 0 {
@@ -330,7 +330,7 @@ func (c *ReplicaCalculator) GetObjectPerPodMetricReplicas(statusReplicas int32, 
 func (c *ReplicaCalculator) getReadyPodsCount(namespace string, selector labels.Selector) (int64, error) {
 	podList, err := c.podLister.Pods(namespace).List(selector)
 	if err != nil {
-		return 0, fmt.Errorf("unable to get pods while calculating replica count: %v", err)
+		return 0, fmt.Errorf("unable to get pods while calculating replica count: %w", err)
 	}
 
 	if len(podList) == 0 {
