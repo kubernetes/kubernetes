@@ -807,6 +807,7 @@ func dropDisabledFields(
 	dropImageVolumes(podSpec, oldPodSpec)
 	dropSELinuxChangePolicy(podSpec, oldPodSpec)
 	dropContainerStopSignals(podSpec, oldPodSpec)
+	dropDisabledEmptyDirStickyBit(podSpec, oldPodSpec)
 }
 
 // setHostnameOverrideInUse returns true if any pod's spec defines HostnameOverride field.
@@ -892,6 +893,29 @@ func containerStopSignalsInUse(podSpec *api.PodSpec) bool {
 		return true
 	})
 	return inUse
+}
+
+func dropDisabledEmptyDirStickyBit(podSpec, oldPodSpec *api.PodSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.EmptyDirStickyBit) || emptyDirStickyBitInUse(oldPodSpec) {
+		return
+	}
+	for i := range podSpec.Volumes {
+		if podSpec.Volumes[i].EmptyDir != nil {
+			podSpec.Volumes[i].EmptyDir.StickyBit = nil
+		}
+	}
+}
+
+func emptyDirStickyBitInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	for _, v := range podSpec.Volumes {
+		if v.EmptyDir != nil && v.EmptyDir.StickyBit != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func dropDisabledPodLevelResources(podSpec, oldPodSpec *api.PodSpec) {
