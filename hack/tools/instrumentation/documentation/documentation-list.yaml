@@ -6313,6 +6313,20 @@
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
+- name: gated_pods
+  subsystem: scheduler
+  help: Number of pods in the gated queue broken down by scheduling gate name from
+    spec.schedulingGates. A pod declaring multiple scheduling gates is counted once
+    per gate, so the sum across gates is greater than or equal to scheduler_pending_pods{queue=\"gated\"}.
+    Pods gated by plugins that do not correspond to a spec.schedulingGates entry are
+    not included.
+  type: Gauge
+  stabilityLevel: ALPHA
+  labels:
+  - gate
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
 - name: get_node_hint_duration_seconds
   subsystem: scheduler
   help: Latency for getting a node hint.

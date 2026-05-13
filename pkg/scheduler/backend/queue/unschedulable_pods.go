@@ -18,6 +18,7 @@ package queue
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -33,20 +34,35 @@ type unschedulablePods struct {
 	// that are specifically blocked by scheduling gates. These recorders handle
 	// increments, decrements, and transitions (Gated <-> Ungated).
 	unschedulableRecorder, gatedRecorder metrics.MetricRecorder
+	// gatedByGateRecorder tracks per-gate counts of pods currently sitting in the
+	// gated state, broken down by their spec.SchedulingGates names. Pods gated by
+	// plugins without a corresponding spec entry contribute to gatedRecorder but
+	// not here.
+	gatedByGateRecorder metrics.GatedPodsByGateRecorder
+	// countedGates records, for each pod currently counted on gatedByGateRecorder,
+	// the gate names that were incremented. We track this independently of
+	// pod.Spec.SchedulingGates because the spec can change (gates can only be
+	// removed) between the time a pod is added to the gated state and the time
+	// we need to decrement its counters.
+	countedGates map[string]sets.Set[string]
 }
 
 // newUnschedulablePods initializes a new object of unschedulablePods.
-func newUnschedulablePods(unschedulableRecorder, gatedRecorder metrics.MetricRecorder) *unschedulablePods {
+func newUnschedulablePods(unschedulableRecorder, gatedRecorder metrics.MetricRecorder, gatedByGateRecorder metrics.GatedPodsByGateRecorder) *unschedulablePods {
 	return &unschedulablePods{
 		podInfoMap:            make(map[string]*framework.QueuedPodInfo),
 		keyFunc:               util.GetPodFullName,
 		unschedulableRecorder: unschedulableRecorder,
 		gatedRecorder:         gatedRecorder,
+		gatedByGateRecorder:   gatedByGateRecorder,
+		countedGates:          make(map[string]sets.Set[string]),
 	}
 }
 
 // updateMetricsOnStateChange handles the metric accounting when a pod changes
-// between Gated and Unschedulable states.
+// between Gated and Unschedulable states. Per-gate accounting (gatedByGateRecorder)
+// is reconciled separately in addOrUpdate so that gate set changes are picked up
+// even when the gated/ungated state does not flip.
 func (u *unschedulablePods) updateMetricsOnStateChange(gatedBefore, isGated bool) {
 	if gatedBefore == isGated {
 		return
@@ -77,6 +93,11 @@ func (u *unschedulablePods) addOrUpdate(pInfo *framework.QueuedPodInfo, gatedBef
 		}
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("unschedulable", event).Inc()
 	}
+	if pInfo.Gated() {
+		u.reconcileCountedGates(podID, pInfo.Pod)
+	} else {
+		u.releaseCountedGates(podID)
+	}
 	u.podInfoMap[podID] = pInfo
 }
 
@@ -91,6 +112,7 @@ func (u *unschedulablePods) delete(pod *v1.Pod, gated bool) {
 			u.unschedulableRecorder.Dec()
 		}
 	}
+	u.releaseCountedGates(podID)
 	delete(u.podInfoMap, podID)
 }
 
@@ -109,4 +131,53 @@ func (u *unschedulablePods) clear() {
 	u.podInfoMap = make(map[string]*framework.QueuedPodInfo)
 	u.unschedulableRecorder.Clear()
 	u.gatedRecorder.Clear()
+	u.gatedByGateRecorder.Clear()
+	u.countedGates = make(map[string]sets.Set[string])
+}
+
+// reconcileCountedGates incs/decs gatedByGateRecorder so that the per-gate
+// counters reflect the pod's current spec.SchedulingGates. Called whenever a
+// pod is added or updated while in the Gated state.
+func (u *unschedulablePods) reconcileCountedGates(podID string, pod *v1.Pod) {
+	prev := u.countedGates[podID]
+	curr := podSchedulingGateNameSet(pod)
+
+	for g := range prev.Difference(curr) {
+		u.gatedByGateRecorder.Dec(g)
+	}
+	for g := range curr.Difference(prev) {
+		u.gatedByGateRecorder.Inc(g)
+	}
+
+	if curr.Len() == 0 {
+		delete(u.countedGates, podID)
+	} else {
+		u.countedGates[podID] = curr
+	}
+}
+
+// releaseCountedGates decrements gatedByGateRecorder for the gate set
+// previously counted for this pod (if any) and clears the bookkeeping entry.
+func (u *unschedulablePods) releaseCountedGates(podID string) {
+	prev, ok := u.countedGates[podID]
+	if !ok {
+		return
+	}
+	for g := range prev {
+		u.gatedByGateRecorder.Dec(g)
+	}
+	delete(u.countedGates, podID)
+}
+
+// podSchedulingGateNameSet returns the set of gate names declared on the pod's
+// spec.SchedulingGates.
+func podSchedulingGateNameSet(pod *v1.Pod) sets.Set[string] {
+	if len(pod.Spec.SchedulingGates) == 0 {
+		return sets.New[string]()
+	}
+	out := sets.New[string]()
+	for _, g := range pod.Spec.SchedulingGates {
+		out.Insert(g.Name)
+	}
+	return out
 }

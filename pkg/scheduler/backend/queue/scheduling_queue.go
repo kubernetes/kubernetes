@@ -377,7 +377,7 @@ func NewPriorityQueue(
 		stop:                              make(chan struct{}),
 		podMaxInUnschedulablePodsDuration: options.podMaxInUnschedulablePodsDuration,
 		backoffQ:                          backoffQ,
-		unschedulablePods:                 newUnschedulablePods(metrics.NewUnschedulablePodsRecorder(), metrics.NewGatedPodsRecorder()),
+		unschedulablePods:                 newUnschedulablePods(metrics.NewUnschedulablePodsRecorder(), metrics.NewGatedPodsRecorder(), metrics.NewGatedPodsByGateRecorder()),
 		preEnqueuePluginMap:               options.preEnqueuePluginMap,
 		queueingHintMap:                   options.queueingHintMap,
 		pluginToEventsMap:                 buildEventMap(options.queueingHintMap),
