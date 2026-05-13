@@ -266,7 +266,7 @@ func NewManager(kubeClient clientset.Interface, podManager PodManager, podDeleti
 //  3. We immediately abort deferral (returning false) if any init container fails (ExitCode != 0),
 //     if the pod transitions out of Pending, if a main container starts, or if ALL
 //     init containers have successfully completed (reaching the Initialized state).
-func (m *manager) isEligibleForDeferral(oldStatus, newStatus *v1.PodStatus, hasActiveDeferral bool) bool {
+func (m *manager) isEligibleForInitDeferral(oldStatus, newStatus *v1.PodStatus, hasActiveDeferral bool) bool {
 	// If the pod is no longer pending, initialization is over. We cannot defer.
 	if newStatus.Phase != v1.PodPending {
 		return false
@@ -1101,8 +1101,11 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 		newStatus.at = cachedStatus.at
 	}
 
-	_, hasActiveDeferral := m.podStatusDeferrals[pod.UID]
-	shouldDefer := m.isEligibleForDeferral(&oldStatus, &status, hasActiveDeferral)
+	expiration, hasActiveDeferral := m.podStatusDeferrals[pod.UID]
+	if hasActiveDeferral && !m.clock.Now().Before(expiration) {
+		hasActiveDeferral = false
+	}
+	shouldDefer := m.isEligibleForInitDeferral(&oldStatus, &status, hasActiveDeferral)
 
 	m.podStatuses[pod.UID] = newStatus
 
@@ -1111,9 +1114,8 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 			m.podStatusDeferrals[pod.UID] = m.clock.Now().Add(initContainerStatusDeferralWindow)
 
 			// Spawn a lightweight timer to wake up the syncBatch loop if nothing else does
-			timer := m.clock.NewTimer(initContainerStatusDeferralWindow)
 			go func() {
-				<-timer.C()
+				<-m.clock.After(initContainerStatusDeferralWindow)
 				select {
 				case m.podStatusChannel <- struct{}{}:
 				default:
@@ -1122,12 +1124,11 @@ func (m *manager) updateStatusInternal(logger klog.Logger, pod *v1.Pod, status v
 		}
 	} else {
 		delete(m.podStatusDeferrals, pod.UID)
-	}
-
-	select {
-	case m.podStatusChannel <- struct{}{}:
-	default:
-		// there's already a status update pending
+		select {
+		case m.podStatusChannel <- struct{}{}:
+		default:
+			// there's already a status update pending
+		}
 	}
 
 	podCopy := *pod
@@ -1191,6 +1192,7 @@ func (m *manager) RemoveOrphanedStatuses(logger klog.Logger, podUIDs map[types.U
 		if _, ok := podUIDs[key]; !ok {
 			logger.V(5).Info("Removing pod from status map", "podUID", key)
 			delete(m.podStatuses, key)
+			delete(m.podStatusDeferrals, key)
 			if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 				if _, exists := m.podResizeConditions[key]; exists {
 					delete(m.podResizeConditions, key)

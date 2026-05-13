@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	clientgofake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/klog/v2/ktesting"
 	testingclock "k8s.io/utils/clock/testing"
@@ -230,7 +231,7 @@ func TestIsEligibleForDeferral(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := m.isEligibleForDeferral(tt.oldStatus, tt.newStatus, tt.hasActiveDeferral)
+			result := m.isEligibleForInitDeferral(tt.oldStatus, tt.newStatus, tt.hasActiveDeferral)
 			if result != tt.expected {
 				t.Errorf("expected %v, got %v", tt.expected, result)
 			}
@@ -421,4 +422,107 @@ func TestInitContainerStatusCoalescing_AllInitComplete(t *testing.T) {
 	}
 	manager.SetPodStatus(logger, pod, status)
 	verifyUpdates(t, manager, 1)
+}
+
+func TestRemoveOrphanedStatuses_CleansUpDeferrals(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	fakeClient := &clientgofake.Clientset{}
+	m := newTestManager(fakeClient)
+
+	// Manually inject a dummy pod into both maps
+	orphanUID := "orphan-1234"
+	m.podStatusesLock.Lock()
+	m.podStatuses[types.UID(orphanUID)] = versionedPodStatus{}
+	m.podStatusDeferrals[types.UID(orphanUID)] = time.Now()
+	m.podStatusesLock.Unlock()
+
+	// Verify they are there
+	m.podStatusesLock.RLock()
+	if _, ok := m.podStatuses[types.UID(orphanUID)]; !ok {
+		t.Fatalf("Failed to setup test: podStatus missing")
+	}
+	if _, ok := m.podStatusDeferrals[types.UID(orphanUID)]; !ok {
+		t.Fatalf("Failed to setup test: podStatusDeferrals missing")
+	}
+	m.podStatusesLock.RUnlock()
+
+	// Call RemoveOrphanedStatuses with an empty map (meaning ALL pods are orphaned)
+	validPods := make(map[types.UID]bool)
+	m.RemoveOrphanedStatuses(logger, validPods)
+
+	// Verify the orphan was cleaned up from BOTH maps
+	m.podStatusesLock.RLock()
+	if _, ok := m.podStatuses[types.UID(orphanUID)]; ok {
+		t.Errorf("Expected pod to be removed from podStatuses")
+	}
+	if _, ok := m.podStatusDeferrals[types.UID(orphanUID)]; ok {
+		t.Errorf("Expected pod to be removed from podStatusDeferrals")
+	}
+	m.podStatusesLock.RUnlock()
+}
+
+func TestInitContainerStatusCoalescing_ExpiredDeferral(t *testing.T) {
+	// This test verifies the fix for a bug where expired deferral entries were left in the
+	// podStatusDeferrals map. If a deferral expired, the map entry remained, causing subsequent
+	// updates to incorrectly assume an active deferral was still running and fail to start a new
+	// timer. We verify that after an expiration, a new status update properly triggers a NEW timer.
+	logger, ctx := ktesting.NewTestContext(t)
+	fakeClient := &clientgofake.Clientset{}
+	manager := newTestManager(fakeClient)
+
+	fakeClock := testingclock.NewFakeClock(time.Now())
+	manager.clock = fakeClock
+
+	pod := getTestPod()
+	pod.Spec.InitContainers = []v1.Container{{Name: "init1"}, {Name: "init2"}}
+
+	status := v1.PodStatus{
+		Phase: v1.PodPending,
+		InitContainerStatuses: []v1.ContainerStatus{
+			{Name: "init1", State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}},
+			{Name: "init2", State: v1.ContainerState{Waiting: &v1.ContainerStateWaiting{}}},
+		},
+	}
+	manager.SetPodStatus(logger, pod, status)
+	verifyUpdates(t, manager, 1)
+
+	// 1. Init1 starts Running
+	status.InitContainerStatuses[0].State = v1.ContainerState{
+		Running: &v1.ContainerStateRunning{StartedAt: metav1.Now()},
+	}
+	manager.SetPodStatus(logger, pod, status)
+
+	require.Eventually(t, func() bool {
+		return fakeClock.HasWaiters()
+	}, 5*time.Second, 10*time.Millisecond, "Expected timer to be registered")
+
+	// 2. Expire the deferral window
+	fakeClock.Step(initContainerStatusDeferralWindow + 100*time.Millisecond)
+
+	require.Eventually(t, func() bool {
+		return manager.consumeUpdates(ctx) == 1
+	}, 5*time.Second, 10*time.Millisecond, "Expected flush after first expiration")
+
+	// 3. Init1 terminates, Init2 starts Running
+	status.InitContainerStatuses[0].State = v1.ContainerState{
+		Terminated: &v1.ContainerStateTerminated{ExitCode: 0},
+	}
+	status.InitContainerStatuses[1].State = v1.ContainerState{
+		Running: &v1.ContainerStateRunning{StartedAt: metav1.Now()},
+	}
+	manager.SetPodStatus(logger, pod, status)
+
+	// 4. If the bug was present, no new timer would be created because the old deferral
+	// entry was still in the map, so hasActiveDeferral would be true, skipping timer creation.
+	// With the fix, we check if it expired and create a new timer.
+	require.Eventually(t, func() bool {
+		return fakeClock.HasWaiters()
+	}, 5*time.Second, 10*time.Millisecond, "Expected NEW timer to be registered for Init2")
+
+	// 5. Expire the second deferral window
+	fakeClock.Step(initContainerStatusDeferralWindow + 100*time.Millisecond)
+
+	require.Eventually(t, func() bool {
+		return manager.consumeUpdates(ctx) == 1
+	}, 5*time.Second, 10*time.Millisecond, "Expected flush after second expiration")
 }
