@@ -712,10 +712,10 @@ func (p *Plugin) validateNodeServiceAccountAudience(ctx context.Context, tr *aut
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("audience %q not found in pod spec volume, error authorizing %s to request tokens for this audience: %w", requestedAudience, userInfo.GetName(), err)
+		return fmt.Errorf("error authorizing %s to request tokens for audience %q: %w", userInfo.GetName(), requestedAudience, err)
 	}
 
-	return fmt.Errorf("audience %q not found in pod spec volume, %s is not authorized to request tokens for this audience", requestedAudience, userInfo.GetName())
+	return fmt.Errorf("%s is not authorized to request tokens for audience %q", userInfo.GetName(), requestedAudience)
 }
 
 func (p *Plugin) podReferencesAudience(ctx context.Context, pod *v1.Pod, audience string) (bool, error) {
