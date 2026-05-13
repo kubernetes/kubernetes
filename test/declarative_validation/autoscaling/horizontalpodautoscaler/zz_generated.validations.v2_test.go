@@ -38,6 +38,12 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 			},
+			"spec.scaleTargetRef.kind": {
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.scaleTargetRef.name": {
+				{ErrorType: "FieldValueRequired"},
+			},
 		},
 	)
 }

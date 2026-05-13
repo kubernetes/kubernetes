@@ -67,11 +67,11 @@ message ContainerResourceMetricStatus {
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 message CrossVersionObjectReference {
   // kind is the kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
-  // +k8s:alpha(since: "1.36")=+k8s:required
+  // +k8s:alpha(since: "1.37")=+k8s:required
   optional string kind = 1;
 
   // name is the name of the referent; More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-  // +k8s:alpha(since: "1.36")=+k8s:required
+  // +k8s:alpha(since: "1.37")=+k8s:required
   optional string name = 2;
 
   // apiVersion is the API version of the referent
@@ -273,7 +273,8 @@ message HorizontalPodAutoscalerSpec {
   // If not set, the default metric will be set to 80% average CPU utilization.
   // +listType=atomic
   // +optional
-  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:opaqueType
   repeated MetricSpec metrics = 4;
 
   // behavior configures the scaling behavior of the target
@@ -306,7 +307,8 @@ message HorizontalPodAutoscalerStatus {
   // currentMetrics is the last read state of the metrics used by this autoscaler.
   // +listType=atomic
   // +optional
-  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:opaqueType
   repeated MetricStatus currentMetrics = 5;
 
   // conditions is the set of conditions required for this autoscaler to scale its target,
@@ -341,7 +343,8 @@ message MetricSpec {
   // object refers to a metric describing a single kubernetes object
   // (for example, hits-per-second on an Ingress object).
   // +optional
-  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:opaqueType
   optional ObjectMetricSource object = 2;
 
   // pods refers to a metric describing each pod in the current scale target
@@ -384,7 +387,8 @@ message MetricStatus {
   // object refers to a metric describing a single kubernetes object
   // (for example, hits-per-second on an Ingress object).
   // +optional
-  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:opaqueType
   optional ObjectMetricStatus object = 2;
 
   // pods refers to a metric describing each pod in the current scale target

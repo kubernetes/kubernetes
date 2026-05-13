@@ -26,11 +26,11 @@ import (
 // +structType=atomic
 type CrossVersionObjectReference struct {
 	// kind is the kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
-	// +k8s:alpha(since: "1.36")=+k8s:required
+	// +k8s:alpha(since: "1.37")=+k8s:required
 	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
 
 	// name is the name of the referent; More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-	// +k8s:alpha(since: "1.36")=+k8s:required
+	// +k8s:alpha(since: "1.37")=+k8s:required
 	Name string `json:"name" protobuf:"bytes,2,opt,name=name"`
 
 	// apiVersion is the API version of the referent
