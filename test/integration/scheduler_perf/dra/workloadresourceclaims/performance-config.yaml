@@ -54,7 +54,7 @@
       PodGroupCount: $podGroups
     collectMetrics: true
   workloads:
-  - name: 10podgroups_10pods
+  - name: fast
     labels: [integration-test, short]
     params:
       # This testcase runs through all code paths without
@@ -64,11 +64,19 @@
       podGroups: 10
       measurePods: 10
   - name: 1podgroup_1000pods
+    labels: [integration-test, short]
     params:
       nodesWithDRA: 10
       nodesWithoutDRA: 0
       podGroups: 1
       measurePods: 1000
+  - name: 100podgroups_5000pods
+    labels: [performance]
+    params:
+      nodesWithDRA: 50
+      nodesWithoutDRA: 0
+      podGroups: 100
+      measurePods: 5000
 
 # SharedPodGroupResourceClaimTemplate schedules PodGroups whose member Pods all share
 # the same ResourceClaim generated from a ResourceClaimTemplate.
@@ -111,7 +119,7 @@
       PodGroupCount: $podGroups
     collectMetrics: true
   workloads:
-  - name: 10podgroups_10pods
+  - name: fast
     labels: [integration-test, short]
     params:
       # This testcase runs through all code paths without
@@ -121,8 +129,16 @@
       podGroups: 10
       measurePods: 10
   - name: 1podgroup_1000pods
+    labels: [integration-test, short]
     params:
       nodesWithDRA: 10
       nodesWithoutDRA: 0
       podGroups: 1
       measurePods: 1000
+  - name: 100podgroups_5000pods
+    labels: [performance]
+    params:
+      nodesWithDRA: 50
+      nodesWithoutDRA: 0
+      podGroups: 100
+      measurePods: 5000
