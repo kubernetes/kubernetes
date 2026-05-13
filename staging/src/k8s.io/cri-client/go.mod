@@ -36,6 +36,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260414002931-afd174a4e478 // indirect
 	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	k8s.io/kube-openapi v0.0.0-20260513181538-f7523842b150
 )
 
 replace (
@@ -45,3 +46,5 @@ replace (
 	k8s.io/component-base => ../component-base
 	k8s.io/cri-api => ../cri-api
 )
+
+replace k8s.io/kube-openapi => github.com/arthurbdiniz/kube-openapi v0.0.0-20260513181538-f7523842b150

@@ -13,7 +13,7 @@ require (
 	k8s.io/client-go v0.0.0
 	k8s.io/code-generator v0.0.0
 	k8s.io/klog/v2 v2.140.0
-	k8s.io/kube-openapi v0.0.0-20260511211612-da4e56fe5676
+	k8s.io/kube-openapi v0.0.0-20260513181538-f7523842b150
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
 	sigs.k8s.io/structured-merge-diff/v6 v6.4.0
 )
@@ -72,3 +72,5 @@ replace (
 	k8s.io/code-generator => ../code-generator
 	k8s.io/streaming => ../streaming
 )
+
+replace k8s.io/kube-openapi => github.com/arthurbdiniz/kube-openapi v0.0.0-20260513181538-f7523842b150

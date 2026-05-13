@@ -14,4 +14,9 @@ require (
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2
 )
 
-require github.com/go-logr/logr v1.4.3 // indirect
+require (
+	github.com/go-logr/logr v1.4.3 // indirect
+	k8s.io/kube-openapi v0.0.0-20260513181538-f7523842b150
+)
+
+replace k8s.io/kube-openapi => github.com/arthurbdiniz/kube-openapi v0.0.0-20260513181538-f7523842b150

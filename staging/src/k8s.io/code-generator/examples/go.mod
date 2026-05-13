@@ -64,3 +64,5 @@ replace (
 	k8s.io/apimachinery => ../../apimachinery
 	k8s.io/client-go => ../../client-go
 )
+
+replace k8s.io/kube-openapi => github.com/arthurbdiniz/kube-openapi v0.0.0-20260513181538-f7523842b150

@@ -104,7 +104,7 @@ require (
 	k8s.io/kms v0.0.0
 	k8s.io/kube-aggregator v0.0.0
 	k8s.io/kube-controller-manager v0.0.0
-	k8s.io/kube-openapi v0.0.0-20260511211612-da4e56fe5676
+	k8s.io/kube-openapi v0.0.0-20260513181538-f7523842b150
 	k8s.io/kube-proxy v0.0.0
 	k8s.io/kube-scheduler v0.0.0
 	k8s.io/kubectl v0.0.0
@@ -261,3 +261,5 @@ replace (
 	k8s.io/sample-controller => ./staging/src/k8s.io/sample-controller
 	k8s.io/streaming => ./staging/src/k8s.io/streaming
 )
+
+replace k8s.io/kube-openapi => github.com/arthurbdiniz/kube-openapi v0.0.0-20260513181538-f7523842b150
