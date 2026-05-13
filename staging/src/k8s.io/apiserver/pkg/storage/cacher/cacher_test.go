@@ -381,7 +381,7 @@ func TestStats(t *testing.T) {
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SizeBasedListCostEstimate, sizeBasedListCostEstimate)
 			ctx, cacher, terminate := testSetup(t)
 			t.Cleanup(terminate)
-			storagetesting.RunTestStats(ctx, t, cacher, codecs.LegacyCodec(examplev1.SchemeGroupVersion), identity.NewEncryptCheckTransformer(), sizeBasedListCostEstimate)
+			storagetesting.RunTestStats(ctx, t, cacher, examplev1ProtoCodec, identity.NewEncryptCheckTransformer(), sizeBasedListCostEstimate)
 		})
 	}
 }
@@ -492,6 +492,7 @@ type setupOptions struct {
 	indexerFuncs   map[string]storage.IndexerFunc
 	indexers       cache.Indexers
 	clock          clock.WithTicker
+	codec          runtime.Codec
 }
 
 type setupOption func(*setupOptions)
@@ -502,6 +503,7 @@ func withDefaults(options *setupOptions) {
 	options.resourcePrefix = prefix
 	options.keyFunc = func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) }
 	options.clock = clock.RealClock{}
+	options.codec = examplev1ProtoCodec
 }
 
 func withClusterScopedKeyFunc(options *setupOptions) {
@@ -545,7 +547,7 @@ func testSetupWithEtcdServer(t testing.TB, opts ...setupOption) (context.Context
 		opt(&setupOpts)
 	}
 
-	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
+	server, etcdStorage := newEtcdTestStorageWithCodec(t, etcd3testing.PathPrefix(), setupOpts.codec)
 	// Inject one list error to make sure we test the relist case.
 	listErrors := 1
 	if clientfeatures.FeatureGates().Enabled(clientfeatures.WatchListClient) {
@@ -570,7 +572,7 @@ func testSetupWithEtcdServer(t testing.TB, opts ...setupOption) (context.Context
 		NewListFunc:         newPodList,
 		IndexerFuncs:        setupOpts.indexerFuncs,
 		Indexers:            &setupOpts.indexers,
-		Codec:               codecs.LegacyCodec(examplev1.SchemeGroupVersion),
+		Codec:               setupOpts.codec,
 		Clock:               setupOpts.clock,
 	}
 	cacher, err := NewCacherFromConfig(config)
