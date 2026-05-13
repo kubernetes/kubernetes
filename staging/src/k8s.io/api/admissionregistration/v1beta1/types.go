@@ -1263,6 +1263,8 @@ type MutatingAdmissionPolicySpec struct {
 	// The expression of a variable can refer to other variables defined earlier in the list but not those after.
 	// Thus, variables must be sorted by the order of first appearance and acyclic.
 	// +listType=atomic
+	// +k8s:maxItems=8
+	// +k8s:optional
 	// +optional
 	Variables []Variable `json:"variables,omitempty" protobuf:"bytes,3,rep,name=variables"`
 
