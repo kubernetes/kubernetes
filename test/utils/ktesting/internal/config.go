@@ -16,7 +16,10 @@ limitations under the License.
 
 package internal
 
+import "time"
+
 type InitConfig struct {
-	PerTestOutput bool
-	BufferLogs    bool
+	PerTestOutput      bool
+	BufferLogs         bool
+	CleanupGracePeriod time.Duration // Zero means use the package default (DefaultCleanupGracePeriod).
 }

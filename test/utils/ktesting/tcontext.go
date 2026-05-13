@@ -40,18 +40,20 @@ import (
 // used to capture log output in memory to check it in tests.
 type Underlier = ktesting.Underlier
 
-// CleanupGracePeriod is the time that a [TContext] gets canceled before the
-// deadline of its underlying test suite (usually determined via "go test
+// DefaultCleanupGracePeriod is the time that a [TContext] gets canceled before
+// the deadline of its underlying test suite (usually determined via "go test
 // -timeout"). This gives the running test(s) time to fail with an informative
 // timeout error. After that, all cleanup callbacks then have the remaining
 // time to complete before the test binary is killed.
 //
-// For this to work, each blocking calls in a test must respect the
+// For this to work, each blocking call in a test must respect the
 // cancellation of the [TContext].
 //
 // When using Ginkgo to manage the test suite and running tests, the
-// CleanupGracePeriod is ignored because Ginkgo itself manages timeouts.
-const CleanupGracePeriod = 5 * time.Second
+// cleanup grace period is ignored because Ginkgo itself manages timeouts.
+//
+// This value can be overridden per-[TContext] via [initoption.WithCleanupGracePeriod].
+const DefaultCleanupGracePeriod = 5 * time.Second
 
 // TB is the interface common to [testing.T], [testing.B], [testing.F] and
 // [github.com/onsi/ginkgo/v2] which ktesting relies upon itself or
@@ -172,15 +174,23 @@ func Init(tb TB, opts ...InitOption) TContext {
 		header = klogHeader
 	}
 
+	// Resolve the effective cleanup grace period: use the caller-supplied value
+	// if positive, otherwise fall back to DefaultCleanupGracePeriod.
+	gracePeriod := c.CleanupGracePeriod
+	if gracePeriod <= 0 {
+		gracePeriod = DefaultCleanupGracePeriod
+	}
+
 	var cancelTimeout func(cause string)
 	if deadline != nil {
 		timeLeft := time.Until(*deadline)
-		timeLeft -= CleanupGracePeriod
-		ctx, cancelTimeout = withTimeout(ctx, tb, timeLeft, fmt.Sprintf("test suite deadline (%s) is close, need to clean up before the %s cleanup grace period", deadline.Truncate(time.Second), CleanupGracePeriod))
+		timeLeft -= gracePeriod
+		ctx, cancelTimeout = withTimeout(ctx, tb, timeLeft, fmt.Sprintf("test suite deadline (%s) is close, need to clean up before the %s cleanup grace period", deadline.Truncate(time.Second), gracePeriod))
 	}
 
 	// Construct new TContext with context and settings as determined above.
 	tCtx := InitCtx(ctx, tb)
+	tCtx.cleanupGracePeriod = gracePeriod
 	tCtx.isSyncTest = isSyncTest
 	if cancelTimeout != nil {
 		tCtx.cancel = cancelTimeout
@@ -240,12 +250,19 @@ type InitOption = initoption.InitOption
 
 // InitCtx is a variant of [Init] which uses an already existing context and
 // whatever logger and timeouts are stored there.
-// Functional options are part of the API, but currently
-// there are none which have an effect.
-func InitCtx(ctx context.Context, tb TB, _ ...InitOption) TContext {
+func InitCtx(ctx context.Context, tb TB, opts ...InitOption) TContext {
+	c := internal.InitConfig{}
+	for _, opt := range opts {
+		opt(&c)
+	}
+	gracePeriod := c.CleanupGracePeriod
+	if gracePeriod <= 0 {
+		gracePeriod = DefaultCleanupGracePeriod
+	}
 	return TContext{
-		Context:   ctx,
-		testingTB: testingTB{TB: tb},
+		Context:            ctx,
+		testingTB:          testingTB{TB: tb},
+		cleanupGracePeriod: gracePeriod,
 	}
 }
 
@@ -414,6 +431,11 @@ type TContext struct {
 	//
 	// Used by WithError.
 	capture *capture
+
+	// cleanupGracePeriod is the effective cleanup grace period for this context.
+	// It is always non-zero: both Init and InitCtx resolve it from the supplied
+	// options or fall back to DefaultCleanupGracePeriod.
+	cleanupGracePeriod time.Duration
 }
 
 type capture struct {
