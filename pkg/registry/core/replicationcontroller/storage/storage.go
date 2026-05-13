@@ -23,7 +23,6 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -313,9 +312,7 @@ func (i *scaleUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runti
 		return nil, errors.NewBadRequest(fmt.Sprintf("expected input object type to be Scale, but %T", newScaleObj))
 	}
 
-	errs := validation.ValidateScale(scale)
-	dv := rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}
-	errs = dv.ValidateDeclaratively(ctx, scale, oldScale, errs, operation.Update, rest.DeclarativeValidationConfig{SubresourceGVKMapper: i.scaleGVKMapper})
+	errs := validation.ValidateScaleUpdate(ctx, scale, oldScale, legacyscheme.Scheme, i.scaleGVKMapper)
 
 	if len(errs) > 0 {
 		return nil, errors.NewInvalid(autoscaling.Kind("Scale"), replicationcontroller.Name, errs)
