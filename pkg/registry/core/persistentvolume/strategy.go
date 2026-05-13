@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/operation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -78,9 +77,8 @@ func (persistentvolumeStrategy) PrepareForCreate(ctx context.Context, obj runtim
 func (persistentvolumeStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	persistentvolume := obj.(*api.PersistentVolume)
 	opts := validation.ValidationOptionsForPersistentVolume(persistentvolume, nil)
-	allErrs := validation.ValidatePersistentVolume(persistentvolume, opts)
-	allErrs = append(allErrs, volumevalidation.ValidatePersistentVolume(persistentvolume)...)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, nil, allErrs, operation.Create)
+	errorList := validation.ValidatePersistentVolume(persistentvolume, opts)
+	return append(errorList, volumevalidation.ValidatePersistentVolume(persistentvolume)...)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -108,10 +106,9 @@ func (persistentvolumeStrategy) ValidateUpdate(ctx context.Context, obj, old run
 	newPv := obj.(*api.PersistentVolume)
 	oldPv := old.(*api.PersistentVolume)
 	opts := validation.ValidationOptionsForPersistentVolume(newPv, oldPv)
-	allErrs := validation.ValidatePersistentVolume(newPv, opts)
-	allErrs = append(allErrs, volumevalidation.ValidatePersistentVolume(newPv)...)
-	allErrs = append(allErrs, validation.ValidatePersistentVolumeUpdate(newPv, oldPv, opts)...)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, allErrs, operation.Update)
+	errorList := validation.ValidatePersistentVolume(newPv, opts)
+	errorList = append(errorList, volumevalidation.ValidatePersistentVolume(newPv)...)
+	return append(errorList, validation.ValidatePersistentVolumeUpdate(newPv, oldPv, opts)...)
 }
 
 // WarningsOnUpdate returns warnings for the given update.

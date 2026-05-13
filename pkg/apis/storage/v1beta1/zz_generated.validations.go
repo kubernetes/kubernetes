@@ -265,19 +265,26 @@ func Validate_VolumeAttachment(
 
 // Validate_VolumeAttachmentSource validates an instance of VolumeAttachmentSource according
 // to declarative validation rules in the API schema.
-func Validate_VolumeAttachmentSource(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *storagev1beta1.VolumeAttachmentSource) (errs field.ErrorList) {
+func Validate_VolumeAttachmentSource(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *storagev1beta1.VolumeAttachmentSource) (errs field.ErrorList) {
+
 	// field storagev1beta1.VolumeAttachmentSource.PersistentVolumeName has no validation
 
-	// field storagev1beta1.VolumeAttachmentSource.InlineVolumeSpec
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *v1.PersistentVolumeSpec, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field storagev1beta1.VolumeAttachmentSource.InlineVolumeSpec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.PersistentVolumeSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -286,9 +293,13 @@ func Validate_VolumeAttachmentSource(ctx context.Context, op operation.Operation
 			// call the type's validation function
 			errs = append(errs, corev1.Validate_PersistentVolumeSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("inlineVolumeSpec"), obj.InlineVolumeSpec, safe.Field(oldObj, func(oldObj *storagev1beta1.VolumeAttachmentSource) *v1.PersistentVolumeSpec {
-			return oldObj.InlineVolumeSpec
-		}), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1beta1.VolumeAttachmentSource) *v1.PersistentVolumeSpec {
+				return oldObj.InlineVolumeSpec
+			})
+		errs = append(errs, fn(fldPath.Child("inlineVolumeSpec"), obj.InlineVolumeSpec, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }
@@ -334,19 +345,27 @@ func Validate_VolumeAttachmentSpec(
 		errs = append(errs, fn(fldPath.Child("attacher"), &obj.Attacher, oldVal, oldObj != nil)...)
 	}
 
-	// field storagev1beta1.VolumeAttachmentSpec.Source
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *storagev1beta1.VolumeAttachmentSource, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field storagev1beta1.VolumeAttachmentSpec.Source
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *storagev1beta1.VolumeAttachmentSource,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_VolumeAttachmentSource(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("source"), &obj.Source, safe.Field(oldObj, func(oldObj *storagev1beta1.VolumeAttachmentSpec) *storagev1beta1.VolumeAttachmentSource {
-			return &oldObj.Source
-		}), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *storagev1beta1.VolumeAttachmentSpec) *storagev1beta1.VolumeAttachmentSource {
+				return &oldObj.Source
+			})
+		errs = append(errs, fn(fldPath.Child("source"), &obj.Source, oldVal, oldObj != nil)...)
+	}
 
 	// field storagev1beta1.VolumeAttachmentSpec.NodeName has no validation
 	return errs

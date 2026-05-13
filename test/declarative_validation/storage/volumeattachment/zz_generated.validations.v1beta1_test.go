@@ -38,6 +38,9 @@ func init() {
 				{ErrorType: "FieldValueRequired"},
 				{ErrorType: "FieldValueTooLong", Origin: "maxLength"},
 			},
+			"spec.source.inlineVolumeSpec.volumeMode": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+			},
 		},
 	)
 }

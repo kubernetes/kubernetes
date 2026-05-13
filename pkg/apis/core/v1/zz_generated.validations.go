@@ -41,13 +41,20 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
 	// type PersistentVolume
-	scheme.AddValidationFunc((*corev1.PersistentVolume)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_PersistentVolume(ctx, op, nil /* fldPath */, obj.(*corev1.PersistentVolume), safe.Cast[*corev1.PersistentVolume](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*corev1.PersistentVolume)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/", "/status":
+				return Validate_PersistentVolume(
+					ctx, op, nil, /* fldPath */
+					obj.(*corev1.PersistentVolume),
+					safe.Cast[*corev1.PersistentVolume](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type ReplicationController
 	scheme.AddValidationFunc(
 		(*corev1.ReplicationController)(nil),
@@ -68,21 +75,34 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 
 // Validate_PersistentVolume validates an instance of PersistentVolume according
 // to declarative validation rules in the API schema.
-func Validate_PersistentVolume(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.PersistentVolume) (errs field.ErrorList) {
+func Validate_PersistentVolume(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.PersistentVolume) (errs field.ErrorList) {
+
 	// field corev1.PersistentVolume.TypeMeta has no validation
 	// field corev1.PersistentVolume.ObjectMeta has no validation
 
-	// field corev1.PersistentVolume.Spec
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *corev1.PersistentVolumeSpec, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field corev1.PersistentVolume.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.PersistentVolumeSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_PersistentVolumeSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *corev1.PersistentVolume) *corev1.PersistentVolumeSpec { return &oldObj.Spec }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PersistentVolume) *corev1.PersistentVolumeSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
 
 	// field corev1.PersistentVolume.Status has no validation
 	return errs
@@ -90,7 +110,10 @@ func Validate_PersistentVolume(ctx context.Context, op operation.Operation, fldP
 
 // Validate_PersistentVolumeSpec validates an instance of PersistentVolumeSpec according
 // to declarative validation rules in the API schema.
-func Validate_PersistentVolumeSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *corev1.PersistentVolumeSpec) (errs field.ErrorList) {
+func Validate_PersistentVolumeSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *corev1.PersistentVolumeSpec) (errs field.ErrorList) {
+
 	// field corev1.PersistentVolumeSpec.Capacity has no validation
 	// field corev1.PersistentVolumeSpec.PersistentVolumeSource has no validation
 	// field corev1.PersistentVolumeSpec.AccessModes has no validation
@@ -99,27 +122,37 @@ func Validate_PersistentVolumeSpec(ctx context.Context, op operation.Operation, 
 	// field corev1.PersistentVolumeSpec.StorageClassName has no validation
 	// field corev1.PersistentVolumeSpec.MountOptions has no validation
 
-	// field corev1.PersistentVolumeSpec.VolumeMode
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *corev1.PersistentVolumeMode, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field corev1.PersistentVolumeSpec.VolumeMode
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.PersistentVolumeMode,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("volumeMode"), obj.VolumeMode, safe.Field(oldObj, func(oldObj *corev1.PersistentVolumeSpec) *corev1.PersistentVolumeMode { return oldObj.VolumeMode }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *corev1.PersistentVolumeSpec) *corev1.PersistentVolumeMode {
+				return oldObj.VolumeMode
+			})
+		errs = append(errs, fn(fldPath.Child("volumeMode"), obj.VolumeMode, oldVal, oldObj != nil)...)
+	}
 
 	// field corev1.PersistentVolumeSpec.NodeAffinity has no validation
 	// field corev1.PersistentVolumeSpec.VolumeAttributesClassName has no validation

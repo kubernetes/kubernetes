@@ -25,12 +25,11 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	registry "k8s.io/kubernetes/pkg/registry/core/persistentvolume"
 
 	// ensure types are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
-
-var apiVersions = []string{"v1"}
 
 func TestDeclarativeValidate(t *testing.T) {
 	for _, apiVersion := range apiVersions {
@@ -59,7 +58,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 	}
 	for k, tc := range testCases {
 		t.Run(k, func(t *testing.T) {
-			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, Strategy.Validate, tc.expectedErrs)
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
 }
@@ -73,6 +72,8 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 }
 
 func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
+	blockMode := api.PersistentVolumeBlock
+
 	testCases := map[string]struct {
 		oldObj       api.PersistentVolume
 		updateObj    api.PersistentVolume
@@ -83,11 +84,22 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			updateObj: mkValidPersistentVolume(),
 		},
 		"invalid update volumeMode changed": {
-			oldObj: mkValidPersistentVolume(),
-			updateObj: mkValidPersistentVolume(func(obj *api.PersistentVolume) {
-				mode := api.PersistentVolumeBlock
-				obj.Spec.VolumeMode = &mode
-			}),
+			oldObj:    mkValidPersistentVolume(),
+			updateObj: mkValidPersistentVolume(tweakVolumeMode(&blockMode)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "volumeMode"), nil, "").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		"invalid update volumeMode unset from set": {
+			oldObj:    mkValidPersistentVolume(),
+			updateObj: mkValidPersistentVolume(tweakVolumeMode(nil)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "volumeMode"), nil, "").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		"invalid update volumeMode set from unset": {
+			oldObj:    mkValidPersistentVolume(tweakVolumeMode(nil)),
+			updateObj: mkValidPersistentVolume(),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("spec", "volumeMode"), nil, "").WithOrigin("immutable").MarkAlpha(),
 			},
@@ -105,7 +117,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				IsResourceRequest: true,
 				Verb:              "update",
 			})
-			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, Strategy.ValidateUpdate, tc.expectedErrs)
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, registry.Strategy, tc.expectedErrs)
 		})
 	}
 }
@@ -133,4 +145,10 @@ func mkValidPersistentVolume(tweaks ...func(obj *api.PersistentVolume)) api.Pers
 		tweak(&obj)
 	}
 	return obj
+}
+
+func tweakVolumeMode(mode *api.PersistentVolumeMode) func(obj *api.PersistentVolume) {
+	return func(obj *api.PersistentVolume) {
+		obj.Spec.VolumeMode = mode
+	}
 }
