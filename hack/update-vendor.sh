@@ -343,4 +343,7 @@ if (( "${#loopback_deps[@]}" > 0 )); then
   exit 1
 fi
 
+kube::log::status "vendor: updating prod-dependencies.json" >&11
+GOFLAGS='' hack/analyzedeps/run.sh >"${KUBE_ROOT}"/hack/prod-dependencies.json
+
 kube::log::status "NOTE: don't forget to handle vendor/* and LICENSE/* files that were added or removed" >&11
