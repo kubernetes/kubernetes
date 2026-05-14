@@ -682,9 +682,14 @@ func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, pInfo *framework.Queue
 	}
 	p.unschedulablePods.delete(pInfo.Pod, gatedBefore)
 
+	// Capture PodInfo before activeQ.add makes pInfo accessible to other goroutines.
+	// After activeQ.add releases its lock, another goroutine can Pop this pInfo
+	// and modify its PodInfo field (e.g., in handleSchedulingFailure), racing with
+	// the read below.
+	pi := pInfo.PodInfo
 	p.activeQ.add(logger, pInfo, event)
 	if event == framework.EventUnscheduledPodAdd.Label() || event == framework.EventUnscheduledPodUpdate.Label() {
-		p.nominator.addNominatedPod(logger, pInfo.PodInfo, nil)
+		p.nominator.addNominatedPod(logger, pi, nil)
 	}
 	// Pod successfully moved to activeQ.
 	return true
