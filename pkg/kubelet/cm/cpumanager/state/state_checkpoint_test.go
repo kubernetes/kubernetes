@@ -297,7 +297,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 			},
 		},
 		{
-			"Restore checkpoint from checkpoint with v1 checksum",
+			"Fail to restore checkpoint from checkpoint with v1 checksum",
 			nil,
 			`{
 				"policyName": "none",
@@ -306,13 +306,11 @@ func TestCheckpointStateRestore(t *testing.T) {
 			}`,
 			"none",
 			containermap.ContainerMap{},
-			"",
-			&stateMemory{
-				defaultCPUSet: cpuset.New(1, 2, 3),
-			},
+			"checkpoint is corrupted",
+			nil,
 		},
 		{
-			"Restore checkpoint from v1 (migration)",
+			"Fail to restore checkpoint from v1 (migration)",
 			nil,
 			`{
 				"policyName": "static",
@@ -324,22 +322,9 @@ func TestCheckpointStateRestore(t *testing.T) {
 				"checksum": 2026311253
 			}`,
 			"static",
-			func() containermap.ContainerMap {
-				cm := containermap.NewContainerMap()
-				cm.Add("pod", "container1", "containerID1")
-				cm.Add("pod", "container2", "containerID2")
-				return cm
-			}(),
-			"",
-			&stateMemory{
-				assignments: ContainerCPUAssignments{
-					"pod": map[string]cpuset.CPUSet{
-						"container1": cpuset.New(4, 5, 6),
-						"container2": cpuset.New(1, 2, 3),
-					},
-				},
-				defaultCPUSet: cpuset.New(7, 8, 9),
-			},
+			containermap.ContainerMap{},
+			"cannot unmarshal string into Go struct field CPUManagerCheckpointV2.entries of type map[string]string",
+			nil,
 		},
 		{
 			"Restore checkpoint from v2 (migration)",
