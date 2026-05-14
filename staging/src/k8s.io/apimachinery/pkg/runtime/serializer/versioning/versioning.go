@@ -317,20 +317,17 @@ func (c *codec) encodeStreamingList(list runtime.Object, w io.Writer, streamingL
 		return false, err
 	}
 
-	return streamingListEncoder.EncodeListWithIterator(versionedListHeader, w, func(visit itemVisitor) error {
+	produceVersionedItems := func(visit itemVisitor) error {
 		return meta.EachListItemWithAlloc(list, func(item runtime.Object) error {
-			versionedItem, err := c.convertor.ConvertToVersion(item, c.encodeVersion)
+			versionedItem, err := c.convertListItemToVersion(item)
 			if err != nil {
 				return err
 			}
-			if e, ok := versionedItem.(runtime.NestedObjectEncoder); ok {
-				if err := e.EncodeNestedObjects(runtime.WithVersionEncoder{Version: c.encodeVersion, Encoder: c.encoder, ObjectTyper: c.typer}); err != nil {
-					return err
-				}
-			}
 			return visit(versionedItem)
 		})
-	})
+	}
+
+	return streamingListEncoder.EncodeListWithIterator(versionedListHeader, w, produceVersionedItems)
 }
 
 func (c *codec) convertListHeaderToVersion(list runtime.Object) (runtime.Object, error) {
@@ -339,6 +336,19 @@ func (c *codec) convertListHeaderToVersion(list runtime.Object) (runtime.Object,
 		return nil, err
 	}
 	return c.convertor.ConvertToVersion(emptyList, c.encodeVersion)
+}
+
+func (c *codec) convertListItemToVersion(item runtime.Object) (runtime.Object, error) {
+	versionedItem, err := c.convertor.ConvertToVersion(item, c.encodeVersion)
+	if err != nil {
+		return nil, err
+	}
+	if e, ok := versionedItem.(runtime.NestedObjectEncoder); ok {
+		if err := e.EncodeNestedObjects(runtime.WithVersionEncoder{Version: c.encodeVersion, Encoder: c.encoder, ObjectTyper: c.typer}); err != nil {
+			return nil, err
+		}
+	}
+	return versionedItem, nil
 }
 
 func newEmptyListWithListMeta(list runtime.Object) (runtime.Object, error) {
