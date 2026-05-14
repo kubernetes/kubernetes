@@ -150,6 +150,7 @@ func (sc *stateCheckpoint) loadAndMigrateCheckpointV2() (*MemoryManagerCheckpoin
 
 	// Loaded V1, now migrate to V2.
 	sc.logger.Info("migrating memory manager checkpoint from v1 to v2")
+	checkpointV2 = newMemoryManagerCheckpointV2()
 	sc.migrateV1CheckpointToV2Checkpoint(checkpointV1, checkpointV2)
 
 	return checkpointV2, nil

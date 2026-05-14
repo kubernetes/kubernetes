@@ -354,6 +354,76 @@ func TestCheckpointStateRestore(t *testing.T) {
 	}
 }
 
+func TestCheckpointStateRestoreClearsCorruptV2PodEntriesBeforeV1Migration(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResources, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodLevelResourceManagers, true)
+
+	testingDir, err := os.MkdirTemp("", "memorymanager_state_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(testingDir)
+
+	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
+	require.NoError(t, err)
+
+	checkpointV1 := &MemoryManagerCheckpointV1{
+		PolicyName: "static",
+		MachineState: NUMANodeMap{
+			0: &NUMANodeState{
+				MemoryMap: map[v1.ResourceName]*MemoryTable{
+					v1.ResourceMemory: {
+						Allocatable:    1536,
+						Free:           1024,
+						Reserved:       512,
+						SystemReserved: 512,
+						TotalMemSize:   2048,
+					},
+				},
+			},
+		},
+		Entries: ContainerMemoryAssignments{
+			"pod": map[string][]Block{
+				"container1": {
+					{
+						NUMAAffinity: []int{0},
+						Type:         v1.ResourceMemory,
+						Size:         512,
+					},
+				},
+			},
+		},
+	}
+	data, err := checkpointV1.MarshalCheckpoint()
+	require.NoError(t, err)
+
+	var content map[string]any
+	require.NoError(t, json.Unmarshal(data, &content))
+	content["podEntries"] = map[string]any{
+		"stale-pod": map[string]any{
+			"memoryBlocks": []any{
+				map[string]any{
+					"numaAffinity": []any{1},
+					"type":         string(v1.ResourceMemory),
+					"size":         1024,
+				},
+			},
+		},
+	}
+	data, err = json.Marshal(content)
+	require.NoError(t, err)
+
+	checkpoint := &testutil.MockCheckpoint{Content: string(data)}
+	require.NoError(t, cpm.CreateCheckpoint(testingCheckpoint, checkpoint))
+
+	restoredState, err := NewCheckpointState(logger, testingDir, testingCheckpoint, "static")
+	require.NoError(t, err)
+
+	require.Len(t, restoredState.GetMachineState(), 1)
+	assert.Equal(t, checkpointV1.MachineState[0].MemoryMap, restoredState.GetMachineState()[0].MemoryMap)
+	assert.Equal(t, checkpointV1.Entries, restoredState.GetMemoryAssignments())
+	assert.Empty(t, restoredState.GetPodMemoryAssignments())
+}
+
 func TestCheckpointStateStore(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
 	expectedState := &stateMemory{
