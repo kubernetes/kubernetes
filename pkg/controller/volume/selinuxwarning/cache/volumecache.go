@@ -212,6 +212,25 @@ func (c *volumeCache) DeletePod(logger klog.Logger, podKey cache.ObjectName) {
 	defer c.mutex.Unlock()
 	defer c.dump(logger)
 
+	for volumeName := range c.podToVolumes[podKey] {
+		conflicts, found := c.conflicts[volumeName]
+		if !found {
+			continue
+		}
+		updated := make([]Conflict, 0, len(conflicts))
+		for _, existing := range conflicts {
+			// preserve other conflicts belonging to volume
+			if existing.Pod != podKey && existing.OtherPod != podKey {
+				updated = append(updated, existing)
+			}
+		}
+		if len(updated) == 0 {
+			delete(c.conflicts, volumeName)
+		} else {
+			c.conflicts[volumeName] = updated
+		}
+	}
+
 	// Use reverse index to only iterate through volumes this pod actually uses.
 	for volumeName := range c.podToVolumes[podKey] {
 		volume, found := c.volumes[volumeName]
@@ -224,21 +243,6 @@ func (c *volumeCache) DeletePod(logger klog.Logger, podKey cache.ObjectName) {
 		}
 	}
 	delete(c.podToVolumes, podKey)
-
-	// Remove cached conflicts involving the deleted pod
-	for volName, volConflicts := range c.conflicts {
-		updated := make([]Conflict, 0, len(volConflicts))
-		for _, existing := range volConflicts {
-			if existing.Pod != podKey && existing.OtherPod != podKey {
-				updated = append(updated, existing)
-			}
-		}
-		if len(updated) == 0 {
-			delete(c.conflicts, volName)
-		} else {
-			c.conflicts[volName] = updated
-		}
-	}
 }
 
 // registerPodVolume adds volumeName to the pod volume index.
