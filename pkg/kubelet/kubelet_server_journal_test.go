@@ -275,6 +275,12 @@ func Test_nodeLogQuery_validate(t *testing.T) {
 		{name: "two files", Files: []string{file1, file2}, wantErr: true},
 		{name: "one file options", Files: []string{file1}, options: options{Pattern: pattern}, wantErr: true},
 		{name: "invalid pattern", Services: []string{service1}, options: options{Pattern: invalid}, wantErr: true},
+		{
+			name:     "pattern length exceeds cap",
+			Services: []string{service1},
+			options:  options{Pattern: strings.Repeat("a", maxPatternLength+1)},
+			wantErr:  true,
+		},
 		{name: "since", Services: []string{service1}, options: options{SinceTime: &since}},
 		{name: "until", Services: []string{service1}, options: options{UntilTime: &until}},
 		{name: "since until", Services: []string{service1}, options: options{SinceTime: &until, UntilTime: &since},

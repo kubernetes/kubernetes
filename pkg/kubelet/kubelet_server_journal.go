@@ -42,6 +42,7 @@ const (
 	dateLayout       = "2006-1-2 15:4:5"
 	maxTailLines     = 100000
 	maxServiceLength = 256
+	maxPatternLength = 256
 	maxServices      = 4
 	nodeLogDir       = "/var/log/"
 )
@@ -263,8 +264,13 @@ func (n *nodeLogQuery) validate() field.ErrorList {
 		}
 	}
 
-	if _, err := syntax.Parse(n.Pattern, syntax.Perl); err != nil {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("pattern"), n.Pattern, err.Error()))
+	if n.Pattern != "" {
+		if len(n.Pattern) > maxPatternLength {
+			allErrs = append(allErrs, field.TooLong(field.NewPath("pattern"), "", maxPatternLength))
+		}
+		if _, err := syntax.Parse(n.Pattern, syntax.Perl); err != nil {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("pattern"), n.Pattern, err.Error()))
+		}
 	}
 
 	return allErrs
