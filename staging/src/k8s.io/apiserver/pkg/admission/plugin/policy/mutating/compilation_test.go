@@ -352,8 +352,8 @@ func TestCompilation(t *testing.T) {
 				vAttrs := &admission.VersionedAttributes{
 					Attributes:         attrs,
 					VersionedKind:      gvk,
-					VersionedObject:    obj,
-					VersionedOldObject: tc.oldObject,
+					VersionedObject:    admission.NewLazyObject(obj),
+					VersionedOldObject: admission.NewLazyObject(tc.oldObject),
 				}
 				r := patch.Request{
 					MatchedResource:     tc.gvr,

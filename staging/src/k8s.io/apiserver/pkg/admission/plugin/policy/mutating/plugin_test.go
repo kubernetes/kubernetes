@@ -337,7 +337,7 @@ type annotationPatcher struct {
 }
 
 func (ap annotationPatcher) Patch(ctx context.Context, request patch.Request, runtimeCELCostBudget int64) (runtime.Object, error) {
-	obj := request.VersionedAttributes.VersionedObject.DeepCopyObject()
+	obj := request.VersionedAttributes.VersionedObject.Object().DeepCopyObject()
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, err
@@ -351,5 +351,5 @@ type smdPatcher struct {
 }
 
 func (sp smdPatcher) Patch(ctx context.Context, request patch.Request, runtimeCELCostBudget int64) (runtime.Object, error) {
-	return patch.ApplyStructuredMergeDiff(request.TypeConverter, request.VersionedAttributes.VersionedObject, sp.patch)
+	return patch.ApplyStructuredMergeDiff(request.TypeConverter, request.VersionedAttributes.VersionedObject.Object(), sp.patch)
 }
