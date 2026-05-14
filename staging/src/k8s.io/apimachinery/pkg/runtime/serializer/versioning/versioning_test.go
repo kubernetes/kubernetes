@@ -17,14 +17,18 @@ limitations under the License.
 package versioning
 
 import (
+	"bytes"
+	stdjson "encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"reflect"
 	"testing"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	jsonserializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
 	"k8s.io/apimachinery/pkg/util/diff"
 )
@@ -391,6 +395,151 @@ func TestCacheableObject(t *testing.T) {
 	runtimetesting.CacheableObjectTest(t, encoder)
 }
 
+func TestEncodeStreamingListConvertsItemsIndividually(t *testing.T) {
+	var remainingItemCount int64 = 7
+	internalList := &testInternalList{
+		ListMeta: metav1.ListMeta{
+			ResourceVersion:    "123",
+			Continue:           "next-token",
+			RemainingItemCount: &remainingItemCount,
+		},
+		Items: []testInternalItem{
+			{Name: "pod-a"},
+			{Name: "pod-b"},
+		},
+	}
+	serializer := &mockStreamingListSerializer{handled: true}
+	convertor := &countingListConvertor{}
+	typer := &mockTyper{gvks: []schema.GroupVersionKind{{Version: runtime.APIVersionInternal, Kind: "TestItemList"}}}
+
+	codec := NewCodec(serializer, nil, convertor, nil, typer, nil, schema.GroupVersion{Version: "v1"}, nil, "TestEncodeStreamingListConvertsItemsIndividually")
+	if err := codec.Encode(internalList, ioutil.Discard); err != nil {
+		t.Fatalf("unexpected encode error: %v", err)
+	}
+
+	if convertor.listWithItemsConversions != 0 {
+		t.Fatalf("unexpected full-list conversions with items: %d", convertor.listWithItemsConversions)
+	}
+	if convertor.emptyListConversions != 1 {
+		t.Fatalf("expected one empty-list conversion, got %d", convertor.emptyListConversions)
+	}
+	if convertor.itemConversions != len(internalList.Items) {
+		t.Fatalf("expected %d item conversions, got %d", len(internalList.Items), convertor.itemConversions)
+	}
+	if serializer.encodeCalled {
+		t.Fatalf("expected streaming list path, fallback encoder was used")
+	}
+	if serializer.versionedList == nil {
+		t.Fatalf("expected versioned list header to be passed to streaming serializer")
+	}
+	if got := serializer.versionedList.GetObjectKind().GroupVersionKind(); got != (schema.GroupVersionKind{Version: "v1", Kind: "TestItemList"}) {
+		t.Fatalf("unexpected versioned list GVK: %#v", got)
+	}
+	if len(serializer.items) != len(internalList.Items) {
+		t.Fatalf("expected %d streamed items, got %d", len(internalList.Items), len(serializer.items))
+	}
+	for i, item := range serializer.items {
+		gvk := item.GetObjectKind().GroupVersionKind()
+		if gvk != (schema.GroupVersionKind{Version: "v1", Kind: "TestItem"}) {
+			t.Fatalf("unexpected item %d GVK: %#v", i, gvk)
+		}
+	}
+}
+
+func TestEncodeStreamingListFallsBackToFullListConversion(t *testing.T) {
+	internalList := &testInternalList{
+		ListMeta: metav1.ListMeta{ResourceVersion: "123"},
+		Items: []testInternalItem{
+			{Name: "pod-a"},
+			{Name: "pod-b"},
+		},
+	}
+	serializer := &mockStreamingListSerializer{handled: false}
+	convertor := &countingListConvertor{}
+	typer := &mockTyper{gvks: []schema.GroupVersionKind{{Version: runtime.APIVersionInternal, Kind: "TestItemList"}}}
+
+	codec := NewCodec(serializer, nil, convertor, nil, typer, nil, schema.GroupVersion{Version: "v1"}, nil, "TestEncodeStreamingListFallsBackToFullListConversion")
+	if err := codec.Encode(internalList, ioutil.Discard); err != nil {
+		t.Fatalf("unexpected encode error: %v", err)
+	}
+
+	if convertor.listWithItemsConversions != 1 {
+		t.Fatalf("expected one full-list conversion fallback, got %d", convertor.listWithItemsConversions)
+	}
+	if !serializer.encodeCalled {
+		t.Fatalf("expected fallback encoder to be used")
+	}
+}
+
+func TestEncodeStreamingListMatchesFullListConversionJSON(t *testing.T) {
+	var remainingItemCount int64 = 7
+	internalList := &testInternalList{
+		ListMeta: metav1.ListMeta{
+			ResourceVersion:    "123",
+			Continue:           "next-token",
+			RemainingItemCount: &remainingItemCount,
+		},
+		Items: []testInternalItem{
+			{Name: "pod-a"},
+			{Name: "pod-b"},
+		},
+	}
+
+	convertor := &countingListConvertor{}
+	typer := &mockTyper{gvks: []schema.GroupVersionKind{{Version: runtime.APIVersionInternal, Kind: "TestItemList"}}}
+
+	jsonEncoder := jsonserializer.NewSerializerWithOptions(
+		jsonserializer.DefaultMetaFactory,
+		nil,
+		nil,
+		jsonserializer.SerializerOptions{StreamingCollectionsEncoding: true},
+	)
+
+	codecOld := NewCodec(
+		encoderWithoutStreamingList{Encoder: jsonEncoder},
+		nil,
+		convertor,
+		nil,
+		typer,
+		nil,
+		schema.GroupVersion{Version: "v1"},
+		nil,
+		"TestEncodeStreamingListMatchesFullListConversionJSON",
+	)
+	codecNew := NewCodec(
+		jsonEncoder,
+		nil,
+		convertor,
+		nil,
+		typer,
+		nil,
+		schema.GroupVersion{Version: "v1"},
+		nil,
+		"TestEncodeStreamingListMatchesFullListConversionJSON",
+	)
+
+	var oldBuf, newBuf bytes.Buffer
+	if err := codecOld.Encode(internalList, &oldBuf); err != nil {
+		t.Fatalf("unexpected old-path encode error: %v", err)
+	}
+	if err := codecNew.Encode(internalList, &newBuf); err != nil {
+		t.Fatalf("unexpected new-path encode error: %v", err)
+	}
+
+	var oldDecoded any
+	var newDecoded any
+	if err := stdjson.Unmarshal(oldBuf.Bytes(), &oldDecoded); err != nil {
+		t.Fatalf("failed to decode old-path JSON: %v", err)
+	}
+	if err := stdjson.Unmarshal(newBuf.Bytes(), &newDecoded); err != nil {
+		t.Fatalf("failed to decode new-path JSON: %v", err)
+	}
+
+	if !reflect.DeepEqual(oldDecoded, newDecoded) {
+		t.Fatalf("decoded JSON differs between old and new paths:\n%s", diff.Diff(oldDecoded, newDecoded))
+	}
+}
+
 func BenchmarkIdentifier(b *testing.B) {
 	encoder := &mockSerializer{}
 	gv := schema.GroupVersion{Group: "group", Version: "version"}
@@ -402,4 +551,134 @@ func BenchmarkIdentifier(b *testing.B) {
 			b.Errorf("unexpected identifier: %s", id)
 		}
 	}
+}
+
+type testInternalItem struct {
+	metav1.TypeMeta `json:",inline"`
+	Name            string `json:"name,omitempty"`
+}
+
+func (i *testInternalItem) DeepCopyObject() runtime.Object {
+	copy := *i
+	return &copy
+}
+
+type testExternalItem struct {
+	metav1.TypeMeta `json:",inline"`
+	Name            string `json:"name,omitempty"`
+}
+
+func (i *testExternalItem) DeepCopyObject() runtime.Object {
+	copy := *i
+	return &copy
+}
+
+type testInternalList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []testInternalItem `json:"items"`
+}
+
+func (l *testInternalList) DeepCopyObject() runtime.Object {
+	copy := *l
+	if l.Items != nil {
+		copy.Items = append([]testInternalItem(nil), l.Items...)
+	}
+	return &copy
+}
+
+type testExternalList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []testExternalItem `json:"items"`
+}
+
+func (l *testExternalList) DeepCopyObject() runtime.Object {
+	copy := *l
+	if l.Items != nil {
+		copy.Items = append([]testExternalItem(nil), l.Items...)
+	}
+	return &copy
+}
+
+type countingListConvertor struct {
+	itemConversions          int
+	emptyListConversions     int
+	listWithItemsConversions int
+}
+
+func (c *countingListConvertor) Convert(in, out, context interface{}) error {
+	return fmt.Errorf("Convert is not implemented")
+}
+
+func (c *countingListConvertor) ConvertToVersion(in runtime.Object, gv runtime.GroupVersioner) (runtime.Object, error) {
+	switch obj := in.(type) {
+	case *testInternalItem:
+		c.itemConversions++
+		out := &testExternalItem{
+			TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "TestItem"},
+			Name:     obj.Name,
+		}
+		out.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{Version: "v1", Kind: "TestItem"})
+		return out, nil
+	case *testInternalList:
+		out := &testExternalList{
+			TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "TestItemList"},
+			ListMeta: obj.ListMeta,
+		}
+		out.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{Version: "v1", Kind: "TestItemList"})
+		if len(obj.Items) == 0 {
+			c.emptyListConversions++
+			return out, nil
+		}
+		c.listWithItemsConversions++
+		out.Items = make([]testExternalItem, len(obj.Items))
+		for i := range obj.Items {
+			out.Items[i] = testExternalItem{
+				TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "TestItem"},
+				Name:     obj.Items[i].Name,
+			}
+		}
+		return out, nil
+	default:
+		return nil, fmt.Errorf("unexpected object type %T", in)
+	}
+}
+
+func (c *countingListConvertor) ConvertFieldLabel(gvk schema.GroupVersionKind, label, value string) (string, string, error) {
+	return label, value, nil
+}
+
+type encoderWithoutStreamingList struct {
+	runtime.Encoder
+}
+
+type mockStreamingListSerializer struct {
+	handled       bool
+	encodeCalled  bool
+	versionedList runtime.Object
+	items         []runtime.Object
+	obj           runtime.Object
+}
+
+func (s *mockStreamingListSerializer) Encode(obj runtime.Object, w io.Writer) error {
+	s.encodeCalled = true
+	s.obj = obj
+	return nil
+}
+
+func (s *mockStreamingListSerializer) EncodeListWithIterator(list runtime.Object, w io.Writer, iter itemIterator) (bool, error) {
+	s.versionedList = list
+	if !s.handled {
+		return false, nil
+	}
+	s.items = s.items[:0]
+	return true, iter(func(obj runtime.Object) error {
+		s.items = append(s.items, obj)
+		return nil
+	})
+}
+
+func (s *mockStreamingListSerializer) Identifier() runtime.Identifier {
+	return runtime.Identifier("mock-streaming-list")
 }
