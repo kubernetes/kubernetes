@@ -33,10 +33,11 @@ type StripedLockSet struct {
 // The size will be normalized to stay in the <1, 31> interval.
 func NewStripedLockSet(size int32) *StripedLockSet {
 	size = max(size, 1) // make sure we're at least at size 1
+	actualSize := min(31, size)
 
 	return &StripedLockSet{
-		locks: make([]sync.Mutex, min(31, size)),
-		size:  size,
+		locks: make([]sync.Mutex, actualSize),
+		size:  actualSize,
 	}
 }
 
