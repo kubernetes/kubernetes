@@ -18,6 +18,7 @@ package cache
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -83,6 +84,29 @@ func Test_MarkVolumeAsAttached_Positive_NewVolume(t *testing.T) {
 	verifyVolumeExistsAsw(t, generatedVolumeName, true /* shouldExist */, asw)
 	verifyVolumeExistsInUnmountedVolumes(t, generatedVolumeName, asw)
 	verifyVolumeDoesntExistInGloballyMountedVolumes(t, generatedVolumeName, asw)
+}
+
+// Calls MarkVolumeAsAttached() with a nil volume spec.
+// Verifies it returns an error and leaves the actual state unchanged.
+func Test_MarkVolumeAsAttached_Negative_NilVolumeSpec(t *testing.T) {
+	// Arrange
+	volumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
+	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
+
+	// Act
+	logger, _ := ktesting.NewTestContext(t)
+	err := asw.MarkVolumeAsAttached(logger, emptyVolumeName, nil, "" /* nodeName */, "" /* devicePath */)
+
+	// Assert
+	if err == nil {
+		t.Fatal("MarkVolumeAsAttached did not fail. Expected error for nil volume spec, got nil")
+	}
+	if !strings.Contains(err.Error(), "volume spec is nil") {
+		t.Fatalf("MarkVolumeAsAttached returned unexpected error. Expected to contain %q, got %q", "volume spec is nil", err.Error())
+	}
+	if attachedVolumes := asw.GetAttachedVolumes(); len(attachedVolumes) != 0 {
+		t.Fatalf("MarkVolumeAsAttached mutated actual state. Expected no attached volumes, got %v", attachedVolumes)
+	}
 }
 
 // Calls MarkVolumeAsAttached() once to add volume, specifying a name --
