@@ -1991,6 +1991,7 @@
   labels:
   - group
   - resource
+  - storage
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
@@ -2000,7 +2001,9 @@
   stabilityLevel: ALPHA
   labels:
   - group
+  - index
   - resource
+  - storage
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
@@ -2011,6 +2014,7 @@
   labels:
   - group
   - resource
+  - storage
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
@@ -2020,7 +2024,9 @@
   stabilityLevel: ALPHA
   labels:
   - group
+  - index
   - resource
+  - storage
   componentEndpoints:
   - component: kube-apiserver
     endpoint: /metrics
@@ -2176,6 +2182,44 @@
   subsystem: watch_cache
   namespace: apiserver
   help: Counter of events received in watch cache broken by resource type.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: initialization_duration_seconds
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Histogram of watch cache initialization duration in seconds, broken by resource
+    type.
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
+  buckets:
+  - 0.05
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 5
+  - 10
+  - 30
+  - 60
+  - 180
+  - 600
+  componentEndpoints:
+  - component: kube-apiserver
+    endpoint: /metrics
+- name: initialization_errors_total
+  subsystem: watch_cache
+  namespace: apiserver
+  help: Counter of watch cache initialization errors broken by resource type.
   type: Counter
   stabilityLevel: ALPHA
   labels:
@@ -2696,6 +2740,33 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: dynamic_resource_allocation_resource_claims
+  help: Number of ResourceClaims, categorized by allocation status, admin access,
+    and source. Source can be 'resource_claim_template' (created from a template),
+    'extended_resource' (extended resources), or empty (manually created by a user).
+  type: Custom
+  stabilityLevel: ALPHA
+  labels:
+  - allocated
+  - admin_access
+  - source
+  componentEndpoints:
+  - component: kube-controller-manager
+    endpoint: /metrics
+- name: resourceclaim_creates_total
+  subsystem: dynamic_resource_allocation
+  help: Number of ResourceClaims creation requests, categorized by creation status
+    and admin access
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - admin_access
+  - status
+  componentEndpoints:
+  - component: kube-controller-manager
+    endpoint: /metrics
+  - component: kube-scheduler
+    endpoint: /metrics
 - name: changes
   subsystem: endpoint_slice_controller
   help: Number of EndpointSlice changes
@@ -3072,6 +3143,17 @@
   help: Current number of controlled HPA objects.
   type: Gauge
   stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kube-controller-manager
+    endpoint: /metrics
+- name: stale_sync_skips_total
+  subsystem: horizontal_pod_autoscaler_controller
+  help: Total number of HPA syncs skipped due to a stale watch cache.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - group
+  - resource
   componentEndpoints:
   - component: kube-controller-manager
     endpoint: /metrics
@@ -5595,9 +5677,8 @@
   subsystem: replicaset_controller
   help: The ratio of chosen deleted pod's ages to the current youngest pod's age (at
     the time). Should be <2. The intent of this metric is to measure the rough efficacy
-    of the LogarithmicScaleDown feature gate's effect on the sorting (and deletion)
-    of pods when a replicaset scales down. This only considers Ready pods when calculating
-    and reporting.
+    of the sorting (and deletion) of pods when a replicaset scales down. This only
+    considers Ready pods when calculating and reporting.
   type: Histogram
   stabilityLevel: ALPHA
   buckets:
@@ -5650,31 +5731,6 @@
   - resource_name
   componentEndpoints:
   - component: kubelet
-    endpoint: /metrics
-- name: creates_total
-  subsystem: resourceclaim_controller
-  help: Number of ResourceClaims creation requests, categorized by creation status
-    and admin access
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - admin_access
-  - status
-  componentEndpoints:
-  - component: kube-controller-manager
-    endpoint: /metrics
-- name: resourceclaim_controller_resource_claims
-  help: Number of ResourceClaims, categorized by allocation status, admin access,
-    and source. Source can be 'resource_claim_template' (created from a template),
-    'extended_resource' (extended resources), or empty (manually created by a user).
-  type: Custom
-  stabilityLevel: ALPHA
-  labels:
-  - allocated
-  - admin_access
-  - source
-  componentEndpoints:
-  - component: kube-controller-manager
     endpoint: /metrics
 - name: request_processing_duration_seconds
   subsystem: resourcepoolstatusrequest_controller
@@ -6538,16 +6594,6 @@
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
-- name: resourceclaim_creates_total
-  subsystem: scheduler
-  help: Number of ResourceClaims creation requests within scheduler
-  type: Counter
-  stabilityLevel: ALPHA
-  labels:
-  - status
-  componentEndpoints:
-  - component: kube-scheduler
-    endpoint: /metrics
 - name: scheduling_algorithm_duration_seconds
   subsystem: scheduler
   help: Scheduling algorithm latency in seconds
@@ -6798,32 +6844,6 @@
   componentEndpoints:
   - component: kube-controller-manager
     endpoint: /metrics
-- name: storage_operation_duration_seconds
-  help: Storage operation duration
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - migrated
-  - operation_name
-  - status
-  - volume_plugin
-  buckets:
-  - 0.1
-  - 0.25
-  - 0.5
-  - 1
-  - 2.5
-  - 5
-  - 10
-  - 15
-  - 25
-  - 50
-  - 120
-  - 300
-  - 600
-  componentEndpoints:
-  - component: kubelet
-    endpoint: /metrics
 - name: pod_deletion_duration_seconds
   subsystem: taint_eviction_controller
   help: Latency, in seconds, between the time when a taint effect has been activated
@@ -7011,30 +7031,6 @@
   - plugin_name
   componentEndpoints:
   - component: kube-controller-manager
-    endpoint: /metrics
-- name: volume_operation_total_seconds
-  help: Storage operation end to end duration in seconds
-  type: Histogram
-  stabilityLevel: ALPHA
-  labels:
-  - operation_name
-  - plugin_name
-  buckets:
-  - 0.1
-  - 0.25
-  - 0.5
-  - 1
-  - 2.5
-  - 5
-  - 10
-  - 15
-  - 25
-  - 50
-  - 120
-  - 300
-  - 600
-  componentEndpoints:
-  - component: kubelet
     endpoint: /metrics
 - name: capacity
   subsystem: watch_cache
@@ -7797,6 +7793,56 @@
   - profile
   componentEndpoints:
   - component: kube-scheduler
+    endpoint: /metrics
+- name: storage_operation_duration_seconds
+  help: Storage operation duration
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - migrated
+  - operation_name
+  - status
+  - volume_plugin
+  buckets:
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 5
+  - 10
+  - 15
+  - 25
+  - 50
+  - 120
+  - 300
+  - 600
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
+- name: volume_operation_total_seconds
+  help: Storage operation end to end duration in seconds
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - operation_name
+  - plugin_name
+  buckets:
+  - 0.1
+  - 0.25
+  - 0.5
+  - 1
+  - 2.5
+  - 5
+  - 10
+  - 15
+  - 25
+  - 50
+  - 120
+  - 300
+  - 600
+  componentEndpoints:
+  - component: kubelet
     endpoint: /metrics
 - name: adds_total
   subsystem: workqueue
