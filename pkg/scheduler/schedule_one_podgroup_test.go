@@ -444,10 +444,10 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 			expectedPodGroupPostFilterCalled: false,
 		},
 		{
-			name:                             "disables pod group post filter when DefaultPreemption is not registered",
+			name:                             "runs pod group post filter when a custom PodGroupPostFilter plugin is registered",
 			wapFeatureGateEnabled:            true,
 			postFilterPlugin:                 "FakePodGroupPlugin",
-			expectedPodGroupPostFilterCalled: false,
+			expectedPodGroupPostFilterCalled: true,
 		},
 	}
 
