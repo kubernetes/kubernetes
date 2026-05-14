@@ -34,7 +34,7 @@ var (
 	listTotal = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Subsystem:      subsystem,
-			Name:           "storage_list_requests_total",
+			Name:           "storage_list_total",
 			Help:           "Number of LIST requests served from storage partitioned by backend and index.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
