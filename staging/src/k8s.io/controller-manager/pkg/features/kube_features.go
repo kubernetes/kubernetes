@@ -43,7 +43,7 @@ const (
 
 	// owner: @jefftree, @tchap
 	//
-	// Make kube-controller-manager release leader election lock on exit.
+	// Make kube-controller-manager and cloud-controller-manager release leader election lock on exit.
 	ControllerManagerReleaseLeaderElectionLockOnExit featuregate.Feature = "ControllerManagerReleaseLeaderElectionLockOnExit"
 )
 
