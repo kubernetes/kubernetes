@@ -29,6 +29,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	resourceapi "k8s.io/api/resource/v1"
+	"k8s.io/api/scheduling/v1alpha2"
 	schedulingapiv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -343,6 +344,20 @@ func PodsCleanedUp(ctx context.Context, c clientset.Interface, namespace string)
 	}
 }
 
+// PodGroupDeleted returns true if a pod group is not found in the given namespace.
+func PodGroupDeleted(ctx context.Context, cs clientset.Interface, podNamespace, podName string) wait.ConditionWithContextFunc {
+	return func(context.Context) (bool, error) {
+		_, err := cs.SchedulingV1alpha2().PodGroups(podNamespace).Get(ctx, podName, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, err
+		}
+		return false, nil
+	}
+}
+
 // SyncSchedulerInformerFactory starts informer and waits for caches to be synced
 func SyncSchedulerInformerFactory(testCtx *TestContext) {
 	testCtx.InformerFactory.Start(testCtx.SchedulerCtx.Done())
@@ -410,6 +425,30 @@ func CleanupPods(ctx context.Context, cs clientset.Interface, t *testing.T, pods
 		if err := wait.PollUntilContextTimeout(ctx, time.Duration(time.Microsecond.Seconds()), wait.ForeverTestTimeout, true,
 			PodDeleted(ctx, cs, p.Namespace, p.Name)); err != nil {
 			t.Errorf("error while waiting for pod  %v/%v to get deleted: %v", p.Namespace, p.Name, err)
+		}
+	}
+}
+
+func CleanupPodGroups(ctx context.Context, cs clientset.Interface, t *testing.T, podGroups ...*v1alpha2.PodGroup) {
+	for _, pg := range podGroups {
+		// Remove finalizers to avoid getting stuck in deletion if GC is not running.
+		// Note: GC is not running because we don't start controller-manager in integration tests.
+		if pg, err := cs.SchedulingV1alpha2().PodGroups(pg.Namespace).Get(ctx, pg.Name, metav1.GetOptions{}); err == nil {
+			if len(pg.Finalizers) > 0 {
+				pg.Finalizers = nil
+				if _, err := cs.SchedulingV1alpha2().PodGroups(pg.Namespace).Update(ctx, pg, metav1.UpdateOptions{}); err != nil {
+					t.Errorf("error while removing finalizers from pod group %v/%v: %v", pg.Namespace, pg.Name, err)
+				}
+			}
+		}
+		if err := cs.SchedulingV1alpha2().PodGroups(pg.Namespace).Delete(ctx, pg.Name, metav1.DeleteOptions{}); err != nil {
+			t.Errorf("error while deleting pod group %v/%v: %v", pg.Namespace, pg.Name, err)
+		}
+	}
+	for _, pg := range podGroups {
+		if err := wait.PollUntilContextTimeout(ctx, time.Duration(time.Microsecond.Seconds()), wait.ForeverTestTimeout, true,
+			PodGroupDeleted(ctx, cs, pg.Namespace, pg.Name)); err != nil {
+			t.Errorf("error while waiting for pod group  %v/%v to get deleted: %v", pg.Namespace, pg.Name, err)
 		}
 	}
 }
@@ -730,7 +769,7 @@ func InitTestDisablePreemption(t *testing.T, nsPrefix string) *TestContext {
 		Profiles: []kubeschedulerconfigv1.KubeSchedulerProfile{{
 			SchedulerName: ptr.To(v1.DefaultSchedulerName),
 			Plugins: &kubeschedulerconfigv1.Plugins{
-				PostFilter: kubeschedulerconfigv1.PluginSet{
+				MultiPoint: kubeschedulerconfigv1.PluginSet{
 					Disabled: []kubeschedulerconfigv1.Plugin{
 						{Name: defaultpreemption.Name},
 					},
@@ -830,6 +869,7 @@ type PausePodConfig struct {
 	Tolerations                       []v1.Toleration
 	NodeName                          string
 	SchedulerName                     string
+	PodGroupName                      string
 	Priority                          *int32
 	PreemptionPolicy                  *v1.PreemptionPolicy
 	PriorityClassName                 string
@@ -890,6 +930,9 @@ func InitPausePod(conf *PausePodConfig) *v1.Pod {
 				Ports: conf.NonRestartableInitContainerPorts,
 			},
 		}
+	}
+	if conf.PodGroupName != "" {
+		pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{PodGroupName: ptr.To(conf.PodGroupName)}
 	}
 	return pod
 }
