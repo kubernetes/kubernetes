@@ -410,6 +410,12 @@ const (
 	// Enables support of HPA scaling to zero pods when an object or custom metric is configured.
 	HPAScaleToZero featuregate.Feature = "HPAScaleToZero"
 
+	// owner: @aleoli
+	// kep: https://kep.k8s.io/6075
+	//
+	// Allow FQDN with trailing dot in HostAliases
+	HostAliasesAllowFQDN featuregate.Feature = "HostAliasesAllowFQDN"
+
 	// owner: @HirazawaUi
 	// kep: https://kep.k8s.io/4762
 	//
@@ -1440,6 +1446,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.16"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
+	HostAliasesAllowFQDN: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	HostnameOverride: {
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
@@ -2337,6 +2347,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	HPAGeneration: {},
 
 	HPAScaleToZero: {},
+
+	HostAliasesAllowFQDN: {},
 
 	HostnameOverride: {},
 
