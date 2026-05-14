@@ -1037,6 +1037,12 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 			postFilterPlugin:                 "FakePodGroupPlugin",
 			expectedPodGroupPostFilterCalled: false,
 		},
+		{
+			name:                             "runs pod group post filter when a custom PodGroupPostFilter plugin is registered",
+			genericWorkloadEnabled:           true,
+			postFilterPlugin:                 "FakePodGroupPlugin",
+			expectedPodGroupPostFilterCalled: true,
+		},
 	}
 
 	for _, tt := range tests {
