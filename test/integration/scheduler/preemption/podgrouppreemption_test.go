@@ -1613,3 +1613,109 @@ func TestDisablePodGroupPreemption(t *testing.T) {
 		}
 	}
 }
+
+// TestPodGroupPreemptionRespectsWaitingPod tests that preemption respects pods that are waiting in the Permit phase
+// (WaitOnPermit), which naturally occurs when using PodGroups and Coscheduling.
+func TestPodGroupPreemptionRespectsWaitingPod(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.GenericWorkload:         true,
+		features.GangScheduling:          true,
+		features.WorkloadAwarePreemption: true,
+	})
+
+	testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-waiting-preemption",
+		scheduler.WithPodMaxBackoffSeconds(0),
+		scheduler.WithPodInitialBackoffSeconds(0))
+	cs, ns := testCtx.ClientSet, testCtx.NS.Name
+
+	// 1. Create a node with resources for only one pod.
+	nodeRes := map[v1.ResourceName]string{
+		v1.ResourceCPU:    "2",
+		v1.ResourceMemory: "2Gi",
+	}
+	node := st.MakeNode().Name("big-node").Capacity(nodeRes).Obj()
+	if _, err := cs.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Error creating node: %v", err)
+	}
+
+	// 2. Create a PodGroup with minMember: 2.
+	pg := st.MakePodGroup().Name("pg1").Namespace(ns).Priority(10).MinCount(2).Obj()
+	if _, err := cs.SchedulingV1alpha2().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+		t.Fatalf("Failed to create PodGroup %s: %v", pg.Name, err)
+	}
+
+	// 3. Create TWO low-priority pods for that PodGroup.
+	// One will fit on big-node.
+	// The other will not fit anywhere, leaving the first stuck in WaitOnPermit.
+	victim1 := st.MakePod().Name("victim-1").Namespace(ns).Priority(10).PodGroupName("pg1").
+		Req(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "1Gi"}).
+		ZeroTerminationGracePeriod().Obj()
+	victim2 := st.MakePod().Name("victim-2").Namespace(ns).Priority(10).PodGroupName("pg1").
+		Req(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "1Gi"}).
+		ZeroTerminationGracePeriod().Obj()
+
+	// 4. Create a high-priority preemptor Pod that requires the resources.
+	preemptor := st.MakePod().Name("preemptor").Namespace(ns).Priority(100).
+		Req(map[v1.ResourceName]string{v1.ResourceCPU: "2", v1.ResourceMemory: "1.5Gi"}).
+		ZeroTerminationGracePeriod().Obj()
+
+	t.Logf("Creating victim pods")
+	var err error
+	_, err = cs.CoreV1().Pods(ns).Create(testCtx.Ctx, victim1, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating victim-1: %v", err)
+	}
+	_, err = cs.CoreV1().Pods(ns).Create(testCtx.Ctx, victim2, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating victim-2: %v", err)
+	}
+
+	// Wait until at least one victim is unschedulable (meaning both were evaluated, one took the node, the other failed).
+	t.Logf("Waiting for a victim to become unschedulable")
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 15*time.Second, false, func(ctx context.Context) (bool, error) {
+		v1Unschedulable, _ := testutils.PodUnschedulable(cs, ns, victim1.Name)(ctx)
+		v2Unschedulable, _ := testutils.PodUnschedulable(cs, ns, victim2.Name)(ctx)
+		return v1Unschedulable || v2Unschedulable, nil
+	})
+	if err != nil {
+		t.Fatalf("Timed out waiting for a victim to become unschedulable: %v", err)
+	}
+
+	t.Logf("Creating preemptor pod")
+	_, err = cs.CoreV1().Pods(ns).Create(testCtx.Ctx, preemptor, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Error creating preemptor: %v", err)
+	}
+
+	t.Logf("Waiting for preemptor to be scheduled")
+	err = wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 15*time.Second, false, testutils.PodScheduled(cs, ns, preemptor.Name))
+	if err != nil {
+		t.Fatalf("Failed waiting for preemptor to schedule: %v", err)
+	}
+
+	// Assert preemptor is scheduled on big-node
+	p, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, preemptor.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Error getting preemptor: %v", err)
+	}
+	if p.Spec.NodeName != "big-node" {
+		t.Fatalf("Preemptor should be scheduled on big-node, but was scheduled on %s", p.Spec.NodeName)
+	}
+
+	// Final verification of victims: neither should have a NodeName because the one that was waiting got rejected.
+	v1, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, victim1.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Error getting victim-1 at the end: %v", err)
+	}
+	if v1.Spec.NodeName != "" {
+		t.Fatalf("Victim-1's NodeName should be empty, but it is %s", v1.Spec.NodeName)
+	}
+
+	v2, err := cs.CoreV1().Pods(ns).Get(testCtx.Ctx, victim2.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Error getting victim-2 at the end: %v", err)
+	}
+	if v2.Spec.NodeName != "" {
+		t.Fatalf("Victim-2's NodeName should be empty, but it is %s", v2.Spec.NodeName)
+	}
+}
