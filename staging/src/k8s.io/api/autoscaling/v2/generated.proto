@@ -274,7 +274,6 @@ message HorizontalPodAutoscalerSpec {
   // +listType=atomic
   // +optional
   // +k8s:alpha(since: "1.37")=+k8s:optional
-  // +k8s:alpha(since: "1.37")=+k8s:opaqueType
   repeated MetricSpec metrics = 4;
 
   // behavior configures the scaling behavior of the target
@@ -308,7 +307,6 @@ message HorizontalPodAutoscalerStatus {
   // +listType=atomic
   // +optional
   // +k8s:alpha(since: "1.37")=+k8s:optional
-  // +k8s:alpha(since: "1.37")=+k8s:opaqueType
   repeated MetricStatus currentMetrics = 5;
 
   // conditions is the set of conditions required for this autoscaler to scale its target,

@@ -83,7 +83,6 @@ type HorizontalPodAutoscalerSpec struct {
 	// +listType=atomic
 	// +optional
 	// +k8s:alpha(since: "1.37")=+k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:opaqueType
 	Metrics []MetricSpec `json:"metrics,omitempty" protobuf:"bytes,4,rep,name=metrics"`
 
 	// behavior configures the scaling behavior of the target
@@ -432,7 +431,6 @@ type HorizontalPodAutoscalerStatus struct {
 	// +listType=atomic
 	// +optional
 	// +k8s:alpha(since: "1.37")=+k8s:optional
-	// +k8s:alpha(since: "1.37")=+k8s:opaqueType
 	CurrentMetrics []MetricStatus `json:"currentMetrics" protobuf:"bytes,5,rep,name=currentMetrics"`
 
 	// conditions is the set of conditions required for this autoscaler to scale its target,
