@@ -29,7 +29,7 @@ Before you start building Kubernetes, make sure to clone the repository using th
 ```bash
 git clone https://github.com/kubernetes/kubernetes.git
 ```
-Navigate to Kubernetes directory before executing scripts files:
+Navigate to the Kubernetes directory before executing script files:
 ```bash
 cd kubernetes
 ```
@@ -57,9 +57,9 @@ You can specify a different registry/name and version for `kube-cross` by settin
 
 All Docker names are suffixed with a hash derived from the file path (to allow concurrent usage on things like CI machines) and a version number.  When the version number changes all state is cleared and clean build is started.  This allows the build infrastructure to be changed and signal to CI systems that old artifacts need to be deleted.
 
-## Build artifacts
-The build system output all its products to a top level directory in the source repository named `_output`.
-These include the binary compiled packages (e.g. kubectl, kube-scheduler etc.) and archived Docker images.
+## Build Artifacts
+The build system outputs all its products to a top level directory in the source repository named `_output`.
+These include the binary compiled packages (e.g., kubectl, kube-scheduler, etc.) and archived Docker images.
 If you intend to run a component with a docker image you will need to load it from this directory with
 the appropriate command, e.g.
 ```
