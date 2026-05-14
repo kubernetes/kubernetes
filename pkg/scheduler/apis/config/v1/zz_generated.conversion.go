@@ -443,6 +443,7 @@ func autoConvert_v1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfigurat
 		return err
 	}
 	out.PercentageOfNodesToScore = (*int32)(unsafe.Pointer(in.PercentageOfNodesToScore))
+	out.PercentageOfPlacementsToScore = (*int32)(unsafe.Pointer(in.PercentageOfPlacementsToScore))
 	if err := metav1.Convert_Pointer_int64_To_int64(&in.PodInitialBackoffSeconds, &out.PodInitialBackoffSeconds, s); err != nil {
 		return err
 	}
@@ -479,6 +480,7 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1_KubeSchedulerConfigurat
 		return err
 	}
 	out.PercentageOfNodesToScore = (*int32)(unsafe.Pointer(in.PercentageOfNodesToScore))
+	out.PercentageOfPlacementsToScore = (*int32)(unsafe.Pointer(in.PercentageOfPlacementsToScore))
 	if err := metav1.Convert_int64_To_Pointer_int64(&in.PodInitialBackoffSeconds, &out.PodInitialBackoffSeconds, s); err != nil {
 		return err
 	}
@@ -506,6 +508,7 @@ func autoConvert_v1_KubeSchedulerProfile_To_config_KubeSchedulerProfile(in *conf
 		return err
 	}
 	out.PercentageOfNodesToScore = (*int32)(unsafe.Pointer(in.PercentageOfNodesToScore))
+	out.PercentageOfPlacementsToScore = (*int32)(unsafe.Pointer(in.PercentageOfPlacementsToScore))
 	if in.Plugins != nil {
 		in, out := &in.Plugins, &out.Plugins
 		*out = new(config.Plugins)
@@ -539,6 +542,7 @@ func autoConvert_config_KubeSchedulerProfile_To_v1_KubeSchedulerProfile(in *conf
 		return err
 	}
 	out.PercentageOfNodesToScore = (*int32)(unsafe.Pointer(in.PercentageOfNodesToScore))
+	out.PercentageOfPlacementsToScore = (*int32)(unsafe.Pointer(in.PercentageOfPlacementsToScore))
 	if in.Plugins != nil {
 		in, out := &in.Plugins, &out.Plugins
 		*out = new(configv1.Plugins)

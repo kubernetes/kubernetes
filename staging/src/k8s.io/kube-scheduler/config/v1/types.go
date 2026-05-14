@@ -68,6 +68,16 @@ type KubeSchedulerConfiguration struct {
 	// nodes will be scored. It is overridden by profile level PercentageOfNodesToScore.
 	PercentageOfNodesToScore *int32 `json:"percentageOfNodesToScore,omitempty"`
 
+	// PercentageOfPlacementsToScore is the percentage of all placements that once found feasible
+	// for running a pod group, the scheduler stops its search for more feasible placements in
+	// the cluster. This helps improve scheduler's performance. Scheduler always tries to find
+	// at least "minFeasiblePlacementsToFind" feasible placements no matter what the value of this flag is.
+	// Example: if the cluster size is 500 placements and the value of this flag is 30,
+	// then scheduler stops finding further feasible placements once it finds 150 feasible ones.
+	// When the value is 0, default percentage (5%--100% based on the generated placements) of the
+	// placements will be scored. It is overridden by profile level PercentageOfPlacementsToScore.
+	PercentageOfPlacementsToScore *int32 `json:"percentageOfPlacementsToScore,omitempty"`
+
 	// PodInitialBackoffSeconds is the initial backoff for unschedulable pods.
 	// If specified, it must be greater than 0. If this value is null, the default value (1s)
 	// will be used.
@@ -152,6 +162,17 @@ type KubeSchedulerProfile struct {
 	// nodes will be scored. It will override global PercentageOfNodesToScore. If it is empty,
 	// global PercentageOfNodesToScore will be used.
 	PercentageOfNodesToScore *int32 `json:"percentageOfNodesToScore,omitempty"`
+
+	// PercentageOfPlacementsToScore is the percentage of all placements that once found feasible
+	// for running a pod group, the scheduler stops its search for more feasible placements in
+	// the cluster. This helps improve scheduler's performance. Scheduler always tries to find
+	// at least "minFeasiblePlacementsToFind" feasible placements no matter what the value of this flag is.
+	// Example: if the cluster size is 500 placements and the value of this flag is 30,
+	// then scheduler stops finding further feasible placements once it finds 150 feasible ones.
+	// When the value is 0, default percentage (5%--100% based on the generated placements) of the
+	// placements will be scored. It will override global PercentageOfPlacementsToScore. If it is empty,
+	// global PercentageOfPlacementsToScore will be used.
+	PercentageOfPlacementsToScore *int32 `json:"percentageOfPlacementsToScore,omitempty"`
 
 	// Plugins specify the set of plugins that should be enabled or disabled.
 	// Enabled plugins are the ones that should be enabled in addition to the
