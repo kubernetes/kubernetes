@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubeconfig
+// Package testing contains utilities for managing kubeadm kubeconfig in tests.
+package testing
 
 import (
 	"crypto/x509"
@@ -24,7 +25,7 @@ import (
 
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 
-	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
+	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs/testing"
 )
 
 // AssertKubeConfigCurrentCluster is a utility function for kubeadm testing that asserts if the CurrentCluster in
@@ -33,12 +34,10 @@ func AssertKubeConfigCurrentCluster(t *testing.T, config *clientcmdapi.Config, e
 	currentContext := config.Contexts[config.CurrentContext]
 	currentCluster := config.Clusters[currentContext.Cluster]
 
-	// Assert expectedAPIServerAddress
 	if currentCluster.Server != expectedAPIServerAddress {
 		t.Errorf("kubeconfig.currentCluster.Server is [%s], expected [%s]", currentCluster.Server, expectedAPIServerAddress)
 	}
 
-	// Assert the APIServerCaCert
 	if len(currentCluster.CertificateAuthorityData) == 0 {
 		t.Error("kubeconfig.currentCluster.CertificateAuthorityData is empty, expected not empty")
 		return
@@ -62,7 +61,6 @@ func AssertKubeConfigCurrentAuthInfoWithClientCert(t *testing.T, config *clientc
 	currentContext := config.Contexts[config.CurrentContext]
 	currentAuthInfo := config.AuthInfos[currentContext.AuthInfo]
 
-	// assert clientCert
 	if len(currentAuthInfo.ClientCertificateData) == 0 {
 		t.Error("kubeconfig.currentAuthInfo.ClientCertificateData is empty, expected not empty")
 		return
@@ -75,19 +73,10 @@ func AssertKubeConfigCurrentAuthInfoWithClientCert(t *testing.T, config *clientc
 		return
 	}
 
-	// Asserts the clientCert is signed by the signinCa
 	certstestutil.AssertCertificateIsSignedByCa(t, currentClientCert, signinCa)
-
-	// Assert the clientCert has expected NotAfter
 	certstestutil.AssertCertificateHasNotAfter(t, currentClientCert, expectedNotAfter)
-
-	// Asserts the clientCert has ClientAuth ExtKeyUsage
 	certstestutil.AssertCertificateHasClientAuthUsage(t, currentClientCert)
-
-	// Asserts the clientCert has expected expectedUserName as CommonName
 	certstestutil.AssertCertificateHasCommonName(t, currentClientCert, expectedClientName)
-
-	// Asserts the clientCert has expected Organizations
 	certstestutil.AssertCertificateHasOrganizations(t, currentClientCert, expectedOrganizations...)
 }
 
@@ -97,10 +86,8 @@ func AssertKubeConfigCurrentAuthInfoWithToken(t *testing.T, config *clientcmdapi
 	currentContext := config.Contexts[config.CurrentContext]
 	currentAuthInfo := config.AuthInfos[currentContext.AuthInfo]
 
-	// assert token
 	if currentAuthInfo.Token != expectedToken {
 		t.Errorf("kubeconfig.currentAuthInfo.Token [%s], expected [%s]", currentAuthInfo.Token, expectedToken)
-		return
 	}
 }
 
@@ -109,9 +96,7 @@ func AssertKubeConfigCurrentAuthInfoWithToken(t *testing.T, config *clientcmdapi
 func AssertKubeConfigCurrentContextWithClusterName(t *testing.T, config *clientcmdapi.Config, expectedClusterName string) {
 	currentContext := config.Contexts[config.CurrentContext]
 
-	// assert cluster name
 	if currentContext.Cluster != expectedClusterName {
 		t.Errorf("kubeconfig.currentContext.clusterName [%s], expected [%s]", currentContext.Cluster, expectedClusterName)
-		return
 	}
 }

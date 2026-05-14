@@ -36,7 +36,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
-	testresources "k8s.io/kubernetes/cmd/kubeadm/test/resources"
+	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
 var errNotImplemented = errors.New("not implemented")
@@ -179,7 +179,7 @@ func TestGetClientURLByIP(t *testing.T) {
 func TestGetEtcdEndpointsWithBackoff(t *testing.T) {
 	tests := []struct {
 		name              string
-		pods              []testresources.FakeStaticPod
+		pods              []staticpodutil.FakeStaticPod
 		expectedEndpoints []string
 		expectedErr       bool
 	}{
@@ -190,7 +190,7 @@ func TestGetEtcdEndpointsWithBackoff(t *testing.T) {
 		},
 		{
 			name: "ipv4 endpoint in pod annotation; port is preserved",
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					Component: constants.Etcd,
 					Annotations: map[string]string{
@@ -230,14 +230,14 @@ func TestGetEtcdEndpointsWithBackoff(t *testing.T) {
 func TestGetRawEtcdEndpointsFromPodAnnotation(t *testing.T) {
 	tests := []struct {
 		name              string
-		pods              []testresources.FakeStaticPod
+		pods              []staticpodutil.FakeStaticPod
 		clientSetup       func(*clientsetfake.Clientset)
 		expectedEndpoints []string
 		expectedErr       bool
 	}{
 		{
 			name: "exactly one pod with annotation",
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					NodeName:    "cp-0",
 					Component:   constants.Etcd,
@@ -248,7 +248,7 @@ func TestGetRawEtcdEndpointsFromPodAnnotation(t *testing.T) {
 		},
 		{
 			name: "two pods; one is missing annotation",
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					NodeName:    "cp-0",
 					Component:   constants.Etcd,
@@ -268,7 +268,7 @@ func TestGetRawEtcdEndpointsFromPodAnnotation(t *testing.T) {
 		},
 		{
 			name: "exactly one pod with annotation; all requests fail",
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					NodeName:    "cp-0",
 					Component:   constants.Etcd,
@@ -314,7 +314,7 @@ func TestGetRawEtcdEndpointsFromPodAnnotation(t *testing.T) {
 func TestGetRawEtcdEndpointsFromPodAnnotationWithoutRetry(t *testing.T) {
 	tests := []struct {
 		name              string
-		pods              []testresources.FakeStaticPod
+		pods              []staticpodutil.FakeStaticPod
 		clientSetup       func(*clientsetfake.Clientset)
 		expectedEndpoints []string
 		expectedErr       bool
@@ -325,7 +325,7 @@ func TestGetRawEtcdEndpointsFromPodAnnotationWithoutRetry(t *testing.T) {
 		},
 		{
 			name: "exactly one pod with annotation",
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					NodeName:    "cp-0",
 					Component:   constants.Etcd,
@@ -336,7 +336,7 @@ func TestGetRawEtcdEndpointsFromPodAnnotationWithoutRetry(t *testing.T) {
 		},
 		{
 			name: "two pods; one is missing annotation",
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					NodeName:    "cp-0",
 					Component:   constants.Etcd,
@@ -351,7 +351,7 @@ func TestGetRawEtcdEndpointsFromPodAnnotationWithoutRetry(t *testing.T) {
 		},
 		{
 			name: "two pods with annotation",
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					NodeName:    "cp-0",
 					Component:   constants.Etcd,
@@ -367,7 +367,7 @@ func TestGetRawEtcdEndpointsFromPodAnnotationWithoutRetry(t *testing.T) {
 		},
 		{
 			name: "exactly one pod with annotation; request fails",
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					NodeName:    "cp-0",
 					Component:   constants.Etcd,

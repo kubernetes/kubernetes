@@ -23,9 +23,9 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
-	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
+	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs/testing"
+	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config/testing"
 	pkiutiltesting "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil/testing"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 type testCertsData struct {
@@ -51,7 +51,7 @@ func TestCreateSparseCerts(t *testing.T) {
 			r.AppendPhase(NewCertsPhase())
 			r.SetDataInitializer(func(*cobra.Command, []string) (workflow.RunData, error) {
 				certsData := &testCertsData{
-					cfg: testutil.GetDefaultInternalConfig(t),
+					cfg: configutil.GetDefaultInternalConfig(t),
 				}
 				certsData.cfg.CertificatesDir = tmpdir
 				return certsData, nil
