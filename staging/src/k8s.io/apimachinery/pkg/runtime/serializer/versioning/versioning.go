@@ -18,10 +18,12 @@ package versioning
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"reflect"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -87,6 +89,14 @@ type codec struct {
 
 	// originalSchemeName is optional, but when filled in it holds the name of the scheme from which this codec originates
 	originalSchemeName string
+}
+
+type itemVisitor = func(runtime.Object) error
+type itemIterator = func(itemVisitor) error
+
+type streamingListEncoder interface {
+	runtime.Encoder
+	EncodeListWithIterator(list runtime.Object, w io.Writer, iter itemIterator) (handled bool, err error)
 }
 
 var _ runtime.EncoderWithAllocator = &codec{}
@@ -268,6 +278,16 @@ func (c *codec) doEncode(obj runtime.Object, w io.Writer, memAlloc runtime.Memor
 		return encodeFn(obj, w)
 	}
 
+	if streamingListEncoder, ok := c.encoder.(streamingListEncoder); ok {
+		handled, err := c.encodeStreamingList(obj, w, streamingListEncoder)
+		if err != nil {
+			return err
+		}
+		if handled {
+			return nil
+		}
+	}
+
 	// Perform a conversion if necessary
 	out, err := c.convertor.ConvertToVersion(obj, c.encodeVersion)
 	if err != nil {
@@ -282,6 +302,81 @@ func (c *codec) doEncode(obj runtime.Object, w io.Writer, memAlloc runtime.Memor
 
 	// Conversion is responsible for setting the proper group, version, and kind onto the outgoing object
 	return encodeFn(out, w)
+}
+
+func (c *codec) encodeStreamingList(list runtime.Object, w io.Writer, streamingListEncoder streamingListEncoder) (bool, error) {
+	if !meta.IsListType(list) {
+		return false, nil
+	}
+	if _, ok := list.(*unstructured.UnstructuredList); ok {
+		return false, nil
+	}
+
+	versionedListHeader, err := c.convertListHeaderToVersion(list)
+	if err != nil {
+		return false, err
+	}
+
+	return streamingListEncoder.EncodeListWithIterator(versionedListHeader, w, func(visit itemVisitor) error {
+		return meta.EachListItemWithAlloc(list, func(item runtime.Object) error {
+			versionedItem, err := c.convertor.ConvertToVersion(item, c.encodeVersion)
+			if err != nil {
+				return err
+			}
+			if e, ok := versionedItem.(runtime.NestedObjectEncoder); ok {
+				if err := e.EncodeNestedObjects(runtime.WithVersionEncoder{Version: c.encodeVersion, Encoder: c.encoder, ObjectTyper: c.typer}); err != nil {
+					return err
+				}
+			}
+			return visit(versionedItem)
+		})
+	})
+}
+
+func (c *codec) convertListHeaderToVersion(list runtime.Object) (runtime.Object, error) {
+	emptyList, err := newEmptyListWithListMeta(list)
+	if err != nil {
+		return nil, err
+	}
+	return c.convertor.ConvertToVersion(emptyList, c.encodeVersion)
+}
+
+func newEmptyListWithListMeta(list runtime.Object) (runtime.Object, error) {
+	listType := reflect.TypeOf(list)
+	if listType.Kind() != reflect.Pointer || listType.Elem().Kind() != reflect.Struct {
+		return nil, fmt.Errorf("expected pointer to list struct, got %T", list)
+	}
+
+	emptyList, ok := reflect.New(listType.Elem()).Interface().(runtime.Object)
+	if !ok {
+		return nil, fmt.Errorf("expected runtime.Object list, got %T", list)
+	}
+
+	src, err := meta.ListAccessor(list)
+	if err != nil {
+		return nil, err
+	}
+	dst, err := meta.ListAccessor(emptyList)
+	if err != nil {
+		return nil, err
+	}
+	copyListMeta(dst, src)
+	return emptyList, nil
+}
+
+func copyListMeta(dst, src meta.List) {
+	dst.SetSelfLink(src.GetSelfLink())
+	dst.SetResourceVersion(src.GetResourceVersion())
+	dst.SetContinue(src.GetContinue())
+	dst.SetRemainingItemCount(copyInt64Ptr(src.GetRemainingItemCount()))
+}
+
+func copyInt64Ptr(in *int64) *int64 {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	return &out
 }
 
 // Identifier implements runtime.Encoder interface.

@@ -32,6 +32,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+type itemVisitor = func(runtime.Object) error
+type itemIterator = func(itemVisitor) error
+
 func streamEncodeCollections(obj runtime.Object, w io.Writer) (bool, error) {
 	list, ok := obj.(*unstructured.UnstructuredList)
 	if ok {
@@ -90,6 +93,20 @@ func getListMeta(list runtime.Object) (metav1.TypeMeta, metav1.ListMeta, []runti
 }
 
 func streamingEncodeList(w io.Writer, typeMeta metav1.TypeMeta, listMeta metav1.ListMeta, items []runtime.Object) error {
+	if items == nil {
+		return streamingEncodeListWithIterator(w, typeMeta, listMeta, nil)
+	}
+	return streamingEncodeListWithIterator(w, typeMeta, listMeta, func(visit itemVisitor) error {
+		for _, item := range items {
+			if err := visit(item); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func streamingEncodeListWithIterator(w io.Writer, typeMeta metav1.TypeMeta, listMeta metav1.ListMeta, iter itemIterator) error {
 	// Start
 	if _, err := w.Write([]byte(`{`)); err != nil {
 		return err
@@ -113,7 +130,7 @@ func streamingEncodeList(w io.Writer, typeMeta metav1.TypeMeta, listMeta metav1.
 	}
 
 	// Items
-	if err := encodeItemsObjectSlice(w, items); err != nil {
+	if err := encodeItemsObjectIterator(w, iter); err != nil {
 		return err
 	}
 
@@ -122,30 +139,43 @@ func streamingEncodeList(w io.Writer, typeMeta metav1.TypeMeta, listMeta metav1.
 	return err
 }
 
-func encodeItemsObjectSlice(w io.Writer, items []runtime.Object) (err error) {
-	if items == nil {
-		err := encodeKeyValuePair(w, "items", nil, nil)
-		return err
+func encodeItemsObjectIterator(w io.Writer, iter itemIterator) (err error) {
+	if iter == nil {
+		return encodeKeyValuePair(w, "items", nil, nil)
 	}
 	_, err = w.Write([]byte(`"items":[`))
 	if err != nil {
 		return err
 	}
-	suffix := []byte(",")
-	for i, item := range items {
-		if i == len(items)-1 {
-			suffix = nil
+	first := true
+	err = iter(func(item runtime.Object) error {
+		if !first {
+			if _, err := w.Write([]byte(",")); err != nil {
+				return err
+			}
 		}
-		err := encodeValue(w, item, suffix)
-		if err != nil {
-			return err
-		}
-	}
-	_, err = w.Write([]byte("]"))
+		first = false
+		return encodeValue(w, item, nil)
+	})
 	if err != nil {
 		return err
 	}
+	_, err = w.Write([]byte("]"))
 	return err
+}
+
+func (s *Serializer) EncodeListWithIterator(list runtime.Object, w io.Writer, iter itemIterator) (bool, error) {
+	if s.options.Yaml || s.options.Pretty || !s.options.StreamingCollectionsEncoding {
+		return false, nil
+	}
+	if _, ok := list.(*unstructured.UnstructuredList); ok {
+		return false, nil
+	}
+	typeMeta, listMeta, _, err := getListMeta(list)
+	if err != nil {
+		return false, nil
+	}
+	return true, streamingEncodeListWithIterator(w, typeMeta, listMeta, iter)
 }
 
 func streamingEncodeUnstructuredList(w io.Writer, list *unstructured.UnstructuredList) error {
