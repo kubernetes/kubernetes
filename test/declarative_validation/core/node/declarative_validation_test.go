@@ -29,24 +29,36 @@ import (
 
 // Smoke test that create requests are wired through declarative validation.
 func TestDeclarativeValidateNodeCreateWiring(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		t.Run(apiVersion, func(t *testing.T) {
+			testDeclarativeValidateNodeCreateWiring(t, apiVersion)
+		})
+	}
+}
+
+func testDeclarativeValidateNodeCreateWiring(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:          "",
-		APIVersion:        "v1",
-		Resource:          "nodes",
-		IsResourceRequest: true,
-		Verb:              "create",
+		APIGroup:   "",
+		APIVersion: apiVersion,
+		Verb:       "create",
 	})
 	obj := mkValidNode()
 	apitesting.VerifyValidationEquivalence(t, ctx, &obj, registry.Strategy, field.ErrorList{})
 }
 
 func TestDeclarativeValidateNodeUpdate(t *testing.T) {
+	for _, apiVersion := range apiVersions {
+		t.Run(apiVersion, func(t *testing.T) {
+			testDeclarativeValidateNodeUpdate(t, apiVersion)
+		})
+	}
+}
+
+func testDeclarativeValidateNodeUpdate(t *testing.T, apiVersion string) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
-		APIGroup:          "",
-		APIVersion:        "v1",
-		Resource:          "nodes",
-		IsResourceRequest: true,
-		Verb:              "update",
+		APIGroup:   "",
+		APIVersion: apiVersion,
+		Verb:       "update",
 	})
 	testCases := map[string]struct {
 		old          api.Node
