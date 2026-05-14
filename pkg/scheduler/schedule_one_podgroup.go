@@ -39,6 +39,17 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+const (
+	// minFeasiblePlacementsToFind is the minimum number of placements that would be scored
+	// in each scheduling cycle.
+	minFeasiblePlacementsToFind = 1
+	// minFeasiblePlacementsPercentageToFind is the minimum percentage of placements that
+	// would be scored in each scheduling cycle. This is a semi-arbitrary value
+	// to ensure that a certain minimum of placements are checked for feasibility.
+	// This in turn helps ensure a minimum level of spreading.
+	minFeasiblePlacementsPercentageToFind = 5
+)
+
 // errPodGroupUnschedulable is used to describe that the pod group is unschedulable.
 var errPodGroupUnschedulable = fmt.Errorf("pod group is unschedulable")
 
@@ -673,6 +684,11 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	var anyResult *podGroupAlgorithmResult
 	successfulResults := make(map[*fwk.Placement]*podGroupAlgorithmResult)
 
+	numPlacementsToFind := int32(1)
+	if schedFwk.HasPlacementScorePlugins() {
+		numPlacementsToFind = sched.numFeasiblePlacementsToFind(schedFwk.PercentageOfPlacementsToScore(), placements)
+	}
+
 	for _, placement := range placements {
 		logger.V(4).Info("Assuming placement in snapshot", "placement", placement.Name)
 		err := sched.nodeInfoSnapshot.AssumePlacement(placement)
@@ -693,6 +709,10 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 
 		if result.status.IsSuccess() || result.waitingOnPreemption {
 			successfulResults[placement] = &result
+		}
+
+		if len(successfulResults) >= int(numPlacementsToFind) {
+			break
 		}
 	}
 
@@ -717,6 +737,42 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	}
 
 	return *successfulResults[bestPlacement]
+}
+
+// numFeasiblePlacementsToFind returns the number of feasible placements that once found, the scheduler stops
+// its search for more feasible placements.
+func (sched *Scheduler) numFeasiblePlacementsToFind(percentageOfPlacementsToScore *int32, placements []*fwk.Placement) (numPlacements int32) {
+	numAllPlacements := int32(len(placements))
+
+	if numAllPlacements < minFeasiblePlacementsToFind {
+		return numAllPlacements
+	}
+
+	// Use profile percentageOfPlacementsToScore if it's set. Otherwise, use global percentageOfPlacementsToScore.
+	var percentage int32
+	if percentageOfPlacementsToScore != nil {
+		percentage = *percentageOfPlacementsToScore
+	} else {
+		percentage = sched.percentageOfPlacementsToScore
+	}
+
+	// If neither is set or the set value is 0, linearly interpolate the value between (0, 100) and (5000, 10),
+	// that is for small clusters use 100% of the placements, and for large clusters use 10% of the placements,
+	// with a hard cap at 5% placements for even larger clusters.
+	if percentage == 0 {
+		numAllNodes := 0
+		for _, placement := range placements {
+			// We are summing up placement nodes as those can overlap or skip over certain nodes.
+			// For the purpose of this computation we care about the upper bound of computed nodes throughout the scheduling cycle,
+			// which can be different than the number of nodes in the cluster.
+			numAllNodes += len(placement.Nodes)
+		}
+		percentage = max(minFeasiblePlacementsPercentageToFind, int32(100-numAllNodes*9/500))
+	}
+
+	numPlacements = max(minFeasiblePlacementsToFind, int32(numAllPlacements)*percentage/100)
+
+	return numPlacements
 }
 
 // findBestPlacement uses PlacementScore plugins to determine the best placement based on the scheduling results.

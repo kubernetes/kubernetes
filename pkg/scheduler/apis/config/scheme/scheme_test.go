@@ -216,6 +216,40 @@ profiles:
 			},
 		},
 		{
+			name: "v1 with non-default global percentageOfPlacementsToScore",
+			data: []byte(`
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+percentageOfPlacementsToScore: 10
+`),
+			wantProfiles: []config.KubeSchedulerProfile{
+				{
+					SchedulerName:                 "default-scheduler",
+					PercentageOfPlacementsToScore: nil,
+					Plugins:                       defaults.PluginsV1,
+					PluginConfig:                  defaults.PluginConfigsV1,
+				},
+			},
+		},
+		{
+			name: "v1 with non-default global and profile percentageOfPlacementsToScore",
+			data: []byte(`
+apiVersion: kubescheduler.config.k8s.io/v1
+kind: KubeSchedulerConfiguration
+percentageOfPlacementsToScore: 10
+profiles:
+- percentageOfPlacementsToScore: 20
+`),
+			wantProfiles: []config.KubeSchedulerProfile{
+				{
+					SchedulerName:                 "default-scheduler",
+					PercentageOfPlacementsToScore: ptr.To[int32](20),
+					Plugins:                       defaults.PluginsV1,
+					PluginConfig:                  defaults.PluginConfigsV1,
+				},
+			},
+		},
+		{
 			name: "v1 plugins can include version and kind",
 			data: []byte(`
 apiVersion: kubescheduler.config.k8s.io/v1
