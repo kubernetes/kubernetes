@@ -17,7 +17,7 @@ limitations under the License.
 package main
 
 import (
-	"k8s.io/kubernetes/test/e2e_node/plugins/gcp-credential-provider/pkg"
+	"k8s.io/kubernetes/cluster/gce/gci/mounter/pkg"
 )
 
 func main() {
