@@ -189,7 +189,7 @@ func getHostExternalAddress(ctx context.Context, client clientset.Interface, p *
 		}
 	}
 	if externalAddress == "" {
-		err = fmt.Errorf("No external address for pod %v on node %v",
+		e2eskipper.Skipf("No NodeExternalIP for pod %v on node %v, test requires SSH-reachable worker nodes",
 			p.Name, p.Spec.NodeName)
 	}
 	return
