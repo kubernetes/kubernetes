@@ -20,6 +20,7 @@ import (
 	"context"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -93,17 +94,21 @@ type probeAttributes struct {
 	HttpRequestCacheHolder *httpProbeRequestHolder
 }
 
-func (p *probeAttributes) setHttpRequestHodler(httpHolder *httpProbeRequestHolder) {
+func (p *probeAttributes) setHttpRequestHolder(httpHolder *httpProbeRequestHolder) {
 	p.HttpRequestCacheHolder = httpHolder
 }
 
 // httpProbeRequestHolder caches the http.Request object to minimize allocations during repeated probes.
 // It invalidates the cache if the Pod's IP address changes.
 type httpProbeRequestHolder struct {
-	httpGet     *v1.HTTPGetAction
-	container   *v1.Container
-	podIP       string
-	requestRoot *http.Request
+	httpGet      *v1.HTTPGetAction
+	container    *v1.Container
+	podIP        string
+	cachedURL    *url.URL
+	cachedHeader http.Header
+	cachedMethod string
+	cachedProto  string
+	requestRoot  *http.Request
 }
 
 // isInitContainer checks if the worker's container is in the pod's init containers
@@ -125,9 +130,17 @@ func (w *worker) initHttpProbeHolder(container *v1.Container) {
 	}
 }
 
+// Set request cache holder values for reuse in future requests.
+func (h *httpProbeRequestHolder) setCacheRequestValues(req *http.Request) {
+	h.cachedHeader = req.Header
+	h.cachedMethod = req.Method
+	h.cachedProto = req.Proto
+	h.cachedURL = req.URL
+}
+
 // getRequest returns a cached http.Request or creates a new one if the Pod IP has changed
 // or if the request hasn't been initialized yet.
-func (h *httpProbeRequestHolder) getRequest(ctx context.Context, currentPodIP string) (*http.Request, error) {
+func (h *httpProbeRequestHolder) getRequest(currentPodIP string) (*http.Request, error) {
 
 	if h.podIP != currentPodIP {
 		h.podIP = currentPodIP
@@ -135,22 +148,41 @@ func (h *httpProbeRequestHolder) getRequest(ctx context.Context, currentPodIP st
 	}
 
 	if h.requestRoot == nil {
-		// New request data (immutable in future pipeline)
 		req, err := httprobe.NewRequestForHTTPGetAction(h.httpGet, h.container, h.podIP, "probe")
 		if err != nil {
 			return nil, err
 		}
 		h.requestRoot = req
+		h.setCacheRequestValues(req)
 	}
 
-	// Fork root request
-	// Guaranteed shallow-copy with new Context
-	return h.requestRoot.WithContext(ctx), nil
+	// Use values from cache holder, without making new values
+	return h.buildRequestFromCache(), nil
+}
+
+// Build request from cached values
+func (h *httpProbeRequestHolder) buildRequestFromCache() *http.Request {
+	clear(h.cachedHeader)
+	return &http.Request{
+		Method:     h.cachedMethod,
+		URL:        h.cachedURL,
+		Proto:      h.cachedProto,
+		ProtoMajor: 1,
+		ProtoMinor: 1,
+		Header:     h.cachedHeader,
+		Host:       h.cachedURL.Host,
+		Body:       nil,
+	}
+
 }
 
 // reset clears the cached request, forcing a re-initialization on the next probe cycle.
 func (h *httpProbeRequestHolder) reset() {
 	h.requestRoot = nil
+	h.cachedHeader = nil
+	h.cachedMethod = ""
+	h.cachedProto = ""
+	h.cachedURL = nil
 }
 
 // Creates and starts a new probe worker.
@@ -420,7 +452,7 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 	// Instantly create probe attributes object.
 	if w.probeAttributes == nil {
 		w.probeAttributes = &probeAttributes{}
-		w.probeAttributes.setHttpRequestHodler(w.httpProbeRequest)
+		w.probeAttributes.setHttpRequestHolder(w.httpProbeRequest)
 	}
 
 	// Note, exec probe does NOT have access to pod environment variables or downward API

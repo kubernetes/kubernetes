@@ -18,6 +18,8 @@ package prober
 
 import (
 	"fmt"
+	"net/http"
+	"reflect"
 	"testing"
 	"time"
 
@@ -1154,22 +1156,41 @@ func TestGetRequestCaching(t *testing.T) {
 		worker := newWorker(manager, readiness, pod, container)
 
 		worker.initHttpProbeHolder(&worker.container)
-		_, err := worker.httpProbeRequest.getRequest(t.Context(), fakePodIp)
+		req, err := worker.httpProbeRequest.getRequest(fakePodIp)
 
 		if err != nil {
 			t.Errorf("Expect no error, got: %v.", err)
 		}
 
-		req2, err := worker.httpProbeRequest.getRequest(t.Context(), fakePodIp)
+		// Check set cache values and fields equality
+		checkCache(t, worker, req)
+		req2, err := worker.httpProbeRequest.getRequest(fakePodIp)
 
 		if err != nil {
 			t.Errorf("Expect no error, got: %v.", err)
+		}
+
+		// Check cached fields between two requests for equality
+		if req.Proto != req2.Proto {
+			t.Errorf("Expected Proto: %v, but got %v.", req.Proto, req2.Proto)
+		}
+
+		if req.URL != req2.URL {
+			t.Errorf("Expected Host: %v, but got %v.", req.URL, req2.URL)
+		}
+
+		if req.Method != req2.Method {
+			t.Errorf("Expected Method: %v, but got %v.", req.Method, req2.Method)
+		}
+
+		if !reflect.DeepEqual(req.Header, req2.Header) {
+			t.Errorf("Expected Header: %v, but got %v.", req.Header, req2.Header)
 		}
 
 		// Cache invalidation
 		worker.httpProbeRequest.reset()
 
-		req3, _ := worker.httpProbeRequest.getRequest(t.Context(), fakePodIp)
+		req3, _ := worker.httpProbeRequest.getRequest(fakePodIp)
 
 		// Test cache invalidation by httpProbeRequest.reset()
 		if req2 == req3 {
@@ -1177,13 +1198,36 @@ func TestGetRequestCaching(t *testing.T) {
 		}
 
 		// Test cache invalidation by change Pod-IP
-		req4, _ := worker.httpProbeRequest.getRequest(t.Context(), fakePodIp+"updated_podIp")
+		req4, _ := worker.httpProbeRequest.getRequest(fakePodIp + "updated_podIp")
 
 		if req4 == req3 {
 			t.Errorf("Expected result: %p != %p, but got %p == %p.", req4, req3, req4, req3)
 		}
 
 	})
+}
+
+func checkCache(t *testing.T, worker *worker, req *http.Request) {
+
+	cachedProto := worker.httpProbeRequest.cachedProto
+	if req.Proto != cachedProto {
+		t.Errorf("Expected Proto: %v, but got %v.", cachedProto, req.Proto)
+	}
+
+	cachedUrl := worker.httpProbeRequest.cachedURL
+	if req.URL != cachedUrl {
+		t.Errorf("Expected Host: %v, but got %v.", cachedUrl, req.URL)
+	}
+
+	cachedMethod := worker.httpProbeRequest.cachedMethod
+	if req.Method != cachedMethod {
+		t.Errorf("Expected Method: %v, but got %v.", cachedMethod, req.Method)
+	}
+
+	cachedHeader := worker.httpProbeRequest.cachedHeader
+	if !reflect.DeepEqual(req.Header, cachedHeader) {
+		t.Errorf("Expected Header: %v, but got %v.", cachedHeader, req.Header)
+	}
 }
 
 func TestGetRequest(t *testing.T) {
@@ -1246,7 +1290,7 @@ func TestGetRequest(t *testing.T) {
 			worker := newWorker(manager, readiness, pod, container)
 
 			worker.initHttpProbeHolder(&worker.container)
-			req, err := worker.httpProbeRequest.getRequest(t.Context(), c.podIp)
+			req, err := worker.httpProbeRequest.getRequest(c.podIp)
 
 			if err != nil && !c.error {
 				t.Errorf("Not expected error: %v", err)
@@ -1260,6 +1304,8 @@ func TestGetRequest(t *testing.T) {
 		})
 	}
 }
+
+var benchmarkHttpProbeSink bool
 
 func BenchmarkHTTPProbe(b *testing.B) {
 	logger, ctx := ktesting.NewTestContext(b)
@@ -1303,6 +1349,6 @@ func BenchmarkHTTPProbe(b *testing.B) {
 
 	b.ResetTimer()
 	for b.Loop() {
-		worker.doProbe(ctx)
+		benchmarkHttpProbeSink = worker.doProbe(ctx)
 	}
 }
