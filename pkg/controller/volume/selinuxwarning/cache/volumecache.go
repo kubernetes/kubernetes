@@ -326,9 +326,9 @@ func (c *volumeCache) GetConflicts(logger klog.Logger) []Conflict {
 	logger.V(4).Info("Scraping conflicts")
 	c.dump(logger)
 
-	result := make([]Conflict, 0)
+	result := sets.New[Conflict]()
 	for _, volConflicts := range c.conflicts {
-		result = append(result, volConflicts...)
+		result.Insert(volConflicts...)
 	}
-	return result
+	return result.UnsortedList()
 }
