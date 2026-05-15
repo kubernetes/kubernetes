@@ -370,9 +370,6 @@ func ValidateIgnoreStoreReadError(fldPath *field.Path, options *metav1.DeleteOpt
 		return allErrs
 	}
 
-	if len(options.DryRun) > 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, true, "cannot be set together with .dryRun"))
-	}
 	if options.PropagationPolicy != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, true, "cannot be set together with .propagationPolicy"))
 	}
