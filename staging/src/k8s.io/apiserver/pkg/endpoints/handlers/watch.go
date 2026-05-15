@@ -264,21 +264,14 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 		s.Scope.err(errors.NewInternalError(err), w, req)
 		return
 	}
-	compressionFlusher := func() error { return nil }
-	var writer io.Writer = w
-	compressed := acceptsGzip(req)
-	if compressed {
-		gw := gzipPool.Get().(*gzip.Writer)
-		gw.Reset(w)
-		compressionFlusher = gw.Flush
-		writer = gw
-		defer func() {
-			gw.Close()
-			gzipPool.Put(gw)
-		}()
-	}
+	wrw := newWatchResponseWriter(req, w, httpFlusher)
+	defer func() {
+		if err := wrw.Close(); err != nil {
+			utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to close watch response writer")
+		}
+	}()
 
-	framer := s.Framer.NewFrameWriter(writer)
+	framer := s.Framer.NewFrameWriter(wrw)
 	if framer == nil {
 		// programmer error
 		err := fmt.Errorf("no stream framing support is available for media type %q", s.MediaType)
@@ -294,11 +287,11 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 	// begin the stream
 	w.Header().Set("Content-Type", s.MediaType)
 	w.Header().Set("Transfer-Encoding", "chunked")
-	if compressed {
-		w.Header().Set("Content-Encoding", "gzip")
-	}
 	w.WriteHeader(http.StatusOK)
-	httpFlusher.Flush()
+	if err := wrw.Flush(); err != nil {
+		utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to flush watch response")
+		return
+	}
 
 	gvr := s.Scope.Resource
 
@@ -359,12 +352,10 @@ func (s *WatchServer) HandleHTTP(w http.ResponseWriter, req *http.Request) {
 
 			if len(ch) == 0 {
 				flushStart := time.Now()
-				err := compressionFlusher()
-				if err != nil {
-					utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to flush compression writer")
+				if err := wrw.Flush(); err != nil {
+					utilruntime.HandleErrorWithContext(req.Context(), err, "Failed to flush watch response")
 					return
 				}
-				httpFlusher.Flush()
 				if isInitPhase {
 					totalFlushTime += time.Since(flushStart)
 				}
@@ -499,17 +490,63 @@ func shouldRecordWatchListLatency(ctx context.Context, event watch.Event) bool {
 	return hasAnnotation
 }
 
+type watchResponseWriter struct {
+	hw          http.ResponseWriter
+	httpFlusher http.Flusher
+	gw          *gzip.Writer
+	writer      io.Writer
+}
+
+func newWatchResponseWriter(req *http.Request, hw http.ResponseWriter, httpFlusher http.Flusher) *watchResponseWriter {
+	compressed := acceptsGzip(req) && req.URL.Query().Get("sendInitialEvents") == "true"
+	wrw := &watchResponseWriter{
+		hw:          hw,
+		httpFlusher: httpFlusher,
+		writer:      hw,
+	}
+	if compressed {
+		gw := gzipPool.Get().(*gzip.Writer)
+		gw.Reset(hw)
+		wrw.gw = gw
+		wrw.writer = gw
+		hw.Header().Set("Content-Encoding", "gzip")
+	}
+	return wrw
+}
+
+func (w *watchResponseWriter) Write(p []byte) (int, error) {
+	return w.writer.Write(p)
+}
+
+func (w *watchResponseWriter) Flush() error {
+	if w.gw != nil {
+		if err := w.gw.Flush(); err != nil {
+			return err
+		}
+	}
+	w.httpFlusher.Flush()
+	return nil
+}
+
+func (w *watchResponseWriter) Close() error {
+	if w.gw == nil {
+		return nil
+	}
+	err := w.gw.Close()
+	w.gw.Reset(nil)
+	gzipPool.Put(w.gw)
+	return err
+}
+
 var gzipPool = &sync.Pool{
 	New: func() interface{} {
-		gw, err := gzip.NewWriterLevel(nil, defaultGzipContentEncodingLevel)
+		gw, err := gzip.NewWriterLevel(nil, 1)
 		if err != nil {
 			panic(err)
 		}
 		return gw
 	},
 }
-
-const defaultGzipContentEncodingLevel = 1
 
 func acceptsGzip(req *http.Request) bool {
 	for _, enc := range strings.Split(req.Header.Get("Accept-Encoding"), ",") {
