@@ -213,6 +213,7 @@ func autoConvert_v1alpha1_ImagePullCredentials_To_config_ImagePullCredentials(in
 	out.KubernetesSecrets = *(*[]config.ImagePullSecret)(unsafe.Pointer(&in.KubernetesSecrets))
 	out.KubernetesServiceAccounts = *(*[]config.ImagePullServiceAccount)(unsafe.Pointer(&in.KubernetesServiceAccounts))
 	out.NodePodsAccessible = in.NodePodsAccessible
+	out.Preloaded = in.Preloaded
 	return nil
 }
 
@@ -225,6 +226,7 @@ func autoConvert_config_ImagePullCredentials_To_v1alpha1_ImagePullCredentials(in
 	out.KubernetesSecrets = *(*[]configv1alpha1.ImagePullSecret)(unsafe.Pointer(&in.KubernetesSecrets))
 	out.KubernetesServiceAccounts = *(*[]configv1alpha1.ImagePullServiceAccount)(unsafe.Pointer(&in.KubernetesServiceAccounts))
 	out.NodePodsAccessible = in.NodePodsAccessible
+	out.Preloaded = in.Preloaded
 	return nil
 }
 

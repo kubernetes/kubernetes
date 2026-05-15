@@ -71254,6 +71254,13 @@ func schema_k8sio_kubelet_config_v1alpha1_ImagePullCredentials(ref common.Refere
 							Format:      "",
 						},
 					},
+					"preloaded": {
+						SchemaProps: spec.SchemaProps{
+							Description: "FIXME: just for now, I don't want to be adding custom conversions right now",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
 				},
 			},
 		},
@@ -71657,6 +71664,13 @@ func schema_k8sio_kubelet_config_v1beta1_ImagePullCredentials(ref common.Referen
 					"nodePodsAccessible": {
 						SchemaProps: spec.SchemaProps{
 							Description: "NodePodsAccessible is a flag denoting the pull credentials are accessible by all the pods on the node, or that no credentials are needed for the pull.\n\nIf true, it is mutually exclusive with the `kubernetesSecrets` field.",
+							Type:        []string{"boolean"},
+							Format:      "",
+						},
+					},
+					"preloaded": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Preloaded indicates that the image was already present on the node when the kubelet first accessed it, and there were no other non-preloaded pulled records or ImagePullIntents for the image",
 							Type:        []string{"boolean"},
 							Format:      "",
 						},
