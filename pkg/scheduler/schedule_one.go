@@ -875,17 +875,13 @@ func (sched *Scheduler) numFeasibleNodesToFind(percentageOfNodesToScore *int32, 
 	}
 
 	if percentage == 0 {
-		percentage = int32(50) - numAllNodes/125
-		if percentage < minFeasibleNodesPercentageToFind {
-			percentage = minFeasibleNodesPercentageToFind
-		}
+		return adaptiveNumFeasibleNodesToFind(numAllNodes)
 	}
 
 	numNodes = numAllNodes * percentage / 100
 	if numNodes < minFeasibleNodesToFind {
 		return minFeasibleNodesToFind
 	}
-
 	return numNodes
 }
 
@@ -1340,4 +1336,17 @@ func updatePod(ctx context.Context, client clientset.Interface, apiCacher fwk.AP
 		podStatusCopy.NominatedNodeName = nominatingInfo.NominatedNodeName
 	}
 	return util.PatchPodStatus(ctx, client, pod.Name, pod.Namespace, &pod.Status, podStatusCopy)
+}
+
+func adaptiveNumFeasibleNodesToFind(n int32) int32 {
+	if n <= 100 {
+		return n
+	}
+	if n <= 1000 {
+		return 100 + (n-100)*320/900
+	}
+	if n <= 5000 {
+		return 420 + (n-1000)*80/4000
+	}
+	return 500 + (n-5000)/20
 }
