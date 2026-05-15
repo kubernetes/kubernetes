@@ -32,47 +32,29 @@ var k8sBinDir = flag.String("k8s-bin-dir", "", "Directory containing k8s kubelet
 var useDockerizedBuild = flag.Bool("use-dockerized-build", false, "Use dockerized build for test artifacts")
 var targetBuildArch = flag.String("target-build-arch", "linux/amd64", "Target architecture for the test artifacts for dockerized build")
 
-var buildCGOTargets = []string{
+var buildTargets = []string{
 	"cmd/kubelet",
-}
-
-var buildNoCGOTargets = []string{
 	"test/e2e_node/e2e_node.test",
 	"github.com/onsi/ginkgo/v2/ginkgo",
 	"cluster/gce/gci/mounter",
 	"test/e2e_node/plugins/gcp-credential-provider",
 }
 
-// BuildGo builds k8s binaries.
+// BuildGo builds some default k8s binaries.
 func BuildGo() error {
-	if err := BuildTargets(true); err != nil {
-		return fmt.Errorf("unable to build cgo targets : %w", err)
-	}
-	if err := BuildTargets(false); err != nil {
-		return fmt.Errorf("unable to build non-cgo targets : %w", err)
-	}
-	return nil
+	return BuildTargets(buildTargets...)
 }
 
-// BuildGo builds k8s binaries.
-func BuildTargets(cgo bool) error {
+// BuildGo builds the specified k8s binaries (= WHAT targets).
+func BuildTargets(targets ...string) error {
 	klog.Infof("Building k8s binaries...")
 	k8sRoot, err := utils.GetK8sRootDir()
 	if err != nil {
 		return fmt.Errorf("failed to locate kubernetes root directory %v", err)
 	}
-	targets := buildCGOTargets
-	if !cgo {
-		targets = buildNoCGOTargets
-	}
 	what := strings.Join(targets, " ")
 	cmd := exec.Command("make", "-C", k8sRoot,
 		fmt.Sprintf("WHAT=%s", what))
-	if cgo {
-		cmd.Args = append(cmd.Args, "CGO_ENABLED=1")
-	} else {
-		cmd.Args = append(cmd.Args, "CGO_ENABLED=0")
-	}
 	if IsDockerizedBuild() {
 		klog.Infof("Building dockerized k8s binaries targets %s for architecture %s", targets, GetTargetBuildArch())
 		// Multi-architecture build is only supported in dockerized build
