@@ -110,30 +110,52 @@ func TestCheckpointStateRestore(t *testing.T) {
 			"Fail to restore checkpoint without data section",
 			nil,
 			`{
-				"checksum": 1234
+				"policyName": "static",
+				"defaultCPUSet": "7-9",
+				"entries": {
+					"pod": {
+						"container1": "4-6",
+						"container2": "1-3"
+					}
+				},
+				"checksum": 1942532442,
+				"dataChecksum": 1234
 			}`,
 			"none",
 			containermap.ContainerMap{},
-			"checkpoint is corrupted",
+			"failed to deserialize cpu manager checkpoint data: unexpected end of JSON input",
 			nil,
 		},
 		{
-			"Fail to restore checkpoint without checksum section (fall back to empty v2 version)",
+			"Fail to restore checkpoint without dataChecksum section",
 			nil,
 			`{
-				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"4-6\"}"
+				"policyName": "static",
+				"defaultCPUSet": "7-9",
+				"entries": {
+					"pod": {
+						"container1": "4-6",
+						"container2": "1-3"
+					}
+				},
+				"checksum": 1942532442,
+				"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"7-9\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"1-3\"}}}"
 			}`,
 			"none",
 			containermap.ContainerMap{},
-			`configured policy "none" differs from state checkpoint policy ""`,
+			`checkpoint is corrupted`,
 			nil,
 		},
+		// In below testcase V2 part of checkpoint is intentionally corrupted to verify that it is not used.
 		{
 			"Restore default cpu set",
 			nil,
 			`{
+				"policyName": "other",
+				"defaultCPUSet": "1-9",
+				"checksum": 1234,
 				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"4-6\"}",
-				"checksum": 657950972
+				"dataChecksum": 657950972
 			}`,
 			"none",
 			containermap.ContainerMap{},
@@ -142,12 +164,16 @@ func TestCheckpointStateRestore(t *testing.T) {
 				defaultCPUSet: cpuset.New(4, 5, 6),
 			},
 		},
+		// In below testcase V2 part of checkpoint is intentionally corrupted to verify that it is not used.
 		{
 			"Restore valid checkpoint",
 			nil,
 			`{
+				"policyName": "other",
+				"defaultCPUSet": "1-9",
+				"checksum": 1234,
 				"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"7-9\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"1-3\"}}}",
-				"checksum": 1420829534
+				"dataChecksum": 1420829534
 			}`,
 			"static",
 			containermap.ContainerMap{},
@@ -166,10 +192,19 @@ func TestCheckpointStateRestore(t *testing.T) {
 			"Fail to restore checkpoint with invalid checksum",
 			nil,
 			`{
-				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"4-6\"}",
-				"checksum": 1234
+				"policyName": "static",
+				"defaultCPUSet": "7-9",
+				"entries": {
+					"pod": {
+						"container1": "4-6",
+						"container2": "1-3"
+					}
+				},
+				"checksum": 1942532442,
+				"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"7-9\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"1-3\"}}}",
+				"dataChecksum": 1234
 			}`,
-			"none",
+			"static",
 			containermap.ContainerMap{},
 			"checkpoint is corrupted",
 			nil,
@@ -183,48 +218,76 @@ func TestCheckpointStateRestore(t *testing.T) {
 			"unexpected end of JSON input",
 			nil,
 		},
+		// In below testcase policyName in V2 part of checkpoint is intentionally unaligned with data section.
 		{
 			"Fail to restore checkpoint with invalid policy name",
 			nil,
 			`{
-				"data": "{\"policyName\":\"other\",\"defaultCPUSet\":\"1-3\"}",
-				"checksum": 2380595610
+				"policyName": "static",
+				"defaultCPUSet": "7-9",
+				"entries": {
+					"pod": {
+						"container1": "4-6",
+						"container2": "1-3"
+					}
+				},
+				"checksum": 1942532442,
+				"data": "{\"policyName\":\"other\",\"defaultCPUSet\":\"7-9\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"1-3\"}}}",
+				"dataChecksum": 1432271708
 			}`,
 			"none",
 			containermap.ContainerMap{},
 			`configured policy "none" differs from state checkpoint policy "other"`,
 			nil,
 		},
+		// In below testcase defaultCPUSet in V2 part of checkpoint is intentionally unaligned with data section.
 		{
 			"Fail to restore checkpoint with unparsable default cpu set",
 			nil,
 			`{
+				"policyName": "none",
+				"defaultCPUSet": "7-9",
+				"checksum": 98002435,
 				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"1.3\"}",
-				"checksum": 3033143655
+				"dataChecksum": 3033143655
 			}`,
 			"none",
 			containermap.ContainerMap{},
 			`could not parse default cpu set "1.3": strconv.Atoi: parsing "1.3": invalid syntax`,
 			nil,
 		},
+		// In below testcase entries in V2 part of checkpoint are intentionally unaligned with data section.
 		{
 			"Fail to restore checkpoint with unparsable assignment entry",
 			nil,
 			`{
+				"policyName": "static",
+				"defaultCPUSet": "1-3",
+				"entries": {
+					"pod": {
+						"container1": "4-6",
+						"container2": "7-9"
+					}
+				},
+				"checksum": 1659543133,
 				"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"asd\"}}}",
-				"checksum": 3794806925
+				"dataChecksum": 3794806925
 			}`,
 			"static",
 			containermap.ContainerMap{},
 			`could not parse cpuset "asd" for container "container2" in pod "pod": strconv.Atoi: parsing "asd": invalid syntax`,
 			nil,
 		},
+		// In below testcase V2 part of checkpoint is intentionally corrupted to verify that it is not used.
 		{
 			"Restore checkpoint ignoring unknown fields in data section",
 			nil,
 			`{
+				"policyName": "other",
+				"defaultCPUSet": "1-9",
+				"checksum": 1234,
 				"data": "{\"policyName\":\"none\",\"defaultCPUSet\":\"4-6\",\"unknownField\":\"value\"}",
-				"checksum": 3492408555
+				"dataChecksum": 3492408555
 			}`,
 			"none",
 			containermap.ContainerMap{},
@@ -374,12 +437,16 @@ func TestCheckpointStateRestore(t *testing.T) {
 				},
 			},
 		},
+		// In below testcase V2 part of checkpoint is intentionally corrupted to verify that it is not used.
 		{
 			"Restore valid v4 checkpoint with PodLevelResourceManagers disabled",
 			FeatureGateCombination{features.PodLevelResourceManagers: false},
 			`{
+				"policyName": "other",
+				"defaultCPUSet": "1-9",
+				"checksum": 1234,
 				"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"7-9\"}},\"podEntries\":{\"pod\":{\"cpuSet\":\"4-10\"}}}",
-				"checksum": 2328898362
+				"dataChecksum": 2328898362
 			}`,
 			"static",
 			containermap.ContainerMap{},
@@ -394,12 +461,16 @@ func TestCheckpointStateRestore(t *testing.T) {
 				defaultCPUSet: cpuset.New(1, 2, 3),
 			},
 		},
+		// In below testcase V2 part of checkpoint is intentionally corrupted to verify that it is not used.
 		{
 			"Restore valid v4 checkpoint with PodLevelResourceManagers enabled",
 			FeatureGateCombination{features.PodLevelResourceManagers: true},
 			`{
+				"policyName": "other",
+				"defaultCPUSet": "1-9",
+				"checksum": 1234,
 				"data": "{\"policyName\":\"static\",\"defaultCPUSet\":\"1-3\",\"entries\":{\"pod\":{\"container1\":\"4-6\",\"container2\":\"7-9\"}},\"podEntries\":{\"pod\":{\"cpuSet\":\"4-10\"}}}",
-				"checksum": 2328898362
+				"dataChecksum": 2328898362
 			}`,
 			"static",
 			containermap.ContainerMap{},

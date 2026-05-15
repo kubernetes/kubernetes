@@ -181,7 +181,7 @@ func (sc *stateCheckpoint) restoreState() error {
 	return nil
 }
 
-// loadAndMigrateCheckpointV3 loads the latest checkpoint and migrates it from older versions if needed.
+// loadAndMigrateCheckpointV4 loads the latest checkpoint and migrates it from older versions if needed.
 func (sc *stateCheckpoint) loadAndMigrateCheckpointV4() (*CPUManagerCheckpointV4, error) {
 	sc.logger.Info("trying to load v4 cpu manager checkpoint")
 	checkpointV4 := newCPUManagerCheckpointV4()
@@ -190,6 +190,12 @@ func (sc *stateCheckpoint) loadAndMigrateCheckpointV4() (*CPUManagerCheckpointV4
 		return checkpointV4, nil
 	}
 	if errors.Is(err, cperrors.ErrCheckpointNotFound) {
+		return nil, err
+	}
+
+	if len(checkpointV4.Data) > 0 || checkpointV4.DataChecksum != 0 {
+		// This is a corrupted V4 checkpoint version. Don't fall back to previous versions, but return error.
+		sc.logger.Error(err, "could not load v4 checkpoint, no falling back to previous versions")
 		return nil, err
 	}
 
