@@ -334,12 +334,13 @@ func NewKubeGenericRuntimeManager(
 		}
 
 		var ( // variables used to determine cache/lock set sizes
-			maxParallelPulls     = ptr.Deref(maxParallelImagePulls, 0)
-			intentCacheSize      = max(2*maxPods, 2*maxParallelPulls)
-			pullRecordsCacheSize = 5 * maxPods
+			maxParallelPulls          = ptr.Deref(maxParallelImagePulls, 0)
+			intentCacheSize           = max(2*maxPods, 2*maxParallelPulls)
+			pullRecordsCacheSize      = 5 * maxPods
+			preloadedRecordsCacheSize = pullRecordsCacheSize
 		)
 
-		memCacheRecordsAccessor := imagepullmanager.NewCachedPullRecordsAccessor(logger, fsRecordAccessor, intentCacheSize, pullRecordsCacheSize, maxParallelPulls)
+		memCacheRecordsAccessor := imagepullmanager.NewCachedPullRecordsAccessor(logger, fsRecordAccessor, intentCacheSize, preloadedRecordsCacheSize, pullRecordsCacheSize, maxParallelPulls)
 
 		imagePullManager, err = imagepullmanager.NewImagePullManager(ctx, memCacheRecordsAccessor, imagePullCredentialsVerificationPolicy, kubeRuntimeManager, maxParallelPulls)
 		if err != nil {

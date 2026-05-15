@@ -1480,6 +1480,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		kubeletconfigv1beta1.CredentialProvider{}.OpenAPIModelName():                                                    schema_k8sio_kubelet_config_v1beta1_CredentialProvider(ref),
 		kubeletconfigv1beta1.CredentialProviderConfig{}.OpenAPIModelName():                                              schema_k8sio_kubelet_config_v1beta1_CredentialProviderConfig(ref),
 		kubeletconfigv1beta1.ExecEnvVar{}.OpenAPIModelName():                                                            schema_k8sio_kubelet_config_v1beta1_ExecEnvVar(ref),
+		kubeletconfigv1beta1.ImagePreloadedRecord{}.OpenAPIModelName():                                                  schema_k8sio_kubelet_config_v1beta1_ImagePreloadedRecord(ref),
 		kubeletconfigv1beta1.ImagePullCredentials{}.OpenAPIModelName():                                                  schema_k8sio_kubelet_config_v1beta1_ImagePullCredentials(ref),
 		kubeletconfigv1beta1.ImagePullIntent{}.OpenAPIModelName():                                                       schema_k8sio_kubelet_config_v1beta1_ImagePullIntent(ref),
 		kubeletconfigv1beta1.ImagePullSecret{}.OpenAPIModelName():                                                       schema_k8sio_kubelet_config_v1beta1_ImagePullSecret(ref),
@@ -1494,6 +1495,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		kubeletconfigv1beta1.KubeletX509Authentication{}.OpenAPIModelName():                                             schema_k8sio_kubelet_config_v1beta1_KubeletX509Authentication(ref),
 		kubeletconfigv1beta1.MemoryReservation{}.OpenAPIModelName():                                                     schema_k8sio_kubelet_config_v1beta1_MemoryReservation(ref),
 		kubeletconfigv1beta1.MemorySwapConfiguration{}.OpenAPIModelName():                                               schema_k8sio_kubelet_config_v1beta1_MemorySwapConfiguration(ref),
+		kubeletconfigv1beta1.PreloadedImage{}.OpenAPIModelName():                                                        schema_k8sio_kubelet_config_v1beta1_PreloadedImage(ref),
 		kubeletconfigv1beta1.SerializedNodeConfigSource{}.OpenAPIModelName():                                            schema_k8sio_kubelet_config_v1beta1_SerializedNodeConfigSource(ref),
 		kubeletconfigv1beta1.ShutdownGracePeriodByPodPriority{}.OpenAPIModelName():                                      schema_k8sio_kubelet_config_v1beta1_ShutdownGracePeriodByPodPriority(ref),
 		kubeletconfigv1beta1.UserNamespaces{}.OpenAPIModelName():                                                        schema_k8sio_kubelet_config_v1beta1_UserNamespaces(ref),
@@ -71155,6 +71157,63 @@ func schema_k8sio_kubelet_config_v1beta1_ExecEnvVar(ref common.ReferenceCallback
 	}
 }
 
+func schema_k8sio_kubelet_config_v1beta1_ImagePreloadedRecord(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"lastUpdatedTime": {
+						SchemaProps: spec.SchemaProps{
+							Description: "LastUpdatedTime is the time of the last update to this record",
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
+						},
+					},
+					"imageRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ImageRef is a reference to the image represented by this file as received from the CRI. The filename is a SHA-256 hash of this value. This is to avoid filename-unsafe characters like ':' and '/'.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"observedImages": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ObservedImages is a set of images, where `image` is the content of a pod's container `image` field that's got its tag/digest removed.\n\nExample:\n  Container requests the `hello-world:latest@sha256:91fb4b041da273d5a3273b6d587d62d518300a6ad268b28628f74997b93171b2` image:\n    \"observedImages\": {\n      \"hello-world\": {}\n    }",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(kubeletconfigv1beta1.PreloadedImage{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"lastUpdatedTime", "imageRef"},
+			},
+		},
+		Dependencies: []string{
+			metav1.Time{}.OpenAPIModelName(), kubeletconfigv1beta1.PreloadedImage{}.OpenAPIModelName()},
+	}
+}
+
 func schema_k8sio_kubelet_config_v1beta1_ImagePullCredentials(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -72637,6 +72696,16 @@ func schema_k8sio_kubelet_config_v1beta1_MemorySwapConfiguration(ref common.Refe
 						},
 					},
 				},
+			},
+		},
+	}
+}
+
+func schema_k8sio_kubelet_config_v1beta1_PreloadedImage(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
 			},
 		},
 	}

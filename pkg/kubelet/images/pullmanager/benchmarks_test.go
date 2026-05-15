@@ -308,7 +308,7 @@ func setupInMemRecordsAccessor(t testing.TB, cacheSize int, authoritative bool) 
 	t.Helper()
 
 	fsAccessor := setupFSRecordsAccessor(t)
-	memcacheAccessor := NewCachedPullRecordsAccessor(logger, fsAccessor, int32(cacheSize), int32(cacheSize), int32(runtime.NumCPU()))
+	memcacheAccessor := NewCachedPullRecordsAccessor(logger, fsAccessor, int32(cacheSize), int32(cacheSize), int32(cacheSize), int32(runtime.NumCPU()))
 	gotMeteredAccessor, ok := memcacheAccessor.(*meteringRecordsAccessor)
 	if !ok {
 		t.Fatalf("the tested accessor must be a metered records accessor, got %T", memcacheAccessor)

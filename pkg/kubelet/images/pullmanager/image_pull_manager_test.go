@@ -426,18 +426,21 @@ func Test_pulledRecordMergeNewCreds(t *testing.T) {
 
 func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 	tests := []struct {
-		name                  string
-		imagePullPolicy       ImagePullPolicyEnforcer
-		podSecrets            []kubeletconfiginternal.ImagePullSecret
-		podServiceAccount     *kubeletconfiginternal.ImagePullServiceAccount
-		image                 string
-		imageRef              string
-		pulledFiles           []string
-		pullingFiles          []string
-		expectedPullRecord    *kubeletconfiginternal.ImagePulledRecord
-		want                  bool
-		wantPodCredsRequested bool
-		expectedCacheWrite    bool
+		name                          string
+		imagePullPolicy               ImagePullPolicyEnforcer
+		podSecrets                    []kubeletconfiginternal.ImagePullSecret
+		podServiceAccount             *kubeletconfiginternal.ImagePullServiceAccount
+		image                         string
+		imageRef                      string
+		pulledFiles                   []string
+		preloadedFiles                []string
+		pullingFiles                  []string
+		expectedPullRecord            *kubeletconfiginternal.ImagePulledRecord
+		expectedPreloadedRecord       *kubeletconfiginternal.ImagePreloadedRecord
+		expectedPreloadedRecordWrites bool
+		want                          bool
+		wantPodCredsRequested         bool
+		expectedCacheWrite            bool
 	}{
 		{
 			name:            "image exists and is recorded with pod's exact secret",
@@ -556,6 +559,51 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 			wantPodCredsRequested: false,
 		},
 		{
+			name:            "image exists but the pull is recorded with a different image name; preloaded record exists for this name",
+			imagePullPolicy: NeverVerifyPreloadedPullPolicy(),
+			podSecrets: []kubeletconfiginternal.ImagePullSecret{
+				{
+					UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "testsecrethash",
+				},
+			},
+			image:                 "docker.io/testing/different:latest",
+			imageRef:              "testimageref",
+			pulledFiles:           []string{"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"},
+			preloadedFiles:        []string{"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"},
+			want:                  false,
+			wantPodCredsRequested: false,
+		},
+		{
+			name:            "image exists but the pull is recorded with a different image name; preloaded record exists for different name",
+			imagePullPolicy: NeverVerifyPreloadedPullPolicy(),
+			podSecrets: []kubeletconfiginternal.ImagePullSecret{
+				{
+					UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "testsecrethash",
+				},
+			},
+			image:                 "docker.io/testing/completely-different:latest",
+			imageRef:              "testimageref",
+			pulledFiles:           []string{"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"},
+			preloadedFiles:        []string{"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"},
+			want:                  true,
+			wantPodCredsRequested: false,
+		},
+		{
+			name:            "image exists but the pull is recorded with a different image name; preloaded record exists for this name - AlwaysVerifyPullPolicy",
+			imagePullPolicy: AlwaysVerifyImagePullPolicy(),
+			podSecrets: []kubeletconfiginternal.ImagePullSecret{
+				{
+					UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "testsecrethash",
+				},
+			},
+			image:                 "docker.io/testing/different:latest",
+			imageRef:              "testimageref",
+			pulledFiles:           []string{"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"},
+			preloadedFiles:        []string{"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064"},
+			want:                  true,
+			wantPodCredsRequested: false,
+		},
+		{
 			name:                  "image exists and is recorded with empty credential mapping",
 			imagePullPolicy:       NeverVerifyPreloadedPullPolicy(),
 			image:                 "docker.io/testing/test:latest",
@@ -573,18 +621,34 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 			wantPodCredsRequested: false,
 		},
 		{
-			name:                  "image exists and there are no records of it with NeverVerifyPreloadedImages pull policy",
-			imagePullPolicy:       NeverVerifyPreloadedPullPolicy(),
-			image:                 "docker.io/testing/test:latest",
-			imageRef:              "testexistingref",
-			want:                  false,
-			wantPodCredsRequested: false,
+			name:                          "image exists and there are no records of it with NeverVerifyPreloadedImages pull policy",
+			imagePullPolicy:               NeverVerifyPreloadedPullPolicy(),
+			image:                         "docker.io/testing/test:latest",
+			imageRef:                      "testexistingref",
+			want:                          false,
+			wantPodCredsRequested:         false,
+			expectedPreloadedRecordWrites: true,
+			expectedPreloadedRecord: &kubeletconfiginternal.ImagePreloadedRecord{
+				ImageRef: "testexistingref",
+				ObservedImages: map[string]kubeletconfiginternal.PreloadedImage{
+					"docker.io/testing/test": {},
+				},
+			},
 		},
 		{
 			name:                  "image exists and there are no records of it with AlwaysVerify pull policy",
 			imagePullPolicy:       AlwaysVerifyImagePullPolicy(),
 			image:                 "docker.io/testing/test:latest",
 			imageRef:              "testexistingref",
+			want:                  true,
+			wantPodCredsRequested: false,
+		},
+		{
+			name:                  "image exists and there is an ImagePreloadedRecord of it with AlwaysVerify pull policy",
+			imagePullPolicy:       AlwaysVerifyImagePullPolicy(),
+			image:                 "docker.io/testing/test:latest",
+			imageRef:              "testexistingref",
+			preloadedFiles:        []string{"sha256-0eeec2fec6456af3efdeaf15c8d3a64b2f3388b5f0df1f12e0ddcbb18aa664d3"},
 			want:                  true,
 			wantPodCredsRequested: false,
 		},
@@ -599,6 +663,21 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 			image:                 "docker.io/testing/test:latest",
 			imageRef:              "testexistingref",
 			pullingFiles:          []string{"sha256-aef2af226629a35d5f3ef0fdbb29fdbebf038d0acd8850590e8c48e1e283aa56"},
+			want:                  true,
+			wantPodCredsRequested: false,
+		},
+		{
+			name:            "image exists and is recorded via pulling intent and PreloadedRecord",
+			imagePullPolicy: NeverVerifyPreloadedPullPolicy(),
+			podSecrets: []kubeletconfiginternal.ImagePullSecret{
+				{
+					UID: "testsecretuid", Namespace: "default", Name: "pull-secret", CredentialHash: "testsecrethash",
+				},
+			},
+			image:                 "docker.io/testing/test:latest",
+			imageRef:              "testexistingref",
+			pullingFiles:          []string{"sha256-aef2af226629a35d5f3ef0fdbb29fdbebf038d0acd8850590e8c48e1e283aa56"},
+			preloadedFiles:        []string{"sha256-0eeec2fec6456af3efdeaf15c8d3a64b2f3388b5f0df1f12e0ddcbb18aa664d3"},
 			want:                  true,
 			wantPodCredsRequested: false,
 		},
@@ -757,22 +836,25 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 
 			testDir := t.TempDir()
 			pullingDir := filepath.Join(testDir, "pulling")
+			preloadedDir := filepath.Join(testDir, "observed-preloaded")
 			pulledDir := filepath.Join(testDir, "pulled")
 
 			_ = teeTestData(t, pullingDir, "pulling", tt.pullingFiles)
+			_ = teeTestData(t, preloadedDir, "observed-preloaded", tt.preloadedFiles)
 			_ = teeTestData(t, pulledDir, "pulled", tt.pulledFiles)
 
-			fsRecordAccessor := &testWriteCountingFSPullRecordsAccessor{
+			fsRecordAccessor := &testWriteCountingFSRecordsAccessor{
 				fsPullRecordsAccessor: fsPullRecordsAccessor{
-					pullingDir: pullingDir,
-					pulledDir:  pulledDir,
-					encoder:    encoder,
-					decoder:    decoder,
+					pullingDir:   pullingDir,
+					preloadedDir: preloadedDir,
+					pulledDir:    pulledDir,
+					encoder:      encoder,
+					decoder:      decoder,
 				},
 			}
 
 			var podCredsRequested bool
-			s := func() ([]kubeletconfiginternal.ImagePullSecret, *kubeletconfiginternal.ImagePullServiceAccount, error) {
+			credsFetcher := func() ([]kubeletconfiginternal.ImagePullSecret, *kubeletconfiginternal.ImagePullServiceAccount, error) {
 				podCredsRequested = true
 				return tt.podSecrets, tt.podServiceAccount, nil
 			}
@@ -781,10 +863,11 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 				imagePolicyEnforcer: tt.imagePullPolicy,
 				intentAccessors:     NewStripedLockSet(10),
 				intentCounters:      &sync.Map{},
+				preloadedAccessors:  NewStripedLockSet(10),
 				pulledAccessors:     NewStripedLockSet(10),
 			}
 
-			if got, err := f.MustAttemptImagePull(tCtx, tt.image, tt.imageRef, s); err != nil {
+			if got, err := f.MustAttemptImagePull(tCtx, tt.image, tt.imageRef, credsFetcher); err != nil {
 				t.Errorf("FileBasedImagePullManager.MustAttemptImagePull() unexpected error %v", err)
 			} else if got != tt.want {
 				t.Errorf("FileBasedImagePullManager.MustAttemptImagePull() = %v, want %v", got, tt.want)
@@ -795,7 +878,11 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 			}
 
 			if tt.expectedCacheWrite != (fsRecordAccessor.imagePulledRecordsWrites != 0) {
-				t.Errorf("expected zero cache writes, got: %v", fsRecordAccessor.imagePulledRecordsWrites)
+				t.Errorf("expected pulled cache writes: %t, got: %v", tt.expectedCacheWrite, fsRecordAccessor.imagePulledRecordsWrites)
+			}
+
+			if tt.expectedPreloadedRecordWrites != (fsRecordAccessor.imagePreloadedRecordsWrites != 0) {
+				t.Errorf("expected preloaded cache writes: %t, got: %v", tt.expectedPreloadedRecordWrites, fsRecordAccessor.imagePreloadedRecordsWrites)
 			}
 
 			if tt.expectedPullRecord != nil {
@@ -809,19 +896,39 @@ func TestFileBasedImagePullManager_MustAttemptImagePull(t *testing.T) {
 					t.Errorf("expected ImagePulledRecord != got; diff: %s", cmp.Diff(tt.expectedPullRecord, got))
 				}
 			}
+
+			if tt.expectedPreloadedRecord != nil {
+				gotPreloaded, err := fsRecordAccessor.GetImagePreloadedRecord(tt.imageRef)
+				if err != nil {
+					t.Fatalf("failed to get an expected ImagePreloadedRecord: %v", err)
+				}
+				if gotPreloaded == nil {
+					t.Fatalf("expected an ImagePreloadedRecord for imageRef %q but got none", tt.imageRef)
+				}
+				gotPreloaded.LastUpdatedTime = tt.expectedPreloadedRecord.LastUpdatedTime
+				if !reflect.DeepEqual(gotPreloaded, tt.expectedPreloadedRecord) {
+					t.Errorf("expected ImagePreloadedRecord != got; diff: %s", cmp.Diff(tt.expectedPreloadedRecord, gotPreloaded))
+				}
+			}
 		})
 	}
 }
 
-type testWriteCountingFSPullRecordsAccessor struct {
-	imagePulledRecordsWrites int
+type testWriteCountingFSRecordsAccessor struct {
+	imagePulledRecordsWrites    int
+	imagePreloadedRecordsWrites int
 
 	fsPullRecordsAccessor
 }
 
-func (a *testWriteCountingFSPullRecordsAccessor) WriteImagePulledRecord(logger klog.Logger, pulledRecord *kubeletconfiginternal.ImagePulledRecord) error {
+func (a *testWriteCountingFSRecordsAccessor) WriteImagePulledRecord(logger klog.Logger, pulledRecord *kubeletconfiginternal.ImagePulledRecord) error {
 	a.imagePulledRecordsWrites += 1
 	return a.fsPullRecordsAccessor.WriteImagePulledRecord(logger, pulledRecord)
+}
+
+func (a *testWriteCountingFSRecordsAccessor) WriteImagePreloadedRecord(logger klog.Logger, preloadedRecord *kubeletconfiginternal.ImagePreloadedRecord) error {
+	a.imagePreloadedRecordsWrites += 1
+	return a.fsPullRecordsAccessor.WriteImagePreloadedRecord(logger, preloadedRecord)
 }
 
 func TestFileBasedImagePullManager_RecordPullIntent(t *testing.T) {
@@ -900,18 +1007,20 @@ func TestFileBasedImagePullManager_RecordPullIntent(t *testing.T) {
 
 func TestFileBasedImagePullManager_RecordImagePulled(t *testing.T) {
 	tests := []struct {
-		name                 string
-		image                string
-		imageRef             string
-		creds                *kubeletconfiginternal.ImagePullCredentials
-		pullsInFlight        int32
-		existingPulling      []string
-		existingPulled       []string
-		expectPullingRemoved string
-		expectPulled         []string
-		checkedPullFile      string
-		expectedPullRecord   kubeletconfiginternal.ImagePulledRecord
-		expectUpdated        bool
+		name                  string
+		image                 string
+		imageRef              string
+		creds                 *kubeletconfiginternal.ImagePullCredentials
+		pullsInFlight         int32
+		existingPulling       []string
+		existingPulled        []string
+		expectPullingRemoved  string
+		expectPulled          []string
+		checkedPullFile       string
+		expectedPullRecord    kubeletconfiginternal.ImagePulledRecord
+		expectUpdated         bool
+		existingPreloaded     []string
+		expectPreloadedRecord *kubeletconfiginternal.ImagePreloadedRecord
 	}{
 		{
 			name:                 "new pull record",
@@ -1199,6 +1308,82 @@ func TestFileBasedImagePullManager_RecordImagePulled(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:                 "pull removes the only preloaded image and deletes the record",
+			image:                "repo.repo/test/test:v1",
+			imageRef:             "preloaded-delete-ref",
+			creds:                &kubeletconfiginternal.ImagePullCredentials{NodePodsAccessible: true},
+			expectPulled:         []string{"sha256-22bbdb43682f2be7afbc43e973815c6c512c831a11f7453b12775440c9addca7"},
+			existingPulling:      []string{"sha256-ee81caca15454863449fb55a1d942904d56d5ed9f9b20a7cb3453944ea2c7e11"},
+			pullsInFlight:        1,
+			expectPullingRemoved: "sha256-ee81caca15454863449fb55a1d942904d56d5ed9f9b20a7cb3453944ea2c7e11",
+			checkedPullFile:      "sha256-22bbdb43682f2be7afbc43e973815c6c512c831a11f7453b12775440c9addca7",
+			expectUpdated:        true,
+			expectedPullRecord: kubeletconfiginternal.ImagePulledRecord{
+				ImageRef: "preloaded-delete-ref",
+				CredentialMapping: map[string]kubeletconfiginternal.ImagePullCredentials{
+					"repo.repo/test/test": {
+						NodePodsAccessible: true,
+					},
+				},
+			},
+			existingPreloaded:     []string{"sha256-22bbdb43682f2be7afbc43e973815c6c512c831a11f7453b12775440c9addca7"},
+			expectPreloadedRecord: nil,
+		},
+		{
+			name:                 "pull removes a preloaded observed image but keeps the record with remaining images",
+			image:                "repo.repo/test/test:v1",
+			imageRef:             "preloaded-keep-ref",
+			creds:                &kubeletconfiginternal.ImagePullCredentials{NodePodsAccessible: true},
+			expectPulled:         []string{"sha256-23a5b68ca21a87bc9ec7510c1d5db90fd6c71b224b9b10a699e19a9ad09e274b"},
+			existingPulling:      []string{"sha256-ee81caca15454863449fb55a1d942904d56d5ed9f9b20a7cb3453944ea2c7e11"},
+			pullsInFlight:        1,
+			expectPullingRemoved: "sha256-ee81caca15454863449fb55a1d942904d56d5ed9f9b20a7cb3453944ea2c7e11",
+			checkedPullFile:      "sha256-23a5b68ca21a87bc9ec7510c1d5db90fd6c71b224b9b10a699e19a9ad09e274b",
+			expectUpdated:        true,
+			expectedPullRecord: kubeletconfiginternal.ImagePulledRecord{
+				ImageRef: "preloaded-keep-ref",
+				CredentialMapping: map[string]kubeletconfiginternal.ImagePullCredentials{
+					"repo.repo/test/test": {
+						NodePodsAccessible: true,
+					},
+				},
+			},
+			existingPreloaded: []string{"sha256-23a5b68ca21a87bc9ec7510c1d5db90fd6c71b224b9b10a699e19a9ad09e274b"},
+			expectPreloadedRecord: &kubeletconfiginternal.ImagePreloadedRecord{
+				ImageRef: "preloaded-keep-ref",
+				ObservedImages: map[string]kubeletconfiginternal.PreloadedImage{
+					"docker.io/other/image": {},
+				},
+			},
+		},
+		{
+			name:                 "pull with non-matching preloaded observed image leaves the record intact",
+			image:                "repo.repo/test/test:v1",
+			imageRef:             "preloaded-nomatch-ref",
+			creds:                &kubeletconfiginternal.ImagePullCredentials{NodePodsAccessible: true},
+			expectPulled:         []string{"sha256-adf2f7ccf67d5c7a1406b14209e15c621bdffde2c0b5e0e016ba13f248254545"},
+			existingPulling:      []string{"sha256-ee81caca15454863449fb55a1d942904d56d5ed9f9b20a7cb3453944ea2c7e11"},
+			pullsInFlight:        1,
+			expectPullingRemoved: "sha256-ee81caca15454863449fb55a1d942904d56d5ed9f9b20a7cb3453944ea2c7e11",
+			checkedPullFile:      "sha256-adf2f7ccf67d5c7a1406b14209e15c621bdffde2c0b5e0e016ba13f248254545",
+			expectUpdated:        true,
+			expectedPullRecord: kubeletconfiginternal.ImagePulledRecord{
+				ImageRef: "preloaded-nomatch-ref",
+				CredentialMapping: map[string]kubeletconfiginternal.ImagePullCredentials{
+					"repo.repo/test/test": {
+						NodePodsAccessible: true,
+					},
+				},
+			},
+			existingPreloaded: []string{"sha256-adf2f7ccf67d5c7a1406b14209e15c621bdffde2c0b5e0e016ba13f248254545"},
+			expectPreloadedRecord: &kubeletconfiginternal.ImagePreloadedRecord{
+				ImageRef: "preloaded-nomatch-ref",
+				ObservedImages: map[string]kubeletconfiginternal.PreloadedImage{
+					"docker.io/other/image": {},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1209,23 +1394,27 @@ func TestFileBasedImagePullManager_RecordImagePulled(t *testing.T) {
 
 			testDir := t.TempDir()
 			pullingDir := filepath.Join(testDir, "pulling")
+			preloadedDir := filepath.Join(testDir, "observed-preloaded")
 			pulledDir := filepath.Join(testDir, "pulled")
 
 			_ = teeTestData(t, pullingDir, "pulling", tt.existingPulling)
 			_ = teeTestData(t, pulledDir, "pulled", tt.existingPulled)
+			_ = teeTestData(t, preloadedDir, "observed-preloaded", tt.existingPreloaded)
 
 			fsRecordAccessor := &fsPullRecordsAccessor{
-				pullingDir: pullingDir,
-				pulledDir:  pulledDir,
-				encoder:    encoder,
-				decoder:    decoder,
+				pullingDir:   pullingDir,
+				preloadedDir: preloadedDir,
+				pulledDir:    pulledDir,
+				encoder:      encoder,
+				decoder:      decoder,
 			}
 
 			f := &PullManager{
-				recordsAccessor: fsRecordAccessor,
-				intentAccessors: NewStripedLockSet(10),
-				intentCounters:  &sync.Map{},
-				pulledAccessors: NewStripedLockSet(10),
+				recordsAccessor:    fsRecordAccessor,
+				intentAccessors:    NewStripedLockSet(10),
+				intentCounters:     &sync.Map{},
+				preloadedAccessors: NewStripedLockSet(10),
+				pulledAccessors:    NewStripedLockSet(10),
 			}
 			f.intentCounters.Store(tt.image, tt.pullsInFlight)
 			origIntentCounter := f.getIntentCounterForImage(tt.image)
@@ -1262,6 +1451,20 @@ func TestFileBasedImagePullManager_RecordImagePulled(t *testing.T) {
 			if !reflect.DeepEqual(got, &tt.expectedPullRecord) {
 				t.Errorf("expected ImagePulledRecord != got; diff: %s", cmp.Diff(tt.expectedPullRecord, got))
 			}
+
+			gotPreloaded, err := fsRecordAccessor.GetImagePreloadedRecord(tt.imageRef)
+			if err != nil {
+				t.Fatalf("failed to read the ImagePreloadedRecord: %v", err)
+			}
+			if tt.expectPreloadedRecord == nil {
+				require.Nil(t, gotPreloaded, "expected no ImagePreloadedRecord for imageRef %q", tt.imageRef)
+			} else {
+				require.NotNil(t, gotPreloaded, "expected an ImagePreloadedRecord for imageRef %q", tt.imageRef)
+				gotPreloaded.LastUpdatedTime = tt.expectPreloadedRecord.LastUpdatedTime
+				if !reflect.DeepEqual(gotPreloaded, tt.expectPreloadedRecord) {
+					t.Errorf("expected ImagePreloadedRecord != got; diff: %s", cmp.Diff(tt.expectPreloadedRecord, gotPreloaded))
+				}
+			}
 		})
 	}
 }
@@ -1295,11 +1498,13 @@ func TestFileBasedImagePullManager_initialize(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                  string
-		existingIntents       []string
-		existingPulledRecords []string
-		expectedIntents       sets.Set[string]
-		expectedPulled        sets.Set[string]
+		name                     string
+		existingIntents          []string
+		existingPreloadedRecords []string
+		existingPulledRecords    []string
+		expectedIntents          sets.Set[string]
+		expectedPreloadedRecords sets.Set[string]
+		expectedPulled           sets.Set[string]
 	}{
 		{
 			name: "no pulling/pulled records",
@@ -1315,6 +1520,16 @@ func TestFileBasedImagePullManager_initialize(t *testing.T) {
 				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a",
 				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
 				"sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991"),
+		},
+		{
+			name: "only preloaded records - initialize leaves them untouched",
+			existingPreloadedRecords: []string{
+				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
+				"sha256-0eeec2fec6456af3efdeaf15c8d3a64b2f3388b5f0df1f12e0ddcbb18aa664d3",
+			},
+			expectedPreloadedRecords: sets.New(
+				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
+				"sha256-0eeec2fec6456af3efdeaf15c8d3a64b2f3388b5f0df1f12e0ddcbb18aa664d3"),
 		},
 		{
 			name: "pulling intent that matches an existing image - no matching pulled record",
@@ -1377,6 +1592,7 @@ func TestFileBasedImagePullManager_initialize(t *testing.T) {
 
 			testDir := t.TempDir()
 			pullingDir := filepath.Join(testDir, "pulling")
+			preloadedDir := filepath.Join(testDir, "observed-preloaded")
 			pulledDir := filepath.Join(testDir, "pulled")
 
 			if err := os.MkdirAll(pullingDir, 0700); err != nil {
@@ -1385,23 +1601,29 @@ func TestFileBasedImagePullManager_initialize(t *testing.T) {
 			if err := os.MkdirAll(pulledDir, 0700); err != nil {
 				t.Fatal(err)
 			}
+			if err := os.MkdirAll(preloadedDir, 0700); err != nil {
+				t.Fatal(err)
+			}
 
 			_ = teeTestData(t, pullingDir, "pulling", tt.existingIntents)
 			_ = teeTestData(t, pulledDir, "pulled", tt.existingPulledRecords)
+			_ = teeTestData(t, preloadedDir, "observed-preloaded", tt.existingPreloadedRecords)
 
 			fsRecordAccessor := &fsPullRecordsAccessor{
-				pullingDir: pullingDir,
-				pulledDir:  pulledDir,
-				encoder:    encoder,
-				decoder:    decoder,
+				pullingDir:   pullingDir,
+				preloadedDir: preloadedDir,
+				pulledDir:    pulledDir,
+				encoder:      encoder,
+				decoder:      decoder,
 			}
 
 			f := &PullManager{
-				recordsAccessor: fsRecordAccessor,
-				imageService:    imageService,
-				intentAccessors: NewStripedLockSet(10),
-				intentCounters:  &sync.Map{},
-				pulledAccessors: NewStripedLockSet(10),
+				recordsAccessor:    fsRecordAccessor,
+				imageService:       imageService,
+				intentAccessors:    NewStripedLockSet(10),
+				intentCounters:     &sync.Map{},
+				preloadedAccessors: NewStripedLockSet(10),
+				pulledAccessors:    NewStripedLockSet(10),
 			}
 			f.initialize(testCtx)
 
@@ -1422,6 +1644,14 @@ func TestFileBasedImagePullManager_initialize(t *testing.T) {
 				t.Fatalf("there was an error processing file in the test output pulled dir: %v", err)
 			}
 
+			gotPreloaded := sets.New[string]()
+			if err := processDirFiles(preloadedDir, func(filePath string, fileContent []byte) error {
+				gotPreloaded.Insert(filepath.Base(filePath))
+				return nil
+			}); err != nil {
+				t.Fatalf("there was an error processing file in the test output preloaded dir: %v", err)
+			}
+
 			if !gotIntents.Equal(tt.expectedIntents) {
 				t.Errorf("difference between expected and received pull intent files: %v", cmp.Diff(tt.expectedIntents, gotIntents))
 			}
@@ -1429,17 +1659,23 @@ func TestFileBasedImagePullManager_initialize(t *testing.T) {
 			if !gotPulled.Equal(tt.expectedPulled) {
 				t.Errorf("difference between expected and received pull record files: %v", cmp.Diff(tt.expectedPulled, gotPulled))
 			}
+
+			if !gotPreloaded.Equal(tt.expectedPreloadedRecords) {
+				t.Errorf("difference between expected and received preloaded record files: %v", cmp.Diff(tt.expectedPreloadedRecords, gotPreloaded))
+			}
 		})
 	}
 }
 
 func TestFileBasedImagePullManager_PruneUnknownRecords(t *testing.T) {
 	tests := []struct {
-		name        string
-		imageList   []string
-		gcStartTime time.Time
-		pulledFiles []string
-		wantFiles   sets.Set[string]
+		name               string
+		imageList          []string
+		gcStartTime        time.Time
+		pulledFiles        []string
+		preloadedFiles     []string
+		wantFiles          sets.Set[string]
+		wantPreloadedFiles sets.Set[string]
 	}{
 		{
 			name:        "all images present",
@@ -1450,10 +1686,16 @@ func TestFileBasedImagePullManager_PruneUnknownRecords(t *testing.T) {
 				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
 				"sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991",
 			},
+			preloadedFiles: []string{
+				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
+			},
 			wantFiles: sets.New(
 				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a",
 				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
 				"sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991",
+			),
+			wantPreloadedFiles: sets.New(
+				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
 			),
 		},
 		{
@@ -1464,6 +1706,10 @@ func TestFileBasedImagePullManager_PruneUnknownRecords(t *testing.T) {
 				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a",
 				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
 				"sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991",
+			},
+			preloadedFiles: []string{
+				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
+				"sha256-0eeec2fec6456af3efdeaf15c8d3a64b2f3388b5f0df1f12e0ddcbb18aa664d3",
 			},
 		},
 		{
@@ -1485,8 +1731,15 @@ func TestFileBasedImagePullManager_PruneUnknownRecords(t *testing.T) {
 				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
 				"sha256-f8778b6393eaf39315e767a58cbeacf2c4b270d94b4d6926ee993d9e49444991",
 			},
+			preloadedFiles: []string{
+				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
+				"sha256-0eeec2fec6456af3efdeaf15c8d3a64b2f3388b5f0df1f12e0ddcbb18aa664d3",
+			},
 			wantFiles: sets.New(
 				"sha256-a2eace2182b24cdbbb730798e47b10709b9ef5e0f0c1624a3bc06c8ca987727a",
+				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
+			),
+			wantPreloadedFiles: sets.New(
 				"sha256-b3c0cc4278800b03a308ceb2611161430df571ca733122f0a40ac8b9792a9064",
 			),
 		},
@@ -1498,22 +1751,29 @@ func TestFileBasedImagePullManager_PruneUnknownRecords(t *testing.T) {
 			require.NoError(t, err)
 
 			testDir := t.TempDir()
+			preloadedDir := filepath.Join(testDir, "observed-preloaded")
 			pulledDir := filepath.Join(testDir, "pulled")
 			if err := os.MkdirAll(pulledDir, 0700); err != nil {
 				t.Fatalf("failed to create testing dir %q: %v", pulledDir, err)
 			}
+			if err := os.MkdirAll(preloadedDir, 0700); err != nil {
+				t.Fatalf("failed to create testing dir %q: %v", preloadedDir, err)
+			}
 
 			_ = teeTestData(t, pulledDir, "pulled", tt.pulledFiles)
+			_ = teeTestData(t, preloadedDir, "observed-preloaded", tt.preloadedFiles)
 
 			fsRecordAccessor := &fsPullRecordsAccessor{
-				pulledDir: pulledDir,
-				encoder:   encoder,
-				decoder:   decoder,
+				preloadedDir: preloadedDir,
+				pulledDir:    pulledDir,
+				encoder:      encoder,
+				decoder:      decoder,
 			}
 
 			f := &PullManager{
-				recordsAccessor: fsRecordAccessor,
-				pulledAccessors: NewStripedLockSet(10),
+				recordsAccessor:    fsRecordAccessor,
+				preloadedAccessors: NewStripedLockSet(10),
+				pulledAccessors:    NewStripedLockSet(10),
 			}
 			f.PruneUnknownRecords(tCtx, tt.imageList, tt.gcStartTime)
 
@@ -1536,6 +1796,27 @@ func TestFileBasedImagePullManager_PruneUnknownRecords(t *testing.T) {
 
 			if !tt.wantFiles.Equal(filesLeft) {
 				t.Errorf("expected equal sets, diff: %s", cmp.Diff(tt.wantFiles, filesLeft))
+			}
+
+			preloadedLeft := sets.New[string]()
+			err = filepath.Walk(preloadedDir, func(path string, info fs.FileInfo, err error) error {
+				if err != nil {
+					return err
+				}
+
+				if path == preloadedDir {
+					return nil
+				}
+
+				preloadedLeft.Insert(info.Name())
+				return nil
+			})
+			if err != nil {
+				t.Fatalf("failed to walk the preloaded dir after prune: %v", err)
+			}
+
+			if !tt.wantPreloadedFiles.Equal(preloadedLeft) {
+				t.Errorf("expected equal preloaded sets, diff: %s", cmp.Diff(tt.wantPreloadedFiles, preloadedLeft))
 			}
 		})
 	}
