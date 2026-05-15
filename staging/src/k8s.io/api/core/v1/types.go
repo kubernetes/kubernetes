@@ -5877,6 +5877,7 @@ type ServiceStatus struct {
 	// +patchStrategy=merge
 	// +listType=map
 	// +listMapKey=type
+	// +k8s:alpha(since: "1.37")=+k8s:eachVal=+k8s:opaqueType
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,2,rep,name=conditions"`
 }
 

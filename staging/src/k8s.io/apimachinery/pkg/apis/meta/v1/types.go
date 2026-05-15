@@ -1627,6 +1627,7 @@ type Condition struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`
 	// +kubebuilder:validation:MaxLength=316
+	// +k8s:alpha(since: "1.37")=+k8s:required
 	Type string `json:"type" protobuf:"bytes,1,opt,name=type"`
 	// status of the condition, one of True, False, Unknown.
 	// +required
