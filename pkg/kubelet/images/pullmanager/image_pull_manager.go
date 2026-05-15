@@ -114,9 +114,19 @@ func (f *PullManager) RecordImagePulled(ctx context.Context, image, imageRef str
 // should be written in order to force credential verification when the image is
 // accessed the next time.
 func (f *PullManager) writePulledRecordIfChanged(ctx context.Context, image, imageRef string, credentials *kubeletconfiginternal.ImagePullCredentials) error {
-	logger := klog.FromContext(ctx)
 	f.pulledAccessors.Lock(imageRef)
 	defer f.pulledAccessors.Unlock(imageRef)
+	return f.lockedWritePulledRecordIfChanged(ctx, image, imageRef, credentials)
+}
+
+func (f *PullManager) lockedWritePulledRecordIfChanged(ctx context.Context, image, imageRef string, credentials *kubeletconfiginternal.ImagePullCredentials) error {
+	logger := klog.FromContext(ctx)
+
+	if credentials.Preloaded && (credentials.NodePodsAccessible ||
+		len(credentials.KubernetesSecrets) > 0 ||
+		len(credentials.KubernetesServiceAccounts) > 0) {
+		panic(fmt.Errorf("tried to write pulled record for image %q that sets both preloaded and credentials: %v", image, credentials))
+	}
 
 	sanitizedImage, err := trimImageTagDigest(image)
 	if err != nil {
@@ -195,52 +205,17 @@ func (f *PullManager) MustAttemptImagePull(ctx context.Context, image, imageRef 
 		recordMustAttemptImagePullResult(resultForMetrics)
 	}()
 
-	var imagePulledByKubelet bool
 	var pulledRecord *kubeletconfiginternal.ImagePulledRecord
 
-	err := func() error {
-		// don't allow changes to the files we're using for our decision
-		f.pulledAccessors.Lock(imageRef)
-		defer f.pulledAccessors.Unlock(imageRef)
-		f.intentAccessors.Lock(image)
-		defer f.intentAccessors.Unlock(image)
+	// TODO: sync.OnceValues(---v)
+	sanitizedImage, imageSanitizationError := trimImageTagDigest(image)
 
-		var err error
-		var exists bool
-		pulledRecord, exists, err = f.recordsAccessor.GetImagePulledRecord(imageRef)
-		switch {
-		case err != nil:
-			return err
-		case exists:
-			imagePulledByKubelet = true
-		case pulledRecord != nil:
-			imagePulledByKubelet = true
-		default:
-			// optimized check - we can check the intent number, however, if it's zero
-			// it may only mean kubelet restarted since writing the intent record and
-			// we must fall back to the actual cache
-			imagePulledByKubelet = f.getIntentCounterForImage(image) > 0
-			if imagePulledByKubelet {
-				break
-			}
-
-			if exists, err := f.recordsAccessor.ImagePullIntentExists(image); err != nil {
-				return fmt.Errorf("failed to check existence of an image pull intent: %w", err)
-			} else if exists {
-				imagePulledByKubelet = true
-			}
-		}
-
-		return nil
-	}()
-
+	pulledRecord, isExempted, err := f.isExemptedByPolicy(ctx, logger, image, sanitizedImage, imageSanitizationError, imageRef)
 	if err != nil {
 		resultForMetrics = checkResultError
 		logger.Error(err, "Unable to access cache records about image pulls")
 		return true, nil
-	}
-
-	if !f.imagePolicyEnforcer.RequireCredentialVerificationForImage(image, imagePulledByKubelet) {
+	} else if isExempted {
 		resultForMetrics = checkResultCredentialPolicyAllowed
 		return false, nil
 	}
@@ -251,10 +226,9 @@ func (f *PullManager) MustAttemptImagePull(ctx context.Context, image, imageRef 
 		return true, nil
 	}
 
-	sanitizedImage, err := trimImageTagDigest(image)
-	if err != nil {
+	if imageSanitizationError != nil {
 		resultForMetrics = checkResultError
-		logger.Error(err, "failed to parse image name, forcing image credentials reverification", "image", sanitizedImage)
+		logger.Error(imageSanitizationError, "failed to parse image name, forcing image credentials reverification", "image", image)
 		return true, nil
 	}
 
@@ -326,6 +300,114 @@ func (f *PullManager) MustAttemptImagePull(ctx context.Context, image, imageRef 
 
 	resultForMetrics = checkResultMustAuthenticate
 	return true, nil
+}
+
+// NOTE: isExemptedByPolicy contains the previous check that was determining whether an
+// image was pulled by the kubelet.
+// The previous `isPulledByKubelet` code was already locking all the records we
+// need to determine whether we should write a `preloaded:true` pulled record
+func (f *PullManager) isExemptedByPolicy(ctx context.Context, logger klog.Logger, image, sanitizedImage string, imageSanitizationError error, imageRef string) (*kubeletconfiginternal.ImagePulledRecord, bool, error) {
+	// don't allow changes to the files we're using for our decision
+	f.pulledAccessors.Lock(imageRef)
+	defer f.pulledAccessors.Unlock(imageRef)
+	f.intentAccessors.Lock(image)
+	defer f.intentAccessors.Unlock(image)
+
+	var pulledRecord *kubeletconfiginternal.ImagePulledRecord
+	var intentExists *bool
+	isPulledByKubelet, err := func() (bool, error) {
+		var exists bool
+		var err error
+		pulledRecord, exists, err = f.recordsAccessor.GetImagePulledRecord(imageRef)
+		if err != nil {
+			return false, err
+		}
+
+		if exists && pulledRecord == nil {
+			return true, nil
+		}
+
+		if pulledRecord != nil {
+			if imageSanitizationError != nil {
+				// we're not able to check the credentials of the ImagePulledRecord
+				return true, nil
+			}
+
+			credential, ok := pulledRecord.CredentialMapping[sanitizedImage]
+			if ok && !credential.Preloaded {
+				return true, nil
+			}
+			if !ok {
+				// check if there are any !Preloaded records -> mark as pulled by
+				// kubelet if at least one exists
+				// NOTE: this would be easier if pulled records were separate
+				for _, c := range pulledRecord.CredentialMapping {
+					if !c.Preloaded {
+						return true, nil
+					}
+				}
+			}
+
+			intentExistsVal, err := f.lockedImagePullIntentExists(image)
+			if err != nil {
+				return false, err
+			}
+			intentExists = new(intentExistsVal)
+
+			if intentExistsVal {
+				return true, nil
+			}
+
+			// pulled record says preloaded, we don't have any record of the image being pulled right now
+			return false, nil
+		}
+
+		// pulled record does not exist
+		intentExistsVal, err := f.lockedImagePullIntentExists(image)
+		if err != nil {
+			return false, err
+		}
+		intentExists = new(intentExistsVal)
+		return intentExistsVal, nil
+	}()
+	if err != nil {
+		return nil, false, err
+	}
+
+	if !f.imagePolicyEnforcer.RequireCredentialVerificationForImage(image, isPulledByKubelet) {
+		// TODO: create a record that this was exempt/pre-pulled - record "NotPulledByKubelet"
+		// what happens when there suddenly is a pulled record, but not just for the imageName?
+		//--------------------------------------------------
+		// NOTE: needs to decide if all conditions are satisfied for the write - no pull intents, no `preloaded:false` records
+		//		  Concurrency - what happens if these get written in the meantime? We cannot lock because the write itself locks - should
+		//						this check be part of the ImageCreds merging?
+		//						The write locks pulled records, but we also need to check intents...
+		//						|--> we probably need a double-locking method
+		if f.lockedShouldWriteImagePreloaded(intentExists, pulledRecord, image) {
+			if err := f.lockedWritePulledRecordIfChanged(ctx, image, imageRef, &kubeletconfiginternal.ImagePullCredentials{Preloaded: true}); err != nil {
+				logger.Error(err, "failed to record image as preloaded", "image", image, "imageRef", imageRef)
+			}
+		}
+		return pulledRecord, true, nil
+	}
+
+	return pulledRecord, false, nil
+}
+
+// lockedImagePullIntentExists is an optimized check for pull intent existence.
+// It checks the intent number, however, if it's zero it may only mean kubelet
+// restarted since writing the intent record and we must fall back to the
+// actual cache
+func (f *PullManager) lockedImagePullIntentExists(image string) (bool, error) {
+	if f.getIntentCounterForImage(image) > 0 {
+		return true, nil
+	}
+
+	exists, err := f.recordsAccessor.ImagePullIntentExists(image)
+	if err != nil {
+		return false, fmt.Errorf("failed to check existence of an image pull intent: %w", err)
+	}
+	return exists, nil
 }
 
 func (f *PullManager) PruneUnknownRecords(ctx context.Context, imageList []string, until time.Time) {
@@ -444,6 +526,28 @@ func searchForExistingTagDigest(inFlightPulls sets.Set[string], image kubecontai
 	return existingRecordedImages
 }
 
+func (f *PullManager) lockedShouldWriteImagePreloaded(intentExists *bool, pulledRecord *kubeletconfiginternal.ImagePulledRecord, image string) bool {
+	if pulledRecord != nil {
+		for _, creds := range pulledRecord.CredentialMapping {
+			if !creds.Preloaded {
+				return false
+			}
+		}
+		return true
+	}
+
+	if intentExists == nil {
+		intentExistsVal, err := f.lockedImagePullIntentExists(image)
+		if err != nil {
+			// TODO: log here
+			return false
+		}
+		intentExists = new(intentExistsVal)
+	}
+
+	return !*intentExists
+}
+
 type kubeSecretCoordinates struct {
 	UID       string
 	Namespace string
@@ -464,7 +568,7 @@ func pulledRecordMergeNewCreds(orig *kubeletconfiginternal.ImagePulledRecord, im
 		return orig, false
 	}
 
-	if !newCreds.NodePodsAccessible && len(newCreds.KubernetesSecrets) == 0 && len(newCreds.KubernetesServiceAccounts) == 0 {
+	if !newCreds.Preloaded && !newCreds.NodePodsAccessible && len(newCreds.KubernetesSecrets) == 0 && len(newCreds.KubernetesServiceAccounts) == 0 {
 		// we don't have any secret, service account credentials or node-wide access to record
 		return orig, false
 	}
@@ -482,6 +586,13 @@ func pulledRecordMergeNewCreds(orig *kubeletconfiginternal.ImagePulledRecord, im
 	if selectedCreds.NodePodsAccessible {
 		return orig, false
 	}
+
+	// preloaded can only ever be true if this was a new record or if both the
+	// previous and current state set preloaded=true
+	if newCreds.Preloaded && selectedCreds.Preloaded {
+		return orig, false
+	}
+	selectedCreds.Preloaded = false
 
 	switch {
 	case newCreds.NodePodsAccessible:
