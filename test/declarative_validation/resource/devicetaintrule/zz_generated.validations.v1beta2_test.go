@@ -34,6 +34,12 @@ func init() {
 				{ErrorType: "FieldValueNotSupported"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"status.conditions[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"status.conditions[*].type": {
+				{ErrorType: "FieldValueRequired"},
+			},
 		},
 	)
 }

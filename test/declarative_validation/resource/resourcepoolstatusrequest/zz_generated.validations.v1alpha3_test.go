@@ -48,6 +48,12 @@ func init() {
 			"status.conditions": {
 				{ErrorType: "FieldValueTooMany", Origin: "maxItems"},
 			},
+			"status.conditions[*]": {
+				{ErrorType: "FieldValueDuplicate"},
+			},
+			"status.conditions[*].type": {
+				{ErrorType: "FieldValueRequired"},
+			},
 			"status.poolCount": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
 				{ErrorType: "FieldValueRequired"},
