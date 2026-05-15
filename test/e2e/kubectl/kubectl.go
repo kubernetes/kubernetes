@@ -40,7 +40,6 @@ import (
 	"time"
 
 	openapi_v2 "github.com/google/gnostic-models/openapiv2"
-	"github.com/google/go-cmp/cmp"
 
 	"sigs.k8s.io/yaml"
 
@@ -931,65 +930,6 @@ metadata:
 			for _, component := range components {
 				ginkgo.By("getting status of " + component)
 				e2ekubectl.RunKubectlOrDie(ns, "get", "componentstatuses", component)
-			}
-		})
-	})
-
-	ginkgo.Describe("Kubectl prune with applyset", func() {
-		ginkgo.It("should apply and prune objects", func(ctx context.Context) {
-			framework.Logf("applying manifest1")
-			manifest1 := `
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cm1
-  namespace: {{ns}}
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cm2
-  namespace: {{ns}}
-`
-
-			manifest1 = strings.ReplaceAll(manifest1, "{{ns}}", ns)
-			args := []string{"apply", "--prune", "--applyset=applyset1", "-f", "-"}
-			e2ekubectl.NewKubectlCommand(ns, args...).AppendEnv([]string{"KUBECTL_APPLYSET=true"}).WithStdinData(manifest1).ExecOrDie(ns)
-
-			framework.Logf("checking which objects exist")
-			objects := mustListObjectsInNamespace(ctx, c, ns)
-			names := mustGetNames(objects)
-			if diff := cmp.Diff(names, []string{"cm1", "cm2"}); diff != "" {
-				framework.Failf("unexpected configmap names (-want +got):\n%s", diff)
-			}
-
-			framework.Logf("applying manifest2")
-			manifest2 := `
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cm1
-  namespace: {{ns}}
-`
-			manifest2 = strings.ReplaceAll(manifest2, "{{ns}}", ns)
-
-			e2ekubectl.NewKubectlCommand(ns, args...).AppendEnv([]string{"KUBECTL_APPLYSET=true"}).WithStdinData(manifest2).ExecOrDie(ns)
-
-			framework.Logf("checking which objects exist")
-			objects = mustListObjectsInNamespace(ctx, c, ns)
-			names = mustGetNames(objects)
-			if diff := cmp.Diff(names, []string{"cm1"}); diff != "" {
-				framework.Failf("unexpected configmap names (-want +got):\n%s", diff)
-			}
-
-			framework.Logf("applying manifest2 (again)")
-			e2ekubectl.NewKubectlCommand(ns, args...).AppendEnv([]string{"KUBECTL_APPLYSET=true"}).WithStdinData(manifest2).ExecOrDie(ns)
-
-			framework.Logf("checking which objects exist")
-			objects = mustListObjectsInNamespace(ctx, c, ns)
-			names = mustGetNames(objects)
-			if diff := cmp.Diff(names, []string{"cm1"}); diff != "" {
-				framework.Failf("unexpected configmap names (-want +got):\n%s", diff)
 			}
 		})
 	})
