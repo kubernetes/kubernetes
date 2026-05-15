@@ -32,6 +32,20 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+type sliceObjectIterator struct {
+	items []runtime.Object
+	index int
+}
+
+func (it *sliceObjectIterator) Next() (runtime.Object, error) {
+	if it.index >= len(it.items) {
+		return nil, io.EOF
+	}
+	item := it.items[it.index]
+	it.index++
+	return item, nil
+}
+
 func streamEncodeCollections(obj runtime.Object, w io.Writer) (bool, error) {
 	list, ok := obj.(*unstructured.UnstructuredList)
 	if ok {
@@ -90,6 +104,10 @@ func getListMeta(list runtime.Object) (metav1.TypeMeta, metav1.ListMeta, []runti
 }
 
 func streamingEncodeList(w io.Writer, typeMeta metav1.TypeMeta, listMeta metav1.ListMeta, items []runtime.Object) error {
+	var iter runtime.ObjectIterator
+	if items != nil {
+		iter = &sliceObjectIterator{items: items}
+	}
 	// Start
 	if _, err := w.Write([]byte(`{`)); err != nil {
 		return err
@@ -113,7 +131,7 @@ func streamingEncodeList(w io.Writer, typeMeta metav1.TypeMeta, listMeta metav1.
 	}
 
 	// Items
-	if err := encodeItemsObjectSlice(w, items); err != nil {
+	if err := encodeItemsObjectIterator(w, iter); err != nil {
 		return err
 	}
 
@@ -122,29 +140,35 @@ func streamingEncodeList(w io.Writer, typeMeta metav1.TypeMeta, listMeta metav1.
 	return err
 }
 
-func encodeItemsObjectSlice(w io.Writer, items []runtime.Object) (err error) {
-	if items == nil {
-		err := encodeKeyValuePair(w, "items", nil, nil)
-		return err
+func encodeItemsObjectIterator(w io.Writer, iter runtime.ObjectIterator) (err error) {
+	if iter == nil {
+		return encodeKeyValuePair(w, "items", nil, nil)
 	}
 	_, err = w.Write([]byte(`"items":[`))
 	if err != nil {
 		return err
 	}
-	suffix := []byte(",")
-	for i, item := range items {
-		if i == len(items)-1 {
-			suffix = nil
+
+	first := true
+	for {
+		item, err := iter.Next()
+		if err == io.EOF {
+			break
 		}
-		err := encodeValue(w, item, suffix)
 		if err != nil {
+			return err
+		}
+		if !first {
+			if _, err := w.Write([]byte(",")); err != nil {
+				return err
+			}
+		}
+		first = false
+		if err := encodeValue(w, item, nil); err != nil {
 			return err
 		}
 	}
 	_, err = w.Write([]byte("]"))
-	if err != nil {
-		return err
-	}
 	return err
 }
 

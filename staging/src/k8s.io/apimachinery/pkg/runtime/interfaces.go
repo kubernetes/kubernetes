@@ -360,6 +360,12 @@ type CacheableObject interface {
 	GetObject() Object
 }
 
+// ObjectIterator produces objects one at a time for streaming serializers.
+// It returns io.EOF when there are no more objects to produce.
+type ObjectIterator interface {
+	Next() (Object, error)
+}
+
 // Unstructured objects store values as map[string]interface{}, with only values that can be serialized
 // to JSON allowed.
 type Unstructured interface {
