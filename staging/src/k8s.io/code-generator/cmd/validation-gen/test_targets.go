@@ -392,9 +392,9 @@ func collectRules(node *typeNode) fieldRules {
 		}
 	}
 
-	var walkNode func(*typeNode, string)
+	var walkNode func(*typeNode, string, bool, bool)
 	var walkChild func(*childNode, string)
-	walkNode = func(n *typeNode, path string) {
+	walkNode = func(n *typeNode, path string, skipElem, skipKey bool) {
 		if n == nil || seen[n] {
 			return
 		}
@@ -411,10 +411,10 @@ func collectRules(node *typeNode) fieldRules {
 		for _, fld := range n.fields {
 			walkChild(fld, joinPath(path, fld.jsonName))
 		}
-		if n.elem != nil {
+		if n.elem != nil && !skipElem {
 			walkChild(n.elem, joinPath(path, "[*]"))
 		}
-		if n.key != nil {
+		if n.key != nil && !skipKey {
 			walkChild(n.key, path)
 		}
 		if n.underlying != nil {
@@ -428,9 +428,10 @@ func collectRules(node *typeNode) fieldRules {
 		record(path, c.fieldValidations.Functions)
 		record(joinPath(path, "[*]"), c.fieldValIterations.Functions)
 		record(path, c.fieldKeyIterations.Functions)
-		walkNode(c.node, path)
+		walkNode(c.node, path, c.fieldValidations.OpaqueValType, c.fieldValidations.OpaqueKeyType)
+
 	}
-	walkNode(node, "")
+	walkNode(node, "", false, false)
 	return rules
 }
 
