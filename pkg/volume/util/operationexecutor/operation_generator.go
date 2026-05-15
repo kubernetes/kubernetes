@@ -32,14 +32,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	volerr "k8s.io/cloud-provider/volume/errors"
 	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -2065,18 +2063,8 @@ func (og *operationGenerator) nodeExpandVolume(
 func (og *operationGenerator) checkForRecoveryFromExpansion(pvc *v1.PersistentVolumeClaim, volumeToMount VolumeToMount) bool {
 	resizeStatus := pvc.Status.AllocatedResourceStatuses[v1.ResourceStorage]
 	allocatedResource := pvc.Status.AllocatedResources
-	featureGateStatus := utilfeature.DefaultFeatureGate.Enabled(features.RecoverVolumeExpansionFailure)
 
-	if !featureGateStatus {
-		// even though RecoverVolumeExpansionFailure feature-gate is disabled, we should consider it enabled
-		// if resizeStatus is not empty or allocatedresources is set
-		if resizeStatus != "" || allocatedResource != nil {
-			return true
-		}
-		return false
-	}
-
-	// Even though RecoverVolumeExpansionFailure feature gate is enabled, it appears that we are running with older version
+	// It appears that we are running with older version
 	// of resize controller, which will not populate allocatedResource and resizeStatus. This can happen because of version skew
 	// and hence we are going to keep expanding using older logic.
 	if resizeStatus == "" && allocatedResource == nil {
@@ -2088,8 +2076,7 @@ func (og *operationGenerator) checkForRecoveryFromExpansion(pvc *v1.PersistentVo
 }
 
 // legacyCallNodeExpandOnPlugin is old version of calling node expansion on plugin, which does not support
-// recovery from volume expansion failure
-// TODO: Removing this code when RecoverVolumeExpansionFailure feature goes GA.
+// recovery from volume expansion failure. It is still used during version skew with older resize controllers.
 func (og *operationGenerator) legacyCallNodeExpandOnPlugin(resizeOp nodeResizeOperationOpts) (bool, error) {
 	pvc := resizeOp.pvc
 	volumeToMount := resizeOp.vmt
@@ -2110,9 +2097,8 @@ func (og *operationGenerator) legacyCallNodeExpandOnPlugin(resizeOp nodeResizeOp
 
 	_, resizeErr := expandableVolumePlugin.NodeExpand(rsOpts)
 	if resizeErr != nil {
-		// This is a workaround for now, until RecoverFromVolumeExpansionFailure feature goes GA.
-		// If RecoverFromVolumeExpansionFailure feature is enabled, we will not ever hit this state, because
-		// we will wait for VolumeExpansionPendingOnNode before trying to expand volume in kubelet.
+		// This is only expected during version skew with older resize controllers because
+		// newer controllers set VolumeExpansionPendingOnNode before kubelet tries to expand.
 		if volumetypes.IsOperationNotSupportedError(resizeErr) {
 			klog.V(4).InfoS(volumeToMount.GenerateMsgDetailed("MountVolume.NodeExpandVolume failed", "NodeExpandVolume not supported"), "pod", klog.KObj(volumeToMount.Pod))
 			return true, nil

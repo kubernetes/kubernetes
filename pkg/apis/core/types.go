@@ -506,9 +506,8 @@ type PersistentVolumeClaimSpec struct {
 	// +optional
 	Selector *metav1.LabelSelector
 	// Resources represents the minimum resources required
-	// If RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements
-	// that are lower than previous value but must still be higher than capacity recorded in the
-	// status field of the claim.
+	// Users are allowed to specify resource requirements that are lower than the previous value
+	// but must still be higher than capacity recorded in the status field of the claim.
 	// +optional
 	Resources VolumeResourceRequirements
 	// VolumeName is the binding reference to the PersistentVolume backing this
@@ -593,7 +592,7 @@ type TypedObjectReference struct {
 // Valid values are:
 //   - "Resizing", "FileSystemResizePending"
 //
-// If RecoverVolumeExpansionFailure feature gate is enabled, then following additional values can be expected:
+// The following additional values can be expected:
 //   - "ControllerResizeError", "NodeResizeError"
 //
 // If VolumeAttributesClass feature gate is enabled, then following additional values can be expected:

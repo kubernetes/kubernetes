@@ -2373,6 +2373,9 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		},
 	}, core.PersistentVolumeClaimStatus{
 		Phase: core.ClaimBound,
+		Capacity: core.ResourceList{
+			core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+		},
 	})
 
 	validClaimStorageClass := testVolumeClaimStorageClass("foo", "ns", "fast", core.PersistentVolumeClaimSpec{
@@ -2826,7 +2829,6 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		isExpectedFailure           bool
 		oldClaim                    *core.PersistentVolumeClaim
 		newClaim                    *core.PersistentVolumeClaim
-		enableRecoverFromExpansion  bool
 		enableVolumeAttributesClass bool
 	}{
 		"valid-update-volumeName-only": {
@@ -2999,33 +3001,23 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			newClaim:          validClaimRWOPAccessModeAddAnnotation,
 		},
 		"valid-expand-shrink-resize-enabled": {
-			oldClaim:                   validClaimShrinkInitial,
-			newClaim:                   validClaimShrink,
-			enableRecoverFromExpansion: true,
+			oldClaim: validClaimShrinkInitial,
+			newClaim: validClaimShrink,
 		},
 		"invalid-expand-shrink-resize-enabled": {
-			oldClaim:                   validClaimShrinkInitial,
-			newClaim:                   invalidClaimShrink,
-			enableRecoverFromExpansion: true,
-			isExpectedFailure:          true,
+			oldClaim:          validClaimShrinkInitial,
+			newClaim:          invalidClaimShrink,
+			isExpectedFailure: true,
 		},
 		"invalid-expand-shrink-to-status-resize-enabled": {
-			oldClaim:                   validClaimShrinkInitial,
-			newClaim:                   invalidShrinkToStatus,
-			enableRecoverFromExpansion: true,
-			isExpectedFailure:          true,
-		},
-		"invalid-expand-shrink-recover-disabled": {
-			oldClaim:                   validClaimShrinkInitial,
-			newClaim:                   validClaimShrink,
-			enableRecoverFromExpansion: false,
-			isExpectedFailure:          true,
+			oldClaim:          validClaimShrinkInitial,
+			newClaim:          invalidShrinkToStatus,
+			isExpectedFailure: true,
 		},
 		"unbound-size-shrink-resize-enabled": {
-			oldClaim:                   validClaimShrinkInitial,
-			newClaim:                   unboundShrink,
-			enableRecoverFromExpansion: true,
-			isExpectedFailure:          true,
+			oldClaim:          validClaimShrinkInitial,
+			newClaim:          unboundShrink,
+			isExpectedFailure: true,
 		},
 		"allow-update-pvc-when-data-source-used": {
 			oldClaim:          invalidClaimDataSourceAPIGroup,
@@ -3128,8 +3120,7 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.RecoverVolumeExpansionFailure: scenario.enableRecoverFromExpansion,
-				features.VolumeAttributesClass:         scenario.enableVolumeAttributesClass,
+				features.VolumeAttributesClass: scenario.enableVolumeAttributesClass,
 			})
 
 			scenario.oldClaim.ResourceVersion = "1"
@@ -3157,21 +3148,18 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 		"nil pv": {
 			oldPvc: nil,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				EnableRecoverFromExpansionFailure: true,
-				EnableVolumeAttributesClass:       false,
+				EnableVolumeAttributesClass: false,
 			},
 		},
 		"invalid apiGroup in dataSource allowed because the old pvc is used": {
 			oldPvc: pvcWithDataSource(&core.TypedLocalObjectReference{APIGroup: &invalidAPIGroup}),
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				EnableRecoverFromExpansionFailure:     true,
 				AllowInvalidAPIGroupInDataSourceOrRef: true,
 			},
 		},
 		"invalid apiGroup in dataSourceRef allowed because the old pvc is used": {
 			oldPvc: pvcWithDataSourceRef(&core.TypedObjectReference{APIGroup: &invalidAPIGroup}),
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				EnableRecoverFromExpansionFailure:     true,
 				AllowInvalidAPIGroupInDataSourceOrRef: true,
 			},
 		},
@@ -3179,16 +3167,14 @@ func TestValidationOptionsForPersistentVolumeClaim(t *testing.T) {
 			oldPvc:                      pvcWithVolumeAttributesClassName(ptr.To("foo")),
 			enableVolumeAttributesClass: true,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				EnableRecoverFromExpansionFailure: true,
-				EnableVolumeAttributesClass:       true,
+				EnableVolumeAttributesClass: true,
 			},
 		},
 		"volume attributes class validated because used and feature disabled": {
 			oldPvc:                      pvcWithVolumeAttributesClassName(ptr.To("foo")),
 			enableVolumeAttributesClass: false,
 			expectValidationOpts: PersistentVolumeClaimSpecValidationOptions{
-				EnableRecoverFromExpansionFailure: true,
-				EnableVolumeAttributesClass:       true,
+				EnableVolumeAttributesClass: true,
 			},
 		},
 	}
@@ -21741,7 +21727,6 @@ func TestValidateLimitRange(t *testing.T) {
 }
 
 func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
 	validClaim := testVolumeClaim("foo", "ns", core.PersistentVolumeClaimSpec{
 		AccessModes: []core.PersistentVolumeAccessMode{
 			core.ReadWriteOnce,
@@ -21966,10 +21951,9 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 	})
 
 	scenarios := map[string]struct {
-		isExpectedFailure          bool
-		oldClaim                   *core.PersistentVolumeClaim
-		newClaim                   *core.PersistentVolumeClaim
-		enableRecoverFromExpansion bool
+		isExpectedFailure bool
+		oldClaim          *core.PersistentVolumeClaim
+		newClaim          *core.PersistentVolumeClaim
 	}{
 		"condition-update-with-enabled-feature-gate": {
 			isExpectedFailure: false,
@@ -21977,107 +21961,89 @@ func TestValidatePersistentVolumeClaimStatusUpdate(t *testing.T) {
 			newClaim:          validConditionUpdate,
 		},
 		"status-update-with-valid-allocatedResources-feature-enabled": {
-			isExpectedFailure:          false,
-			oldClaim:                   validClaim,
-			newClaim:                   validAllocatedResources,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          validAllocatedResources,
 		},
 		"status-update-with-invalid-allocatedResources-native-key-feature-enabled": {
-			isExpectedFailure:          true,
-			oldClaim:                   validClaim,
-			newClaim:                   invalidNativeResourceAllocatedKey,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          invalidNativeResourceAllocatedKey,
 		},
 		"status-update-with-valid-allocatedResources-external-key-feature-enabled": {
-			isExpectedFailure:          false,
-			oldClaim:                   validClaim,
-			newClaim:                   validExternalAllocatedResource,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          validExternalAllocatedResource,
 		},
 
 		"status-update-with-invalid-allocatedResources-feature-enabled": {
-			isExpectedFailure:          true,
-			oldClaim:                   validClaim,
-			newClaim:                   invalidAllocatedResources,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          invalidAllocatedResources,
 		},
 		"status-update-with-no-storage-update": {
-			isExpectedFailure:          true,
-			oldClaim:                   validClaim,
-			newClaim:                   noStoraegeClaimStatus,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          noStoraegeClaimStatus,
 		},
 		"staus-update-with-controller-resize-failed": {
-			isExpectedFailure:          false,
-			oldClaim:                   validClaim,
-			newClaim:                   validResizeStatusControllerResizeFailed,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          validResizeStatusControllerResizeFailed,
 		},
 		"staus-update-with-node-resize-pending": {
-			isExpectedFailure:          false,
-			oldClaim:                   validClaim,
-			newClaim:                   validNodeResizePending,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          validNodeResizePending,
 		},
 		"staus-update-with-node-resize-inprogress": {
-			isExpectedFailure:          false,
-			oldClaim:                   validClaim,
-			newClaim:                   validNodeResizeInProgress,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          validNodeResizeInProgress,
 		},
 		"staus-update-with-node-resize-failed": {
-			isExpectedFailure:          false,
-			oldClaim:                   validClaim,
-			newClaim:                   validNodeResizeFailed,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          validNodeResizeFailed,
 		},
 		"staus-update-with-invalid-native-resource-status-key": {
-			isExpectedFailure:          true,
-			oldClaim:                   validClaim,
-			newClaim:                   invalidNativeResizeStatusPVC,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          invalidNativeResizeStatusPVC,
 		},
 		"staus-update-with-valid-external-resource-status-key": {
-			isExpectedFailure:          false,
-			oldClaim:                   validClaim,
-			newClaim:                   validExternalResizeStatusPVC,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          validExternalResizeStatusPVC,
 		},
 		"status-update-with-multiple-resources-key": {
-			isExpectedFailure:          false,
-			oldClaim:                   validClaim,
-			newClaim:                   multipleResourceStatusPVC,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          multipleResourceStatusPVC,
 		},
 		"status-update-with-valid-pvc-resize-status": {
-			isExpectedFailure:          false,
-			oldClaim:                   validClaim,
-			newClaim:                   validResizeStatusPVC,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: false,
+			oldClaim:          validClaim,
+			newClaim:          validResizeStatusPVC,
 		},
 		"status-update-with-invalid-pvc-resize-status": {
-			isExpectedFailure:          true,
-			oldClaim:                   validClaim,
-			newClaim:                   invalidResizeStatusPVC,
-			enableRecoverFromExpansion: true,
+			isExpectedFailure: true,
+			oldClaim:          validClaim,
+			newClaim:          invalidResizeStatusPVC,
 		},
-		"status-update-with-old-pvc-valid-resourcestatus-newpvc-invalid-recovery-disabled": {
-			isExpectedFailure:          true,
-			oldClaim:                   validResizeStatusPVC,
-			newClaim:                   invalidResizeStatusPVC,
-			enableRecoverFromExpansion: false,
+		"status-update-with-old-pvc-valid-resourcestatus-newpvc-invalid": {
+			isExpectedFailure: true,
+			oldClaim:          validResizeStatusPVC,
+			newClaim:          invalidResizeStatusPVC,
 		},
-		"status-update-with-old-pvc-valid-allocatedResource-newpvc-invalid-recovery-disabled": {
-			isExpectedFailure:          true,
-			oldClaim:                   validExternalAllocatedResource,
-			newClaim:                   invalidNativeResourceAllocatedKey,
-			enableRecoverFromExpansion: false,
+		"status-update-with-old-pvc-valid-allocatedResource-newpvc-invalid": {
+			isExpectedFailure: true,
+			oldClaim:          validExternalAllocatedResource,
+			newClaim:          invalidNativeResourceAllocatedKey,
 		},
 	}
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, scenario.enableRecoverFromExpansion)
-
 			validateOpts := ValidationOptionsForPersistentVolumeClaim(scenario.newClaim, scenario.oldClaim)
 
 			// ensure we have a resource version specified for updates

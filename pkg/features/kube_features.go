@@ -819,12 +819,6 @@ const (
 	// bursting into resources requested at higher QoS levels (memory only for now)
 	QOSReserved featuregate.Feature = "QOSReserved"
 
-	// owner: @gnufied
-	// kep: https://kep.k8s.io/1790
-	//
-	// Allow users to recover from volume expansion failure
-	RecoverVolumeExpansionFailure featuregate.Feature = "RecoverVolumeExpansionFailure"
-
 	// owner: @AkihiroSuda
 	// kep: https://kep.k8s.io/3857
 	//
@@ -1760,12 +1754,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.11"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
-	RecoverVolumeExpansionFailure: {
-		{Version: version.MustParse("1.23"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // GA in 1.34; remove in 1.37
-	},
-
 	RecursiveReadOnlyMounts: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.31"), Default: true, PreRelease: featuregate.Beta},
@@ -2461,8 +2449,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	ProcMountType: {UserNamespacesSupport},
 
 	QOSReserved: {},
-
-	RecoverVolumeExpansionFailure: {},
 
 	RecursiveReadOnlyMounts: {},
 
