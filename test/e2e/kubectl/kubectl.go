@@ -270,6 +270,38 @@ func hostIsLocal(host string) bool {
 	return false
 }
 
+func debugDiscovery() {
+	home := os.Getenv("HOME")
+	if len(home) == 0 {
+		framework.Logf("no $HOME envvar set")
+		return
+	}
+
+	cacheDir := filepath.Join(home, ".kube", "cache", "discovery")
+	err := filepath.Walk(cacheDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// only pay attention to $host_$port/v1/serverresources.json files
+		subpath := strings.TrimPrefix(path, cacheDir+string(filepath.Separator))
+		parts := filepath.SplitList(subpath)
+		if len(parts) != 3 || parts[1] != "v1" || parts[2] != "serverresources.json" {
+			return nil
+		}
+		framework.Logf("%s modified at %s (current time: %s)", path, info.ModTime(), time.Now())
+
+		data, readError := os.ReadFile(path)
+		if readError != nil {
+			framework.Logf("%s error: %v", path, readError)
+		} else {
+			framework.Logf("%s content: %s", path, string(data))
+		}
+		return nil
+	})
+	framework.Logf("scanned %s for discovery docs: %v", home, err)
+}
+
 var _ = SIGDescribe("Kubectl client", func() {
 	defer ginkgo.GinkgoRecover()
 	f := framework.NewDefaultFramework("kubectl")
@@ -305,38 +337,6 @@ var _ = SIGDescribe("Kubectl client", func() {
 			e2edebug.DumpAllNamespaceInfo(ctx, f.ClientSet, ns)
 			framework.Failf("Verified %d of %d pods , error: %v", len(pods), atLeast, err)
 		}
-	}
-
-	debugDiscovery := func() {
-		home := os.Getenv("HOME")
-		if len(home) == 0 {
-			framework.Logf("no $HOME envvar set")
-			return
-		}
-
-		cacheDir := filepath.Join(home, ".kube", "cache", "discovery")
-		err := filepath.Walk(cacheDir, func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-
-			// only pay attention to $host_$port/v1/serverresources.json files
-			subpath := strings.TrimPrefix(path, cacheDir+string(filepath.Separator))
-			parts := filepath.SplitList(subpath)
-			if len(parts) != 3 || parts[1] != "v1" || parts[2] != "serverresources.json" {
-				return nil
-			}
-			framework.Logf("%s modified at %s (current time: %s)", path, info.ModTime(), time.Now())
-
-			data, readError := os.ReadFile(path)
-			if readError != nil {
-				framework.Logf("%s error: %v", path, readError)
-			} else {
-				framework.Logf("%s content: %s", path, string(data))
-			}
-			return nil
-		})
-		framework.Logf("scanned %s for discovery docs: %v", home, err)
 	}
 
 	ginkgo.Describe("Update Demo", func() {
@@ -990,85 +990,6 @@ metadata:
 			names = mustGetNames(objects)
 			if diff := cmp.Diff(names, []string{"cm1"}); diff != "" {
 				framework.Failf("unexpected configmap names (-want +got):\n%s", diff)
-			}
-		})
-	})
-
-	ginkgo.Describe("Kubectl apply", func() {
-		ginkgo.It("should apply a new configuration to an existing RC", func(ctx context.Context) {
-			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostControllerFilename)))
-
-			ginkgo.By("creating Agnhost RC")
-			e2ekubectl.RunKubectlOrDieInput(ns, controllerJSON, "create", "-f", "-")
-			ginkgo.By("applying a modified configuration")
-			stdin := modifyReplicationControllerConfiguration(controllerJSON)
-			e2ekubectl.NewKubectlCommand(ns, "apply", "-f", "-").
-				WithStdinReader(stdin).
-				ExecOrDie(ns)
-			ginkgo.By("checking the result")
-			forEachReplicationController(ctx, c, ns, "app", "agnhost", validateReplicationControllerConfiguration)
-		})
-		ginkgo.It("should reuse port when apply to an existing SVC", func(ctx context.Context) {
-			serviceJSON := readTestFileOrDie(agnhostServiceFilename)
-
-			ginkgo.By("creating Agnhost SVC")
-			e2ekubectl.RunKubectlOrDieInput(ns, string(serviceJSON[:]), "create", "-f", "-")
-
-			ginkgo.By("getting the original port")
-			originalNodePort := e2ekubectl.RunKubectlOrDie(ns, "get", "service", "agnhost-primary", "-o", "jsonpath={.spec.ports[0].port}")
-
-			ginkgo.By("applying the same configuration")
-			e2ekubectl.RunKubectlOrDieInput(ns, string(serviceJSON[:]), "apply", "-f", "-")
-
-			ginkgo.By("getting the port after applying configuration")
-			currentNodePort := e2ekubectl.RunKubectlOrDie(ns, "get", "service", "agnhost-primary", "-o", "jsonpath={.spec.ports[0].port}")
-
-			ginkgo.By("checking the result")
-			if originalNodePort != currentNodePort {
-				framework.Failf("port should keep the same")
-			}
-		})
-
-		ginkgo.It("apply set/view last-applied", func(ctx context.Context) {
-			deployment1Yaml := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostDeployment1Filename)))
-			deployment2Yaml := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostDeployment2Filename)))
-			deployment3Yaml := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostDeployment3Filename)))
-
-			ginkgo.By("deployment replicas number is 2")
-			e2ekubectl.RunKubectlOrDieInput(ns, deployment1Yaml, "apply", "-f", "-")
-
-			ginkgo.By("check the last-applied matches expectations annotations")
-			output := e2ekubectl.RunKubectlOrDieInput(ns, deployment1Yaml, "apply", "view-last-applied", "-f", "-", "-o", "json")
-			requiredString := "\"replicas\": 2"
-			if !strings.Contains(output, requiredString) {
-				framework.Failf("Missing %s in kubectl view-last-applied", requiredString)
-			}
-
-			ginkgo.By("apply file doesn't have replicas")
-			e2ekubectl.RunKubectlOrDieInput(ns, deployment2Yaml, "apply", "set-last-applied", "-f", "-")
-
-			ginkgo.By("check last-applied has been updated, annotations doesn't have replicas")
-			output = e2ekubectl.RunKubectlOrDieInput(ns, deployment1Yaml, "apply", "view-last-applied", "-f", "-", "-o", "json")
-			requiredString = "\"replicas\": 2"
-			if strings.Contains(output, requiredString) {
-				framework.Failf("Presenting %s in kubectl view-last-applied", requiredString)
-			}
-
-			ginkgo.By("scale set replicas to 3")
-			agnhostDeploy := "agnhost-deployment"
-			debugDiscovery()
-			e2ekubectl.RunKubectlOrDie(ns, "scale", "deployment", agnhostDeploy, "--replicas=3")
-
-			ginkgo.By("apply file doesn't have replicas but image changed")
-			e2ekubectl.RunKubectlOrDieInput(ns, deployment3Yaml, "apply", "-f", "-")
-
-			ginkgo.By("verify replicas still is 3 and image has been updated")
-			output = e2ekubectl.RunKubectlOrDieInput(ns, deployment3Yaml, "get", "-f", "-", "-o", "json")
-			requiredItems := []string{"\"replicas\": 3", imageutils.GetE2EImage(imageutils.AgnhostPrev)}
-			for _, item := range requiredItems {
-				if !strings.Contains(output, item) {
-					framework.Failf("Missing %s in kubectl apply", item)
-				}
 			}
 		})
 	})
