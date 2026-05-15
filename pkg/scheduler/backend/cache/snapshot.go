@@ -333,7 +333,11 @@ func (s *Snapshot) IsPVCUsedByPods(key string) bool {
 	return s.usedPVCSet.Has(key)
 }
 
-// AssumePod assumes a given pod in the snapshot.
+// AssumePod assumes a given pod in the snapshot. In addition to adding the
+// pod to its node's NodeInfo, it keeps the snapshot-wide affinity, anti-affinity
+// and PVC indexes (havePodsWithAffinityNodeInfoList,
+// havePodsWithRequiredAntiAffinityNodeInfoList, usedPVCSet) consistent so that
+// scheduling plugins observe up-to-date state during the pod group cycle.
 // ForgetPod should be called on the snapshot before syncing it with the cache.
 // This function is not thread safe, so it should be executed when no other routines can write/read from the snapshot.
 func (s *Snapshot) AssumePod(podInfo *framework.PodInfo) error {
@@ -355,8 +359,8 @@ func (s *Snapshot) AssumePod(podInfo *framework.PodInfo) error {
 	hadPodsWithRequiredAntiAffinity := len(nodeInfo.PodsWithRequiredAntiAffinity) > 0
 	nodeInfo.AddPodInfo(podInfo)
 	nodeInfo.Generation = oldGeneration
-	// AddPodInfo maintains the NodeInfo's affinity and PVC indexes; the
-	// snapshot-wide lists must be updated to match, otherwise inter-pod
+	// nodeInfo.AddPodInfo maintains the NodeInfo's affinity and PVC indexes;
+	// the snapshot-wide lists must be updated to match, otherwise inter-pod
 	// (anti-)affinity and VolumeRestrictions plugins observe stale state.
 	if !hadPodsWithAffinity && len(nodeInfo.PodsWithAffinity) > 0 {
 		s.havePodsWithAffinityNodeInfoList = append(s.havePodsWithAffinityNodeInfoList, nodeInfo)
@@ -382,7 +386,10 @@ func (s *Snapshot) AssumePod(podInfo *framework.PodInfo) error {
 	return nil
 }
 
-// ForgetPod forgets a given pod from the snapshot.
+// ForgetPod forgets a given pod from the snapshot. In addition to removing
+// the pod from its node's NodeInfo, it keeps the snapshot-wide affinity,
+// anti-affinity and PVC indexes (havePodsWithAffinityNodeInfoList,
+// havePodsWithRequiredAntiAffinityNodeInfoList, usedPVCSet) consistent.
 // This function is not thread safe, so it should be executed when no other routines can write/read from the snapshot.
 func (s *Snapshot) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 	key, err := framework.GetPodKey(pod)
@@ -405,8 +412,8 @@ func (s *Snapshot) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 			return err
 		}
 		nodeInfo.Generation = oldGeneration
-		// RemovePod maintains the NodeInfo's affinity and PVC indexes; mirror
-		// those changes in the snapshot-wide lists to keep them consistent.
+		// nodeInfo.RemovePod maintains the NodeInfo's affinity and PVC indexes;
+		// mirror those changes in the snapshot-wide lists to keep them consistent.
 		if len(nodeInfo.PodsWithAffinity) == 0 {
 			s.havePodsWithAffinityNodeInfoList = removeFromNodeInfoList(s.havePodsWithAffinityNodeInfoList, nodeInfo)
 		}
@@ -452,14 +459,17 @@ func (s *Snapshot) forgetAllAssumedPods(logger klog.Logger) {
 	logger.Error(nil, "Found assumed pods in the snapshot that were not forgotten", "assumedPodsCount", len(s.assumedPods))
 }
 
-// removeFromNodeInfoList removes the given nodeInfo from the list, preserving
-// order. It is a no-op if the nodeInfo is not present.
+// removeFromNodeInfoList removes the given nodeInfo from the list using
+// swap-with-last. Order is not preserved: these lists are only iterated by
+// plugins, never ordered. It is a no-op if the nodeInfo is not present.
+// Mirrors the pattern of removeFromSlice in pkg/scheduler/framework/types.go.
 func removeFromNodeInfoList(list []fwk.NodeInfo, nodeInfo fwk.NodeInfo) []fwk.NodeInfo {
 	for i := range list {
 		if list[i] == nodeInfo {
-			copy(list[i:], list[i+1:])
+			list[i] = list[len(list)-1]
 			list[len(list)-1] = nil
-			return list[:len(list)-1]
+			list = list[:len(list)-1]
+			break
 		}
 	}
 	return list
