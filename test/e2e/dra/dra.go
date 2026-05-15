@@ -2504,6 +2504,23 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			}
 			b.Create(tCtx, quota)
 
+			// Wait for the quota controller to initialize the status with zero usage.
+			// This prevents "status unknown for quota" errors when creating pods.
+			ginkgo.By("Waiting for ResourceQuota status to be initialized")
+			gomega.Eventually(ctx, func(ctx context.Context) bool {
+				updatedQuota, err := f.ClientSet.CoreV1().ResourceQuotas(f.Namespace.Name).Get(ctx, quota.Name, metav1.GetOptions{})
+				if err != nil {
+					return false
+				}
+				// Check that all hard resources have corresponding used values
+				for resourceName := range hard {
+					if _, found := updatedQuota.Status.Used[resourceName]; !found {
+						return false
+					}
+				}
+				return true
+			}).WithTimeout(time.Minute).Should(gomega.BeTrue(), "ResourceQuota status should be initialized")
+
 			// create a class with an extended resource
 			b.Create(tCtx, class)
 
