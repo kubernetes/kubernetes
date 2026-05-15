@@ -55,11 +55,6 @@ const (
 	// certain minimum of nodes are checked for feasibility. This in turn helps
 	// ensure a minimum level of spreading.
 	minFeasibleNodesToFind = 100
-	// minFeasibleNodesPercentageToFind is the minimum percentage of nodes that
-	// would be scored in each scheduling cycle. This is a semi-arbitrary value
-	// to ensure that a certain minimum of nodes are checked for feasibility.
-	// This in turn helps ensure a minimum level of spreading.
-	minFeasibleNodesPercentageToFind = 5
 )
 
 // ScheduleOne does the entire scheduling workflow for a single scheduling entity (either a pod or a pod group).
@@ -1338,15 +1333,24 @@ func updatePod(ctx context.Context, client clientset.Interface, apiCacher fwk.AP
 	return util.PatchPodStatus(ctx, client, pod.Name, pod.Namespace, &pod.Status, podStatusCopy)
 }
 
-func adaptiveNumFeasibleNodesToFind(n int32) int32 {
-	if n <= 100 {
-		return n
+// adaptiveNumFeasibleNodesToFind returns the number of feasible nodes that once found, the scheduler stops
+// its search for more feasible nodes.
+// This function is used to calculate the number of feasible nodes to find based on the number of all nodes.
+// The formula is based on the observation that the number of feasible nodes to find is a function of the number of all nodes.
+// The formula is:
+// - if the number of all nodes is less than or equal to 100, return the number of all nodes
+// - if the number of all nodes is greater than 100 and less than or equal to 1000, return 100 + (number of all nodes - 100)*320/900
+// - if the number of all nodes is greater than 1000 and less than or equal to 5000, return 420 + (number of all nodes - 1000)*80/4000
+// - if the number of all nodes is greater than 5000, return 500 + (number of all nodes - 5000)/20
+func adaptiveNumFeasibleNodesToFind(numAllNodes int32) int32 {
+	if numAllNodes <= 100 {
+		return numAllNodes
 	}
-	if n <= 1000 {
-		return 100 + (n-100)*320/900
+	if numAllNodes <= 1000 {
+		return 100 + (numAllNodes-100)*320/900
 	}
-	if n <= 5000 {
-		return 420 + (n-1000)*80/4000
+	if numAllNodes <= 5000 {
+		return 420 + (numAllNodes-1000)*80/4000
 	}
-	return 500 + (n-5000)/20
+	return 500 + (numAllNodes-5000)/20
 }

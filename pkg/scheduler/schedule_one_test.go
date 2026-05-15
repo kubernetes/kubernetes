@@ -4406,7 +4406,7 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 		{
 			name:         "not set profile percentageOfNodesToScore and nodes number more than 50*125",
 			numAllNodes:  3000,
-			wantNumNodes: 780,
+			wantNumNodes: 460,
 		},
 		{
 			name:         "not set profile percentageOfNodesToScore and nodes number more than 50*125",
@@ -4416,7 +4416,7 @@ func TestNumFeasibleNodesToFind(t *testing.T) {
 		{
 			name:         "not set profile percentageOfNodesToScore and nodes number more than 50*125",
 			numAllNodes:  6000,
-			wantNumNodes: 300,
+			wantNumNodes: 550,
 		},
 		{
 			name:              "set profile percentageOfNodesToScore and nodes number more than 50*125",
