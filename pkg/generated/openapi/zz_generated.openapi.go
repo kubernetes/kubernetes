@@ -10923,7 +10923,6 @@ func schema_k8sio_api_apps_v1beta2_Deployment(ref common.ReferenceCallback) comm
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
@@ -11279,7 +11278,6 @@ func schema_k8sio_api_apps_v1beta2_ReplicaSet(ref common.ReferenceCallback) comm
 						},
 					},
 				},
-				Required: []string{"spec"},
 			},
 		},
 		Dependencies: []string{
