@@ -51,7 +51,7 @@ func TestImagePullDurationMetric(t *testing.T) {
 			duration := dp[1]
 			t.Log(imageSize, duration)
 			t.Log(GetImageSizeBucket(uint64(imageSize)))
-			ImagePullDuration.WithLabelValues(GetImageSizeBucket(uint64(imageSize))).Observe(duration)
+			ImagePullDuration.WithLabelValues("test-image:latest", "Always", GetImageSizeBucket(uint64(imageSize))).Observe(duration)
 		}
 
 		wants, err := os.Open("testdata/image_pull_duration_metric")

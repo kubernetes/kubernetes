@@ -17,6 +17,7 @@ limitations under the License.
 package metrics
 
 import (
+	"strings"
 	"sync"
 	"time"
 
@@ -1081,7 +1082,7 @@ var (
 
 	// ImagePullDuration is a Histogram that tracks the duration (in seconds) it takes for an image to be pulled,
 	// including the time spent in the waiting queue of image puller.
-	// The metric is broken down by bucketed image size.
+	// The metric is broken down by image name, pull policy, and bucketed image size.
 	ImagePullDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      KubeletSubsystem,
@@ -1090,7 +1091,7 @@ var (
 			Buckets:        imagePullDurationBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"image_size_in_bytes"},
+		[]string{"image", "pull_policy", "image_size_in_bytes"},
 	)
 
 	LifecycleHandlerSleepTerminated = metrics.NewCounter(
@@ -1468,4 +1469,14 @@ func GetImageSizeBucket(sizeInBytes uint64) string {
 
 	// return empty string when sizeInBytes is 0 (error getting image size)
 	return ""
+}
+
+// GetImageNameForMetrics strips the digest from an image reference for use in metrics labels.
+// This reduces cardinality while keeping registry/repo:tag information.
+// Example: "gcr.io/project/app:v1@sha256:abc123" -> "gcr.io/project/app:v1"
+func GetImageNameForMetrics(image string) string {
+	if before, _, found := strings.Cut(image, "@"); found {
+		return before
+	}
+	return image
 }
