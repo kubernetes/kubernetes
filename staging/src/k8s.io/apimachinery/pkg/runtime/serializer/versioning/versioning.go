@@ -311,6 +311,9 @@ func (c *codec) encodeStreamingList(list runtime.Object, w io.Writer, streamingL
 	if _, ok := list.(*unstructured.UnstructuredList); ok {
 		return false, nil
 	}
+	if _, err := meta.ListAccessor(list); err != nil {
+		return false, nil
+	}
 
 	versionedListHeader, err := c.convertListHeaderToVersion(list)
 	if err != nil {
