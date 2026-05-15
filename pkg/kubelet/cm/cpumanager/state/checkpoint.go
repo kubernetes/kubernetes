@@ -32,6 +32,7 @@ import (
 
 // CPUManagerCheckpointV4 serializes checkpoint data to a string, following the
 // same approach used in the allocation manager (see pkg/kubelet/allocation/state/checkpoint.go).
+// The embedded V3 version is for keeping forward compatibility.
 var _ checkpointmanager.Checkpoint = &CPUManagerCheckpointV1{}
 var _ checkpointmanager.Checkpoint = &CPUManagerCheckpointV2{}
 var _ checkpointmanager.Checkpoint = &CPUManagerCheckpointV3{}
@@ -46,14 +47,20 @@ type CPUManagerCheckpointData struct {
 	PodEntries    PodCPUAssignments            `json:"podEntries,omitempty"`
 }
 
-// CPUManagerCheckpoint represents a structure to store cpu manager checkpoint data
+// CPUManagerCheckpoint represents a structure to store cpu manager checkpoint data.
+// Dual-checksum format for backward compatibility.
+// The Data string with DataChecksum is the authoritative V4 payload.
 type CPUManagerCheckpoint struct {
-	// CPUManagerCheckpointData embedded actual data, not serialized directly
-	CheckpointData CPUManagerCheckpointData `json:"-"`
+	// Backward compatibility
+	CPUManagerCheckpointV3 `json:",inline"`
+
 	// Data is a serialized CPUManagerCheckpointData
 	Data string `json:"data"`
-	// Checksum is a checksum of Data
-	Checksum checksum.Checksum `json:"checksum"`
+	// DataChecksum is a checksum of Data string
+	DataChecksum checksum.Checksum `json:"dataChecksum"`
+
+	// CheckpointData holds actual data, not serialized directly
+	CheckpointData CPUManagerCheckpointData `json:"-"`
 }
 
 // CPUManagerCheckpoint struct is used to store cpu/pod assignments in a checkpoint in v4 format
@@ -111,6 +118,10 @@ func newCPUManagerCheckpointV3() *CPUManagerCheckpointV3 {
 
 func newCPUManagerCheckpointV4() *CPUManagerCheckpointV4 {
 	return &CPUManagerCheckpoint{
+		CPUManagerCheckpointV3: CPUManagerCheckpointV3{
+			Entries:    make(map[string]map[string]string),
+			PodEntries: make(PodCPUAssignments),
+		},
 		CheckpointData: CPUManagerCheckpointData{
 			Entries:    make(map[string]map[string]string),
 			PodEntries: make(PodCPUAssignments),
@@ -162,14 +173,23 @@ func (cp *CPUManagerCheckpointV3) MarshalCheckpoint() ([]byte, error) {
 	return json.Marshal(*cp)
 }
 
-// MarshalCheckpoint returns marshalled checkpoint in v4 format
+// MarshalCheckpoint returns marshalled checkpoint in v4 format with dual checksums.
 func (cp *CPUManagerCheckpoint) MarshalCheckpoint() ([]byte, error) {
 	data, err := json.Marshal(cp.CheckpointData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize cpu manager checkpoint data: %w", err)
 	}
 	cp.Data = string(data)
-	cp.Checksum = checksum.New(cp.Data)
+	cp.DataChecksum = checksum.New(cp.Data)
+
+	cp.PolicyName = cp.CheckpointData.PolicyName
+	cp.DefaultCPUSet = cp.CheckpointData.DefaultCPUSet
+	cp.Entries = cp.CheckpointData.Entries
+	cp.PodEntries = cp.CheckpointData.PodEntries
+
+	// For forward compatibility, clear checksum from the legacy field.
+	// This way it can be read by older kubelets as V2 or V3.
+	cp.Checksum = 0
 
 	return json.Marshal(*cp)
 }
@@ -288,7 +308,8 @@ func (cp *CPUManagerCheckpointV3) VerifyChecksum() error {
 	return nil
 }
 
-// VerifyChecksum verifies that current checksum of checkpoint is valid in v4 format
+// VerifyChecksum verifies that current checksum of checkpoint is valid in v4 format.
+// DataChecksum is the authoritative checksum over Data.
 func (cp *CPUManagerCheckpoint) VerifyChecksum() error {
-	return cp.Checksum.Verify(cp.Data)
+	return cp.DataChecksum.Verify(cp.Data)
 }
