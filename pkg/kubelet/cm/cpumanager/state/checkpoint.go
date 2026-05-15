@@ -46,14 +46,20 @@ type CPUManagerCheckpointData struct {
 	PodEntries    PodCPUAssignments            `json:"podEntries,omitempty"`
 }
 
-// CPUManagerCheckpoint represents a structure to store cpu manager checkpoint data
+// CPUManagerCheckpoint represents a structure to store cpu manager checkpoint data.
+// Dual-checksum format for backward compatibility.
+// The Data string with DataChecksum is the authoritative V4 payload.
 type CPUManagerCheckpoint struct {
-	// CPUManagerCheckpointData embedded actual data, not serialized directly
-	CheckpointData CPUManagerCheckpointData `json:"-"`
+	// Backward compatibility
+	CPUManagerCheckpointV2 `json:",inline"`
+
 	// Data is a serialized CPUManagerCheckpointData
-	Data string `json:"data"`
-	// Checksum is a checksum of Data
-	Checksum checksum.Checksum `json:"checksum"`
+	Data string `json:"data,omitempty"`
+	// DataChecksum is a checksum of the Data string
+	DataChecksum checksum.Checksum `json:"dataChecksum,omitempty"`
+
+	// CheckpointData holds actual data, not serialized directly
+	CheckpointData CPUManagerCheckpointData `json:"-"`
 }
 
 // CPUManagerCheckpoint struct is used to store cpu/pod assignments in a checkpoint in v4 format
@@ -111,6 +117,9 @@ func newCPUManagerCheckpointV3() *CPUManagerCheckpointV3 {
 
 func newCPUManagerCheckpointV4() *CPUManagerCheckpointV4 {
 	return &CPUManagerCheckpoint{
+		CPUManagerCheckpointV2: CPUManagerCheckpointV2{
+			Entries: make(map[string]map[string]string),
+		},
 		CheckpointData: CPUManagerCheckpointData{
 			Entries:    make(map[string]map[string]string),
 			PodEntries: make(PodCPUAssignments),
@@ -162,14 +171,25 @@ func (cp *CPUManagerCheckpointV3) MarshalCheckpoint() ([]byte, error) {
 	return json.Marshal(*cp)
 }
 
-// MarshalCheckpoint returns marshalled checkpoint in v4 format
+// MarshalCheckpoint returns marshalled checkpoint in v4 format with dual checksums.
 func (cp *CPUManagerCheckpoint) MarshalCheckpoint() ([]byte, error) {
 	data, err := json.Marshal(cp.CheckpointData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize cpu manager checkpoint data: %w", err)
 	}
 	cp.Data = string(data)
-	cp.Checksum = checksum.New(cp.Data)
+	cp.DataChecksum = checksum.New(cp.Data)
+
+	cp.PolicyName = cp.CheckpointData.PolicyName
+	cp.DefaultCPUSet = cp.CheckpointData.DefaultCPUSet
+	cp.Entries = cp.CheckpointData.Entries
+
+	cp.CPUManagerCheckpointV2.Checksum = 0
+	object := dump.ForHash(&cp.CPUManagerCheckpointV2)
+	object = strings.Replace(object, "CPUManagerCheckpointV2", "CPUManagerCheckpoint", 1)
+	hash := fnv.New32a()
+	_, _ = fmt.Fprintf(hash, "%v", object)
+	cp.Checksum = checksum.Checksum(hash.Sum32())
 
 	return json.Marshal(*cp)
 }
@@ -288,7 +308,11 @@ func (cp *CPUManagerCheckpointV3) VerifyChecksum() error {
 	return nil
 }
 
-// VerifyChecksum verifies that current checksum of checkpoint is valid in v4 format
+// VerifyChecksum verifies that current checksum of checkpoint is valid in v4 format.
+// DataChecksum is the authoritative checksum over Data.
 func (cp *CPUManagerCheckpoint) VerifyChecksum() error {
+	if cp.DataChecksum != 0 {
+		return cp.DataChecksum.Verify(cp.Data)
+	}
 	return cp.Checksum.Verify(cp.Data)
 }
