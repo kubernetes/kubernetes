@@ -534,6 +534,24 @@ func TestEncodeStreamingListMatchesFullListConversionJSON(t *testing.T) {
 	if err := stdjson.Unmarshal(newBuf.Bytes(), &newDecoded); err != nil {
 		t.Fatalf("failed to decode new-path JSON: %v", err)
 	}
+	oldRoot, ok := oldDecoded.(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected old-path decoded type %T", oldDecoded)
+	}
+	oldItems, ok := oldRoot["items"].([]any)
+	if !ok || len(oldItems) == 0 {
+		t.Fatalf("unexpected old-path decoded items %#v", oldRoot["items"])
+	}
+	firstItem, ok := oldItems[0].(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected old-path decoded first item %#v", oldItems[0])
+	}
+	if _, found := firstItem["kind"]; found {
+		t.Fatalf("expected old-path list item JSON to omit kind, got %#v", firstItem)
+	}
+	if _, found := firstItem["apiVersion"]; found {
+		t.Fatalf("expected old-path list item JSON to omit apiVersion, got %#v", firstItem)
+	}
 
 	if !reflect.DeepEqual(oldDecoded, newDecoded) {
 		t.Fatalf("decoded JSON differs between old and new paths:\n%s", diff.Diff(oldDecoded, newDecoded))
@@ -635,8 +653,7 @@ func (c *countingListConvertor) ConvertToVersion(in runtime.Object, gv runtime.G
 		out.Items = make([]testExternalItem, len(obj.Items))
 		for i := range obj.Items {
 			out.Items[i] = testExternalItem{
-				TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "TestItem"},
-				Name:     obj.Items[i].Name,
+				Name: obj.Items[i].Name,
 			}
 		}
 		return out, nil

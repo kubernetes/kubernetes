@@ -108,6 +108,10 @@ type Serializer struct {
 	identifier runtime.Identifier
 }
 
+func (*Serializer) OmitStreamedItemObjectKind() bool {
+	return true
+}
+
 // Serializer implements Serializer
 var _ runtime.Serializer = &Serializer{}
 var _ recognizer.RecognizingDecoder = &Serializer{}

@@ -99,6 +99,24 @@ type streamingListEncoder interface {
 	EncodeListWithIterator(list runtime.Object, w io.Writer, iter itemIterator) (handled bool, err error)
 }
 
+type streamedItemObjectKindOmittingEncoder interface {
+	OmitStreamedItemObjectKind() bool
+}
+
+type streamedItemObjectKindOmitter struct {
+	runtime.Object
+}
+
+func (o streamedItemObjectKindOmitter) MarshalJSON() ([]byte, error) {
+	objectKind := o.Object.GetObjectKind()
+	oldGVK := objectKind.GroupVersionKind()
+	if oldGVK != (schema.GroupVersionKind{}) {
+		objectKind.SetGroupVersionKind(schema.GroupVersionKind{})
+		defer objectKind.SetGroupVersionKind(oldGVK)
+	}
+	return json.Marshal(o.Object)
+}
+
 var _ runtime.EncoderWithAllocator = &codec{}
 
 var identifiersMap sync.Map
@@ -350,6 +368,9 @@ func (c *codec) convertListItemToVersion(item runtime.Object) (runtime.Object, e
 		if err := e.EncodeNestedObjects(runtime.WithVersionEncoder{Version: c.encodeVersion, Encoder: c.encoder, ObjectTyper: c.typer}); err != nil {
 			return nil, err
 		}
+	}
+	if encoder, ok := c.encoder.(streamedItemObjectKindOmittingEncoder); ok && encoder.OmitStreamedItemObjectKind() {
+		versionedItem = streamedItemObjectKindOmitter{Object: versionedItem}
 	}
 	return versionedItem, nil
 }
