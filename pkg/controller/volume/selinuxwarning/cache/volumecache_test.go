@@ -541,6 +541,35 @@ func TestVolumeCache_MultiVolumeConflicts(t *testing.T) {
 	if len(remaining) != 0 {
 		t.Errorf("Expected no conflicts after deleting podA, got %d: %+v", len(remaining), remaining)
 	}
+
+	// Verify deduplication: podD and podE conflict on two volumes with the same labels.
+	// Identical Conflict entries from different volumes must be deduplicated by GetConflicts.
+	podD := cache.ObjectName{Namespace: "ns", Name: "podD"}
+	podE := cache.ObjectName{Namespace: "ns", Name: "podE"}
+
+	c.AddVolume(logger, "vol3", podD, "system_u:system_r:labelD", v1.SELinuxChangePolicyMountOption, "driver1")
+	c.AddVolume(logger, "vol4", podD, "system_u:system_r:labelD", v1.SELinuxChangePolicyMountOption, "driver1")
+
+	conflictsVol3 := c.AddVolume(logger, "vol3", podE, "system_u:system_r:labelE", v1.SELinuxChangePolicyMountOption, "driver1")
+	conflictsVol4 := c.AddVolume(logger, "vol4", podE, "system_u:system_r:labelE", v1.SELinuxChangePolicyMountOption, "driver1")
+
+	if len(conflictsVol3) != len(conflictsVol4) {
+		t.Fatalf("Expected same number of conflicts from vol3 and vol4 (%d vs %d)", len(conflictsVol3), len(conflictsVol4))
+	}
+	if len(conflictsVol3) == 0 {
+		t.Fatal("Expected conflicts between podD and podE")
+	}
+
+	allConflicts = c.GetConflicts(logger)
+	deCount := 0
+	for _, conflict := range allConflicts {
+		if conflict.Pod == podD || conflict.Pod == podE || conflict.OtherPod == podD || conflict.OtherPod == podE {
+			deCount++
+		}
+	}
+	if deCount != len(conflictsVol3) {
+		t.Errorf("Expected %d deduplicated conflicts for podD/podE (from 2 volumes), got %d", len(conflictsVol3), deCount)
+	}
 }
 
 func TestVolumeCache_DeletePodConflicts(t *testing.T) {
