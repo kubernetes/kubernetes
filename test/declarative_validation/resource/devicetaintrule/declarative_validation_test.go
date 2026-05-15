@@ -25,6 +25,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/resource"
 	registry "k8s.io/kubernetes/pkg/registry/resource/devicetaintrule"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 )
 
 func TestDeclarativeValidate(t *testing.T) {
@@ -69,6 +70,10 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
+
+	meta.RunConditionTestCases(t, ctx, field.NewPath("status", "conditions"), &resource.DeviceTaintRule{}, registry.StatusStrategy, func(obj *resource.DeviceTaintRule, c []metav1.Condition) {
+		*obj = mkValidDeviceTaintRule(func(r *resource.DeviceTaintRule) { r.Status.Conditions = c })
+	})
 }
 
 func TestDeclarativeValidateUpdate(t *testing.T) {
@@ -104,6 +109,13 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			update: mkValidDeviceTaintRule(tweakTaintEffect("")),
 			expectedErrs: field.ErrorList{
 				field.Required(field.NewPath("spec", "taint", "effect"), "").MarkAlpha(),
+			},
+		},
+		"invalid update with unsupported effect": {
+			old:    mkValidDeviceTaintRule(),
+			update: mkValidDeviceTaintRule(tweakTaintEffect("some-other-effect")),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(field.NewPath("spec", "taint", "effect"), resource.DeviceTaintEffect("some-other-effect"), []resource.DeviceTaintEffect{resource.DeviceTaintEffectNoExecute, resource.DeviceTaintEffectNoSchedule, resource.DeviceTaintEffectNone}).MarkAlpha(),
 			},
 		},
 		// TODO: Add more test cases

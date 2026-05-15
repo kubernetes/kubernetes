@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/resource"
 	"k8s.io/kubernetes/pkg/apis/resource/validation"
 	registry "k8s.io/kubernetes/pkg/registry/resource/resourceclaim"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 	pointer "k8s.io/utils/ptr"
 )
 
@@ -1516,6 +1517,15 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.update, &tc.old, strategy, tc.expectedErrs, apitesting.WithSubResources("status"))
 		})
 	}
+
+	meta.RunConditionTestCases(t, ctx, field.NewPath("status", "devices").Index(0).Child("conditions"), &resource.ResourceClaim{}, strategy, func(obj *resource.ResourceClaim, c []v1.Condition) {
+		*obj = mkResourceClaimWithStatus(tweakStatusDevices(resource.AllocatedDeviceStatus{
+			Driver:     "dra.example.com",
+			Pool:       "pool-0",
+			Device:     "device-0",
+			Conditions: c,
+		}))
+	})
 }
 
 func tweakStatusAllocation(results ...resource.DeviceRequestAllocationResult) func(rc *resource.ResourceClaim) {

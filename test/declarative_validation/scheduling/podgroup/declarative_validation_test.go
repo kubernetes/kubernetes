@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 	registry "k8s.io/kubernetes/pkg/registry/scheduling/podgroup"
+	"k8s.io/kubernetes/test/declarative_validation/meta"
 
 	// Ensure all API groups are registered with the scheme
 	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
@@ -611,13 +612,6 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 			oldObj:    mkValidPodGroup(setResourceVersion("1")),
 			updateObj: mkValidPodGroup(setResourceVersion("1"), addCondition(scheduling.PodGroupScheduled)),
 		},
-		"duplicate condition types": {
-			oldObj:    mkValidPodGroup(setResourceVersion("1")),
-			updateObj: mkValidPodGroup(setResourceVersion("1"), addCondition(scheduling.PodGroupScheduled), addCondition(scheduling.PodGroupScheduled)),
-			expectedErrs: field.ErrorList{
-				field.Duplicate(field.NewPath("status", "conditions").Index(1).Child("type"), scheduling.PodGroupScheduled).MarkFromImperative(),
-			},
-		},
 		"valid resource claim status update": {
 			oldObj: mkValidPodGroup(
 				setResourceVersion("1"),
@@ -713,6 +707,10 @@ func testDeclarativeValidateStatusUpdate(t *testing.T, apiVersion string) {
 			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, strategy, tc.expectedErrs)
 		})
 	}
+
+	meta.RunConditionTestCases(t, ctx, field.NewPath("status", "conditions"), &scheduling.PodGroup{}, registry.NewStatusStrategy(registry.NewStrategy()), func(obj *scheduling.PodGroup, c []metav1.Condition) {
+		*obj = mkValidPodGroup(setResourceVersion("1"), func(pg *scheduling.PodGroup) { pg.Status.Conditions = c })
+	})
 }
 
 // mkValidPodGroup produces a PodGroup which passes validation with no tweaks.
