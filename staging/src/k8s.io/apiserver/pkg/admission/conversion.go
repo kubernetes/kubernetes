@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/cel/common"
 )
 
 // VersionedAttributes is a wrapper around the original admission attributes, adding versioned
@@ -131,12 +132,12 @@ func (l *LazyObject) CELValue() (ref.Val, error) {
 	if l.object == nil {
 		return nil, nil
 	}
-	// TODO: Eventually use TypedToVal instead of unstructured object conversion.
-	unstructuredObj, err := ConvertObjectToUnstructured(l.object)
-	if err != nil {
-		return nil, err
+	if u, ok := l.object.(*unstructured.Unstructured); ok {
+		l.celVal = types.DefaultTypeAdapter.NativeToValue(u.Object)
+		return l.celVal, nil
 	}
-	l.celVal = types.DefaultTypeAdapter.NativeToValue(unstructuredObj.Object)
+
+	l.celVal = common.UnstructuredReflectToVal(l.object)
 	return l.celVal, nil
 }
 
