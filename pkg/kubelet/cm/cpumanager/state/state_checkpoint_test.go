@@ -148,7 +148,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 		},
 		// In below testcase V2 part of checkpoint is intentionally corrupted to verify that it is not used.
 		{
-			"Restore default cpu set",
+			"Restore default CPU set",
 			nil,
 			`{
 				"policyName": "other",
@@ -164,7 +164,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 				defaultCPUSet: cpuset.New(4, 5, 6),
 			},
 		},
-		// In below testcase V2 part of checkpoint is intentionally corrupted to verify that it is not used.
+		// In below test case V2 part of checkpoint is intentionally corrupted to verify that it is not used.
 		{
 			"Restore valid checkpoint",
 			nil,
@@ -218,7 +218,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 			"unexpected end of JSON input",
 			nil,
 		},
-		// In below testcase policyName in V2 part of checkpoint is intentionally unaligned with data section.
+		// In below test case policyName in V2 part of checkpoint is intentionally unaligned with data section.
 		{
 			"Fail to restore checkpoint with invalid policy name",
 			nil,
@@ -242,7 +242,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 		},
 		// In below testcase defaultCPUSet in V2 part of checkpoint is intentionally unaligned with data section.
 		{
-			"Fail to restore checkpoint with unparsable default cpu set",
+			"Fail to restore checkpoint with unparsable default CPU set",
 			nil,
 			`{
 				"policyName": "none",
@@ -253,7 +253,7 @@ func TestCheckpointStateRestore(t *testing.T) {
 			}`,
 			"none",
 			containermap.ContainerMap{},
-			`could not parse default cpu set "1.3": strconv.Atoi: parsing "1.3": invalid syntax`,
+			`could not parse default CPU set "1.3": strconv.Atoi: parsing "1.3": invalid syntax`,
 			nil,
 		},
 		// In below testcase entries in V2 part of checkpoint are intentionally unaligned with data section.
