@@ -24,10 +24,13 @@ import (
 	"testing"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -334,6 +337,116 @@ func TestCheckGracefulDelete(t *testing.T) {
 		}
 
 		assertDefault(t, api.Mapping.Resource, "CheckGracefulDelete must not be implemented", !isGraceful, exempt)
+	})
+}
+
+// TestReturnDeletedObject verifies that APIs prefer ReturnDeletedObject = false.
+//
+// Rationale: Returning the entire object on deletion is expensive, almost never needed
+// by clients, and the status returned when ReturnDeletedObject = false is preferred.
+func TestReturnDeletedObject(t *testing.T) {
+	exempt := sets.New(
+		// Grandfathered legacy APIs that historically returned the full object on deletion:
+		"namespaces.v1",
+		"persistentvolumeclaims.v1",
+		"persistentvolumes.v1",
+		"pods.v1",
+		"podtemplates.v1",
+		"resourcequotas.v1",
+		"serviceaccounts.v1",
+		"services.v1",
+		"csidrivers.v1.storage.k8s.io",
+		"csinodes.v1.storage.k8s.io",
+		"storageclasses.v1.storage.k8s.io",
+		"volumeattachments.v1.storage.k8s.io",
+		"volumeattributesclasses.v1.storage.k8s.io",
+		"volumeattributesclasses.v1beta1.storage.k8s.io",
+		"deviceclasses.v1.resource.k8s.io",
+		"deviceclasses.v1beta1.resource.k8s.io",
+		"deviceclasses.v1beta2.resource.k8s.io",
+		"devicetaintrules.v1alpha3.resource.k8s.io",
+		"devicetaintrules.v1beta2.resource.k8s.io",
+		"resourceclaims.v1.resource.k8s.io",
+		"resourceclaims.v1beta1.resource.k8s.io",
+		"resourceclaims.v1beta2.resource.k8s.io",
+		"resourceclaimtemplates.v1.resource.k8s.io",
+		"resourceclaimtemplates.v1beta1.resource.k8s.io",
+		"resourceclaimtemplates.v1beta2.resource.k8s.io",
+		"resourcepoolstatusrequests.v1alpha3.resource.k8s.io",
+		"resourceslices.v1.resource.k8s.io",
+		"resourceslices.v1beta1.resource.k8s.io",
+		"resourceslices.v1beta2.resource.k8s.io",
+
+		// APIs with mandatory asynchronous cleanup finalizers that cannot be stripped:
+		"customresourcedefinitions.v1.apiextensions.k8s.io",
+	)
+	TestAllDefinitions(t, "return-deleted-object", func(t *testing.T, api Definition) {
+		if !api.HasVerb("create") || !api.HasVerb("delete") {
+			t.Skip("Resource does not support create and delete")
+		}
+
+		client := api.ResourceClient()
+		obj := TestObj(t, api.StorageData.Stub, "{}", api.Mapping.GroupVersionKind)
+		created, err := client.Create(context.TODO(), obj, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatalf("Failed to create: %v", err)
+		}
+		name := created.GetName()
+
+		if len(created.GetFinalizers()) > 0 && api.HasVerb("update") {
+			created.SetFinalizers(nil)
+			_, err := client.Update(context.TODO(), created, metav1.UpdateOptions{})
+			if err != nil {
+				t.Fatalf("Failed to strip finalizers: %v", err)
+			}
+		}
+
+		gv := api.Mapping.GroupVersionKind.GroupVersion()
+		config := dynamic.ConfigFor(api.Config)
+		config.GroupVersion = &gv
+		config.APIPath = dynamic.LegacyAPIPathResolverFunc(api.Mapping.GroupVersionKind)
+		restClient, err := rest.RESTClientFor(config)
+		if err != nil {
+			t.Fatalf("Failed to create rest client: %v", err)
+		}
+
+		zero := int64(0)
+		bg := metav1.DeletePropagationBackground
+		delOpts := metav1.DeleteOptions{
+			GracePeriodSeconds: &zero,
+			PropagationPolicy:  &bg,
+		}
+
+		req := restClient.Delete().
+			Resource(api.Mapping.Resource.Resource).
+			Name(name).
+			Body(&delOpts)
+
+		if api.Mapping.Scope == meta.RESTScopeNamespace {
+			req.Namespace(api.Namespace)
+		}
+
+		result := req.Do(context.TODO())
+		if err := result.Error(); err != nil {
+			t.Fatalf("Failed to delete: %v", err)
+		}
+
+		resObj, err := result.Get()
+		if err != nil {
+			t.Fatalf("Failed to get result object: %v", err)
+		}
+
+		var kind string
+		if _, ok := resObj.(*metav1.Status); ok {
+			kind = "Status"
+		} else if unstr, ok := resObj.(*unstructured.Unstructured); ok {
+			kind = unstr.GetKind()
+		} else {
+			kind = resObj.GetObjectKind().GroupVersionKind().Kind
+		}
+
+		returnsDeleted := kind != "Status"
+		assertDefault(t, api.Mapping.Resource, "ReturnDeletedObject must be false", !returnsDeleted, exempt)
 	})
 }
 
