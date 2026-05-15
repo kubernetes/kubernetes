@@ -42,8 +42,8 @@ func init() {
 
 // SetupTestPackage sets up the test package with binaries k8s required for node e2e tests
 func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
-	// Build the executables
-	if err := builder.BuildGo(); err != nil {
+	// Build the executables required below.
+	if err := builder.BuildTargets("cmd/kubelet", "test/e2e_node/e2e_node.test", "github.com/onsi/ginkgo/v2/ginkgo"); err != nil {
 		return fmt.Errorf("failed to build the dependencies: %w", err)
 	}
 
@@ -59,7 +59,7 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 	}
 
 	// Copy binaries
-	requiredBins := []string{"kubelet", "e2e_node.test", "ginkgo", "mounter", "gcp-credential-provider"}
+	requiredBins := []string{"kubelet", "e2e_node.test", "ginkgo"}
 	for _, bin := range requiredBins {
 		source := filepath.Join(buildOutputDir, bin)
 		klog.V(2).Infof("Copying binaries from %s", source)
@@ -69,6 +69,17 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 		out, err := exec.Command("cp", source, filepath.Join(tardir, bin)).CombinedOutput()
 		if err != nil {
 			return fmt.Errorf("failed to copy %q: %v Output: %q", bin, err, out)
+		}
+	}
+
+	// When e2e_node.test is invoked through these symlinks, it behaves like these
+	// separate binaries.
+	e2eNodeBinary := "e2e_node.test"
+	for _, alias := range []string{"mounter", "gcp-credential-provider"} {
+		symlink := filepath.Join(tardir, alias)
+		klog.V(2).Infof("Creating symlink %s -> %s", symlink, e2eNodeBinary)
+		if err := os.Symlink(e2eNodeBinary, symlink); err != nil {
+			return fmt.Errorf("failed to create symlink %q: %w", alias, err)
 		}
 	}
 
