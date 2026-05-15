@@ -468,6 +468,7 @@ message ServiceCIDRStatus {
   // +patchStrategy=merge
   // +listType=map
   // +listMapKey=type
+  // +k8s:alpha(since: "1.37")=+k8s:eachVal=+k8s:opaqueType
   repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
 }
 

@@ -73,6 +73,9 @@ message StorageVersionMigrationStatus {
   // +listType=map
   // +listMapKey=type
   // +optional
+  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:listType=map
+  // +k8s:alpha(since: "1.37")=+k8s:listMapKey=type
   repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
 
   // ResourceVersion to compare with the GC cache for performing the migration.

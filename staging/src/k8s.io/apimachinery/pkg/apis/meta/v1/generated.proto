@@ -193,6 +193,7 @@ message Condition {
   // +kubebuilder:validation:Required
   // +kubebuilder:validation:Pattern=`^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$`
   // +kubebuilder:validation:MaxLength=316
+  // +k8s:alpha(since: "1.37")=+k8s:required
   optional string type = 1;
 
   // status of the condition, one of True, False, Unknown.
