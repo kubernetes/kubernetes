@@ -39,7 +39,7 @@ var _ checkpointmanager.Checkpoint = &CPUManagerCheckpointV3{}
 var _ checkpointmanager.Checkpoint = &CPUManagerCheckpointV4{}
 var _ checkpointmanager.Checkpoint = &CPUManagerCheckpoint{}
 
-// CPUManagerCheckpointData struct is used to store cpu/pod assignments, which is part of a checkpoint in v4 format
+// CPUManagerCheckpointData struct is used to store CPU/pod assignments, which is part of a checkpoint in v4 format
 type CPUManagerCheckpointData struct {
 	PolicyName    string                       `json:"policyName"`
 	DefaultCPUSet string                       `json:"defaultCpuSet"`
@@ -47,7 +47,7 @@ type CPUManagerCheckpointData struct {
 	PodEntries    PodCPUAssignments            `json:"podEntries,omitempty"`
 }
 
-// CPUManagerCheckpoint represents a structure to store cpu manager checkpoint data.
+// CPUManagerCheckpoint represents a structure to store CPU manager checkpoint data.
 // Dual-checksum format for backward compatibility.
 // The Data string with DataChecksum is the authoritative V4 payload.
 type CPUManagerCheckpoint struct {
@@ -63,10 +63,10 @@ type CPUManagerCheckpoint struct {
 	CheckpointData CPUManagerCheckpointData `json:"-"`
 }
 
-// CPUManagerCheckpoint struct is used to store cpu/pod assignments in a checkpoint in v4 format
+// CPUManagerCheckpoint struct is used to store CPU/pod assignments in a checkpoint in v4 format
 type CPUManagerCheckpointV4 = CPUManagerCheckpoint
 
-// CPUManagerCheckpointV3 struct is used to store cpu/pod assignments in a checkpoint in v3 format
+// CPUManagerCheckpointV3 struct is used to store CPU/pod assignments in a checkpoint in v3 format
 type CPUManagerCheckpointV3 struct {
 	PolicyName    string                       `json:"policyName"`
 	DefaultCPUSet string                       `json:"defaultCpuSet"`
@@ -75,7 +75,7 @@ type CPUManagerCheckpointV3 struct {
 	Checksum      checksum.Checksum            `json:"checksum"`
 }
 
-// CPUManagerCheckpointV2 struct is used to store cpu/pod assignments in a checkpoint in v2 format
+// CPUManagerCheckpointV2 struct is used to store CPU/pod assignments in a checkpoint in v2 format
 type CPUManagerCheckpointV2 struct {
 	PolicyName    string                       `json:"policyName"`
 	DefaultCPUSet string                       `json:"defaultCpuSet"`
@@ -83,7 +83,7 @@ type CPUManagerCheckpointV2 struct {
 	Checksum      checksum.Checksum            `json:"checksum"`
 }
 
-// CPUManagerCheckpointV1 struct is used to store cpu/pod assignments in a checkpoint in v1 format
+// CPUManagerCheckpointV1 struct is used to store CPU/pod assignments in a checkpoint in v1 format
 type CPUManagerCheckpointV1 struct {
 	PolicyName    string            `json:"policyName"`
 	DefaultCPUSet string            `json:"defaultCpuSet"`

@@ -45,7 +45,7 @@ type stateCheckpoint struct {
 	initialContainers containermap.ContainerMap
 }
 
-// NewCheckpointState creates new State for keeping track of cpu/pod assignment with checkpoint backend
+// NewCheckpointState creates new State for keeping track of CPU/pod assignment with checkpoint backend
 func NewCheckpointState(logger logr.Logger, stateDir, checkpointName, policyName string, initialContainers containermap.ContainerMap) (State, error) {
 	// we store a logger instance because the checkpointmanager code gets no context yet, so it's pointless to add on our outer layer
 	// since we store a checkpoint, we can use the relatively expensive "WithName".
@@ -157,7 +157,7 @@ func (sc *stateCheckpoint) restoreState() error {
 		return fmt.Errorf("configured policy %q differs from state checkpoint policy %q", sc.policyName, cp.CheckpointData.PolicyName)
 	}
 	if tmpDefaultCPUSet, err = cpuset.Parse(cp.CheckpointData.DefaultCPUSet); err != nil {
-		return fmt.Errorf("could not parse default cpu set %q: %w", cp.CheckpointData.DefaultCPUSet, err)
+		return fmt.Errorf("could not parse default CPU set %q: %w", cp.CheckpointData.DefaultCPUSet, err)
 	}
 	for pod := range cp.CheckpointData.Entries {
 		tmpAssignments[pod] = make(map[string]cpuset.CPUSet, len(cp.CheckpointData.Entries[pod]))
@@ -183,7 +183,7 @@ func (sc *stateCheckpoint) restoreState() error {
 
 // loadAndMigrateCheckpointV4 loads the latest checkpoint and migrates it from older versions if needed.
 func (sc *stateCheckpoint) loadAndMigrateCheckpointV4() (*CPUManagerCheckpointV4, error) {
-	sc.logger.Info("trying to load v4 cpu manager checkpoint")
+	sc.logger.Info("trying to load v4 CPU manager checkpoint")
 	checkpointV4 := newCPUManagerCheckpointV4()
 	err := sc.checkpointManager.GetCheckpoint(sc.checkpointName, checkpointV4)
 	if err == nil {
@@ -195,7 +195,7 @@ func (sc *stateCheckpoint) loadAndMigrateCheckpointV4() (*CPUManagerCheckpointV4
 
 	if len(checkpointV4.Data) > 0 || checkpointV4.DataChecksum != 0 {
 		// This is a corrupted V4 checkpoint version. Don't fall back to previous versions, but return error.
-		sc.logger.Error(err, "could not load v4 checkpoint, no falling back to previous versions")
+		sc.logger.Error(err, "could not load v4 checkpoint, not falling back to previous versions")
 		return nil, err
 	}
 
@@ -212,7 +212,7 @@ func (sc *stateCheckpoint) loadAndMigrateCheckpointV4() (*CPUManagerCheckpointV4
 	checkpointV4 = newCPUManagerCheckpointV4()
 
 	// Loaded V3, now migrate to V4.
-	sc.logger.Info("migrating cpu manager checkpoint from v3 to v4")
+	sc.logger.Info("migrating CPU manager checkpoint from v3 to v4")
 	sc.migrateV3CheckpointToV4Checkpoint(checkpointV3, checkpointV4)
 
 	return checkpointV4, nil
@@ -220,7 +220,7 @@ func (sc *stateCheckpoint) loadAndMigrateCheckpointV4() (*CPUManagerCheckpointV4
 
 // loadAndMigrateCheckpointV3 loads the checkpoint in V3 and migrates it from older versions if needed.
 func (sc *stateCheckpoint) loadAndMigrateCheckpointV3() (*CPUManagerCheckpointV3, error) {
-	sc.logger.Info("trying to load v3 cpu manager checkpoint")
+	sc.logger.Info("trying to load v3 CPU manager checkpoint")
 	checkpointV3 := newCPUManagerCheckpointV3()
 	err := sc.checkpointManager.GetCheckpoint(sc.checkpointName, checkpointV3)
 	if err == nil {
@@ -243,14 +243,14 @@ func (sc *stateCheckpoint) loadAndMigrateCheckpointV3() (*CPUManagerCheckpointV3
 	checkpointV3 = newCPUManagerCheckpointV3()
 
 	// Loaded V2, now migrate to V3.
-	sc.logger.Info("migrating cpu manager checkpoint from v2 to v3")
+	sc.logger.Info("migrating CPU manager checkpoint from v2 to v3")
 	sc.migrateV2CheckpointToV3Checkpoint(checkpointV2, checkpointV3)
 
 	return checkpointV3, nil
 }
 
 func (sc *stateCheckpoint) loadAndMigrateCheckpointV2() (*CPUManagerCheckpointV2, error) {
-	sc.logger.Info("trying to load v2 cpu manager checkpoint")
+	sc.logger.Info("trying to load v2 CPU manager checkpoint")
 	checkpointV2 := newCPUManagerCheckpointV2()
 	err := sc.checkpointManager.GetCheckpoint(sc.checkpointName, checkpointV2)
 	if err == nil {
@@ -267,7 +267,7 @@ func (sc *stateCheckpoint) loadAndMigrateCheckpointV2() (*CPUManagerCheckpointV2
 	checkpointV1, err := sc.loadCheckpointV1()
 	if err == nil {
 		// Loaded V1, now migrate V1 -> V2.
-		sc.logger.Info("migrating cpu manager checkpoint from v1 to v2")
+		sc.logger.Info("migrating CPU manager checkpoint from v1 to v2")
 		tmpV2 := newCPUManagerCheckpointV2()
 		if migrationErr := sc.migrateV1CheckpointToV2Checkpoint(checkpointV1, tmpV2); migrationErr != nil {
 			return nil, fmt.Errorf("failed to migrate checkpoint from v1 to v2: %w", migrationErr)
@@ -280,7 +280,7 @@ func (sc *stateCheckpoint) loadAndMigrateCheckpointV2() (*CPUManagerCheckpointV2
 }
 
 func (sc *stateCheckpoint) loadCheckpointV1() (*CPUManagerCheckpointV1, error) {
-	sc.logger.Info("trying to load v1 cpu manager checkpoint")
+	sc.logger.Info("trying to load v1 CPU manager checkpoint")
 	checkpointV1 := newCPUManagerCheckpointV1()
 	err := sc.checkpointManager.GetCheckpoint(sc.checkpointName, checkpointV1)
 	if err != nil {
