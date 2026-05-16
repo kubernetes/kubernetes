@@ -280,22 +280,31 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1.ValidatingWeb
 		defer cancel()
 	}
 
-	r := client.Post().Body(request)
+	do := func() {
+		err = webhook.WithAdmissionWebhookTransportErrorRetry(ctx, func() error {
+			r := client.Post().Body(request)
 
-	// if the context has a deadline, set it as a parameter to inform the backend
-	if deadline, hasDeadline := ctx.Deadline(); hasDeadline {
-		// compute the timeout
-		if timeout := time.Until(deadline); timeout > 0 {
-			// if it's not an even number of seconds, round up to the nearest second
-			if truncated := timeout.Truncate(time.Second); truncated != timeout {
-				timeout = truncated + time.Second
+			// if the context has a deadline, set it as a parameter to inform the backend
+			if deadline, hasDeadline := ctx.Deadline(); hasDeadline {
+				// compute the timeout
+				if timeout := time.Until(deadline); timeout > 0 {
+					// if it's not an even number of seconds, round up to the nearest second
+					if truncated := timeout.Truncate(time.Second); truncated != timeout {
+						timeout = truncated + time.Second
+					}
+					// set the timeout
+					r.Timeout(timeout)
+				}
 			}
-			// set the timeout
-			r.Timeout(timeout)
-		}
-	}
 
-	do := func() { err = r.Do(ctx).Into(response) }
+			resp := response.DeepCopyObject()
+			if err := r.Do(ctx).Into(resp); err != nil {
+				return err
+			}
+			response = resp
+			return nil
+		})
+	}
 	if wd, ok := endpointsrequest.LatencyTrackersFrom(ctx); ok {
 		tmp := do
 		do = func() { wd.ValidatingWebhookTracker.Track(tmp) }

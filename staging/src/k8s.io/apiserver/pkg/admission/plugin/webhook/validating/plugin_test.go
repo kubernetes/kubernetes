@@ -18,14 +18,19 @@ package validating
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	"k8s.io/api/admission/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	admissionmetrics "k8s.io/apiserver/pkg/admission/metrics"
 	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
@@ -174,6 +179,183 @@ func TestValidate(t *testing.T) {
 		} else {
 			assert.Equal(t, tt.ExpectAnnotations, fakeAttr.GetAnnotations(auditinternal.LevelMetadata), tt.Name+": annotations not set as expected.")
 		}
+	}
+}
+
+func TestValidateRetriesTransportError(t *testing.T) {
+	var attempts int32
+	testServer := webhooktesting.NewTestServerWithHandler(t, func(w http.ResponseWriter, r *http.Request) {
+		if atomic.AddInt32(&attempts, 1) == 1 {
+			hj, ok := w.(http.Hijacker)
+			if !ok {
+				t.Errorf("expected response writer to support hijacking")
+				return
+			}
+			conn, _, err := hj.Hijack()
+			if err != nil {
+				t.Errorf("failed to hijack connection: %v", err)
+				return
+			}
+			conn.Close() //nolint:errcheck
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
+			Response: &v1beta1.AdmissionResponse{
+				Allowed: true,
+				Result: &metav1.Status{
+					Code: http.StatusOK,
+				},
+			},
+		}); err != nil {
+			t.Errorf("failed to encode admission review response: %v", err)
+			return
+		}
+	})
+	testServer.StartTLS()
+	defer testServer.Close()
+
+	serverURL, err := url.ParseRequestURI(testServer.URL)
+	if err != nil {
+		t.Fatalf("this should never happen? %v", err)
+	}
+
+	var testCase *webhooktesting.ValidatingTest
+	testCases := webhooktesting.NewNonMutatingTestCases(serverURL)
+	for i := range testCases {
+		tt := testCases[i]
+		if tt.Name == "match & allow (url)" {
+			testCase = &tt
+			break
+		}
+	}
+	if testCase == nil {
+		t.Fatal("failed to find allow url test case")
+	}
+
+	wh, err := NewValidatingAdmissionWebhook(nil)
+	if err != nil {
+		t.Fatalf("failed to create validating webhook: %v", err)
+	}
+
+	ns := "webhook-test"
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	client, informer := webhooktesting.NewFakeValidatingDataSource(ns, testCase.Webhooks, stopCh)
+
+	wh.SetAuthenticationInfoResolverWrapper(webhooktesting.Wrapper(webhooktesting.NewAuthenticationInfoResolver(new(int32))))
+	wh.SetExternalKubeClientSet(client)
+	wh.SetExternalKubeInformerFactory(informer)
+
+	informer.Start(stopCh)
+	informer.WaitForCacheSync(stopCh)
+
+	if err = wh.ValidateInitialization(); err != nil {
+		t.Fatalf("failed to validate initialization: %v", err)
+	}
+
+	err = wh.Validate(context.TODO(), webhooktesting.NewAttribute(ns, nil, false), webhooktesting.NewObjectInterfacesForTest())
+	if err != nil {
+		t.Fatalf("expected webhook to succeed after retry, got %v", err)
+	}
+	if got := atomic.LoadInt32(&attempts); got != 2 {
+		t.Fatalf("expected 2 webhook attempts, got %d", got)
+	}
+}
+
+func TestValidateDoesNotRetryWebhookResponseErrors(t *testing.T) {
+	tests := []struct {
+		name    string
+		handler func(http.ResponseWriter, *http.Request)
+	}{
+		{
+			name: "http 500",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				http.Error(w, "webhook internal server error", http.StatusInternalServerError)
+			},
+		},
+		{
+			name: "invalid admission review",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte("webhook invalid response")) //nolint:errcheck
+			},
+		},
+		{
+			name: "admission rejection",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				if err := json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
+					Response: &v1beta1.AdmissionResponse{
+						Allowed: false,
+						Result: &metav1.Status{
+							Code: http.StatusForbidden,
+						},
+					},
+				}); err != nil {
+					t.Errorf("failed to encode admission review response: %v", err)
+					return
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var attempts int32
+			testServer := webhooktesting.NewTestServerWithHandler(t, func(w http.ResponseWriter, r *http.Request) {
+				atomic.AddInt32(&attempts, 1)
+				tt.handler(w, r)
+			})
+			testServer.StartTLS()
+			defer testServer.Close()
+
+			serverURL, err := url.ParseRequestURI(testServer.URL)
+			if err != nil {
+				t.Fatalf("this should never happen? %v", err)
+			}
+
+			testCases := webhooktesting.NewNonMutatingTestCases(serverURL)
+			var testCase *webhooktesting.ValidatingTest
+			for i := range testCases {
+				tt := testCases[i]
+				if tt.Name == "match & allow (url)" {
+					testCase = &tt
+					break
+				}
+			}
+			if testCase == nil {
+				t.Fatal("failed to find allow url test case")
+			}
+
+			wh, err := NewValidatingAdmissionWebhook(nil)
+			if err != nil {
+				t.Fatalf("failed to create validating webhook: %v", err)
+			}
+
+			ns := "webhook-test"
+			stopCh := make(chan struct{})
+			defer close(stopCh)
+			client, informer := webhooktesting.NewFakeValidatingDataSource(ns, testCase.Webhooks, stopCh)
+
+			wh.SetAuthenticationInfoResolverWrapper(webhooktesting.Wrapper(webhooktesting.NewAuthenticationInfoResolver(new(int32))))
+			wh.SetExternalKubeClientSet(client)
+			wh.SetExternalKubeInformerFactory(informer)
+
+			informer.Start(stopCh)
+			informer.WaitForCacheSync(stopCh)
+
+			if err = wh.ValidateInitialization(); err != nil {
+				t.Fatalf("failed to validate initialization: %v", err)
+			}
+
+			if err = wh.Validate(context.TODO(), webhooktesting.NewAttribute(ns, nil, false), webhooktesting.NewObjectInterfacesForTest()); err == nil {
+				t.Fatal("expected webhook to fail")
+			}
+			if got := atomic.LoadInt32(&attempts); got != 1 {
+				t.Fatalf("expected 1 webhook attempt, got %d", got)
+			}
+		})
 	}
 }
 

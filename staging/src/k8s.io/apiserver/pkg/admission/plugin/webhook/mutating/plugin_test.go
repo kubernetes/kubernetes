@@ -18,15 +18,20 @@ package mutating
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"reflect"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	"k8s.io/api/admission/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
@@ -211,6 +216,162 @@ func TestAdmit(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestAdmitRetriesTransportError(t *testing.T) {
+	var attempts int32
+	var lock sync.Mutex
+	var uids []string
+	testServer := webhooktesting.NewTestServerWithHandler(t, func(w http.ResponseWriter, r *http.Request) {
+		review := &v1beta1.AdmissionReview{}
+		if err := json.NewDecoder(r.Body).Decode(review); err != nil {
+			t.Errorf("failed to decode admission review: %v", err)
+			return
+		}
+		lock.Lock()
+		uids = append(uids, string(review.Request.UID))
+		lock.Unlock()
+
+		if atomic.AddInt32(&attempts, 1) == 1 {
+			hj, ok := w.(http.Hijacker)
+			if !ok {
+				t.Errorf("expected response writer to support hijacking")
+				return
+			}
+			conn, _, err := hj.Hijack()
+			if err != nil {
+				t.Errorf("failed to hijack connection: %v", err)
+				return
+			}
+			conn.Close() //nolint:errcheck
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(&v1beta1.AdmissionReview{
+			Response: &v1beta1.AdmissionResponse{
+				Allowed: true,
+				Result: &metav1.Status{
+					Code: http.StatusOK,
+				},
+			},
+		}); err != nil {
+			t.Errorf("failed to encode admission review response: %v", err)
+			return
+		}
+	})
+	testServer.StartTLS()
+	defer testServer.Close()
+
+	serverURL, err := url.ParseRequestURI(testServer.URL)
+	if err != nil {
+		t.Fatalf("this should never happen? %v", err)
+	}
+
+	var testCase *webhooktesting.MutatingTest
+	testCases := webhooktesting.ConvertToMutatingTestCases(webhooktesting.NewNonMutatingTestCases(serverURL), "test-webhooks")
+	for i := range testCases {
+		tt := testCases[i]
+		if tt.Name == "match & allow (url)" {
+			testCase = &tt
+			break
+		}
+	}
+	if testCase == nil {
+		t.Fatal("failed to find allow url test case")
+	}
+
+	wh, err := NewMutatingWebhook(nil)
+	if err != nil {
+		t.Fatalf("failed to create mutating webhook: %v", err)
+	}
+
+	ns := "webhook-test"
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	client, informer := webhooktesting.NewFakeMutatingDataSource(ns, testCase.Webhooks, stopCh)
+
+	wh.SetAuthenticationInfoResolverWrapper(webhooktesting.Wrapper(webhooktesting.NewAuthenticationInfoResolver(new(int32))))
+	wh.SetExternalKubeClientSet(client)
+	wh.SetExternalKubeInformerFactory(informer)
+
+	informer.Start(stopCh)
+	informer.WaitForCacheSync(stopCh)
+
+	if err = wh.ValidateInitialization(); err != nil {
+		t.Fatalf("failed to validate initialization: %v", err)
+	}
+
+	err = wh.Admit(context.TODO(), webhooktesting.NewAttribute(ns, nil, false), webhooktesting.NewObjectInterfacesForTest())
+	if err != nil {
+		t.Fatalf("expected webhook to succeed after retry, got %v", err)
+	}
+	if got := atomic.LoadInt32(&attempts); got != 2 {
+		t.Fatalf("expected 2 webhook attempts, got %d", got)
+	}
+	lock.Lock()
+	defer lock.Unlock()
+	if len(uids) != 2 {
+		t.Fatalf("expected 2 AdmissionReview UIDs, got %d", len(uids))
+	}
+	if uids[0] != uids[1] {
+		t.Fatalf("expected retry to use the same AdmissionReview UID, got %q and %q", uids[0], uids[1])
+	}
+}
+
+func TestAdmitDoesNotRetryWebhookResponseErrors(t *testing.T) {
+	var attempts int32
+	testServer := webhooktesting.NewTestServerWithHandler(t, func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&attempts, 1)
+		http.Error(w, "webhook internal server error", http.StatusInternalServerError)
+	})
+	testServer.StartTLS()
+	defer testServer.Close()
+
+	serverURL, err := url.ParseRequestURI(testServer.URL)
+	if err != nil {
+		t.Fatalf("this should never happen? %v", err)
+	}
+
+	var testCase *webhooktesting.MutatingTest
+	testCases := webhooktesting.ConvertToMutatingTestCases(webhooktesting.NewNonMutatingTestCases(serverURL), "test-webhooks")
+	for i := range testCases {
+		tt := testCases[i]
+		if tt.Name == "match & allow (url)" {
+			testCase = &tt
+			break
+		}
+	}
+	if testCase == nil {
+		t.Fatal("failed to find allow url test case")
+	}
+
+	wh, err := NewMutatingWebhook(nil)
+	if err != nil {
+		t.Fatalf("failed to create mutating webhook: %v", err)
+	}
+
+	ns := "webhook-test"
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	client, informer := webhooktesting.NewFakeMutatingDataSource(ns, testCase.Webhooks, stopCh)
+
+	wh.SetAuthenticationInfoResolverWrapper(webhooktesting.Wrapper(webhooktesting.NewAuthenticationInfoResolver(new(int32))))
+	wh.SetExternalKubeClientSet(client)
+	wh.SetExternalKubeInformerFactory(informer)
+
+	informer.Start(stopCh)
+	informer.WaitForCacheSync(stopCh)
+
+	if err = wh.ValidateInitialization(); err != nil {
+		t.Fatalf("failed to validate initialization: %v", err)
+	}
+
+	if err = wh.Admit(context.TODO(), webhooktesting.NewAttribute(ns, nil, false), webhooktesting.NewObjectInterfacesForTest()); err == nil {
+		t.Fatal("expected webhook to fail")
+	}
+	if got := atomic.LoadInt32(&attempts); got != 1 {
+		t.Fatalf("expected 1 webhook attempt, got %d", got)
 	}
 }
 
