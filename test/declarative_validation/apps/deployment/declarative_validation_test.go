@@ -80,7 +80,6 @@ func TestDeclarativeValidate(t *testing.T) {
 						field.Required(field.NewPath("spec").Child("selector"), "").MarkCoveredByDeclarative().MarkAlpha(),
 						field.Invalid(field.NewPath("spec").Child("template").Child("metadata").Child("labels"), nil, "").MarkFromImperative(),
 					},
-					skipVersions: []string{"v1beta1"},
 					allRulesOnly: true,
 				},
 			}
@@ -174,7 +173,6 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 						field.Invalid(field.NewPath("spec", "template", "metadata", "labels"), nil, "").MarkFromImperative(),
 						field.Invalid(field.NewPath("spec", "selector"), nil, "field is immutable").WithOrigin("immutable").MarkAlpha(),
 					},
-					skipVersions: []string{"v1beta1"},
 					allRulesOnly: true,
 				},
 			}
