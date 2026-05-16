@@ -306,9 +306,10 @@ func TestDataKeyGenerationLatency(t *testing.T) {
 	RegisterMetrics()
 	dataKeyGenerationFailuresTotal.Reset()
 
-	sinceInSeconds = func(start time.Time) float64 {
+	cleanup := SetSinceInSecondsForTest(func(start time.Time) float64 {
 		return time.Unix(0, 1*int64(time.Millisecond)).Sub(start).Seconds()
-	}
+	})
+	t.Cleanup(cleanup)
 
 	RecordDataKeyGeneration(time.Unix(0, 0), nil)
 
