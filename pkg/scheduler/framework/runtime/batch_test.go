@@ -25,6 +25,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -432,5 +433,326 @@ func TestBatchBasic(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// countingFilterPlugin is a filter plugin that records each Filter invocation.
+// It also iterates over the node's pods and the pod's containers to simulate
+// the non-trivial work that real filter plugins (e.g. NodeResourcesFit) perform.
+type countingFilterPlugin struct {
+	calls        int
+	rejectResult bool // if true, Filter returns Unschedulable
+}
+
+func (pl *countingFilterPlugin) Name() string { return "countingFilter" }
+
+func (pl *countingFilterPlugin) Filter(_ context.Context, _ fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	pl.calls++
+	// Simulate work proportional to what a real resource filter does:
+	// iterate containers and node pods to avoid the call being compiled away.
+	var used int64
+	for _, p := range nodeInfo.GetPods() {
+		for _, c := range p.GetPod().Spec.Containers {
+			if q, ok := c.Resources.Requests[v1.ResourceCPU]; ok {
+				used += q.MilliValue()
+			}
+		}
+	}
+	for _, c := range pod.Spec.Containers {
+		if q, ok := c.Resources.Requests[v1.ResourceCPU]; ok {
+			used += q.MilliValue()
+		}
+	}
+	_ = used
+	if pl.rejectResult {
+		return fwk.NewStatus(fwk.Unschedulable, "always reject")
+	}
+	return nil
+}
+
+func newCountingFilterPlugin(pl *countingFilterPlugin) func(context.Context, runtime.Object, fwk.Handle) (fwk.Plugin, error) {
+	return func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+		return pl, nil
+	}
+}
+
+// makeResourcePod returns a pod with the given CPU and memory requests on its single container.
+func makeResourcePod(name string, cpu, mem string) *v1.Pod {
+	reqs := v1.ResourceList{}
+	if cpu != "" {
+		reqs[v1.ResourceCPU] = resource.MustParse(cpu)
+	}
+	if mem != "" {
+		reqs[v1.ResourceMemory] = resource.MustParse(mem)
+	}
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: name, UID: types.UID(blockingPodID(name))},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{Resources: v1.ResourceRequirements{Requests: reqs}},
+			},
+		},
+	}
+}
+
+// makeNodeInfo builds a NodeInfo with the given allocatable and already-requested resources.
+func makeNodeInfo(nodeName string, allocMilliCPU, allocMemory, reqMilliCPU, reqMemory int64) *framework.NodeInfo {
+	ni := framework.NewNodeInfo()
+	ni.SetNode(&v1.Node{
+		ObjectMeta: metav1.ObjectMeta{Name: nodeName, UID: types.UID(nodeName)},
+		Status: v1.NodeStatus{
+			Allocatable: v1.ResourceList{
+				v1.ResourceCPU:    *resource.NewMilliQuantity(allocMilliCPU, resource.DecimalSI),
+				v1.ResourceMemory: *resource.NewQuantity(allocMemory, resource.BinarySI),
+			},
+		},
+	})
+	ni.Requested.MilliCPU = reqMilliCPU
+	ni.Requested.Memory = reqMemory
+	return ni
+}
+
+// TestBatchResourcePrecheck verifies that batchStateCompatible skips
+// RunFilterPlugins when the pod's resource requests fit within the node's
+// remaining allocatable capacity.
+func TestBatchResourcePrecheck(t *testing.T) {
+	const (
+		allocMilliCPU = int64(8000)
+		allocMemory   = int64(16 * 1024 * 1024 * 1024)
+		reqMilliCPU   = int64(4000) // 4 CPUs already in use
+		reqMemory     = int64(8 * 1024 * 1024 * 1024)
+	)
+
+	tests := []struct {
+		name              string
+		podCPU            string
+		podMemory         string
+		filterShouldPass  bool // filter returns nil (pod fits) when called
+		expectFilterCalls int
+		expectHint        string
+	}{
+		{
+			name:              "pod fits node resources: filter not called",
+			podCPU:            "100m",
+			podMemory:         "128Mi",
+			filterShouldPass:  true,  // irrelevant; filter won't be called
+			expectFilterCalls: 0,
+			expectHint:        "",
+		},
+		{
+			name:              "pod exhausts node CPU: filter is called and rejects",
+			podCPU:            "5000m", // 5 CPUs but only 4 remaining
+			podMemory:         "128Mi",
+			filterShouldPass:  false, // filter returns Unschedulable
+			expectFilterCalls: 1,
+			expectHint:        "n1", // batchStateCompatible returns true → hint given
+		},
+		{
+			name:              "pod exhausts node memory: filter is called and rejects",
+			podCPU:            "100m",
+			podMemory:         "9Gi", // 9 GiB but only 8 GiB remaining
+			filterShouldPass:  false,
+			expectFilterCalls: 1,
+			expectHint:        "n1",
+		},
+		{
+			name:              "pod has no resource requests: filter is called",
+			podCPU:            "",
+			podMemory:         "",
+			filterShouldPass:  true, // filter passes, so batchStateCompatible returns false
+			expectFilterCalls: 1,
+			expectHint:        "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			filter := &countingFilterPlugin{rejectResult: !tt.filterShouldPass}
+			r := make(Registry)
+			if err := r.Register("countingFilter", newCountingFilterPlugin(filter)); err != nil {
+				t.Fatal(err)
+			}
+			if err := r.Register(queueSortPlugin, newQueueSortPlugin); err != nil {
+				t.Fatal(err)
+			}
+			if err := r.Register(bindPlugin, newBindPlugin); err != nil {
+				t.Fatal(err)
+			}
+			plugins := &config.Plugins{
+				QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: queueSortPlugin}}},
+				Bind:      config.PluginSet{Enabled: []config.Plugin{{Name: bindPlugin}}},
+				Filter:    config.PluginSet{Enabled: []config.Plugin{{Name: "countingFilter"}}},
+			}
+			profile := config.KubeSchedulerProfile{Plugins: plugins}
+
+			lister := &sharedLister{nodes: nodeInfoLister{}}
+			testFwk, err := NewFramework(ctx, r, &profile, WithSnapshotSharedLister(lister))
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+
+			batch := newOpportunisticBatch(testFwk, false)
+			state := framework.NewCycleState()
+
+			// Simulate a successfully scheduled first pod that chose "n3".
+			firstPod := makeResourcePod("1", tt.podCPU, tt.podMemory)
+			firstPod.UID = types.UID(blockingPodID("first"))
+			batch.StoreScheduleResults(ctx, fwk.PodSignature("sig"), "", "n3",
+				newTestNodes([]string{"n1"}), 1)
+			batch.lastCycle = schedulingCycle{cycleCount: 1, chosenNode: "n3", succeeded: true}
+
+			// Set up the node lister with the lastChosenNode ("n3") having known resources.
+			nodeN3 := makeNodeInfo("n3", allocMilliCPU, allocMemory, reqMilliCPU, reqMemory)
+			lister.nodes = nodeInfoLister{nodeN3}
+
+			// Run the second pod through GetNodeHint.
+			secondPod := makeResourcePod("2", tt.podCPU, tt.podMemory)
+			hint := batch.GetNodeHint(ctx, secondPod, fwk.PodSignature("sig"), state, 2)
+
+			if hint != tt.expectHint {
+				t.Errorf("hint = %q, want %q", hint, tt.expectHint)
+			}
+			if filter.calls != tt.expectFilterCalls {
+				t.Errorf("filter called %d times, want %d", filter.calls, tt.expectFilterCalls)
+			}
+		})
+	}
+}
+
+func BenchmarkBatchStateCompatibleResourcePrecheck(b *testing.B) {
+	// Benchmark batchStateCompatible for the common case: a low-resource pod
+	// on a node with plenty of remaining capacity. The fast path should avoid
+	// calling RunFilterPlugins entirely.
+	_, ctx := ktesting.NewTestContext(b)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	filter := &countingFilterPlugin{rejectResult: false}
+	r := make(Registry)
+	_ = r.Register("countingFilter", newCountingFilterPlugin(filter))
+	_ = r.Register(queueSortPlugin, newQueueSortPlugin)
+	_ = r.Register(bindPlugin, newBindPlugin)
+	plugins := &config.Plugins{
+		QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: queueSortPlugin}}},
+		Bind:      config.PluginSet{Enabled: []config.Plugin{{Name: bindPlugin}}},
+		Filter:    config.PluginSet{Enabled: []config.Plugin{{Name: "countingFilter"}}},
+	}
+	profile := config.KubeSchedulerProfile{Plugins: plugins}
+	lister := &sharedLister{nodes: nodeInfoLister{}}
+	testFwk, _ := NewFramework(ctx, r, &profile, WithSnapshotSharedLister(lister))
+
+	nodeN3 := makeNodeInfo("n3", 8000, 16*1024*1024*1024, 4000, 8*1024*1024*1024)
+	lister.nodes = nodeInfoLister{nodeN3}
+
+	pod := makeResourcePod("bench", "100m", "128Mi")
+	state := framework.NewCycleState()
+
+	batch := newOpportunisticBatch(testFwk, false)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		filter.calls = 0
+		batch.state = &batchState{
+			signature:   fwk.PodSignature("sig"),
+			sortedNodes: newTestNodes([]string{"n1"}),
+		}
+		batch.lastCycle = schedulingCycle{cycleCount: int64(i), chosenNode: "n3", succeeded: true}
+		batch.batchStateCompatible(ctx, pod, fwk.PodSignature("sig"), int64(i+1), state, lister.nodes)
+	}
+}
+
+// BenchmarkBatchStateCompatibleRunFilterPath measures batchStateCompatible when
+// RunFilterPlugins is always reached — equivalent to the pre-optimization path
+// for any pod. Use a pod with no resource requests so the fast-path pre-check
+// does not fire.
+func BenchmarkBatchStateCompatibleRunFilterPath(b *testing.B) {
+	_, ctx := ktesting.NewTestContext(b)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	filter := &countingFilterPlugin{rejectResult: false}
+	r := make(Registry)
+	_ = r.Register("countingFilter", newCountingFilterPlugin(filter))
+	_ = r.Register(queueSortPlugin, newQueueSortPlugin)
+	_ = r.Register(bindPlugin, newBindPlugin)
+	plugins := &config.Plugins{
+		QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: queueSortPlugin}}},
+		Bind:      config.PluginSet{Enabled: []config.Plugin{{Name: bindPlugin}}},
+		Filter:    config.PluginSet{Enabled: []config.Plugin{{Name: "countingFilter"}}},
+	}
+	profile := config.KubeSchedulerProfile{Plugins: plugins}
+	lister := &sharedLister{nodes: nodeInfoLister{}}
+	testFwk, _ := NewFramework(ctx, r, &profile, WithSnapshotSharedLister(lister))
+
+	nodeN3 := makeNodeInfo("n3", 8000, 16*1024*1024*1024, 4000, 8*1024*1024*1024)
+	lister.nodes = nodeInfoLister{nodeN3}
+
+	// Pod with no resource requests: fast-path check is bypassed, RunFilterPlugins always runs.
+	pod := makeResourcePod("bench-no-res", "", "")
+	state := framework.NewCycleState()
+
+	batch := newOpportunisticBatch(testFwk, false)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		filter.calls = 0
+		batch.state = &batchState{
+			signature:   fwk.PodSignature("sig"),
+			sortedNodes: newTestNodes([]string{"n1"}),
+		}
+		batch.lastCycle = schedulingCycle{cycleCount: int64(i), chosenNode: "n3", succeeded: true}
+		batch.batchStateCompatible(ctx, pod, fwk.PodSignature("sig"), int64(i+1), state, lister.nodes)
+	}
+}
+
+// BenchmarkPodContainerRequests measures the cost of the O(1) resource pre-check
+// in isolation, so it can be compared with the cost of a RunFilterPlugins call.
+func BenchmarkPodContainerRequests(b *testing.B) {
+	pod := makeResourcePod("bench", "100m", "128Mi")
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		cpu, mem := podContainerRequests(pod)
+		_ = cpu
+		_ = mem
+	}
+}
+
+// BenchmarkRunFilterPluginsOnly measures the cost of a single RunFilterPlugins
+// call through the framework, for comparison with BenchmarkPodContainerRequests.
+func BenchmarkRunFilterPluginsOnly(b *testing.B) {
+	_, ctx := ktesting.NewTestContext(b)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	filter := &countingFilterPlugin{rejectResult: false}
+	r := make(Registry)
+	_ = r.Register("countingFilter", newCountingFilterPlugin(filter))
+	_ = r.Register(queueSortPlugin, newQueueSortPlugin)
+	_ = r.Register(bindPlugin, newBindPlugin)
+	plugins := &config.Plugins{
+		QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: queueSortPlugin}}},
+		Bind:      config.PluginSet{Enabled: []config.Plugin{{Name: bindPlugin}}},
+		Filter:    config.PluginSet{Enabled: []config.Plugin{{Name: "countingFilter"}}},
+	}
+	profile := config.KubeSchedulerProfile{Plugins: plugins}
+	lister := &sharedLister{nodes: nodeInfoLister{}}
+	testFwk, _ := NewFramework(ctx, r, &profile, WithSnapshotSharedLister(lister))
+
+	nodeN3 := makeNodeInfo("n3", 8000, 16*1024*1024*1024, 4000, 8*1024*1024*1024)
+	lister.nodes = nodeInfoLister{nodeN3}
+	pod := makeResourcePod("bench", "100m", "128Mi")
+	state := framework.NewCycleState()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		testFwk.RunFilterPlugins(ctx, state, pod, nodeN3)
 	}
 }

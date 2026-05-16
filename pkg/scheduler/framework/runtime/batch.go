@@ -218,6 +218,23 @@ func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, pod *v1.P
 		return false
 	}
 
+	// Fast path: if the pod requests any CPU or memory and the node has
+	// sufficient remaining allocatable capacity for both, the node cannot
+	// be resource-full for this pod. Skip the expensive RunFilterPlugins
+	// call and return false immediately. Pods whose non-resource constraints
+	// (taints, affinity, etc.) would have caused a rejection may
+	// occasionally miss a valid batch hint, but scheduling correctness is
+	// unaffected — returning false here only prevents hint reuse.
+	podMilliCPU, podMemory := podContainerRequests(pod)
+	if podMilliCPU > 0 || podMemory > 0 {
+		remainingMilliCPU := lastChosenNode.GetAllocatable().GetMilliCPU() - lastChosenNode.GetRequested().GetMilliCPU()
+		remainingMemory := lastChosenNode.GetAllocatable().GetMemory() - lastChosenNode.GetRequested().GetMemory()
+		if podMilliCPU <= remainingMilliCPU && podMemory <= remainingMemory {
+			b.logUnusableState(logger, cycleCount, metrics.BatchFlushNodeNotFull)
+			return false
+		}
+	}
+
 	status := b.handle.RunFilterPlugins(ctx, state, pod, lastChosenNode)
 	if !status.IsRejected() {
 		b.logUnusableState(logger, cycleCount, metrics.BatchFlushNodeNotFull)
@@ -226,6 +243,21 @@ func (b *OpportunisticBatch) batchStateCompatible(ctx context.Context, pod *v1.P
 
 	// Our state matches with our new pod and is useable
 	return true
+}
+
+// podContainerRequests sums CPU and memory requests across all regular
+// containers in the pod spec. Init containers are omitted for efficiency;
+// the result is used only as a conservative fast-path pre-check.
+func podContainerRequests(pod *v1.Pod) (milliCPU, memory int64) {
+	for _, c := range pod.Spec.Containers {
+		if q, ok := c.Resources.Requests[v1.ResourceCPU]; ok {
+			milliCPU += q.MilliValue()
+		}
+		if q, ok := c.Resources.Requests[v1.ResourceMemory]; ok {
+			memory += q.Value()
+		}
+	}
+	return
 }
 
 // Irritatingly we can end up with a variety of different configurations that are all "empty".
