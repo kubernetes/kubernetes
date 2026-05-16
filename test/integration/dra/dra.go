@@ -212,26 +212,16 @@ func run(tCtx ktesting.TContext, whatRE string) {
 				})
 			},
 		},
-		// This scenario verifies that features which have graduated to GA can
-		// still be explicitly disabled via feature gates.
-		"GA-opt-out": {
-			apis: map[schema.GroupVersion]bool{},
-			features: map[featuregate.Feature]bool{
-				featuregate.Feature("AllBeta"): false,
-				features.DRAPrioritizedList:    false,
-			},
-			f: func(tCtx ktesting.TContext) {
-				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, false) })
-			},
-		},
 		"GA-opt-out-1.36": {
 			version: "1.36",
 			apis:    map[schema.GroupVersion]bool{},
 			features: map[featuregate.Feature]bool{
 				features.DRAResourceClaimDeviceStatus: false,
+				features.DRAPrioritizedList:           false,
 			},
 			f: func(tCtx ktesting.TContext) {
 				runSubTest(tCtx, "ResourceClaimDeviceStatus", func(tCtx ktesting.TContext) { testResourceClaimDeviceStatus(tCtx, false) })
+				runSubTest(tCtx, "PrioritizedList", func(tCtx ktesting.TContext) { testPrioritizedList(tCtx, false) })
 			},
 		},
 		"v1beta1": {
