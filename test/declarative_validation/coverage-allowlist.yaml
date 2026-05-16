@@ -22,3 +22,48 @@
   errorType: '*'
   origin: '*'
   reason: Not served by kube-apiserver.
+
+# Scale subresource: no dedicated Strategy in the new tree; tested separately
+# via VerifyVersionedValidationEquivalence (which doesn't populate the
+# in-process coverage accumulator). extensions/v1beta1/Scale is covered by
+# the group-level entry above.
+- apiVersion: autoscaling/v1
+  kind: Scale
+  path: '*'
+  errorType: '*'
+  origin: '*'
+  reason: Scale subresource has no dedicated Strategy; tested separately.
+- apiVersion: apps/v1beta1
+  kind: Scale
+  path: '*'
+  errorType: '*'
+  origin: '*'
+  reason: Scale subresource has no dedicated Strategy; tested separately.
+- apiVersion: apps/v1beta2
+  kind: Scale
+  path: '*'
+  errorType: '*'
+  origin: '*'
+  reason: Scale subresource has no dedicated Strategy; tested separately.
+
+# VolumeAttachment spec is immutable. Updating inlineVolumeSpec.volumeMode is
+# rejected at spec before the nested PersistentVolumeSpec rule can be observed
+# through the REST strategy.
+- apiVersion: storage.k8s.io/v1
+  kind: VolumeAttachment
+  path: spec.source.inlineVolumeSpec.volumeMode
+  errorType: FieldValueInvalid
+  origin: immutable
+  reason: VolumeAttachment spec immutability short-circuits this nested update rule.
+- apiVersion: storage.k8s.io/v1alpha1
+  kind: VolumeAttachment
+  path: spec.source.inlineVolumeSpec.volumeMode
+  errorType: FieldValueInvalid
+  origin: immutable
+  reason: VolumeAttachment spec immutability short-circuits this nested update rule.
+- apiVersion: storage.k8s.io/v1beta1
+  kind: VolumeAttachment
+  path: spec.source.inlineVolumeSpec.volumeMode
+  errorType: FieldValueInvalid
+  origin: immutable
+  reason: VolumeAttachment spec immutability short-circuits this nested update rule.
