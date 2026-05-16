@@ -27,6 +27,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	grpccodes "google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
@@ -280,28 +281,29 @@ func (wc *watchChan) RequestWatchProgress() error {
 // The revision to watch will be set to the revision in response.
 // All events sent will have isCreated=true
 func (wc *watchChan) sync() error {
-	opts := []clientv3.OpOption{}
 	if wc.recursive {
-		opts = append(opts, clientv3.WithLimit(defaultWatcherMaxLimit))
-		rangeEnd := clientv3.GetPrefixRangeEnd(wc.key)
-		opts = append(opts, clientv3.WithRange(rangeEnd))
+		return wc.syncPaginatedBypass()
 	}
+	// Single-object watch: one Get, queued through the normal pipeline.
+	return wc.paginateList(nil, "get", func(kv *mvccpb.KeyValue) error {
+		wc.queueEvent(parseKV(kv))
+		return nil
+	})
+}
 
-	var err error
+// paginateList walks the range described by opts page by page, invoking emit
+// for every KV in key order. It owns cursor advancement, the initial-revision
+// capture, and the empty-page/More sanity check. emit returning a non-nil
+// error aborts the walk and that error is returned as-is (used for context
+// cancellation by the bypass path).
+func (wc *watchChan) paginateList(opts []clientv3.OpOption, metricsOp string, emit func(kv *mvccpb.KeyValue) error) error {
 	var lastKey []byte
 	var withRev int64
-	var getResp *clientv3.GetResponse
-
-	metricsOp := "get"
-	if wc.recursive {
-		metricsOp = "list"
-	}
-
 	preparedKey := wc.key
 
 	for {
 		startTime := time.Now()
-		getResp, err = wc.watcher.client.KV.Get(wc.ctx, preparedKey, opts...)
+		getResp, err := wc.watcher.client.KV.Get(wc.ctx, preparedKey, opts...)
 		metrics.RecordEtcdRequest(metricsOp, wc.watcher.groupResource, err, startTime)
 		if err != nil {
 			return interpretListError(err, true, preparedKey, wc.key)
@@ -311,10 +313,11 @@ func (wc *watchChan) sync() error {
 			return fmt.Errorf("no results were found, but etcd indicated there were more values remaining")
 		}
 
-		// send items from the response until no more results
 		for i, kv := range getResp.Kvs {
 			lastKey = kv.Key
-			wc.queueEvent(parseKV(kv))
+			if err := emit(kv); err != nil {
+				return err
+			}
 			// free kv early. Long lists can take O(seconds) to decode.
 			getResp.Kvs[i] = nil
 		}
@@ -334,6 +337,66 @@ func (wc *watchChan) sync() error {
 			opts = append(opts, clientv3.WithRev(withRev))
 		}
 	}
+}
+
+// syncPaginatedBypass is the unordered, parallel-decode variant of the
+// recursive initial sync. It paginates the range with the same paginateList
+// loop as the ordered path, but instead of decoding KVs in order and queueing
+// them through the incomingEventChan/processEvents pipeline, it fans each
+// page's KVs out to a worker pool that decodes in parallel and writes
+// watch.Events directly to wc.resultChan. Event ordering is not preserved,
+// which is safe for initial sync because the receiver (watchCache.Replace via
+// reflector) rebuilds its index in bulk and does not depend on event order.
+//
+// On transform error the worker logs and continues (matching the klog
+// behavior of the existing path), so a single decode failure does not stall
+// the stream.
+func (wc *watchChan) syncPaginatedBypass() error {
+	const numWorkers = 10
+	const kvBuf = 256
+
+	kvCh := make(chan *mvccpb.KeyValue, kvBuf)
+	var workerWg sync.WaitGroup
+	// Cleanup runs on every return path: closing kvCh lets the workers drain
+	// and exit, then we wait for them before returning.
+	defer func() {
+		close(kvCh)
+		workerWg.Wait()
+	}()
+	workerWg.Add(numWorkers)
+	for i := 0; i < numWorkers; i++ {
+		go func() {
+			defer workerWg.Done()
+			for kv := range kvCh {
+				e := parseKV(kv)
+				res, terr := wc.transform(e)
+				if terr != nil {
+					continue
+				}
+				if res == nil {
+					continue
+				}
+				select {
+				case wc.resultChan <- *res:
+				case <-wc.ctx.Done():
+					return
+				}
+			}
+		}()
+	}
+
+	opts := []clientv3.OpOption{
+		clientv3.WithLimit(defaultWatcherMaxLimit),
+		clientv3.WithRange(clientv3.GetPrefixRangeEnd(wc.key)),
+	}
+	return wc.paginateList(opts, "list", func(kv *mvccpb.KeyValue) error {
+		select {
+		case kvCh <- kv:
+			return nil
+		case <-wc.ctx.Done():
+			return wc.ctx.Err()
+		}
+	})
 }
 
 func logWatchChannelErr(err error) {
