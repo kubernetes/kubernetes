@@ -272,8 +272,8 @@ message DeploymentSpec {
 
   // Label selector for pods. Existing ReplicaSets whose pods are
   // selected by this will be the ones affected by this deployment.
-  // +optional
-  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:required
+  // +required
   // +k8s:alpha(since: "1.37")=+k8s:immutable
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
@@ -906,8 +906,8 @@ message ReplicaSetSpec {
   // If the selector is empty, it is defaulted to the labels present on the pod template.
   // Label keys and values that must match in order to be controlled by this replica set.
   // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
-  // +optional
-  // +k8s:alpha(since: "1.37")=+k8s:optional
+  // +k8s:alpha(since: "1.37")=+k8s:required
+  // +required
   // +k8s:alpha(since: "1.37")=+k8s:immutable
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
