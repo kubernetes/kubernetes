@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -210,10 +210,27 @@ func TestTopPod(t *testing.T) {
 					return true, res, nil
 				})
 			}
+			podList := &v1.PodList{
+				Items: []v1.Pod{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod1", Namespace: testNS},
+						Spec:       v1.PodSpec{NodeName: "node-a"},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod2", Namespace: testNS},
+						Spec:       v1.PodSpec{NodeName: "node-b"},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "pod3", Namespace: testNS},
+						Spec:       v1.PodSpec{NodeName: "node-c"},
+					},
+				},
+			}
 
 			tf := cmdtesting.NewTestFactory().WithNamespace(testNS)
 			defer tf.Cleanup()
 
+			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
 			ns := scheme.Codecs.WithoutConversion()
 
 			tf.Client = &fake.RESTClient{
@@ -224,6 +241,8 @@ func TestTopPod(t *testing.T) {
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
 					case p == "/apis":
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(apisbodyWithMetrics)))}, nil
+					case p == "/api/v1/namespaces/"+testNS+"/pods":
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, podList)}, nil
 					default:
 						t.Fatalf("%s: unexpected request: %#v\nGot URL: %#v",
 							testCase.name, req, req.URL)
