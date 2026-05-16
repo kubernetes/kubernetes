@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	gruntime "runtime"
 	"strings"
@@ -49,6 +50,16 @@ const (
 )
 
 var ErrNotInCluster = errors.New("unable to load in-cluster configuration, KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT must be defined")
+
+const serviceAccountRoot = "/var/run/secrets/kubernetes.io/serviceaccount"
+
+func serviceAccountFilePath(goos, filename string) string {
+	path := path.Join(serviceAccountRoot, filename)
+	if goos == "windows" {
+		return "c:" + path
+	}
+	return path
+}
 
 // Config holds the common attributes that can be passed to a Kubernetes client on
 // initialization.
@@ -541,10 +552,8 @@ func DefaultKubernetesUserAgent() string {
 // running inside a pod running on kubernetes. It will return ErrNotInCluster
 // if called from a process not running in a kubernetes environment.
 func InClusterConfig() (*Config, error) {
-	const (
-		tokenFile  = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-		rootCAFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
-	)
+	tokenFile := serviceAccountFilePath(gruntime.GOOS, "token")
+	rootCAFile := serviceAccountFilePath(gruntime.GOOS, "ca.crt")
 	host, port := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")
 	if len(host) == 0 || len(port) == 0 {
 		return nil, ErrNotInCluster
