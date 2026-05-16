@@ -27,9 +27,12 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 )
 
 const (
@@ -75,6 +78,77 @@ func (t *testEnvelopeService) Rotate() {
 func newTestEnvelopeService() *testEnvelopeService {
 	return &testEnvelopeService{
 		keyVersion: "1",
+	}
+}
+
+func TestEnvelopeMetrics(t *testing.T) {
+	value.RegisterMetrics()
+	value.ResetEnvelopeTransformationCacheMissTotalForTest()
+	cleanup := value.SetSinceInSecondsForTest(func(time.Time) float64 {
+		return 0.001
+	})
+	t.Cleanup(cleanup)
+
+	envelopeService := newTestEnvelopeService()
+	cbcTransformer := func(block cipher.Block) (value.Transformer, error) {
+		return aestransformer.NewCBCTransformer(block), nil
+	}
+	// Cache size 1 ensures the second encryption operation evicts the first
+	// key from the cache, so a later read of the first ciphertext will miss.
+	envelopeTransformer := NewEnvelopeTransformer(envelopeService, 1, cbcTransformer)
+	ctx := context.Background()
+	dataCtx := value.DefaultContext(testContextText)
+	originalText := []byte(testText)
+
+	transformedData1, err := envelopeTransformer.TransformToStorage(ctx, originalText, dataCtx)
+	if err != nil {
+		t.Fatalf("envelopeTransformer: error while transforming data to storage: %s", err)
+	}
+
+	// Second transform evicts transformedData1's key from the LRU cache (capacity 1).
+	if _, err := envelopeTransformer.TransformToStorage(ctx, originalText, dataCtx); err != nil {
+		t.Fatalf("envelopeTransformer: error while transforming data to storage: %s", err)
+	}
+
+	// Read transformedData1; since its key was evicted, this triggers a cache miss.
+	untransformedData, _, err := envelopeTransformer.TransformFromStorage(ctx, transformedData1, dataCtx)
+	if err != nil {
+		t.Fatalf("could not decrypt data: %v", err)
+	}
+	if !bytes.Equal(untransformedData, originalText) {
+		t.Fatalf("transformed data incorrectly. Expected: %v, got %v", originalText, untransformedData)
+	}
+
+	want := `
+		# HELP apiserver_storage_data_key_generation_duration_seconds [BETA] Latencies in seconds of data encryption key(DEK) generation operations.
+		# TYPE apiserver_storage_data_key_generation_duration_seconds histogram
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="5e-06"} 0
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="1e-05"} 0
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="2e-05"} 0
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="4e-05"} 0
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="8e-05"} 0
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="0.00016"} 0
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="0.00032"} 0
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="0.00064"} 0
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="0.00128"} 2
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="0.00256"} 2
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="0.00512"} 2
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="0.01024"} 2
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="0.02048"} 2
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="0.04096"} 2
+		apiserver_storage_data_key_generation_duration_seconds_bucket{le="+Inf"} 2
+		apiserver_storage_data_key_generation_duration_seconds_sum 0.002
+		apiserver_storage_data_key_generation_duration_seconds_count 2
+		# HELP apiserver_storage_envelope_transformation_cache_misses_total [BETA] Total number of cache misses while accessing key decryption key(KEK).
+		# TYPE apiserver_storage_envelope_transformation_cache_misses_total counter
+		apiserver_storage_envelope_transformation_cache_misses_total 1
+	`
+	metricNames := []string{
+		"apiserver_storage_data_key_generation_duration_seconds",
+		"apiserver_storage_envelope_transformation_cache_misses_total",
+	}
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(want), metricNames...); err != nil {
+		t.Fatal(err)
 	}
 }
 

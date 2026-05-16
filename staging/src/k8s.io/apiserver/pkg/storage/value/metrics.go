@@ -141,6 +141,20 @@ var sinceInSeconds = func(start time.Time) float64 {
 	return time.Since(start).Seconds()
 }
 
+// SetSinceInSecondsForTest overrides sinceInSeconds for tests and returns a
+// cleanup function that restores the original implementation.
+func SetSinceInSecondsForTest(fn func(time.Time) float64) func() {
+	old := sinceInSeconds
+	sinceInSeconds = fn
+	return func() { sinceInSeconds = old }
+}
+
+// ResetEnvelopeTransformationCacheMissTotalForTest resets the
+// envelope_transformation_cache_misses_total counter for tests.
+func ResetEnvelopeTransformationCacheMissTotalForTest() {
+	envelopeTransformationCacheMissTotal.Reset()
+}
+
 type gRPCError interface {
 	GRPCStatus() *status.Status
 }
