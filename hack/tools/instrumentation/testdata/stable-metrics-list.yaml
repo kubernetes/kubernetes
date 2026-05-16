@@ -490,6 +490,36 @@
   - extension_point
   - plugin
   - profile
+- name: plugin_execution_duration_seconds
+  subsystem: scheduler
+  help: Duration for running a plugin at a specific extension point.
+  type: Histogram
+  stabilityLevel: BETA
+  labels:
+  - extension_point
+  - plugin
+  - status
+  buckets:
+  - 1e-05
+  - 1.5000000000000002e-05
+  - 2.2500000000000005e-05
+  - 3.375000000000001e-05
+  - 5.062500000000001e-05
+  - 7.593750000000002e-05
+  - 0.00011390625000000003
+  - 0.00017085937500000006
+  - 0.0002562890625000001
+  - 0.00038443359375000017
+  - 0.0005766503906250003
+  - 0.0008649755859375004
+  - 0.0012974633789062506
+  - 0.0019461950683593758
+  - 0.0029192926025390638
+  - 0.004378938903808595
+  - 0.006568408355712893
+  - 0.009852612533569338
+  - 0.014778918800354007
+  - 0.02216837820053101
 - name: pod_scheduling_sli_duration_seconds
   subsystem: scheduler
   help: E2e latency for a pod being scheduled, from the time the pod enters the scheduling
@@ -519,6 +549,27 @@
   - 1310.72
   - 2621.44
   - 5242.88
+- name: scheduling_algorithm_duration_seconds
+  subsystem: scheduler
+  help: Scheduling algorithm latency in seconds
+  type: Histogram
+  stabilityLevel: BETA
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
 - name: unschedulable_pods
   subsystem: scheduler
   help: The number of unschedulable pods broken down by plugin name. A pod will increment

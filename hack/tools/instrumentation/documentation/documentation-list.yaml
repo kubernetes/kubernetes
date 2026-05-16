@@ -6361,7 +6361,7 @@
   subsystem: scheduler
   help: Duration for running a plugin at a specific extension point.
   type: Histogram
-  stabilityLevel: ALPHA
+  stabilityLevel: BETA
   labels:
   - extension_point
   - plugin
@@ -6552,7 +6552,7 @@
   subsystem: scheduler
   help: Scheduling algorithm latency in seconds
   type: Histogram
-  stabilityLevel: ALPHA
+  stabilityLevel: BETA
   buckets:
   - 0.001
   - 0.002
