@@ -595,7 +595,7 @@ func (kl *Kubelet) GetOrCreateUserNamespaceMappings(logger klog.Logger, pod *v1.
 func (kl *Kubelet) GeneratePodHostNameAndDomain(logger klog.Logger, pod *v1.Pod) (string, string, error) {
 	clusterDomain := kl.dnsConfigurer.ClusterDomain
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.HostnameOverride) && pod.Spec.HostnameOverride != nil {
+	if pod.Spec.HostnameOverride != nil {
 		hostname := *pod.Spec.HostnameOverride
 		if msgs := utilvalidation.IsDNS1123Subdomain(hostname); len(msgs) != 0 {
 			return "", "", fmt.Errorf("pod HostnameOverride %q is not a valid DNS subdomain: %s", hostname, strings.Join(msgs, ";"))
