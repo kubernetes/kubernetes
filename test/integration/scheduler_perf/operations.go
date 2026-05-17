@@ -348,7 +348,8 @@ type createPodsOp struct {
 	PersistentVolumeClaimTemplatePath *string
 	// Params to be passed to the template.
 	// Values with `$` prefix will be resolved to the workload parameters.
-	TemplateParams map[string]any
+	TemplateParams    map[string]any
+	NominatedNodeName string
 }
 
 func (cpo *createPodsOp) isValid(allowParameterization bool) error {
@@ -369,6 +370,12 @@ func (cpo *createPodsOp) isValid(allowParameterization bool) error {
 	}
 	if cpo.SteadyState && !allowParameterization && cpo.Duration.Duration <= 0 {
 		return errors.New("when creating pods in a steady state, the test duration must be > 0")
+	}
+	if cpo.NominatedNodeName != "" && cpo.SteadyState {
+		return errors.New("nominatedNodeName and steadyState cannot be used together")
+	}
+	if cpo.NominatedNodeName != "" && cpo.SkipWaitToCompletion {
+		return errors.New("nominatedNodeName and skipWaitToCompletion cannot be used together")
 	}
 	return nil
 }

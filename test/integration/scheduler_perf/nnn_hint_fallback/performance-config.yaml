@@ -1,0 +1,33 @@
+# The following labels are used in this file. (listed in ascending order of the number of covered test cases)
+#
+# - integration-test: test cases to run as the integration test.
+# - performance: test cases to run in the performance test.
+# - short: supplemental label for the above two labels (must not used alone), which literally means short execution time test cases.
+#
+# NNNMiss measures the NNN miss -> OB hint hit path.
+- name: NNNMiss
+  defaultPodTemplatePath: templates/gated-pod-default.yaml
+  schedulerConfigPath: scheduler-config.yaml
+  featureGates:
+    OpportunisticBatching: true
+  workloadTemplate:
+  - opcode: createNodes
+    countParam: $initNodes
+  - opcode: createNodes
+    count: 1
+    nodeTemplatePath: templates/blocked-node.yaml
+  - opcode: createPods
+    countParam: $measurePods
+    nominatedNodeName: scheduler-perf-blocked
+    collectMetrics: true
+  workloads:
+  - name: 500Nodes
+    labels: [integration-test, short]
+    params:
+      initNodes: 500
+      measurePods: 499
+  - name: 5000Nodes
+    labels: [performance]
+    params:
+      initNodes: 5000
+      measurePods: 4999

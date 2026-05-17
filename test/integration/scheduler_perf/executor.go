@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
@@ -242,6 +243,15 @@ func (e *WorkloadExecutor) runCreatePodsOp(tCtx ktesting.TContext, opIndex int, 
 		op.PodTemplatePath = e.testCase.DefaultPodTemplatePath
 	}
 
+	if op.NominatedNodeName != "" {
+		if err := createPodsRapidly(tCtx, namespace, op); err != nil {
+			return err
+		}
+		if err := patchNominatedNodeName(tCtx, namespace, op); err != nil {
+			return err
+		}
+	}
+
 	if op.CollectMetrics {
 		if e.collectorCancel != nil {
 			return fmt.Errorf("metrics collection is overlapping. Probably second collector was started before stopping a previous one")
@@ -252,8 +262,14 @@ func (e *WorkloadExecutor) runCreatePodsOp(tCtx ktesting.TContext, opIndex int, 
 			return err
 		}
 	}
-	if err := createPodsRapidly(tCtx, namespace, op); err != nil {
-		return err
+	if op.NominatedNodeName != "" {
+		if err := clearSchedulingGates(tCtx, namespace, op); err != nil {
+			return err
+		}
+	} else {
+		if err := createPodsRapidly(tCtx, namespace, op); err != nil {
+			return err
+		}
 	}
 	switch {
 	case op.SkipWaitToCompletion:
@@ -621,6 +637,41 @@ func createPodsRapidly(tCtx ktesting.TContext, namespace string, cpo *createPods
 	config.AddStrategy(namespace, cpo.Count, strategy)
 	podCreator := testutils.NewTestPodCreator(tCtx.Client(), config)
 	return podCreator.CreatePods(tCtx)
+}
+
+func patchNominatedNodeName(tCtx ktesting.TContext, namespace string, cpo *createPodsOp) error {
+	podClient := tCtx.Client().CoreV1().Pods(namespace)
+	pods, err := podClient.List(tCtx, metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("listing pods: %w", err)
+	}
+	if len(pods.Items) != cpo.Count {
+		return fmt.Errorf("expected %d pods in %q, got %d", cpo.Count, namespace, len(pods.Items))
+	}
+	for i := range pods.Items {
+		pod := &pods.Items[i]
+		patch := []byte(fmt.Sprintf(`{"status":{"nominatedNodeName":%q}}`, cpo.NominatedNodeName))
+		if _, err := podClient.Patch(tCtx, pod.Name, types.MergePatchType, patch, metav1.PatchOptions{}, "status"); err != nil {
+			return fmt.Errorf("patching status.nominatedNodeName for pod %s: %w", pod.Name, err)
+		}
+	}
+	return nil
+}
+
+func clearSchedulingGates(tCtx ktesting.TContext, namespace string, cpo *createPodsOp) error {
+	podClient := tCtx.Client().CoreV1().Pods(namespace)
+	pods, err := podClient.List(tCtx, metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("listing pods: %w", err)
+	}
+	patch := []byte(`{"spec":{"schedulingGates":null}}`)
+	for i := range pods.Items {
+		pod := &pods.Items[i]
+		if _, err := podClient.Patch(tCtx, pod.Name, types.StrategicMergePatchType, patch, metav1.PatchOptions{}); err != nil {
+			return fmt.Errorf("clearing schedulingGates for pod %s: %w", pod.Name, err)
+		}
+	}
+	return nil
 }
 
 // createPodsSteadily implements the "create pods and delete pods" mode of [createPodsOp].
