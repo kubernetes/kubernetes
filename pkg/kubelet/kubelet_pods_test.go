@@ -8646,7 +8646,7 @@ func TestMakeEnvironmentVariablesWithFileKeyRef(t *testing.T) {
 		return filePath
 	}
 
-	// Test cases for FileKeyRef feature gate
+	// Test cases for FileKeyRef
 	testCases := []struct {
 		name          string
 		container     *v1.Container
@@ -8964,8 +8964,6 @@ func TestMakeEnvironmentVariablesWithFileKeyRef(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EnvFiles, true)
-
 			if tc.setupFiles != nil {
 				tc.setupFiles()
 			}
