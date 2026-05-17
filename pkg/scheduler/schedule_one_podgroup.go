@@ -200,10 +200,7 @@ func initPodSchedulingContext(ctx context.Context, pod *v1.Pod, placementCycleSt
 	podsToActivate := framework.NewPodsToActivate()
 	state.Write(framework.PodsToActivateKey, podsToActivate)
 
-	var podGroupCycleState fwk.PodGroupCycleState
-	if placementCycleState != nil {
-		podGroupCycleState = placementCycleState.GetPodGroupSchedulingCycle()
-	}
+	podGroupCycleState := placementCycleState.GetPodGroupSchedulingCycle()
 	// Marks this cycle as a pod group scheduling cycle.
 	state.SetPodGroupSchedulingCycle(podGroupCycleState)
 	// Set the placement cycle state so per-pod plugins can access placement-scoped data.
