@@ -23,6 +23,7 @@ import (
 	"math/big"
 	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"unicode"
@@ -1818,5 +1819,53 @@ func TestQuantityRoundtripCBOR(t *testing.T) {
 			}
 			t.Errorf("Expected equal: %v, %v (cbor was '%s')", initial, final, diag)
 		}
+	}
+}
+
+func TestParseLargeQuantity(t *testing.T) {
+	tests := []struct {
+		input     string
+		expectErr bool
+		expectI64 bool
+		expectVal int64
+	}{
+		{
+			input:     strconv.FormatInt(math.MaxInt64, 10), // 9223372036854775807
+			expectErr: false,
+			expectI64: true,
+			expectVal: math.MaxInt64,
+		},
+		{
+			input:     strconv.FormatInt(math.MaxInt64-1, 10), // 9223372036854775806
+			expectErr: false,
+			expectI64: true,
+			expectVal: math.MaxInt64 - 1,
+		},
+		{
+			input:     "9223372036854775808", // math.MaxInt64 + 1, too big for int64
+			expectErr: false,
+			expectI64: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.input, func(t *testing.T) {
+			q, err := ParseQuantity(tc.input)
+			if tc.expectErr && err == nil {
+				t.Errorf("expected error for input %q but got none", tc.input)
+				return
+			}
+			if !tc.expectErr && err != nil {
+				t.Errorf("unexpected error for input %q: %v", tc.input, err)
+				return
+			}
+			val, ok := q.AsInt64()
+			if ok != tc.expectI64 {
+				t.Errorf("input %q: AsInt64() ok=%v, want %v", tc.input, ok, tc.expectI64)
+			}
+			if tc.expectI64 && val != tc.expectVal {
+				t.Errorf("input %q: AsInt64() value=%v, want %v", tc.input, val, tc.expectVal)
+			}
+		})
 	}
 }

@@ -323,7 +323,8 @@ func ParseQuantity(str string) (Quantity, error) {
 			var value int64
 			value, err := strconv.ParseInt(shifted, 10, 64)
 			if err != nil {
-				return Quantity{}, ErrNumeric
+				// value overflows int64, fall through to decimal path
+				goto useDec
 			}
 			if result, ok := int64Multiply(value, int64(mantissa)); ok {
 				if !positive {
@@ -344,11 +345,11 @@ func ParseQuantity(str string) (Quantity, error) {
 			}
 		}
 	}
-
-	amount := new(inf.Dec)
-	if _, ok := amount.SetString(value); !ok {
-		return Quantity{}, ErrNumeric
-	}
+	useDec:
+		amount := new(inf.Dec)
+		if _, ok := amount.SetString(value); !ok {
+			return Quantity{}, ErrNumeric
+		}
 
 	// So that no one but us has to think about suffixes, remove it.
 	if base == 10 {
