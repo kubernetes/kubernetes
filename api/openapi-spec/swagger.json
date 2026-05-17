@@ -13218,7 +13218,7 @@
           "type": "string"
         },
         "reason": {
-          "description": "reason is why the action was taken. It is human-readable. This field cannot be empty for new Events and it can have at most 128 characters.",
+          "description": "reason is why the action was taken. It is a short, machine-readable CamelCase string, e.g. `FailedScheduling`. This field cannot be empty for new Events and it can have at most 128 characters.",
           "type": "string"
         },
         "regarding": {

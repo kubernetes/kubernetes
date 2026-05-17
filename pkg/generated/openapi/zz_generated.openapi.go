@@ -33922,7 +33922,7 @@ func schema_k8sio_api_events_v1_Event(ref common.ReferenceCallback) common.OpenA
 					},
 					"reason": {
 						SchemaProps: spec.SchemaProps{
-							Description: "reason is why the action was taken. It is human-readable. This field cannot be empty for new Events and it can have at most 128 characters.",
+							Description: "reason is why the action was taken. It is a short, machine-readable CamelCase string, e.g. `FailedScheduling`. This field cannot be empty for new Events and it can have at most 128 characters.",
 							Type:        []string{"string"},
 							Format:      "",
 						},

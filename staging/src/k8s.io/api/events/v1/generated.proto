@@ -60,7 +60,8 @@ message Event {
   // This field cannot be empty for new Events and it can have at most 128 characters.
   optional string action = 6;
 
-  // reason is why the action was taken. It is human-readable.
+  // reason is why the action was taken. It is a short, machine-readable
+  // CamelCase string, e.g. `FailedScheduling`.
   // This field cannot be empty for new Events and it can have at most 128 characters.
   optional string reason = 7;
 
