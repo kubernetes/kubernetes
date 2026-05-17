@@ -759,6 +759,7 @@ func dropDisabledFields(
 	dropDisabledDynamicResourceAllocationFields(podSpec, oldPodSpec)
 	dropDisabledClusterTrustBundleProjection(podSpec, oldPodSpec)
 	dropDisabledPodCertificateProjection(podSpec, oldPodSpec)
+	dropDisabledAtomicWriteVolumeUserFields(podSpec, oldPodSpec)
 	dropDisabledSchedulingGroup(podSpec, oldPodSpec)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) && !inPlacePodVerticalScalingInUse(oldPodSpec) {
@@ -1573,6 +1574,146 @@ func dropDisabledPodCertificateProjection(podSpec, oldPodSpec *api.PodSpec) {
 			podSpec.Volumes[i].Projected.Sources[j].PodCertificate = nil
 		}
 	}
+}
+
+func dropDisabledAtomicWriteVolumeUserFields(podSpec, oldPodSpec *api.PodSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.AtomicWriteVolumeUserFields) {
+		return
+	}
+	if podSpec == nil {
+		return
+	}
+
+	// If the pod was already using it, it can keep using it.
+	if atomicWriteVolumeUserFieldsInUse(oldPodSpec) {
+		return
+	}
+
+	for i := range podSpec.Volumes {
+		if podSpec.Volumes[i].Secret != nil {
+			podSpec.Volumes[i].Secret.DefaultUser = nil
+
+			for j := range podSpec.Volumes[i].Secret.Items {
+				podSpec.Volumes[i].Secret.Items[j].User = nil
+			}
+		} else if podSpec.Volumes[i].ConfigMap != nil {
+			podSpec.Volumes[i].ConfigMap.DefaultUser = nil
+
+			for j := range podSpec.Volumes[i].ConfigMap.Items {
+				podSpec.Volumes[i].ConfigMap.Items[j].User = nil
+			}
+		} else if podSpec.Volumes[i].DownwardAPI != nil {
+			podSpec.Volumes[i].DownwardAPI.DefaultUser = nil
+
+			for j := range podSpec.Volumes[i].DownwardAPI.Items {
+				podSpec.Volumes[i].DownwardAPI.Items[j].User = nil
+			}
+		} else if podSpec.Volumes[i].Projected != nil {
+			podSpec.Volumes[i].Projected.DefaultUser = nil
+
+			for j := range podSpec.Volumes[i].Projected.Sources {
+				if podSpec.Volumes[i].Projected.Sources[j].Secret != nil {
+					for k := range podSpec.Volumes[i].Projected.Sources[j].Secret.Items {
+						podSpec.Volumes[i].Projected.Sources[j].Secret.Items[k].User = nil
+					}
+				} else if podSpec.Volumes[i].Projected.Sources[j].DownwardAPI != nil {
+					for k := range podSpec.Volumes[i].Projected.Sources[j].DownwardAPI.Items {
+						podSpec.Volumes[i].Projected.Sources[j].DownwardAPI.Items[k].User = nil
+					}
+				} else if podSpec.Volumes[i].Projected.Sources[j].ConfigMap != nil {
+					for k := range podSpec.Volumes[i].Projected.Sources[j].ConfigMap.Items {
+						podSpec.Volumes[i].Projected.Sources[j].ConfigMap.Items[k].User = nil
+					}
+				} else if podSpec.Volumes[i].Projected.Sources[j].ServiceAccountToken != nil {
+					podSpec.Volumes[i].Projected.Sources[j].ServiceAccountToken.User = nil
+				} else if podSpec.Volumes[i].Projected.Sources[j].ClusterTrustBundle != nil {
+					podSpec.Volumes[i].Projected.Sources[j].ClusterTrustBundle.User = nil
+				} else if podSpec.Volumes[i].Projected.Sources[j].PodCertificate != nil {
+					podSpec.Volumes[i].Projected.Sources[j].PodCertificate.User = nil
+				}
+			}
+		}
+	}
+}
+
+func atomicWriteVolumeUserFieldsInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	for i := range podSpec.Volumes {
+		if podSpec.Volumes[i].Secret != nil {
+			if podSpec.Volumes[i].Secret.DefaultUser != nil {
+				return true
+			}
+
+			for j := range podSpec.Volumes[i].Secret.Items {
+				if podSpec.Volumes[i].Secret.Items[j].User != nil {
+					return true
+				}
+			}
+		} else if podSpec.Volumes[i].ConfigMap != nil {
+			if podSpec.Volumes[i].ConfigMap.DefaultUser != nil {
+				return true
+			}
+
+			for j := range podSpec.Volumes[i].ConfigMap.Items {
+				if podSpec.Volumes[i].ConfigMap.Items[j].User != nil {
+					return true
+				}
+			}
+		} else if podSpec.Volumes[i].DownwardAPI != nil {
+			if podSpec.Volumes[i].DownwardAPI.DefaultUser != nil {
+				return true
+			}
+
+			for j := range podSpec.Volumes[i].DownwardAPI.Items {
+				if podSpec.Volumes[i].DownwardAPI.Items[j].User != nil {
+					return true
+				}
+			}
+		} else if podSpec.Volumes[i].Projected != nil {
+			if podSpec.Volumes[i].Projected.DefaultUser != nil {
+				return true
+			}
+
+			for j := range podSpec.Volumes[i].Projected.Sources {
+				if podSpec.Volumes[i].Projected.Sources[j].Secret != nil {
+					for k := range podSpec.Volumes[i].Projected.Sources[j].Secret.Items {
+						if podSpec.Volumes[i].Projected.Sources[j].Secret.Items[k].User != nil {
+							return true
+						}
+					}
+				} else if podSpec.Volumes[i].Projected.Sources[j].DownwardAPI != nil {
+					for k := range podSpec.Volumes[i].Projected.Sources[j].DownwardAPI.Items {
+						if podSpec.Volumes[i].Projected.Sources[j].DownwardAPI.Items[k].User != nil {
+							return true
+						}
+					}
+				} else if podSpec.Volumes[i].Projected.Sources[j].ConfigMap != nil {
+					for k := range podSpec.Volumes[i].Projected.Sources[j].ConfigMap.Items {
+						if podSpec.Volumes[i].Projected.Sources[j].ConfigMap.Items[k].User != nil {
+							return true
+						}
+					}
+				} else if podSpec.Volumes[i].Projected.Sources[j].ServiceAccountToken != nil {
+					if podSpec.Volumes[i].Projected.Sources[j].ServiceAccountToken.User != nil {
+						return true
+					}
+				} else if podSpec.Volumes[i].Projected.Sources[j].ClusterTrustBundle != nil {
+					if podSpec.Volumes[i].Projected.Sources[j].ClusterTrustBundle.User != nil {
+						return true
+					}
+				} else if podSpec.Volumes[i].Projected.Sources[j].PodCertificate != nil {
+					if podSpec.Volumes[i].Projected.Sources[j].PodCertificate.User != nil {
+						return true
+					}
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 func hasInvalidLabelValueInAffinitySelector(spec *api.PodSpec) bool {
