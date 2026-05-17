@@ -1751,7 +1751,9 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 
 			for i := range tt.algorithmResult.podResults {
 				pod := podGroupInfo.QueuedPodInfos[i].Pod
-				podCtx := initPodSchedulingContext(ctx, pod, podGroupCycleState, nil, runAllPostFilters)
+				placementCycleState := framework.NewCycleState()
+				placementCycleState.SetPodGroupSchedulingCycle(podGroupCycleState)
+				podCtx := initPodSchedulingContext(ctx, pod, placementCycleState, runAllPostFilters)
 				tt.algorithmResult.podResults[i].podCtx = podCtx
 			}
 
@@ -2200,7 +2202,7 @@ func (mp *fakePlacementPlugin) PlacementScoreExtensions() fwk.PlacementScoreExte
 	return nil
 }
 
-func (mp *fakePlacementPlugin) ScorePlacement(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
+func (mp *fakePlacementPlugin) ScorePlacement(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
 	return mp.scorePlacementsResult[placement.Name], mp.scorePlacementsStatus[placement.Name]
 }
 
@@ -2538,7 +2540,6 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 					ScheduleResult{},
 					fwk.Status{}),
 				cmpopts.IgnoreFields(algorithmResult{}, "podCtx", "schedulingDuration"),
-				cmpopts.IgnoreFields(podGroupAlgorithmResult{}, "placementCycleState"),
 				statusCmpOpt,
 			}
 
@@ -2741,12 +2742,12 @@ func (p *placementStateTracker) Filter(ctx context.Context, state fwk.CycleState
 	return nil
 }
 
-func (p *placementStateTracker) ScorePlacement(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
-	if placement.PlacementCycleState == nil {
+func (p *placementStateTracker) ScorePlacement(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
+	if state == nil {
 		return 0, fwk.NewStatus(fwk.Error, "PlacementCycleState is nil during ScorePlacement")
 	}
 
-	data, err := placement.PlacementCycleState.Read(placementStateKey)
+	data, err := state.Read(placementStateKey)
 	if err != nil {
 		return 0, fwk.NewStatus(fwk.Error, fmt.Sprintf("failed to read PlacementCycleState for %s: %v", placement.Name, err))
 	}
@@ -2785,7 +2786,7 @@ func TestPlacementCycleStateLifecycle(t *testing.T) {
 
 	// A single scenario exercises both isolation and continuity:
 	// - Filter writes a node-name marker into PlacementCycleState during each placement's simulation.
-	// - ScorePlacement reads from PodGroupAssignments.PlacementCycleState after all simulations.
+	// - ScorePlacement reads from the placement state after all simulations.
 	// Assertions verify:
 	//   1. Each placement's scorer reads only the value its own simulation wrote (isolation).
 	//   2. Data written during each placement's simulation remains readable during its scoring (continuity from simulation to scoring).

@@ -278,7 +278,7 @@ func (pl *TestPlugin) GeneratePlacements(ctx context.Context, state fwk.PodGroup
 	return &fwk.GeneratePlacementsResult{Placements: pl.inj.GeneratePlacementsResult}, fwk.NewStatus(fwk.Code(pl.inj.GeneratePlacementsStatus), injectReason)
 }
 
-func (pl *TestPlugin) ScorePlacement(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
+func (pl *TestPlugin) ScorePlacement(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
 	return 0, fwk.NewStatus(fwk.Code(pl.inj.PlacementScoreStatus), injectReason)
 }
 
@@ -3666,7 +3666,7 @@ func TestRecordingMetrics(t *testing.T) {
 		{
 			name: "PlacementScore - Success",
 			action: func(ctx context.Context, f framework.Framework) {
-				f.RunPlacementScorePlugins(ctx, state, nil, []*fwk.PodGroupAssignments{{Placement: &fwk.Placement{}}})
+				f.RunPlacementScorePlugins(ctx, state, nil, []*fwk.PodGroupAssignments{{Placement: &fwk.Placement{}, PlacementCycleState: state}})
 			},
 			wantExtensionPoint: "PlacementScore",
 			wantStatus:         fwk.Success,
@@ -3750,7 +3750,7 @@ func TestRecordingMetrics(t *testing.T) {
 		{
 			name: "PlacementScore - Error",
 			action: func(ctx context.Context, f framework.Framework) {
-				f.RunPlacementScorePlugins(ctx, state, nil, []*fwk.PodGroupAssignments{{Placement: &fwk.Placement{}}})
+				f.RunPlacementScorePlugins(ctx, state, nil, []*fwk.PodGroupAssignments{{Placement: &fwk.Placement{}, PlacementCycleState: state}})
 			},
 			inject:             injectedResult{PlacementScoreStatus: int(fwk.Error)},
 			wantExtensionPoint: "PlacementScore",
@@ -4440,7 +4440,7 @@ func (pl *testPlacementScorePlugin) Name() string {
 	return pl.name
 }
 
-func (pl *testPlacementScorePlugin) ScorePlacement(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
+func (pl *testPlacementScorePlugin) ScorePlacement(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
 	r := pl.results[placement.Placement]
 	return r.score, r.status
 }
@@ -4683,7 +4683,7 @@ func TestRunPlacementScorePlugins(t *testing.T) {
 			}
 			assumedPlacements := make([]*fwk.PodGroupAssignments, len(placements))
 			for i := range placements {
-				assumedPlacements[i] = &fwk.PodGroupAssignments{Placement: placements[i]}
+				assumedPlacements[i] = &fwk.PodGroupAssignments{Placement: placements[i], PlacementCycleState: framework.NewCycleState()}
 			}
 
 			result, status := fw.RunPlacementScorePlugins(ctx, framework.NewCycleState(), nil, assumedPlacements)

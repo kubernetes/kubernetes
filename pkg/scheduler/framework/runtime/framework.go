@@ -1520,7 +1520,7 @@ func (f *frameworkImpl) RunPlacementScorePlugins(ctx context.Context, state fwk.
 					logger := klog.LoggerWithName(logger, pl.Name())
 					ctx = klog.NewContext(ctx, logger)
 				}
-				s, status := f.runPlacementScorePlugin(ctx, pl, state, podGroupInfo, pga)
+				s, status := f.runPlacementScorePlugin(ctx, pl, pga.PlacementCycleState, podGroupInfo, pga)
 				if !status.IsSuccess() {
 					err := fmt.Errorf("plugin %q failed with: %w", pl.Name(), status.AsError())
 					errCh.SendWithCancel(err, cancel)
@@ -1589,7 +1589,7 @@ func (f *frameworkImpl) RunPlacementScorePlugins(ctx context.Context, state fwk.
 	return allPlacementPluginScores, nil
 }
 
-func (f *frameworkImpl) runPlacementScorePlugin(ctx context.Context, pl fwk.PlacementScorePlugin, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
+func (f *frameworkImpl) runPlacementScorePlugin(ctx context.Context, pl fwk.PlacementScorePlugin, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.ScorePlacement(ctx, state, podGroup, placement)
 	}

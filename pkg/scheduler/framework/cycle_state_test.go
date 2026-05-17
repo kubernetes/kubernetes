@@ -204,7 +204,9 @@ func TestPlacementCycleState(t *testing.T) {
 
 	t.Run("set and get", func(t *testing.T) {
 		state := NewCycleState()
+		podGroupState := NewCycleState()
 		placementState := NewCycleState()
+		placementState.SetPodGroupSchedulingCycle(podGroupState)
 		placementState.Write("testkey", &fakeData{data: "placementdata"})
 
 		state.SetPlacementCycleState(placementState)
@@ -220,6 +222,9 @@ func TestPlacementCycleState(t *testing.T) {
 		}
 		if data.(*fakeData).data != "placementdata" {
 			t.Errorf("expected 'placementdata', got %q", data.(*fakeData).data)
+		}
+		if got.GetPodGroupSchedulingCycle() != podGroupState {
+			t.Errorf("expected PlacementCycleState to expose its PodGroupCycleState")
 		}
 	})
 
