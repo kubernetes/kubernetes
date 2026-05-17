@@ -5282,6 +5282,9 @@ func TestDropHostnameOverride(t *testing.T) {
 				newPodHasHostnameOverride, newPod := newPodInfo.hasHostnameOverride, newPodInfo.pod()
 
 				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					if !enabled {
+						featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+					}
 					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HostnameOverride, enabled)
 
 					DropDisabledPodFields(newPod, oldPod)
