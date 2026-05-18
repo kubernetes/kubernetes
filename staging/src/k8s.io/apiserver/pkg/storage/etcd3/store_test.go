@@ -922,6 +922,7 @@ func testSetup(t testing.TB, opts ...setupOption) (context.Context, *store, *kub
 		setupOpts.codec,
 		setupOpts.newFunc,
 		setupOpts.newListFunc,
+		nil,
 		setupOpts.prefix,
 		setupOpts.resourcePrefix,
 		setupOpts.groupResource,
