@@ -18,14 +18,20 @@ package kuberuntime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"runtime"
 	"sort"
+	"strings"
+	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	v1 "k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
+	crierror "k8s.io/cri-api/pkg/errors"
 	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	runtimeutil "k8s.io/kubernetes/pkg/kubelet/kuberuntime/util"
@@ -33,6 +39,8 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	netutils "k8s.io/utils/net"
 )
+
+const podSandboxRecoveryTimeout = 2 * time.Minute
 
 // createPodSandbox creates a pod sandbox and returns (podSandBoxID, message, error).
 func (m *kubeGenericRuntimeManager) createPodSandbox(ctx context.Context, pod *v1.Pod, attempt uint32) (string, string, error) {
@@ -66,12 +74,100 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(ctx context.Context, pod *v
 
 	podSandBoxID, err := m.runtimeService.RunPodSandbox(ctx, podSandboxConfig, runtimeHandler)
 	if err != nil {
+		if recoveredPodSandboxID, recovered := m.recoverPodSandboxFromRunPodSandboxError(ctx, pod, attempt, err); recovered {
+			return recoveredPodSandboxID, "", nil
+		}
 		message := fmt.Sprintf("Failed to create sandbox for pod %q: %v", format.Pod(pod), err)
 		logger.Error(err, "Failed to create sandbox for pod", "pod", klog.KObj(pod))
 		return "", message, err
 	}
 
 	return podSandBoxID, "", nil
+}
+
+func shouldRecoverPodSandboxFromRunPodSandboxError(err error) bool {
+	// Keep plain context errors as a fallback for non-gRPC runtime service implementations.
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	switch status.Code(err) {
+	case codes.Canceled, codes.DeadlineExceeded, codes.AlreadyExists, codes.FailedPrecondition:
+		return true
+	}
+
+	// Some CRI implementations report sandbox name reservation conflicts only in the
+	// error message. Keep this as a compatibility fallback for runtime-specific
+	// wording such as containerd's sandbox name reservation error.
+	errMsg := err.Error()
+	return strings.Contains(errMsg, "failed to reserve sandbox name") &&
+		strings.Contains(errMsg, "is reserved for")
+}
+
+func (m *kubeGenericRuntimeManager) recoverPodSandboxFromRunPodSandboxError(ctx context.Context, pod *v1.Pod, attempt uint32, runErr error) (string, bool) {
+	if !shouldRecoverPodSandboxFromRunPodSandboxError(runErr) {
+		return "", false
+	}
+
+	logger := klog.FromContext(ctx)
+	recoveryCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), podSandboxRecoveryTimeout)
+	defer cancel()
+
+	sandboxes, err := m.getSandboxes(recoveryCtx, listOptions{podUID: pod.UID})
+	if err != nil {
+		logger.Error(err, "Failed to inspect pod sandboxes after RunPodSandbox error", "pod", klog.KObj(pod), "runPodSandboxError", runErr)
+		return "", false
+	}
+	sort.Sort(podSandboxByCreatedThenID(sandboxes))
+
+	readySandboxID := ""
+	for _, sandbox := range sandboxes {
+		if !podSandboxMatchesPod(sandbox, pod, attempt) {
+			continue
+		}
+		if sandbox.GetState() == runtimeapi.PodSandboxState_SANDBOX_READY {
+			if readySandboxID == "" {
+				readySandboxID = sandbox.Id
+			}
+			continue
+		}
+		m.removePodSandboxAfterRunPodSandboxError(recoveryCtx, pod, sandbox.Id, runErr)
+	}
+
+	if readySandboxID != "" {
+		logger.V(4).Info("Using ready pod sandbox found after RunPodSandbox error", "podSandboxID", readySandboxID, "pod", klog.KObj(pod), "runPodSandboxError", runErr)
+		return readySandboxID, true
+	}
+
+	return "", false
+}
+
+func (m *kubeGenericRuntimeManager) removePodSandboxAfterRunPodSandboxError(ctx context.Context, pod *v1.Pod, podSandboxID string, runErr error) {
+	logger := klog.FromContext(ctx)
+	logger.V(4).Info("Removing pod sandbox after RunPodSandbox error", "podSandboxID", podSandboxID, "pod", klog.KObj(pod), "runPodSandboxError", runErr)
+	if err := m.runtimeService.StopPodSandbox(ctx, podSandboxID); err != nil {
+		if crierror.IsNotFound(err) {
+			return
+		}
+		logger.Error(err, "Failed to stop pod sandbox after RunPodSandbox error", "podSandboxID", podSandboxID, "pod", klog.KObj(pod), "runPodSandboxError", runErr)
+		return
+	}
+	if err := m.runtimeService.RemovePodSandbox(ctx, podSandboxID); err != nil {
+		logger.Error(err, "Failed to remove pod sandbox after RunPodSandbox error", "podSandboxID", podSandboxID, "pod", klog.KObj(pod), "runPodSandboxError", runErr)
+	}
+}
+
+func podSandboxMatchesPod(sandbox *runtimeapi.PodSandbox, pod *v1.Pod, attempt uint32) bool {
+	if sandbox == nil || sandbox.Id == "" {
+		return false
+	}
+	metadata := sandbox.GetMetadata()
+	if metadata == nil {
+		return false
+	}
+	return metadata.GetName() == pod.Name &&
+		metadata.GetNamespace() == pod.Namespace &&
+		metadata.GetUid() == string(pod.UID) &&
+		metadata.GetAttempt() == attempt
 }
 
 // generatePodSandboxConfig generates pod sandbox config from v1.Pod.
