@@ -772,7 +772,7 @@ func (s *store) GetList(ctx context.Context, key string, opts storage.ListOption
 	// get them recorded even in error cases.
 	defer func() {
 		numReturn := v.Len()
-		metrics.RecordStorageListMetrics(s.groupResource, numFetched, numEvald, numReturn)
+		metrics.RecordStorageListMetrics(s.groupResource, "", numFetched, numEvald, numReturn)
 	}()
 
 	aggregator := s.listErrAggrFactory()

@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/features"
+	storagemetrics "k8s.io/apiserver/pkg/storage/metrics"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -267,6 +268,7 @@ func RecordListCacheMetrics(groupResource schema.GroupResource, indexName string
 	listCacheCount.WithLabelValues(groupResource.Group, groupResource.Resource, indexName).Inc()
 	listCacheNumFetched.WithLabelValues(groupResource.Group, groupResource.Resource, indexName).Add(float64(numFetched))
 	listCacheNumReturned.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numReturned))
+	storagemetrics.RecordStorageListMetrics(groupResource, storagemetrics.StorageBackendWatchCache, indexName, numFetched, 0, numReturned)
 }
 
 // RecordResourceVersion sets the current resource version for a given resource type.

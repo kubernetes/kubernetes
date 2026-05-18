@@ -54,12 +54,14 @@ import (
 	"k8s.io/apiserver/pkg/storage/cacher/store"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	etcdfeature "k8s.io/apiserver/pkg/storage/feature"
+	storagemetrics "k8s.io/apiserver/pkg/storage/metrics"
 	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientfeatures "k8s.io/client-go/features"
 	clientfeaturestesting "k8s.io/client-go/features/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	k8smetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
@@ -724,6 +726,7 @@ func TestGetListNonRecursiveCacheWithConsistentListFromCache(t *testing.T) {
 		})
 	}
 }
+
 func TestGetCacheBypass(t *testing.T) {
 	backingStorage := &cachertesting.MockStorage{}
 	cacher, _, err := newTestCacher(backingStorage)
@@ -752,6 +755,58 @@ func TestGetCacheBypass(t *testing.T) {
 	}, result)
 	if !errors.Is(err, errDummy) {
 		t.Errorf("Get without RV=0 should bypass cacher: %v", err)
+	}
+}
+
+func TestListMetrics(t *testing.T) {
+	ctx, delegator, terminate := testSetup(t, withNodeNameAndNamespaceIndex)
+	t.Cleanup(terminate)
+
+	storagemetrics.Register()
+	legacyregistry.Reset()
+	t.Cleanup(legacyregistry.Reset)
+
+	pod := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "pod-1", Namespace: "ns"},
+		Spec:       example.PodSpec{NodeName: "node"},
+	}
+	if err := (storage.APIObjectVersioner{}).UpdateObject(pod, 100); err != nil {
+		t.Fatal(err)
+	}
+	if err := delegator.cacher.watchCache.Add(pod); err != nil {
+		t.Fatal(err)
+	}
+
+	pred := storagetesting.CreatePodPredicate(fields.ParseSelectorOrDie("spec.nodeName=node"), true, []string{"spec.nodeName"})
+	result := &example.PodList{}
+	if err := delegator.GetList(ctx, "/pods/ns", storage.ListOptions{
+		ResourceVersion: "0",
+		Predicate:       pred,
+		Recursive:       true,
+	}, result); err != nil {
+		t.Fatal(err)
+	}
+
+	expected := `# HELP apiserver_storage_list_evaluated_objects_total [ALPHA] Number of objects tested in the course of serving a LIST request from storage
+# TYPE apiserver_storage_list_evaluated_objects_total counter
+apiserver_storage_list_evaluated_objects_total{group="",resource="pods",storage="watchcache"} 0
+# HELP apiserver_storage_list_fetched_objects_total [ALPHA] Number of objects read from storage in the course of serving a LIST request
+# TYPE apiserver_storage_list_fetched_objects_total counter
+apiserver_storage_list_fetched_objects_total{group="",index="f:spec.nodeName",resource="pods",storage="watchcache"} 1
+# HELP apiserver_storage_list_returned_objects_total [ALPHA] Number of objects returned for a LIST request from storage
+# TYPE apiserver_storage_list_returned_objects_total counter
+apiserver_storage_list_returned_objects_total{group="",resource="pods",storage="watchcache"} 1
+# HELP apiserver_storage_list_total [ALPHA] Number of LIST requests served from storage
+# TYPE apiserver_storage_list_total counter
+apiserver_storage_list_total{group="",index="f:spec.nodeName",resource="pods",storage="watchcache"} 1
+`
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(expected),
+		"apiserver_storage_list_total",
+		"apiserver_storage_list_fetched_objects_total",
+		"apiserver_storage_list_evaluated_objects_total",
+		"apiserver_storage_list_returned_objects_total",
+	); err != nil {
+		t.Fatal(err)
 	}
 }
 
