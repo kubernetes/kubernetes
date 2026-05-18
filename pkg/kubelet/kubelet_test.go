@@ -4155,7 +4155,7 @@ func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
 }
 
 func TestHandlePodUpdates_RecordContainerRequestedResizes(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	metrics.Register()
 	metrics.ContainerRequestedResizes.Reset()
 
@@ -4736,7 +4736,7 @@ func TestHandlePodUpdates_RecordContainerRequestedResizes(t *testing.T) {
 			kubelet := testKubelet.kubelet
 
 			kubelet.podManager.AddPod(initialPod)
-			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(tCtx.Logger(), initialPod))
+			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(logger, initialPod))
 			kubelet.HandlePodUpdates(tCtx, []*v1.Pod{updatedPod})
 
 			tc.updateExpectedFunc(&expectedMetrics)
@@ -4800,7 +4800,7 @@ func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 		t.Skip("InPlacePodVerticalScaling is not currently supported for Windows")
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 
 	testKubelet := newTestKubeletExcludeAdmitHandlers(t, false /* controllerAttachDetachEnabled */, true /*enableResizing*/)
 	defer testKubelet.Cleanup()
@@ -4922,21 +4922,21 @@ func TestHandlePodReconcile_RetryPendingResizes(t *testing.T) {
 			handler := &testPodAdmitHandler{podsToReject: []*v1.Pod{pendingResizeAllocated}}
 			kubelet.allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
 
-			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(tCtx.Logger(), pendingResizeAllocated))
-			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(tCtx.Logger(), tc.oldPod))
+			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(logger, pendingResizeAllocated))
+			require.NoError(t, kubelet.allocationManager.SetAllocatedResources(logger, tc.oldPod))
 
 			// We only expect status resources to change in HandlePodReconcile.
 			tc.oldPod.Spec = tc.newPod.Spec
 
 			kubelet.podManager.AddPod(pendingResizeDesired)
 			kubelet.podManager.AddPod(tc.oldPod)
-			kubelet.allocationManager.PushPendingResize(tCtx.Logger(), pendingResizeDesired.UID)
+			kubelet.allocationManager.PushPendingResize(logger, pendingResizeDesired.UID)
 
 			kubelet.statusManager.ClearPodResizePendingCondition(pendingResizeDesired.UID)
 			kubelet.HandlePodReconcile(tCtx, []*v1.Pod{tc.newPod})
 			require.Equal(t, tc.shouldRetryPendingResize, kubelet.statusManager.IsPodResizeDeferred(pendingResizeDesired.UID))
 
-			kubelet.allocationManager.RemovePod(tCtx.Logger(), pendingResizeDesired.UID)
+			kubelet.allocationManager.RemovePod(logger, pendingResizeDesired.UID)
 			kubelet.podManager.RemovePod((pendingResizeDesired))
 			kubelet.podManager.RemovePod(tc.oldPod)
 		})
