@@ -222,6 +222,9 @@ func (rtv requirednessTagValidator) hasZeroDefault(context Context) (bool, bool,
 	t := util.NonPointer(util.NativeType(context.Type))
 	zero, found := typeZeroValue[t.String()]
 	if !found {
+		if t.Kind == types.Struct {
+			return true, reflect.DeepEqual(defaultValue, map[string]any{}), nil
+		}
 		return false, false, fmt.Errorf("unknown zero-value for type %s", t.String())
 	}
 
