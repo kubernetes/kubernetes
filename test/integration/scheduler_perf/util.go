@@ -93,7 +93,7 @@ func newDefaultComponentConfig() (*config.KubeSchedulerConfiguration, error) {
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfiguration, enabledFeatures map[featuregate.Feature]bool, opts *schedulerPerfOptions) (*scheduler.Scheduler, informers.SharedInformerFactory, <-chan struct{}, ktesting.TContext) {
+func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfiguration, enabledFeatures map[featuregate.Feature]bool, qps *float32, burst *int, opts *schedulerPerfOptions) (*scheduler.Scheduler, informers.SharedInformerFactory, <-chan struct{}, ktesting.TContext) {
 	var runtimeConfig []string
 	if enabledFeatures[features.DynamicResourceAllocation] {
 		runtimeConfig = append(runtimeConfig, fmt.Sprintf("%s=true", resourceapi.SchemeGroupVersion))
@@ -124,11 +124,16 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 		tCtx.Cancel("test is done")
 	})
 
-	// TODO: client connection configuration, such as QPS or Burst is configurable in theory, this could be derived from the `config`, need to
-	// support this when there is any testcase that depends on such configuration.
 	cfg := restclient.CopyConfig(server.ClientConfig)
 	cfg.QPS = 5000.0
 	cfg.Burst = 5000
+
+	if qps != nil {
+		cfg.QPS = *qps
+	}
+	if burst != nil {
+		cfg.Burst = *burst
+	}
 
 	// use default component config if config here is nil
 	if config == nil {

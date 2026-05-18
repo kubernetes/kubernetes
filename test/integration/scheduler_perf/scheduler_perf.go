@@ -256,6 +256,12 @@ type testCase struct {
 	// SchedulerConfigPath is the path of scheduler configuration
 	// Optional
 	SchedulerConfigPath string
+	// APIServerQPS overrides the max QPS of the connection to the API server.
+	// Optional
+	APIServerQPS *float32
+	// APIServerBurst overrides the throttle limit for bursts in the connection to the API server.
+	// Optional
+	APIServerBurst *int
 	// Default path to spec file describing the pods to create.
 	// This path can be overridden in createPodsOp by setting PodTemplatePath .
 	// Optional
@@ -715,7 +721,7 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 	timeout := 30 * time.Minute
 	tCtx = tCtx.WithTimeout(timeout, fmt.Sprintf("timed out after the %s per-test timeout", timeout))
 
-	return setupClusterForWorkload(tCtx, tc.SchedulerConfigPath, featureGates, opts)
+	return setupClusterForWorkload(tCtx, tc.SchedulerConfigPath, featureGates, tc.APIServerQPS, tc.APIServerBurst, opts)
 }
 
 func featureGatesMerge(src map[featuregate.Feature]bool, overrides map[featuregate.Feature]bool) map[featuregate.Feature]bool {
@@ -993,7 +999,7 @@ func unrollWorkloadTemplate(tb ktesting.TB, wt []op, w *Workload) []op {
 	return unrolled
 }
 
-func setupClusterForWorkload(tCtx ktesting.TContext, configPath string, featureGates map[featuregate.Feature]bool, opts *schedulerPerfOptions) (*scheduler.Scheduler, informers.SharedInformerFactory, <-chan struct{}, ktesting.TContext) {
+func setupClusterForWorkload(tCtx ktesting.TContext, configPath string, featureGates map[featuregate.Feature]bool, qps *float32, burst *int, opts *schedulerPerfOptions) (*scheduler.Scheduler, informers.SharedInformerFactory, <-chan struct{}, ktesting.TContext) {
 	var cfg *config.KubeSchedulerConfiguration
 	var err error
 	if configPath != "" {
@@ -1005,7 +1011,7 @@ func setupClusterForWorkload(tCtx ktesting.TContext, configPath string, featureG
 			tCtx.Fatalf("validate scheduler config file failed: %v", err)
 		}
 	}
-	return mustSetupCluster(tCtx, cfg, featureGates, opts)
+	return mustSetupCluster(tCtx, cfg, featureGates, qps, burst, opts)
 }
 
 func labelsMatch(actualLabels, requiredLabels map[string]string) bool {
