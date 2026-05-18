@@ -24,6 +24,11 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 )
 
+const (
+	StorageBackendEtcd       = "etcd"
+	StorageBackendWatchCache = "watchcache"
+)
+
 var (
 	listStorageCount = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
@@ -31,7 +36,7 @@ var (
 			Help:           "Number of LIST requests served from storage",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"group", "resource"},
+		[]string{"group", "resource", "storage", "index"},
 	)
 	listStorageNumFetched = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
@@ -39,7 +44,7 @@ var (
 			Help:           "Number of objects read from storage in the course of serving a LIST request",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"group", "resource"},
+		[]string{"group", "resource", "storage", "index"},
 	)
 	listStorageNumSelectorEvals = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
@@ -47,7 +52,7 @@ var (
 			Help:           "Number of objects tested in the course of serving a LIST request from storage",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"group", "resource"},
+		[]string{"group", "resource", "storage"},
 	)
 	listStorageNumReturned = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
@@ -55,7 +60,7 @@ var (
 			Help:           "Number of objects returned for a LIST request from storage",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
-		[]string{"group", "resource"},
+		[]string{"group", "resource", "storage"},
 	)
 	registerMetrics sync.Once
 )
@@ -71,9 +76,9 @@ func Register() {
 }
 
 // RecordStorageListMetrics notes various metrics of the cost to serve a LIST request.
-func RecordStorageListMetrics(groupResource schema.GroupResource, numFetched, numEvald, numReturned int) {
-	listStorageCount.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
-	listStorageNumFetched.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numFetched))
-	listStorageNumSelectorEvals.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numEvald))
-	listStorageNumReturned.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numReturned))
+func RecordStorageListMetrics(groupResource schema.GroupResource, storageBackend, index string, numFetched, numEvald, numReturned int) {
+	listStorageCount.WithLabelValues(groupResource.Group, groupResource.Resource, storageBackend, index).Inc()
+	listStorageNumFetched.WithLabelValues(groupResource.Group, groupResource.Resource, storageBackend, index).Add(float64(numFetched))
+	listStorageNumSelectorEvals.WithLabelValues(groupResource.Group, groupResource.Resource, storageBackend).Add(float64(numEvald))
+	listStorageNumReturned.WithLabelValues(groupResource.Group, groupResource.Resource, storageBackend).Add(float64(numReturned))
 }

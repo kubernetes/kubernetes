@@ -262,9 +262,9 @@ func UpdateLeaseObjectCount(count int64) {
 	etcdLeaseObjectCounts.WithLabelValues().Observe(float64(count))
 }
 
-// RecordStorageListMetrics notes various metrics of the cost to serve a LIST request
-func RecordStorageListMetrics(groupResource schema.GroupResource, numFetched, numEvald, numReturned int) {
-	storagemetrics.RecordStorageListMetrics(groupResource, numFetched, numEvald, numReturned)
+// RecordStorageListMetrics notes various metrics of the cost to serve a LIST request.
+func RecordStorageListMetrics(groupResource schema.GroupResource, index string, numFetched, numEvald, numReturned int) {
+	storagemetrics.RecordStorageListMetrics(groupResource, storagemetrics.StorageBackendEtcd, index, numFetched, numEvald, numReturned)
 }
 
 type Monitor interface {
