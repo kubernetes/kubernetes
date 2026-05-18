@@ -30,6 +30,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -279,7 +280,15 @@ func makeMounts(logger klog.Logger, pod *v1.Pod, podDir string, container *v1.Co
 	mountEtcHostsFile := shouldMountHostsFile(pod, podIPs)
 	logger.V(3).Info("Creating hosts mount for container", "pod", klog.KObj(pod), "containerName", container.Name, "podIPs", podIPs, "path", mountEtcHostsFile)
 	mounts := []kubecontainer.Mount{}
-	var cleanupAction func()
+	var cleanupActions []func()
+	cleanupAction := func() {
+		// We reverse the order to do the cleanup in the opposite order the mounts were done in - in case there are dependencies
+		// between the cleanup actions. Note that there is no hierarchy or any other order here in the first place,
+		// it is just clean up actions are performed in opposite order.
+		for _, fn := range slices.Backward(cleanupActions) {
+			fn()
+		}
+	}
 	for i, mount := range container.VolumeMounts {
 		// do not mount /etc/hosts if container is already mounting on the path
 		mountEtcHostsFile = mountEtcHostsFile && (mount.MountPath != etcHostsPath)
@@ -358,7 +367,8 @@ func makeMounts(logger klog.Logger, pod *v1.Pod, podDir string, container *v1.Co
 						return nil, cleanupAction, fmt.Errorf("failed to create subPath directory for volumeMount %q of container %q", mount.Name, container.Name)
 					}
 				}
-				hostPath, cleanupAction, err = subpather.PrepareSafeSubpath(subpath.Subpath{
+				var subpathCleanup func()
+				hostPath, subpathCleanup, err = subpather.PrepareSafeSubpath(subpath.Subpath{
 					VolumeMountIndex: i,
 					Path:             hostPath,
 					VolumeName:       vol.InnerVolumeSpecName,
@@ -366,6 +376,11 @@ func makeMounts(logger klog.Logger, pod *v1.Pod, podDir string, container *v1.Co
 					PodDir:           podDir,
 					ContainerName:    container.Name,
 				})
+				if subpathCleanup != nil {
+					// Append to the cleanup slice so all subpath cleanup actions are
+					// invoked when the composite cleanupAction is called.
+					cleanupActions = append(cleanupActions, subpathCleanup)
+				}
 				if err != nil {
 					// Don't pass detailed error back to the user because it could give information about host filesystem
 					logger.Error(nil, "Failed to prepare subPath for volumeMount of the container", "containerName", container.Name, "volumeMountName", mount.Name)
