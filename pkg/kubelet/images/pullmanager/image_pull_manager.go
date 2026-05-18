@@ -375,14 +375,6 @@ func (f *PullManager) isExemptedByPolicy(ctx context.Context, logger klog.Logger
 	}
 
 	if !f.imagePolicyEnforcer.RequireCredentialVerificationForImage(image, isPulledByKubelet) {
-		// TODO: create a record that this was exempt/pre-pulled - record "NotPulledByKubelet"
-		// what happens when there suddenly is a pulled record, but not just for the imageName?
-		//--------------------------------------------------
-		// NOTE: needs to decide if all conditions are satisfied for the write - no pull intents, no `preloaded:false` records
-		//		  Concurrency - what happens if these get written in the meantime? We cannot lock because the write itself locks - should
-		//						this check be part of the ImageCreds merging?
-		//						The write locks pulled records, but we also need to check intents...
-		//						|--> we probably need a double-locking method
 		if f.lockedShouldWriteImagePreloaded(intentExists, pulledRecord, image) {
 			if err := f.lockedWritePulledRecordIfChanged(ctx, image, imageRef, &kubeletconfiginternal.ImagePullCredentials{Preloaded: true}); err != nil {
 				logger.Error(err, "failed to record image as preloaded", "image", image, "imageRef", imageRef)
