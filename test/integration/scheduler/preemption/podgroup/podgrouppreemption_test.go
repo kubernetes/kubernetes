@@ -1289,7 +1289,8 @@ func TestPodGroupPreemption(t *testing.T) {
 				wapCalls := 0
 				err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 					wapCalls = 0
-					allExpectedPreempted := append(tt.expectedPreempted, tt.expectedPreemptedAnyOf...)
+					allExpectedPreempted := append([]string(nil), tt.expectedPreempted...)
+					allExpectedPreempted = append(allExpectedPreempted, tt.expectedPreemptedAnyOf...)
 					for _, podName := range allExpectedPreempted {
 						events, err := cs.CoreV1().Events(ns).List(ctx, metav1.ListOptions{
 							FieldSelector: "involvedObject.name=" + podName,
@@ -3263,7 +3264,7 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 				{
 					name: "create pod group for preemptor",
 					createPodGroup: &createPodGroup{
-						podGroup: st.MakePodGroup().Name("pg-second-preemptor").MinCount(1).Priority(100).Obj(),
+						podGroup: st.MakePodGroup().Name("pg-second-preemptor").MinCount(1).Priority(50).Obj(),
 					},
 				},
 				{
@@ -3305,22 +3306,6 @@ func TestPodGroupAsyncPreemption(t *testing.T) {
 						podName:       "preemptor-high-priority",
 						expectSuccess: true,
 					},
-				},
-				// The last pod will get back to the queue with backoff time, run preemption again.
-				{
-					name: "schedule the mid-priority Pod again",
-					schedulePod: &schedulePod{
-						podName:             "preemptor-mid-priority",
-						expectUnschedulable: true,
-					},
-				},
-				{
-					name:                 "check the mid-priority Pod making the preemption API calls",
-					podRunningPreemption: ptr.To(5),
-				},
-				{
-					name:               "complete the preemption API calls",
-					completePreemption: "preemptor-mid-priority",
 				},
 				{
 					name: "schedule the mid-priority Pod again",
@@ -3710,9 +3695,7 @@ func TestDisablePodGroupPreemption(t *testing.T) {
 // (WaitOnPermit), which naturally occurs when using PodGroups and Coscheduling.
 func TestPodGroupPreemptionRespectsWaitingPod(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.GenericWorkload:         true,
-		features.GangScheduling:          true,
-		features.WorkloadAwarePreemption: true,
+		features.GenericWorkload: true,
 	})
 
 	testCtx := testutils.InitTestSchedulerWithNS(t, "podgroup-waiting-preemption",
@@ -3732,7 +3715,7 @@ func TestPodGroupPreemptionRespectsWaitingPod(t *testing.T) {
 
 	// 2. Create a PodGroup with minMember: 2.
 	pg := st.MakePodGroup().Name("pg1").Namespace(ns).Priority(10).MinCount(2).Obj()
-	if _, err := cs.SchedulingV1alpha2().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
+	if _, err := cs.SchedulingV1beta1().PodGroups(ns).Create(testCtx.Ctx, pg, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create PodGroup %s: %v", pg.Name, err)
 	}
 
