@@ -449,3 +449,39 @@ func TestIsSchedulableAfterTargetPodUpdate(t *testing.T) {
 		})
 	}
 }
+
+func TestEventsToRegister(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+
+	tests := []struct {
+		name           string
+		enabled        bool
+		expectedLength int
+	}{
+		{
+			name:           "plugin disabled",
+			enabled:        false,
+			expectedLength: 0,
+		},
+		{
+			name:           "plugin enabled",
+			enabled:        true,
+			expectedLength: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plugin := &NodeDeclaredFeatures{
+				enabled: tt.enabled,
+			}
+			events, err := plugin.EventsToRegister(ctx)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(events) != tt.expectedLength {
+				t.Errorf("expected %d events, got %d", tt.expectedLength, len(events))
+			}
+		})
+	}
+}
