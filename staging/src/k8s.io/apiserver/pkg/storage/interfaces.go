@@ -419,3 +419,9 @@ func PrepareKey(resourcePrefix, key string, recursive bool) (string, error) {
 	}
 	return key, nil
 }
+
+// StorageKey is a key after the storage backend prefix has been applied.
+type StorageKey string
+
+// ReverseKeyFunc recovers object identity from a storage key.
+type ReverseKeyFunc func(key StorageKey) (name string, namespace string, err error)

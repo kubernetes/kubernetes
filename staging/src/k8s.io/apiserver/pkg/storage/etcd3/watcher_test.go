@@ -328,7 +328,7 @@ func TestWatchChanSync(t *testing.T) {
 				eventsReceived := 0
 				for event := range w.incomingEventChan {
 					eventsReceived++
-					storagetesting.ExpectContains(t, "incorrect list pods", initList, event.key)
+					storagetesting.ExpectContains(t, "incorrect list pods", initList, string(event.key))
 				}
 
 				if eventsReceived != testCase.expectEventCount {
@@ -403,7 +403,7 @@ func TestWatchChanSyncStreamFallsBackToPaginated(t *testing.T) {
 	eventsReceived := 0
 	for event := range w.incomingEventChan {
 		eventsReceived++
-		storagetesting.ExpectContains(t, "incorrect list pods", initList, event.key)
+		storagetesting.ExpectContains(t, "incorrect list pods", initList, string(event.key))
 	}
 	if eventsReceived != len(initList) {
 		t.Errorf("Unexpected number of events: %v, expected: %v", eventsReceived, len(initList))
@@ -419,7 +419,7 @@ func drainSync(t *testing.T, store *store, ctx context.Context, sync func(*watch
 	close(wc.incomingEventChan)
 	out := map[string]*event{}
 	for e := range wc.incomingEventChan {
-		out[e.key] = e
+		out[string(e.key)] = e
 	}
 	return out
 }

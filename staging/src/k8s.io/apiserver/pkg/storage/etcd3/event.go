@@ -18,12 +18,15 @@ package etcd3
 
 import (
 	"fmt"
+
 	"go.etcd.io/etcd/api/v3/mvccpb"
 	clientv3 "go.etcd.io/etcd/client/v3"
+
+	"k8s.io/apiserver/pkg/storage"
 )
 
 type event struct {
-	key              string
+	key              storage.StorageKey
 	value            []byte
 	prevValue        []byte
 	rev              int64
@@ -46,7 +49,7 @@ type event struct {
 // parseKV converts a KeyValue retrieved from an initial sync() listing to a synthetic isCreated event.
 func parseKV(kv *mvccpb.KeyValue) *event {
 	return &event{
-		key:       string(kv.Key),
+		key:       storage.StorageKey(kv.Key),
 		value:     kv.Value,
 		prevValue: nil,
 		rev:       kv.ModRevision,
@@ -62,7 +65,7 @@ func parseEvent(e *clientv3.Event) (*event, error) {
 
 	}
 	ret := &event{
-		key:       string(e.Kv.Key),
+		key:       storage.StorageKey(e.Kv.Key),
 		value:     e.Kv.Value,
 		rev:       e.Kv.ModRevision,
 		isDeleted: e.Type == clientv3.EventTypeDelete,
