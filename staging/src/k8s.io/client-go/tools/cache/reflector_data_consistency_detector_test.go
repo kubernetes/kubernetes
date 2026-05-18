@@ -19,6 +19,7 @@ package cache
 import (
 	"context"
 	"fmt"
+	"runtime/debug"
 	"testing"
 	"time"
 
@@ -34,36 +35,38 @@ import (
 )
 
 func TestReflectorDataConsistencyDetector(t *testing.T) {
-	clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, true)
-	restore := consistencydetector.SetDataConsistencyDetectionForWatchListEnabledForTest(true)
-	defer restore()
-
-	markTransformed := func(obj interface{}) (interface{}, error) {
-		pod, ok := obj.(*v1.Pod)
-		if !ok {
-			return obj, nil
-		}
-		newPod := pod.DeepCopy()
-		if newPod.Labels == nil {
-			newPod.Labels = make(map[string]string)
-		}
-		newPod.Labels["transformed"] = "true"
-		return newPod, nil
-	}
-
-	for _, inOrder := range []bool{false, true} {
-		t.Run(fmt.Sprintf("InOrder=%v", inOrder), func(t *testing.T) {
-			clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.InOrderInformers, inOrder)
+	for _, watchList := range []bool{false, true} {
+		for _, inOrder := range []bool{false, true} {
 			for _, transformerEnabled := range []bool{false, true} {
-				var transformer TransformFunc
-				if transformerEnabled {
-					transformer = markTransformed
-				}
-				t.Run(fmt.Sprintf("Transformer=%v", transformerEnabled), func(t *testing.T) {
+				t.Run(fmt.Sprintf("WatchList=%v,InOrder=%v,Transformer=%v", watchList, inOrder, transformerEnabled), func(t *testing.T) {
+					var transformer TransformFunc
+					if transformerEnabled {
+						transformer = func(obj interface{}) (interface{}, error) {
+							pod, ok := obj.(*v1.Pod)
+							if !ok {
+								return obj, nil
+							}
+							newPod := pod.DeepCopy()
+							if newPod.Labels == nil {
+								newPod.Labels = make(map[string]string)
+							}
+							if _, transformed := newPod.Labels["transformed"]; transformed {
+								t.Error("already transformed")
+								t.Log(string(debug.Stack()))
+							}
+							newPod.Labels["transformed"] = "true"
+							return newPod, nil
+						}
+					}
+
+					clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.WatchListClient, watchList)
+					clientfeaturestesting.SetFeatureDuringTest(t, clientfeatures.InOrderInformers, inOrder)
+					restore := consistencydetector.SetDataConsistencyDetectionForWatchListEnabledForTest(watchList)
+					defer restore()
 					runTestReflectorDataConsistencyDetector(t, transformer)
 				})
 			}
-		})
+		}
 	}
 }
 
