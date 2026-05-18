@@ -117,7 +117,7 @@ func streamingEncodeList(w io.Writer, typeMeta metav1.TypeMeta, listMeta metav1.
 				_, err := w.Write([]byte{0xf6}) // CBOR null
 				return err
 			}
-			if err := writeArrayHeader(w, len(items)); err != nil {
+			if err := writeArrayHead(w, len(items)); err != nil {
 				return err
 			}
 			for _, item := range items {
@@ -180,8 +180,6 @@ func streamingEncodeUnstructuredList(w io.Writer, list *unstructured.Unstructure
 			}
 			return keys[i] < keys[j]
 		})
-	} else if len(keys) > 0 {
-		start = rand.Intn(len(keys)) //nolint:gosec // Don't need a CSPRNG for deck cutting.
 	}
 
 	if err := writeMapHead(w, len(keys)); err != nil {
@@ -194,7 +192,7 @@ func streamingEncodeUnstructuredList(w io.Writer, list *unstructured.Unstructure
 			return err
 		}
 		if key == "items" {
-			if err := writeArrayHeader(w, len(list.Items)); err != nil {
+			if err := writeArrayHead(w, len(list.Items)); err != nil {
 				return err
 			}
 			for _, item := range list.Items {
@@ -221,35 +219,38 @@ func encodeKeyValuePair(w io.Writer, key string, value interface{}, mode modes.E
 	return nil
 }
 
-// writeMapHeader writes a CBOR map header for a map with n entries.
+// writeMapHead writes a CBOR map header for a map with n entries.
 // Uses major type 5 (0xa0 base), following RFC 8949 Section 3.1.
 func writeMapHead(w io.Writer, n int) error {
-	return writeCollectionHead(w, 0xa0, 0xb8, n)
+	return writeCollectionHead(w, 0xa0, n)
 }
 
-// writeArrayHeader writes a CBOR array header for an array with n elements.
+// writeArrayHead writes a CBOR array header for an array with n elements.
 // Uses major type 4 (0x80 base), following RFC 8949 Section 3.1.
-func writeArrayHeader(w io.Writer, n int) error {
-	return writeCollectionHead(w, 0x80, 0x98, n)
+func writeArrayHead(w io.Writer, n int) error {
+	return writeCollectionHead(w, 0x80, n)
 }
 
-// writeCollectionHeader writes a CBOR collection (array or map) header encoding
+// writeCollectionHead writes a CBOR collection (array or map) header encoding
 // the number of elements n, following RFC 8949 Section 3 additional info rules:
 //
-//   - base: the single-byte prefix when n fits in the low 5 bits (n <= 23),
-//     e.g. 0xa0 for map, 0x80 for array.
-//   - ext: the prefix byte when n requires additional bytes (n > 23),
-//     e.g. 0xb8 for map, 0x98 for array. ext+0 means 1-byte length follows,
-//     ext+1 means 2-byte, ext+2 means 4-byte, ext+3 means 8-byte.
+//   - base: the prefix byte for the collection type.
+//     For maps: 0xa0 (major type 5), for arrays: 0x80 (major type 4).
 //
-// Encoding table (map example, base=0xa0, ext=0xb8):
+// The extended form prefixes are derived from base using bitwise OR:
+//   - base|24: 1-byte length follows (additional info 24)
+//   - base|25: 2-byte length follows (additional info 25)
+//   - base|26: 4-byte length follows (additional info 26)
+//   - base|27: 8-byte length follows (additional info 27)
+//
+// Encoding table (map example, base=0xa0):
 //
 //	n <= 23:         1 byte  — 0xa0|n
-//	n <= 0xFF:        2 bytes — 0xb8, n
-//	n <= 0xFFFF:      3 bytes — 0xb9, n>>8, n
-//	n <= 0xFFFFFFFF:  5 bytes — 0xba, n>>24..n
-//	n > 0xFFFFFFFF:   9 bytes — 0xbb, n>>56..n
-func writeCollectionHead(w io.Writer, base, ext byte, n int) error {
+//	n <= 0xFF:        2 bytes — 0xb8 (0xa0|24), n
+//	n <= 0xFFFF:      3 bytes — 0xb9 (0xa0|25), n>>8, n
+//	n <= 0xFFFFFFFF:  5 bytes — 0xba (0xa0|26), n>>24..n
+//	n > 0xFFFFFFFF:   9 bytes — 0xbb (0xa0|27), n>>56..n
+func writeCollectionHead(w io.Writer, base byte, n int) error {
 	switch {
 	case n <= 23:
 		// Additional info 0–23: length is encoded directly in the low 5 bits.
@@ -257,20 +258,20 @@ func writeCollectionHead(w io.Writer, base, ext byte, n int) error {
 		return err
 	case n <= 0xFF:
 		// Additional info 24: one additional byte carries the length.
-		_, err := w.Write([]byte{ext, byte(n)})
+		_, err := w.Write([]byte{base | 24, byte(n)})
 		return err
 	case n <= 0xFFFF:
 		// Additional info 25: two additional bytes carry the length (big-endian).
-		_, err := w.Write([]byte{ext + 1, byte(n >> 8), byte(n)})
+		_, err := w.Write([]byte{base | 25, byte(n >> 8), byte(n)})
 		return err
 	case n <= 0xFFFFFFFF:
 		// Additional info 26: four additional bytes carry the length (big-endian).
-		_, err := w.Write([]byte{ext + 2, byte(n >> 24), byte(n >> 16), byte(n >> 8), byte(n)})
+		_, err := w.Write([]byte{base | 26, byte(n >> 24), byte(n >> 16), byte(n >> 8), byte(n)})
 		return err
 	default:
 		// Additional info 27: eight additional bytes carry the length (big-endian).
 		_, err := w.Write([]byte{
-			ext + 3, byte(n >> 56), byte(n >> 48), byte(n >> 40), byte(n >> 32), byte(n >> 24), byte(n >> 16),
+			base | 27, byte(n >> 56), byte(n >> 48), byte(n >> 40), byte(n >> 32), byte(n >> 24), byte(n >> 16),
 			byte(n >> 8), byte(n),
 		})
 		return err
