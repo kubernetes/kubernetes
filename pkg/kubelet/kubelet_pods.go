@@ -869,6 +869,9 @@ func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, co
 				cm := envVar.ValueFrom.ConfigMapKeyRef
 				name := cm.Name
 				key := cm.Key
+				if key == "" && utilfeature.DefaultFeatureGate.Enabled(features.EnvVarKeyDefaultsToName) {
+					key = envVar.Name
+				}
 				optional := cm.Optional != nil && *cm.Optional
 				configMap, ok := configMaps[name]
 				if !ok {
@@ -896,6 +899,9 @@ func (kl *Kubelet) makeEnvironmentVariables(ctx context.Context, pod *v1.Pod, co
 				s := envVar.ValueFrom.SecretKeyRef
 				name := s.Name
 				key := s.Key
+				if key == "" && utilfeature.DefaultFeatureGate.Enabled(features.EnvVarKeyDefaultsToName) {
+					key = envVar.Name
+				}
 				optional := s.Optional != nil && *s.Optional
 				secret, ok := secrets[name]
 				if !ok {

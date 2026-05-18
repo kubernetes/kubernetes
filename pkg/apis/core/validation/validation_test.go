@@ -31113,3 +31113,143 @@ func TestValidatePodSchedulingGroup(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateEnvVarKeyDefaultsToName(t *testing.T) {
+	testCases := []struct {
+		name           string
+		featureEnabled bool
+		envVar         core.EnvVar
+		expectError    bool
+		errorField     string
+	}{
+		{
+			name:           "configMapKeyRef: empty key accepted when gate is on",
+			featureEnabled: true,
+			envVar: core.EnvVar{
+				Name: "LOG_LEVEL",
+				ValueFrom: &core.EnvVarSource{
+					ConfigMapKeyRef: &core.ConfigMapKeySelector{
+						LocalObjectReference: core.LocalObjectReference{Name: "app-config"},
+						Key:                  "",
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name:           "secretKeyRef: empty key accepted when gate is on",
+			featureEnabled: true,
+			envVar: core.EnvVar{
+				Name: "DB_PASSWORD",
+				ValueFrom: &core.EnvVarSource{
+					SecretKeyRef: &core.SecretKeySelector{
+						LocalObjectReference: core.LocalObjectReference{Name: "db-secret"},
+						Key:                  "",
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name:           "configMapKeyRef: empty key rejected when gate is off",
+			featureEnabled: false,
+			envVar: core.EnvVar{
+				Name: "LOG_LEVEL",
+				ValueFrom: &core.EnvVarSource{
+					ConfigMapKeyRef: &core.ConfigMapKeySelector{
+						LocalObjectReference: core.LocalObjectReference{Name: "app-config"},
+						Key:                  "",
+					},
+				},
+			},
+			expectError: true,
+			errorField:  "valueFrom.configMapKeyRef.key",
+		},
+		{
+			name:           "secretKeyRef: empty key rejected when gate is off",
+			featureEnabled: false,
+			envVar: core.EnvVar{
+				Name: "DB_PASSWORD",
+				ValueFrom: &core.EnvVarSource{
+					SecretKeyRef: &core.SecretKeySelector{
+						LocalObjectReference: core.LocalObjectReference{Name: "db-secret"},
+						Key:                  "",
+					},
+				},
+			},
+			expectError: true,
+			errorField:  "valueFrom.secretKeyRef.key",
+		},
+		{
+			name:           "configMapKeyRef: env var name that is invalid as a ConfigMap key is rejected when gate is on",
+			featureEnabled: true,
+			envVar: core.EnvVar{
+				Name: "INVALID=NAME",
+				ValueFrom: &core.EnvVarSource{
+					ConfigMapKeyRef: &core.ConfigMapKeySelector{
+						LocalObjectReference: core.LocalObjectReference{Name: "app-config"},
+						Key:                  "",
+					},
+				},
+			},
+			expectError: true,
+			errorField:  "valueFrom.configMapKeyRef.key",
+		},
+		{
+			name:           "explicit key is always accepted when gate is on",
+			featureEnabled: true,
+			envVar: core.EnvVar{
+				Name: "MY_VAR",
+				ValueFrom: &core.EnvVarSource{
+					ConfigMapKeyRef: &core.ConfigMapKeySelector{
+						LocalObjectReference: core.LocalObjectReference{Name: "app-config"},
+						Key:                  "some-key",
+					},
+				},
+			},
+			expectError: false,
+		},
+		{
+			name:           "explicit key is always accepted when gate is off",
+			featureEnabled: false,
+			envVar: core.EnvVar{
+				Name: "MY_VAR",
+				ValueFrom: &core.EnvVarSource{
+					SecretKeyRef: &core.SecretKeySelector{
+						LocalObjectReference: core.LocalObjectReference{Name: "db-secret"},
+						Key:                  "explicit-key",
+					},
+				},
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EnvVarKeyDefaultsToName, tc.featureEnabled)
+
+			opts := PodValidationOptions{}
+			errs := validateEnvVarValueFrom(tc.envVar, field.NewPath("valueFrom"), opts)
+
+			if tc.expectError && len(errs) == 0 {
+				t.Errorf("expected validation error for field %q, got none", tc.errorField)
+			}
+			if !tc.expectError && len(errs) > 0 {
+				t.Errorf("expected no validation errors, got: %v", errs)
+			}
+			if tc.expectError && tc.errorField != "" && len(errs) > 0 {
+				found := false
+				for _, e := range errs {
+					if e.Field == tc.errorField {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("expected error on field %q, got errors on: %v", tc.errorField, errs)
+				}
+			}
+		})
+	}
+}

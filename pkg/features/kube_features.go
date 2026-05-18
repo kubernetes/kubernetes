@@ -341,6 +341,13 @@ const (
 	// from the specified file in the emptyDir volume, without mounting the file.
 	EnvFiles featuregate.Feature = "EnvFiles"
 
+	// owner: @dap0am
+	// kep: http://kep.k8s.io/5883
+	//
+	// Allow the `key` field in `configMapKeyRef` and `secretKeyRef` to be
+	// omitted, defaulting to the enclosing env var's `name` at runtime.
+	EnvVarKeyDefaultsToName featuregate.Feature = "EnvVarKeyDefaultsToName"
+
 	// owner: @harche
 	// kep: http://kep.k8s.io/3386
 	//
@@ -1384,6 +1391,9 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.34"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.Beta},
 	},
+	EnvVarKeyDefaultsToName: {
+		{Version: version.MustParse("1.35"), Default: false, PreRelease: featuregate.Alpha},
+	},
 	EventedPLEG: {
 		{Version: version.MustParse("1.26"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2313,6 +2323,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	DynamicResourceAllocation: {},
 
 	EnvFiles: {},
+
+	EnvVarKeyDefaultsToName: {},
 
 	EventedPLEG: {},
 

@@ -9175,3 +9175,214 @@ func TestGeneratePodHostNameAndDomain(t *testing.T) {
 		})
 	}
 }
+
+func TestMakeEnvironmentVariablesEnvVarKeyDefaultsToName(t *testing.T) {
+	testCases := []struct {
+		name           string
+		featureEnabled bool
+		envVars        []v1.EnvVar
+		configMaps     []*v1.ConfigMap
+		secrets        []*v1.Secret
+		expectedEnvs   []kubecontainer.EnvVar
+		expectedErrStr string
+	}{
+		{
+			name:           "configMapKeyRef: omitted key defaults to env var name when gate is on",
+			featureEnabled: true,
+			envVars: []v1.EnvVar{
+				{
+					Name: "LOG_LEVEL",
+					ValueFrom: &v1.EnvVarSource{
+						ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{Name: "app-config"},
+						},
+					},
+				},
+			},
+			configMaps: []*v1.ConfigMap{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "app-config", Namespace: "test"},
+					Data:       map[string]string{"LOG_LEVEL": "debug"},
+				},
+			},
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "LOG_LEVEL", Value: "debug"},
+			},
+		},
+		{
+			name:           "secretKeyRef: omitted key defaults to env var name when gate is on",
+			featureEnabled: true,
+			envVars: []v1.EnvVar{
+				{
+					Name: "DB_PASSWORD",
+					ValueFrom: &v1.EnvVarSource{
+						SecretKeyRef: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{Name: "db-secret"},
+						},
+					},
+				},
+			},
+			secrets: []*v1.Secret{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "db-secret", Namespace: "test"},
+					Data:       map[string][]byte{"DB_PASSWORD": []byte("s3cr3t")},
+				},
+			},
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "DB_PASSWORD", Value: "s3cr3t"},
+			},
+		},
+		{
+			name:           "configMapKeyRef: omitted key with gate off uses empty key (key not found)",
+			featureEnabled: false,
+			envVars: []v1.EnvVar{
+				{
+					Name: "LOG_LEVEL",
+					ValueFrom: &v1.EnvVarSource{
+						ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{Name: "app-config"},
+						},
+					},
+				},
+			},
+			configMaps: []*v1.ConfigMap{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "app-config", Namespace: "test"},
+					Data:       map[string]string{"LOG_LEVEL": "debug"},
+				},
+			},
+			expectedErrStr: "couldn't find key",
+		},
+		{
+			name:           "secretKeyRef: omitted key with gate off uses empty key (key not found)",
+			featureEnabled: false,
+			envVars: []v1.EnvVar{
+				{
+					Name: "DB_PASSWORD",
+					ValueFrom: &v1.EnvVarSource{
+						SecretKeyRef: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{Name: "db-secret"},
+						},
+					},
+				},
+			},
+			secrets: []*v1.Secret{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "db-secret", Namespace: "test"},
+					Data:       map[string][]byte{"DB_PASSWORD": []byte("s3cr3t")},
+				},
+			},
+			expectedErrStr: "couldn't find key",
+		},
+		{
+			name:           "explicit key is unaffected when gate is on",
+			featureEnabled: true,
+			envVars: []v1.EnvVar{
+				{
+					Name: "MY_VAR",
+					ValueFrom: &v1.EnvVarSource{
+						ConfigMapKeyRef: &v1.ConfigMapKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{Name: "app-config"},
+							Key:                  "different-key",
+						},
+					},
+				},
+			},
+			configMaps: []*v1.ConfigMap{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "app-config", Namespace: "test"},
+					Data:       map[string]string{"different-key": "the-value"},
+				},
+			},
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "MY_VAR", Value: "the-value"},
+			},
+		},
+		{
+			name:           "explicit key is unaffected when gate is off",
+			featureEnabled: false,
+			envVars: []v1.EnvVar{
+				{
+					Name: "MY_VAR",
+					ValueFrom: &v1.EnvVarSource{
+						SecretKeyRef: &v1.SecretKeySelector{
+							LocalObjectReference: v1.LocalObjectReference{Name: "db-secret"},
+							Key:                  "explicit-key",
+						},
+					},
+				},
+			},
+			secrets: []*v1.Secret{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "db-secret", Namespace: "test"},
+					Data:       map[string][]byte{"explicit-key": []byte("value123")},
+				},
+			},
+			expectedEnvs: []kubecontainer.EnvVar{
+				{Name: "MY_VAR", Value: "value123"},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EnvVarKeyDefaultsToName, tc.featureEnabled)
+
+			testKubelet := newTestKubelet(t, false)
+			defer testKubelet.Cleanup()
+			kl := testKubelet.kubelet
+
+			for _, cm := range tc.configMaps {
+				cmCopy := cm
+				testKubelet.fakeKubeClient.AddReactor("get", "configmaps", func(action core.Action) (bool, runtime.Object, error) {
+					return true, cmCopy, nil
+				})
+			}
+			for _, s := range tc.secrets {
+				sCopy := s
+				testKubelet.fakeKubeClient.AddReactor("get", "secrets", func(action core.Action) (bool, runtime.Object, error) {
+					return true, sCopy, nil
+				})
+			}
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pod",
+					Namespace: "test",
+				},
+				Spec: v1.PodSpec{
+					EnableServiceLinks: ptr.To(false),
+					Containers: []v1.Container{
+						{
+							Name: "test-container",
+							Env:  tc.envVars,
+						},
+					},
+				},
+			}
+
+			result, err := kl.makeEnvironmentVariables(pod, &pod.Spec.Containers[0], "192.168.0.1", []string{"192.168.0.1"}, kubecontainer.VolumeMap{})
+			if tc.expectedErrStr != "" {
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tc.expectedErrStr)
+				}
+				if !strings.Contains(err.Error(), tc.expectedErrStr) {
+					t.Fatalf("expected error containing %q, got: %v", tc.expectedErrStr, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(result) != len(tc.expectedEnvs) {
+				t.Fatalf("expected %d env vars, got %d: %v", len(tc.expectedEnvs), len(result), result)
+			}
+			for i, expected := range tc.expectedEnvs {
+				if result[i].Name != expected.Name || result[i].Value != expected.Value {
+					t.Errorf("env[%d]: expected {%q, %q}, got {%q, %q}",
+						i, expected.Name, expected.Value, result[i].Name, result[i].Value)
+				}
+			}
+		})
+	}
+}

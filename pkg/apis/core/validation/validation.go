@@ -2820,11 +2820,11 @@ func validateEnvVarValueFrom(ev core.EnvVar, fldPath *field.Path, opts PodValida
 	}
 	if ev.ValueFrom.ConfigMapKeyRef != nil {
 		numSources++
-		allErrs = append(allErrs, validateConfigMapKeySelector(ev.ValueFrom.ConfigMapKeyRef, fldPath.Child("configMapKeyRef"))...)
+		allErrs = append(allErrs, validateConfigMapKeySelector(ev.ValueFrom.ConfigMapKeyRef, ev.Name, fldPath.Child("configMapKeyRef"))...)
 	}
 	if ev.ValueFrom.SecretKeyRef != nil {
 		numSources++
-		allErrs = append(allErrs, validateSecretKeySelector(ev.ValueFrom.SecretKeyRef, fldPath.Child("secretKeyRef"))...)
+		allErrs = append(allErrs, validateSecretKeySelector(ev.ValueFrom.SecretKeyRef, ev.Name, fldPath.Child("secretKeyRef"))...)
 	}
 
 	if ev.ValueFrom.FileKeyRef != nil {
@@ -3010,7 +3010,7 @@ func validateContainerResourceDivisor(rName string, divisor resource.Quantity, f
 	return allErrs
 }
 
-func validateConfigMapKeySelector(s *core.ConfigMapKeySelector, fldPath *field.Path) field.ErrorList {
+func validateConfigMapKeySelector(s *core.ConfigMapKeySelector, envVarName string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	nameFn := ValidateNameFunc(ValidateSecretName)
@@ -3018,7 +3018,16 @@ func validateConfigMapKeySelector(s *core.ConfigMapKeySelector, fldPath *field.P
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), s.Name, msg))
 	}
 	if len(s.Key) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("key"), ""))
+		if utilfeature.DefaultFeatureGate.Enabled(features.EnvVarKeyDefaultsToName) {
+			// key is omitted; it will default to envVarName at runtime.
+			// Validate that the env var name is also a valid ConfigMap key.
+			for _, msg := range validation.IsConfigMapKey(envVarName) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), envVarName,
+					"may not be omitted: env var name is not a valid ConfigMap key: "+msg))
+			}
+		} else {
+			allErrs = append(allErrs, field.Required(fldPath.Child("key"), ""))
+		}
 	} else {
 		for _, msg := range validation.IsConfigMapKey(s.Key) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), s.Key, msg))
@@ -3028,7 +3037,7 @@ func validateConfigMapKeySelector(s *core.ConfigMapKeySelector, fldPath *field.P
 	return allErrs
 }
 
-func validateSecretKeySelector(s *core.SecretKeySelector, fldPath *field.Path) field.ErrorList {
+func validateSecretKeySelector(s *core.SecretKeySelector, envVarName string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	nameFn := ValidateNameFunc(ValidateSecretName)
@@ -3036,7 +3045,16 @@ func validateSecretKeySelector(s *core.SecretKeySelector, fldPath *field.Path) f
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), s.Name, msg))
 	}
 	if len(s.Key) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("key"), ""))
+		if utilfeature.DefaultFeatureGate.Enabled(features.EnvVarKeyDefaultsToName) {
+			// key is omitted; it will default to envVarName at runtime.
+			// Validate that the env var name is also a valid ConfigMap key.
+			for _, msg := range validation.IsConfigMapKey(envVarName) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), envVarName,
+					"may not be omitted: env var name is not a valid Secret key: "+msg))
+			}
+		} else {
+			allErrs = append(allErrs, field.Required(fldPath.Child("key"), ""))
+		}
 	} else {
 		for _, msg := range validation.IsConfigMapKey(s.Key) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("key"), s.Key, msg))
