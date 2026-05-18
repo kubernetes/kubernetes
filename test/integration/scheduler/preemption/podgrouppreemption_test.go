@@ -842,7 +842,8 @@ func TestPodGroupPreemption(t *testing.T) {
 			if tt.expectedPodsPreemptedByWAP > 0 {
 				err := wait.PollUntilContextTimeout(testCtx.Ctx, 100*time.Millisecond, 10*time.Second, false, func(ctx context.Context) (bool, error) {
 					wapCalls := 0
-					allExpectedPreempted := append(tt.expectedPreempted, tt.expectedPreemptedAnyOf...)
+					allExpectedPreempted := tt.expectedPreempted
+					allExpectedPreempted = append(allExpectedPreempted, tt.expectedPreemptedAnyOf...)
 					for _, podName := range allExpectedPreempted {
 						events, err := cs.CoreV1().Events(ns).List(ctx, metav1.ListOptions{
 							FieldSelector: "involvedObject.name=" + podName,

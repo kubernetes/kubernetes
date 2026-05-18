@@ -29,7 +29,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	"k8s.io/api/scheduling/v1alpha2"
 	schedulingapiv1alpha2 "k8s.io/api/scheduling/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -429,7 +428,7 @@ func CleanupPods(ctx context.Context, cs clientset.Interface, t *testing.T, pods
 	}
 }
 
-func CleanupPodGroups(ctx context.Context, cs clientset.Interface, t *testing.T, podGroups ...*v1alpha2.PodGroup) {
+func CleanupPodGroups(ctx context.Context, cs clientset.Interface, t *testing.T, podGroups ...*schedulingapiv1alpha2.PodGroup) {
 	for _, pg := range podGroups {
 		// Remove finalizers to avoid getting stuck in deletion if GC is not running.
 		// Note: GC is not running because we don't start controller-manager in integration tests.
