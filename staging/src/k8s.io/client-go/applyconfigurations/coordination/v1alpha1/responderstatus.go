@@ -28,7 +28,7 @@ import (
 // ResponderStatus represents the last observed status of the eviction process of the responder.
 // It should be only updated by the designated responder whose name is .name field.
 type ResponderStatusApplyConfiguration struct {
-	// name allows you to identify the responder reacting to the EvictionRequest.
+	// name allows you to identify the responder reacting to the Eviction.
 	//
 	// It must be a valid domain-prefixed path (such as "acme.io/foo").
 	// This field is initialized by Kubernetes and must be unique for each responder.

@@ -28,12 +28,17 @@ import (
 
 type CoordinationV1alpha1Interface interface {
 	RESTClient() rest.Interface
+	EvictionsGetter
 	EvictionRequestsGetter
 }
 
 // CoordinationV1alpha1Client is used to interact with features provided by the coordination.k8s.io group.
 type CoordinationV1alpha1Client struct {
 	restClient rest.Interface
+}
+
+func (c *CoordinationV1alpha1Client) Evictions(namespace string) EvictionInterface {
+	return newEvictions(c, namespace)
 }
 
 func (c *CoordinationV1alpha1Client) EvictionRequests(namespace string) EvictionRequestInterface {

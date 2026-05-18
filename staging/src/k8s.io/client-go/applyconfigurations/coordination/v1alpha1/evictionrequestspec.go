@@ -18,24 +18,34 @@ limitations under the License.
 
 package v1alpha1
 
+import (
+	coordinationv1alpha1 "k8s.io/api/coordination/v1alpha1"
+)
+
 // EvictionRequestSpecApplyConfiguration represents a declarative configuration of the EvictionRequestSpec type for use
 // with apply.
 //
 // EvictionRequestSpec is a specification of an EvictionRequest.
 type EvictionRequestSpecApplyConfiguration struct {
 	// target contains a reference to an object (e.g. a pod) that should be evicted.
-	// Target UID must be the same as the EvictionRequest's .metadata.name.
 	// This field is required and immutable.
-	Target *EvictionTargetApplyConfiguration `json:"target,omitempty"`
-	// requesters allow you to identify entities, that requested the eviction of the target.
-	// At least one requester with the eviction intent is required when creating an eviction request.
-	// If all the requesters withdraw their eviction intent, the eviction will be canceled.
+	Target *EvictionRequestTargetApplyConfiguration `json:"target,omitempty"`
+	// requesterName allows you to identify the entity, that requested the eviction of the target.
 	//
-	// Requester controllers should use server-side-apply to manage the requester intent.
+	// It must be a valid domain-prefixed path (such as "acme.io/foo").
+	// Domain names *.k8s.io and *.kubernetes.io are reserved.
+	// This field is required and immutable.
+	RequesterName *string `json:"requesterName,omitempty"`
+	// intent specifies the action that should be taken for the specified target.
 	//
-	// Once added, items cannot be removed.
-	// The minimum length of the requesters list is 1, and the maximum is 100.
-	Requesters []RequesterApplyConfiguration `json:"requesters,omitempty"`
+	// - Eviction means that the requester is interested in the eviction of the target.
+	// - Withdrawn means that the requester is no longer interested in the eviction of the target.
+	// If all requesters' intents are withdrawn for a common target, the eviction will be canceled.
+	// Cancellation consequences:
+	// - Inactive responders will never run.
+	// - Active responders are expected to cancel the eviction.
+	// - Completed or Interrupted responders should not take any action.
+	Intent *coordinationv1alpha1.EvictionRequestIntent `json:"intent,omitempty"`
 }
 
 // EvictionRequestSpecApplyConfiguration constructs a declarative configuration of the EvictionRequestSpec type for use with
@@ -47,20 +57,23 @@ func EvictionRequestSpec() *EvictionRequestSpecApplyConfiguration {
 // WithTarget sets the Target field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Target field is set to the value of the last call.
-func (b *EvictionRequestSpecApplyConfiguration) WithTarget(value *EvictionTargetApplyConfiguration) *EvictionRequestSpecApplyConfiguration {
+func (b *EvictionRequestSpecApplyConfiguration) WithTarget(value *EvictionRequestTargetApplyConfiguration) *EvictionRequestSpecApplyConfiguration {
 	b.Target = value
 	return b
 }
 
-// WithRequesters adds the given value to the Requesters field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the Requesters field.
-func (b *EvictionRequestSpecApplyConfiguration) WithRequesters(values ...*RequesterApplyConfiguration) *EvictionRequestSpecApplyConfiguration {
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithRequesters")
-		}
-		b.Requesters = append(b.Requesters, *values[i])
-	}
+// WithRequesterName sets the RequesterName field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the RequesterName field is set to the value of the last call.
+func (b *EvictionRequestSpecApplyConfiguration) WithRequesterName(value string) *EvictionRequestSpecApplyConfiguration {
+	b.RequesterName = &value
+	return b
+}
+
+// WithIntent sets the Intent field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Intent field is set to the value of the last call.
+func (b *EvictionRequestSpecApplyConfiguration) WithIntent(value coordinationv1alpha1.EvictionRequestIntent) *EvictionRequestSpecApplyConfiguration {
+	b.Intent = &value
 	return b
 }

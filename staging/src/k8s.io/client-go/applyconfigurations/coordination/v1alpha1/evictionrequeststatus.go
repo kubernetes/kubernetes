@@ -29,50 +29,22 @@ import (
 type EvictionRequestStatusApplyConfiguration struct {
 	// conditions contain information about the eviction request.
 	//
-	// Eviction request specific conditions are: Evicted or Canceled (managed by evictionrequest-controller),
-	//
+	// EvictionRequest specific conditions are: Evicted or Failed (managed by evictionrequest-controller).
 	// - Failed means that the eviction request is no longer being processed
 	// by any eviction responder. This can happen if the request is canceled or if no responder
 	// managed to evict the target (e.g. terminate or delete a pod).
 	// - Evicted means that the target has been evicted (e.g. a pod has been terminated or deleted).
 	//
-	// The maximum length of the conditions list is 500.
+	// These conditions can be reset if the eviction was unsuccessful and a new Eviction intent has
+	// been submitted.
+	//
+	// The maximum length of the conditions list is 100.
 	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 	// observedGeneration is EvictionRequest's .metadata.generation observed by the evictionrequest-controller.
 	// The observed generation value cannot be negative and can only be incremented.
 	// The minimum value is 1.
 	// This field is managed by evictionrequest-controller.
 	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
-	// targetResponders reference responders that should eventually respond to this eviction
-	// request to help with the graceful eviction of a target. These responders are selected
-	// sequentially, in the order in which they appear in the list by setting the Active state to
-	// the TargetResponder .state field. The maximum number of active responders allowed is 1.
-	// Eventually each responder can end up in an Interrupted, Canceled or, Complete state.
-	// Responders should observe these states in order to navigate their lifecycle.
-	//
-	// If the target is a pod, the field is populated from Pod's .spec.evictionResponders. Default
-	// responders may be added to the list according to the target.
-	//
-	// Default responders:
-	// - imperative-eviction.k8s.io/evictor responder is appended to the end of the list if the
-	// target is a pod. It will call the /evict API endpoint. This call may not succeed due to
-	// PodDisruptionBudgets, which may block the pod termination. It will update the responder
-	// message and try again with a backoff.
-	//
-	// The maximum length of the responders list is 17.
-	// The length and keys of the list cannot change once set.
-	// This field is managed by evictionrequest-controller.
-	TargetResponders []TargetResponderApplyConfiguration `json:"targetResponders,omitempty"`
-	// responders represents the eviction process status of each declared responder.
-	//
-	// The responder list should be the same length and have the same .name fields as
-	// .status.targetResponders. Only responders with .name that have Active state in
-	// .targetResponders[].state should be updated and can be mutated. First initialization
-	// of the list is allowed.
-	//
-	// Each ResponderStatus is initialized by evictionrequest-controller and then managed by
-	// the designated responder.
-	Responders []ResponderStatusApplyConfiguration `json:"responders,omitempty"`
 }
 
 // EvictionRequestStatusApplyConfiguration constructs a declarative configuration of the EvictionRequestStatus type for use with
@@ -99,31 +71,5 @@ func (b *EvictionRequestStatusApplyConfiguration) WithConditions(values ...*v1.C
 // If called multiple times, the ObservedGeneration field is set to the value of the last call.
 func (b *EvictionRequestStatusApplyConfiguration) WithObservedGeneration(value int64) *EvictionRequestStatusApplyConfiguration {
 	b.ObservedGeneration = &value
-	return b
-}
-
-// WithTargetResponders adds the given value to the TargetResponders field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the TargetResponders field.
-func (b *EvictionRequestStatusApplyConfiguration) WithTargetResponders(values ...*TargetResponderApplyConfiguration) *EvictionRequestStatusApplyConfiguration {
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithTargetResponders")
-		}
-		b.TargetResponders = append(b.TargetResponders, *values[i])
-	}
-	return b
-}
-
-// WithResponders adds the given value to the Responders field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the Responders field.
-func (b *EvictionRequestStatusApplyConfiguration) WithResponders(values ...*ResponderStatusApplyConfiguration) *EvictionRequestStatusApplyConfiguration {
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithResponders")
-		}
-		b.Responders = append(b.Responders, *values[i])
-	}
 	return b
 }

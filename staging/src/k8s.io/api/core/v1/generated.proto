@@ -4835,20 +4835,20 @@ message PodSpec {
   // +optional
   optional PodSchedulingGroup schedulingGroup = 43;
 
-  // evictionResponders reference responders that react to EvictionRequests.
-  // Responders should observe and communicate through the EvictionRequest API to help with
+  // evictionResponders reference responders that react to Evictions based on EvictionRequests.
+  // Responders should observe and communicate through the Eviction Resource API to help with
   // the graceful termination of a pod. The responders are selected sequentially, in the order
   // in which they appear in the list.
   //
   // Responders should periodically report on an eviction progress by updating the
-  // .status.responders[].heartbeatTime field of the EvictionRequest object. If this field is
+  // .status.responders[].heartbeatTime field of the Eviction object. If this field is
   // not updated within 20 minutes, the eviction request is passed over to the next responder at
   // a higher index. If there is no other responder, the last default
   // imperative-eviction.k8s.io/evictor responder will evict the pod using the imperative
   // Eviction API (/evict endpoint).
   //
   // The maximum length of the responders list is 16.
-  // Responders are not supported when the pod is part of a workload (.spec.workloadRef is set).
+  // Responders are not supported when the pod is part of a PodGroup (.spec.schedulingGroup is set).
   // This field can only be set on creation and is immutable afterwards.
   // +featureGate=EvictionRequestAPI
   // +optional

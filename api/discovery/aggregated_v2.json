@@ -2344,6 +2344,41 @@
                 "update",
                 "watch"
               ]
+            },
+            {
+              "resource": "evictions",
+              "responseKind": {
+                "group": "",
+                "kind": "Eviction",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "eviction",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "Eviction",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
             }
           ],
           "version": "v1alpha1"

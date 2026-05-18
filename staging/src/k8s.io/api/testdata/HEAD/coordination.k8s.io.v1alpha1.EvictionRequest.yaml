@@ -33,9 +33,8 @@ metadata:
   selfLink: selfLinkValue
   uid: uidValue
 spec:
-  requesters:
-  - intent: intentValue
-    name: nameValue
+  intent: intentValue
+  requesterName: requesterNameValue
   target:
     pod:
       name: nameValue
@@ -49,13 +48,3 @@ status:
     status: statusValue
     type: typeValue
   observedGeneration: 2
-  responders:
-  - completionTime: "2005-01-01T01:01:01Z"
-    expectedCompletionTime: "2004-01-01T01:01:01Z"
-    heartbeatTime: "2003-01-01T01:01:01Z"
-    message: messageValue
-    name: nameValue
-    startTime: "2002-01-01T01:01:01Z"
-  targetResponders:
-  - name: nameValue
-    state: stateValue

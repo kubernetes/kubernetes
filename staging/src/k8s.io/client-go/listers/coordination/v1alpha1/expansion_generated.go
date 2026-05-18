@@ -18,6 +18,14 @@ limitations under the License.
 
 package v1alpha1
 
+// EvictionListerExpansion allows custom methods to be added to
+// EvictionLister.
+type EvictionListerExpansion interface{}
+
+// EvictionNamespaceListerExpansion allows custom methods to be added to
+// EvictionNamespaceLister.
+type EvictionNamespaceListerExpansion interface{}
+
 // EvictionRequestListerExpansion allows custom methods to be added to
 // EvictionRequestLister.
 type EvictionRequestListerExpansion interface{}

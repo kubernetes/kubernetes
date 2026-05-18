@@ -4164,6 +4164,38 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: strategy
       type:
         scalar: string
+- name: io.k8s.api.coordination.v1alpha1.Eviction
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.coordination.v1alpha1.EvictionSpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.coordination.v1alpha1.EvictionStatus
+      default: {}
+- name: io.k8s.api.coordination.v1alpha1.EvictionPodReference
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: uid
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.coordination.v1alpha1.EvictionRequest
   map:
     fields:
@@ -4185,20 +4217,31 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.api.coordination.v1alpha1.EvictionRequestStatus
       default: {}
+- name: io.k8s.api.coordination.v1alpha1.EvictionRequestPodReference
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+      default: ""
+    - name: uid
+      type:
+        scalar: string
+      default: ""
 - name: io.k8s.api.coordination.v1alpha1.EvictionRequestSpec
   map:
     fields:
-    - name: requesters
+    - name: intent
       type:
-        list:
-          elementType:
-            namedType: io.k8s.api.coordination.v1alpha1.Requester
-          elementRelationship: associative
-          keys:
-          - name
+        scalar: string
+      default: ""
+    - name: requesterName
+      type:
+        scalar: string
+      default: ""
     - name: target
       type:
-        namedType: io.k8s.api.coordination.v1alpha1.EvictionTarget
+        namedType: io.k8s.api.coordination.v1alpha1.EvictionRequestTarget
       default: {}
 - name: io.k8s.api.coordination.v1alpha1.EvictionRequestStatus
   map:
@@ -4214,6 +4257,45 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: observedGeneration
       type:
         scalar: numeric
+- name: io.k8s.api.coordination.v1alpha1.EvictionRequestTarget
+  map:
+    fields:
+    - name: pod
+      type:
+        namedType: io.k8s.api.coordination.v1alpha1.EvictionRequestPodReference
+    unions:
+    - fields:
+      - fieldName: pod
+        discriminatorValue: Pod
+- name: io.k8s.api.coordination.v1alpha1.EvictionSpec
+  map:
+    fields:
+    - name: target
+      type:
+        namedType: io.k8s.api.coordination.v1alpha1.EvictionTarget
+      default: {}
+- name: io.k8s.api.coordination.v1alpha1.EvictionStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
+    - name: observedGeneration
+      type:
+        scalar: numeric
+    - name: requesters
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.coordination.v1alpha1.Requester
+          elementRelationship: associative
+          keys:
+          - name
     - name: responders
       type:
         list:
@@ -4235,22 +4317,11 @@ var schemaYAML = typed.YAMLObject(`types:
     fields:
     - name: pod
       type:
-        namedType: io.k8s.api.coordination.v1alpha1.PodReference
+        namedType: io.k8s.api.coordination.v1alpha1.EvictionPodReference
     unions:
     - fields:
       - fieldName: pod
         discriminatorValue: Pod
-- name: io.k8s.api.coordination.v1alpha1.PodReference
-  map:
-    fields:
-    - name: name
-      type:
-        scalar: string
-      default: ""
-    - name: uid
-      type:
-        scalar: string
-      default: ""
 - name: io.k8s.api.coordination.v1alpha1.Requester
   map:
     fields:

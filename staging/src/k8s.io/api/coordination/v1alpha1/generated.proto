@@ -28,10 +28,15 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "k8s.io/api/coordination/v1alpha1";
 
-// EvictionRequest defines a request that should ideally result in a graceful eviction of a
+// Eviction initiates an eviction process, which should ideally result in a graceful eviction of a
 // .spec.target (e.g. termination of a pod).
 //
-// `.spec.requesters` field should be set and kept updated to preserve the eviction request.
+// The evictionrequest-controller observes intents of all EvictionRequests and transforms them into
+// Evictions. It manages the Eviction lifecycle.
+// Requesters are preserved in .status.requesters even after they have withdrawn their request.
+// If all requesters withdraw their eviction intent for a common target, the eviction will be
+// canceled. Once all EvictionRequest corresponding to this Eviction .spec.target have been
+// removed, this Eviction object will eventually be garbage collected.
 //
 // If the target is a pod, the .status.targetResponders is populated from Pod's
 // .spec.evictionResponders.
@@ -46,15 +51,82 @@ option go_package = "k8s.io/api/coordination/v1alpha1";
 // imperative-eviction.k8s.io/evictor responder will evict the pod using the imperative Eviction API
 // (/evict endpoint).
 // +k8s:validation-gen-nolint // Note: remove this when the API got GA
+message Eviction {
+  // metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+  // .metadaata.name set by the evictionrequest-controller is purely informative and subject to change.
+  // .spec.target field should be used to identify the target precisesly.
+  //
+  // The requester and responder names will be used as label keys and added to the labels of the
+  // eviction in one of the following formats:
+  // 1. acme.io/foo: "requester"
+  // 2. acme.io/foo: "responder"
+  // 3. acme.io/foo: "requesterresponder"
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // spec defines the eviction specification.
+  // https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+  // +required
+  optional EvictionSpec spec = 2;
+
+  // status represents the most recently observed status of the eviction.
+  // Populated by responders and evictionrequest-controller.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+  // +optional
+  optional EvictionStatus status = 3;
+}
+
+// EvictionList contains a list of Eviction resources.
+message EvictionList {
+  // metadata is the standard list metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // items is the list of Evictions.
+  repeated Eviction items = 2;
+}
+
+// EvictionPodReference contains enough information to locate the referenced pod inside the same
+// namespace.
+message EvictionPodReference {
+  // name of the target.
+  // This field is required.
+  // +required
+  // +k8s:required
+  // +k8s:format=k8s-long-name
+  optional string name = 1;
+
+  // uid of the target.
+  // It can be found in .spec.metadata.uid of the target and is a lowercase UUID in 8-4-4-4-12 format.
+  // This field is required.
+  // +required
+  // +k8s:required
+  // +k8s:format=k8s-uuid
+  optional string uid = 2;
+}
+
+// EvictionRequest defines a request that should ideally result in a graceful eviction of a
+// .spec.target (e.g. termination of a pod).
+//
+// The evictionrequest-controller observes intents of all EvictionRequests and transforms them into
+// Evictions.
+//   - .spec.requesterName is set as a label on the Eviction for easier lookup.
+//   - Each target can have a set of responders assigned to it. Eviction objects are observed by
+//     these responders, who implement the eviction logic and update the Eviction's status with
+//     progress.
+//
+// There is many-to-many relationship between EvictionRequests and Evictions.
+//
+// If all requesters withdraw their eviction intent for a common target, the eviction will be
+// canceled. Deleting an EvictionRequest also counts as a withdrawal.
+// Once all EvictionRequest of a target are removed, the corresponding Evictions are eventually
+// garbage collected.
+//
+// +k8s:validation-gen-nolint // Note: remove this when the API got GA
 message EvictionRequest {
   // metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
-  // .metadata.name is required and should match the .metadata.uid of the pod being evicted.
-  // .metadata.generateName is not supported.
-  // The labels of the eviction request object are synchronized with .metadata.labels of the
-  // eviction request's target. The labels of the target have a preference.
   // +optional
-  // +k8s:subfield(name)=+k8s:format=k8s-uuid
-  // +k8s:subfield(generateName)=+k8s:forbidden
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // spec defines the eviction request specification.
@@ -63,7 +135,6 @@ message EvictionRequest {
   optional EvictionRequestSpec spec = 2;
 
   // status represents the most recently observed status of the eviction request.
-  // Populated by responders and evictionrequest-controller.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional EvictionRequestStatus status = 3;
@@ -80,47 +151,71 @@ message EvictionRequestList {
   repeated EvictionRequest items = 2;
 }
 
+// EvictionRequestPodReference contains enough information to locate the referenced pod inside the
+// same namespace.
+message EvictionRequestPodReference {
+  // name of the target.
+  // This field is required.
+  // +required
+  // +k8s:required
+  // +k8s:format=k8s-long-name
+  optional string name = 1;
+
+  // uid of the target.
+  // It can be found in .spec.metadata.uid of the target and is a lowercase UUID in 8-4-4-4-12 format.
+  // This field is required.
+  // +required
+  // +k8s:required
+  // +k8s:format=k8s-uuid
+  optional string uid = 2;
+}
+
 // EvictionRequestSpec is a specification of an EvictionRequest.
 message EvictionRequestSpec {
   // target contains a reference to an object (e.g. a pod) that should be evicted.
-  // Target UID must be the same as the EvictionRequest's .metadata.name.
   // This field is required and immutable.
   // +required
   // +k8s:immutable
-  optional EvictionTarget target = 1;
+  optional EvictionRequestTarget target = 1;
 
-  // requesters allow you to identify entities, that requested the eviction of the target.
-  // At least one requester with the eviction intent is required when creating an eviction request.
-  // If all the requesters withdraw their eviction intent, the eviction will be canceled.
+  // requesterName allows you to identify the entity, that requested the eviction of the target.
   //
-  // Requester controllers should use server-side-apply to manage the requester intent.
-  //
-  // Once added, items cannot be removed.
-  // The minimum length of the requesters list is 1, and the maximum is 100.
+  // It must be a valid domain-prefixed path (such as "acme.io/foo").
+  // Domain names *.k8s.io and *.kubernetes.io are reserved.
+  // This field is required and immutable.
   // +required
-  // +patchMergeKey=name
-  // +patchStrategy=merge
-  // +listType=map
-  // +listMapKey=name
   // +k8s:required
-  // +k8s:listType=map
-  // +k8s:listMapKey=name
-  // +k8s:maxItems=100
-  repeated Requester requesters = 2;
+  // +k8s:immutable
+  optional string requesterName = 2;
+
+  // intent specifies the action that should be taken for the specified target.
+  //
+  // - Eviction means that the requester is interested in the eviction of the target.
+  // - Withdrawn means that the requester is no longer interested in the eviction of the target.
+  //   If all requesters' intents are withdrawn for a common target, the eviction will be canceled.
+  //   Cancellation consequences:
+  //   - Inactive responders will never run.
+  //   - Active responders are expected to cancel the eviction.
+  //   - Completed or Interrupted responders should not take any action.
+  // +required
+  // +k8s:required
+  optional string intent = 3;
 }
 
 // EvictionRequestStatus represents the last observed status of the eviction request.
 message EvictionRequestStatus {
   // conditions contain information about the eviction request.
   //
-  // Eviction request specific conditions are: Evicted or Canceled (managed by evictionrequest-controller),
-  //
+  // EvictionRequest specific conditions are: Evicted or Failed (managed by evictionrequest-controller).
   // - Failed means that the eviction request is no longer being processed
   //   by any eviction responder. This can happen if the request is canceled or if no responder
   //   managed to evict the target (e.g. terminate or delete a pod).
   // - Evicted means that the target has been evicted (e.g. a pod has been terminated or deleted).
   //
-  // 	The maximum length of the conditions list is 500.
+  // These conditions can be reset if the eviction was unsuccessful and a new Eviction intent has
+  // been submitted.
+  //
+  // The maximum length of the conditions list is 100.
   // +optional
   // +patchMergeKey=type
   // +patchStrategy=merge
@@ -129,7 +224,7 @@ message EvictionRequestStatus {
   // +k8s:optional
   // +k8s:listType=map
   // +k8s:listMapKey=type
-  // +k8s:maxItems=500
+  // +k8s:maxItems=100
   repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
 
   // observedGeneration is EvictionRequest's .metadata.generation observed by the evictionrequest-controller.
@@ -140,6 +235,72 @@ message EvictionRequestStatus {
   // +k8s:optional
   // +k8s:minimum=1
   optional int64 observedGeneration = 2;
+}
+
+// EvictionRequestTarget contains a reference to an object that should be evicted.
+// +union
+message EvictionRequestTarget {
+  // pod references a pod that is subject to eviction/termination.
+  // Pods that are part of a PodGroup (.spec.schedulingGroup is set) are not supported.
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  optional EvictionRequestPodReference pod = 1;
+}
+
+// EvictionSpec is a specification of an Eviction.
+message EvictionSpec {
+  // target contains a reference to an object (e.g. a pod) that should be evicted.
+  // This field is required and immutable.
+  // +required
+  // +k8s:immutable
+  optional EvictionTarget target = 1;
+}
+
+// EvictionStatus represents the last observed status of the eviction request.
+message EvictionStatus {
+  // conditions contain information about the eviction request.
+  //
+  // Eviction request specific conditions are: Evicted or Failed (managed by evictionrequest-controller).
+  // - Failed means that the eviction request is no longer being processed
+  //   by any eviction responder. This can happen if the request is canceled or if no responder
+  //   managed to evict the target (e.g. terminate or delete a pod).
+  // - Evicted means that the target has been evicted (e.g. a pod has been terminated or deleted).
+  //
+  // 	The maximum length of the conditions list is 100.
+  // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=type
+  // +k8s:maxItems=100
+  repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
+
+  // observedGeneration is Eviction's .metadata.generation observed by the evictionrequest-controller.
+  // The observed generation value cannot be negative and can only be incremented.
+  // The minimum value is 1.
+  // This field is managed by evictionrequest-controller.
+  // +optional
+  // +k8s:optional
+  // +k8s:minimum=1
+  optional int64 observedGeneration = 2;
+
+  // requesters allow you to identify the entities, that requested the eviction of the target.
+  // If all the requesters withdraw their eviction intent, the eviction will be canceled.
+  //
+  // Once added, items cannot be removed.
+  // +optional
+  // +patchMergeKey=name
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=name
+  repeated Requester requesters = 3;
 
   // targetResponders reference responders that should eventually respond to this eviction
   // request to help with the graceful eviction of a target. These responders are selected
@@ -169,7 +330,7 @@ message EvictionRequestStatus {
   // +k8s:listType=map
   // +k8s:listMapKey=name
   // +k8s:maxItems=17
-  repeated TargetResponder targetResponders = 3;
+  repeated TargetResponder targetResponders = 4;
 
   // responders represents the eviction process status of each declared responder.
   //
@@ -189,7 +350,7 @@ message EvictionRequestStatus {
   // +k8s:listType=map
   // +k8s:listMapKey=name
   // +k8s:maxItems=17
-  repeated ResponderStatus responders = 6;
+  repeated ResponderStatus responders = 5;
 }
 
 // EvictionTarget contains a reference to an object that should be evicted.
@@ -200,25 +361,7 @@ message EvictionTarget {
   // +optional
   // +k8s:optional
   // +k8s:unionMember
-  optional PodReference pod = 1;
-}
-
-// PodReference contains enough information to locate the referenced pod inside the same namespace.
-message PodReference {
-  // name of the target.
-  // This field is required.
-  // +required
-  // +k8s:required
-  // +k8s:format=k8s-long-name
-  optional string name = 1;
-
-  // uid of the target.
-  // It can be found in .spec.metadata.uid of the target and is a lowercase UUID in 8-4-4-4-12 format.
-  // This field is required.
-  // +required
-  // +k8s:required
-  // +k8s:format=k8s-uuid
-  optional string uid = 2;
+  optional EvictionPodReference pod = 1;
 }
 
 // Requester allows you to identify the entity, that requested the eviction of the target.
@@ -252,7 +395,7 @@ message Requester {
 // It should be only updated by the designated responder whose name is .name field.
 // +structType=granular
 message ResponderStatus {
-  // name allows you to identify the responder reacting to the EvictionRequest.
+  // name allows you to identify the responder reacting to the Eviction.
   //
   // It must be a valid domain-prefixed path (such as "acme.io/foo").
   // This field is initialized by Kubernetes and must be unique for each responder.
@@ -309,12 +452,12 @@ message ResponderStatus {
   optional string message = 6;
 }
 
-// TargetResponder allows you to specify the responder reacting to the EvictionRequest.
-// Responders should observe and communicate through the EvictionRequest API (see .state) to help
+// TargetResponder allows you to specify the responder reacting to the Eviction.
+// Responders should observe and communicate through the Eviction API (see .state) to help
 // with the graceful eviction of a target (e.g. termination of a pod).
 // +structType=atomic
 message TargetResponder {
-  // name allows you to identify the responder reacting to the EvictionRequest.
+  // name allows you to identify the responder reacting to the Eviction.
   //
   // It must be a valid domain-prefixed path (such as "acme.io/foo").
   // This field must be unique for each responder.
@@ -336,8 +479,8 @@ message TargetResponder {
   //   request is passed over to the next responder. Only one responder can be active at a time.
   // - Interrupted means that the responder has failed to start or failed to update
   //   heartbeatTime in ResponderStatus in a timely manner.
-  // - Canceled means that the responder has been canceled. In other words, there is no
-  //   Eviction intent in .spec.requesters.
+  // - Canceled means that the responder has been canceled. In other words, there	is no
+  //   EvictionRequest with the same target and Eviction intent in .spec.intent.
   // - Completed means that the responder has successfully completed and set completionTime
   //   in ResponderStatus.
   //

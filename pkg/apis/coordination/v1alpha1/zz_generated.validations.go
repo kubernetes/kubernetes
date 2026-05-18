@@ -42,93 +42,564 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type Eviction
+	scheme.AddValidationFunc(
+		(*coordinationv1alpha1.Eviction)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/", "/status":
+				return Validate_Eviction(
+					ctx, op, nil, /* fldPath */
+					obj.(*coordinationv1alpha1.Eviction),
+					safe.Cast[*coordinationv1alpha1.Eviction](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type EvictionRequest
-	scheme.AddValidationFunc((*coordinationv1alpha1.EvictionRequest)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/", "/status":
-			return Validate_EvictionRequest(ctx, op, nil /* fldPath */, obj.(*coordinationv1alpha1.EvictionRequest), safe.Cast[*coordinationv1alpha1.EvictionRequest](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*coordinationv1alpha1.EvictionRequest)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/", "/status":
+				return Validate_EvictionRequest(
+					ctx, op, nil, /* fldPath */
+					obj.(*coordinationv1alpha1.EvictionRequest),
+					safe.Cast[*coordinationv1alpha1.EvictionRequest](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
+}
+
+// Validate_Eviction validates an instance of Eviction according
+// to declarative validation rules in the API schema.
+func Validate_Eviction(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *coordinationv1alpha1.Eviction) (errs field.ErrorList) {
+
+	// field coordinationv1alpha1.Eviction.TypeMeta has no validation
+	// field coordinationv1alpha1.Eviction.ObjectMeta has no validation
+
+	{ // field coordinationv1alpha1.Eviction.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *coordinationv1alpha1.EvictionSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_EvictionSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.Eviction) *coordinationv1alpha1.EvictionSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
+
+	{ // field coordinationv1alpha1.Eviction.Status
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *coordinationv1alpha1.EvictionStatus,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_EvictionStatus(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.Eviction) *coordinationv1alpha1.EvictionStatus {
+				return &oldObj.Status
+			})
+		errs = append(errs, fn(fldPath.Child("status"), &obj.Status, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_EvictionPodReference validates an instance of EvictionPodReference according
+// to declarative validation rules in the API schema.
+func Validate_EvictionPodReference(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *coordinationv1alpha1.EvictionPodReference) (errs field.ErrorList) {
+
+	{ // field coordinationv1alpha1.EvictionPodReference.Name
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.LongName(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.EvictionPodReference) *string {
+				return &oldObj.Name
+			})
+		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
+	}
+
+	{ // field coordinationv1alpha1.EvictionPodReference.UID
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *types.UID,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.UUID(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.EvictionPodReference) *types.UID {
+				return &oldObj.UID
+			})
+		errs = append(errs, fn(fldPath.Child("uid"), &obj.UID, oldVal, oldObj != nil)...)
+	}
+
+	return errs
 }
 
 // Validate_EvictionRequest validates an instance of EvictionRequest according
 // to declarative validation rules in the API schema.
-func Validate_EvictionRequest(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *coordinationv1alpha1.EvictionRequest) (errs field.ErrorList) {
+func Validate_EvictionRequest(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *coordinationv1alpha1.EvictionRequest) (errs field.ErrorList) {
+
 	// field coordinationv1alpha1.EvictionRequest.TypeMeta has no validation
+	// field coordinationv1alpha1.EvictionRequest.ObjectMeta has no validation
 
-	// field coordinationv1alpha1.EvictionRequest.ObjectMeta
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *v1.ObjectMeta, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field coordinationv1alpha1.EvictionRequest.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *coordinationv1alpha1.EvictionRequestSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
-			}
-			// call field-attached validations
-			func() { // cohort name
-				errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "name", func(o *v1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.UUID)...)
-			}()
-			func() { // cohort generateName
-				earlyReturn := false
-				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "generateName", func(o *v1.ObjectMeta) *string { return &o.GenerateName }, validate.DirectEqualPtr, validate.ForbiddenValue); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
 				}
-				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "generateName", func(o *v1.ObjectMeta) *string { return &o.GenerateName }, validate.DirectEqualPtr, validate.OptionalValue); len(e) != 0 {
-					earlyReturn = true
-				}
-				if earlyReturn {
-					return // do not proceed
-				}
-			}()
-			return
-		}(fldPath.Child("metadata"), &obj.ObjectMeta, safe.Field(oldObj, func(oldObj *coordinationv1alpha1.EvictionRequest) *v1.ObjectMeta { return &oldObj.ObjectMeta }), oldObj != nil)...)
-
-	// field coordinationv1alpha1.EvictionRequest.Spec
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *coordinationv1alpha1.EvictionRequestSpec, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_EvictionRequestSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *coordinationv1alpha1.EvictionRequest) *coordinationv1alpha1.EvictionRequestSpec {
-			return &oldObj.Spec
-		}), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.EvictionRequest) *coordinationv1alpha1.EvictionRequestSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
 
-	// field coordinationv1alpha1.EvictionRequest.Status
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *coordinationv1alpha1.EvictionRequestStatus, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field coordinationv1alpha1.EvictionRequest.Status
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *coordinationv1alpha1.EvictionRequestStatus,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_EvictionRequestStatus(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("status"), &obj.Status, safe.Field(oldObj, func(oldObj *coordinationv1alpha1.EvictionRequest) *coordinationv1alpha1.EvictionRequestStatus {
-			return &oldObj.Status
-		}), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.EvictionRequest) *coordinationv1alpha1.EvictionRequestStatus {
+				return &oldObj.Status
+			})
+		errs = append(errs, fn(fldPath.Child("status"), &obj.Status, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+var symbolsForEvictionRequestIntent = sets.New(coordinationv1alpha1.EvictionRequestIntentEviction, coordinationv1alpha1.EvictionRequestIntentWithdrawn)
+
+// Validate_EvictionRequestIntent validates an instance of EvictionRequestIntent according
+// to declarative validation rules in the API schema.
+func Validate_EvictionRequestIntent(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *coordinationv1alpha1.EvictionRequestIntent) (errs field.ErrorList) {
+
+	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForEvictionRequestIntent, nil); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	return errs
+}
+
+// Validate_EvictionRequestPodReference validates an instance of EvictionRequestPodReference according
+// to declarative validation rules in the API schema.
+func Validate_EvictionRequestPodReference(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *coordinationv1alpha1.EvictionRequestPodReference) (errs field.ErrorList) {
+
+	{ // field coordinationv1alpha1.EvictionRequestPodReference.Name
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.LongName(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.EvictionRequestPodReference) *string {
+				return &oldObj.Name
+			})
+		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
+	}
+
+	{ // field coordinationv1alpha1.EvictionRequestPodReference.UID
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *types.UID,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.UUID(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.EvictionRequestPodReference) *types.UID {
+				return &oldObj.UID
+			})
+		errs = append(errs, fn(fldPath.Child("uid"), &obj.UID, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }
 
 // Validate_EvictionRequestSpec validates an instance of EvictionRequestSpec according
 // to declarative validation rules in the API schema.
-func Validate_EvictionRequestSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *coordinationv1alpha1.EvictionRequestSpec) (errs field.ErrorList) {
-	// field coordinationv1alpha1.EvictionRequestSpec.Target
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *coordinationv1alpha1.EvictionTarget, oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_EvictionRequestSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *coordinationv1alpha1.EvictionRequestSpec) (errs field.ErrorList) {
+
+	{ // field coordinationv1alpha1.EvictionRequestSpec.Target
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *coordinationv1alpha1.EvictionRequestTarget,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_EvictionRequestTarget(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.EvictionRequestSpec) *coordinationv1alpha1.EvictionRequestTarget {
+				return &oldObj.Target
+			})
+		errs = append(errs, fn(fldPath.Child("target"), &obj.Target, oldVal, oldObj != nil)...)
+	}
+
+	{ // field coordinationv1alpha1.EvictionRequestSpec.RequesterName
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.EvictionRequestSpec) *string {
+				return &oldObj.RequesterName
+			})
+		errs = append(errs, fn(fldPath.Child("requesterName"), &obj.RequesterName, oldVal, oldObj != nil)...)
+	}
+
+	{ // field coordinationv1alpha1.EvictionRequestSpec.Intent
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *coordinationv1alpha1.EvictionRequestIntent,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_EvictionRequestIntent(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.EvictionRequestSpec) *coordinationv1alpha1.EvictionRequestIntent {
+				return &oldObj.Intent
+			})
+		errs = append(errs, fn(fldPath.Child("intent"), &obj.Intent, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_EvictionRequestStatus validates an instance of EvictionRequestStatus according
+// to declarative validation rules in the API schema.
+func Validate_EvictionRequestStatus(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *coordinationv1alpha1.EvictionRequestStatus) (errs field.ErrorList) {
+
+	{ // field coordinationv1alpha1.EvictionRequestStatus.Conditions
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []v1.Condition,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 100).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+				func(a v1.Condition, b v1.Condition) bool { return a.Type == b.Type }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.EvictionRequestStatus) []v1.Condition {
+				return oldObj.Conditions
+			})
+		errs = append(errs, fn(fldPath.Child("conditions"), obj.Conditions, oldVal, oldObj != nil)...)
+	}
+
+	{ // field coordinationv1alpha1.EvictionRequestStatus.ObservedGeneration
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int64,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 1); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.EvictionRequestStatus) *int64 {
+				return oldObj.ObservedGeneration
+			})
+		errs = append(errs, fn(fldPath.Child("observedGeneration"), obj.ObservedGeneration, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+var unionMembershipFor_k8s_io_api_coordination_v1alpha1_EvictionRequestTarget_ = validate.NewUnionMembership(validate.NewUnionMember("pod"))
+
+// Validate_EvictionRequestTarget validates an instance of EvictionRequestTarget according
+// to declarative validation rules in the API schema.
+func Validate_EvictionRequestTarget(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *coordinationv1alpha1.EvictionRequestTarget) (errs field.ErrorList) {
+
+	if e := validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_api_coordination_v1alpha1_EvictionRequestTarget_,
+		func(obj *coordinationv1alpha1.EvictionRequestTarget) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.Pod != nil
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	{ // field coordinationv1alpha1.EvictionRequestTarget.Pod
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *coordinationv1alpha1.EvictionRequestPodReference,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_EvictionRequestPodReference(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.EvictionRequestTarget) *coordinationv1alpha1.EvictionRequestPodReference {
+				return oldObj.Pod
+			})
+		errs = append(errs, fn(fldPath.Child("pod"), obj.Pod, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_EvictionSpec validates an instance of EvictionSpec according
+// to declarative validation rules in the API schema.
+func Validate_EvictionSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *coordinationv1alpha1.EvictionSpec) (errs field.ErrorList) {
+
+	{ // field coordinationv1alpha1.EvictionSpec.Target
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *coordinationv1alpha1.EvictionTarget,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -138,151 +609,220 @@ func Validate_EvictionRequestSpec(ctx context.Context, op operation.Operation, f
 			// call the type's validation function
 			errs = append(errs, Validate_EvictionTarget(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("target"), &obj.Target, safe.Field(oldObj, func(oldObj *coordinationv1alpha1.EvictionRequestSpec) *coordinationv1alpha1.EvictionTarget {
-			return &oldObj.Target
-		}), oldObj != nil)...)
-
-	// field coordinationv1alpha1.EvictionRequestSpec.Requesters
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []coordinationv1alpha1.Requester, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 100); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			// lists with map semantics require unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a coordinationv1alpha1.Requester, b coordinationv1alpha1.Requester) bool { return a.Name == b.Name })...)
-			// iterate the list and call the type's validation function
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a coordinationv1alpha1.Requester, b coordinationv1alpha1.Requester) bool { return a.Name == b.Name }, validate.DirectEqual, Validate_Requester)...)
-			return
-		}(fldPath.Child("requesters"), obj.Requesters, safe.Field(oldObj, func(oldObj *coordinationv1alpha1.EvictionRequestSpec) []coordinationv1alpha1.Requester {
-			return oldObj.Requesters
-		}), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.EvictionSpec) *coordinationv1alpha1.EvictionTarget {
+				return &oldObj.Target
+			})
+		errs = append(errs, fn(fldPath.Child("target"), &obj.Target, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }
 
-// Validate_EvictionRequestStatus validates an instance of EvictionRequestStatus according
+// Validate_EvictionStatus validates an instance of EvictionStatus according
 // to declarative validation rules in the API schema.
-func Validate_EvictionRequestStatus(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *coordinationv1alpha1.EvictionRequestStatus) (errs field.ErrorList) {
-	// field coordinationv1alpha1.EvictionRequestStatus.Conditions
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []v1.Condition, oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_EvictionStatus(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *coordinationv1alpha1.EvictionStatus) (errs field.ErrorList) {
+
+	{ // field coordinationv1alpha1.EvictionStatus.Conditions
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []v1.Condition,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 500); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 100).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a v1.Condition, b v1.Condition) bool { return a.Type == b.Type })...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+				func(a v1.Condition, b v1.Condition) bool { return a.Type == b.Type }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("conditions"), obj.Conditions, safe.Field(oldObj, func(oldObj *coordinationv1alpha1.EvictionRequestStatus) []v1.Condition { return oldObj.Conditions }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.EvictionStatus) []v1.Condition {
+				return oldObj.Conditions
+			})
+		errs = append(errs, fn(fldPath.Child("conditions"), obj.Conditions, oldVal, oldObj != nil)...)
+	}
 
-	// field coordinationv1alpha1.EvictionRequestStatus.ObservedGeneration
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *int64, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field coordinationv1alpha1.EvictionStatus.ObservedGeneration
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *int64,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 1)...)
+			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 1); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("observedGeneration"), obj.ObservedGeneration, safe.Field(oldObj, func(oldObj *coordinationv1alpha1.EvictionRequestStatus) *int64 { return oldObj.ObservedGeneration }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.EvictionStatus) *int64 {
+				return oldObj.ObservedGeneration
+			})
+		errs = append(errs, fn(fldPath.Child("observedGeneration"), obj.ObservedGeneration, oldVal, oldObj != nil)...)
+	}
 
-	// field coordinationv1alpha1.EvictionRequestStatus.TargetResponders
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []coordinationv1alpha1.TargetResponder, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field coordinationv1alpha1.EvictionStatus.Requesters
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []coordinationv1alpha1.Requester,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 17); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a coordinationv1alpha1.TargetResponder, b coordinationv1alpha1.TargetResponder) bool {
-				return a.Name == b.Name
-			})...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+				func(a coordinationv1alpha1.Requester, b coordinationv1alpha1.Requester) bool { return a.Name == b.Name }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			// iterate the list and call the type's validation function
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a coordinationv1alpha1.TargetResponder, b coordinationv1alpha1.TargetResponder) bool {
-				return a.Name == b.Name
-			}, validate.DirectEqual, Validate_TargetResponder)...)
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a coordinationv1alpha1.Requester, b coordinationv1alpha1.Requester) bool { return a.Name == b.Name }, validate.DirectEqual, Validate_Requester); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("targetResponders"), obj.TargetResponders, safe.Field(oldObj, func(oldObj *coordinationv1alpha1.EvictionRequestStatus) []coordinationv1alpha1.TargetResponder {
-			return oldObj.TargetResponders
-		}), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.EvictionStatus) []coordinationv1alpha1.Requester {
+				return oldObj.Requesters
+			})
+		errs = append(errs, fn(fldPath.Child("requesters"), obj.Requesters, oldVal, oldObj != nil)...)
+	}
 
-	// field coordinationv1alpha1.EvictionRequestStatus.Responders
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []coordinationv1alpha1.ResponderStatus, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field coordinationv1alpha1.EvictionStatus.TargetResponders
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []coordinationv1alpha1.TargetResponder,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 17); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 17).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a coordinationv1alpha1.ResponderStatus, b coordinationv1alpha1.ResponderStatus) bool {
-				return a.Name == b.Name
-			})...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+				func(a coordinationv1alpha1.TargetResponder, b coordinationv1alpha1.TargetResponder) bool {
+					return a.Name == b.Name
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			// iterate the list and call the type's validation function
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a coordinationv1alpha1.ResponderStatus, b coordinationv1alpha1.ResponderStatus) bool {
-				return a.Name == b.Name
-			}, validate.SemanticDeepEqual, Validate_ResponderStatus)...)
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a coordinationv1alpha1.TargetResponder, b coordinationv1alpha1.TargetResponder) bool {
+					return a.Name == b.Name
+				}, validate.DirectEqual, Validate_TargetResponder); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("responders"), obj.Responders, safe.Field(oldObj, func(oldObj *coordinationv1alpha1.EvictionRequestStatus) []coordinationv1alpha1.ResponderStatus {
-			return oldObj.Responders
-		}), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.EvictionStatus) []coordinationv1alpha1.TargetResponder {
+				return oldObj.TargetResponders
+			})
+		errs = append(errs, fn(fldPath.Child("targetResponders"), obj.TargetResponders, oldVal, oldObj != nil)...)
+	}
+
+	{ // field coordinationv1alpha1.EvictionStatus.Responders
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []coordinationv1alpha1.ResponderStatus,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 17).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			// lists with map semantics require unique keys
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+				func(a coordinationv1alpha1.ResponderStatus, b coordinationv1alpha1.ResponderStatus) bool {
+					return a.Name == b.Name
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			// iterate the list and call the type's validation function
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
+				func(a coordinationv1alpha1.ResponderStatus, b coordinationv1alpha1.ResponderStatus) bool {
+					return a.Name == b.Name
+				}, validate.SemanticDeepEqual, Validate_ResponderStatus); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.EvictionStatus) []coordinationv1alpha1.ResponderStatus {
+				return oldObj.Responders
+			})
+		errs = append(errs, fn(fldPath.Child("responders"), obj.Responders, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }
@@ -291,98 +831,73 @@ var unionMembershipFor_k8s_io_api_coordination_v1alpha1_EvictionTarget_ = valida
 
 // Validate_EvictionTarget validates an instance of EvictionTarget according
 // to declarative validation rules in the API schema.
-func Validate_EvictionTarget(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *coordinationv1alpha1.EvictionTarget) (errs field.ErrorList) {
-	errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_api_coordination_v1alpha1_EvictionTarget_, func(obj *coordinationv1alpha1.EvictionTarget) bool {
-		if obj == nil {
-			return false
-		}
-		return obj.Pod != nil
-	})...)
+func Validate_EvictionTarget(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *coordinationv1alpha1.EvictionTarget) (errs field.ErrorList) {
 
-	// field coordinationv1alpha1.EvictionTarget.Pod
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *coordinationv1alpha1.PodReference, oldValueCorrelated bool) (errs field.ErrorList) {
+	if e := validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_api_coordination_v1alpha1_EvictionTarget_,
+		func(obj *coordinationv1alpha1.EvictionTarget) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.Pod != nil
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+
+	{ // field coordinationv1alpha1.EvictionTarget.Pod
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *coordinationv1alpha1.EvictionPodReference,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// call the type's validation function
-			errs = append(errs, Validate_PodReference(ctx, op, fldPath, obj, oldObj)...)
+			errs = append(errs, Validate_EvictionPodReference(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("pod"), obj.Pod, safe.Field(oldObj, func(oldObj *coordinationv1alpha1.EvictionTarget) *coordinationv1alpha1.PodReference {
-			return oldObj.Pod
-		}), oldObj != nil)...)
-
-	return errs
-}
-
-// Validate_PodReference validates an instance of PodReference according
-// to declarative validation rules in the API schema.
-func Validate_PodReference(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *coordinationv1alpha1.PodReference) (errs field.ErrorList) {
-	// field coordinationv1alpha1.PodReference.Name
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			errs = append(errs, validate.LongName(ctx, op, fldPath, obj, oldObj)...)
-			return
-		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *coordinationv1alpha1.PodReference) *string { return &oldObj.Name }), oldObj != nil)...)
-
-	// field coordinationv1alpha1.PodReference.UID
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *types.UID, oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			errs = append(errs, validate.UUID(ctx, op, fldPath, obj, oldObj)...)
-			return
-		}(fldPath.Child("uid"), &obj.UID, safe.Field(oldObj, func(oldObj *coordinationv1alpha1.PodReference) *types.UID { return &oldObj.UID }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.EvictionTarget) *coordinationv1alpha1.EvictionPodReference {
+				return oldObj.Pod
+			})
+		errs = append(errs, fn(fldPath.Child("pod"), obj.Pod, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }
 
 // Validate_Requester validates an instance of Requester according
 // to declarative validation rules in the API schema.
-func Validate_Requester(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *coordinationv1alpha1.Requester) (errs field.ErrorList) {
-	// field coordinationv1alpha1.Requester.Name
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_Requester(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *coordinationv1alpha1.Requester) (errs field.ErrorList) {
+
+	{ // field coordinationv1alpha1.Requester.Name
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -390,18 +905,28 @@ func Validate_Requester(ctx context.Context, op operation.Operation, fldPath *fi
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *coordinationv1alpha1.Requester) *string { return &oldObj.Name }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.Requester) *string {
+				return &oldObj.Name
+			})
+		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
+	}
 
-	// field coordinationv1alpha1.Requester.Intent
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *coordinationv1alpha1.RequesterIntent, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field coordinationv1alpha1.Requester.Intent
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *coordinationv1alpha1.RequesterIntent,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -411,9 +936,13 @@ func Validate_Requester(ctx context.Context, op operation.Operation, fldPath *fi
 			// call the type's validation function
 			errs = append(errs, Validate_RequesterIntent(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("intent"), &obj.Intent, safe.Field(oldObj, func(oldObj *coordinationv1alpha1.Requester) *coordinationv1alpha1.RequesterIntent {
-			return &oldObj.Intent
-		}), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.Requester) *coordinationv1alpha1.RequesterIntent {
+				return &oldObj.Intent
+			})
+		errs = append(errs, fn(fldPath.Child("intent"), &obj.Intent, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }
@@ -422,8 +951,13 @@ var symbolsForRequesterIntent = sets.New(coordinationv1alpha1.RequesterIntentEvi
 
 // Validate_RequesterIntent validates an instance of RequesterIntent according
 // to declarative validation rules in the API schema.
-func Validate_RequesterIntent(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *coordinationv1alpha1.RequesterIntent) (errs field.ErrorList) {
-	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForRequesterIntent, nil)...)
+func Validate_RequesterIntent(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *coordinationv1alpha1.RequesterIntent) (errs field.ErrorList) {
+
+	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForRequesterIntent, nil); len(e) != 0 {
+		errs = append(errs, e...)
+	}
 
 	return errs
 }
@@ -432,25 +966,37 @@ var symbolsForResponderStateType = sets.New(coordinationv1alpha1.ResponderStateA
 
 // Validate_ResponderStateType validates an instance of ResponderStateType according
 // to declarative validation rules in the API schema.
-func Validate_ResponderStateType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *coordinationv1alpha1.ResponderStateType) (errs field.ErrorList) {
-	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForResponderStateType, nil)...)
+func Validate_ResponderStateType(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *coordinationv1alpha1.ResponderStateType) (errs field.ErrorList) {
+
+	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForResponderStateType, nil); len(e) != 0 {
+		errs = append(errs, e...)
+	}
 
 	return errs
 }
 
 // Validate_ResponderStatus validates an instance of ResponderStatus according
 // to declarative validation rules in the API schema.
-func Validate_ResponderStatus(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *coordinationv1alpha1.ResponderStatus) (errs field.ErrorList) {
-	// field coordinationv1alpha1.ResponderStatus.Name
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_ResponderStatus(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *coordinationv1alpha1.ResponderStatus) (errs field.ErrorList) {
+
+	{ // field coordinationv1alpha1.ResponderStatus.Name
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -458,21 +1004,31 @@ func Validate_ResponderStatus(ctx context.Context, op operation.Operation, fldPa
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *coordinationv1alpha1.ResponderStatus) *string { return &oldObj.Name }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.ResponderStatus) *string {
+				return &oldObj.Name
+			})
+		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
+	}
 
-	// field coordinationv1alpha1.ResponderStatus.StartTime
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *v1.Time, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field coordinationv1alpha1.ResponderStatus.StartTime
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.Time,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
-			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoUnset, validate.NoModify); len(e) != 0 {
+			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoUnset, validate.NoModify).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -480,57 +1036,87 @@ func Validate_ResponderStatus(ctx context.Context, op operation.Operation, fldPa
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("startTime"), obj.StartTime, safe.Field(oldObj, func(oldObj *coordinationv1alpha1.ResponderStatus) *v1.Time { return oldObj.StartTime }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.ResponderStatus) *v1.Time {
+				return oldObj.StartTime
+			})
+		errs = append(errs, fn(fldPath.Child("startTime"), obj.StartTime, oldVal, oldObj != nil)...)
+	}
 
-	// field coordinationv1alpha1.ResponderStatus.HeartbeatTime
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *v1.Time, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field coordinationv1alpha1.ResponderStatus.HeartbeatTime
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.Time,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("heartbeatTime"), obj.HeartbeatTime, safe.Field(oldObj, func(oldObj *coordinationv1alpha1.ResponderStatus) *v1.Time { return oldObj.HeartbeatTime }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.ResponderStatus) *v1.Time {
+				return oldObj.HeartbeatTime
+			})
+		errs = append(errs, fn(fldPath.Child("heartbeatTime"), obj.HeartbeatTime, oldVal, oldObj != nil)...)
+	}
 
-	// field coordinationv1alpha1.ResponderStatus.ExpectedCompletionTime
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *v1.Time, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field coordinationv1alpha1.ResponderStatus.ExpectedCompletionTime
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.Time,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("expectedCompletionTime"), obj.ExpectedCompletionTime, safe.Field(oldObj, func(oldObj *coordinationv1alpha1.ResponderStatus) *v1.Time { return oldObj.ExpectedCompletionTime }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.ResponderStatus) *v1.Time {
+				return oldObj.ExpectedCompletionTime
+			})
+		errs = append(errs, fn(fldPath.Child("expectedCompletionTime"), obj.ExpectedCompletionTime, oldVal, oldObj != nil)...)
+	}
 
-	// field coordinationv1alpha1.ResponderStatus.CompletionTime
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *v1.Time, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field coordinationv1alpha1.ResponderStatus.CompletionTime
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.Time,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
-			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoUnset, validate.NoModify); len(e) != 0 {
+			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoUnset, validate.NoModify).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -538,43 +1124,68 @@ func Validate_ResponderStatus(ctx context.Context, op operation.Operation, fldPa
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("completionTime"), obj.CompletionTime, safe.Field(oldObj, func(oldObj *coordinationv1alpha1.ResponderStatus) *v1.Time { return oldObj.CompletionTime }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.ResponderStatus) *v1.Time {
+				return oldObj.CompletionTime
+			})
+		errs = append(errs, fn(fldPath.Child("completionTime"), obj.CompletionTime, oldVal, oldObj != nil)...)
+	}
 
-	// field coordinationv1alpha1.ResponderStatus.Message
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field coordinationv1alpha1.ResponderStatus.Message
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			errs = append(errs, validate.MaxLength(ctx, op, fldPath, obj, oldObj, 4000)...)
+			if e := validate.MaxLength(ctx, op, fldPath, obj, oldObj, 4000); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("message"), &obj.Message, safe.Field(oldObj, func(oldObj *coordinationv1alpha1.ResponderStatus) *string { return &oldObj.Message }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.ResponderStatus) *string {
+				return &oldObj.Message
+			})
+		errs = append(errs, fn(fldPath.Child("message"), &obj.Message, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }
 
 // Validate_TargetResponder validates an instance of TargetResponder according
 // to declarative validation rules in the API schema.
-func Validate_TargetResponder(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *coordinationv1alpha1.TargetResponder) (errs field.ErrorList) {
-	// field coordinationv1alpha1.TargetResponder.Name
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_TargetResponder(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *coordinationv1alpha1.TargetResponder) (errs field.ErrorList) {
+
+	{ // field coordinationv1alpha1.TargetResponder.Name
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -582,18 +1193,28 @@ func Validate_TargetResponder(ctx context.Context, op operation.Operation, fldPa
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *coordinationv1alpha1.TargetResponder) *string { return &oldObj.Name }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.TargetResponder) *string {
+				return &oldObj.Name
+			})
+		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
+	}
 
-	// field coordinationv1alpha1.TargetResponder.State
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *coordinationv1alpha1.ResponderStateType, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field coordinationv1alpha1.TargetResponder.State
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *coordinationv1alpha1.ResponderStateType,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -603,9 +1224,13 @@ func Validate_TargetResponder(ctx context.Context, op operation.Operation, fldPa
 			// call the type's validation function
 			errs = append(errs, Validate_ResponderStateType(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("state"), &obj.State, safe.Field(oldObj, func(oldObj *coordinationv1alpha1.TargetResponder) *coordinationv1alpha1.ResponderStateType {
-			return &oldObj.State
-		}), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *coordinationv1alpha1.TargetResponder) *coordinationv1alpha1.ResponderStateType {
+				return &oldObj.State
+			})
+		errs = append(errs, fn(fldPath.Child("state"), &obj.State, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }

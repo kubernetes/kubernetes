@@ -586,16 +586,26 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscoordinationv1.LeaseSpecApplyConfiguration{}
 
 		// Group=coordination.k8s.io, Version=v1alpha1
+	case coordinationv1alpha1.SchemeGroupVersion.WithKind("Eviction"):
+		return &applyconfigurationscoordinationv1alpha1.EvictionApplyConfiguration{}
+	case coordinationv1alpha1.SchemeGroupVersion.WithKind("EvictionPodReference"):
+		return &applyconfigurationscoordinationv1alpha1.EvictionPodReferenceApplyConfiguration{}
 	case coordinationv1alpha1.SchemeGroupVersion.WithKind("EvictionRequest"):
 		return &applyconfigurationscoordinationv1alpha1.EvictionRequestApplyConfiguration{}
+	case coordinationv1alpha1.SchemeGroupVersion.WithKind("EvictionRequestPodReference"):
+		return &applyconfigurationscoordinationv1alpha1.EvictionRequestPodReferenceApplyConfiguration{}
 	case coordinationv1alpha1.SchemeGroupVersion.WithKind("EvictionRequestSpec"):
 		return &applyconfigurationscoordinationv1alpha1.EvictionRequestSpecApplyConfiguration{}
 	case coordinationv1alpha1.SchemeGroupVersion.WithKind("EvictionRequestStatus"):
 		return &applyconfigurationscoordinationv1alpha1.EvictionRequestStatusApplyConfiguration{}
+	case coordinationv1alpha1.SchemeGroupVersion.WithKind("EvictionRequestTarget"):
+		return &applyconfigurationscoordinationv1alpha1.EvictionRequestTargetApplyConfiguration{}
+	case coordinationv1alpha1.SchemeGroupVersion.WithKind("EvictionSpec"):
+		return &applyconfigurationscoordinationv1alpha1.EvictionSpecApplyConfiguration{}
+	case coordinationv1alpha1.SchemeGroupVersion.WithKind("EvictionStatus"):
+		return &applyconfigurationscoordinationv1alpha1.EvictionStatusApplyConfiguration{}
 	case coordinationv1alpha1.SchemeGroupVersion.WithKind("EvictionTarget"):
 		return &applyconfigurationscoordinationv1alpha1.EvictionTargetApplyConfiguration{}
-	case coordinationv1alpha1.SchemeGroupVersion.WithKind("PodReference"):
-		return &applyconfigurationscoordinationv1alpha1.PodReferenceApplyConfiguration{}
 	case coordinationv1alpha1.SchemeGroupVersion.WithKind("Requester"):
 		return &applyconfigurationscoordinationv1alpha1.RequesterApplyConfiguration{}
 	case coordinationv1alpha1.SchemeGroupVersion.WithKind("ResponderStatus"):

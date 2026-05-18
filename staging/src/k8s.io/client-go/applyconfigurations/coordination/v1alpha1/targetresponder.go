@@ -25,11 +25,11 @@ import (
 // TargetResponderApplyConfiguration represents a declarative configuration of the TargetResponder type for use
 // with apply.
 //
-// TargetResponder allows you to specify the responder reacting to the EvictionRequest.
-// Responders should observe and communicate through the EvictionRequest API (see .state) to help
+// TargetResponder allows you to specify the responder reacting to the Eviction.
+// Responders should observe and communicate through the Eviction API (see .state) to help
 // with the graceful eviction of a target (e.g. termination of a pod).
 type TargetResponderApplyConfiguration struct {
-	// name allows you to identify the responder reacting to the EvictionRequest.
+	// name allows you to identify the responder reacting to the Eviction.
 	//
 	// It must be a valid domain-prefixed path (such as "acme.io/foo").
 	// This field must be unique for each responder.
@@ -48,8 +48,8 @@ type TargetResponderApplyConfiguration struct {
 	// request is passed over to the next responder. Only one responder can be active at a time.
 	// - Interrupted means that the responder has failed to start or failed to update
 	// heartbeatTime in ResponderStatus in a timely manner.
-	// - Canceled means that the responder has been canceled. In other words, there is no
-	// Eviction intent in .spec.requesters.
+	// - Canceled means that the responder has been canceled. In other words, there	is no
+	// EvictionRequest with the same target and Eviction intent in .spec.intent.
 	// - Completed means that the responder has successfully completed and set completionTime
 	// in ResponderStatus.
 	//

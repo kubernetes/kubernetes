@@ -22,6 +22,21 @@ limitations under the License.
 package v1alpha1
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in Eviction) OpenAPIModelName() string {
+	return "io.k8s.api.coordination.v1alpha1.Eviction"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in EvictionList) OpenAPIModelName() string {
+	return "io.k8s.api.coordination.v1alpha1.EvictionList"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in EvictionPodReference) OpenAPIModelName() string {
+	return "io.k8s.api.coordination.v1alpha1.EvictionPodReference"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in EvictionRequest) OpenAPIModelName() string {
 	return "io.k8s.api.coordination.v1alpha1.EvictionRequest"
 }
@@ -29,6 +44,11 @@ func (in EvictionRequest) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in EvictionRequestList) OpenAPIModelName() string {
 	return "io.k8s.api.coordination.v1alpha1.EvictionRequestList"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in EvictionRequestPodReference) OpenAPIModelName() string {
+	return "io.k8s.api.coordination.v1alpha1.EvictionRequestPodReference"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
@@ -42,13 +62,23 @@ func (in EvictionRequestStatus) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
-func (in EvictionTarget) OpenAPIModelName() string {
-	return "io.k8s.api.coordination.v1alpha1.EvictionTarget"
+func (in EvictionRequestTarget) OpenAPIModelName() string {
+	return "io.k8s.api.coordination.v1alpha1.EvictionRequestTarget"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
-func (in PodReference) OpenAPIModelName() string {
-	return "io.k8s.api.coordination.v1alpha1.PodReference"
+func (in EvictionSpec) OpenAPIModelName() string {
+	return "io.k8s.api.coordination.v1alpha1.EvictionSpec"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in EvictionStatus) OpenAPIModelName() string {
+	return "io.k8s.api.coordination.v1alpha1.EvictionStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
+func (in EvictionTarget) OpenAPIModelName() string {
+	return "io.k8s.api.coordination.v1alpha1.EvictionTarget"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.

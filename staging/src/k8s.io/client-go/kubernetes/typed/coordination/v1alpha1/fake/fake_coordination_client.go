@@ -28,6 +28,10 @@ type FakeCoordinationV1alpha1 struct {
 	*testing.Fake
 }
 
+func (c *FakeCoordinationV1alpha1) Evictions(namespace string) v1alpha1.EvictionInterface {
+	return newFakeEvictions(c, namespace)
+}
+
 func (c *FakeCoordinationV1alpha1) EvictionRequests(namespace string) v1alpha1.EvictionRequestInterface {
 	return newFakeEvictionRequests(c, namespace)
 }

@@ -39,6 +39,36 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*coordinationv1alpha1.Eviction)(nil), (*coordination.Eviction)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_Eviction_To_coordination_Eviction(a.(*coordinationv1alpha1.Eviction), b.(*coordination.Eviction), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*coordination.Eviction)(nil), (*coordinationv1alpha1.Eviction)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_coordination_Eviction_To_v1alpha1_Eviction(a.(*coordination.Eviction), b.(*coordinationv1alpha1.Eviction), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*coordinationv1alpha1.EvictionList)(nil), (*coordination.EvictionList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_EvictionList_To_coordination_EvictionList(a.(*coordinationv1alpha1.EvictionList), b.(*coordination.EvictionList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*coordination.EvictionList)(nil), (*coordinationv1alpha1.EvictionList)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_coordination_EvictionList_To_v1alpha1_EvictionList(a.(*coordination.EvictionList), b.(*coordinationv1alpha1.EvictionList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*coordinationv1alpha1.EvictionPodReference)(nil), (*coordination.EvictionPodReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_EvictionPodReference_To_coordination_EvictionPodReference(a.(*coordinationv1alpha1.EvictionPodReference), b.(*coordination.EvictionPodReference), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*coordination.EvictionPodReference)(nil), (*coordinationv1alpha1.EvictionPodReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_coordination_EvictionPodReference_To_v1alpha1_EvictionPodReference(a.(*coordination.EvictionPodReference), b.(*coordinationv1alpha1.EvictionPodReference), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*coordinationv1alpha1.EvictionRequest)(nil), (*coordination.EvictionRequest)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_EvictionRequest_To_coordination_EvictionRequest(a.(*coordinationv1alpha1.EvictionRequest), b.(*coordination.EvictionRequest), scope)
 	}); err != nil {
@@ -56,6 +86,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*coordination.EvictionRequestList)(nil), (*coordinationv1alpha1.EvictionRequestList)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_coordination_EvictionRequestList_To_v1alpha1_EvictionRequestList(a.(*coordination.EvictionRequestList), b.(*coordinationv1alpha1.EvictionRequestList), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*coordinationv1alpha1.EvictionRequestPodReference)(nil), (*coordination.EvictionRequestPodReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_EvictionRequestPodReference_To_coordination_EvictionRequestPodReference(a.(*coordinationv1alpha1.EvictionRequestPodReference), b.(*coordination.EvictionRequestPodReference), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*coordination.EvictionRequestPodReference)(nil), (*coordinationv1alpha1.EvictionRequestPodReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_coordination_EvictionRequestPodReference_To_v1alpha1_EvictionRequestPodReference(a.(*coordination.EvictionRequestPodReference), b.(*coordinationv1alpha1.EvictionRequestPodReference), scope)
 	}); err != nil {
 		return err
 	}
@@ -79,6 +119,36 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*coordinationv1alpha1.EvictionRequestTarget)(nil), (*coordination.EvictionRequestTarget)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_EvictionRequestTarget_To_coordination_EvictionRequestTarget(a.(*coordinationv1alpha1.EvictionRequestTarget), b.(*coordination.EvictionRequestTarget), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*coordination.EvictionRequestTarget)(nil), (*coordinationv1alpha1.EvictionRequestTarget)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_coordination_EvictionRequestTarget_To_v1alpha1_EvictionRequestTarget(a.(*coordination.EvictionRequestTarget), b.(*coordinationv1alpha1.EvictionRequestTarget), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*coordinationv1alpha1.EvictionSpec)(nil), (*coordination.EvictionSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_EvictionSpec_To_coordination_EvictionSpec(a.(*coordinationv1alpha1.EvictionSpec), b.(*coordination.EvictionSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*coordination.EvictionSpec)(nil), (*coordinationv1alpha1.EvictionSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_coordination_EvictionSpec_To_v1alpha1_EvictionSpec(a.(*coordination.EvictionSpec), b.(*coordinationv1alpha1.EvictionSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*coordinationv1alpha1.EvictionStatus)(nil), (*coordination.EvictionStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_EvictionStatus_To_coordination_EvictionStatus(a.(*coordinationv1alpha1.EvictionStatus), b.(*coordination.EvictionStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*coordination.EvictionStatus)(nil), (*coordinationv1alpha1.EvictionStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_coordination_EvictionStatus_To_v1alpha1_EvictionStatus(a.(*coordination.EvictionStatus), b.(*coordinationv1alpha1.EvictionStatus), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*coordinationv1alpha1.EvictionTarget)(nil), (*coordination.EvictionTarget)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1alpha1_EvictionTarget_To_coordination_EvictionTarget(a.(*coordinationv1alpha1.EvictionTarget), b.(*coordination.EvictionTarget), scope)
 	}); err != nil {
@@ -86,16 +156,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*coordination.EvictionTarget)(nil), (*coordinationv1alpha1.EvictionTarget)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_coordination_EvictionTarget_To_v1alpha1_EvictionTarget(a.(*coordination.EvictionTarget), b.(*coordinationv1alpha1.EvictionTarget), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*coordinationv1alpha1.PodReference)(nil), (*coordination.PodReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_PodReference_To_coordination_PodReference(a.(*coordinationv1alpha1.PodReference), b.(*coordination.PodReference), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*coordination.PodReference)(nil), (*coordinationv1alpha1.PodReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_coordination_PodReference_To_v1alpha1_PodReference(a.(*coordination.PodReference), b.(*coordinationv1alpha1.PodReference), scope)
 	}); err != nil {
 		return err
 	}
@@ -130,6 +190,82 @@ func RegisterConversions(s *runtime.Scheme) error {
 		return err
 	}
 	return nil
+}
+
+func autoConvert_v1alpha1_Eviction_To_coordination_Eviction(in *coordinationv1alpha1.Eviction, out *coordination.Eviction, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_v1alpha1_EvictionSpec_To_coordination_EvictionSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_EvictionStatus_To_coordination_EvictionStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1alpha1_Eviction_To_coordination_Eviction is an autogenerated conversion function.
+func Convert_v1alpha1_Eviction_To_coordination_Eviction(in *coordinationv1alpha1.Eviction, out *coordination.Eviction, s conversion.Scope) error {
+	return autoConvert_v1alpha1_Eviction_To_coordination_Eviction(in, out, s)
+}
+
+func autoConvert_coordination_Eviction_To_v1alpha1_Eviction(in *coordination.Eviction, out *coordinationv1alpha1.Eviction, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	if err := Convert_coordination_EvictionSpec_To_v1alpha1_EvictionSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_coordination_EvictionStatus_To_v1alpha1_EvictionStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_coordination_Eviction_To_v1alpha1_Eviction is an autogenerated conversion function.
+func Convert_coordination_Eviction_To_v1alpha1_Eviction(in *coordination.Eviction, out *coordinationv1alpha1.Eviction, s conversion.Scope) error {
+	return autoConvert_coordination_Eviction_To_v1alpha1_Eviction(in, out, s)
+}
+
+func autoConvert_v1alpha1_EvictionList_To_coordination_EvictionList(in *coordinationv1alpha1.EvictionList, out *coordination.EvictionList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]coordination.Eviction)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_v1alpha1_EvictionList_To_coordination_EvictionList is an autogenerated conversion function.
+func Convert_v1alpha1_EvictionList_To_coordination_EvictionList(in *coordinationv1alpha1.EvictionList, out *coordination.EvictionList, s conversion.Scope) error {
+	return autoConvert_v1alpha1_EvictionList_To_coordination_EvictionList(in, out, s)
+}
+
+func autoConvert_coordination_EvictionList_To_v1alpha1_EvictionList(in *coordination.EvictionList, out *coordinationv1alpha1.EvictionList, s conversion.Scope) error {
+	out.ListMeta = in.ListMeta
+	out.Items = *(*[]coordinationv1alpha1.Eviction)(unsafe.Pointer(&in.Items))
+	return nil
+}
+
+// Convert_coordination_EvictionList_To_v1alpha1_EvictionList is an autogenerated conversion function.
+func Convert_coordination_EvictionList_To_v1alpha1_EvictionList(in *coordination.EvictionList, out *coordinationv1alpha1.EvictionList, s conversion.Scope) error {
+	return autoConvert_coordination_EvictionList_To_v1alpha1_EvictionList(in, out, s)
+}
+
+func autoConvert_v1alpha1_EvictionPodReference_To_coordination_EvictionPodReference(in *coordinationv1alpha1.EvictionPodReference, out *coordination.EvictionPodReference, s conversion.Scope) error {
+	out.Name = in.Name
+	out.UID = types.UID(in.UID)
+	return nil
+}
+
+// Convert_v1alpha1_EvictionPodReference_To_coordination_EvictionPodReference is an autogenerated conversion function.
+func Convert_v1alpha1_EvictionPodReference_To_coordination_EvictionPodReference(in *coordinationv1alpha1.EvictionPodReference, out *coordination.EvictionPodReference, s conversion.Scope) error {
+	return autoConvert_v1alpha1_EvictionPodReference_To_coordination_EvictionPodReference(in, out, s)
+}
+
+func autoConvert_coordination_EvictionPodReference_To_v1alpha1_EvictionPodReference(in *coordination.EvictionPodReference, out *coordinationv1alpha1.EvictionPodReference, s conversion.Scope) error {
+	out.Name = in.Name
+	out.UID = types.UID(in.UID)
+	return nil
+}
+
+// Convert_coordination_EvictionPodReference_To_v1alpha1_EvictionPodReference is an autogenerated conversion function.
+func Convert_coordination_EvictionPodReference_To_v1alpha1_EvictionPodReference(in *coordination.EvictionPodReference, out *coordinationv1alpha1.EvictionPodReference, s conversion.Scope) error {
+	return autoConvert_coordination_EvictionPodReference_To_v1alpha1_EvictionPodReference(in, out, s)
 }
 
 func autoConvert_v1alpha1_EvictionRequest_To_coordination_EvictionRequest(in *coordinationv1alpha1.EvictionRequest, out *coordination.EvictionRequest, s conversion.Scope) error {
@@ -186,11 +322,34 @@ func Convert_coordination_EvictionRequestList_To_v1alpha1_EvictionRequestList(in
 	return autoConvert_coordination_EvictionRequestList_To_v1alpha1_EvictionRequestList(in, out, s)
 }
 
+func autoConvert_v1alpha1_EvictionRequestPodReference_To_coordination_EvictionRequestPodReference(in *coordinationv1alpha1.EvictionRequestPodReference, out *coordination.EvictionRequestPodReference, s conversion.Scope) error {
+	out.Name = in.Name
+	out.UID = types.UID(in.UID)
+	return nil
+}
+
+// Convert_v1alpha1_EvictionRequestPodReference_To_coordination_EvictionRequestPodReference is an autogenerated conversion function.
+func Convert_v1alpha1_EvictionRequestPodReference_To_coordination_EvictionRequestPodReference(in *coordinationv1alpha1.EvictionRequestPodReference, out *coordination.EvictionRequestPodReference, s conversion.Scope) error {
+	return autoConvert_v1alpha1_EvictionRequestPodReference_To_coordination_EvictionRequestPodReference(in, out, s)
+}
+
+func autoConvert_coordination_EvictionRequestPodReference_To_v1alpha1_EvictionRequestPodReference(in *coordination.EvictionRequestPodReference, out *coordinationv1alpha1.EvictionRequestPodReference, s conversion.Scope) error {
+	out.Name = in.Name
+	out.UID = types.UID(in.UID)
+	return nil
+}
+
+// Convert_coordination_EvictionRequestPodReference_To_v1alpha1_EvictionRequestPodReference is an autogenerated conversion function.
+func Convert_coordination_EvictionRequestPodReference_To_v1alpha1_EvictionRequestPodReference(in *coordination.EvictionRequestPodReference, out *coordinationv1alpha1.EvictionRequestPodReference, s conversion.Scope) error {
+	return autoConvert_coordination_EvictionRequestPodReference_To_v1alpha1_EvictionRequestPodReference(in, out, s)
+}
+
 func autoConvert_v1alpha1_EvictionRequestSpec_To_coordination_EvictionRequestSpec(in *coordinationv1alpha1.EvictionRequestSpec, out *coordination.EvictionRequestSpec, s conversion.Scope) error {
-	if err := Convert_v1alpha1_EvictionTarget_To_coordination_EvictionTarget(&in.Target, &out.Target, s); err != nil {
+	if err := Convert_v1alpha1_EvictionRequestTarget_To_coordination_EvictionRequestTarget(&in.Target, &out.Target, s); err != nil {
 		return err
 	}
-	out.Requesters = *(*[]coordination.Requester)(unsafe.Pointer(&in.Requesters))
+	out.RequesterName = in.RequesterName
+	out.Intent = coordination.EvictionRequestIntent(in.Intent)
 	return nil
 }
 
@@ -200,10 +359,11 @@ func Convert_v1alpha1_EvictionRequestSpec_To_coordination_EvictionRequestSpec(in
 }
 
 func autoConvert_coordination_EvictionRequestSpec_To_v1alpha1_EvictionRequestSpec(in *coordination.EvictionRequestSpec, out *coordinationv1alpha1.EvictionRequestSpec, s conversion.Scope) error {
-	if err := Convert_coordination_EvictionTarget_To_v1alpha1_EvictionTarget(&in.Target, &out.Target, s); err != nil {
+	if err := Convert_coordination_EvictionRequestTarget_To_v1alpha1_EvictionRequestTarget(&in.Target, &out.Target, s); err != nil {
 		return err
 	}
-	out.Requesters = *(*[]coordinationv1alpha1.Requester)(unsafe.Pointer(&in.Requesters))
+	out.RequesterName = in.RequesterName
+	out.Intent = coordinationv1alpha1.EvictionRequestIntent(in.Intent)
 	return nil
 }
 
@@ -215,8 +375,6 @@ func Convert_coordination_EvictionRequestSpec_To_v1alpha1_EvictionRequestSpec(in
 func autoConvert_v1alpha1_EvictionRequestStatus_To_coordination_EvictionRequestStatus(in *coordinationv1alpha1.EvictionRequestStatus, out *coordination.EvictionRequestStatus, s conversion.Scope) error {
 	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
 	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
-	out.TargetResponders = *(*[]coordination.TargetResponder)(unsafe.Pointer(&in.TargetResponders))
-	out.Responders = *(*[]coordination.ResponderStatus)(unsafe.Pointer(&in.Responders))
 	return nil
 }
 
@@ -228,8 +386,6 @@ func Convert_v1alpha1_EvictionRequestStatus_To_coordination_EvictionRequestStatu
 func autoConvert_coordination_EvictionRequestStatus_To_v1alpha1_EvictionRequestStatus(in *coordination.EvictionRequestStatus, out *coordinationv1alpha1.EvictionRequestStatus, s conversion.Scope) error {
 	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
 	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
-	out.TargetResponders = *(*[]coordinationv1alpha1.TargetResponder)(unsafe.Pointer(&in.TargetResponders))
-	out.Responders = *(*[]coordinationv1alpha1.ResponderStatus)(unsafe.Pointer(&in.Responders))
 	return nil
 }
 
@@ -238,8 +394,80 @@ func Convert_coordination_EvictionRequestStatus_To_v1alpha1_EvictionRequestStatu
 	return autoConvert_coordination_EvictionRequestStatus_To_v1alpha1_EvictionRequestStatus(in, out, s)
 }
 
+func autoConvert_v1alpha1_EvictionRequestTarget_To_coordination_EvictionRequestTarget(in *coordinationv1alpha1.EvictionRequestTarget, out *coordination.EvictionRequestTarget, s conversion.Scope) error {
+	out.Pod = (*coordination.EvictionRequestPodReference)(unsafe.Pointer(in.Pod))
+	return nil
+}
+
+// Convert_v1alpha1_EvictionRequestTarget_To_coordination_EvictionRequestTarget is an autogenerated conversion function.
+func Convert_v1alpha1_EvictionRequestTarget_To_coordination_EvictionRequestTarget(in *coordinationv1alpha1.EvictionRequestTarget, out *coordination.EvictionRequestTarget, s conversion.Scope) error {
+	return autoConvert_v1alpha1_EvictionRequestTarget_To_coordination_EvictionRequestTarget(in, out, s)
+}
+
+func autoConvert_coordination_EvictionRequestTarget_To_v1alpha1_EvictionRequestTarget(in *coordination.EvictionRequestTarget, out *coordinationv1alpha1.EvictionRequestTarget, s conversion.Scope) error {
+	out.Pod = (*coordinationv1alpha1.EvictionRequestPodReference)(unsafe.Pointer(in.Pod))
+	return nil
+}
+
+// Convert_coordination_EvictionRequestTarget_To_v1alpha1_EvictionRequestTarget is an autogenerated conversion function.
+func Convert_coordination_EvictionRequestTarget_To_v1alpha1_EvictionRequestTarget(in *coordination.EvictionRequestTarget, out *coordinationv1alpha1.EvictionRequestTarget, s conversion.Scope) error {
+	return autoConvert_coordination_EvictionRequestTarget_To_v1alpha1_EvictionRequestTarget(in, out, s)
+}
+
+func autoConvert_v1alpha1_EvictionSpec_To_coordination_EvictionSpec(in *coordinationv1alpha1.EvictionSpec, out *coordination.EvictionSpec, s conversion.Scope) error {
+	if err := Convert_v1alpha1_EvictionTarget_To_coordination_EvictionTarget(&in.Target, &out.Target, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1alpha1_EvictionSpec_To_coordination_EvictionSpec is an autogenerated conversion function.
+func Convert_v1alpha1_EvictionSpec_To_coordination_EvictionSpec(in *coordinationv1alpha1.EvictionSpec, out *coordination.EvictionSpec, s conversion.Scope) error {
+	return autoConvert_v1alpha1_EvictionSpec_To_coordination_EvictionSpec(in, out, s)
+}
+
+func autoConvert_coordination_EvictionSpec_To_v1alpha1_EvictionSpec(in *coordination.EvictionSpec, out *coordinationv1alpha1.EvictionSpec, s conversion.Scope) error {
+	if err := Convert_coordination_EvictionTarget_To_v1alpha1_EvictionTarget(&in.Target, &out.Target, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_coordination_EvictionSpec_To_v1alpha1_EvictionSpec is an autogenerated conversion function.
+func Convert_coordination_EvictionSpec_To_v1alpha1_EvictionSpec(in *coordination.EvictionSpec, out *coordinationv1alpha1.EvictionSpec, s conversion.Scope) error {
+	return autoConvert_coordination_EvictionSpec_To_v1alpha1_EvictionSpec(in, out, s)
+}
+
+func autoConvert_v1alpha1_EvictionStatus_To_coordination_EvictionStatus(in *coordinationv1alpha1.EvictionStatus, out *coordination.EvictionStatus, s conversion.Scope) error {
+	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
+	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
+	out.Requesters = *(*[]coordination.Requester)(unsafe.Pointer(&in.Requesters))
+	out.TargetResponders = *(*[]coordination.TargetResponder)(unsafe.Pointer(&in.TargetResponders))
+	out.Responders = *(*[]coordination.ResponderStatus)(unsafe.Pointer(&in.Responders))
+	return nil
+}
+
+// Convert_v1alpha1_EvictionStatus_To_coordination_EvictionStatus is an autogenerated conversion function.
+func Convert_v1alpha1_EvictionStatus_To_coordination_EvictionStatus(in *coordinationv1alpha1.EvictionStatus, out *coordination.EvictionStatus, s conversion.Scope) error {
+	return autoConvert_v1alpha1_EvictionStatus_To_coordination_EvictionStatus(in, out, s)
+}
+
+func autoConvert_coordination_EvictionStatus_To_v1alpha1_EvictionStatus(in *coordination.EvictionStatus, out *coordinationv1alpha1.EvictionStatus, s conversion.Scope) error {
+	out.Conditions = *(*[]v1.Condition)(unsafe.Pointer(&in.Conditions))
+	out.ObservedGeneration = (*int64)(unsafe.Pointer(in.ObservedGeneration))
+	out.Requesters = *(*[]coordinationv1alpha1.Requester)(unsafe.Pointer(&in.Requesters))
+	out.TargetResponders = *(*[]coordinationv1alpha1.TargetResponder)(unsafe.Pointer(&in.TargetResponders))
+	out.Responders = *(*[]coordinationv1alpha1.ResponderStatus)(unsafe.Pointer(&in.Responders))
+	return nil
+}
+
+// Convert_coordination_EvictionStatus_To_v1alpha1_EvictionStatus is an autogenerated conversion function.
+func Convert_coordination_EvictionStatus_To_v1alpha1_EvictionStatus(in *coordination.EvictionStatus, out *coordinationv1alpha1.EvictionStatus, s conversion.Scope) error {
+	return autoConvert_coordination_EvictionStatus_To_v1alpha1_EvictionStatus(in, out, s)
+}
+
 func autoConvert_v1alpha1_EvictionTarget_To_coordination_EvictionTarget(in *coordinationv1alpha1.EvictionTarget, out *coordination.EvictionTarget, s conversion.Scope) error {
-	out.Pod = (*coordination.PodReference)(unsafe.Pointer(in.Pod))
+	out.Pod = (*coordination.EvictionPodReference)(unsafe.Pointer(in.Pod))
 	return nil
 }
 
@@ -249,35 +477,13 @@ func Convert_v1alpha1_EvictionTarget_To_coordination_EvictionTarget(in *coordina
 }
 
 func autoConvert_coordination_EvictionTarget_To_v1alpha1_EvictionTarget(in *coordination.EvictionTarget, out *coordinationv1alpha1.EvictionTarget, s conversion.Scope) error {
-	out.Pod = (*coordinationv1alpha1.PodReference)(unsafe.Pointer(in.Pod))
+	out.Pod = (*coordinationv1alpha1.EvictionPodReference)(unsafe.Pointer(in.Pod))
 	return nil
 }
 
 // Convert_coordination_EvictionTarget_To_v1alpha1_EvictionTarget is an autogenerated conversion function.
 func Convert_coordination_EvictionTarget_To_v1alpha1_EvictionTarget(in *coordination.EvictionTarget, out *coordinationv1alpha1.EvictionTarget, s conversion.Scope) error {
 	return autoConvert_coordination_EvictionTarget_To_v1alpha1_EvictionTarget(in, out, s)
-}
-
-func autoConvert_v1alpha1_PodReference_To_coordination_PodReference(in *coordinationv1alpha1.PodReference, out *coordination.PodReference, s conversion.Scope) error {
-	out.Name = in.Name
-	out.UID = types.UID(in.UID)
-	return nil
-}
-
-// Convert_v1alpha1_PodReference_To_coordination_PodReference is an autogenerated conversion function.
-func Convert_v1alpha1_PodReference_To_coordination_PodReference(in *coordinationv1alpha1.PodReference, out *coordination.PodReference, s conversion.Scope) error {
-	return autoConvert_v1alpha1_PodReference_To_coordination_PodReference(in, out, s)
-}
-
-func autoConvert_coordination_PodReference_To_v1alpha1_PodReference(in *coordination.PodReference, out *coordinationv1alpha1.PodReference, s conversion.Scope) error {
-	out.Name = in.Name
-	out.UID = types.UID(in.UID)
-	return nil
-}
-
-// Convert_coordination_PodReference_To_v1alpha1_PodReference is an autogenerated conversion function.
-func Convert_coordination_PodReference_To_v1alpha1_PodReference(in *coordination.PodReference, out *coordinationv1alpha1.PodReference, s conversion.Scope) error {
-	return autoConvert_coordination_PodReference_To_v1alpha1_PodReference(in, out, s)
 }
 
 func autoConvert_v1alpha1_Requester_To_coordination_Requester(in *coordinationv1alpha1.Requester, out *coordination.Requester, s conversion.Scope) error {

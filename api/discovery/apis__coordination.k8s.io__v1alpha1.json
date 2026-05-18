@@ -30,6 +30,34 @@
         "patch",
         "update"
       ]
+    },
+    {
+      "kind": "Eviction",
+      "name": "evictions",
+      "namespaced": true,
+      "singularName": "eviction",
+      "storageVersionHash": "/6ffMPRsDPE=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "Eviction",
+      "name": "evictions/status",
+      "namespaced": true,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
     }
   ]
 }

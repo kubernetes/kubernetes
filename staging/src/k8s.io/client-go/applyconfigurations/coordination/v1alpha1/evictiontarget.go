@@ -25,7 +25,7 @@ package v1alpha1
 type EvictionTargetApplyConfiguration struct {
 	// pod references a pod that is subject to eviction/termination.
 	// Pods that are part of a PodGroup (.spec.schedulingGroup is set) are not supported.
-	Pod *PodReferenceApplyConfiguration `json:"pod,omitempty"`
+	Pod *EvictionPodReferenceApplyConfiguration `json:"pod,omitempty"`
 }
 
 // EvictionTargetApplyConfiguration constructs a declarative configuration of the EvictionTarget type for use with
@@ -37,7 +37,7 @@ func EvictionTarget() *EvictionTargetApplyConfiguration {
 // WithPod sets the Pod field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Pod field is set to the value of the last call.
-func (b *EvictionTargetApplyConfiguration) WithPod(value *PodReferenceApplyConfiguration) *EvictionTargetApplyConfiguration {
+func (b *EvictionTargetApplyConfiguration) WithPod(value *EvictionPodReferenceApplyConfiguration) *EvictionTargetApplyConfiguration {
 	b.Pod = value
 	return b
 }

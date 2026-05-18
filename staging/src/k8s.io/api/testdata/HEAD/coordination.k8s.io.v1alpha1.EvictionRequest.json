@@ -50,12 +50,8 @@
         "uid": "uidValue"
       }
     },
-    "requesters": [
-      {
-        "name": "nameValue",
-        "intent": "intentValue"
-      }
-    ]
+    "requesterName": "requesterNameValue",
+    "intent": "intentValue"
   },
   "status": {
     "conditions": [
@@ -68,22 +64,6 @@
         "message": "messageValue"
       }
     ],
-    "observedGeneration": 2,
-    "targetResponders": [
-      {
-        "name": "nameValue",
-        "state": "stateValue"
-      }
-    ],
-    "responders": [
-      {
-        "name": "nameValue",
-        "startTime": "2002-01-01T01:01:01Z",
-        "heartbeatTime": "2003-01-01T01:01:01Z",
-        "expectedCompletionTime": "2004-01-01T01:01:01Z",
-        "completionTime": "2005-01-01T01:01:01Z",
-        "message": "messageValue"
-      }
-    ]
+    "observedGeneration": 2
   }
 }

@@ -33,33 +33,27 @@ import (
 // EvictionRequest defines a request that should ideally result in a graceful eviction of a
 // .spec.target (e.g. termination of a pod).
 //
-// `.spec.requesters` field should be set and kept updated to preserve the eviction request.
+// The evictionrequest-controller observes intents of all EvictionRequests and transforms them into
+// Evictions.
+// - .spec.requesterName is set as a label on the Eviction for easier lookup.
+// - Each target can have a set of responders assigned to it. Eviction objects are observed by
+// these responders, who implement the eviction logic and update the Eviction's status with
+// progress.
 //
-// If the target is a pod, the .status.targetResponders is populated from Pod's
-// .spec.evictionResponders.
+// There is many-to-many relationship between EvictionRequests and Evictions.
 //
-// Responders should observe and communicate through the .status to help with the eviction
-// of the target when they see their state == Active in .status.targetResponders. ResponderStatus
-// struct should then be periodically updated to indicate the progress or completion of the eviction
-// process by each responder in .status.responders. If .status.responders[].heartbeatTime is
-// not updated within 20 minutes, the eviction request is passed over to the next responder.
-//
-// If there are no other responders and the target is a pod, the last default
-// imperative-eviction.k8s.io/evictor responder will evict the pod using the imperative Eviction API
-// (/evict endpoint).
+// If all requesters withdraw their eviction intent for a common target, the eviction will be
+// canceled. Deleting an EvictionRequest also counts as a withdrawal.
+// Once all EvictionRequest of a target are removed, the corresponding Evictions are eventually
+// garbage collected.
 type EvictionRequestApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:""`
 	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
-	// .metadata.name is required and should match the .metadata.uid of the pod being evicted.
-	// .metadata.generateName is not supported.
-	// The labels of the eviction request object are synchronized with .metadata.labels of the
-	// eviction request's target. The labels of the target have a preference.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// spec defines the eviction request specification.
 	// https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Spec *EvictionRequestSpecApplyConfiguration `json:"spec,omitempty"`
 	// status represents the most recently observed status of the eviction request.
-	// Populated by responders and evictionrequest-controller.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Status *EvictionRequestStatusApplyConfiguration `json:"status,omitempty"`
 }
