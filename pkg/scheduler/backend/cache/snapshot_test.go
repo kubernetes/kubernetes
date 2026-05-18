@@ -697,12 +697,8 @@ func TestSnapshot_AssumeForgetAffinityAndPVC(t *testing.T) {
 			for _, n := range affinityList {
 				gotAffinity.Insert(n.Node().Name)
 			}
-			wantAffinity := tt.expectedAffinity
-			if wantAffinity == nil {
-				wantAffinity = sets.New[string]()
-			}
-			if !gotAffinity.Equal(wantAffinity) {
-				t.Errorf("Unexpected affinity node list, want: %v, got: %v", sets.List(wantAffinity), sets.List(gotAffinity))
+			if !gotAffinity.Equal(tt.expectedAffinity) {
+				t.Errorf("Unexpected affinity node list, want: %v, got: %v", sets.List(tt.expectedAffinity), sets.List(gotAffinity))
 			}
 			if len(affinityList) != gotAffinity.Len() {
 				t.Errorf("affinity node list contains duplicates: %v", affinityList)
@@ -716,12 +712,8 @@ func TestSnapshot_AssumeForgetAffinityAndPVC(t *testing.T) {
 			for _, n := range antiAffinityList {
 				gotAntiAffinity.Insert(n.Node().Name)
 			}
-			wantAntiAffinity := tt.expectedAntiAffinity
-			if wantAntiAffinity == nil {
-				wantAntiAffinity = sets.New[string]()
-			}
-			if !gotAntiAffinity.Equal(wantAntiAffinity) {
-				t.Errorf("Unexpected anti-affinity node list, want: %v, got: %v", sets.List(wantAntiAffinity), sets.List(gotAntiAffinity))
+			if !gotAntiAffinity.Equal(tt.expectedAntiAffinity) {
+				t.Errorf("Unexpected anti-affinity node list, want: %v, got: %v", sets.List(tt.expectedAntiAffinity), sets.List(gotAntiAffinity))
 			}
 
 			wantPVC := tt.expectedUsedPVCSet
