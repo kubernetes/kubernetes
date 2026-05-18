@@ -127,8 +127,14 @@ type HorizontalController struct {
 	scaleDownEventsLock sync.RWMutex
 
 	// Storage of HPAs and their selectors.
+	// TODO: Remove hpaSelectors and hpaSelectorsMux once HPAOptimizedSelectorStore
+	// graduates to GA.
 	hpaSelectors    *selectors.BiMultimap
 	hpaSelectorsMux sync.Mutex
+
+	// hpaSelectorStore is the optimized version for hpaSelectors, gated by
+	// HPAOptimizedSelectorStore.
+	hpaSelectorStore *hpaSelectorStore
 
 	// consistencyStore is used to track the state of the controller's operations.
 	consistencyStore consistencyutil.ConsistencyStore
@@ -184,8 +190,13 @@ func NewHorizontalController(
 		scaleUpEventsLock:   sync.RWMutex{},
 		scaleDownEvents:     map[string][]timestampedScaleEvent{},
 		scaleDownEventsLock: sync.RWMutex{},
-		hpaSelectors:        selectors.NewBiMultimap(),
 		consistencyStore:    consistencyStore,
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.HPAOptimizedSelectorStore) {
+		hpaController.hpaSelectorStore = newHPASelectorStore()
+	} else {
+		hpaController.hpaSelectors = selectors.NewBiMultimap()
 	}
 
 	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -291,13 +302,18 @@ func (a *HorizontalController) enqueueHPA(obj interface{}) {
 	// Registering first avoids a race where immediate reconciliation starts
 	// before selector bookkeeping exists.
 	hpaKey := selectors.Parse(key)
-	a.hpaSelectorsMux.Lock()
-	if !a.hpaSelectors.SelectorExists(hpaKey) {
-		a.hpaSelectors.PutSelector(hpaKey, labels.Nothing())
-		// Observe HPA addition - only when it's a new HPA
-		a.monitor.ObserveHPAAddition()
+	if a.hpaSelectorStore != nil {
+		if a.hpaSelectorStore.PutIfAbsent(hpaKey.Namespace, hpaKey, labels.Nothing()) {
+			a.monitor.ObserveHPAAddition()
+		}
+	} else {
+		a.hpaSelectorsMux.Lock()
+		if !a.hpaSelectors.SelectorExists(hpaKey) {
+			a.hpaSelectors.PutSelector(hpaKey, labels.Nothing())
+			a.monitor.ObserveHPAAddition()
+		}
+		a.hpaSelectorsMux.Unlock()
 	}
-	a.hpaSelectorsMux.Unlock()
 
 	// Add the HPA to the queue for immediate processing. Deduplication is handled
 	// by the queue: if the key is already queued or being processed, this is a no-op.
@@ -328,9 +344,14 @@ func (a *HorizontalController) deleteHPA(obj interface{}) {
 	a.queue.Forget(key)
 
 	// Remove HPA and attached selector.
-	a.hpaSelectorsMux.Lock()
-	defer a.hpaSelectorsMux.Unlock()
-	a.hpaSelectors.DeleteSelector(selectors.Parse(key))
+	hpaKey := selectors.Parse(key)
+	if a.hpaSelectorStore != nil {
+		a.hpaSelectorStore.Delete(hpaKey.Namespace, hpaKey)
+	} else {
+		a.hpaSelectorsMux.Lock()
+		defer a.hpaSelectorsMux.Unlock()
+		a.hpaSelectors.DeleteSelector(hpaKey)
+	}
 	// Observe HPA deletion
 	a.monitor.ObserveHPADeletion()
 }
@@ -476,19 +497,32 @@ func (a *HorizontalController) validateAndParseSelector(hpa *autoscalingv2.Horiz
 	}
 
 	hpaKey := selectors.Key{Name: hpa.Name, Namespace: hpa.Namespace}
-	a.hpaSelectorsMux.Lock()
-	if a.hpaSelectors.SelectorExists(hpaKey) {
+	if a.hpaSelectorStore != nil {
 		// Update HPA selector only if the HPA was registered in enqueueHPA.
-		a.hpaSelectors.PutSelector(hpaKey, parsedSelector)
+		if !a.hpaSelectorStore.PutIfPresent(hpaKey.Namespace, hpaKey, parsedSelector) {
+			// short circuit if HPA is deleted already by now
+			return nil, fmt.Errorf("HPA %s/%s was deleted during reconciliation", hpa.Namespace, hpa.Name)
+		}
+	} else {
+		a.hpaSelectorsMux.Lock()
+		if a.hpaSelectors.SelectorExists(hpaKey) {
+			// Update HPA selector only if the HPA was registered in enqueueHPA.
+			a.hpaSelectors.PutSelector(hpaKey, parsedSelector)
+		}
+		a.hpaSelectorsMux.Unlock()
 	}
-	a.hpaSelectorsMux.Unlock()
 
 	pods, err := a.podLister.Pods(hpa.Namespace).List(parsedSelector)
 	if err != nil {
 		return nil, err
 	}
 
-	selectingHpas := a.hpasControllingPodsUnderSelector(pods)
+	var selectingHpas []selectors.Key
+	if a.hpaSelectorStore != nil {
+		selectingHpas = a.hpaSelectorStore.HPAsMatchingPods(hpa.Namespace, pods, 2)
+	} else {
+		selectingHpas = a.hpasControllingPodsUnderSelector(pods)
+	}
 	if len(selectingHpas) > 1 {
 		errMsg := fmt.Sprintf("pods by selector %v are controlled by multiple HPAs: %v", selector, selectingHpas)
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "AmbiguousSelector", errMsg)
