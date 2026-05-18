@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: pod-with-pod-affinity-large-resource-
+spec:
+  affinity:
+    podAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            color: blue
+        topologyKey: kubernetes.io/hostname
+  containers:
+  - image: registry.k8s.io/pause:3.10.2
+    name: pause
+    ports:
+    - containerPort: 80
+    resources:
+      limits:
+        cpu: "4"
+        memory: 32Gi
+      requests:
+        cpu: "4"
+        memory: 32Gi
