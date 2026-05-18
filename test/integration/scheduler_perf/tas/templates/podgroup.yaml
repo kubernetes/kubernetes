@@ -6,3 +6,6 @@ spec:
   schedulingPolicy:
     gang:
       minCount: {{.podsPerGroup}}
+  schedulingConstraints:
+    topology:
+    - key: topology.kubernetes.io/rack

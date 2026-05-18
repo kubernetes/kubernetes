@@ -265,7 +265,14 @@ func (e *WorkloadExecutor) runCreatePodsOp(tCtx ktesting.TContext, opIndex int, 
 			return err
 		}
 	default:
-		if err := waitUntilPodsScheduledInNamespace(tCtx, e.podInformer, nil, namespace, op.Count); err != nil {
+		// Default timeout is 10 minutes because even at the lowest observed QPS of ~10 pods/sec,
+		// a standard 5000-node test completes. Heavy test suites (e.g. TAS) can configure a custom
+		// podsSchedulingTimeout option to avoid meeting this strict default ceiling.
+		timeout := 10 * time.Minute
+		if e.opts != nil && e.opts.podsSchedulingTimeout > 0 {
+			timeout = e.opts.podsSchedulingTimeout
+		}
+		if err := waitUntilPodsScheduledInNamespace(tCtx, e.podInformer, nil, namespace, op.Count, timeout); err != nil {
 			return fmt.Errorf("error in waiting for pods to get scheduled: %w", err)
 		}
 	}
@@ -809,7 +816,7 @@ func waitUntilPodsScheduled(tCtx ktesting.TContext, podInformer coreinformers.Po
 		if !ok {
 			return fmt.Errorf("unknown namespace %s", namespace)
 		}
-		if err := waitUntilPodsScheduledInNamespace(tCtx, podInformer, labelSelector, namespace, wantCount); err != nil {
+		if err := waitUntilPodsScheduledInNamespace(tCtx, podInformer, labelSelector, namespace, wantCount, 10*time.Minute); err != nil {
 			return fmt.Errorf("error waiting for pods in namespace %q: %w", namespace, err)
 		}
 	}
@@ -900,12 +907,14 @@ func getNodePreparer(prefix string, cno *createNodesOp, clientset clientset.Inte
 }
 
 // waitUntilPodsScheduledInNamespace blocks until all pods in the given
-// namespace are scheduled. Times out after 10 minutes because even at the
+// namespace are scheduled. Times out after 10 minutes by default because even at the
 // lowest observed QPS of ~10 pods/sec, a 5000-node test should complete.
-func waitUntilPodsScheduledInNamespace(tCtx ktesting.TContext, podInformer coreinformers.PodInformer, labelSelector map[string]string, namespace string, wantCount int) error {
+// Complex test suites (e.g. TAS where each pod gets scheduled multiple times for placements)
+// may override this timeout via schedulerPerfOptions.
+func waitUntilPodsScheduledInNamespace(tCtx ktesting.TContext, podInformer coreinformers.PodInformer, labelSelector map[string]string, namespace string, wantCount int, timeout time.Duration) error {
 	var pendingPod *v1.Pod
 
-	err := wait.PollUntilContextTimeout(tCtx, 1*time.Second, 10*time.Minute, true, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(tCtx, 1*time.Second, timeout, true, func(ctx context.Context) (bool, error) {
 		select {
 		case <-ctx.Done():
 			return true, ctx.Err()

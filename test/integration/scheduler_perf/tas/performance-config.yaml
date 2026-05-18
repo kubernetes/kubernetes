@@ -4,33 +4,35 @@
 # - performance: test cases to run in the performance test.
 # - short: supplemental label for the above two labels (must not used alone), which literally means short execution time test cases.
 
-- name: GangScheduling
+- name: TopologyAwareScheduling
   featureGates:
     GenericWorkload: true
     GangScheduling: true
+    TopologyAwareWorkloadScheduling: true
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
+    nodeTemplatePath: templates/node.yaml
   - opcode: createNamespaces
-    prefix: gang
+    prefix: tas
     count: 1
   - opcode: createAny
-    # Create pod groups (gangs), each has a min count policy specified in pod group template.
+    # Create pod groups (gangs), each has a min count policy and topology constraint specified in pod group template.
     # Each pod group is named gang-0, gang-1, ... gang-(n-1).
     countParam: $initPodGroups
-    namespace: gang-0
+    namespace: tas-0
     templatePath: templates/podgroup.yaml
     templateParams:
       podsPerGroup: $podsPerGroup
   - opcode: waitForPodGroups
     # Wait for the scheduler's informer cache to reflect the newly created PodGroup objects.
-    namespace: gang-0
+    namespace: tas-0
     countParam: $initPodGroups
   - opcode: createPods
     # Create pods with reference to the pod groups (gangs) according to their indices (e.g., pods 0-2 → gang-0, pods 3-5 → gang-1, etc.).
     countParam: $initPodGroups
     countMultiplierParam: $podsPerGroup
-    namespace: gang-0
+    namespace: tas-0
     podTemplatePath: templates/gang-pod.yaml
     collectMetrics: true
     templateParams:
@@ -48,24 +50,24 @@
       initNodes: 100
       initPodGroups: 10
       podsPerGroup: 3
-  - name: 5000Nodes_1000Gangs_3000Pods
+  - name: 5000Nodes_750Gangs_3000Pods
     labels: [performance]
     params:
       initNodes: 5000
-      initPodGroups: 1000
-      podsPerGroup: 3
-  - name: 5000Nodes_2000Gangs_6000Pods
+      initPodGroups: 750
+      podsPerGroup: 4
+  - name: 5000Nodes_1500Gangs_6000Pods
     labels: [performance]
     params:
       initNodes: 5000
-      initPodGroups: 2000
-      podsPerGroup: 3
-  - name: 5000Nodes_3000Gangs_9000Pods
+      initPodGroups: 1500
+      podsPerGroup: 4
+  - name: 5000Nodes_2250Gangs_9000Pods
     labels: [performance]
     params:
       initNodes: 5000
-      initPodGroups: 3000
-      podsPerGroup: 3
+      initPodGroups: 2250
+      podsPerGroup: 4
   - name: 5000Nodes_3Gangs_3000Pods_1000PerGroup
     labels: [performance]
     params:
@@ -84,3 +86,5 @@
       initNodes: 5000
       initPodGroups: 9
       podsPerGroup: 1000
+
+
