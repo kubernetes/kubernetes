@@ -56,9 +56,11 @@ type Snapshot struct {
 	// keyed in the format "namespace/name".
 	usedPVCSet sets.Set[string]
 	generation int64
-	// assumedPods maps a pod key to an assumed pod object during a single pod group scheduling cycle.
-	// This map should be emptied before the next cycle starts.
-	assumedPods map[string]*v1.Pod
+	// assumedPods maps a pod key to its assume-time state during a single pod
+	// group scheduling cycle. The state records exactly what AssumePod added
+	// to the snapshot-wide indexes so that ForgetPod can revert it without
+	// rescanning the snapshot. This map should be emptied before the next cycle starts.
+	assumedPods map[string]*assumedPodState
 	// podGroupStates maps a pod group key to a snapshot of its state, used during a pod group scheduling cycle.
 	podGroupStates map[podGroupKey]*podGroupStateSnapshot
 	// placementNodes stores nodes that are present in the current placement.
@@ -75,12 +77,32 @@ type Snapshot struct {
 
 var _ fwk.SharedLister = &Snapshot{}
 
+// assumedPodState captures what an AssumePod call added to the snapshot's
+// shared indexes (havePodsWithAffinityNodeInfoList,
+// havePodsWithRequiredAntiAffinityNodeInfoList, usedPVCSet). ForgetPod
+// reads it to undo exactly those additions in O(1) per index.
+//
+// This relies on the contract of snapshot-level Assume/Forget:
+//  1. ForgetPod is only called for a pod that was previously assumed.
+//  2. Pods are forgotten in reverse order of being assumed.
+//  3. No other snapshot mutations happen between AssumePod and ForgetPod
+//     of the same pod.
+type assumedPodState struct {
+	pod                     *v1.Pod
+	addedToAffinityList     bool
+	addedToAntiAffinityList bool
+	// addedPVCKeys lists the PVC keys this pod inserted into usedPVCSet
+	// (i.e., keys not already present at assume time). Keys that were
+	// already in the set are omitted, so ForgetPod must not delete them.
+	addedPVCKeys []string
+}
+
 // NewEmptySnapshot initializes a Snapshot struct and returns it.
 func NewEmptySnapshot() *Snapshot {
 	return &Snapshot{
 		nodeInfoMap:            make(map[string]*framework.NodeInfo),
 		usedPVCSet:             sets.New[string](),
-		assumedPods:            make(map[string]*v1.Pod),
+		assumedPods:            make(map[string]*assumedPodState),
 		podGroupStates:         make(map[podGroupKey]*podGroupStateSnapshot),
 		genericWorkloadEnabled: utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload),
 	}
@@ -338,6 +360,8 @@ func (s *Snapshot) IsPVCUsedByPods(key string) bool {
 // and PVC indexes (havePodsWithAffinityNodeInfoList,
 // havePodsWithRequiredAntiAffinityNodeInfoList, usedPVCSet) consistent so that
 // scheduling plugins observe up-to-date state during the pod group cycle.
+// The exact additions are recorded in assumedPodState so ForgetPod can undo
+// them directly.
 // ForgetPod should be called on the snapshot before syncing it with the cache.
 // This function is not thread safe, so it should be executed when no other routines can write/read from the snapshot.
 func (s *Snapshot) AssumePod(podInfo *framework.PodInfo) error {
@@ -362,19 +386,27 @@ func (s *Snapshot) AssumePod(podInfo *framework.PodInfo) error {
 	// nodeInfo.AddPodInfo maintains the NodeInfo's affinity and PVC indexes;
 	// the snapshot-wide lists must be updated to match, otherwise inter-pod
 	// (anti-)affinity and VolumeRestrictions plugins observe stale state.
+	state := &assumedPodState{pod: pod}
 	if !hadPodsWithAffinity && len(nodeInfo.PodsWithAffinity) > 0 {
 		s.havePodsWithAffinityNodeInfoList = append(s.havePodsWithAffinityNodeInfoList, nodeInfo)
+		state.addedToAffinityList = true
 	}
 	if !hadPodsWithRequiredAntiAffinity && len(nodeInfo.PodsWithRequiredAntiAffinity) > 0 {
 		s.havePodsWithRequiredAntiAffinityNodeInfoList = append(s.havePodsWithRequiredAntiAffinityNodeInfoList, nodeInfo)
+		state.addedToAntiAffinityList = true
 	}
 	for _, v := range pod.Spec.Volumes {
 		if v.PersistentVolumeClaim == nil {
 			continue
 		}
-		s.usedPVCSet.Insert(framework.GetNamespacedName(pod.Namespace, v.PersistentVolumeClaim.ClaimName))
+		pvcKey := framework.GetNamespacedName(pod.Namespace, v.PersistentVolumeClaim.ClaimName)
+		if s.usedPVCSet.Has(pvcKey) {
+			continue
+		}
+		s.usedPVCSet.Insert(pvcKey)
+		state.addedPVCKeys = append(state.addedPVCKeys, pvcKey)
 	}
-	s.assumedPods[key] = pod
+	s.assumedPods[key] = state
 	// Update the pod group state in the snapshot if the pod belongs to a pod group.
 	if !s.genericWorkloadEnabled || pod.Spec.SchedulingGroup == nil {
 		return nil
@@ -387,20 +419,22 @@ func (s *Snapshot) AssumePod(podInfo *framework.PodInfo) error {
 }
 
 // ForgetPod forgets a given pod from the snapshot. In addition to removing
-// the pod from its node's NodeInfo, it keeps the snapshot-wide affinity,
-// anti-affinity and PVC indexes (havePodsWithAffinityNodeInfoList,
-// havePodsWithRequiredAntiAffinityNodeInfoList, usedPVCSet) consistent.
+// the pod from its node's NodeInfo, it reverts exactly the snapshot-wide
+// index additions recorded by AssumePod (havePodsWithAffinityNodeInfoList,
+// havePodsWithRequiredAntiAffinityNodeInfoList, usedPVCSet). Relies on the
+// LIFO Assume/Forget contract documented on assumedPodState.
 // This function is not thread safe, so it should be executed when no other routines can write/read from the snapshot.
 func (s *Snapshot) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 	key, err := framework.GetPodKey(pod)
 	if err != nil {
 		return err
 	}
-	assumedPod, ok := s.assumedPods[key]
+	state, ok := s.assumedPods[key]
 	if !ok {
 		return fmt.Errorf("assumed pod %q not found in the snapshot", key)
 	}
 	delete(s.assumedPods, key)
+	assumedPod := state.pod
 	nodeName := assumedPod.Spec.NodeName
 	if nodeInfo, ok := s.nodeInfoMap[nodeName]; ok {
 		// Calling RemovePod increases the Generation number of the nodeInfo.
@@ -412,22 +446,16 @@ func (s *Snapshot) ForgetPod(logger klog.Logger, pod *v1.Pod) error {
 			return err
 		}
 		nodeInfo.Generation = oldGeneration
-		// nodeInfo.RemovePod maintains the NodeInfo's affinity and PVC indexes;
-		// mirror those changes in the snapshot-wide lists to keep them consistent.
-		if len(nodeInfo.PodsWithAffinity) == 0 {
+		// Undo only what this pod's AssumePod added to the snapshot-wide
+		// indexes; the NodeInfo's own indexes are maintained by RemovePod.
+		if state.addedToAffinityList {
 			s.havePodsWithAffinityNodeInfoList = removeFromNodeInfoList(s.havePodsWithAffinityNodeInfoList, nodeInfo)
 		}
-		if len(nodeInfo.PodsWithRequiredAntiAffinity) == 0 {
+		if state.addedToAntiAffinityList {
 			s.havePodsWithRequiredAntiAffinityNodeInfoList = removeFromNodeInfoList(s.havePodsWithRequiredAntiAffinityNodeInfoList, nodeInfo)
 		}
-		for _, v := range pod.Spec.Volumes {
-			if v.PersistentVolumeClaim == nil {
-				continue
-			}
-			pvcKey := framework.GetNamespacedName(pod.Namespace, v.PersistentVolumeClaim.ClaimName)
-			if !s.isPVCUsedByAnyNode(pvcKey) {
-				s.usedPVCSet.Delete(pvcKey)
-			}
+		for _, pvcKey := range state.addedPVCKeys {
+			s.usedPVCSet.Delete(pvcKey)
 		}
 		if len(nodeInfo.Pods) == 0 && nodeInfo.Node() == nil {
 			delete(s.nodeInfoMap, nodeName)
@@ -450,8 +478,8 @@ func (s *Snapshot) forgetAllAssumedPods(logger klog.Logger) {
 	if len(s.assumedPods) == 0 {
 		return
 	}
-	for _, pod := range s.assumedPods {
-		err := s.ForgetPod(logger, pod)
+	for _, state := range s.assumedPods {
+		err := s.ForgetPod(logger, state.pod)
 		if err != nil {
 			utilruntime.HandleErrorWithLogger(logger, err, "Failed to forget assumed pod")
 		}
@@ -473,17 +501,6 @@ func removeFromNodeInfoList(list []fwk.NodeInfo, nodeInfo fwk.NodeInfo) []fwk.No
 		}
 	}
 	return list
-}
-
-// isPVCUsedByAnyNode reports whether any node in the snapshot still has a pod
-// referencing the given PVC key.
-func (s *Snapshot) isPVCUsedByAnyNode(key string) bool {
-	for _, nodeInfo := range s.nodeInfoMap {
-		if _, ok := nodeInfo.PVCRefCounts[key]; ok {
-			return true
-		}
-	}
-	return false
 }
 
 // AssumePlacement sets placement context in the snapshot.

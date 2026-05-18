@@ -655,9 +655,12 @@ func TestSnapshot_AssumeForgetAffinityAndPVC(t *testing.T) {
 			podsToForget: []*v1.Pod{pvcPod},
 		},
 		{
-			name:             "two pods with affinity on the same node, forget one",
+			// AssumePod/ForgetPod are documented as LIFO, so we forget the
+			// pod assumed last; node-1 must remain in the list because the
+			// first pod still has affinity terms.
+			name:             "two pods with affinity on the same node, forget the last assumed",
 			podsToAssume:     []*v1.Pod{affinityPod, affinityPod2},
-			podsToForget:     []*v1.Pod{affinityPod},
+			podsToForget:     []*v1.Pod{affinityPod2},
 			expectedAffinity: sets.New("node-1"),
 		},
 		{
