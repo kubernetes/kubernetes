@@ -28,9 +28,33 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "k8s.io/api/scheduling/v1alpha3";
 
+// AllDisruptionMode specifies that children can only be disrupted together.
+message AllDisruptionMode {
+}
+
 // BasicSchedulingPolicy indicates that standard Kubernetes
 // scheduling behavior should be used.
 message BasicSchedulingPolicy {
+}
+
+// DisruptionMode defines how individual entities within a group can be disrupted.
+// Exactly one mode can be set.
+//
+// +union
+message DisruptionMode {
+  // Single specifies that children can be disrupted independently from each other.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  optional SingleDisruptionMode single = 1;
+
+  // All specifies that all children can only be disrupted together.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  optional AllDisruptionMode all = 2;
 }
 
 // GangSchedulingPolicy defines the parameters for gang scheduling.
@@ -243,18 +267,18 @@ message PodGroupSpec {
 
   // DisruptionMode defines the mode in which a given PodGroup can be disrupted.
   // Controllers are expected to fill this field by copying it from a PodGroupTemplate.
-  // One of Pod, PodGroup. Defaults to Pod if unset.
+  // One of Single, All. Defaults to Single if unset.
   // This field is immutable.
   // This field is available only when the WorkloadAwarePreemption feature gate
   // is enabled.
   //
   // +featureGate=WorkloadAwarePreemption
+  // +default={"single": {}}
   // +optional
   // +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
   // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
   // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:immutable
-  // +default="Pod"
-  optional string disruptionMode = 5;
+  optional DisruptionMode disruptionMode = 5;
 
   // PriorityClassName defines the priority that should be considered when scheduling this pod group.
   // Controllers are expected to fill this field by copying it from a PodGroupTemplate.
@@ -379,7 +403,7 @@ message PodGroupTemplate {
   repeated PodGroupResourceClaim resourceClaims = 4;
 
   // DisruptionMode defines the mode in which a given PodGroup can be disrupted.
-  // One of Pod, PodGroup.
+  // One of Single, All.
   // This field is available only when the WorkloadAwarePreemption feature gate
   // is enabled.
   //
@@ -387,7 +411,7 @@ message PodGroupTemplate {
   // +optional
   // +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
   // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
-  optional string disruptionMode = 5;
+  optional DisruptionMode disruptionMode = 5;
 
   // PriorityClassName indicates the priority that should be considered when scheduling
   // a pod group created from this template. If no priority class is specified, admission
@@ -430,6 +454,10 @@ message PodGroupTemplateReference {
   // +k8s:optional
   // +k8s:unionMember
   optional WorkloadPodGroupTemplateReference workload = 1;
+}
+
+// SingleDisruptionMode specifies that children can be disrupted independently.
+message SingleDisruptionMode {
 }
 
 // TopologyConstraint defines a topology constraint for a PodGroup.

@@ -31,7 +31,6 @@ import (
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	sets "k8s.io/apimachinery/pkg/util/sets"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
 )
 
@@ -73,7 +72,7 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 	return nil
 }
 
-var symbolsForDisruptionMode = sets.New(schedulingv1alpha3.DisruptionModePod, schedulingv1alpha3.DisruptionModePodGroup)
+var unionMembershipFor_k8s_io_api_scheduling_v1alpha3_DisruptionMode_ = validate.NewUnionMembership(validate.NewUnionMember("single"), validate.NewUnionMember("all"))
 
 // Validate_DisruptionMode validates an instance of DisruptionMode according
 // to declarative validation rules in the API schema.
@@ -81,8 +80,76 @@ func Validate_DisruptionMode(
 	ctx context.Context, op operation.Operation, fldPath *field.Path,
 	obj, oldObj *schedulingv1alpha3.DisruptionMode) (errs field.ErrorList) {
 
-	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForDisruptionMode, nil); len(e) != 0 {
+	if e := validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_api_scheduling_v1alpha3_DisruptionMode_,
+		func(obj *schedulingv1alpha3.DisruptionMode) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.Single != nil
+		},
+		func(obj *schedulingv1alpha3.DisruptionMode) bool {
+			if obj == nil {
+				return false
+			}
+			return obj.All != nil
+		}); len(e) != 0 {
 		errs = append(errs, e...)
+	}
+
+	{ // field schedulingv1alpha3.DisruptionMode.Single
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *schedulingv1alpha3.SingleDisruptionMode,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *schedulingv1alpha3.DisruptionMode) *schedulingv1alpha3.SingleDisruptionMode {
+				return oldObj.Single
+			})
+		errs = append(errs, fn(fldPath.Child("single"), obj.Single, oldVal, oldObj != nil)...)
+	}
+
+	{ // field schedulingv1alpha3.DisruptionMode.All
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *schedulingv1alpha3.AllDisruptionMode,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *schedulingv1alpha3.DisruptionMode) *schedulingv1alpha3.AllDisruptionMode {
+				return oldObj.All
+			})
+		errs = append(errs, fn(fldPath.Child("all"), obj.All, oldVal, oldObj != nil)...)
 	}
 
 	return errs
@@ -647,7 +714,7 @@ func Validate_PodGroupSpec(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
 					return nil
 				}
 			}
@@ -980,7 +1047,7 @@ func Validate_PodGroupTemplate(
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
 					return nil
 				}
 			}

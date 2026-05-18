@@ -1842,6 +1842,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsschedulingv1.PriorityClassApplyConfiguration{}
 
 		// Group=scheduling.k8s.io, Version=v1alpha3
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("DisruptionMode"):
+		return &applyconfigurationsschedulingv1alpha3.DisruptionModeApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("GangSchedulingPolicy"):
 		return &applyconfigurationsschedulingv1alpha3.GangSchedulingPolicyApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("PodGroup"):

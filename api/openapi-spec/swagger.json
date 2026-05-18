@@ -19802,9 +19802,35 @@
         }
       ]
     },
+    "io.k8s.api.scheduling.v1alpha3.AllDisruptionMode": {
+      "description": "AllDisruptionMode specifies that children can only be disrupted together.",
+      "type": "object"
+    },
     "io.k8s.api.scheduling.v1alpha3.BasicSchedulingPolicy": {
       "description": "BasicSchedulingPolicy indicates that standard Kubernetes scheduling behavior should be used.",
       "type": "object"
+    },
+    "io.k8s.api.scheduling.v1alpha3.DisruptionMode": {
+      "description": "DisruptionMode defines how individual entities within a group can be disrupted. Exactly one mode can be set.",
+      "properties": {
+        "all": {
+          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.AllDisruptionMode",
+          "description": "All specifies that all children can only be disrupted together."
+        },
+        "single": {
+          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.SingleDisruptionMode",
+          "description": "Single specifies that children can be disrupted independently from each other."
+        }
+      },
+      "type": "object",
+      "x-kubernetes-unions": [
+        {
+          "fields-to-discriminateBy": {
+            "all": "All",
+            "single": "Single"
+          }
+        }
+      ]
     },
     "io.k8s.api.scheduling.v1alpha3.GangSchedulingPolicy": {
       "description": "GangSchedulingPolicy defines the parameters for gang scheduling.",
@@ -19969,8 +19995,8 @@
       "description": "PodGroupSpec defines the desired state of a PodGroup.",
       "properties": {
         "disruptionMode": {
-          "description": "DisruptionMode defines the mode in which a given PodGroup can be disrupted. Controllers are expected to fill this field by copying it from a PodGroupTemplate. One of Pod, PodGroup. Defaults to Pod if unset. This field is immutable. This field is available only when the WorkloadAwarePreemption feature gate is enabled.",
-          "type": "string"
+          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.DisruptionMode",
+          "description": "DisruptionMode defines the mode in which a given PodGroup can be disrupted. Controllers are expected to fill this field by copying it from a PodGroupTemplate. One of Single, All. Defaults to Single if unset. This field is immutable. This field is available only when the WorkloadAwarePreemption feature gate is enabled."
         },
         "podGroupTemplateRef": {
           "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.PodGroupTemplateReference",
@@ -20048,8 +20074,8 @@
       "description": "PodGroupTemplate represents a template for a set of pods with a scheduling policy.",
       "properties": {
         "disruptionMode": {
-          "description": "DisruptionMode defines the mode in which a given PodGroup can be disrupted. One of Pod, PodGroup. This field is available only when the WorkloadAwarePreemption feature gate is enabled.",
-          "type": "string"
+          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.DisruptionMode",
+          "description": "DisruptionMode defines the mode in which a given PodGroup can be disrupted. One of Single, All. This field is available only when the WorkloadAwarePreemption feature gate is enabled."
         },
         "name": {
           "description": "Name is a unique identifier for the PodGroupTemplate within the Workload. It must be a DNS label. This field is immutable.",
@@ -20108,6 +20134,10 @@
           }
         }
       ]
+    },
+    "io.k8s.api.scheduling.v1alpha3.SingleDisruptionMode": {
+      "description": "SingleDisruptionMode specifies that children can be disrupted independently.",
+      "type": "object"
     },
     "io.k8s.api.scheduling.v1alpha3.TopologyConstraint": {
       "description": "TopologyConstraint defines a topology constraint for a PodGroup.",

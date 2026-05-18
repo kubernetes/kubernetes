@@ -28,6 +28,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+
 	// Side-effect import: registers PodGroup with legacyscheme.Scheme so
 	// the ConvertToVersion calls below resolve the type.
 	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
@@ -66,9 +67,28 @@ func podGroupWithSchedulingConstraints(keys ...string) *scheduling.PodGroup {
 	return pg
 }
 
-func podGroupWithDisruptionMode(mode scheduling.DisruptionMode) *scheduling.PodGroup {
+func podGroupWithDisruptionModeSingle() *scheduling.PodGroup {
 	pg := podGroup.DeepCopy()
-	pg.Spec.DisruptionMode = &mode
+	pg.Spec.DisruptionMode = &scheduling.DisruptionMode{
+		Single: &scheduling.SingleDisruptionMode{},
+	}
+	return pg
+}
+
+func podGroupWithDisruptionModeAll() *scheduling.PodGroup {
+	pg := podGroup.DeepCopy()
+	pg.Spec.DisruptionMode = &scheduling.DisruptionMode{
+		All: &scheduling.AllDisruptionMode{},
+	}
+	return pg
+}
+
+func podGroupWithDisruptionModeBoth() *scheduling.PodGroup {
+	pg := podGroup.DeepCopy()
+	pg.Spec.DisruptionMode = &scheduling.DisruptionMode{
+		Single: &scheduling.SingleDisruptionMode{},
+		All:    &scheduling.AllDisruptionMode{},
+	}
 	return pg
 }
 
@@ -81,7 +101,6 @@ var (
 	maximumError           = "must be less than or equal to 1000000000"
 	subdomainNameError     = "lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
 	forbiddenError         = "Forbidden"
-	supportedModesError    = `supported values: "Pod", "PodGroup"`
 )
 
 func TestStrategy(t *testing.T) {
@@ -180,27 +199,27 @@ func TestStrategyCreate(t *testing.T) {
 			expectObj: podGroup,
 		},
 		"workload aware preemption disabled - drop disruption mode": {
-			obj:       podGroupWithDisruptionMode(scheduling.DisruptionModePod),
+			obj:       podGroupWithDisruptionModeSingle(),
 			expectObj: podGroup,
 		},
 		"workload aware preemption enabled - preserve disruption mode (pod)": {
-			obj:                           podGroupWithDisruptionMode(scheduling.DisruptionModePod),
-			expectObj:                     podGroupWithDisruptionMode(scheduling.DisruptionModePod),
+			obj:                           podGroupWithDisruptionModeSingle(),
+			expectObj:                     podGroupWithDisruptionModeSingle(),
 			enableWorkloadAwarePreemption: true,
 		},
 		"workload aware preemption enabled - preserve disruption mode (pod group)": {
-			obj:                           podGroupWithDisruptionMode(scheduling.DisruptionModePodGroup),
-			expectObj:                     podGroupWithDisruptionMode(scheduling.DisruptionModePodGroup),
+			obj:                           podGroupWithDisruptionModeAll(),
+			expectObj:                     podGroupWithDisruptionModeAll(),
 			enableWorkloadAwarePreemption: true,
 		},
-		"workload aware preemption enabled - unknown disruption mode": {
-			obj:                           podGroupWithDisruptionMode(scheduling.DisruptionMode("Invalid")),
+		"workload aware preemption enabled - both disruption modes set": {
+			obj:                           podGroupWithDisruptionModeBoth(),
 			enableWorkloadAwarePreemption: true,
-			expectValidationError:         supportedModesError,
+			expectValidationError:         "must specify exactly one of",
 		},
 		"workload aware preemption disabled - drop priorityClassName": {
 			obj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg := podGroupWithDisruptionModeSingle()
 				pg.Spec.PriorityClassName = "high-priority"
 				return pg
 			}(),
@@ -208,7 +227,7 @@ func TestStrategyCreate(t *testing.T) {
 		},
 		"workload aware preemption enabled - invalid priorityClassName": {
 			obj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg := podGroupWithDisruptionModeSingle()
 				pg.Spec.PriorityClassName = "invalid/priority/class/name"
 				return pg
 			}(),
@@ -217,12 +236,12 @@ func TestStrategyCreate(t *testing.T) {
 		},
 		"workload aware preemption enabled - preserve priorityClassName": {
 			obj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg := podGroupWithDisruptionModeSingle()
 				pg.Spec.PriorityClassName = "high-priority"
 				return pg
 			}(),
 			expectObj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg := podGroupWithDisruptionModeSingle()
 				pg.Spec.PriorityClassName = "high-priority"
 				return pg
 			}(),
@@ -230,7 +249,7 @@ func TestStrategyCreate(t *testing.T) {
 		},
 		"workload aware preemption disabled - drop priority": {
 			obj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg := podGroupWithDisruptionModeSingle()
 				pg.Spec.Priority = new(int32(1000))
 				return pg
 			}(),
@@ -238,12 +257,12 @@ func TestStrategyCreate(t *testing.T) {
 		},
 		"workload aware preemption enabled - preserve priority": {
 			obj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg := podGroupWithDisruptionModeSingle()
 				pg.Spec.Priority = new(int32(1000))
 				return pg
 			}(),
 			expectObj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg := podGroupWithDisruptionModeSingle()
 				pg.Spec.Priority = new(int32(1000))
 				return pg
 			}(),
@@ -251,7 +270,7 @@ func TestStrategyCreate(t *testing.T) {
 		},
 		"workload aware preemption enabled - too high priority": {
 			obj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg := podGroupWithDisruptionModeSingle()
 				pg.Spec.Priority = new(int32(scheduling.HighestUserDefinablePriority + 1))
 				return pg
 			}(),
@@ -392,33 +411,33 @@ func TestStrategyUpdate(t *testing.T) {
 			expectValidationError: forbiddenError,
 		},
 		"disruption mode update, workload aware preemption disabled": {
-			oldObj:                podGroupWithDisruptionMode(scheduling.DisruptionModePod),
-			newObj:                podGroupWithDisruptionMode(scheduling.DisruptionModePodGroup),
+			oldObj:                podGroupWithDisruptionModeSingle(),
+			newObj:                podGroupWithDisruptionModeAll(),
 			expectValidationError: forbiddenError,
 		},
 		"disruption mode update, workload aware preemption enabled": {
-			oldObj:                        podGroupWithDisruptionMode(scheduling.DisruptionModePod),
-			newObj:                        podGroupWithDisruptionMode(scheduling.DisruptionModePodGroup),
+			oldObj:                        podGroupWithDisruptionModeSingle(),
+			newObj:                        podGroupWithDisruptionModeAll(),
 			enableWorkloadAwarePreemption: true,
 			expectValidationError:         fieldImmutableError,
 		},
 		"priority class name update, workload aware preemption disabled": {
 			oldObj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg := podGroupWithDisruptionModeSingle()
 				pg.Spec.PriorityClassName = "low-priority"
 				return pg
 			}(),
 			newObj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg := podGroupWithDisruptionModeSingle()
 				pg.Spec.PriorityClassName = "high-priority"
 				return pg
 			}(),
 			expectValidationError: forbiddenError,
 		},
 		"priority class name update, workload aware preemption enabled": {
-			oldObj: podGroupWithDisruptionMode(scheduling.DisruptionModePod),
+			oldObj: podGroupWithDisruptionModeSingle(),
 			newObj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg := podGroupWithDisruptionModeSingle()
 				pg.Spec.PriorityClassName = "high-priority"
 				return pg
 			}(),
@@ -427,21 +446,21 @@ func TestStrategyUpdate(t *testing.T) {
 		},
 		"priority update, workload aware preemption disabled": {
 			oldObj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg := podGroupWithDisruptionModeSingle()
 				pg.Spec.Priority = new(int32(1000))
 				return pg
 			}(),
 			newObj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg := podGroupWithDisruptionModeSingle()
 				pg.Spec.Priority = new(int32(2000))
 				return pg
 			}(),
 			expectValidationError: forbiddenError,
 		},
 		"priority update, workload aware preemption enabled": {
-			oldObj: podGroupWithDisruptionMode(scheduling.DisruptionModePod),
+			oldObj: podGroupWithDisruptionModeSingle(),
 			newObj: func() *scheduling.PodGroup {
-				pg := podGroupWithDisruptionMode(scheduling.DisruptionModePod)
+				pg := podGroupWithDisruptionModeSingle()
 				pg.Spec.Priority = new(int32(2000))
 				return pg
 			}(),

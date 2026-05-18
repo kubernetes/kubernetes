@@ -633,7 +633,7 @@ func TestWorkloadAwarePreemptionInvocation(t *testing.T) {
 
 	workload := st.MakeWorkload().Name("workload").PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(3).Obj()).Obj()
 	pg := st.MakePodGroup().Namespace("default").Name("pg1").TemplateRef("t1", "workload").
-		DisruptionMode(schedulingapi.DisruptionModePodGroup).Priority(100).MinCount(3).Obj()
+		DisruptionModeAll().Priority(100).MinCount(3).Obj()
 
 	// Low priority pods taking up all resources
 	lowPods := []*v1.Pod{
@@ -744,7 +744,7 @@ func TestPostFilterInvocationCount(t *testing.T) {
 
 	workload := st.MakeWorkload().Name("workload").PodGroupTemplate(st.MakePodGroupTemplate().Name("t1").MinCount(3).Obj()).Obj()
 	pg := st.MakePodGroup().Namespace("default").Name("pg1").TemplateRef("t1", "workload").
-		DisruptionMode(schedulingapi.DisruptionModePodGroup).Priority(100).MinCount(3).Obj()
+		DisruptionModeAll().Priority(100).MinCount(3).Obj()
 
 	// Low priority pods taking up all resources
 	lowPods := []*v1.Pod{

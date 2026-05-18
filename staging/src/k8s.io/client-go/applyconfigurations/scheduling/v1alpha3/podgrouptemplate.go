@@ -18,10 +18,6 @@ limitations under the License.
 
 package v1alpha3
 
-import (
-	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
-)
-
 // PodGroupTemplateApplyConfiguration represents a declarative configuration of the PodGroupTemplate type for use
 // with apply.
 //
@@ -47,10 +43,10 @@ type PodGroupTemplateApplyConfiguration struct {
 	// This field is immutable.
 	ResourceClaims []PodGroupResourceClaimApplyConfiguration `json:"resourceClaims,omitempty"`
 	// DisruptionMode defines the mode in which a given PodGroup can be disrupted.
-	// One of Pod, PodGroup.
+	// One of Single, All.
 	// This field is available only when the WorkloadAwarePreemption feature gate
 	// is enabled.
-	DisruptionMode *schedulingv1alpha3.DisruptionMode `json:"disruptionMode,omitempty"`
+	DisruptionMode *DisruptionModeApplyConfiguration `json:"disruptionMode,omitempty"`
 	// PriorityClassName indicates the priority that should be considered when scheduling
 	// a pod group created from this template. If no priority class is specified, admission
 	// control can set this to the global default priority class if it exists. Otherwise,
@@ -114,8 +110,8 @@ func (b *PodGroupTemplateApplyConfiguration) WithResourceClaims(values ...*PodGr
 // WithDisruptionMode sets the DisruptionMode field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the DisruptionMode field is set to the value of the last call.
-func (b *PodGroupTemplateApplyConfiguration) WithDisruptionMode(value schedulingv1alpha3.DisruptionMode) *PodGroupTemplateApplyConfiguration {
-	b.DisruptionMode = &value
+func (b *PodGroupTemplateApplyConfiguration) WithDisruptionMode(value *DisruptionModeApplyConfiguration) *PodGroupTemplateApplyConfiguration {
+	b.DisruptionMode = value
 	return b
 }
 

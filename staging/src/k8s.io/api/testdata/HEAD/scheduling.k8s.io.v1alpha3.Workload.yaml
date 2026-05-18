@@ -38,7 +38,9 @@ spec:
     kind: kindValue
     name: nameValue
   podGroupTemplates:
-  - disruptionMode: disruptionModeValue
+  - disruptionMode:
+      all: {}
+      single: {}
     name: nameValue
     priority: 7
     priorityClassName: priorityClassNameValue

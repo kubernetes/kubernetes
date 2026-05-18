@@ -28,7 +28,7 @@ import (
 
 func init() {
 	coverage.RegisterDeclaredRules(
-		schema.GroupVersionKind{Group: "scheduling.k8s.io", Version: "v1alpha2", Kind: "Workload"},
+		schema.GroupVersionKind{Group: "scheduling.k8s.io", Version: "v1alpha3", Kind: "Workload"},
 		coverage.FieldRules{
 			"spec.controllerRef": {
 				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
@@ -54,7 +54,7 @@ func init() {
 			},
 			"spec.podGroupTemplates[*].disruptionMode": {
 				{ErrorType: "FieldValueForbidden"},
-				{ErrorType: "FieldValueNotSupported"},
+				{ErrorType: "FieldValueInvalid", Origin: "union"},
 			},
 			"spec.podGroupTemplates[*].name": {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-short-name"},

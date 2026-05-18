@@ -163,7 +163,7 @@ type PodGroupTemplate struct {
 	ResourceClaims []PodGroupResourceClaim `json:"resourceClaims,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,4,rep,name=resourceClaims"`
 
 	// DisruptionMode defines the mode in which a given PodGroup can be disrupted.
-	// One of Pod, PodGroup.
+	// One of Single, All.
 	// This field is available only when the WorkloadAwarePreemption feature gate
 	// is enabled.
 	//
@@ -171,7 +171,7 @@ type PodGroupTemplate struct {
 	// +optional
 	// +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
 	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
-	DisruptionMode *DisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,5,opt,name=disruptionMode,casttype=DisruptionMode"`
+	DisruptionMode *DisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,5,opt,name=disruptionMode"`
 
 	// PriorityClassName indicates the priority that should be considered when scheduling
 	// a pod group created from this template. If no priority class is specified, admission
@@ -298,19 +298,35 @@ type PodGroupResourceClaim struct {
 	ResourceClaimTemplateName *string `json:"resourceClaimTemplateName,omitempty" protobuf:"bytes,3,opt,name=resourceClaimTemplateName"`
 }
 
-// DisruptionMode describes the mode in which a PodGroup can be disrupted (e.g. preempted).
-// +enum
-// +k8s:enum
-type DisruptionMode string
+// DisruptionMode defines how individual entities within a group can be disrupted.
+// Exactly one mode can be set.
+//
+// +union
+type DisruptionMode struct {
+	// Single specifies that children can be disrupted independently from each other.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:unionMember
+	Single *SingleDisruptionMode `json:"single,omitempty" protobuf:"bytes,1,opt,name=single"`
 
-const (
-	// DisruptionModePod means that individual pods can be disrupted or preempted independently.
-	// It doesn't depend on exact set of pods currently running in this PodGroup.
-	DisruptionModePod DisruptionMode = "Pod"
-	// DisruptionModePodGroup means that the whole PodGroup needs to be disrupted
-	// or preempted together.
-	DisruptionModePodGroup DisruptionMode = "PodGroup"
-)
+	// All specifies that all children can only be disrupted together.
+	//
+	// +optional
+	// +k8s:optional
+	// +k8s:unionMember
+	All *AllDisruptionMode `json:"all,omitempty" protobuf:"bytes,2,opt,name=all"`
+}
+
+// SingleDisruptionMode specifies that children can be disrupted independently.
+type SingleDisruptionMode struct {
+	// Intentionally empty now.
+}
+
+// AllDisruptionMode specifies that children can only be disrupted together.
+type AllDisruptionMode struct {
+	// Intentionally empty now.
+}
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -409,18 +425,18 @@ type PodGroupSpec struct {
 
 	// DisruptionMode defines the mode in which a given PodGroup can be disrupted.
 	// Controllers are expected to fill this field by copying it from a PodGroupTemplate.
-	// One of Pod, PodGroup. Defaults to Pod if unset.
+	// One of Single, All. Defaults to Single if unset.
 	// This field is immutable.
 	// This field is available only when the WorkloadAwarePreemption feature gate
 	// is enabled.
 	//
 	// +featureGate=WorkloadAwarePreemption
+	// +default={"single": {}}
 	// +optional
 	// +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
 	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
 	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:immutable
-	// +default="Pod"
-	DisruptionMode *DisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,5,opt,name=disruptionMode,casttype=DisruptionMode"`
+	DisruptionMode *DisruptionMode `json:"disruptionMode,omitempty" protobuf:"bytes,5,opt,name=disruptionMode"`
 
 	// PriorityClassName defines the priority that should be considered when scheduling this pod group.
 	// Controllers are expected to fill this field by copying it from a PodGroupTemplate.

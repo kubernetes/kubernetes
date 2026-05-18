@@ -14711,6 +14711,18 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: numeric
       default: 0
+- name: io.k8s.api.scheduling.v1alpha3.AllDisruptionMode
+  map:
+    elementType:
+      scalar: untyped
+      list:
+        elementType:
+          namedType: __untyped_atomic_
+        elementRelationship: atomic
+      map:
+        elementType:
+          namedType: __untyped_deduced_
+        elementRelationship: separable
 - name: io.k8s.api.scheduling.v1alpha3.BasicSchedulingPolicy
   map:
     elementType:
@@ -14723,6 +14735,21 @@ var schemaYAML = typed.YAMLObject(`types:
         elementType:
           namedType: __untyped_deduced_
         elementRelationship: separable
+- name: io.k8s.api.scheduling.v1alpha3.DisruptionMode
+  map:
+    fields:
+    - name: all
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha3.AllDisruptionMode
+    - name: single
+      type:
+        namedType: io.k8s.api.scheduling.v1alpha3.SingleDisruptionMode
+    unions:
+    - fields:
+      - fieldName: all
+        discriminatorValue: All
+      - fieldName: single
+        discriminatorValue: Single
 - name: io.k8s.api.scheduling.v1alpha3.GangSchedulingPolicy
   map:
     fields:
@@ -14803,8 +14830,9 @@ var schemaYAML = typed.YAMLObject(`types:
     fields:
     - name: disruptionMode
       type:
-        scalar: string
-      default: Pod
+        namedType: io.k8s.api.scheduling.v1alpha3.DisruptionMode
+      default:
+        single: {}
     - name: podGroupTemplateRef
       type:
         namedType: io.k8s.api.scheduling.v1alpha3.PodGroupTemplateReference
@@ -14853,7 +14881,7 @@ var schemaYAML = typed.YAMLObject(`types:
     fields:
     - name: disruptionMode
       type:
-        scalar: string
+        namedType: io.k8s.api.scheduling.v1alpha3.DisruptionMode
     - name: name
       type:
         scalar: string
@@ -14889,6 +14917,18 @@ var schemaYAML = typed.YAMLObject(`types:
     - fields:
       - fieldName: workload
         discriminatorValue: Workload
+- name: io.k8s.api.scheduling.v1alpha3.SingleDisruptionMode
+  map:
+    elementType:
+      scalar: untyped
+      list:
+        elementType:
+          namedType: __untyped_atomic_
+        elementRelationship: atomic
+      map:
+        elementType:
+          namedType: __untyped_deduced_
+        elementRelationship: separable
 - name: io.k8s.api.scheduling.v1alpha3.TopologyConstraint
   map:
     fields:

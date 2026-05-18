@@ -22,6 +22,8 @@ limitations under the License.
 package v1alpha3
 
 import (
+	json "encoding/json"
+
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -37,8 +39,9 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 
 func SetObjectDefaults_PodGroup(in *schedulingv1alpha3.PodGroup) {
 	if in.Spec.DisruptionMode == nil {
-		var ptrVar1 schedulingv1alpha3.DisruptionMode = "Pod"
-		in.Spec.DisruptionMode = &ptrVar1
+		if err := json.Unmarshal([]byte(`{"single": {}}`), &in.Spec.DisruptionMode); err != nil {
+			panic(err)
+		}
 	}
 }
 

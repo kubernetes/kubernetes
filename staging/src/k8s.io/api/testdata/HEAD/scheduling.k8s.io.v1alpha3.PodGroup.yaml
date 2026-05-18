@@ -33,7 +33,9 @@ metadata:
   selfLink: selfLinkValue
   uid: uidValue
 spec:
-  disruptionMode: disruptionModeValue
+  disruptionMode:
+    all: {}
+    single: {}
   podGroupTemplateRef:
     workload:
       podGroupTemplateName: podGroupTemplateNameValue

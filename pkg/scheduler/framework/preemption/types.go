@@ -96,9 +96,9 @@ func getPodGroup(p *v1.Pod, pgLister schedulinglisters.PodGroupLister) *scheduli
 	return pg
 }
 
-// isDisruptionModePodGroup checks if the PodGroup disruption mode is set to PodGroup.
-func isDisruptionModePodGroup(pg *schedulingapi.PodGroup) bool {
-	return pg != nil && pg.Spec.DisruptionMode != nil && *pg.Spec.DisruptionMode == schedulingapi.DisruptionModePodGroup
+// isDisruptionModeAll checks if the PodGroup disruption mode is set to All.
+func isDisruptionModeAll(pg *schedulingapi.PodGroup) bool {
+	return pg != nil && pg.Spec.DisruptionMode != nil && pg.Spec.DisruptionMode.All != nil
 }
 
 // newDomainForWorkloadPreemption creates a new domain for workload preemption.
@@ -120,7 +120,7 @@ func newDomainForWorkloadPreemption(nodes []fwk.NodeInfo, pgLister schedulinglis
 				victimMap[p.GetPod().UID] = newVictim([]fwk.PodInfo{p}, corev1helpers.PodPriority(p.GetPod()), []fwk.NodeInfo{node})
 				continue
 			}
-			if !isDisruptionModePodGroup(pg) {
+			if !isDisruptionModeAll(pg) {
 				victimMap[p.GetPod().UID] = newVictim([]fwk.PodInfo{p}, util.PodGroupPriority(pg), []fwk.NodeInfo{node})
 				continue
 			}

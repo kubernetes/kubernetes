@@ -16,7 +16,9 @@ limitations under the License.
 
 package v1alpha3
 
-import runtime "k8s.io/apimachinery/pkg/runtime"
+import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
+)
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
