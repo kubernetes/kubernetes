@@ -61,6 +61,10 @@ func filterOutDisabledSpecs(specs et.ExtensionTestSpecs) et.ExtensionTestSpecs {
 			// which are done by a script upstream. In OCP, we added a separate driver csi-hostpath-groupsnapshot,
 			// that will not be skipped by any rule here.
 			"[Driver: csi-hostpath] [Testpattern:  (delete policy)] volumegroupsnapshottable [Feature:volumegroupsnapshot]",
+
+			// https://issues.redhat.com/browse/OCPBUGS-77243
+			// Requires CRI-O be configured to accept insecure registries, which is not done OOTB and not typically recommended (though is possible to do).
+			"[sig-node] Container Runtime blackbox test when running a container with a new image [Serial] should be able to pull from private registry with secret [NodeConformance]",
 		},
 		// tests that are known broken and need to be fixed upstream or in openshift
 		// always add an issue here
@@ -135,9 +139,6 @@ func filterOutDisabledSpecs(specs et.ExtensionTestSpecs) et.ExtensionTestSpecs {
 			"[sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv6]",
 			"[sig-network] Networking should provider Internet connection for containers using DNS",
 
-			// https://bugzilla.redhat.com/show_bug.cgi?id=1957894
-			"[sig-node] Container Runtime blackbox test when running a container with a new image should be able to pull from private registry with secret",
-
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1952457
 			"[sig-node] crictl should be able to run crictl on the node",
 
@@ -172,9 +173,6 @@ func filterOutDisabledSpecs(specs et.ExtensionTestSpecs) et.ExtensionTestSpecs {
 
 			// https://issues.redhat.com/browse/OCPBUGS-61378
 			"[sig-network] Conntrack should be able to cleanup conntrack entries when UDP service target port changes for a NodePort service",
-
-			// https://issues.redhat.com/browse/OCPBUGS-77243
-			"[sig-node] Container Runtime blackbox test when running a container with a new image [Serial] should be able to pull from private registry with secret [NodeConformance]",
 		},
 		// tests that may work, but we don't support them
 		"Unsupported": {
