@@ -1731,7 +1731,7 @@ func TestScaleUpOneMetricInvalid(t *testing.T) {
 		reportedLevels:      []uint64{300, 400, 500},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
-		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelSpec,
 		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
 			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
 			// Actually, such an invalid type should be validated in the kube-apiserver and invalid metric type shouldn't be recorded.
@@ -3598,7 +3598,7 @@ func TestConditionInvalidSourceType(t *testing.T) {
 			},
 		},
 		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
-		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelSpec,
 		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
 			// Actually, such an invalid type should be validated in the kube-apiserver and invalid metric type shouldn't be recorded.
 			"CheddarCheese": monitor.ActionLabelNone,
@@ -5294,7 +5294,7 @@ func TestNoScaleDownOneMetricInvalid(t *testing.T) {
 			{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "InvalidMetricSourceType"},
 		},
 		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
-		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelSpec,
 		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
 			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleDown,
 			"CheddarCheese":                        monitor.ActionLabelNone,
