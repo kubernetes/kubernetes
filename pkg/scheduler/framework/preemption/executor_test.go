@@ -404,6 +404,7 @@ func TestPrepareCandidate(t *testing.T) {
 			nodeNames:             []string{node1Name},
 			expectedStatus:        nil,
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
+			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
 		{
 			name: "one victim with same condition",
@@ -903,7 +904,7 @@ func TestPrepareCandidateAsyncSetsPreemptingSets(t *testing.T) {
 					// preemptPodCallsCounter helps verify if the last victim pod gets preempted after other victims.
 					preemptPodCallsCounter := 0
 					preemptFunc := executor.PreemptPod
-					executor.PreemptPod = func(ctx context.Context, c Candidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) error {
+					executor.PreemptPod = func(ctx context.Context, c Candidate, preemptor ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {
 						// Verify contents of the sets: preempting and lastVictimsPendingPreemption before preemption of subsequent pods.
 						executor.mu.RLock()
 						preemptPodCallsCounter++
@@ -1311,6 +1312,7 @@ func TestPreemptPod(t *testing.T) {
 		addVictimToPrebind bool
 		addVictimToWaiting bool
 		expectCancel       bool
+		expectDeleteEvent  bool
 		expectedActions    []string
 	}{
 		{
@@ -1318,6 +1320,7 @@ func TestPreemptPod(t *testing.T) {
 			addVictimToPrebind: true,
 			addVictimToWaiting: false,
 			expectCancel:       true,
+			expectDeleteEvent:  false,
 			expectedActions:    []string{},
 		},
 		{
@@ -1325,6 +1328,7 @@ func TestPreemptPod(t *testing.T) {
 			addVictimToPrebind: false,
 			addVictimToWaiting: true,
 			expectCancel:       false,
+			expectDeleteEvent:  false,
 			expectedActions:    []string{},
 		},
 		{
@@ -1332,6 +1336,7 @@ func TestPreemptPod(t *testing.T) {
 			addVictimToPrebind: false,
 			addVictimToWaiting: false,
 			expectCancel:       false,
+			expectDeleteEvent:  true,
 			expectedActions:    []string{"patch", "delete"},
 		},
 	}
@@ -1391,9 +1396,12 @@ func TestPreemptPod(t *testing.T) {
 					preemptor = &podGroupExecutorPreemptor{pg: preemptorPodGroup, pods: preemptorPods}
 				}
 
-				err = pe.PreemptPod(ctx, &candidate{name: "fake-node"}, preemptor, victimPod, "test-plugin")
+				deleteEventExpected, err := pe.PreemptPod(ctx, &candidate{name: "fake-node"}, preemptor, victimPod, "test-plugin")
 				if err != nil {
 					t.Fatal(err)
+				}
+				if deleteEventExpected != tt.expectDeleteEvent {
+					t.Fatalf("Expected deleteEventExpected=%v, got %v", tt.expectDeleteEvent, deleteEventExpected)
 				}
 				if tt.expectCancel {
 					if victimCtx.Err() == nil {

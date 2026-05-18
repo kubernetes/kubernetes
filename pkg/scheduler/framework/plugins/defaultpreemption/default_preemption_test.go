@@ -2615,12 +2615,12 @@ func TestPreEnqueue(t *testing.T) {
 
 			finishPreemption := make(chan struct{})
 
-			p.Executor.PreemptPod = func(ctx context.Context, c preemption.Candidate, preemptor preemption.ExecutorPreemptor, victim *v1.Pod, pluginName string) error {
+			p.Executor.PreemptPod = func(ctx context.Context, c preemption.Candidate, preemptor preemption.ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {
 				if !tt.features.EnableAsyncPreemption {
-					return nil
+					return false, nil
 				}
 				<-finishPreemption
-				return nil
+				return true, nil
 			}
 
 			// Fill the cycle state

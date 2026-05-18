@@ -1248,7 +1248,7 @@ func TestAsyncPreemption(t *testing.T) {
 					}
 
 					preemptPodFn := preemptionPlugin.Executor.PreemptPod
-					preemptionPlugin.Executor.PreemptPod = func(ctx context.Context, c preemption.Candidate, preemptor preemption.ExecutorPreemptor, victim *v1.Pod, pluginName string) error {
+					preemptionPlugin.Executor.PreemptPod = func(ctx context.Context, c preemption.Candidate, preemptor preemption.ExecutorPreemptor, victim *v1.Pod, pluginName string) (bool, error) {
 						// block the preemption goroutine to complete until the test case allows it to proceed.
 						lock.Lock()
 						ch, ok := preemptionDoneChannels[preemptor.GetName()]
