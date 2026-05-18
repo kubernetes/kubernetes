@@ -61,6 +61,18 @@ func BenchmarkCacherInit(b *testing.B) {
 		Clock:        clock.RealClock{},
 	}
 
+	// Warm up before timing: the first cacher init pays one-time cold
+	// costs and is reliably ~20% slower than steady state.
+	warm, err := NewCacherFromConfig(config)
+	if err != nil {
+		b.Fatal(err)
+	}
+	if err := warm.Wait(ctx); err != nil {
+		b.Fatal(err)
+	}
+	warm.Stop()
+	etcd3.TestOnlyResetResourceSizeEstimator(etcdStorage)
+
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
