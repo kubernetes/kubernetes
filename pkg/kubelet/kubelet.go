@@ -702,6 +702,7 @@ func NewMainKubelet(ctx context.Context,
 		klet.statusManager.AddPodUpdateNotifier(klet.podsServer)
 	}
 	klet.allocationManager = allocation.NewManager(
+		logger,
 		klet.getRootDir(),
 		klet.statusManager,
 		klet.syncPodNow,
@@ -2879,7 +2880,7 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 			// Check if we can admit the pod; if not, reject it.
 			// We failed pods that we rejected, so activePods include all admitted
 			// pods that are alive.
-			if ok, reason, message := kl.allocationManager.AddPod(kl.GetActivePods(), pod); !ok {
+			if ok, reason, message := kl.allocationManager.AddPod(logger, kl.GetActivePods(), pod); !ok {
 				kl.rejectPod(ctx, pod, reason, message)
 				// We avoid recording the metric in canAdmitPod because it's called
 				// repeatedly during a resize, which would inflate the metric.
@@ -2909,7 +2910,7 @@ func (kl *Kubelet) HandlePodAdditions(ctx context.Context, pods []*v1.Pod) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		kl.statusManager.BackfillPodResizeConditions(pods)
 		for _, uid := range pendingResizes {
-			kl.allocationManager.PushPendingResize(uid)
+			kl.allocationManager.PushPendingResize(logger, uid)
 		}
 		if len(pendingResizes) > 0 {
 			kl.allocationManager.RetryPendingResizes(ctx, allocation.TriggerReasonPodsAdded)
@@ -2938,7 +2939,7 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 			if recordResizeOperations(oldPod, pod) {
 				_, updatedFromAllocation := kl.allocationManager.UpdatePodFromAllocation(pod)
 				if updatedFromAllocation {
-					kl.allocationManager.PushPendingResize(pod.UID)
+					kl.allocationManager.PushPendingResize(logger, pod.UID)
 					// TODO(natasha41575): If the resize is immediately actuated, it will trigger a pod sync
 					// and we will end up calling UpdatePod twice. Figure out if there is a way to avoid this.
 					kl.allocationManager.RetryPendingResizes(ctx, allocation.TriggerReasonPodUpdated)
@@ -3072,7 +3073,7 @@ func (kl *Kubelet) HandlePodRemoves(ctx context.Context, pods []*v1.Pod) {
 	for _, pod := range pods {
 		kl.podCertificateManager.ForgetPod(ctx, pod)
 		kl.podManager.RemovePod(pod)
-		kl.allocationManager.RemovePod(pod.UID)
+		kl.allocationManager.RemovePod(logger, pod.UID)
 
 		pod, mirrorPod, wasMirror := kl.podManager.GetPodAndMirrorPod(pod)
 		if wasMirror {
