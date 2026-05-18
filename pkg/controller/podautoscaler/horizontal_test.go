@@ -181,7 +181,7 @@ type testCase struct {
 	testScaleClient   *scalefake.FakeScaleClient
 
 	recommendations   []timestampedRecommendation
-	hpaSelectors      *selectors.BiMultimap
+	hpaSelectors      map[selectors.Key]labels.Selector
 	initialConditions []autoscalingv2.HorizontalPodAutoscalerCondition
 
 	verifyReconciliationDuration     bool
@@ -868,8 +868,12 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 	if tc.recommendations != nil {
 		hpaController.recommendations["test-namespace/test-hpa"] = tc.recommendations
 	}
-	if tc.hpaSelectors != nil {
-		hpaController.hpaSelectors = tc.hpaSelectors
+	for key, sel := range tc.hpaSelectors {
+		if hpaController.hpaSelectorStore != nil {
+			hpaController.hpaSelectorStore.Put(key.Namespace, key, sel)
+		} else {
+			hpaController.hpaSelectors.PutSelector(key, sel)
+		}
 	}
 
 	// reset all HPA prometheus metrics
@@ -3342,9 +3346,6 @@ func TestConditionInvalidSelectorUnparsable(t *testing.T) {
 }
 
 func TestConditionNoAmbiguousSelectorWhenNoSelectorOverlapBetweenHPAs(t *testing.T) {
-	hpaSelectors := selectors.NewBiMultimap()
-	hpaSelectors.PutSelector(selectors.Key{Name: "test-hpa-2", Namespace: testNamespace}, labels.SelectorFromSet(labels.Set{"cheddar": "cheese"}))
-
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
@@ -3355,7 +3356,9 @@ func TestConditionNoAmbiguousSelectorWhenNoSelectorOverlapBetweenHPAs(t *testing
 		reportedLevels:          []uint64{300, 500, 700},
 		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		useMetricsAPI:           true,
-		hpaSelectors:            hpaSelectors,
+		hpaSelectors: map[selectors.Key]labels.Selector{
+			{Name: "test-hpa-2", Namespace: testNamespace}: labels.SelectorFromSet(labels.Set{"cheddar": "cheese"}),
+		},
 		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
 		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
 		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
@@ -3369,9 +3372,6 @@ func TestConditionNoAmbiguousSelectorWhenNoSelectorOverlapBetweenHPAs(t *testing
 }
 
 func TestConditionAmbiguousSelectorWhenFullSelectorOverlapBetweenHPAs(t *testing.T) {
-	hpaSelectors := selectors.NewBiMultimap()
-	hpaSelectors.PutSelector(selectors.Key{Name: "test-hpa-2", Namespace: testNamespace}, labels.SelectorFromSet(labels.Set{"name": podNamePrefix}))
-
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
@@ -3394,7 +3394,9 @@ func TestConditionAmbiguousSelectorWhenFullSelectorOverlapBetweenHPAs(t *testing
 				Reason: "AmbiguousSelector",
 			},
 		},
-		hpaSelectors: hpaSelectors,
+		hpaSelectors: map[selectors.Key]labels.Selector{
+			{Name: "test-hpa-2", Namespace: testNamespace}: labels.SelectorFromSet(labels.Set{"name": podNamePrefix}),
+		},
 		expectedReportedReconciliationActionLabel:     monitor.ActionLabelNone,
 		expectedReportedReconciliationErrorLabel:      monitor.ErrorLabelInternal,
 		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{},
@@ -3404,9 +3406,6 @@ func TestConditionAmbiguousSelectorWhenFullSelectorOverlapBetweenHPAs(t *testing
 }
 
 func TestConditionAmbiguousSelectorWhenPartialSelectorOverlapBetweenHPAs(t *testing.T) {
-	hpaSelectors := selectors.NewBiMultimap()
-	hpaSelectors.PutSelector(selectors.Key{Name: "test-hpa-2", Namespace: testNamespace}, labels.SelectorFromSet(labels.Set{"cheddar": "cheese"}))
-
 	tc := testCase{
 		minReplicas:             2,
 		maxReplicas:             6,
@@ -3429,7 +3428,9 @@ func TestConditionAmbiguousSelectorWhenPartialSelectorOverlapBetweenHPAs(t *test
 				Reason: "AmbiguousSelector",
 			},
 		},
-		hpaSelectors: hpaSelectors,
+		hpaSelectors: map[selectors.Key]labels.Selector{
+			{Name: "test-hpa-2", Namespace: testNamespace}: labels.SelectorFromSet(labels.Set{"cheddar": "cheese"}),
+		},
 		expectedReportedReconciliationActionLabel:     monitor.ActionLabelNone,
 		expectedReportedReconciliationErrorLabel:      monitor.ErrorLabelInternal,
 		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{},
@@ -5900,11 +5901,16 @@ func (s *spyWorkQueue) getAddRateLimitedCalls() []string {
 
 func newTestEnqueueController(spy *spyWorkQueue) *HorizontalController {
 	monitor.Register()
-	return &HorizontalController{
-		queue:        spy,
-		hpaSelectors: selectors.NewBiMultimap(),
-		monitor:      monitor.New(),
+	ctrl := &HorizontalController{
+		queue:   spy,
+		monitor: monitor.New(),
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.HPAOptimizedSelectorStore) {
+		ctrl.hpaSelectorStore = newHPASelectorStore()
+	} else {
+		ctrl.hpaSelectors = selectors.NewBiMultimap()
+	}
+	return ctrl
 }
 
 func TestEnqueueHPAAddsImmediately(t *testing.T) {
@@ -5936,10 +5942,15 @@ func TestEnqueueHPARegistersSelectorBeforeQueueAdd(t *testing.T) {
 	expectedSelectorKey := selectors.Key{Name: "test-hpa", Namespace: "test-ns"}
 	spy.onAdd = func(item string) {
 		assert.Equal(t, expectedKey, item)
-		ctrl.hpaSelectorsMux.Lock()
-		defer ctrl.hpaSelectorsMux.Unlock()
-		assert.True(t, ctrl.hpaSelectors.SelectorExists(expectedSelectorKey),
-			"selector registration should happen before queue.Add")
+		if ctrl.hpaSelectorStore != nil {
+			assert.False(t, ctrl.hpaSelectorStore.PutIfAbsent(expectedSelectorKey.Namespace, expectedSelectorKey, labels.Nothing()),
+				"selector registration should happen before queue.Add")
+		} else {
+			ctrl.hpaSelectorsMux.Lock()
+			defer ctrl.hpaSelectorsMux.Unlock()
+			assert.True(t, ctrl.hpaSelectors.SelectorExists(expectedSelectorKey),
+				"selector registration should happen before queue.Add")
+		}
 	}
 
 	hpa := &autoscalingv2.HorizontalPodAutoscaler{
@@ -6119,10 +6130,9 @@ func (f *fakeRVGetter) LastStoreSyncResourceVersion() string { return f.rv }
 
 func newConsistencyTestController(hpaLister autoscalinglisters.HorizontalPodAutoscalerLister, consistencyStore consistencyutil.ConsistencyStore) *HorizontalController {
 	monitor.Register()
-	return &HorizontalController{
+	ctrl := &HorizontalController{
 		hpaLister:        hpaLister,
 		hpaListerSynced:  alwaysReady,
-		hpaSelectors:     selectors.NewBiMultimap(),
 		monitor:          monitor.New(),
 		consistencyStore: consistencyStore,
 		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
@@ -6130,6 +6140,12 @@ func newConsistencyTestController(hpaLister autoscalinglisters.HorizontalPodAuto
 			workqueue.TypedRateLimitingQueueConfig[string]{Name: "test"},
 		),
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.HPAOptimizedSelectorStore) {
+		ctrl.hpaSelectorStore = newHPASelectorStore()
+	} else {
+		ctrl.hpaSelectors = selectors.NewBiMultimap()
+	}
+	return ctrl
 }
 
 // TestUpdateStatusPopulatesConsistencyStore verifies updateStatus records the
