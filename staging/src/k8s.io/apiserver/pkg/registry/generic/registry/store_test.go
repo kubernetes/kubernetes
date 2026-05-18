@@ -152,6 +152,8 @@ func TestCompleteWithOptionsDefaultsStoreKeyFuncs(t *testing.T) {
 		ctx           context.Context
 		expectRootKey string
 		expectKey     string
+		expectName    string
+		expectNS      string
 	}{
 		{
 			name:          "namespaced",
@@ -159,6 +161,8 @@ func TestCompleteWithOptionsDefaultsStoreKeyFuncs(t *testing.T) {
 			ctx:           genericapirequest.WithNamespace(genericapirequest.NewContext(), "ns1"),
 			expectRootKey: "/pods/ns1",
 			expectKey:     "/pods/ns1/pod1",
+			expectName:    "pod1",
+			expectNS:      "ns1",
 		},
 		{
 			name:          "cluster scoped",
@@ -166,6 +170,7 @@ func TestCompleteWithOptionsDefaultsStoreKeyFuncs(t *testing.T) {
 			ctx:           genericapirequest.NewContext(),
 			expectRootKey: "/pods",
 			expectKey:     "/pods/pod1",
+			expectName:    "pod1",
 		},
 	}
 
@@ -204,6 +209,17 @@ func TestCompleteWithOptionsDefaultsStoreKeyFuncs(t *testing.T) {
 			}
 			if got != tc.expectKey {
 				t.Fatalf("KeyFunc returned %q, expect %q", got, tc.expectKey)
+			}
+			keyFuncs := defaultStoreKeyFuncs("/pods", "/registry/pods", tc.namespaced)
+			if keyFuncs.storageReverseKeyFunc == nil {
+				t.Fatal("ReverseKeyFunc was not defaulted")
+			}
+			name, namespace, err := keyFuncs.storageReverseKeyFunc(storage.StorageKey("/registry" + tc.expectKey))
+			if err != nil {
+				t.Fatalf("ReverseKeyFunc failed: %v", err)
+			}
+			if name != tc.expectName || namespace != tc.expectNS {
+				t.Fatalf("ReverseKeyFunc returned name=%q namespace=%q, expect name=%q namespace=%q", name, namespace, tc.expectName, tc.expectNS)
 			}
 		})
 	}
@@ -304,26 +320,112 @@ func TestDefaultStoreKeyFuncs(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			keyFuncs := defaultStoreKeyFuncs("/pods", tc.namespaced)
+			keyFuncs := defaultStoreKeyFuncs("/pods", "/registry/pods", tc.namespaced)
 
-			if got := keyFuncs.storageRootKeyFunc(tc.ctx); got != tc.expectRootKey {
-				t.Fatalf("storageRootKeyFunc returned %q, expect %q", got, tc.expectRootKey)
+			if got := keyFuncs.requestKeyRootFunc(tc.ctx); got != tc.expectRootKey {
+				t.Fatalf("requestKeyRootFunc returned %q, expect %q", got, tc.expectRootKey)
 			}
 
-			gotKey, err := keyFuncs.storageKeyFunc(tc.ctx, tc.keyName)
+			gotKey, err := keyFuncs.requestKeyFunc(tc.ctx, tc.keyName)
 			if (err != nil) != tc.expectKeyErr {
-				t.Fatalf("storageKeyFunc error = %v, expectErr %t", err, tc.expectKeyErr)
+				t.Fatalf("requestKeyFunc error = %v, expectErr %t", err, tc.expectKeyErr)
 			}
 			if err == nil && gotKey != tc.expectKey {
-				t.Fatalf("storageKeyFunc returned %q, expect %q", gotKey, tc.expectKey)
+				t.Fatalf("requestKeyFunc returned %q, expect %q", gotKey, tc.expectKey)
 			}
 
-			gotCacheKey, err := keyFuncs.cacheKeyFunc(tc.obj)
+			gotCacheKey, err := keyFuncs.objectKeyFunc(tc.obj)
 			if (err != nil) != tc.expectCacheKeyErr {
-				t.Fatalf("cacheKeyFunc error = %v, expectErr %t", err, tc.expectCacheKeyErr)
+				t.Fatalf("objectKeyFunc error = %v, expectErr %t", err, tc.expectCacheKeyErr)
 			}
 			if err == nil && gotCacheKey != tc.expectCacheKey {
-				t.Fatalf("cacheKeyFunc returned %q, expect %q", gotCacheKey, tc.expectCacheKey)
+				t.Fatalf("objectKeyFunc returned %q, expect %q", gotCacheKey, tc.expectCacheKey)
+			}
+
+			if tc.expectKey != "" {
+				if keyFuncs.storageReverseKeyFunc == nil {
+					t.Fatal("ReverseKeyFunc is nil")
+				}
+				name, namespace, err := keyFuncs.storageReverseKeyFunc(storage.StorageKey("/registry" + tc.expectKey))
+				if err != nil {
+					t.Fatalf("ReverseKeyFunc error = %v", err)
+				}
+				accessor, err := meta.Accessor(tc.obj)
+				if err != nil {
+					t.Fatalf("failed to access test object: %v", err)
+				}
+				expectedNamespace := ""
+				if tc.namespaced {
+					expectedNamespace = accessor.GetNamespace()
+				}
+				if name != accessor.GetName() || namespace != expectedNamespace {
+					t.Fatalf("ReverseKeyFunc returned name=%q namespace=%q, expect name=%q namespace=%q", name, namespace, accessor.GetName(), expectedNamespace)
+				}
+			}
+		})
+	}
+}
+
+func TestReverseKeyFunc(t *testing.T) {
+	keyPrefix := "/registry/pods"
+	testCases := []struct {
+		name           string
+		reverseKeyFunc storage.ReverseKeyFunc
+		key            storage.StorageKey
+		expectName     string
+		expectNS       string
+		expectErr      bool
+	}{
+		{
+			name:           "namespaced",
+			reverseKeyFunc: NamespaceReverseKeyFunc(keyPrefix),
+			key:            "/registry/pods/ns1/pod1",
+			expectName:     "pod1",
+			expectNS:       "ns1",
+		},
+		{
+			name:           "cluster scoped",
+			reverseKeyFunc: NoNamespaceReverseKeyFunc(keyPrefix),
+			key:            "/registry/pods/pod1",
+			expectName:     "pod1",
+		},
+		{
+			name:           "invalid prefix",
+			reverseKeyFunc: NamespaceReverseKeyFunc(keyPrefix),
+			key:            "/registry/services/ns1/pod1",
+			expectErr:      true,
+		},
+		{
+			name:           "invalid namespaced key",
+			reverseKeyFunc: NamespaceReverseKeyFunc(keyPrefix),
+			key:            "/registry/pods/ns1/pod1/extra",
+			expectErr:      true,
+		},
+		{
+			name:           "invalid cluster scoped key",
+			reverseKeyFunc: NoNamespaceReverseKeyFunc(keyPrefix),
+			key:            "/registry/pods/pod1/extra",
+			expectErr:      true,
+		},
+		{
+			name:           "empty cluster scoped name",
+			reverseKeyFunc: NoNamespaceReverseKeyFunc(keyPrefix),
+			key:            "/registry/pods/",
+			expectErr:      true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			name, namespace, err := tc.reverseKeyFunc(tc.key)
+			if (err != nil) != tc.expectErr {
+				t.Fatalf("reverseKeyFunc error = %v, expectErr %t", err, tc.expectErr)
+			}
+			if err != nil {
+				return
+			}
+			if name != tc.expectName || namespace != tc.expectNS {
+				t.Fatalf("reverseKeyFunc returned name=%q namespace=%q, expect name=%q namespace=%q", name, namespace, tc.expectName, tc.expectNS)
 			}
 		})
 	}
@@ -2587,7 +2689,7 @@ func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheE
 	newListFunc := func() runtime.Object { return &example.PodList{} }
 
 	sc.Codec = apitesting.TestStorageCodec(codecs, examplev1.SchemeGroupVersion)
-	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, "/pods")
+	s, dFunc, err := factory.Create(*sc.ForResource(schema.GroupResource{Resource: "pods"}), newFunc, newListFunc, nil, "/pods")
 	if err != nil {
 		t.Fatalf("Error creating storage: %v", err)
 	}
