@@ -445,6 +445,8 @@ type Plugin interface {
 type PreEnqueuePlugin interface {
 	Plugin
 	// PreEnqueue is called prior to adding Pods to activeQ or backoffQ.
+	// An unsuccessful status marks the pod as gated and moves it to unschedulableQ.
+	// Gated pods are only re-evaluated on events registered by the gating plugin or wildcard events.
 	PreEnqueue(ctx context.Context, p *v1.Pod) *Status
 }
 
