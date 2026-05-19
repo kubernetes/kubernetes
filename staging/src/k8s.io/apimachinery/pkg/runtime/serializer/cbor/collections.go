@@ -1,5 +1,5 @@
 /*
-Copyright 2026 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/conversion"
+	"k8s.io/klog/v2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -42,15 +43,18 @@ func streamEncodeCollections(obj runtime.Object, w io.Writer, mode modes.EncMode
 		return true, streamingEncodeUnstructuredList(w, list, mode)
 	}
 	if _, ok := obj.(cbor.Marshaler); ok {
+		klog.InfoS("is implement cbor.Marshaler", "obj", obj)
 		return false, nil
 	}
 	if _, ok := obj.(json.Marshaler); ok {
+		klog.InfoS("is implement json.Marshaler", "obj", obj)
 		return false, nil
 	}
 	typeMeta, listMeta, items, err := getListMeta(obj)
 	if err == nil {
 		return true, streamingEncodeList(w, typeMeta, listMeta, items, mode)
 	}
+	klog.ErrorS(err, "getListMeta err", "obj", obj)
 	return false, nil
 }
 
@@ -69,8 +73,13 @@ func getListMeta(list runtime.Object) (metav1.TypeMeta, metav1.ListMeta, []runti
 	if !ok {
 		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, fmt.Errorf("expected TypeMeta field to have TypeMeta type")
 	}
-	if listType.Field(0).Tag.Get("json") != ",inline" {
-		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, fmt.Errorf(`expected TypeMeta json field tag to be ",inline"`)
+	if !listType.Field(0).Anonymous {
+		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, fmt.Errorf(`expected TypeMeta json field tag to be embedded`)
+	}
+	if jsonTag, jsonTagExists := listType.Field(0).Tag.Lookup("json"); !jsonTagExists {
+		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, fmt.Errorf(`expected TypeMeta json field tag`)
+	} else if jsonTag != "" && jsonTag != ",inline" {
+		return metav1.TypeMeta{}, metav1.ListMeta{}, nil, fmt.Errorf(`expected TypeMeta json field tag to be "" or ",inline"`)
 	}
 	// ListMeta
 	listMeta, ok := listValue.Field(1).Interface().(metav1.ListMeta)
@@ -222,13 +231,13 @@ func encodeKeyValuePair(w io.Writer, key string, value interface{}, mode modes.E
 // writeMapHead writes a CBOR map header for a map with n entries.
 // Uses major type 5 (0xa0 base), following RFC 8949 Section 3.1.
 func writeMapHead(w io.Writer, n int) error {
-	return writeCollectionHead(w, 0xa0, n)
+	return writeCollectionHead(w, 0xa0, int64(n))
 }
 
 // writeArrayHead writes a CBOR array header for an array with n elements.
 // Uses major type 4 (0x80 base), following RFC 8949 Section 3.1.
 func writeArrayHead(w io.Writer, n int) error {
-	return writeCollectionHead(w, 0x80, n)
+	return writeCollectionHead(w, 0x80, int64(n))
 }
 
 // writeCollectionHead writes a CBOR collection (array or map) header encoding
@@ -250,7 +259,7 @@ func writeArrayHead(w io.Writer, n int) error {
 //	n <= 0xFFFF:      3 bytes — 0xb9 (0xa0|25), n>>8, n
 //	n <= 0xFFFFFFFF:  5 bytes — 0xba (0xa0|26), n>>24..n
 //	n > 0xFFFFFFFF:   9 bytes — 0xbb (0xa0|27), n>>56..n
-func writeCollectionHead(w io.Writer, base byte, n int) error {
+func writeCollectionHead(w io.Writer, base byte, n int64) error {
 	switch {
 	case n <= 23:
 		// Additional info 0–23: length is encoded directly in the low 5 bits.
