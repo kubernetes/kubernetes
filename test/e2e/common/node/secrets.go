@@ -78,6 +78,17 @@ var _ = SIGDescribe("Secrets", func() {
 									},
 								},
 							},
+							{
+								Name: "SECRET_DATA_BINARY",
+								ValueFrom: &v1.EnvVarSource{
+									SecretKeyRef: &v1.SecretKeySelector{
+										LocalObjectReference: v1.LocalObjectReference{
+											Name: name,
+										},
+										Key: "data-binary-1",
+									},
+								},
+							},
 						},
 					},
 				},
@@ -87,6 +98,7 @@ var _ = SIGDescribe("Secrets", func() {
 
 		e2epodoutput.TestContainerOutput(ctx, f, "consume secrets", pod, 0, []string{
 			"SECRET_DATA=value-1",
+			"SECRET_DATA_BINARY=\x80",
 		})
 	})
 
@@ -130,8 +142,8 @@ var _ = SIGDescribe("Secrets", func() {
 		}
 
 		e2epodoutput.TestContainerOutput(ctx, f, "consume secrets", pod, 0, []string{
-			"data-1=value-1", "data-2=value-2", "data-3=value-3",
-			"p-data-1=value-1", "p-data-2=value-2", "p-data-3=value-3",
+			"data-1=value-1", "data-2=value-2", "data-3=value-3", "data-binary-1=\x80",
+			"p-data-1=value-1", "p-data-2=value-2", "p-data-3=value-3", "p-data-binary-1=\x80",
 		})
 	})
 
@@ -304,15 +316,15 @@ var _ = SIGDescribe("Secrets", func() {
 
 		e2epodoutput.TestContainerOutput(ctx, f, "consume secrets", pod, 0, []string{
 			// Original values without prefix
-			"data-1=value-1", "data-2=value-2", "data-3=value-3",
+			"data-1=value-1", "data-2=value-2", "data-3=value-3", "data-binary-1=\x80",
 			// Values with digit prefix
-			"1-data-1=value-1", "1-data-2=value-2", "1-data-3=value-3",
+			"1-data-1=value-1", "1-data-2=value-2", "1-data-3=value-3", "1-data-binary-1=\x80",
 			// Values with special character prefix
-			"$_-data-1=value-1", "$_-data-2=value-2", "$_-data-3=value-3",
+			"$_-data-1=value-1", "$_-data-2=value-2", "$_-data-3=value-3", "$_-data-binary-1=\x80",
 			// Values with uppercase letter prefix
-			"ABC_data-1=value-1", "ABC_data-2=value-2", "ABC_data-3=value-3",
+			"ABC_data-1=value-1", "ABC_data-2=value-2", "ABC_data-3=value-3", "ABC_data-binary-1=\x80",
 			// Values with symbol prefix
-			"#@!data-1=value-1", "#@!data-2=value-2", "#@!data-3=value-3",
+			"#@!data-1=value-1", "#@!data-2=value-2", "#@!data-3=value-3", "#@!data-binary-1=\x80",
 		})
 	})
 })
@@ -324,9 +336,10 @@ func secretForTest(namespace, name string) *v1.Secret {
 			Name:      name,
 		},
 		Data: map[string][]byte{
-			"data-1": []byte("value-1\n"),
-			"data-2": []byte("value-2\n"),
-			"data-3": []byte("value-3\n"),
+			"data-1":        []byte("value-1\n"),
+			"data-2":        []byte("value-2\n"),
+			"data-3":        []byte("value-3\n"),
+			"data-binary-1": []byte{0x80}, // non-utf8 data
 		},
 	}
 }
