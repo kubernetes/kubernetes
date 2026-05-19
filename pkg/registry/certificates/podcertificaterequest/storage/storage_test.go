@@ -242,7 +242,7 @@ func TestUpdateStatus(t *testing.T) {
 	defer server.Terminate(t)
 	defer statusStorage.store.DestroyFunc()
 
-	test := genericregistrytest.New(t, statusStorage.store)
+	test := genericregistrytest.New(t, statusStorage.store, "status")
 	test.SetUserInfo(&user.DefaultInfo{
 		Name: "foo",
 	})
@@ -309,7 +309,7 @@ func TestUpdateStatusStompsSpec(t *testing.T) {
 	defer server.Terminate(t)
 	defer statusStorage.store.DestroyFunc()
 
-	test := genericregistrytest.New(t, statusStorage.store)
+	test := genericregistrytest.New(t, statusStorage.store, "status")
 	test.SetUserInfo(&user.DefaultInfo{
 		Name: "foo",
 	})
@@ -355,7 +355,7 @@ func TestUpdateStatusFailsWhenAuthorizerDenies(t *testing.T) {
 	defer server.Terminate(t)
 	defer statusStorage.store.DestroyFunc()
 
-	test := genericregistrytest.New(t, statusStorage.store)
+	test := genericregistrytest.New(t, statusStorage.store, "status")
 	test.SetUserInfo(&user.DefaultInfo{
 		Name: "foo",
 	})
