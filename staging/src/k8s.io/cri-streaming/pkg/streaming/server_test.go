@@ -305,6 +305,7 @@ func runRemoteCommandTest(t *testing.T, commandType string) {
 		resp, err := s.GetExec(&runtimeapi.ExecRequest{
 			ContainerId: containerID,
 			Cmd:         []string{"echo"},
+			Env:         []string{"env1=value1", "env2=value2"},
 			Stdin:       stdin,
 			Stdout:      stdout,
 			Stderr:      stderr,
@@ -379,8 +380,9 @@ type fakeRuntime struct {
 	t *testing.T
 }
 
-func (f *fakeRuntime) Exec(_ context.Context, containerID string, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommandserver.TerminalSize) error {
+func (f *fakeRuntime) Exec(_ context.Context, containerID string, cmd []string, env []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan remotecommandserver.TerminalSize) error {
 	assert.Equal(f.t, testContainerID, containerID)
+	assert.Equal(f.t, []string{"env1=value1", "env2=value2"}, env)
 	doServerStreams(f.t, "exec", stdin, stdout, stderr)
 	return nil
 }

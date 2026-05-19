@@ -1328,10 +1328,12 @@ func (m *kubeGenericRuntimeManager) GetContainerLogs(ctx context.Context, pod *v
 }
 
 // GetExec gets the endpoint the runtime will serve the exec request from.
-func (m *kubeGenericRuntimeManager) GetExec(ctx context.Context, id kubecontainer.ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error) {
+// env comes from the kubelet exec query string today; kubelet may append injected variables later.
+func (m *kubeGenericRuntimeManager) GetExec(ctx context.Context, id kubecontainer.ContainerID, cmd []string, env []string, stdin, stdout, stderr, tty bool) (*url.URL, error) {
 	req := &runtimeapi.ExecRequest{
 		ContainerId: id.ID,
 		Cmd:         cmd,
+		Env:         env,
 		Tty:         tty,
 		Stdin:       stdin,
 		Stdout:      stdout,

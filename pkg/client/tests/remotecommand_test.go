@@ -55,15 +55,15 @@ type fakeExecutor struct {
 	exec          bool
 }
 
-func (ex *fakeExecutor) ExecInContainer(_ context.Context, name string, uid string, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
-	return ex.run(name, uid, container, cmd, in, out, err, tty)
+func (ex *fakeExecutor) ExecInContainer(_ context.Context, name string, uid string, container string, cmd []string, env []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize, timeout time.Duration) error {
+	return ex.run(name, uid, container, cmd, env, in, out, err, tty)
 }
 
 func (ex *fakeExecutor) AttachContainer(_ context.Context, name string, uid string, container string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan remotecommand.TerminalSize) error {
-	return ex.run(name, uid, container, nil, in, out, err, tty)
+	return ex.run(name, uid, container, nil, nil, in, out, err, tty)
 }
 
-func (ex *fakeExecutor) run(name string, uid string, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error {
+func (ex *fakeExecutor) run(name string, uid string, container string, cmd []string, env []string, in io.Reader, out, err io.WriteCloser, tty bool) error {
 	ex.command = cmd
 	ex.tty = tty
 
@@ -127,7 +127,8 @@ func fakeServer(t *testing.T, requestReceived chan struct{}, testName string, ex
 		}
 		if exec {
 			cmd := req.URL.Query()[api.ExecCommandParam]
-			remotecommand.ServeExec(w, req, executor, "pod", "uid", "container", cmd, opts, 0, 10*time.Second, serverProtocols)
+			env := req.URL.Query()[api.ExecEnvParam]
+			remotecommand.ServeExec(w, req, executor, "pod", "uid", "container", cmd, env, opts, 0, 10*time.Second, serverProtocols)
 		} else {
 			remotecommand.ServeAttach(w, req, executor, "pod", "uid", "container", opts, 0, 10*time.Second, serverProtocols)
 		}

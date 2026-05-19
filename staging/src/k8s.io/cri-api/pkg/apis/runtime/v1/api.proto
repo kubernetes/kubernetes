@@ -1633,6 +1633,8 @@ message ExecRequest {
     // in this case. The output of stdout and stderr will be combined to a
     // single stream.
     bool stderr = 6;
+    // Environment variables to set in the exec'd container process.
+    repeated string env = 7;
 }
 
 message ExecResponse {
