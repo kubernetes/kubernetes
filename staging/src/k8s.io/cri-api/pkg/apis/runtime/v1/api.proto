@@ -839,7 +839,7 @@ message ImageSpec {
 
 message KeyValue {
     string key = 1;
-    string value = 2;
+    bytes value = 2;
 }
 
 // LinuxContainerResources specifies Linux specific configuration for
