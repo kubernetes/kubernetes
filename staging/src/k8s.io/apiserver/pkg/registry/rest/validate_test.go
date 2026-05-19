@@ -175,7 +175,7 @@ func TestValidateDeclaratively(t *testing.T) {
 			} else {
 				cfg.OpType = operation.Update
 			}
-			results := panicSafeValidateFunc(validateDeclaratively)(ctx, scheme, tc.object, tc.oldObject, cfg)
+			results := runDeclarativeValidationWithRecover(ctx, scheme, tc.object, tc.oldObject, cfg)
 			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
 			matcher.Test(t, tc.expected, results)
 		})
@@ -458,31 +458,32 @@ func TestCompareDeclarativeErrorsAndEmitMismatches(t *testing.T) {
 	}
 }
 
-func TestWithRecover(t *testing.T) {
-	ctx := context.Background()
-	scheme := runtime.NewScheme()
-	var options []string
-	obj := &runtime.Unknown{}
+func TestRunDeclarativeValidationWithRecover(t *testing.T) {
+	ctx := genericapirequest.WithRequestInfo(context.Background(), &genericapirequest.RequestInfo{
+		APIGroup:   "",
+		APIVersion: "v1",
+	})
+	obj := &v1.Pod{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"}}
 
 	testCases := []struct {
 		name       string
-		validateFn func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList
+		opType     operation.Type
+		oldObj     runtime.Object
+		validateFn func(ctx context.Context, op operation.Operation, object, oldObject any) field.ErrorList
 		wantErrs   field.ErrorList
 	}{
 		{
-			name: "no panic",
-			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList {
-				return field.ErrorList{
-					field.Invalid(field.NewPath("field"), "value", "reason"),
-				}
+			name:   "no panic on create",
+			opType: operation.Create,
+			validateFn: func(context.Context, operation.Operation, any, any) field.ErrorList {
+				return field.ErrorList{field.Invalid(field.NewPath("field"), "value", "reason")}
 			},
-			wantErrs: field.ErrorList{
-				field.Invalid(field.NewPath("field"), "value", "reason"),
-			},
+			wantErrs: field.ErrorList{field.Invalid(field.NewPath("field"), "value", "reason")},
 		},
 		{
-			name: "panic returns InternalError",
-			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList {
+			name:   "panic on create returns InternalError",
+			opType: operation.Create,
+			validateFn: func(context.Context, operation.Operation, any, any) field.ErrorList {
 				panic("test panic")
 			},
 			wantErrs: field.ErrorList{
@@ -490,52 +491,10 @@ func TestWithRecover(t *testing.T) {
 			},
 		},
 		{
-			name: "nil return, no panic",
-			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList {
-				return nil
-			},
-			wantErrs: nil,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			wrapped := panicSafeValidateFunc(tc.validateFn)
-			gotErrs := wrapped(ctx, scheme, obj, nil, &ValidationConfigOption{ValidationIdentifier: "test_validationIdentifier", OpType: operation.Create, DeclarativeValidationConfig: DeclarativeValidationConfig{Options: options}})
-
-			if !equalErrorLists(gotErrs, tc.wantErrs) {
-				t.Errorf("panicSafeValidateFunc() gotErrs = %#v, want %#v", gotErrs, tc.wantErrs)
-			}
-		})
-	}
-}
-
-func TestWithRecoverUpdate(t *testing.T) {
-	ctx := context.Background()
-	scheme := runtime.NewScheme()
-	var options []string
-	obj := &runtime.Unknown{}
-	oldObj := &runtime.Unknown{}
-
-	testCases := []struct {
-		name       string
-		validateFn func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList
-		wantErrs   field.ErrorList
-	}{
-		{
-			name: "no panic",
-			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList {
-				return field.ErrorList{
-					field.Invalid(field.NewPath("field"), "value", "reason"),
-				}
-			},
-			wantErrs: field.ErrorList{
-				field.Invalid(field.NewPath("field"), "value", "reason"),
-			},
-		},
-		{
-			name: "panic returns InternalError",
-			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList {
+			name:   "panic on update returns InternalError",
+			opType: operation.Update,
+			oldObj: &v1.Pod{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"}},
+			validateFn: func(context.Context, operation.Operation, any, any) field.ErrorList {
 				panic("test update panic")
 			},
 			wantErrs: field.ErrorList{
@@ -543,8 +502,9 @@ func TestWithRecoverUpdate(t *testing.T) {
 			},
 		},
 		{
-			name: "nil return, no panic",
-			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList {
+			name:   "nil return, no panic",
+			opType: operation.Create,
+			validateFn: func(context.Context, operation.Operation, any, any) field.ErrorList {
 				return nil
 			},
 			wantErrs: nil,
@@ -553,11 +513,18 @@ func TestWithRecoverUpdate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			wrapped := panicSafeValidateFunc(tc.validateFn)
-			gotErrs := wrapped(ctx, scheme, obj, oldObj, &ValidationConfigOption{ValidationIdentifier: "test_validationIdentifier", OpType: operation.Update, DeclarativeValidationConfig: DeclarativeValidationConfig{Options: options}})
+			scheme := runtime.NewScheme()
+			scheme.AddKnownTypes(schema.GroupVersion{Version: "v1"}, &v1.Pod{})
+			scheme.AddValidationFunc(&v1.Pod{}, tc.validateFn)
+
+			cfg := &ValidationConfigOption{
+				ValidationIdentifier: "test_validationIdentifier",
+				OpType:               tc.opType,
+			}
+			gotErrs := runDeclarativeValidationWithRecover(ctx, scheme, obj, tc.oldObj, cfg)
 
 			if !equalErrorLists(gotErrs, tc.wantErrs) {
-				t.Errorf("panicSafeValidateUpdateFunc() gotErrs = %#v, want %#v", gotErrs, tc.wantErrs)
+				t.Errorf("runDeclarativeValidationWithRecover() gotErrs = %#v, want %#v", gotErrs, tc.wantErrs)
 			}
 		})
 	}

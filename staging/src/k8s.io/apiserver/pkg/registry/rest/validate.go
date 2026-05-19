@@ -317,26 +317,16 @@ func gatherDeclarativeValidationMismatches(imperativeErrs, declarativeErrs field
 	return mismatchDetails
 }
 
-// createDeclarativeValidationPanicHandler returns a function with panic recovery logic
-// that increments the panic metric and appends an InternalError to errs.
-func createDeclarativeValidationPanicHandler(errs *field.ErrorList, validationIdentifier string) func() {
-	return func() {
+// runDeclarativeValidationWithRecover invokes validateDeclaratively with panic recovery.
+// On panic, the panic metric is incremented and an InternalError is appended to the returned errors.
+func runDeclarativeValidationWithRecover(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *ValidationConfigOption) (errs field.ErrorList) {
+	defer func() {
 		if r := recover(); r != nil {
-			validationmetrics.Metrics.IncDeclarativeValidationPanicMetric(validationIdentifier)
-			*errs = append(*errs, field.InternalError(nil, fmt.Errorf("panic during declarative validation: %v", r)))
+			validationmetrics.Metrics.IncDeclarativeValidationPanicMetric(o.ValidationIdentifier)
+			errs = append(errs, field.InternalError(nil, fmt.Errorf("panic during declarative validation: %v", r)))
 		}
-	}
-}
-
-// panicSafeValidateFunc wraps a validation function with panic recovery logic.
-// On panic, the panic metric is incremented and an InternalError is returned in errs.
-func panicSafeValidateFunc(
-	validateFunc func(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *ValidationConfigOption) field.ErrorList,
-) func(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *ValidationConfigOption) field.ErrorList {
-	return func(ctx context.Context, scheme *runtime.Scheme, obj, oldObj runtime.Object, o *ValidationConfigOption) (errs field.ErrorList) {
-		defer createDeclarativeValidationPanicHandler(&errs, o.ValidationIdentifier)()
-		return validateFunc(ctx, scheme, obj, oldObj, o)
-	}
+	}()
+	return validateDeclaratively(ctx, scheme, obj, oldObj, o)
 }
 
 func metricIdentifier(ctx context.Context, scheme *runtime.Scheme, obj runtime.Object, opType operation.Type) (string, error) {
@@ -405,7 +395,7 @@ func ValidateDeclarativelyWithMigrationChecks(ctx context.Context, scheme *runti
 		DeclarativeValidationConfig: config,
 	}
 
-	declarativeErrs := panicSafeValidateFunc(validateDeclaratively)(ctx, scheme, obj, oldObj, cfg)
+	declarativeErrs := runDeclarativeValidationWithRecover(ctx, scheme, obj, oldObj, cfg)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.DeclarativeValidation) {
 		// Standard errors are authoritative and may not have handwritten counterparts (e.g., in new APIs).
