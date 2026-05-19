@@ -986,6 +986,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 		pods []*v1.Pod,
 		totalPods int,
 		selector labels.Selector,
+		now time.Time,
 	) []*v1.Pod {
 		// in burst mode, 2 pods got deleted, so 2 new pods will be created at the same time
 		if len(pods) != totalPods {
@@ -994,9 +995,9 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 
 		// if pod 4 ready, start to update pod 3.
 		spc.setPodRunning(set, 4)
-		originalPods, _ := spc.setPodReadyCondition(set, 4, true, time.Now())
+		originalPods, _ := spc.setPodReadyCondition(set, 4, true, now)
 		sort.Sort(ascendingOrdinal(originalPods))
-		if _, err := ssc.UpdateStatefulSet(context.TODO(), set, originalPods, time.Now()); err != nil {
+		if _, err := ssc.UpdateStatefulSet(context.TODO(), set, originalPods, now); err != nil {
 			t.Fatal(err)
 		}
 		pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
@@ -1010,7 +1011,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 		}
 
 		// create new pod 3
-		if _, err = ssc.UpdateStatefulSet(context.TODO(), set, pods, time.Now()); err != nil {
+		if _, err = ssc.UpdateStatefulSet(context.TODO(), set, pods, now); err != nil {
 			t.Fatal(err)
 		}
 		pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
@@ -1030,16 +1031,17 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 		pods []*v1.Pod,
 		totalPods int,
 		selector labels.Selector,
+		now time.Time,
 	) []*v1.Pod {
 		// only one pod gets created at a time due to OrderedReady
 		if len(pods) != 5 {
 			t.Fatalf("Expected create pods 5, got pods %v", len(pods))
 		}
 		spc.setPodRunning(set, 4)
-		spc.setPodReadyCondition(set, 4, true, time.Now()) // nolint:errcheck
+		spc.setPodReadyCondition(set, 4, true, now) // nolint:errcheck
 
 		// create new pod 4 (only one pod gets created at a time due to OrderedReady)
-		if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods, time.Now()); err != nil {
+		if _, err := ssc.UpdateStatefulSet(context.TODO(), set, pods, now); err != nil {
 			t.Fatal(err)
 		}
 		pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
@@ -1063,6 +1065,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 			pods []*v1.Pod,
 			totalPods int,
 			selector labels.Selector,
+			now time.Time,
 		) []*v1.Pod
 	}{
 		{apps.OrderedReadyPodManagement, simpleOrderedVerificationFn},
@@ -1084,6 +1087,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 			}(),
 		}
 
+		fakeClock := testingclock.NewFakeClock(time.Date(2026, time.March, 12, 12, 0, 0, 0, time.UTC))
 		client := fake.NewSimpleClientset()
 		spc, _, ssc := setupController(client)
 		if err := scaleUpStatefulSetControl(set, ssc, spc, assertBurstInvariants, nil); err != nil {
@@ -1108,7 +1112,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 		sort.Sort(ascendingOrdinal(originalPods))
 
 		// since maxUnavailable is 2, update pods 4 and 5, this will delete the pod 4 and 5,
-		if _, err = ssc.UpdateStatefulSet(context.TODO(), set, originalPods, time.Now()); err != nil {
+		if _, err = ssc.UpdateStatefulSet(context.TODO(), set, originalPods, fakeClock.Now()); err != nil {
 			t.Fatal(err)
 		}
 		pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
@@ -1124,7 +1128,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 		}
 
 		// create new pods
-		if _, err = ssc.UpdateStatefulSet(context.TODO(), set, pods, time.Now()); err != nil {
+		if _, err = ssc.UpdateStatefulSet(context.TODO(), set, pods, fakeClock.Now()); err != nil {
 			t.Fatal(err)
 		}
 		pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
@@ -1132,15 +1136,15 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailable(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		tc.verifyFn(set, spc, ssc, pods, int(totalPods), selector)
+		tc.verifyFn(set, spc, ssc, pods, int(totalPods), selector, fakeClock.Now())
 
 		// pods 3/4/5 ready, should not update other pods
 		spc.setPodRunning(set, 3)
 		spc.setPodRunning(set, 5)
-		spc.setPodReadyCondition(set, 5, true, time.Now()) // nolint:errcheck
-		originalPods, _ = spc.setPodReadyCondition(set, 3, true, time.Now())
+		spc.setPodReadyCondition(set, 5, true, fakeClock.Now()) // nolint:errcheck
+		originalPods, _ = spc.setPodReadyCondition(set, 3, true, fakeClock.Now())
 		sort.Sort(ascendingOrdinal(originalPods))
-		if _, err = ssc.UpdateStatefulSet(context.TODO(), set, originalPods, time.Now()); err != nil {
+		if _, err = ssc.UpdateStatefulSet(context.TODO(), set, originalPods, fakeClock.Now()); err != nil {
 			t.Fatal(err)
 		}
 		pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
@@ -1272,8 +1276,6 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableInOrderedModeVerifyInv
 func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MaxUnavailableStatefulSet, true)
 
-	fakeClock := testingclock.NewFakeClock(time.Date(2026, time.March, 12, 12, 0, 0, 0, time.UTC))
-
 	testCases := []struct {
 		name                      string
 		podManagementPolicy       apps.PodManagementPolicyType
@@ -1282,7 +1284,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 		maxUnavailable            intstr.IntOrString
 		minReadySeconds           int32
 		unavailableOrdinals       []int
-		makeUnavailable           func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error
+		makeUnavailable           func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error
 		expectedRemainingOrdinals []int
 	}{
 		{
@@ -1291,8 +1293,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			replicas:            1,
 			maxUnavailable:      intstr.FromInt32(1),
 			unavailableOrdinals: []int{0},
-			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
+			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error {
+				_, err := spc.setPodReadyCondition(set, ordinal, false, now)
 				return err
 			},
 			expectedRemainingOrdinals: []int{},
@@ -1303,8 +1305,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			replicas:            3,
 			maxUnavailable:      intstr.FromInt32(1),
 			unavailableOrdinals: []int{2},
-			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
+			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error {
+				_, err := spc.setPodReadyCondition(set, ordinal, false, now)
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1},
@@ -1315,8 +1317,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			replicas:            5,
 			maxUnavailable:      intstr.FromInt32(2),
 			unavailableOrdinals: []int{3, 4},
-			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
+			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error {
+				_, err := spc.setPodReadyCondition(set, ordinal, false, now)
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1, 2},
@@ -1327,8 +1329,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			replicas:            1,
 			maxUnavailable:      intstr.FromInt32(1),
 			unavailableOrdinals: []int{0},
-			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
+			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error {
+				_, err := spc.setPodReadyCondition(set, ordinal, false, now)
 				return err
 			},
 			expectedRemainingOrdinals: []int{0},
@@ -1339,8 +1341,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			replicas:            3,
 			maxUnavailable:      intstr.FromInt32(1),
 			unavailableOrdinals: []int{2},
-			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
+			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error {
+				_, err := spc.setPodReadyCondition(set, ordinal, false, now)
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1, 2},
@@ -1351,8 +1353,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			replicas:            5,
 			maxUnavailable:      intstr.FromInt32(2),
 			unavailableOrdinals: []int{4},
-			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
+			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error {
+				_, err := spc.setPodReadyCondition(set, ordinal, false, now)
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1, 2, 3},
@@ -1363,7 +1365,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			replicas:            3,
 			maxUnavailable:      intstr.FromInt32(1),
 			unavailableOrdinals: []int{2},
-			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
+			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error {
 				_, err := spc.setPodTerminated(set, ordinal)
 				return err
 			},
@@ -1375,7 +1377,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			replicas:            3,
 			maxUnavailable:      intstr.FromInt32(1),
 			unavailableOrdinals: []int{2},
-			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
+			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error {
 				_, err := spc.setPodTerminated(set, ordinal)
 				return err
 			},
@@ -1387,9 +1389,9 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			replicas:            5,
 			maxUnavailable:      intstr.FromInt32(3),
 			unavailableOrdinals: []int{3, 4},
-			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
+			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error {
 				if ordinal == 3 {
-					_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
+					_, err := spc.setPodReadyCondition(set, ordinal, false, now)
 					return err
 				}
 				_, err := spc.setPodTerminated(set, ordinal)
@@ -1404,8 +1406,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			maxUnavailable:      intstr.FromInt32(1),
 			minReadySeconds:     30,
 			unavailableOrdinals: []int{2},
-			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodAvailable(set, ordinal, fakeClock.Now())
+			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error {
+				_, err := spc.setPodAvailable(set, ordinal, now)
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1},
@@ -1417,8 +1419,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			maxUnavailable:      intstr.FromInt32(1),
 			minReadySeconds:     30,
 			unavailableOrdinals: []int{2},
-			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodAvailable(set, ordinal, fakeClock.Now())
+			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error {
+				_, err := spc.setPodAvailable(set, ordinal, now)
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1, 2},
@@ -1429,9 +1431,9 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			replicas:            5,
 			maxUnavailable:      intstr.FromInt32(3),
 			unavailableOrdinals: []int{3, 4},
-			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
+			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error {
 				if ordinal == 3 {
-					_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
+					_, err := spc.setPodReadyCondition(set, ordinal, false, now)
 					return err
 				}
 				_, err := spc.setPodTerminated(set, ordinal)
@@ -1445,12 +1447,12 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			replicas:            5,
 			maxUnavailable:      intstr.FromInt32(3),
 			unavailableOrdinals: []int{3, 4},
-			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
+			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error {
 				if ordinal == 3 {
 					_, err := spc.setPodTerminated(set, ordinal)
 					return err
 				}
-				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
+				_, err := spc.setPodReadyCondition(set, ordinal, false, now)
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1, 3},
@@ -1461,9 +1463,9 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			replicas:            5,
 			maxUnavailable:      intstr.FromInt32(3),
 			unavailableOrdinals: []int{3, 4},
-			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
+			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error {
 				if ordinal == 3 {
-					_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
+					_, err := spc.setPodReadyCondition(set, ordinal, false, now)
 					return err
 				}
 				_, err := spc.setPodTerminated(set, ordinal)
@@ -1477,12 +1479,12 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			replicas:            5,
 			maxUnavailable:      intstr.FromInt32(3),
 			unavailableOrdinals: []int{3, 4},
-			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
+			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error {
 				if ordinal == 3 {
 					_, err := spc.setPodTerminated(set, ordinal)
 					return err
 				}
-				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
+				_, err := spc.setPodReadyCondition(set, ordinal, false, now)
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1, 2, 3},
@@ -1494,8 +1496,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			partition:           2,
 			maxUnavailable:      intstr.FromInt32(1),
 			unavailableOrdinals: []int{4},
-			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
+			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error {
+				_, err := spc.setPodReadyCondition(set, ordinal, false, now)
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1, 2, 3},
@@ -1507,8 +1509,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			partition:           2,
 			maxUnavailable:      intstr.FromInt32(1),
 			unavailableOrdinals: []int{2},
-			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
+			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error {
+				_, err := spc.setPodReadyCondition(set, ordinal, false, now)
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1, 3, 4},
@@ -1520,8 +1522,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			partition:           2,
 			maxUnavailable:      intstr.FromInt32(1),
 			unavailableOrdinals: []int{1},
-			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
+			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error {
+				_, err := spc.setPodReadyCondition(set, ordinal, false, now)
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1, 2, 3, 4},
@@ -1533,8 +1535,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			partition:           2,
 			maxUnavailable:      intstr.FromInt32(1),
 			unavailableOrdinals: []int{4},
-			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
+			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error {
+				_, err := spc.setPodReadyCondition(set, ordinal, false, now)
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1, 2, 3, 4},
@@ -1546,8 +1548,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			partition:           3,
 			maxUnavailable:      intstr.FromInt32(2),
 			unavailableOrdinals: []int{3, 4},
-			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
+			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error {
+				_, err := spc.setPodReadyCondition(set, ordinal, false, now)
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1, 2},
@@ -1559,8 +1561,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			partition:           3,
 			maxUnavailable:      intstr.FromInt32(2),
 			unavailableOrdinals: []int{1, 4},
-			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
+			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error {
+				_, err := spc.setPodReadyCondition(set, ordinal, false, now)
 				return err
 			},
 			expectedRemainingOrdinals: []int{0, 1, 2, 3},
@@ -1571,8 +1573,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			replicas:            4,
 			maxUnavailable:      intstr.FromInt32(2),
 			unavailableOrdinals: []int{0, 1},
-			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
+			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error {
+				_, err := spc.setPodReadyCondition(set, ordinal, false, now)
 				return err
 			},
 			expectedRemainingOrdinals: []int{2, 3},
@@ -1583,8 +1585,8 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			replicas:            5,
 			maxUnavailable:      intstr.FromInt32(3),
 			unavailableOrdinals: []int{0, 1},
-			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int) error {
-				_, err := spc.setPodReadyCondition(set, ordinal, false, time.Now())
+			makeUnavailable: func(spc *fakeObjectManager, set *apps.StatefulSet, ordinal int, now time.Time) error {
+				_, err := spc.setPodReadyCondition(set, ordinal, false, now)
 				return err
 			},
 			expectedRemainingOrdinals: []int{2, 3},
@@ -1593,6 +1595,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			fakeClock := testingclock.NewFakeClock(time.Date(2026, time.March, 12, 12, 0, 0, 0, time.UTC))
 			set := newStatefulSet(tc.replicas)
 			set.Spec.PodManagementPolicy = tc.podManagementPolicy
 			set.Spec.UpdateStrategy = apps.StatefulSetUpdateStrategy{
@@ -1625,7 +1628,7 @@ func TestStatefulSetControlRollingUpdateWithMaxUnavailableAndUnavailableStalePod
 			}
 
 			for _, ordinal := range tc.unavailableOrdinals {
-				if err := tc.makeUnavailable(spc, set, ordinal); err != nil {
+				if err := tc.makeUnavailable(spc, set, ordinal, fakeClock.Now()); err != nil {
 					t.Fatalf("makeUnavailable(%d): %v", ordinal, err)
 				}
 			}
@@ -4175,7 +4178,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 		expectedUnavailableReplicasValue int
 	}
 
-	testFn := func(test *testcase, t *testing.T) {
+	testFn := func(test *testcase, t *testing.T, now time.Time) {
 
 		// Create StatefulSet
 		set := newStatefulSet(test.totalPods)
@@ -4223,7 +4226,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 		for i := 0; i < test.unavailablePodCount; i++ {
 			if test.podManagementPolicy == apps.OrderedReadyPodManagement {
 				_, _ = spc.setPodRunning(set, i)
-				pods, _ = spc.setPodReadyCondition(set, i, false, time.Now())
+				pods, _ = spc.setPodReadyCondition(set, i, false, now)
 			} else {
 				pods, _ = spc.addTerminatingPod(set, i)
 			}
@@ -4232,7 +4235,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 		// Make remaining pods ready
 		for i := test.unavailablePodCount; i < int(test.totalPods); i++ {
 			_, _ = spc.setPodRunning(set, i)
-			pods, _ = spc.setPodReadyCondition(set, i, true, time.Now())
+			pods, _ = spc.setPodReadyCondition(set, i, true, now)
 		}
 		sort.Sort(ascendingOrdinal(pods))
 
@@ -4244,7 +4247,7 @@ func TestStatefulSetMetrics(t *testing.T) {
 			ReadyReplicas: readyReplicas,
 		}
 		updateRevision := &apps.ControllerRevision{}
-		_, err = updateStatefulSetAfterInvariantEstablished(context.TODO(), ssc.(*defaultStatefulSetControl), set, pods, updateRevision, status, time.Now())
+		_, err = updateStatefulSetAfterInvariantEstablished(context.TODO(), ssc.(*defaultStatefulSetControl), set, pods, updateRevision, status, now)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -4407,7 +4410,8 @@ func TestStatefulSetMetrics(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			testFn(&test, t)
+			fakeClock := testingclock.NewFakeClock(time.Date(2026, time.March, 12, 12, 0, 0, 0, time.UTC))
+			testFn(&test, t, fakeClock.Now())
 		})
 	}
 }
