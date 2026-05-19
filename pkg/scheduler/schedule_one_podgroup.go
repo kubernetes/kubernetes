@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"sort"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -28,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	schedulingapi "k8s.io/kubernetes/pkg/apis/scheduling"
@@ -36,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
-	"k8s.io/utils/ptr"
 )
 
 // errPodGroupUnschedulable is used to describe that the pod group is unschedulable.
@@ -116,60 +113,6 @@ func (sched *Scheduler) skipPodGroupPodSchedule(ctx context.Context, schedFwk fr
 			podGroupInfo.UnscheduledPods = append(podGroupInfo.UnscheduledPods, pInfo.Pod)
 		}
 	}
-}
-
-// podGroupInfoForPod is a temporary function that obtains the QueuedPodGroupInfo based on the pod that got popped from the scheduling queue.
-// Ultimately, scheduling queue, adjusted with workload-awareness will return such QueuedPodGroupInfo directly.
-func (sched *Scheduler) podGroupInfoForPod(ctx context.Context, pInfo *framework.QueuedPodInfo) (*framework.QueuedPodGroupInfo, error) {
-	logger := klog.FromContext(ctx)
-
-	// Get the actual pod group state
-	podGroupState, err := sched.Cache.PodGroupStates().Get(pInfo.Pod.Namespace, *pInfo.Pod.Spec.SchedulingGroup.PodGroupName)
-	if err != nil {
-		return nil, fmt.Errorf("error while retrieving pod group state: %w", err)
-	}
-	unscheduledPods := podGroupState.UnscheduledPods()
-
-	podGroupInfo := &framework.QueuedPodGroupInfo{
-		PodGroupInfo: &framework.PodGroupInfo{
-			Namespace: pInfo.Pod.Namespace,
-			Name:      *pInfo.Pod.Spec.SchedulingGroup.PodGroupName,
-		},
-		QueuedPodInfos: make([]*framework.QueuedPodInfo, 0, len(unscheduledPods)+1),
-	}
-	podGroupInfo.QueuedPodInfos = append(podGroupInfo.QueuedPodInfos, pInfo)
-
-	// Pop all unscheduled pods from the scheduling queue
-	for _, pod := range unscheduledPods {
-		if pod.Name == pInfo.Pod.Name {
-			continue
-		}
-		unscheduledPodInfo := sched.SchedulingQueue.PopSpecificPod(logger, pod)
-		if unscheduledPodInfo == nil {
-			logger.V(5).Info("Pod available in pod group state not available in scheduling queue", "podGroup", klog.KObj(podGroupInfo), "pod", klog.KObj(pod))
-			continue
-		}
-		podGroupInfo.QueuedPodInfos = append(podGroupInfo.QueuedPodInfos, unscheduledPodInfo)
-	}
-	// Sort the pods in deterministic order. First by priority, then by their InitialAttemptTimestamp.
-	sort.Slice(podGroupInfo.QueuedPodInfos, func(i, j int) bool {
-		pInfo1 := podGroupInfo.QueuedPodInfos[i]
-		pInfo2 := podGroupInfo.QueuedPodInfos[j]
-		p1 := corev1helpers.PodPriority(pInfo1.GetPodInfo().GetPod())
-		p2 := corev1helpers.PodPriority(pInfo2.GetPodInfo().GetPod())
-		// Timestamps should be set, but dereferencing them for safety.
-		p1Timestamp := ptr.Deref(pInfo1.InitialAttemptTimestamp, time.Time{})
-		p2Timestamp := ptr.Deref(pInfo2.InitialAttemptTimestamp, time.Time{})
-		return (p1 > p2) || (p1 == p2 && p1Timestamp.Before(p2Timestamp))
-	})
-
-	// Populate UnscheduledPods based on the QueuedPodInfos.
-	podGroupInfo.UnscheduledPods = make([]*v1.Pod, 0, len(podGroupInfo.QueuedPodInfos))
-	for _, pInfo := range podGroupInfo.QueuedPodInfos {
-		podGroupInfo.UnscheduledPods = append(podGroupInfo.UnscheduledPods, pInfo.Pod)
-	}
-
-	return podGroupInfo, nil
 }
 
 // podSchedulingContext holds the precomputed data needed to handle the pod scheduling.
@@ -620,10 +563,10 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 			Message: podGroupResult.status.Message(),
 		}
 		if podGroupResult.waitingOnPreemption {
-			logger.V(2).Info("Pod group is waiting for preemption", "podGroup", klog.KObj(podGroupInfo), "unschedulablePods", unschedulablePods)
+			logger.V(2).Info("Pod group is waiting for preemption", "podGroup", klog.KObj(podGroupInfo), "unschedulablePods", unschedulablePods, "err", podGroupResult.status.Message())
 			metrics.PodGroupWaitingOnPreemption(schedFwk.ProfileName(), metrics.SinceInSeconds(start))
 		} else {
-			logger.V(2).Info("Unable to schedule a pod group", "podGroup", klog.KObj(podGroupInfo), "unschedulablePods", unschedulablePods)
+			logger.V(2).Info("Unable to schedule a pod group", "podGroup", klog.KObj(podGroupInfo), "unschedulablePods", unschedulablePods, "err", podGroupResult.status.Message())
 			metrics.PodGroupUnschedulable(schedFwk.ProfileName(), metrics.SinceInSeconds(start))
 		}
 
@@ -638,6 +581,11 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 		metrics.PodGroupScheduleError(schedFwk.ProfileName(), metrics.SinceInSeconds(start))
 	}
 	sched.updatePodGroupCondition(ctx, podGroupInfo, condition)
+
+	err := sched.SchedulingQueue.AddAttemptedPodGroupIfNotPresent(logger, podGroupInfo, sched.SchedulingQueue.SchedulingCycle())
+	if err != nil {
+		utilruntime.HandleErrorWithContext(ctx, err, "Failed to add attempted pod group to scheduling queue", "podGroup", klog.KObj(podGroupInfo))
+	}
 }
 
 // updatePodGroupCondition patches the given condition on a PodGroup.

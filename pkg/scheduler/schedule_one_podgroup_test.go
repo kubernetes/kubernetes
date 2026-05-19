@@ -32,7 +32,6 @@ import (
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -58,7 +57,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	tf "k8s.io/kubernetes/pkg/scheduler/testing/framework"
-	"k8s.io/utils/ptr"
 )
 
 // fakePodGroupPlugin simulates Filter, PostFilter, Permit and PodGroupPostFilter behaviors for PodGroup scheduling testing.
@@ -183,113 +181,6 @@ func (mp *fakePlacementFeasiblePlugin) PlacementFeasible(ctx context.Context, pl
 
 func (mp *fakePlacementFeasiblePlugin) Permit(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (*fwk.Status, time.Duration) {
 	return fwk.NewStatus(fwk.Error, "unexpected call to permit"), 0
-}
-
-func TestPodGroupInfoForPod(t *testing.T) {
-	groupName := "pg"
-	p1 := st.MakePod().Name("p1").Namespace("ns1").UID("p1").PodGroupName(groupName).Priority(100).Obj()
-	p2 := st.MakePod().Name("p2").Namespace("ns1").UID("p2").PodGroupName(groupName).Priority(200).Obj()
-	p3 := st.MakePod().Name("p3").Namespace("ns1").UID("p3").PodGroupName(groupName).Priority(150).Obj()
-	p4 := st.MakePod().Name("p4").Namespace("ns1").UID("p4").PodGroupName(groupName).Priority(150).Obj()
-
-	pInfo1, _ := framework.NewPodInfo(p1)
-	pInfo2, _ := framework.NewPodInfo(p2)
-	pInfo3, _ := framework.NewPodInfo(p3)
-	pInfo4, _ := framework.NewPodInfo(p4)
-
-	now := time.Now()
-	qInfo1 := &framework.QueuedPodInfo{PodInfo: pInfo1, InitialAttemptTimestamp: ptr.To(now)}
-	qInfo2 := &framework.QueuedPodInfo{PodInfo: pInfo2, InitialAttemptTimestamp: ptr.To(now.Add(time.Second))}
-	qInfo3 := &framework.QueuedPodInfo{PodInfo: pInfo3, InitialAttemptTimestamp: ptr.To(now.Add(2 * time.Second))}
-	qInfo4 := &framework.QueuedPodInfo{PodInfo: pInfo4, InitialAttemptTimestamp: ptr.To(now.Add(time.Second))}
-
-	tests := []struct {
-		name            string
-		pInfo           *framework.QueuedPodInfo
-		unscheduledPods map[string]*v1.Pod
-		queuePods       map[types.UID]*framework.QueuedPodInfo
-		expectedPods    []string
-	}{
-		{
-			name:  "Success with multiple pods, sorted by priority and timestamp",
-			pInfo: qInfo1,
-			unscheduledPods: map[string]*v1.Pod{
-				"p2": p2,
-				"p3": p3,
-				"p4": p4,
-			},
-			queuePods: map[types.UID]*framework.QueuedPodInfo{
-				"p2": qInfo2,
-				"p3": qInfo3,
-				"p4": qInfo4,
-			},
-			expectedPods: []string{"p2", "p4", "p3", "p1"},
-		},
-		{
-			name:  "Pods not in state or not in queue are skipped",
-			pInfo: qInfo1,
-			unscheduledPods: map[string]*v1.Pod{
-				"p2": p2,
-				"p3": p3,
-				// p4 missing from unscheduled pods
-			},
-			queuePods: map[types.UID]*framework.QueuedPodInfo{
-				"p2": qInfo2,
-				// p3 missing from queue
-				"p4": qInfo4,
-			},
-			expectedPods: []string{"p2", "p1"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			logger, ctx := ktesting.NewTestContext(t)
-			cache := internalcache.New(ctx, nil, true)
-
-			cache.AddPodGroupMember(tt.pInfo.Pod)
-			for _, pod := range tt.unscheduledPods {
-				cache.AddPodGroupMember(pod)
-			}
-
-			q := internalqueue.NewTestQueue(ctx, nil)
-			for _, pInfo := range tt.queuePods {
-				err := q.AddUnschedulableIfNotPresent(logger, pInfo, 0)
-				if err != nil {
-					t.Fatalf("Failed to add unschedulable pod: %v", err)
-				}
-			}
-			sched := &Scheduler{
-				Cache:           cache,
-				SchedulingQueue: q,
-			}
-
-			result, err := sched.podGroupInfoForPod(ctx, tt.pInfo)
-			if err != nil {
-				t.Fatalf("Failed to get pod group info: %v", err)
-			}
-
-			if diff := cmp.Diff(groupName, result.PodGroupInfo.Name); diff != "" {
-				t.Errorf("Unexpected pod group name (-want,+got):\n%s", diff)
-			}
-
-			var gotQueuedPods []string
-			for _, pInfo := range result.QueuedPodInfos {
-				gotQueuedPods = append(gotQueuedPods, pInfo.Pod.Name)
-			}
-			if diff := cmp.Diff(tt.expectedPods, gotQueuedPods); diff != "" {
-				t.Errorf("Unexpected pod order in QueuedPodInfos (-want,+got):\n%s", diff)
-			}
-
-			var gotUnscheduledPods []string
-			for _, pod := range result.UnscheduledPods {
-				gotUnscheduledPods = append(gotUnscheduledPods, pod.Name)
-			}
-			if diff := cmp.Diff(tt.expectedPods, gotUnscheduledPods); diff != "" {
-				t.Errorf("Unexpected pod order in UnscheduledPods (-want,+got):\n%s", diff)
-			}
-		})
-	}
 }
 
 func TestFrameworkForPodGroup(t *testing.T) {

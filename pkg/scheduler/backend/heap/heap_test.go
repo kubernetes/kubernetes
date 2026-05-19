@@ -32,9 +32,20 @@ func testHeapObjectKeyFunc(obj testHeapObject) string {
 type testHeapObject struct {
 	name string
 	val  interface{}
+	size int
+}
+
+func (obj testHeapObject) Size() int {
+	return obj.size
 }
 
 type testMetricRecorder int
+
+func (tmr *testMetricRecorder) Add(val int) {
+	if tmr != nil {
+		*tmr += testMetricRecorder(val)
+	}
+}
 
 func (tmr *testMetricRecorder) Inc() {
 	if tmr != nil {
@@ -55,7 +66,11 @@ func (tmr *testMetricRecorder) Clear() {
 }
 
 func mkHeapObj(name string, val interface{}) testHeapObject {
-	return testHeapObject{name: name, val: val}
+	return testHeapObject{name: name, val: val, size: 1}
+}
+
+func mkHeapObjWithSize(name string, val interface{}, size int) testHeapObject {
+	return testHeapObject{name: name, val: val, size: size}
 }
 
 func compareInts(val1 testHeapObject, val2 testHeapObject) bool {
@@ -714,25 +729,25 @@ func TestHeapLargeScale(t *testing.T) {
 func TestHeapWithRecorder(t *testing.T) {
 	metricRecorder := new(testMetricRecorder)
 	h := NewWithRecorder(testHeapObjectKeyFunc, compareInts, metricRecorder)
-	h.AddOrUpdate(mkHeapObj("foo", 10))
-	h.AddOrUpdate(mkHeapObj("bar", 1))
-	h.AddOrUpdate(mkHeapObj("baz", 100))
-	h.AddOrUpdate(mkHeapObj("qux", 11))
+	h.AddOrUpdate(mkHeapObjWithSize("foo", 10, 1))
+	h.AddOrUpdate(mkHeapObjWithSize("bar", 1, 2))
+	h.AddOrUpdate(mkHeapObjWithSize("baz", 100, 3))
+	h.AddOrUpdate(mkHeapObjWithSize("qux", 11, 4))
 
-	if *metricRecorder != 4 {
-		t.Errorf("expected count to be 4 but got %d", *metricRecorder)
+	if *metricRecorder != 10 {
+		t.Errorf("expected count to be 10 (1+2+3+4) but got %d", *metricRecorder)
 	}
-	if obj := h.Delete(mkHeapObj("bar", 1)); obj.name == "" {
+	if obj := h.Delete(mkHeapObjWithSize("bar", 1, 2)); obj.name == "" {
 		t.Fatalf("Failed to delete item")
 	}
-	if *metricRecorder != 3 {
-		t.Errorf("expected count to be 3 but got %d", *metricRecorder)
+	if *metricRecorder != 8 {
+		t.Errorf("expected count to be 8 (1+3+4) but got %d", *metricRecorder)
 	}
 	if _, err := h.Pop(); err != nil {
 		t.Fatal(err)
 	}
-	if *metricRecorder != 2 {
-		t.Errorf("expected count to be 2 but got %d", *metricRecorder)
+	if *metricRecorder != 7 {
+		t.Errorf("expected count to be 7 (3+4) but got %d", *metricRecorder)
 	}
 
 	h.metricRecorder.Clear()
