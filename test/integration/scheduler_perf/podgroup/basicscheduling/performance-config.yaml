@@ -11,25 +11,22 @@
   - opcode: createNodes
     countParam: $initNodes
   - opcode: createNamespaces
-    prefix: basic
+    prefix: basic-ns
     count: 1
-  - opcode: createAny
-    # Create pod groups, each has a basic scheduling policy specified in pod group template.
+  - opcode: createPodGroups
+    # Create pod groups, and wait for the scheduler's informer cache to reflect the newly created pod group objects.
     # Each pod group is named basic-group-0, basic-group-1, ... basic-group-(n-1).
+    # Each group has basic scheduling policy specified in the pod group template.
     countParam: $initPodGroups
-    namespace: basic-0
+    namespace: basic-ns-0
     templatePath: templates/podgroup.yaml
     templateParams:
       podsPerGroup: $podsPerGroup
-  - opcode: waitForPodGroups
-    # Wait for the scheduler's informer cache to reflect the newly created PodGroup objects.
-    namespace: basic-0
-    countParam: $initPodGroups
   - opcode: createPods
     # Create pods with reference to the pod groups according to their indices (e.g., pods 0-2 → basic-group-0, pods 3-5 → basic-group-1, etc.).
     countParam: $initPodGroups
     countMultiplierParam: $podsPerGroup
-    namespace: basic-0
+    namespace: basic-ns-0
     podTemplatePath: templates/basic-pod.yaml
     collectMetrics: true
     templateParams:
