@@ -27,14 +27,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"gopkg.in/go-jose/go-jose.v2"
-
-	"k8s.io/kubernetes/test/utils/oidc/handlers"
 )
 
 const (
@@ -49,19 +46,79 @@ var (
 	ErrBadClientID         = errors.New("client ID is bad")
 )
 
+type Token struct {
+	IDToken      string `json:"id_token"`
+	AccessToken  string `json:"access_token"`
+	TokenType    string `json:"token_type"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int64  `json:"expires_in"`
+}
+
+// TokenHandler serves token responses for the test OIDC server.
+// Use SetHandler to configure the response for each test scenario.
+type TokenHandler struct {
+	handler func() (Token, error)
+}
+
+// Token returns the configured token response.
+func (h *TokenHandler) Token() (Token, error) {
+	if h.handler == nil {
+		return Token{}, fmt.Errorf("no token handler configured")
+	}
+	return h.handler()
+}
+
+// SetHandler configures the function that will be called when the token
+// endpoint is hit.
+func (h *TokenHandler) SetHandler(fn func() (Token, error)) {
+	h.handler = fn
+}
+
+// PrependHandler sets a handler that runs for the given number of calls,
+// then falls back to the previously configured handler.
+func (h *TokenHandler) PrependHandler(fn func() (Token, error), times int) {
+	previous := h.handler
+	remaining := times
+	h.handler = func() (Token, error) {
+		if remaining > 0 {
+			remaining--
+			return fn()
+		}
+		if previous != nil {
+			return previous()
+		}
+		return Token{}, fmt.Errorf("no token handler configured")
+	}
+}
+
 type TestServer struct {
 	httpServer   *httptest.Server
-	tokenHandler *handlers.MockTokenHandler
-	jwksHandler  *handlers.MockJWKsHandler
+	tokenHandler *TokenHandler
+	publicKeys   []jose.JSONWebKey
 }
 
-// JwksHandler is getter of JSON Web Key Sets handler
-func (ts *TestServer) JwksHandler() *handlers.MockJWKsHandler {
-	return ts.jwksHandler
+// SetPublicKey computes a thumbprint-based key ID and stores the key
+// so the /jwks endpoint will serve it.
+func (ts *TestServer) SetPublicKey(t *testing.T, publicKey crypto.PublicKey) {
+	t.Helper()
+	var alg string
+	switch publicKey.(type) {
+	case *rsa.PublicKey:
+		alg = string(jose.RS256)
+	case *ecdsa.PublicKey:
+		alg = string(jose.ES256)
+	default:
+		t.Fatalf("unsupported public key type: %T", publicKey)
+	}
+	key := jose.JSONWebKey{Key: publicKey, Use: "sig", Algorithm: alg}
+	thumbprint, err := key.Thumbprint(crypto.SHA256)
+	require.NoError(t, err)
+	key.KeyID = hex.EncodeToString(thumbprint)
+	ts.publicKeys = append(ts.publicKeys, key)
 }
 
-// TokenHandler is getter of JWT token handler
-func (ts *TestServer) TokenHandler() *handlers.MockTokenHandler {
+// TokenHandler returns the token handler for configuring test responses.
+func (ts *TestServer) TokenHandler() *TokenHandler {
 	return ts.tokenHandler
 }
 
@@ -71,13 +128,8 @@ func (ts *TestServer) URL() string {
 }
 
 // TokenURL returns the public URL of JWT token endpoint
-func (ts *TestServer) TokenURL() (string, error) {
-	url, err := url.JoinPath(ts.httpServer.URL, tokenWebPath)
-	if err != nil {
-		return "", fmt.Errorf("error joining paths: %v", err)
-	}
-
-	return url, nil
+func (ts *TestServer) TokenURL() string {
+	return ts.httpServer.URL + tokenWebPath
 }
 
 // BuildAndRunTestServer configures OIDC TLS server and its routing
@@ -105,8 +157,7 @@ func BuildAndRunTestServer(t *testing.T, caPath, caKeyPath, issuerOverride strin
 
 	oidcServer := &TestServer{
 		httpServer:   httpServer,
-		tokenHandler: handlers.NewMockTokenHandler(t),
-		jwksHandler:  handlers.NewMockJWKsHandler(t),
+		tokenHandler: &TokenHandler{},
 	}
 
 	issuer := httpServer.URL
@@ -147,7 +198,7 @@ func BuildAndRunTestServer(t *testing.T, caPath, caKeyPath, issuerOverride strin
 	})
 
 	mux.HandleFunc(jwksWebPath, func(writer http.ResponseWriter, request *http.Request) {
-		keySet := oidcServer.jwksHandler.KeySet()
+		keySet := jose.JSONWebKeySet{Keys: oidcServer.publicKeys}
 
 		writer.Header().Add("Content-Type", "application/json")
 		writer.WriteHeader(http.StatusOK)
@@ -162,18 +213,14 @@ func BuildAndRunTestServer(t *testing.T, caPath, caKeyPath, issuerOverride strin
 }
 
 func discoveryDocHandler(t *testing.T, writer http.ResponseWriter, httpServerURL, issuer string) {
-	authURL, err := url.JoinPath(httpServerURL + authWebPath)
-	require.NoError(t, err)
-	tokenURL, err := url.JoinPath(httpServerURL + tokenWebPath)
-	require.NoError(t, err)
-	jwksURL, err := url.JoinPath(httpServerURL + jwksWebPath)
-	require.NoError(t, err)
-	userInfoURL, err := url.JoinPath(httpServerURL + authWebPath)
-	require.NoError(t, err)
+	authURL := httpServerURL + authWebPath
+	tokenURL := httpServerURL + tokenWebPath
+	jwksURL := httpServerURL + jwksWebPath
+	userInfoURL := httpServerURL + authWebPath
 
 	writer.Header().Add("Content-Type", "application/json")
 
-	err = json.NewEncoder(writer).Encode(struct {
+	err := json.NewEncoder(writer).Encode(struct {
 		Issuer      string `json:"issuer"`
 		AuthURL     string `json:"authorization_endpoint"`
 		TokenURL    string `json:"token_endpoint"`
@@ -193,28 +240,43 @@ type JosePrivateKey interface {
 	*rsa.PrivateKey | *ecdsa.PrivateKey
 }
 
-// TokenHandlerBehaviorReturningPredefinedJWT describes the scenario when signed JWT token is being created.
-// This behavior should being applied to the MockTokenHandler.
+// SignToken creates a signed JWT from the given private key and claims,
+// returning the compact-serialized token string.
+func SignToken[K JosePrivateKey](privateKey K, claims map[string]interface{}) (string, error) {
+	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: GetSignatureAlgorithm(privateKey), Key: privateKey}, nil)
+	if err != nil {
+		return "", fmt.Errorf("creating signer: %w", err)
+	}
+
+	payloadJSON, err := json.Marshal(claims)
+	if err != nil {
+		return "", fmt.Errorf("marshaling claims: %w", err)
+	}
+
+	sig, err := signer.Sign(payloadJSON)
+	if err != nil {
+		return "", fmt.Errorf("signing payload: %w", err)
+	}
+
+	token, err := sig.CompactSerialize()
+	if err != nil {
+		return "", fmt.Errorf("serializing token: %w", err)
+	}
+	return token, nil
+}
+
+// TokenHandlerBehaviorReturningPredefinedJWT returns a handler function that
+// signs the given claims into a JWT and returns it as a Token response.
 func TokenHandlerBehaviorReturningPredefinedJWT[K JosePrivateKey](
-	t *testing.T,
 	privateKey K,
 	claims map[string]interface{}, accessToken, refreshToken string,
-) func() (handlers.Token, error) {
-	t.Helper()
-
-	return func() (handlers.Token, error) {
-		signer, err := jose.NewSigner(jose.SigningKey{Algorithm: GetSignatureAlgorithm(privateKey), Key: privateKey}, nil)
-		require.NoError(t, err)
-
-		payloadJSON, err := json.Marshal(claims)
-		require.NoError(t, err)
-
-		idTokenSignature, err := signer.Sign(payloadJSON)
-		require.NoError(t, err)
-		idToken, err := idTokenSignature.CompactSerialize()
-		require.NoError(t, err)
-
-		return handlers.Token{
+) func() (Token, error) {
+	return func() (Token, error) {
+		idToken, err := SignToken(privateKey, claims)
+		if err != nil {
+			return Token{}, fmt.Errorf("signing id token: %w", err)
+		}
+		return Token{
 			IDToken:      idToken,
 			AccessToken:  accessToken,
 			RefreshToken: refreshToken,
@@ -224,24 +286,6 @@ func TokenHandlerBehaviorReturningPredefinedJWT[K JosePrivateKey](
 
 type JosePublicKey interface {
 	*rsa.PublicKey | *ecdsa.PublicKey
-}
-
-// DefaultJwksHandlerBehavior describes the scenario when JSON Web Key Set token is being returned.
-// This behavior should being applied to the MockJWKsHandler.
-func DefaultJwksHandlerBehavior[K JosePublicKey](t *testing.T, verificationPublicKey K) func() jose.JSONWebKeySet {
-	t.Helper()
-
-	return func() jose.JSONWebKeySet {
-		key := jose.JSONWebKey{Key: verificationPublicKey, Use: "sig", Algorithm: string(GetSignatureAlgorithm(verificationPublicKey))}
-
-		thumbprint, err := key.Thumbprint(crypto.SHA256)
-		require.NoError(t, err)
-
-		key.KeyID = hex.EncodeToString(thumbprint)
-		return jose.JSONWebKeySet{
-			Keys: []jose.JSONWebKey{key},
-		}
-	}
 }
 
 type JoseKey interface{ JosePrivateKey | JosePublicKey }
