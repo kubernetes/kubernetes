@@ -227,9 +227,21 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 
 	// Worker should terminate if pod is terminated.
 	if status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded {
-		logger.V(3).Info("Pod is terminated, exiting probe worker",
-			"pod", klog.KObj(w.pod), "phase", status.Phase)
-		return false
+		// For readiness probes, keep probing until the published result is
+		// already Failure so the pod can transition to NotReady before being
+		// removed. During eviction the phase is set to PodFailed before
+		// containers are stopped, causing the probe worker to exit before it
+		// can detect the container becoming unready.
+		readinessResult, _ := w.resultsManager.Get(w.containerID)
+		if w.probeType == readiness && !w.containerID.IsEmpty() &&
+			readinessResult != results.Failure {
+			logger.V(3).Info("Pod is terminating but readiness probe has not failed yet, continuing to probe",
+				"pod", klog.KObj(w.pod), "phase", status.Phase)
+		} else {
+			logger.V(3).Info("Pod is terminated, exiting probe worker",
+				"pod", klog.KObj(w.pod), "phase", status.Phase)
+			return false
+		}
 	}
 
 	c, ok := podutil.GetContainerStatus(status.ContainerStatuses, w.container.Name)

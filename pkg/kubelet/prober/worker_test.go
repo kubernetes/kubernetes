@@ -854,6 +854,67 @@ func TestDoProbe_TerminatedContainerWithRestartPolicyNever(t *testing.T) {
 	expectResult(t, w, results.Failure, "regular container with pod restart policy Never")
 }
 
+func TestReadinessProbeContinuesDuringPodFailedPhase(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+	w := newTestWorker(m, readiness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 1})
+
+	// Pod is running and readiness probe succeeds.
+	runningStatus := getTestRunningStatus()
+	m.statusManager.SetPodStatus(logger, w.pod, runningStatus)
+	m.prober.exec = fakeExecProber{probe.Success, nil}
+	expectContinue(t, w, w.doProbe(ctx), "initial success")
+	expectResult(t, w, results.Success, "initial success")
+
+	// Eviction sets phase to PodFailed while containers are still running.
+	// The readiness probe worker should keep probing.
+	evictedStatus := getTestRunningStatus()
+	evictedStatus.Phase = v1.PodFailed
+	m.statusManager.SetPodStatus(logger, w.pod, evictedStatus)
+
+	m.prober.exec = fakeExecProber{probe.Success, nil}
+	expectContinue(t, w, w.doProbe(ctx), "PodFailed but probe still succeeding")
+	expectResult(t, w, results.Success, "PodFailed but probe still succeeding")
+
+	// Container handles SIGTERM and becomes unready; probe now fails.
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	expectContinue(t, w, w.doProbe(ctx), "PodFailed and probe failing")
+	expectResult(t, w, results.Failure, "PodFailed and probe failing")
+
+	// Once the published result is Failure, the worker should exit.
+	if w.doProbe(ctx) {
+		t.Error("Expected probe worker to exit after readiness result became Failure in PodFailed phase")
+	}
+}
+
+func TestReadinessProbeExitsWhenContainerStopsDuringEviction(t *testing.T) {
+	logger, ctx := ktesting.NewTestContext(t)
+	m := newTestManager()
+	w := newTestWorker(m, readiness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 1})
+
+	runningStatus := getTestRunningStatus()
+	m.statusManager.SetPodStatus(logger, w.pod, runningStatus)
+	m.prober.exec = fakeExecProber{probe.Success, nil}
+	expectContinue(t, w, w.doProbe(ctx), "initial success")
+	expectResult(t, w, results.Success, "initial success")
+
+	// Eviction: phase is PodFailed and container has stopped running.
+	stoppedStatus := getTestRunningStatus()
+	stoppedStatus.Phase = v1.PodFailed
+	stoppedStatus.ContainerStatuses[0].State.Running = nil
+	stoppedStatus.ContainerStatuses[0].State.Terminated = &v1.ContainerStateTerminated{}
+	m.statusManager.SetPodStatus(logger, w.pod, stoppedStatus)
+
+	// First probe after container stops sets result to Failure (line 309).
+	w.doProbe(ctx)
+	expectResult(t, w, results.Failure, "container stopped during eviction")
+
+	// Next cycle: PodFailed + result is Failure => worker exits.
+	if w.doProbe(ctx) {
+		t.Error("Expected probe worker to exit after container stopped in PodFailed phase")
+	}
+}
+
 func TestLivenessProbeDisabledByStarted(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	m := newTestManager()
