@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -1152,99 +1153,92 @@ func TestGetRequestCaching(t *testing.T) {
 		})
 
 		fakePodIp := "some-pod"
-
 		worker := newWorker(manager, readiness, pod, container)
-
 		worker.initHttpProbeHolder(&worker.container)
+
 		req, err := worker.httpProbeRequest.getRequest(fakePodIp)
-
 		if err != nil {
-			t.Errorf("Expect no error, got: %v.", err)
+			t.Fatalf("Unexpected error getting initial request: %v", err)
 		}
 
-		// Check set cache values and fields equality
-		checkCache(t, worker, req)
+		// Verify internal cache fields are correctly populated
+		assertRequestMatchesCache(t, worker, req)
+
 		req2, err := worker.httpProbeRequest.getRequest(fakePodIp)
-
 		if err != nil {
-			t.Errorf("Expect no error, got: %v.", err)
+			t.Fatalf("Unexpected error getting cached request: %v", err)
 		}
 
-		// Check cached fields between two requests for equality
+		// Verify fields between two subsequent requests are identical (hit cache)
 		if req.Proto != req2.Proto {
-			t.Errorf("Expected Proto: %v, but got %v.", req.Proto, req2.Proto)
+			t.Errorf("Proto mismatch: expected %q, got %q", req.Proto, req2.Proto)
 		}
-
-		if req.URL != req2.URL {
-			t.Errorf("Expected Host: %v, but got %v.", req.URL, req2.URL)
+		if req.URL.String() != req2.URL.String() {
+			t.Errorf("URL mismatch: expected %q, got %q", req.URL.String(), req2.URL.String())
 		}
-
 		if req.Method != req2.Method {
-			t.Errorf("Expected Method: %v, but got %v.", req.Method, req2.Method)
+			t.Errorf("Method mismatch: expected %q, got %q", req.Method, req2.Method)
 		}
-
 		if !reflect.DeepEqual(req.Header, req2.Header) {
-			t.Errorf("Expected Header: %v, but got %v.", req.Header, req2.Header)
+			t.Errorf("Header mismatch:\nexpected: %v\ngot: %v", req.Header, req2.Header)
 		}
 
-		// Cache invalidation
+		// Test cache invalidation via explicit reset()
 		worker.httpProbeRequest.reset()
+		worker.container.ReadinessProbe.HTTPGet.Path = "/new-path"
 
-		req3, _ := worker.httpProbeRequest.getRequest(fakePodIp)
-
-		// Test cache invalidation by httpProbeRequest.reset()
-		if req2 == req3 {
-			t.Errorf("Expected result: %p != %p, but got %p == %p.", req2, req3, req2, req3)
+		req3, err := worker.httpProbeRequest.getRequest(fakePodIp)
+		if err != nil {
+			t.Fatalf("Unexpected error getting request after reset: %v", err)
+		}
+		if req3.URL.Path != "/new-path" {
+			t.Errorf("Cache reset failed: expected updated path %q, got cached path %q", "/new-path", req3.URL.Path)
 		}
 
-		// Test cache invalidation by change Pod-IP
-		req4, _ := worker.httpProbeRequest.getRequest(fakePodIp + "updated_podIp")
-
-		if req4 == req3 {
-			t.Errorf("Expected result: %p != %p, but got %p == %p.", req4, req3, req4, req3)
+		// Test cache invalidation via Pod-IP change
+		updatedPodIp := "updated-pod-ip"
+		req4, err := worker.httpProbeRequest.getRequest(updatedPodIp)
+		if err != nil {
+			t.Fatalf("Unexpected error getting request after IP change: %v", err)
 		}
-
+		if !strings.Contains(req4.URL.Host, updatedPodIp) {
+			t.Errorf("Cache invalidation via IP change failed: expected host to contain %q, got %q", updatedPodIp, req4.URL.Host)
+		}
 	})
 }
 
-func checkCache(t *testing.T, worker *worker, req *http.Request) {
+func assertRequestMatchesCache(t *testing.T, worker *worker, req *http.Request) {
+	t.Helper()
 
-	cachedProto := worker.httpProbeRequest.cachedProto
-	if req.Proto != cachedProto {
-		t.Errorf("Expected Proto: %v, but got %v.", cachedProto, req.Proto)
+	if req.Proto != worker.httpProbeRequest.cachedProto {
+		t.Errorf("Cache Proto mismatch: expected %q, got %q", worker.httpProbeRequest.cachedProto, req.Proto)
 	}
-
-	cachedUrl := worker.httpProbeRequest.cachedURL
-	if req.URL != cachedUrl {
-		t.Errorf("Expected Host: %v, but got %v.", cachedUrl, req.URL)
+	if req.URL != worker.httpProbeRequest.cachedURL {
+		t.Errorf("Cache URL mismatch: expected %v, got %v", worker.httpProbeRequest.cachedURL, req.URL)
 	}
-
-	cachedMethod := worker.httpProbeRequest.cachedMethod
-	if req.Method != cachedMethod {
-		t.Errorf("Expected Method: %v, but got %v.", cachedMethod, req.Method)
+	if req.Method != worker.httpProbeRequest.cachedMethod {
+		t.Errorf("Cache Method mismatch: expected %q, got %q", worker.httpProbeRequest.cachedMethod, req.Method)
 	}
-
-	cachedHeader := worker.httpProbeRequest.cachedHeader
-	if !reflect.DeepEqual(req.Header, cachedHeader) {
-		t.Errorf("Expected Header: %v, but got %v.", cachedHeader, req.Header)
+	if !reflect.DeepEqual(req.Header, worker.httpProbeRequest.cachedHeader) {
+		t.Errorf("Cache Header mismatch:\nexpected: %v\ngot: %v", worker.httpProbeRequest.cachedHeader, req.Header)
 	}
 }
 
 func TestGetRequest(t *testing.T) {
 	cases := []struct {
-		name  string
-		error bool
-		podIp string
+		name        string
+		podIp       string
+		expectError bool
 	}{
 		{
-			name:  "valid pod ip",
-			error: false,
-			podIp: "podip.docker",
+			name:        "valid pod ip",
+			podIp:       "podip.docker",
+			expectError: false,
 		},
 		{
-			name:  "invalid pod ip",
-			error: true,
-			podIp: "http://123123",
+			name:        "invalid pod ip",
+			podIp:       "http://123123", // Assuming httprobe fails on scheme in IP
+			expectError: true,
 		},
 	}
 
@@ -1288,18 +1282,52 @@ func TestGetRequest(t *testing.T) {
 			})
 
 			worker := newWorker(manager, readiness, pod, container)
-
 			worker.initHttpProbeHolder(&worker.container)
+
 			req, err := worker.httpProbeRequest.getRequest(c.podIp)
 
-			if err != nil && !c.error {
-				t.Errorf("Not expected error: %v", err)
-			} else if err == nil && c.error {
-				t.Errorf("No expected error.")
+			// Invariant 1: Error presence matches expectations
+			if (err != nil) != c.expectError {
+				t.Fatalf("Unexpected error state: expectError=%t, got err=%v", c.expectError, err)
 			}
 
-			if req == nil && err == nil {
-				t.Errorf("Request does not returning without error.")
+			// Invariant 2: If error is expected, no request should be returned
+			if c.expectError {
+				if req != nil {
+					t.Errorf("Expected nil request on error, but got: %v", req)
+				}
+				return // Stop further checks for failure cases
+			}
+
+			// --- Success Path Invariants ---
+
+			// Invariant 3: Request must not be nil if err is nil
+			if req == nil {
+				t.Error("Returned request is nil, but no error was reported")
+			}
+
+			// Invariant 4: Internal podIP state must be updated to the current IP
+			if worker.httpProbeRequest.podIP != c.podIp {
+				t.Errorf("Internal podIP state mismatch: expected %q, got %q", c.podIp, worker.httpProbeRequest.podIP)
+			}
+
+			// Invariant 5: Lazy initialization verification (requestRoot must be set)
+			if worker.httpProbeRequest.requestRoot == nil {
+				t.Error("Internal requestRoot was not initialized after a successful call")
+			}
+
+			// Invariant 6: Returned request data must match cached fields
+			if req.Proto != worker.httpProbeRequest.cachedProto {
+				t.Errorf("Cache Proto mismatch: expected %q, got %q", worker.httpProbeRequest.cachedProto, req.Proto)
+			}
+			if req.URL != worker.httpProbeRequest.cachedURL {
+				t.Errorf("Cache URL mismatch: expected %v, got %v", worker.httpProbeRequest.cachedURL, req.URL)
+			}
+			if req.Method != worker.httpProbeRequest.cachedMethod {
+				t.Errorf("Cache Method mismatch: expected %q, got %q", worker.httpProbeRequest.cachedMethod, req.Method)
+			}
+			if !reflect.DeepEqual(req.Header, worker.httpProbeRequest.cachedHeader) {
+				t.Errorf("Cache Header mismatch:\nexpected: %v\ngot: %v", worker.httpProbeRequest.cachedHeader, req.Header)
 			}
 		})
 	}
