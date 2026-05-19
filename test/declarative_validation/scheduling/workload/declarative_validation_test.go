@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apimachinery/pkg/util/version"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -377,7 +376,7 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 				features.GangScheduling:                  tc.enableWorkloadAwarePreemption,
 				features.WorkloadAwarePreemption:         tc.enableWorkloadAwarePreemption,
 			})
-			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs, apitesting.WithMinEmulationVersion(version.MustParse("1.36")))
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
 		})
 	}
 }
@@ -622,7 +621,7 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 				IsResourceRequest: true,
 				Verb:              "update",
 			})
-			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, registry.Strategy, tc.expectedErrs, apitesting.WithMinEmulationVersion(version.MustParse("1.36")))
+			apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, registry.Strategy, tc.expectedErrs)
 		})
 	}
 }
