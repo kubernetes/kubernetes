@@ -465,6 +465,7 @@
   namespace: apiserver
   help: Number of objects read from watch cache in the course of serving a LIST request
   type: Counter
+  deprecatedVersion: 1.37.0
   stabilityLevel: ALPHA
   labels:
   - group
@@ -477,6 +478,7 @@
   namespace: apiserver
   help: Number of objects returned for a LIST request from watch cache
   type: Counter
+  deprecatedVersion: 1.37.0
   stabilityLevel: ALPHA
   labels:
   - group
@@ -488,6 +490,7 @@
   namespace: apiserver
   help: Number of LIST requests served from watch cache
   type: Counter
+  deprecatedVersion: 1.37.0
   stabilityLevel: ALPHA
   labels:
   - group
