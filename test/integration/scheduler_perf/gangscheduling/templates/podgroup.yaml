@@ -5,4 +5,4 @@ metadata:
 spec:
   schedulingPolicy:
     gang:
-      minCount: 3
+      minCount: {{.podsPerGroup}}

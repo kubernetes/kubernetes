@@ -51,6 +51,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
@@ -71,6 +72,9 @@ const (
 
 // Kubernetes components running in the cluster, in the order in which they need to be started and upgraded.
 var KubeClusterComponents = []ClusterComponentName{KubeAPIServer, KubeControllerManager, KubeScheduler, Kubelet, KubeProxy}
+
+// featureGatedComponents lists the components that accept --feature-gates on their command line.
+var featureGatedComponents = []ClusterComponentName{KubeAPIServer, KubeControllerManager, KubeScheduler, Kubelet}
 
 // All components, including etcd.
 var components = append([]ClusterComponentName{Etcd}, KubeClusterComponents...)
@@ -125,7 +129,7 @@ type Cluster struct {
 // Kubernetes release. They will be invoked with parameters  as defined in the
 // *current* local-up-cluster.sh. This works as long as local-up-cluster.sh in its
 // default configuration doesn't depend on something which was added only recently.
-func (c *Cluster) Start(tCtx ktesting.TContext, state string, bindir string, localUpClusterEnv map[string]string) {
+func (c *Cluster) Start(tCtx ktesting.TContext, state string, bindir string, localUpClusterEnv map[string]string, featureGates string) {
 	tCtx.Helper()
 	c.Stop(tCtx)
 
@@ -192,7 +196,7 @@ processLocalUpClusterOutput:
 			if !ok {
 				break processLocalUpClusterOutput
 			}
-			c.processLocalUpClusterOutput(tCtx, state, line)
+			c.processLocalUpClusterOutput(tCtx, state, line, featureGates)
 		}
 	}
 	// Usually it has stopped by now already because we saw the end of its output stream,
@@ -205,7 +209,7 @@ processLocalUpClusterOutput:
 // Matches e.g. "+ API_SECURE_PORT=6443".
 var varAssignment = regexp.MustCompile(`^\+ ([A-Z0-9_]+)=(.*)$`)
 
-func (c *Cluster) processLocalUpClusterOutput(tCtx ktesting.TContext, state string, line string) {
+func (c *Cluster) processLocalUpClusterOutput(tCtx ktesting.TContext, state string, line string, featureGates string) {
 	tCtx.Logf("local-up-cluster: %s", line)
 
 	if strings.HasPrefix(line, localUpClusterRunPrefix) {
@@ -219,6 +223,12 @@ func (c *Cluster) processLocalUpClusterOutput(tCtx ktesting.TContext, state stri
 
 		// Cluster components and etcd are kept running.
 		if slices.Contains(components, ClusterComponentName(name)) {
+			if featureGates != "" && slices.Contains(featureGatedComponents, ClusterComponentName(name)) {
+				splitCmdLine := strings.Split(cmdLine, " ")
+				merged, err := mergeFeatureGatesFlags(splitCmdLine, featureGates)
+				tCtx.ExpectNoError(err, "merge feature gates %s into %s command line", featureGates, name)
+				cmdLine = strings.Join(merged, " ")
+			}
 			c.runComponent(tCtx, state, ClusterComponentName(name), cmdLine)
 			return
 		}
@@ -336,6 +346,9 @@ type ModifyOptions struct {
 
 	// FileByComponent overrides BinDir for those components which are specified here.
 	FileByComponent map[ClusterComponentName]string
+
+	// FeatureGatesByComponent specifies feature gates to apply to component command line.
+	FeatureGatesByComponent map[ClusterComponentName]string
 }
 
 func (m ModifyOptions) GetComponentFile(component ClusterComponentName) string {
@@ -363,8 +376,6 @@ func (c *Cluster) Modify(tCtx ktesting.TContext, state string, options ModifyOpt
 		FileByComponent: make(map[ClusterComponentName]string),
 	}
 
-	// We could also do things like turning feature gates on or off.
-	// For now we only support replacing the file.
 	updated := make(map[ClusterComponentName]*Cmd)
 
 	// Phase 1: stop all components that need modification in reverse order
@@ -372,7 +383,7 @@ func (c *Cluster) Modify(tCtx ktesting.TContext, state string, options ModifyOpt
 	// apiserver they depend on.
 	for _, component := range slices.Backward(KubeClusterComponents) {
 		fileName := options.GetComponentFile(component)
-		if fileName == "" {
+		if fileName == "" && options.FeatureGatesByComponent[component] == "" {
 			continue
 		}
 		tCtx := tCtx.WithStep(fmt.Sprintf("stop %s", component))
@@ -388,17 +399,21 @@ func (c *Cluster) Modify(tCtx ktesting.TContext, state string, options ModifyOpt
 
 		// Find the command (might be wrapped by sudo!).
 		cmdLine := slices.Clone(cmd.CommandLine)
-		found := false
-		for i := range cmdLine {
-			if path.Base(cmdLine[i]) == string(component) {
-				found = true
-				restore.FileByComponent[component] = cmdLine[i]
-				cmdLine[i] = fileName
-				break
+
+		// Replace binary if requested.
+		if fileName != "" {
+			found := false
+			for i := range cmdLine {
+				if path.Base(cmdLine[i]) == string(component) {
+					found = true
+					restore.FileByComponent[component] = cmdLine[i]
+					cmdLine[i] = fileName
+					break
+				}
 			}
-		}
-		if !found {
-			tCtx.Fatal("binary filename not found")
+			if !found {
+				tCtx.Fatal("binary filename not found")
+			}
 		}
 		cmd.Name = string(component) + "-" + state
 		cmd.CommandLine = cmdLine
@@ -411,6 +426,12 @@ func (c *Cluster) Modify(tCtx ktesting.TContext, state string, options ModifyOpt
 	// apiserver.
 	for _, component := range KubeClusterComponents {
 		if cmd, ok := updated[component]; ok {
+			// Apply feature gates.
+			if featureGates, ok := options.FeatureGatesByComponent[component]; ok {
+				merged, err := mergeFeatureGatesFlags(cmd.CommandLine, featureGates)
+				tCtx.ExpectNoError(err, "merge feature gates %s into %s command line", featureGates, component)
+				cmd.CommandLine = merged
+			}
 			c.runComponentWithRetry(tCtx, component, cmd)
 		}
 	}
@@ -546,4 +567,70 @@ func dumpProcesses(tCtx ktesting.TContext) {
 	// cmd.Start(tCtx)
 	// processes := cmd.Wait(tCtx)
 	// tCtx.Log(processes)
+}
+
+// ToggleFeatureGates restarts the feature gated components with the specified feature gates.
+// The returned ModifyOptions can be passed to Modify to restore the original state.
+func (c *Cluster) ToggleFeatureGates(tCtx ktesting.TContext, state string, featureGates string) ModifyOptions {
+	tCtx.Helper()
+
+	opts := ModifyOptions{
+		FileByComponent:         make(map[ClusterComponentName]string),
+		FeatureGatesByComponent: make(map[ClusterComponentName]string),
+	}
+
+	for _, component := range featureGatedComponents {
+		opts.FeatureGatesByComponent[component] = featureGates
+	}
+
+	return c.Modify(tCtx, state, opts)
+}
+
+// mergeFeatureGatesFlags merges the given feature gates (in "fg1=true,fg2=false" format)
+// into the command line. Any existing --feature-gates flags are merged together and
+// overridden by the new gates. The result contains exactly one --feature-gates flag at
+// the position of the first one previously found, or appended at the end if none was
+// present. If no gates result, the command line is returned unchanged.
+//
+// An error is returned if any --feature-gates flag in cmdLine or the featureGates
+// argument itself is malformed.
+func mergeFeatureGatesFlags(cmdLine []string, featureGates string) ([]string, error) {
+	gates := map[string]bool{}
+	gatesValue := cliflag.NewMapStringBool(&gates)
+
+	// Strip all --feature-gates tokens from the command line, accumulating
+	// their values into gatesValue. Remember where the first one was so the
+	// merged flag lands at the same position.
+	insertIdx := -1
+	out := make([]string, 0, len(cmdLine))
+	for _, tok := range cmdLine {
+		value, ok := strings.CutPrefix(tok, "--feature-gates=")
+		if !ok {
+			out = append(out, tok)
+			continue
+		}
+		if err := gatesValue.Set(value); err != nil {
+			return nil, fmt.Errorf("invalid --feature-gates in command line %q: %w", tok, err)
+		}
+		if insertIdx == -1 {
+			insertIdx = len(out)
+		}
+	}
+
+	// Apply the new gates on top (new values win over existing ones).
+	if featureGates != "" {
+		if err := gatesValue.Set(featureGates); err != nil {
+			return nil, fmt.Errorf("invalid feature gates %q: %w", featureGates, err)
+		}
+	}
+
+	// If no existing parseable flag was found and no gates resulted, nothing to do.
+	if insertIdx == -1 && len(gates) == 0 {
+		return out, nil
+	}
+	flag := "--feature-gates=" + gatesValue.String()
+	if insertIdx != -1 {
+		return slices.Insert(out, insertIdx, flag), nil
+	}
+	return append(out, flag), nil
 }
