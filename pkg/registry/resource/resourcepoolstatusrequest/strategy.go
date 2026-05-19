@@ -69,12 +69,6 @@ func (*resourcePoolStatusRequestStrategy) Validate(ctx context.Context, obj runt
 	return validation.ValidateResourcePoolStatusRequest(request)
 }
 
-// DeclarativeValidationConfig implements rest.DeclarativeValidationConfigurer to supply declarative
-// validation options to the generic BeforeCreate/BeforeUpdate code path.
-func (*resourcePoolStatusRequestStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
-	return rest.DeclarativeValidationConfig{}
-}
-
 func (*resourcePoolStatusRequestStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
 	return nil
 }
