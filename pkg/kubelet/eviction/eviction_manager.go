@@ -635,6 +635,7 @@ func (m *managerImpl) evictPod(logger klog.Logger, pod *v1.Pod, gracePeriodOverr
 		return false
 	}
 	// record that we are evicting the pod
+	//nolint:forbidigo // Legacy usage
 	m.recorder.AnnotatedEventf(pod, annotations, v1.EventTypeWarning, Reason, "%s", evictMsg)
 	// this is a blocking call and should only return when the pod and its containers are killed.
 	logger.V(3).Info("Evicting pod", "pod", klog.KObj(pod), "podUID", pod.UID, "message", evictMsg)
