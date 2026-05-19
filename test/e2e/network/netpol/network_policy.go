@@ -624,7 +624,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 
 			ginkgo.By("Creating a network policy for the server which allows traffic only on a (non-existent) named port.")
 			ingressRule := networkingv1.NetworkPolicyIngressRule{}
-			ingressRule.Ports = append(ingressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{StrVal: "no-such-port"}, Protocol: &protocolTCP})
+			ingressRule.Ports = append(ingressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{Type: intstr.String, StrVal: "no-such-port"}, Protocol: &protocolTCP})
 			policy := GenNetworkPolicyWithNameAndPodMatchLabel("allow-ingress-on-nonexistent-port", map[string]string{"pod": "a"}, SetSpecIngressRules(ingressRule))
 			CreatePolicy(ctx, k8s, policy, nsX)
 
