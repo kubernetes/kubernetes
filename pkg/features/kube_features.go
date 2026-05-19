@@ -146,6 +146,12 @@ const (
 	// Enable ClusterTrustBundle Kubelet projected volumes.  Depends on ClusterTrustBundle.
 	ClusterTrustBundleProjection featuregate.Feature = "ClusterTrustBundleProjection"
 
+	// owner: @tosi3k
+	// kep: https://kep.k8s.io/6012
+	//
+	// Enables support for Composite Pod Groups.
+	CompositePodGroup featuregate.Feature = "CompositePodGroup"
+
 	// owner: @adrianreber
 	// kep: https://kep.k8s.io/2008
 	//
@@ -1264,6 +1270,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 	ClusterTrustBundleProjection: {
 		{Version: version.MustParse("1.29"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Beta},
+	},
+
+	CompositePodGroup: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
 	ContainerCheckpoint: {
