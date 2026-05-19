@@ -1114,3 +1114,37 @@ func TestUpdateContainerResources(t *testing.T) {
 	// Verify container is updated
 	assert.Contains(t, fakeRuntime.Called, "UpdateContainerResources")
 }
+
+func TestGetExecSetsAuditRequestID(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc123"}
+
+	_, err = m.GetExec(tCtx, containerID, []string{"ls"}, true, true, false, false, "audit-id-xyz")
+	require.NoError(t, err)
+
+	assert.Contains(t, fakeRuntime.Called, "Exec")
+	require.NotNil(t, fakeRuntime.LastExecRequest, "ExecRequest should be captured")
+	assert.Equal(t, "audit-id-xyz", fakeRuntime.LastExecRequest.AuditRequestId,
+		"audit_request_id should be set on ExecRequest")
+	assert.Equal(t, "abc123", fakeRuntime.LastExecRequest.ContainerId)
+	assert.Equal(t, []string{"ls"}, fakeRuntime.LastExecRequest.Cmd)
+}
+
+func TestGetAttachSetsAuditRequestID(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	fakeRuntime, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+
+	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc123"}
+
+	_, err = m.GetAttach(tCtx, containerID, true, true, false, false, "audit-id-attach-456")
+	require.NoError(t, err)
+
+	assert.Contains(t, fakeRuntime.Called, "Attach")
+	require.NotNil(t, fakeRuntime.LastAttachRequest, "AttachRequest should be captured")
+	assert.Equal(t, "audit-id-attach-456", fakeRuntime.LastAttachRequest.AuditRequestId,
+		"audit_request_id should be set on AttachRequest")
+}

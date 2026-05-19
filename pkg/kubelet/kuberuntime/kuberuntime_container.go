@@ -1328,14 +1328,15 @@ func (m *kubeGenericRuntimeManager) GetContainerLogs(ctx context.Context, pod *v
 }
 
 // GetExec gets the endpoint the runtime will serve the exec request from.
-func (m *kubeGenericRuntimeManager) GetExec(ctx context.Context, id kubecontainer.ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error) {
+func (m *kubeGenericRuntimeManager) GetExec(ctx context.Context, id kubecontainer.ContainerID, cmd []string, stdin, stdout, stderr, tty bool, auditID string) (*url.URL, error) {
 	req := &runtimeapi.ExecRequest{
-		ContainerId: id.ID,
-		Cmd:         cmd,
-		Tty:         tty,
-		Stdin:       stdin,
-		Stdout:      stdout,
-		Stderr:      stderr,
+		ContainerId:    id.ID,
+		Cmd:            cmd,
+		Tty:            tty,
+		Stdin:          stdin,
+		Stdout:         stdout,
+		Stderr:         stderr,
+		AuditRequestId: auditID,
 	}
 	resp, err := m.runtimeService.Exec(ctx, req)
 	if err != nil {
@@ -1346,13 +1347,14 @@ func (m *kubeGenericRuntimeManager) GetExec(ctx context.Context, id kubecontaine
 }
 
 // GetAttach gets the endpoint the runtime will serve the attach request from.
-func (m *kubeGenericRuntimeManager) GetAttach(ctx context.Context, id kubecontainer.ContainerID, stdin, stdout, stderr, tty bool) (*url.URL, error) {
+func (m *kubeGenericRuntimeManager) GetAttach(ctx context.Context, id kubecontainer.ContainerID, stdin, stdout, stderr, tty bool, auditID string) (*url.URL, error) {
 	req := &runtimeapi.AttachRequest{
-		ContainerId: id.ID,
-		Stdin:       stdin,
-		Stdout:      stdout,
-		Stderr:      stderr,
-		Tty:         tty,
+		ContainerId:    id.ID,
+		Stdin:          stdin,
+		Stdout:         stdout,
+		Stderr:         stderr,
+		Tty:            tty,
+		AuditRequestId: auditID,
 	}
 	resp, err := m.runtimeService.Attach(ctx, req)
 	if err != nil {

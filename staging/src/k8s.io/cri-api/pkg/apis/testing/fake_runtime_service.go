@@ -76,6 +76,9 @@ type FakeRuntimeService struct {
 	FakeLinuxConfiguration *runtimeapi.LinuxRuntimeConfiguration
 
 	ErrorOnSandboxCreate bool
+
+	LastExecRequest   *runtimeapi.ExecRequest
+	LastAttachRequest *runtimeapi.AttachRequest
 }
 
 // GetContainerID returns the unique container ID from the FakeRuntimeService.
@@ -536,11 +539,12 @@ func (r *FakeRuntimeService) ExecSync(_ context.Context, containerID string, cmd
 }
 
 // Exec emulates the execution of a command in a container in the FakeRuntimeService.
-func (r *FakeRuntimeService) Exec(context.Context, *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
+func (r *FakeRuntimeService) Exec(_ context.Context, req *runtimeapi.ExecRequest) (*runtimeapi.ExecResponse, error) {
 	r.Lock()
 	defer r.Unlock()
 
 	r.Called = append(r.Called, "Exec")
+	r.LastExecRequest = req
 	if err := r.popError("Exec"); err != nil {
 		return nil, err
 	}
@@ -554,6 +558,7 @@ func (r *FakeRuntimeService) Attach(_ context.Context, req *runtimeapi.AttachReq
 	defer r.Unlock()
 
 	r.Called = append(r.Called, "Attach")
+	r.LastAttachRequest = req
 	if err := r.popError("Attach"); err != nil {
 		return nil, err
 	}

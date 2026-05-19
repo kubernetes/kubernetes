@@ -5952,7 +5952,7 @@ func TestGetExec(t *testing.T) {
 			kubelet.containerRuntime = fakeRuntime
 			kubelet.streamingRuntime = fakeRuntime
 
-			redirect, err := kubelet.GetExec(tCtx, tc.podFullName, podUID, tc.container, tc.command, remotecommand.Options{})
+			redirect, err := kubelet.GetExec(tCtx, tc.podFullName, podUID, tc.container, tc.command, remotecommand.Options{}, "")
 			if tc.expectError {
 				assert.Error(t, err, description)
 			} else {

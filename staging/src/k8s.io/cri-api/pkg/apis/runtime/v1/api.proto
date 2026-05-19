@@ -1633,6 +1633,11 @@ message ExecRequest {
     // in this case. The output of stdout and stderr will be combined to a
     // single stream.
     bool stderr = 6;
+    // audit_request_id is the unique identifier from the API server audit log
+    // for the exec request that initiated this session. This allows runtime
+    // security agents to correlate in-container activity with the originating
+    // API server audit event.
+    string audit_request_id = 7;
 }
 
 message ExecResponse {
@@ -1658,6 +1663,9 @@ message AttachRequest {
     // in this case. The output of stdout and stderr will be combined to a
     // single stream.
     bool stderr = 5;
+    // audit_request_id is the unique identifier from the API server audit log
+    // for the attach request that initiated this session.
+    string audit_request_id = 6;
 }
 
 message AttachResponse {

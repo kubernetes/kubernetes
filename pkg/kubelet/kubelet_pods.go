@@ -2810,7 +2810,7 @@ func (kl *Kubelet) RunInContainer(ctx context.Context, podFullName string, podUI
 }
 
 // GetExec gets the URL the exec will be served from, or nil if the Kubelet will serve it.
-func (kl *Kubelet) GetExec(ctx context.Context, podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error) {
+func (kl *Kubelet) GetExec(ctx context.Context, podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options, auditID string) (*url.URL, error) {
 	container, err := kl.findContainer(ctx, podFullName, podUID, containerName)
 	if err != nil {
 		return nil, err
@@ -2818,11 +2818,11 @@ func (kl *Kubelet) GetExec(ctx context.Context, podFullName string, podUID types
 	if container == nil {
 		return nil, fmt.Errorf("container not found (%q)", containerName)
 	}
-	return kl.streamingRuntime.GetExec(ctx, container.ID, cmd, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, streamOpts.TTY)
+	return kl.streamingRuntime.GetExec(ctx, container.ID, cmd, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, streamOpts.TTY, auditID)
 }
 
 // GetAttach gets the URL the attach will be served from, or nil if the Kubelet will serve it.
-func (kl *Kubelet) GetAttach(ctx context.Context, podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error) {
+func (kl *Kubelet) GetAttach(ctx context.Context, podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options, auditID string) (*url.URL, error) {
 	container, err := kl.findContainer(ctx, podFullName, podUID, containerName)
 	if err != nil {
 		return nil, err
@@ -2844,7 +2844,7 @@ func (kl *Kubelet) GetAttach(ctx context.Context, podFullName string, podUID typ
 	}
 	tty := containerSpec.TTY
 
-	return kl.streamingRuntime.GetAttach(ctx, container.ID, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, tty)
+	return kl.streamingRuntime.GetAttach(ctx, container.ID, streamOpts.Stdin, streamOpts.Stdout, streamOpts.Stderr, tty, auditID)
 }
 
 // GetPortForward gets the URL the port-forward will be served from, or nil if the Kubelet will serve it.

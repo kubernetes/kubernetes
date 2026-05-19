@@ -532,7 +532,7 @@ func (f *FakeRuntime) ImageFsInfo(_ context.Context) (*runtimeapi.ImageFsInfoRes
 	return resp, f.Err
 }
 
-func (f *FakeStreamingRuntime) GetExec(_ context.Context, id kubecontainer.ContainerID, cmd []string, stdin, stdout, stderr, tty bool) (*url.URL, error) {
+func (f *FakeStreamingRuntime) GetExec(_ context.Context, id kubecontainer.ContainerID, cmd []string, stdin, stdout, stderr, tty bool, auditID string) (*url.URL, error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -540,7 +540,7 @@ func (f *FakeStreamingRuntime) GetExec(_ context.Context, id kubecontainer.Conta
 	return &url.URL{Host: FakeHost}, f.Err
 }
 
-func (f *FakeStreamingRuntime) GetAttach(_ context.Context, id kubecontainer.ContainerID, stdin, stdout, stderr, tty bool) (*url.URL, error) {
+func (f *FakeStreamingRuntime) GetAttach(_ context.Context, id kubecontainer.ContainerID, stdin, stdout, stderr, tty bool, auditID string) (*url.URL, error) {
 	f.Lock()
 	defer f.Unlock()
 

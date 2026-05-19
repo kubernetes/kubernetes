@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/proxy"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -564,6 +566,61 @@ apiserver_websocket_streaming_requests_total{proxy_type=%q,subresource="portforw
 					"apiserver_websocket_streaming_requests_total"); err != nil {
 					t.Errorf("unexpected metric output: %v", err)
 				}
+			}
+		})
+	}
+}
+
+func TestWithAuditIDHeader(t *testing.T) {
+	tests := []struct {
+		name           string
+		auditID        string
+		existingHeader string
+		expectedHeader string
+	}{
+		{
+			name:           "audit ID from context is injected as header",
+			auditID:        "test-audit-id-123",
+			expectedHeader: "test-audit-id-123",
+		},
+		{
+			name:           "empty audit ID results in no header",
+			auditID:        "",
+			expectedHeader: "",
+		},
+		{
+			name:           "existing Audit-ID header is overwritten by context value",
+			auditID:        "from-context",
+			existingHeader: "from-header",
+			expectedHeader: "from-context",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var receivedHeader string
+			delegate := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				receivedHeader = req.Header.Get("Audit-ID")
+			})
+
+			handler := withAuditIDHeader(delegate)
+
+			req := httptest.NewRequest(http.MethodGet, "/exec/ns/pod/container", nil)
+			if tc.existingHeader != "" {
+				req.Header.Set("Audit-ID", tc.existingHeader)
+			}
+
+			if tc.auditID != "" {
+				ctx := audit.WithAuditContext(req.Context())
+				audit.WithAuditID(ctx, types.UID(tc.auditID))
+				req = req.WithContext(ctx)
+			}
+
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, req)
+
+			if receivedHeader != tc.expectedHeader {
+				t.Errorf("expected Audit-ID header %q, got %q", tc.expectedHeader, receivedHeader)
 			}
 		})
 	}

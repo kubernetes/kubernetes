@@ -619,6 +619,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.35"
+- name: ExecRequestID
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.37"
 - name: ExtendWebSocketsToKubelet
   versionedSpecs:
   - default: true

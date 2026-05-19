@@ -355,6 +355,14 @@ const (
 	// Locked to default, will remove in v1.38. Progress is reflected in KEP #1972 update
 	ExecProbeTimeout featuregate.Feature = "ExecProbeTimeout"
 
+	// owner: @nispriha
+	// kep: https://kep.k8s.io/6035
+	//
+	// Enables propagation of the audit request ID from the API server
+	// through the kubelet to the CRI ExecRequest, allowing runtime
+	// security agents to correlate exec sessions with API server audit logs.
+	ExecRequestID featuregate.Feature = "ExecRequestID"
+
 	// owner: @seans3
 	// kep: http://kep.k8s.io/4006
 	//
@@ -1400,6 +1408,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.35"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in v1.38
 	},
 
+	ExecRequestID: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	ExtendWebSocketsToKubelet: {
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 	},
@@ -2328,6 +2340,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	EventedPLEG: {},
 
 	ExecProbeTimeout: {},
+
+	ExecRequestID: {},
 
 	ExtendWebSocketsToKubelet: {NodeDeclaredFeatures},
 

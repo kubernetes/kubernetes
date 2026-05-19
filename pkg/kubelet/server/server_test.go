@@ -104,6 +104,8 @@ type fakeKubelet struct {
 	runFunc             func(podFullName string, uid types.UID, containerName string, cmd []string) ([]byte, error)
 	getExecCheck        func(string, types.UID, string, []string, remotecommandserver.Options)
 	getAttachCheck      func(string, types.UID, string, remotecommandserver.Options)
+	lastExecAuditID     string
+	lastAttachAuditID   string
 	getPortForwardCheck func(string, string, types.UID, portforward.V4Options)
 
 	containerLogsFunc func(ctx context.Context, podFullName, containerName string, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) error
@@ -234,7 +236,8 @@ func newTestStreamingServer(streamIdleTimeout time.Duration) (s *testStreamingSe
 	return s, nil
 }
 
-func (fk *fakeKubelet) GetExec(_ context.Context, podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options) (*url.URL, error) {
+func (fk *fakeKubelet) GetExec(_ context.Context, podFullName string, podUID types.UID, containerName string, cmd []string, streamOpts remotecommandserver.Options, auditID string) (*url.URL, error) {
+	fk.lastExecAuditID = auditID
 	if fk.getExecCheck != nil {
 		fk.getExecCheck(podFullName, podUID, containerName, cmd, streamOpts)
 	}
@@ -253,7 +256,8 @@ func (fk *fakeKubelet) GetExec(_ context.Context, podFullName string, podUID typ
 	return url.Parse(resp.GetUrl())
 }
 
-func (fk *fakeKubelet) GetAttach(_ context.Context, podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options) (*url.URL, error) {
+func (fk *fakeKubelet) GetAttach(_ context.Context, podFullName string, podUID types.UID, containerName string, streamOpts remotecommandserver.Options, auditID string) (*url.URL, error) {
+	fk.lastAttachAuditID = auditID
 	if fk.getAttachCheck != nil {
 		fk.getAttachCheck(podFullName, podUID, containerName, streamOpts)
 	}
@@ -2537,4 +2541,61 @@ func TestKubeletNativeHistogramMetrics(t *testing.T) {
 	}
 
 	testutil.AssertHasNativeHistogram(t, mf, nil)
+}
+
+func TestExecAuditIDPropagation(t *testing.T) {
+	tests := []struct {
+		name            string
+		featureEnabled  bool
+		auditIDHeader   string
+		expectedAuditID string
+	}{
+		{
+			name:            "audit ID is forwarded when feature gate is enabled",
+			featureEnabled:  true,
+			auditIDHeader:   "test-audit-id-abc",
+			expectedAuditID: "test-audit-id-abc",
+		},
+		{
+			name:            "audit ID is not forwarded when feature gate is disabled",
+			featureEnabled:  false,
+			auditIDHeader:   "test-audit-id-abc",
+			expectedAuditID: "",
+		},
+		{
+			name:            "empty audit ID header when feature gate is enabled",
+			featureEnabled:  true,
+			auditIDHeader:   "",
+			expectedAuditID: "",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExecRequestID, tc.featureEnabled)
+
+			ss, err := newTestStreamingServer(0)
+			require.NoError(t, err)
+			defer ss.testHTTPServer.Close()
+			fw := newServerTestWithDebug(tCtx, true, ss)
+			defer fw.testHTTPServer.Close()
+
+			resp, err := http.Get(fw.testHTTPServer.URL + "/healthz")
+			require.NoError(t, err)
+			_ = resp.Body.Close()
+
+			req, err := http.NewRequest(http.MethodPost, fw.testHTTPServer.URL+"/exec/default/test/container?command=ls&input=1&output=1", nil)
+			require.NoError(t, err)
+			if tc.auditIDHeader != "" {
+				req.Header.Set("Audit-ID", tc.auditIDHeader)
+			}
+			client := &http.Client{}
+			resp, err = client.Do(req)
+			require.NoError(t, err)
+			_ = resp.Body.Close()
+
+			assert.Equal(t, tc.expectedAuditID, fw.fakeKubelet.lastExecAuditID, "audit ID should match expected value")
+		})
+	}
 }

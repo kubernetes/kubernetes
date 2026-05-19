@@ -26,6 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -133,6 +135,9 @@ func (r *AttachREST) Connect(ctx context.Context, name string, opts runtime.Obje
 	transport := connInfo.Transport
 	nodeSupportsWebsockets := checkNodeSupportsWebsockets(connInfo.NodeFeatures)
 	handler := newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder)
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExecRequestID) {
+		handler = withAuditIDHeader(handler)
+	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.TranslateStreamCloseWebsocketRequests) {
 		// If the node supports websocket translation, revert to legacy proxy, and let kubelet handle it.
 		if utilfeature.DefaultFeatureGate.Enabled(features.ExtendWebSocketsToKubelet) && nodeSupportsWebsockets {
@@ -208,6 +213,9 @@ func (r *ExecREST) Connect(ctx context.Context, name string, opts runtime.Object
 	transport := connInfo.Transport
 	nodeSupportsWebsockets := checkNodeSupportsWebsockets(connInfo.NodeFeatures)
 	handler := newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder)
+	if utilfeature.DefaultFeatureGate.Enabled(features.ExecRequestID) {
+		handler = withAuditIDHeader(handler)
+	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.TranslateStreamCloseWebsocketRequests) {
 		// If the node supports websocket translation, revert to legacy proxy, and let kubelet handle it.
 		if utilfeature.DefaultFeatureGate.Enabled(features.ExtendWebSocketsToKubelet) && nodeSupportsWebsockets {
@@ -317,4 +325,16 @@ func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.Roun
 func checkNodeSupportsWebsockets(nodeFeatures []string) bool {
 	nodeSupportsWebsockets := slices.Contains(nodeFeatures, string(features.ExtendWebSocketsToKubelet))
 	return nodeSupportsWebsockets
+}
+
+// withAuditIDHeader wraps a handler to propagate the audit ID from the
+// request context into an HTTP header so that the kubelet can read it.
+func withAuditIDHeader(delegate http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if auditID, found := audit.AuditIDFrom(req.Context()); found {
+			req = net.CloneRequest(req)
+			req.Header.Set(auditinternal.HeaderAuditID, string(auditID))
+		}
+		delegate.ServeHTTP(w, req)
+	})
 }
