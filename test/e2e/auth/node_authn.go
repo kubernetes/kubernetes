@@ -39,7 +39,7 @@ var _ = SIGDescribe("NodeAuthenticator", func() {
 	f := framework.NewDefaultFramework("node-authn")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 	var ns string
-	var nodeIP string
+	var nodeIPs []string
 	ginkgo.BeforeEach(func(ctx context.Context) {
 		ns = f.Namespace.Name
 
@@ -51,30 +51,33 @@ var _ = SIGDescribe("NodeAuthenticator", func() {
 			family = v1.IPv6Protocol
 		}
 
-		nodeIP = e2enode.FirstAddressByTypeAndFamily(nodes, v1.NodeInternalIP, family)
-		gomega.Expect(nodeIP).NotTo(gomega.BeEmpty())
+		nodeIPs := e2enode.GetAddressesByTypeAndFamily(&nodes.Items[0], v1.NodeInternalIP, family)
+		gomega.Expect(nodeIPs).NotTo(gomega.BeEmpty())
 	})
 
 	ginkgo.It("The kubelet's main port 10250 should reject requests with no credentials", func(ctx context.Context) {
 		pod := createNodeAuthTestPod(ctx, f)
-
-		// Anonymous authentication is disabled by default
-		host := net.JoinHostPort(nodeIP, strconv.Itoa(ports.KubeletPort))
-		result := e2eoutput.RunHostCmdOrDie(ns, pod.Name, fmt.Sprintf("curl -sIk -o /dev/null -w '%s' https://%s/metrics", "%{http_code}", host))
-		gomega.Expect(result).To(gomega.Or(gomega.Equal("401"), gomega.Equal("403")), "the kubelet's main port 10250 should reject requests with no credentials")
+		for _, nodeIP := range nodeIPs {
+			// Anonymous authentication is disabled by default
+			host := net.JoinHostPort(nodeIP, strconv.Itoa(ports.KubeletPort))
+			result := e2eoutput.RunHostCmdOrDie(ns, pod.Name, fmt.Sprintf("curl -sIk -o /dev/null -w '%s' https://%s/metrics", "%{http_code}", host))
+			gomega.Expect(result).To(gomega.Or(gomega.Equal("401"), gomega.Equal("403")), "the kubelet's main port 10250 should reject requests with no credentials")
+		}
 	})
 
 	ginkgo.It("The kubelet can delegate ServiceAccount tokens to the API server", func(ctx context.Context) {
 		pod := createNodeAuthTestPod(ctx, f)
 
-		host := net.JoinHostPort(nodeIP, strconv.Itoa(ports.KubeletPort))
-		result := e2eoutput.RunHostCmdOrDie(ns,
-			pod.Name,
-			fmt.Sprintf("curl -sIk -o /dev/null -w '%s' --header \"Authorization: Bearer `%s`\" https://%s/metrics",
-				"%{http_code}",
-				"cat /var/run/secrets/kubernetes.io/serviceaccount/token",
-				host))
-		gomega.Expect(result).To(gomega.Or(gomega.Equal("401"), gomega.Equal("403")), "the kubelet can delegate ServiceAccount tokens to the API server")
+		for _, nodeIP := range nodeIPs {
+			host := net.JoinHostPort(nodeIP, strconv.Itoa(ports.KubeletPort))
+			result := e2eoutput.RunHostCmdOrDie(ns,
+				pod.Name,
+				fmt.Sprintf("curl -sIk -o /dev/null -w '%s' --header \"Authorization: Bearer `%s`\" https://%s/metrics",
+					"%{http_code}",
+					"cat /var/run/secrets/kubernetes.io/serviceaccount/token",
+					host))
+			gomega.Expect(result).To(gomega.Or(gomega.Equal("401"), gomega.Equal("403")), "the kubelet can delegate ServiceAccount tokens to the API server")
+		}
 	})
 })
 

@@ -17,14 +17,10 @@ limitations under the License.
 package validatingwebhookconfiguration
 
 import (
-	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 )
 
@@ -33,7 +29,7 @@ func TestValidatingWebhookConfigurationStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Error("ValidatingWebhookConfiguration strategy must be cluster scoped")
 	}
-	if Strategy.AllowCreateOnUpdate(context.Background()) {
+	if Strategy.AllowCreateOnUpdate() {
 		t.Errorf("ValidatingWebhookConfiguration should not allow create on update")
 	}
 
@@ -81,70 +77,4 @@ func validValidatingWebhookConfiguration() *admissionregistration.ValidatingWebh
 			AdmissionReviewVersions: []string{"v1beta1"},
 		}},
 	}
-}
-
-func TestStaticSuffixWarningsAndValidation(t *testing.T) {
-	ctx := genericapirequest.NewDefaultContext()
-	staticName := "my-webhook.static.k8s.io"
-
-	makeConfig := func(name string) *admissionregistration.ValidatingWebhookConfiguration {
-		cfg := validValidatingWebhookConfiguration()
-		cfg.Name = name
-		return cfg
-	}
-
-	t.Run("feature gate disabled warns on create", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ManifestBasedAdmissionControlConfig, false)
-		warnings := Strategy.WarningsOnCreate(ctx, makeConfig(staticName))
-		if len(warnings) == 0 {
-			t.Error("Expected warning for .static.k8s.io suffix when feature gate is disabled")
-		}
-	})
-
-	t.Run("feature gate disabled warns on update", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ManifestBasedAdmissionControlConfig, false)
-		warnings := Strategy.WarningsOnUpdate(ctx, makeConfig(staticName), makeConfig(staticName))
-		if len(warnings) == 0 {
-			t.Error("Expected warning for .static.k8s.io suffix when feature gate is disabled")
-		}
-	})
-
-	t.Run("feature gate disabled no warning for normal name", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ManifestBasedAdmissionControlConfig, false)
-		warnings := Strategy.WarningsOnCreate(ctx, makeConfig("normal-webhook"))
-		if len(warnings) != 0 {
-			t.Errorf("Expected no warnings for normal name, got: %v", warnings)
-		}
-	})
-
-	t.Run("feature gate enabled rejects static suffix on create", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ManifestBasedAdmissionControlConfig, true)
-		errs := Strategy.Validate(ctx, makeConfig(staticName))
-		found := false
-		for _, e := range errs {
-			if e.Field == "metadata.name" {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Error("Expected validation error for .static.k8s.io suffix when feature gate is enabled")
-		}
-	})
-
-	t.Run("feature gate enabled no warning on create", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ManifestBasedAdmissionControlConfig, true)
-		warnings := Strategy.WarningsOnCreate(ctx, makeConfig(staticName))
-		if len(warnings) != 0 {
-			t.Errorf("Expected no warnings when feature gate is enabled (validation handles it), got: %v", warnings)
-		}
-	})
-
-	t.Run("feature gate enabled warns on update", func(t *testing.T) {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ManifestBasedAdmissionControlConfig, true)
-		warnings := Strategy.WarningsOnUpdate(ctx, makeConfig(staticName), makeConfig(staticName))
-		if len(warnings) == 0 {
-			t.Error("Expected warning for .static.k8s.io suffix on update even when feature gate is enabled")
-		}
-	})
 }

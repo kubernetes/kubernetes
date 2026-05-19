@@ -41,6 +41,8 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
+	genericfeatures "k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook/metrics"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -202,18 +204,21 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 			Verb: attr.GetVerb(),
 		}
 	}
-	// Process Match Conditions before calling the webhook
-	matches, err := w.match(ctx, r)
-	// If at least one matchCondition evaluates to an error (but none are FALSE):
-	// If failurePolicy=Deny, then the webhook rejects the request
-	// If failurePolicy=NoOpinion, then the error is ignored and the webhook is skipped
-	if err != nil {
-		return w.decisionOnError, "", err
-	}
-	// If at least one matchCondition successfully evaluates to FALSE,
-	// then the webhook is skipped.
-	if !matches {
-		return authorizer.DecisionNoOpinion, "", nil
+	// skipping match when feature is not enabled
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StructuredAuthorizationConfiguration) {
+		// Process Match Conditions before calling the webhook
+		matches, err := w.match(ctx, r)
+		// If at least one matchCondition evaluates to an error (but none are FALSE):
+		// If failurePolicy=Deny, then the webhook rejects the request
+		// If failurePolicy=NoOpinion, then the error is ignored and the webhook is skipped
+		if err != nil {
+			return w.decisionOnError, "", err
+		}
+		// If at least one matchCondition successfully evaluates to FALSE,
+		// then the webhook is skipped.
+		if !matches {
+			return authorizer.DecisionNoOpinion, "", nil
+		}
 	}
 	// If all evaluated successfully and ALL matchConditions evaluate to TRUE,
 	// then the webhook is called.
@@ -304,17 +309,19 @@ func resourceAttributesFrom(attr authorizer.Attributes) *authorizationv1.Resourc
 		Name:        attr.GetName(),
 	}
 
-	// If we are able to get any requirements while parsing selectors, use them, even if there's an error.
-	// This is because selectors only narrow, so if a subset of selector requirements are available, the request can be allowed.
-	if selectorRequirements, _ := fieldSelectorToAuthorizationAPI(attr); len(selectorRequirements) > 0 {
-		ret.FieldSelector = &authorizationv1.FieldSelectorAttributes{
-			Requirements: selectorRequirements,
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AuthorizeWithSelectors) {
+		// If we are able to get any requirements while parsing selectors, use them, even if there's an error.
+		// This is because selectors only narrow, so if a subset of selector requirements are available, the request can be allowed.
+		if selectorRequirements, _ := fieldSelectorToAuthorizationAPI(attr); len(selectorRequirements) > 0 {
+			ret.FieldSelector = &authorizationv1.FieldSelectorAttributes{
+				Requirements: selectorRequirements,
+			}
 		}
-	}
 
-	if selectorRequirements, _ := labelSelectorToAuthorizationAPI(attr); len(selectorRequirements) > 0 {
-		ret.LabelSelector = &authorizationv1.LabelSelectorAttributes{
-			Requirements: selectorRequirements,
+		if selectorRequirements, _ := labelSelectorToAuthorizationAPI(attr); len(selectorRequirements) > 0 {
+			ret.LabelSelector = &authorizationv1.LabelSelectorAttributes{
+				Requirements: selectorRequirements,
+			}
 		}
 	}
 

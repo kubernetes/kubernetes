@@ -22,6 +22,6 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ExternalSimple struct {
-	runtime.TypeMeta `json:""`
+	runtime.TypeMeta `json:",inline"`
 	TestString       string `json:"testString"`
 }

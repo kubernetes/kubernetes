@@ -1789,8 +1789,10 @@
       ]
     },
     "hostnameOverride": "hostnameOverrideValue",
-    "schedulingGroup": {
-      "podGroupName": "podGroupNameValue"
+    "workloadRef": {
+      "name": "nameValue",
+      "podGroup": "podGroupValue",
+      "podGroupReplicaKey": "podGroupReplicaKeyValue"
     }
   },
   "status": {
@@ -1890,12 +1892,7 @@
             "name": "nameValue",
             "mountPath": "mountPathValue",
             "readOnly": true,
-            "recursiveReadOnly": "recursiveReadOnlyValue",
-            "volumeStatus": {
-              "image": {
-                "imageRef": "imageRefValue"
-              }
-            }
+            "recursiveReadOnly": "recursiveReadOnlyValue"
           }
         ],
         "user": {
@@ -1913,8 +1910,7 @@
             "resources": [
               {
                 "resourceID": "resourceIDValue",
-                "health": "healthValue",
-                "message": "messageValue"
+                "health": "healthValue"
               }
             ]
           }
@@ -1989,12 +1985,7 @@
             "name": "nameValue",
             "mountPath": "mountPathValue",
             "readOnly": true,
-            "recursiveReadOnly": "recursiveReadOnlyValue",
-            "volumeStatus": {
-              "image": {
-                "imageRef": "imageRefValue"
-              }
-            }
+            "recursiveReadOnly": "recursiveReadOnlyValue"
           }
         ],
         "user": {
@@ -2012,8 +2003,7 @@
             "resources": [
               {
                 "resourceID": "resourceIDValue",
-                "health": "healthValue",
-                "message": "messageValue"
+                "health": "healthValue"
               }
             ]
           }
@@ -2089,12 +2079,7 @@
             "name": "nameValue",
             "mountPath": "mountPathValue",
             "readOnly": true,
-            "recursiveReadOnly": "recursiveReadOnlyValue",
-            "volumeStatus": {
-              "image": {
-                "imageRef": "imageRefValue"
-              }
-            }
+            "recursiveReadOnly": "recursiveReadOnlyValue"
           }
         ],
         "user": {
@@ -2112,8 +2097,7 @@
             "resources": [
               {
                 "resourceID": "resourceIDValue",
-                "health": "healthValue",
-                "message": "messageValue"
+                "health": "healthValue"
               }
             ]
           }
@@ -2154,17 +2138,6 @@
           "request": "requestValue"
         }
       ]
-    },
-    "nodeAllocatableResourceClaimStatuses": [
-      {
-        "resourceClaimName": "resourceClaimNameValue",
-        "containers": [
-          "containersValue"
-        ],
-        "resources": {
-          "resourcesKey": "0"
-        }
-      }
-    ]
+    }
   }
 }

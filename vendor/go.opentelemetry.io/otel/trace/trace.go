@@ -12,11 +12,6 @@ const (
 	// with the sampling bit set means the span is sampled.
 	FlagsSampled = TraceFlags(0x01)
 
-	// FlagsRandom is a bitmask with the random trace ID flag set. When
-	// set, it signals that the trace ID was generated randomly with at
-	// least 56 bits of randomness (W3C Trace Context Level 2).
-	FlagsRandom = TraceFlags(0x02)
-
 	errInvalidHexID errorConst = "trace-id and span-id can only contain [0-9a-f] characters, all lowercase"
 
 	errInvalidTraceIDLength errorConst = "hex encoded trace-id must have length equals to 32"
@@ -196,20 +191,6 @@ func (tf TraceFlags) WithSampled(sampled bool) TraceFlags { // nolint:revive  //
 	return tf &^ FlagsSampled
 }
 
-// IsRandom reports whether the random bit is set in the TraceFlags.
-func (tf TraceFlags) IsRandom() bool {
-	return tf&FlagsRandom == FlagsRandom
-}
-
-// WithRandom sets the random bit in a new copy of the TraceFlags.
-func (tf TraceFlags) WithRandom(random bool) TraceFlags { // nolint:revive  // random is not a control flag.
-	if random {
-		return tf | FlagsRandom
-	}
-
-	return tf &^ FlagsRandom
-}
-
 // MarshalJSON implements a custom marshal function to encode TraceFlags
 // as a hex string.
 func (tf TraceFlags) MarshalJSON() ([]byte, error) {
@@ -334,11 +315,6 @@ func (sc SpanContext) TraceFlags() TraceFlags {
 // IsSampled reports whether the sampling bit is set in the SpanContext's TraceFlags.
 func (sc SpanContext) IsSampled() bool {
 	return sc.traceFlags.IsSampled()
-}
-
-// IsRandom reports whether the random bit is set in the SpanContext's TraceFlags.
-func (sc SpanContext) IsRandom() bool {
-	return sc.traceFlags.IsRandom()
 }
 
 // WithTraceFlags returns a new SpanContext with the TraceFlags replaced.

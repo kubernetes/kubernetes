@@ -29,7 +29,6 @@ import (
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -511,7 +510,7 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 
 	maxPVs := getObjectCount()
 	pvs := make([]*v1.PersistentVolume, maxPVs)
-	for i := range maxPVs {
+	for i := 0; i < maxPVs; i++ {
 		// This PV will be claimed, released, and deleted
 		pvs[i] = createPV("pv-"+strconv.Itoa(i), "/tmp/foo"+strconv.Itoa(i), strconv.Itoa(i+1)+"G",
 			[]v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, v1.PersistentVolumeReclaimRetain)
@@ -519,7 +518,7 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 
 	pvc := createPVC("pvc-2", ns.Name, strconv.Itoa(maxPVs/2)+"G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, "")
 
-	for i := range maxPVs {
+	for i := 0; i < maxPVs; i++ {
 		_, err := testClient.CoreV1().PersistentVolumes().Create(context.TODO(), pvs[i], metav1.CreateOptions{})
 		if err != nil {
 			t.Errorf("Failed to create PersistentVolume %d: %v", i, err)
@@ -542,7 +541,7 @@ func TestPersistentVolumeMultiPVs(t *testing.T) {
 
 	// only one PV is bound
 	bound := 0
-	for i := range maxPVs {
+	for i := 0; i < maxPVs; i++ {
 		pv, err := testClient.CoreV1().PersistentVolumes().Get(context.TODO(), pvs[i].Name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Unexpected error getting pv: %v", err)
@@ -674,9 +673,6 @@ func TestPersistentVolumeClaimVolumeAttirbutesClassName(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if !tc.featureEnabled {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
-			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeAttributesClass, tc.featureEnabled)
 			s := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins=ServiceAccount,StorageObjectInUseProtection"}, framework.SharedEtcd())
 			defer s.TearDownFn()
@@ -780,7 +776,7 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 	objCount := getObjectCount()
 	pvs := make([]*v1.PersistentVolume, objCount)
 	pvcs := make([]*v1.PersistentVolumeClaim, objCount)
-	for i := range objCount {
+	for i := 0; i < objCount; i++ {
 		// This PV will be claimed, released, and deleted
 		pvs[i] = createPV("pv-"+strconv.Itoa(i), "/tmp/foo"+strconv.Itoa(i), "1G",
 			[]v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, v1.PersistentVolumeReclaimRetain)
@@ -794,12 +790,12 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 	// watchPV early - it seems it has limited capacity and it gets stuck
 	// with >3000 volumes.
 	go func() {
-		for i := range objCount {
+		for i := 0; i < objCount; i++ {
 			_, _ = testClient.CoreV1().PersistentVolumes().Create(context.TODO(), pvs[i], metav1.CreateOptions{})
 		}
 	}()
 	// Wait for them to get Available
-	for i := range objCount {
+	for i := 0; i < objCount; i++ {
 		waitForAnyPersistentVolumePhase(watchPV, v1.VolumeAvailable)
 		klog.V(1).Infof("%d volumes available", i+1)
 	}
@@ -873,7 +869,7 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 
 	// Create the claims, again in a separate goroutine.
 	go func() {
-		for i := range objCount {
+		for i := 0; i < objCount; i++ {
 			_, _ = testClient.CoreV1().PersistentVolumeClaims(ns.Name).Create(context.TODO(), pvcs[i], metav1.CreateOptions{})
 		}
 	}()
@@ -885,7 +881,7 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 	}
 
 	// wait until the binder pairs all volumes
-	for i := range objCount {
+	for i := 0; i < objCount; i++ {
 		waitForPersistentVolumePhase(testClient, pvs[i].Name, watchPV, v1.VolumeBound)
 		klog.V(1).Infof("%d claims bound", i+1)
 	}
@@ -894,7 +890,7 @@ func TestPersistentVolumeMultiPVsPVCs(t *testing.T) {
 	close(stopCh)
 
 	// check that everything is bound to something
-	for i := range objCount {
+	for i := 0; i < objCount; i++ {
 		pv, err := testClient.CoreV1().PersistentVolumes().Get(context.TODO(), pvs[i].Name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Unexpected error getting pv: %v", err)
@@ -940,7 +936,7 @@ func TestPersistentVolumeControllerStartup(t *testing.T) {
 	// Create *bound* volumes and PVCs
 	pvs := make([]*v1.PersistentVolume, objCount)
 	pvcs := make([]*v1.PersistentVolumeClaim, objCount)
-	for i := range objCount {
+	for i := 0; i < objCount; i++ {
 		pvName := "pv-startup-" + strconv.Itoa(i)
 		pvcName := "pvc-startup-" + strconv.Itoa(i)
 
@@ -1027,7 +1023,7 @@ func TestPersistentVolumeControllerStartup(t *testing.T) {
 	}
 
 	// check that everything is bound to something
-	for i := range objCount {
+	for i := 0; i < objCount; i++ {
 		pv, err := testClient.CoreV1().PersistentVolumes().Get(context.TODO(), pvs[i].Name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("Unexpected error getting pv: %v", err)
@@ -1085,7 +1081,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 
 	objCount := getObjectCount()
 	pvcs := make([]*v1.PersistentVolumeClaim, objCount)
-	for i := range objCount {
+	for i := 0; i < objCount; i++ {
 		pvc := createPVC("pvc-provision-"+strconv.Itoa(i), ns.Name, "1G", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}, "gold")
 		pvcs[i] = pvc
 	}
@@ -1094,7 +1090,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	// Create the claims in a separate goroutine to pop events from watchPVC
 	// early. It gets stuck with >3000 claims.
 	go func() {
-		for i := range objCount {
+		for i := 0; i < objCount; i++ {
 			_, _ = testClient.CoreV1().PersistentVolumeClaims(ns.Name).Create(context.TODO(), pvcs[i], metav1.CreateOptions{})
 		}
 	}()
@@ -1114,7 +1110,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	if len(pvList.Items) != objCount {
 		t.Fatalf("Expected to get %d volumes, got %d", objCount, len(pvList.Items))
 	}
-	for i := range objCount {
+	for i := 0; i < objCount; i++ {
 		pv := &pvList.Items[i]
 		if pv.Status.Phase != v1.VolumeBound {
 			t.Fatalf("Expected volume %s to be bound, is %s instead", pv.Name, pv.Status.Phase)
@@ -1123,7 +1119,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	}
 
 	// Delete the claims
-	for i := range objCount {
+	for i := 0; i < objCount; i++ {
 		_ = testClient.CoreV1().PersistentVolumeClaims(ns.Name).Delete(context.TODO(), pvcs[i].Name, metav1.DeleteOptions{})
 	}
 
@@ -1481,7 +1477,7 @@ func waitForSomePersistentVolumeClaimPhase(ctx context.Context, testClient clien
 	}()
 
 	return wait.ExponentialBackoffWithContext(ctx, retry.DefaultBackoff, func(ctx context.Context) (bool, error) {
-		for i := range objCount {
+		for i := 0; i < objCount; i++ {
 			err := waitForAnyPersistentVolumeClaimPhase(watchPVC, v1.ClaimBound)
 			if err != nil {
 				klog.Errorf("Failed to wait for a claim (%d/%d) to be bound: %v", i+1, objCount, err)

@@ -1428,10 +1428,9 @@ func (s *EtcdServer) mayAddMember(memb membership.Member) error {
 		return errors.ErrNotEnoughStartedMembers
 	}
 
-	// Treat the new member as unavailable when checking quorum safety.
-	if !isConnectedToQuorumAfterAddingNewMemberSince(s.r.transport, time.Now().Add(-HealthInterval), s.MemberID(), s.cluster.VotingMembers()) {
+	if !isConnectedFullySince(s.r.transport, time.Now().Add(-HealthInterval), s.MemberID(), s.cluster.VotingMembers()) {
 		lg.Warn(
-			"rejecting member add request; local member has not been connected to majority peers, reconfigure breaks active quorum",
+			"rejecting member add request; local member has not been connected to all peers, reconfigure breaks active quorum",
 			zap.String("local-member-id", s.MemberID().String()),
 			zap.String("requested-member-add", fmt.Sprintf("%+v", memb)),
 			zap.Error(errors.ErrUnhealthy),
@@ -1669,19 +1668,6 @@ func (s *EtcdServer) UpdateMember(ctx context.Context, memb membership.Member) (
 		Context: b,
 	}
 	return s.configure(ctx, cc)
-}
-
-func (s *EtcdServer) MemberList(ctx context.Context, r *pb.MemberListRequest) ([]*membership.Member, error) {
-	if r.Linearizable {
-		if err := s.LinearizableReadNotify(ctx); err != nil {
-			return nil, err
-		}
-	}
-
-	if err := s.requireAuthInfo(ctx); err != nil {
-		return nil, err
-	}
-	return s.cluster.Members(), nil
 }
 
 func (s *EtcdServer) setCommittedIndex(v uint64) {

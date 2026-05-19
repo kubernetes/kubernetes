@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"unicode/utf8"
 
-	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/internal/encoding/messageset"
 	"google.golang.org/protobuf/internal/encoding/text"
 	"google.golang.org/protobuf/internal/errors"
@@ -50,19 +49,12 @@ type UnmarshalOptions struct {
 		protoregistry.MessageTypeResolver
 		protoregistry.ExtensionTypeResolver
 	}
-
-	// RecursionLimit limits how deeply messages may be nested.
-	// If zero, a default limit is applied.
-	RecursionLimit int
 }
 
 // Unmarshal reads the given []byte and populates the given [proto.Message]
 // using options in the UnmarshalOptions object.
 // The provided message must be mutable (e.g., a non-nil pointer to a message).
 func (o UnmarshalOptions) Unmarshal(b []byte, m proto.Message) error {
-	if o.RecursionLimit == 0 {
-		o.RecursionLimit = protowire.DefaultRecursionLimit
-	}
 	return o.unmarshal(b, m)
 }
 
@@ -110,14 +102,8 @@ func (d decoder) syntaxError(pos int, f string, x ...any) error {
 	return errors.New(head+f, x...)
 }
 
-var errRecursionDepth = errors.New("exceeded maximum recursion depth")
-
 // unmarshalMessage unmarshals into the given protoreflect.Message.
 func (d decoder) unmarshalMessage(m protoreflect.Message, checkDelims bool) error {
-	if d.opts.RecursionLimit--; d.opts.RecursionLimit < 0 {
-		return errRecursionDepth
-	}
-
 	messageDesc := m.Descriptor()
 	if !flags.ProtoLegacy && messageset.IsMessageSet(messageDesc) {
 		return errors.New("no support for proto1 MessageSets")
@@ -451,10 +437,6 @@ func (d decoder) unmarshalList(fd protoreflect.FieldDescriptor, list protoreflec
 // unmarshalMap unmarshals into given protoreflect.Map. A map value is a
 // textproto message containing {key: <kvalue>, value: <mvalue>}.
 func (d decoder) unmarshalMap(fd protoreflect.FieldDescriptor, mmap protoreflect.Map) error {
-	if d.opts.RecursionLimit--; d.opts.RecursionLimit < 0 {
-		return errRecursionDepth
-	}
-
 	// Determine ahead whether map entry is a scalar type or a message type in
 	// order to call the appropriate unmarshalMapValue func inside
 	// unmarshalMapEntry.

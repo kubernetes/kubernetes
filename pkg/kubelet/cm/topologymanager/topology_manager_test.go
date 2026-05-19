@@ -218,10 +218,6 @@ func (m *mockHintProvider) GetPodTopologyHints(pod *v1.Pod) map[string][]Topolog
 	return m.th
 }
 
-func (m *mockHintProvider) AllocatePod(pod *v1.Pod) error {
-	return nil
-}
-
 func (m *mockHintProvider) Allocate(pod *v1.Pod, container *v1.Container) error {
 	//return allocateError
 	return nil

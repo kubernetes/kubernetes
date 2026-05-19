@@ -1,4 +1,5 @@
 //go:build windows
+// +build windows
 
 /*
 Copyright 2014 The Kubernetes Authors.
@@ -31,15 +32,15 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/proxy"
-	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
+	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/winkernel"
 )
 
 // platformApplyDefaults is called after parsing command-line flags and/or reading the
 // config file, to apply platform-specific default values to config.
-func (o *Options) platformApplyDefaults(config *kubeproxyconfig.KubeProxyConfiguration) {
+func (o *Options) platformApplyDefaults(config *proxyconfigapi.KubeProxyConfiguration) {
 	if config.Mode == "" {
-		config.Mode = kubeproxyconfig.ProxyModeKernelspace
+		config.Mode = proxyconfigapi.ProxyModeKernelspace
 	}
 	if config.Winkernel.RootHnsEndpointName == "" {
 		config.Winkernel.RootHnsEndpointName = "cbr0"
@@ -80,7 +81,7 @@ func (s *ProxyServer) platformCheckSupported(ctx context.Context) (ipv4Supported
 }
 
 // createProxier creates the proxy.Provider
-func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig.KubeProxyConfiguration, dualStackMode, initOnly bool) (proxy.Provider, error) {
+func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.KubeProxyConfiguration, dualStackMode, initOnly bool) (proxy.Provider, error) {
 	if initOnly {
 		return nil, fmt.Errorf("--init-only is not implemented on Windows")
 	}
@@ -90,20 +91,26 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig
 
 	if dualStackMode {
 		proxier, err = winkernel.NewDualStackProxier(
-			config,
+			config.SyncPeriod.Duration,
+			config.MinSyncPeriod.Duration,
 			s.NodeName,
 			s.NodeIPs,
 			s.Recorder,
 			s.HealthzServer,
+			config.HealthzBindAddress,
+			config.Winkernel,
 		)
 	} else {
 		proxier, err = winkernel.NewProxier(
-			config,
 			s.PrimaryIPFamily,
+			config.SyncPeriod.Duration,
+			config.MinSyncPeriod.Duration,
 			s.NodeName,
 			s.NodeIPs[s.PrimaryIPFamily],
 			s.Recorder,
 			s.HealthzServer,
+			config.HealthzBindAddress,
+			config.Winkernel,
 		)
 	}
 	if err != nil {
@@ -114,7 +121,7 @@ func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig
 }
 
 // platformCleanup removes stale kube-proxy rules that can be safely removed.
-func platformCleanup(ctx context.Context, mode kubeproxyconfig.ProxyMode, cleanupAndExit bool) error {
+func platformCleanup(ctx context.Context, mode proxyconfigapi.ProxyMode, cleanupAndExit bool) error {
 	if cleanupAndExit {
 		return errors.New("--cleanup-and-exit is not implemented on Windows")
 	}

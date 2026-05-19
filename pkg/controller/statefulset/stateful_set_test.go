@@ -271,7 +271,7 @@ func TestStatefulSetControllerDeletionTimestampRace(t *testing.T) {
 	}
 
 	// It should not adopt revisions.
-	revisions, err := ssh.ListControllerRevisions(set, parentKind, selector)
+	revisions, err := ssh.ListControllerRevisions(set, selector)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -719,14 +719,12 @@ func TestOrphanedPodsWithPVCDeletePolicy(t *testing.T) {
 			om.podsIndexer.Add(pod)
 			claims := getPersistentVolumeClaims(set, pod)
 			for _, claim := range claims {
-				if err := om.CreateClaim(&claim, set); err != nil {
-					t.Errorf("Failed to create claim %s: %v", claim.Name, err)
-				}
+				om.CreateClaim(&claim)
 			}
 		}
 
 		for i := range pods {
-			if _, err := om.setPodReadyCondition(set, i, true, time.Now()); err != nil {
+			if _, err := om.setPodReadyCondition(set, i, true); err != nil {
 				t.Errorf("%d: %v", i, err)
 			}
 			if _, err := om.setPodRunning(set, i); err != nil {
@@ -913,11 +911,11 @@ func TestStaleOwnerRefOnScaleup(t *testing.T) {
 }
 
 func TestStatefulSetAvailabilityCheck(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	_, ctx := ktesting.NewTestContext(t)
 
 	set := setMinReadySeconds(newStatefulSet(4), int32(5)) // 5 seconds
 	set = setupPodManagementPolicy(apps.ParallelPodManagement, set)
-	ssc, _, om, _ := newFakeStatefulSetController(tCtx, set)
+	ssc, _, om, _ := newFakeStatefulSetController(ctx, set)
 	if err := om.setsIndexer.Add(set); err != nil {
 		t.Fatalf("could not add set to the cache: %v", err)
 	}
@@ -941,7 +939,7 @@ func TestStatefulSetAvailabilityCheck(t *testing.T) {
 			t.Fatalf("%d: %v", i, err)
 		}
 	}
-	err := ssc.syncStatefulSet(tCtx, set, pods)
+	err := ssc.syncStatefulSet(ctx, set, pods)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -965,7 +963,9 @@ func TestStatefulSetAvailabilityCheck(t *testing.T) {
 	}
 
 	// RS should be re-queued after 700ms to recompute .status.availableReplicas (200ms extra for the test).
-	tCtx.Eventually(ssc.queue.Len).WithTimeout(900*time.Millisecond).
+	ktesting.Eventually(ctx, func(tCtx ktesting.TContext) int {
+		return ssc.queue.Len()
+	}).WithTimeout(900*time.Millisecond).
 		WithPolling(10*time.Millisecond).
 		Should(gomega.Equal(1), " StatefulSet should be re-queued to recompute .status.availableReplicas")
 }
@@ -1043,7 +1043,7 @@ func scaleUpStatefulSetControllerBounded(logger klog.Logger, set *apps.StatefulS
 		fakeWorker(ssc)
 		pod = getPodAtOrdinal(pods, ord)
 		prev = *pod
-		if pods, err = om.setPodReadyCondition(set, ord, true, time.Now()); err != nil {
+		if pods, err = om.setPodReadyCondition(set, ord, true); err != nil {
 			return err
 		}
 		pod = getPodAtOrdinal(pods, ord)

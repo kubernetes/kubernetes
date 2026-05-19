@@ -17,9 +17,9 @@ import (
 var ISO2022JP encoding.Encoding = &iso2022JP
 
 var iso2022JP = internal.Encoding{
-	Encoding: internal.FuncEncoding{Decoder: iso2022JPNewDecoder, Encoder: iso2022JPNewEncoder},
-	Name:     "ISO-2022-JP",
-	MIB:      identifier.ISO2022JP,
+	internal.FuncEncoding{iso2022JPNewDecoder, iso2022JPNewEncoder},
+	"ISO-2022-JP",
+	identifier.ISO2022JP,
 }
 
 func iso2022JPNewDecoder() transform.Transformer {

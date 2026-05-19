@@ -17,7 +17,6 @@ limitations under the License.
 package phases
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -139,7 +138,7 @@ func removeContainers(criSocketPath string) error {
 	if err := containerRuntime.Connect(); err != nil {
 		return err
 	}
-	defer containerRuntime.Close(context.Background())
+	defer containerRuntime.Close()
 
 	containers, err := containerRuntime.ListKubeContainers()
 	if err != nil {

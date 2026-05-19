@@ -51,6 +51,9 @@ type Reconciler struct {
 	// topologyCache tracks the distribution of Nodes and endpoints across zones
 	// to enable TopologyAwareHints.
 	topologyCache *topologycache.TopologyCache
+	// trafficDistributionEnabled determines if trafficDistribution field is to
+	// be considered when reconciling EndpointSlice hints.
+	trafficDistributionEnabled bool
 	// preferSameTrafficDistribution determines if the new (PreferSameZone /
 	// PreferSameNode) trafficDistribution values should be considered when
 	// reconciling EndpointSlice hints.
@@ -62,10 +65,11 @@ type Reconciler struct {
 
 type ReconcilerOption func(*Reconciler)
 
-// WithPreferSameTrafficDistributionEnabled controls whether the Reconciler
-// accepts the new `trafficDistribution` values.
-func WithPreferSameTrafficDistributionEnabled(preferSame bool) ReconcilerOption {
+// WithTrafficDistributionEnabled controls whether the Reconciler considers the
+// `trafficDistribution` field while reconciling EndpointSlices.
+func WithTrafficDistributionEnabled(enabled, preferSame bool) ReconcilerOption {
 	return func(r *Reconciler) {
+		r.trafficDistributionEnabled = enabled
 		r.preferSameTrafficDistribution = preferSame
 	}
 }
@@ -73,7 +77,7 @@ func WithPreferSameTrafficDistributionEnabled(preferSame bool) ReconcilerOption 
 // validTrafficDistribution determines whether TrafficDistribution is set and valid for
 // this cluster.
 func (r *Reconciler) validTrafficDistribution(trafficDistribution *string) bool {
-	if trafficDistribution == nil {
+	if trafficDistribution == nil || !r.trafficDistributionEnabled {
 		return false
 	}
 	if *trafficDistribution == corev1.ServiceTrafficDistributionPreferClose {

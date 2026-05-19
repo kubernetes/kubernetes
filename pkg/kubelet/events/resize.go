@@ -40,27 +40,27 @@ type podResourceSummary struct {
 }
 
 // PodResizeCompletedMsg generates the pod resize completed event message.
-func PodResizeCompletedMsg(logger klog.Logger, allocatedPod *v1.Pod, generation int64) string {
-	return podResizeMessage(logger, allocatedPod, generation, "", "Pod resize completed")
+func PodResizeCompletedMsg(allocatedPod *v1.Pod, generation int64) string {
+	return podResizeMessage(allocatedPod, generation, "", "Pod resize completed")
 }
 
 // PodResizeStartedMsg generates the pod resize in progress event message.
-func PodResizeStartedMsg(logger klog.Logger, allocatedPod *v1.Pod, generation int64) string {
-	return podResizeMessage(logger, allocatedPod, generation, "", "Pod resize started")
+func PodResizeStartedMsg(allocatedPod *v1.Pod, generation int64) string {
+	return podResizeMessage(allocatedPod, generation, "", "Pod resize started")
 }
 
 // PodResizeErrorMsg generates the pod resize in progress error event message.
-func PodResizeErrorMsg(logger klog.Logger, allocatedPod *v1.Pod, generation int64, errorMsg string) string {
-	return podResizeMessage(logger, allocatedPod, generation, errorMsg, "Pod resize error")
+func PodResizeErrorMsg(allocatedPod *v1.Pod, generation int64, errorMsg string) string {
+	return podResizeMessage(allocatedPod, generation, errorMsg, "Pod resize error")
 }
 
 // PodResizePendingMsg generates the pod resize pending event message.
-func PodResizePendingMsg(logger klog.Logger, pod *v1.Pod, reason, message string, generation int64) string {
-	return podResizeMessage(logger, pod, generation, message, fmt.Sprintf("Pod resize %s", reason))
+func PodResizePendingMsg(pod *v1.Pod, reason, message string, generation int64) string {
+	return podResizeMessage(pod, generation, message, fmt.Sprintf("Pod resize %s", reason))
 }
 
-func podResizeMessage(logger klog.Logger, pod *v1.Pod, generation int64, errorMsg, messagePrefix string) string {
-	resources, err := makeResourceSummaryFromSpec(logger, pod, generation, errorMsg)
+func podResizeMessage(pod *v1.Pod, generation int64, errorMsg, messagePrefix string) string {
+	resources, err := makeResourceSummaryFromSpec(pod, generation, errorMsg)
 	if err != nil {
 		return messagePrefix
 	}
@@ -69,7 +69,7 @@ func podResizeMessage(logger klog.Logger, pod *v1.Pod, generation int64, errorMs
 }
 
 // Returns the desired resources from the podspec.
-func makeResourceSummaryFromSpec(logger klog.Logger, pod *v1.Pod, generation int64, errorMessage string) (string, error) {
+func makeResourceSummaryFromSpec(pod *v1.Pod, generation int64, errorMessage string) (string, error) {
 	specResources := &podResourceSummary{Generation: generation, Error: errorMessage}
 	for container, containerType := range podutil.ContainerIter(&pod.Spec, podutil.InitContainers|podutil.Containers) {
 		allocation := containerAllocation{
@@ -86,7 +86,7 @@ func makeResourceSummaryFromSpec(logger klog.Logger, pod *v1.Pod, generation int
 
 	message, err := json.Marshal(specResources)
 	if err != nil {
-		logger.Error(err, "Failed to serialize resource summary", "pod", format.Pod(pod))
+		klog.ErrorS(err, "Failed to serialize resource summary", "pod", format.Pod(pod))
 		return "", err
 	}
 	return string(message), nil

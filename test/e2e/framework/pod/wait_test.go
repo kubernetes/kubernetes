@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/internal/output"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	_ "k8s.io/kubernetes/test/utils/ktesting/format" // activate YAML object dumps
+	_ "k8s.io/kubernetes/test/utils/format" // activate YAML object dumps
 )
 
 // The line number of the following code is checked in TestFailureOutput below.
@@ -160,7 +160,6 @@ The function passed to Eventually returned the following error:
                     ResourceVersion: "",
                     Continue: "",
                     RemainingItemCount: nil,
-                    ShardInfo: nil,
                 },
                 Status: "Failure",
                 Message: "pods \"no-such-pod\" not found",
@@ -192,7 +191,6 @@ The function passed to Eventually returned the following error:
                     ResourceVersion: "",
                     Continue: "",
                     RemainingItemCount: nil,
-                    ShardInfo: nil,
                 },
                 Status: "Failure",
                 Message: "pods \"no-such-pod\" not found",
@@ -224,7 +222,6 @@ The function passed to Eventually returned the following error:
                     ResourceVersion: "",
                     Continue: "",
                     RemainingItemCount: nil,
-                    ShardInfo: nil,
                 },
                 Status: "Failure",
                 Message: "pods \"no-such-pod\" not found",
@@ -251,7 +248,6 @@ The function passed to Eventually returned the following error:
                     ResourceVersion: "",
                     Continue: "",
                     RemainingItemCount: nil,
-                    ShardInfo: nil,
                 },
                 Status: "Failure",
                 Message: "pods \"no-such-pod\" not found",
@@ -283,7 +279,6 @@ The function passed to Eventually returned the following error:
                     ResourceVersion: "",
                     Continue: "",
                     RemainingItemCount: nil,
-                    ShardInfo: nil,
                 },
                 Status: "Failure",
                 Message: "pods \"no-such-pod\" not found",
@@ -310,7 +305,6 @@ The function passed to Eventually returned the following error:
                     ResourceVersion: "",
                     Continue: "",
                     RemainingItemCount: nil,
-                    ShardInfo: nil,
                 },
                 Status: "Failure",
                 Message: "pods \"no-such-pod\" not found",
@@ -329,7 +323,7 @@ In [It] at: wait_test.go:66 <time>
 					Status: "failed",
 					Failure: &reporters.JUnitFailure{
 						Description: `[FAILED] Timed out after <after>.
-Expected Pod to be in <v1.PodPhase>: Running
+Expected Pod to be in <v1.PodPhase>: "Running"
 Got instead:
     <*v1.Pod>: 
         metadata:
@@ -351,7 +345,7 @@ STEP: waiting for pod pending-pod to run - wait_test.go:70 <time>
     k8s.io/kubernetes/test/e2e/framework/pod_test.glob..func1.5()
     	wait_test.go:71
 [FAILED] Timed out after <after>.
-Expected Pod to be in <v1.PodPhase>: Running
+Expected Pod to be in <v1.PodPhase>: "Running"
 Got instead:
     <*v1.Pod>: 
         metadata:
@@ -423,7 +417,7 @@ The function passed to Eventually returned the following error:
     }
 At one point, however, the function did return successfully.
 Yet, Eventually failed because the matcher was not satisfied:
-Expected Pod to be in <v1.PodPhase>: Running
+Expected Pod to be in <v1.PodPhase>: "Running"
 Got instead:
     <*v1.Pod>: 
         metadata:
@@ -456,7 +450,7 @@ The function passed to Eventually returned the following error:
     }
 At one point, however, the function did return successfully.
 Yet, Eventually failed because the matcher was not satisfied:
-Expected Pod to be in <v1.PodPhase>: Running
+Expected Pod to be in <v1.PodPhase>: "Running"
 Got instead:
     <*v1.Pod>: 
         metadata:

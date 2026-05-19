@@ -729,7 +729,7 @@ func TestOverlappingRSs(t *testing.T) {
 	defer stopControllers()
 
 	// Create 2 RSs with identical selectors
-	for i := range 2 {
+	for i := 0; i < 2; i++ {
 		// One RS has 1 replica, and another has 2 replicas
 		rs := newRS(fmt.Sprintf("rs-%d", i+1), ns.Name, i+1)
 		rss, _ := createRSsPods(t, c, []*apps.ReplicaSet{rs}, []*v1.Pod{})
@@ -744,7 +744,7 @@ func TestOverlappingRSs(t *testing.T) {
 	}
 
 	// Expect both RSs have .status.replicas = .spec.replicas
-	for i := range 2 {
+	for i := 0; i < 2; i++ {
 		newRS, err := c.AppsV1().ReplicaSets(ns.Name).Get(tCtx, fmt.Sprintf("rs-%d", i+1), metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("failed to obtain rs rs-%d: %v", i+1, err)
@@ -945,7 +945,7 @@ func TestExtraPodsAdoptionAndDeletion(t *testing.T) {
 	rs := newRS("rs", ns.Name, 2)
 	// Create 3 pods, RS should adopt only 2 of them
 	podList := []*v1.Pod{}
-	for i := range 3 {
+	for i := 0; i < 3; i++ {
 		pod := newMatchingPod(fmt.Sprintf("pod-%d", i+1), ns.Name)
 		pod.Labels = labelMap()
 		podList = append(podList, pod)

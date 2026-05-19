@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -150,7 +149,7 @@ func AddNamedImport(fset *token.FileSet, f *ast.File, name, path string) (added 
 	if newImport.Name != nil {
 		newImport.Name.NamePos = pos
 	}
-	updateBasicLitPos(newImport.Path, pos)
+	newImport.Path.ValuePos = pos
 	newImport.EndPos = pos
 
 	// Clean up parens. impDecl contains at least one spec.
@@ -185,7 +184,7 @@ func AddNamedImport(fset *token.FileSet, f *ast.File, name, path string) (added 
 		first.Lparen = first.Pos()
 		// Move the imports of the other import declaration to the first one.
 		for _, spec := range gen.Specs {
-			updateBasicLitPos(spec.(*ast.ImportSpec).Path, first.Pos())
+			spec.(*ast.ImportSpec).Path.ValuePos = first.Pos()
 			first.Specs = append(first.Specs, spec)
 		}
 		f.Decls = slices.Delete(f.Decls, i, i+1)
@@ -470,18 +469,4 @@ func Imports(fset *token.FileSet, f *ast.File) [][]*ast.ImportSpec {
 	}
 
 	return groups
-}
-
-// updateBasicLitPos updates lit.Pos,
-// ensuring that lit.End (if set) is displaced by the same amount.
-// (See https://go.dev/issue/76395.)
-func updateBasicLitPos(lit *ast.BasicLit, pos token.Pos) {
-	len := lit.End() - lit.Pos()
-	lit.ValuePos = pos
-	// TODO(adonovan): after go1.26, simplify to:
-	//   lit.ValueEnd = pos + len
-	v := reflect.ValueOf(lit).Elem().FieldByName("ValueEnd")
-	if v.IsValid() && v.Int() != 0 {
-		v.SetInt(int64(pos + len))
-	}
 }

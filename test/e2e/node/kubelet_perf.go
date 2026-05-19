@@ -262,7 +262,8 @@ var _ = SIGDescribe("Kubelet", framework.WithSerial(), framework.WithSlow(), fun
 				},
 			},
 		}
-		for _, itArg := range rTests {
+		for _, testArg := range rTests {
+			itArg := testArg
 			podsPerNode := itArg.podsPerNode
 			name := fmt.Sprintf(
 				"resource tracking for %d pods per node", podsPerNode)

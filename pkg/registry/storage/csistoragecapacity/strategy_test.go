@@ -17,7 +17,6 @@ limitations under the License.
 package csistoragecapacity
 
 import (
-	"context"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -67,7 +66,7 @@ func TestCSIStorageCapacityStrategy(t *testing.T) {
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("CSIStorageCapacity must be namespace scoped")
 	}
-	if Strategy.AllowCreateOnUpdate(context.Background()) {
+	if Strategy.AllowCreateOnUpdate() {
 		t.Errorf("CSIStorageCapacity should not allow create on update")
 	}
 

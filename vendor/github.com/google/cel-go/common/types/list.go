@@ -153,9 +153,6 @@ func (l *baseList) Contains(elem ref.Val) ref.Val {
 
 // ConvertToNative implements the ref.Val interface method.
 func (l *baseList) ConvertToNative(typeDesc reflect.Type) (any, error) {
-	if typeDesc == reflect.TypeFor[any]() {
-		typeDesc = reflect.TypeFor[[]any]()
-	}
 	// If the underlying list value is assignable to the reflected type return it.
 	if reflect.TypeOf(l.value).AssignableTo(typeDesc) {
 		return l.value, nil
@@ -167,19 +164,19 @@ func (l *baseList) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	// Attempt to convert the list to a set of well known protobuf types.
 	switch typeDesc {
 	case anyValueType:
-		json, err := l.ConvertToNative(JSONListType)
+		json, err := l.ConvertToNative(jsonListValueType)
 		if err != nil {
 			return nil, err
 		}
 		return anypb.New(json.(proto.Message))
-	case JSONValueType, JSONListType:
+	case jsonValueType, jsonListValueType:
 		jsonValues, err :=
 			l.ConvertToNative(reflect.TypeOf([]*structpb.Value{}))
 		if err != nil {
 			return nil, err
 		}
 		jsonList := &structpb.ListValue{Values: jsonValues.([]*structpb.Value)}
-		if typeDesc == JSONListType {
+		if typeDesc == jsonListValueType {
 			return jsonList, nil
 		}
 		return structpb.NewListValue(jsonList), nil

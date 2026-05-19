@@ -34,29 +34,27 @@ import (
 // TokenReview attempts to authenticate a token to a known user.
 // Note: TokenReview requests may be cached by the webhook token authenticator
 // plugin in the kube-apiserver.
-// +k8s:supportsSubresource="/status"
 type TokenReview struct {
-	metav1.TypeMeta `json:""`
-	// metadata is the standard object's metadata.
+	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// spec holds information about the request being evaluated
-	// +required
+	// Spec holds information about the request being evaluated
 	Spec TokenReviewSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
-	// status is filled in by the server and indicates whether the token can be authenticated.
+	// Status is filled in by the server and indicates whether the token can be authenticated.
 	// +optional
 	Status TokenReviewStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
 // TokenReviewSpec is a description of the token authentication request.
 type TokenReviewSpec struct {
-	// token is the opaque bearer token.
-	// +required
+	// Token is the opaque bearer token.
+	// +optional
 	Token string `json:"token,omitempty" protobuf:"bytes,1,opt,name=token"`
-	// audiences is a list of the identifiers that the resource server presented
+	// Audiences is a list of the identifiers that the resource server presented
 	// with the token identifies as. Audience-aware token authenticators will
 	// verify that the token was intended for at least one of the audiences in
 	// this list. If no audiences are provided, the audience will default to the
@@ -68,13 +66,13 @@ type TokenReviewSpec struct {
 
 // TokenReviewStatus is the result of the token authentication request.
 type TokenReviewStatus struct {
-	// authenticated indicates that the token was associated with a known user.
+	// Authenticated indicates that the token was associated with a known user.
 	// +optional
 	Authenticated bool `json:"authenticated,omitempty" protobuf:"varint,1,opt,name=authenticated"`
-	// user is the UserInfo associated with the provided token.
+	// User is the UserInfo associated with the provided token.
 	// +optional
 	User UserInfo `json:"user,omitempty" protobuf:"bytes,2,opt,name=user"`
-	// audiences are audience identifiers chosen by the authenticator that are
+	// Audiences are audience identifiers chosen by the authenticator that are
 	// compatible with both the TokenReview and token. An identifier is any
 	// identifier in the intersection of the TokenReviewSpec audiences and the
 	// token's audiences. A client of the TokenReview API that sets the
@@ -86,7 +84,7 @@ type TokenReviewStatus struct {
 	// +optional
 	// +listType=atomic
 	Audiences []string `json:"audiences,omitempty" protobuf:"bytes,4,rep,name=audiences"`
-	// error indicates that the token couldn't be checked
+	// Error indicates that the token couldn't be checked
 	// +optional
 	Error string `json:"error,omitempty" protobuf:"bytes,3,opt,name=error"`
 }
@@ -94,19 +92,19 @@ type TokenReviewStatus struct {
 // UserInfo holds the information about the user needed to implement the
 // user.Info interface.
 type UserInfo struct {
-	// username is the name that uniquely identifies this user among all active users.
+	// The name that uniquely identifies this user among all active users.
 	// +optional
 	Username string `json:"username,omitempty" protobuf:"bytes,1,opt,name=username"`
-	// uid is a unique value that identifies this user across time. If this user is
+	// A unique value that identifies this user across time. If this user is
 	// deleted and another user by the same name is added, they will have
 	// different UIDs.
 	// +optional
 	UID string `json:"uid,omitempty" protobuf:"bytes,2,opt,name=uid"`
-	// groups is the names of groups this user is a part of.
+	// The names of groups this user is a part of.
 	// +optional
 	// +listType=atomic
 	Groups []string `json:"groups,omitempty" protobuf:"bytes,3,rep,name=groups"`
-	// extra is any additional information provided by the authenticator.
+	// Any additional information provided by the authenticator.
 	// +optional
 	Extra map[string]ExtraValue `json:"extra,omitempty" protobuf:"bytes,4,rep,name=extra"`
 }
@@ -129,21 +127,19 @@ func (t ExtraValue) String() string {
 // SelfSubjectReview contains the user information that the kube-apiserver has about the user making this request.
 // When using impersonation, users will receive the user info of the user being impersonated.  If impersonation or
 // request header authentication is used, any extra keys will have their case ignored and returned as lowercase.
-// +k8s:supportsSubresource="/status"
 type SelfSubjectReview struct {
-	metav1.TypeMeta `json:""`
-	// metadata is the standard object's metadata.
+	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	// status is filled in by the server with the user attributes.
-	// +optional
+	// Status is filled in by the server with the user attributes.
 	Status SelfSubjectReviewStatus `json:"status,omitempty" protobuf:"bytes,2,opt,name=status"`
 }
 
 // SelfSubjectReviewStatus is filled by the kube-apiserver and sent back to a user.
 type SelfSubjectReviewStatus struct {
-	// userInfo is a set of attributes belonging to the user making this request.
+	// User attributes of the user making this request.
 	// +optional
 	UserInfo v1.UserInfo `json:"userInfo,omitempty" protobuf:"bytes,1,opt,name=userInfo"`
 }

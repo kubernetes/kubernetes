@@ -274,7 +274,7 @@ func testAssumeRace(tCtx ktesting.TContext) {
 	var informer testInformer
 	testObj := makeObj("pvc1", "1", "")
 	ac := NewAssumeCache(tCtx.Logger(), &informer, "TestObject", "", nil)
-	blockEvent := tCtx.WithCancel()
+	blockEvent := ktesting.WithCancel(tCtx)
 	defer blockEvent.Cancel("test done")
 	eventBlocked := false
 	eventDone := false
@@ -301,7 +301,9 @@ func testAssumeRace(tCtx ktesting.TContext) {
 	assumeDone := false
 	go func() {
 		err := ac.Assume(testObj)
-		tCtx.AssertNoError(err, "Assume failed")
+		if err != nil {
+			tCtx.Errorf("Assume failed: %v", err)
+		}
 		assumeDone = true
 	}()
 
@@ -335,27 +337,27 @@ func TestRestore(t *testing.T) {
 	newObj := makeObj("pvc1", "5", "")
 
 	// Restore object that doesn't exist
-	tCtx.Step("empty cache", func(tCtx ktesting.TContext) {
+	ktesting.Step(tCtx, "empty cache", func(tCtx ktesting.TContext) {
 		cache.Restore("nothing")
 		events.verifyAndFlush(tCtx, nil)
 	})
 
 	// Add old object to cache.
-	tCtx.Step("initial update", func(tCtx ktesting.TContext) {
+	ktesting.Step(tCtx, "initial update", func(tCtx ktesting.TContext) {
 		informer.add(oldObj)
 		verify(tCtx, cache, oldObj.GetName(), oldObj, oldObj)
 		events.verifyAndFlush(tCtx, []event{{What: "add", Obj: oldObj}})
 	})
 
 	// Restore the same object.
-	tCtx.Step("initial Restore", func(tCtx ktesting.TContext) {
+	ktesting.Step(tCtx, "initial Restore", func(tCtx ktesting.TContext) {
 		cache.Restore(oldObj.GetName())
 		verify(tCtx, cache, oldObj.GetName(), oldObj, oldObj)
 		events.verifyAndFlush(tCtx, nil)
 	})
 
 	// Assume new object.
-	tCtx.Step("Assume", func(tCtx ktesting.TContext) {
+	ktesting.Step(tCtx, "Assume", func(tCtx ktesting.TContext) {
 		if err := cache.Assume(newObj); err != nil {
 			tCtx.Fatalf("Assume() returned error %v", err)
 		}
@@ -364,7 +366,7 @@ func TestRestore(t *testing.T) {
 	})
 
 	// Restore the same object.
-	tCtx.Step("second Restore", func(tCtx ktesting.TContext) {
+	ktesting.Step(tCtx, "second Restore", func(tCtx ktesting.TContext) {
 		cache.Restore(oldObj.GetName())
 		verify(tCtx, cache, oldObj.GetName(), oldObj, oldObj)
 		events.verifyAndFlush(tCtx, []event{{What: "update", OldObj: newObj, Obj: oldObj}})
@@ -380,49 +382,49 @@ func TestEvents(t *testing.T) {
 
 	// Add old object to cache.
 	informer.add(oldObj)
-	verify(tCtx.WithStep("after initial update"), cache, key, oldObj, oldObj)
+	verify(ktesting.WithStep(tCtx, "after initial update"), cache, key, oldObj, oldObj)
 
 	// Receive initial list.
 	var events mockEventHandler
 	cache.AddEventHandler(&events)
-	events.verifyAndFlush(tCtx.WithStep("initial list"), []event{{What: "add", Obj: oldObj, InitialList: true}})
+	events.verifyAndFlush(ktesting.WithStep(tCtx, "initial list"), []event{{What: "add", Obj: oldObj, InitialList: true}})
 
 	// Update object.
-	tCtx.Step("initial update", func(tCtx ktesting.TContext) {
+	ktesting.Step(tCtx, "initial update", func(tCtx ktesting.TContext) {
 		informer.update(newObj)
 		verify(tCtx, cache, key, newObj, newObj)
 		events.verifyAndFlush(tCtx, []event{{What: "update", OldObj: oldObj, Obj: newObj}})
 	})
 
 	// Some error cases (don't occur in practice).
-	tCtx.Step("nop add", func(tCtx ktesting.TContext) {
+	ktesting.Step(tCtx, "nop add", func(tCtx ktesting.TContext) {
 		informer.add(1)
 		verify(tCtx, cache, key, newObj, newObj)
 		events.verifyAndFlush(tCtx, nil)
 	})
-	tCtx.Step("nil add", func(tCtx ktesting.TContext) {
+	ktesting.Step(tCtx, "nil add", func(tCtx ktesting.TContext) {
 		informer.add(nil)
 		verify(tCtx, cache, key, newObj, newObj)
 		events.verifyAndFlush(tCtx, nil)
 	})
-	tCtx.Step("nop update", func(tCtx ktesting.TContext) {
+	ktesting.Step(tCtx, "nop update", func(tCtx ktesting.TContext) {
 		informer.update(oldObj)
 		events.verifyAndFlush(tCtx, nil)
 		verify(tCtx, cache, key, newObj, newObj)
 	})
-	tCtx.Step("nil update", func(tCtx ktesting.TContext) {
+	ktesting.Step(tCtx, "nil update", func(tCtx ktesting.TContext) {
 		informer.update(nil)
 		verify(tCtx, cache, key, newObj, newObj)
 		events.verifyAndFlush(tCtx, nil)
 	})
-	tCtx.Step("nop delete", func(tCtx ktesting.TContext) {
+	ktesting.Step(tCtx, "nop delete", func(tCtx ktesting.TContext) {
 		informer.delete(nil)
 		verify(tCtx, cache, key, newObj, newObj)
 		events.verifyAndFlush(tCtx, nil)
 	})
 
 	// Delete object.
-	tCtx.Step("delete", func(tCtx ktesting.TContext) {
+	ktesting.Step(tCtx, "delete", func(tCtx ktesting.TContext) {
 		informer.delete(oldObj)
 		events.verifyAndFlush(tCtx, []event{{What: "delete", Obj: newObj}})
 		_, err := cache.Get(key)
@@ -504,7 +506,7 @@ func TestEventHandlerConcurrency(t *testing.T) {
 	handlers[0].cache = cache
 
 	// Each add blocks until this gets cancelled.
-	tCancelCtx := tCtx.WithCancel()
+	tCancelCtx := ktesting.WithCancel(tCtx)
 	var wg sync.WaitGroup
 
 	for i := range handlers {
@@ -553,7 +555,7 @@ func TestListNoIndexer(t *testing.T) {
 	}
 
 	// List them
-	verifyList(tCtx.WithStep("after add"), cache, objs, "")
+	verifyList(ktesting.WithStep(tCtx, "after add"), cache, objs, "")
 
 	// Update an object.
 	updatedObj := makeObj("test-pvc3", "2", "")
@@ -561,7 +563,7 @@ func TestListNoIndexer(t *testing.T) {
 	informer.update(updatedObj)
 
 	// List them
-	verifyList(tCtx.WithStep("after update"), cache, objs, "")
+	verifyList(ktesting.WithStep(tCtx, "after update"), cache, objs, "")
 
 	// Delete a PV
 	deletedObj := objs[7]
@@ -569,7 +571,7 @@ func TestListNoIndexer(t *testing.T) {
 	informer.delete(deletedObj)
 
 	// List them
-	verifyList(tCtx.WithStep("after delete"), cache, objs, "")
+	verifyList(ktesting.WithStep(tCtx, "after delete"), cache, objs, "")
 }
 
 func TestListWithIndexer(t *testing.T) {
@@ -598,7 +600,7 @@ func TestListWithIndexer(t *testing.T) {
 	}
 
 	// List them
-	verifyList(tCtx.WithStep("after add"), cache, objs, objs[0])
+	verifyList(ktesting.WithStep(tCtx, "after add"), cache, objs, objs[0])
 
 	// Update an object.
 	updatedObj := makeObj("test-pvc3", "2", ns)
@@ -606,7 +608,7 @@ func TestListWithIndexer(t *testing.T) {
 	informer.update(updatedObj)
 
 	// List them
-	verifyList(tCtx.WithStep("after update"), cache, objs, objs[0])
+	verifyList(ktesting.WithStep(tCtx, "after update"), cache, objs, objs[0])
 
 	// Delete a PV
 	deletedObj := objs[7]
@@ -614,5 +616,5 @@ func TestListWithIndexer(t *testing.T) {
 	informer.delete(deletedObj)
 
 	// List them
-	verifyList(tCtx.WithStep("after delete"), cache, objs, objs[0])
+	verifyList(ktesting.WithStep(tCtx, "after delete"), cache, objs, objs[0])
 }

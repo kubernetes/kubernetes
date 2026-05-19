@@ -4,6 +4,7 @@
 package filesys
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"sigs.k8s.io/kustomize/kyaml/errors"
@@ -77,7 +78,8 @@ func ConfirmDir(fSys FileSystem, path string) (ConfirmedDir, error) {
 		return "", errors.WrapPrefixf(err, "not a valid directory")
 	}
 	if f != "" {
-		return "", errors.WrapPrefixf(errors.Errorf("file is not directory"), "'%s'", path)
+		//nolint:govet
+		return "", errors.WrapPrefixf(errors.Errorf("file is not directory"), fmt.Sprintf("'%s'", path))
 	}
 	return d, nil
 }

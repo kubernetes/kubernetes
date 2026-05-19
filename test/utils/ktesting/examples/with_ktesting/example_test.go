@@ -1,4 +1,5 @@
 //go:build example
+// +build example
 
 /*
 Copyright 2023 The Kubernetes Authors.
@@ -40,16 +41,6 @@ func TestTimeout(t *testing.T) {
 	if deadline, ok := t.Deadline(); ok {
 		t.Logf("Will fail shortly before the test suite deadline at %s.", deadline)
 	}
-
-	// This is how Ginkgo and ktesting communicate to Gomega how to
-	// provide a progress report when stuck in e.g. gomega.Eventually.
-	// Here we use this to provide some additional output when
-	// this example is sent a SIGUSR1.
-	remove := tCtx.Value("GINKGO_SPEC_CONTEXT").(interface {
-		AttachProgressReporter(func() string) func()
-	}).AttachProgressReporter(func() string { return "waiting for timeout or interrupt" })
-	defer remove()
-
 	select {
 	case <-time.After(1000 * time.Hour):
 		// This should not be reached.

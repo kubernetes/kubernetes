@@ -23,7 +23,6 @@ import (
 	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
 	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
-	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/jsontext"
 )
 
 // Responses is a container for the expected responses of an operation.
@@ -79,11 +78,11 @@ func (r Responses) MarshalJSON() ([]byte, error) {
 	return concated, nil
 }
 
-func (r Responses) MarshalJSONTo(enc *jsontext.Encoder) error {
+func (r Responses) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
 	type ArbitraryKeys map[string]interface{}
 	var x struct {
-		ArbitraryKeys ArbitraryKeys `json:",inline"`
-		Default       *Response     `json:"default,omitempty"`
+		ArbitraryKeys
+		Default *Response `json:"default,omitempty"`
 	}
 	x.ArbitraryKeys = make(map[string]any, len(r.Extensions)+len(r.StatusCodeResponses))
 	for k, v := range r.Extensions {
@@ -95,7 +94,7 @@ func (r Responses) MarshalJSONTo(enc *jsontext.Encoder) error {
 		x.ArbitraryKeys[strconv.Itoa(k)] = v
 	}
 	x.Default = r.Default
-	return jsonv2.MarshalEncode(enc, x)
+	return opts.MarshalNext(enc, x)
 }
 
 // ResponsesProps describes all responses for an operation.
@@ -151,7 +150,7 @@ func (r *ResponsesProps) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (r *Responses) UnmarshalJSONFrom(dec *jsontext.Decoder) (err error) {
+func (r *Responses) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) (err error) {
 	tok, err := dec.ReadToken()
 	if err != nil {
 		return err
@@ -173,7 +172,7 @@ func (r *Responses) UnmarshalJSONFrom(dec *jsontext.Decoder) (err error) {
 			switch k := tok.String(); {
 			case internal.IsExtensionKey(k):
 				ext = nil
-				if err := jsonv2.UnmarshalDecode(dec, &ext); err != nil {
+				if err := opts.UnmarshalNext(dec, &ext); err != nil {
 					return err
 				}
 
@@ -183,7 +182,7 @@ func (r *Responses) UnmarshalJSONFrom(dec *jsontext.Decoder) (err error) {
 				r.Extensions[k] = ext
 			case k == "default":
 				resp = Response{}
-				if err := jsonv2.UnmarshalDecode(dec, &resp); err != nil {
+				if err := opts.UnmarshalNext(dec, &resp); err != nil {
 					return err
 				}
 
@@ -192,7 +191,7 @@ func (r *Responses) UnmarshalJSONFrom(dec *jsontext.Decoder) (err error) {
 			default:
 				if nk, err := strconv.Atoi(k); err == nil {
 					resp = Response{}
-					if err := jsonv2.UnmarshalDecode(dec, &resp); err != nil {
+					if err := opts.UnmarshalNext(dec, &resp); err != nil {
 						return err
 					}
 

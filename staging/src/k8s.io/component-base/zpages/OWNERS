@@ -2,7 +2,6 @@
 
 approvers:
   - sig-instrumentation-approvers
-emeritus_approvers:
   - logicalhan
 reviewers:
   - sig-instrumentation-reviewers

@@ -37,19 +37,12 @@ type activeQueuer interface {
 	underLock(func(unlockedActiveQ unlockedActiveQueuer))
 	underRLock(func(unlockedActiveQ unlockedActiveQueueReader))
 
-	// delete removes the pod from the activeQ.
-	// It returns the pod info if it was removed, nil otherwise.
-	delete(pInfo *framework.QueuedPodInfo) *framework.QueuedPodInfo
+	delete(pInfo *framework.QueuedPodInfo) error
 	pop(logger klog.Logger) (*framework.QueuedPodInfo, error)
 	list() []*v1.Pod
 	len() int
 	has(pInfo *framework.QueuedPodInfo) bool
-	// add adds pInfo to the activeQ.
-	// Note: it does not signal the pop() method to wake up,
-	// so the caller is responsible for calling broadcast() after executing this method.
-	add(logger klog.Logger, pInfo *framework.QueuedPodInfo, event string)
 
-	movePodToInFlight(pInfo *framework.QueuedPodInfo) error
 	listInFlightEvents() []interface{}
 	listInFlightPods() []*v1.Pod
 	clusterEventsForPod(logger klog.Logger, pInfo *framework.QueuedPodInfo) ([]*clusterEvent, error)
@@ -66,6 +59,10 @@ type activeQueuer interface {
 // underLock() method should be used to protect these methods.
 type unlockedActiveQueuer interface {
 	unlockedActiveQueueReader
+	// add adds a new pod to the activeQ.
+	// The event should show which event triggered this addition and is used for the metric recording.
+	// This method should be called in activeQueue.underLock().
+	add(logger klog.Logger, pInfo *framework.QueuedPodInfo, event string)
 	// update updates the pod in activeQ if oldPodInfo is already in the queue.
 	// It returns new pod info if updated, nil otherwise.
 	update(newPod *v1.Pod, oldPodInfo *framework.QueuedPodInfo) *framework.QueuedPodInfo
@@ -81,6 +78,9 @@ type unlockedActiveQueueReader interface {
 	// Returns false if the pInfo doesn't exist in the queue.
 	// This method should be called in activeQueue.underLock() or activeQueue.underRLock().
 	get(pInfo *framework.QueuedPodInfo) (*framework.QueuedPodInfo, bool)
+	// has returns if pInfo exists in the queue.
+	// This method should be called in activeQueue.underLock() or activeQueue.underRLock().
+	has(pInfo *framework.QueuedPodInfo) bool
 }
 
 // unlockedActiveQueue defines activeQ methods that are not protected by the lock itself.
@@ -99,6 +99,15 @@ func newUnlockedActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], inFlight
 		inFlightEvents:  inFlightEvents,
 		metricsRecorder: metricsRecorder,
 	}
+}
+
+// add adds a new pod to the activeQ.
+// The event should show which event triggered this addition and is used for the metric recording.
+// This method should be called in activeQueue.underLock().
+func (uaq *unlockedActiveQueue) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, event string) {
+	uaq.queue.AddOrUpdate(pInfo)
+	metrics.SchedulerQueueIncomingPods.WithLabelValues("active", event).Inc()
+	logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", activeQ)
 }
 
 // update updates the pod in activeQ if oldPodInfo is already in the queue.
@@ -134,6 +143,12 @@ func (uaq *unlockedActiveQueue) addEventsIfPodInFlight(oldPod, newPod *v1.Pod, e
 // This method should be called in activeQueue.underLock() or activeQueue.underRLock().
 func (uaq *unlockedActiveQueue) get(pInfo *framework.QueuedPodInfo) (*framework.QueuedPodInfo, bool) {
 	return uaq.queue.Get(pInfo)
+}
+
+// has returns if pInfo exists in the queue.
+// This method should be called in activeQueue.underLock() or activeQueue.underRLock().
+func (uaq *unlockedActiveQueue) has(pInfo *framework.QueuedPodInfo) bool {
+	return uaq.queue.Has(pInfo)
 }
 
 // backoffQPopper defines method that is used to pop from the backoffQ when the activeQ is empty.
@@ -200,6 +215,9 @@ type activeQueue struct {
 	// It is mainly used to let Pop() exit its control loop while waiting for an item.
 	closed bool
 
+	// isSchedulingQueueHintEnabled indicates whether the feature gate for the scheduling queue is enabled.
+	isSchedulingQueueHintEnabled bool
+
 	metricsRecorder *metrics.MetricAsyncRecorder
 
 	// backoffQPopper is used to pop from backoffQ when activeQ is empty.
@@ -207,13 +225,14 @@ type activeQueue struct {
 	backoffQPopper backoffQPopper
 }
 
-func newActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], metricRecorder *metrics.MetricAsyncRecorder, backoffQPopper backoffQPopper) *activeQueue {
+func newActiveQueue(queue *heap.Heap[*framework.QueuedPodInfo], isSchedulingQueueHintEnabled bool, metricRecorder *metrics.MetricAsyncRecorder, backoffQPopper backoffQPopper) *activeQueue {
 	aq := &activeQueue{
-		queue:           queue,
-		inFlightPods:    make(map[types.UID]*list.Element),
-		inFlightEvents:  list.New(),
-		metricsRecorder: metricRecorder,
-		backoffQPopper:  backoffQPopper,
+		queue:                        queue,
+		inFlightPods:                 make(map[types.UID]*list.Element),
+		inFlightEvents:               list.New(),
+		isSchedulingQueueHintEnabled: isSchedulingQueueHintEnabled,
+		metricsRecorder:              metricRecorder,
+		backoffQPopper:               backoffQPopper,
 	}
 	aq.cond.L = &aq.lock
 	aq.unlockedQueue = newUnlockedActiveQueue(queue, aq.inFlightPods, aq.inFlightEvents, metricRecorder)
@@ -239,44 +258,12 @@ func (aq *activeQueue) underRLock(fn func(unlockedActiveQ unlockedActiveQueueRea
 	fn(aq.unlockedQueue)
 }
 
-// delete removes the pod from the activeQ.
-// It returns the pod info if it was removed, nil otherwise.
-func (aq *activeQueue) delete(pInfo *framework.QueuedPodInfo) *framework.QueuedPodInfo {
+// delete deletes the pod info from activeQ.
+func (aq *activeQueue) delete(pInfo *framework.QueuedPodInfo) error {
 	aq.lock.Lock()
 	defer aq.lock.Unlock()
 
 	return aq.queue.Delete(pInfo)
-}
-
-// movePodToInFlight moves the pod to the in-flight state.
-// It assumes the pod is already popped from the queue.
-// It updates the metrics and in-flight tracking.
-func (aq *activeQueue) movePodToInFlight(pInfo *framework.QueuedPodInfo) error {
-	aq.lock.Lock()
-	defer aq.lock.Unlock()
-	return aq.unlockedMovePodToInFlight(pInfo)
-}
-
-// unlockedMovePodToInFlight moves the pod to the in-flight state.
-// This method should be called under the lock.
-func (aq *activeQueue) unlockedMovePodToInFlight(pInfo *framework.QueuedPodInfo) error {
-	pInfo.Attempts++
-	// In flight, no concurrent events yet.
-	// If the pod is already in the map, we shouldn't overwrite the inFlightPods otherwise it'd lead to a memory leak.
-	// https://github.com/kubernetes/kubernetes/pull/127016
-	if _, ok := aq.inFlightPods[pInfo.Pod.UID]; ok {
-		return fmt.Errorf("the same pod is tracked in multiple places in the scheduler: %s", klog.KObj(pInfo.Pod))
-	}
-
-	aq.metricsRecorder.ObserveInFlightEventsAsync(metrics.PodPoppedInFlightEvent, 1, false)
-	aq.inFlightPods[pInfo.Pod.UID] = aq.inFlightEvents.PushBack(pInfo.Pod)
-	aq.schedCycle++
-
-	// Update metrics for unschedulable plugins.
-	for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
-		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
-	}
-	return nil
 }
 
 // pop removes the head of the queue and returns it.
@@ -318,14 +305,32 @@ func (aq *activeQueue) unlockedPop(logger klog.Logger) (*framework.QueuedPodInfo
 		}
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("active", framework.PopFromBackoffQ).Inc()
 	}
-	err = aq.unlockedMovePodToInFlight(pInfo)
-	if err != nil {
-		// Just report it as an error, but no need to stop the scheduler
-		// because it likely doesn't cause any visible issues from the scheduling perspective.
-		utilruntime.HandleErrorWithLogger(logger, err, "Discarding the popped pod")
-		// Just ignore/discard this duplicated pod and try to pop the next one.
-		return aq.unlockedPop(logger)
+	pInfo.Attempts++
+	// In flight, no concurrent events yet.
+	if aq.isSchedulingQueueHintEnabled {
+		// If the pod is already in the map, we shouldn't overwrite the inFlightPods otherwise it'd lead to a memory leak.
+		// https://github.com/kubernetes/kubernetes/pull/127016
+		if _, ok := aq.inFlightPods[pInfo.Pod.UID]; ok {
+			// Just report it as an error, but no need to stop the scheduler
+			// because it likely doesn't cause any visible issues from the scheduling perspective.
+			utilruntime.HandleErrorWithLogger(logger, nil, "The same pod is tracked in multiple places in the scheduler, and just discard it", "pod", klog.KObj(pInfo.Pod))
+			// Just ignore/discard this duplicated pod and try to pop the next one.
+			return aq.unlockedPop(logger)
+		}
+
+		aq.metricsRecorder.ObserveInFlightEventsAsync(metrics.PodPoppedInFlightEvent, 1, false)
+		aq.inFlightPods[pInfo.Pod.UID] = aq.inFlightEvents.PushBack(pInfo.Pod)
 	}
+	aq.schedCycle++
+
+	// Update metrics and reset the set of unschedulable plugins for the next attempt.
+	for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
+		metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
+	}
+	pInfo.UnschedulablePlugins.Clear()
+	pInfo.PendingPlugins.Clear()
+	pInfo.GatingPlugin = ""
+	pInfo.GatingPluginEvents = nil
 
 	return pInfo, nil
 }
@@ -351,18 +356,6 @@ func (aq *activeQueue) has(pInfo *framework.QueuedPodInfo) bool {
 	aq.lock.RLock()
 	defer aq.lock.RUnlock()
 	return aq.queue.Has(pInfo)
-}
-
-// add adds pInfo to the activeQ.
-// Note: it does not signal the pop() method to wake up,
-// so the caller is responsible for calling broadcast() after executing this method.
-func (aq *activeQueue) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, event string) {
-	aq.lock.Lock()
-	defer aq.lock.Unlock()
-
-	aq.queue.AddOrUpdate(pInfo)
-	metrics.SchedulerQueueIncomingPods.WithLabelValues("active", event).Inc()
-	logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", activeQ)
 }
 
 // listInFlightEvents returns all inFlightEvents.

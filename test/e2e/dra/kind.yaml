@@ -12,11 +12,6 @@ nodes:
 - role: worker
 - role: worker
 kubeadmConfigPatches:
-  - |
-    kind: KubeletConfiguration
-    apiVersion: kubelet.config.k8s.io/v1beta1
-    enableSystemLogHandler: true
-    enableSystemLogQuery: true
   # v1beta4 for the future (v1.35.0+ ?)
   # https://github.com/kubernetes-sigs/kind/issues/3847
   # TODO: drop v1beta3 when kind makes the switch
@@ -28,7 +23,7 @@ kubeadmConfigPatches:
           - name: "v"
             value: "5"
           - name: "vmodule"
-            value: "allocator*=6,pools*=6,dynamicresources=6,allocateddevices=6,dra_manager=6,extendeddynamicresources=6" # structured/internal/*/allocator*.go, DRA scheduler plugin
+            value: "allocator=6,dynamicresources=6" # structured/allocator.go, DRA scheduler plugin
     controllerManager:
         extraArgs:
           - name: "v"
@@ -37,7 +32,7 @@ kubeadmConfigPatches:
             value: "controller=6" # resourceclaim/controller.go - should have renamed it when copying the controller it was based on!
     apiServer:
         extraArgs:
-          runtime-config: "resource.k8s.io/v1alpha3=true,resource.k8s.io/v1beta1=true,resource.k8s.io/v1beta2=true,scheduling.k8s.io/v1alpha2=true"
+          runtime-config: "resource.k8s.io/v1alpha3=true,resource.k8s.io/v1beta1=true,resource.k8s.io/v1beta2=true"
   - |
     kind: InitConfiguration
     apiVersion: kubeadm.k8s.io/v1beta4
@@ -58,14 +53,14 @@ kubeadmConfigPatches:
     scheduler:
         extraArgs:
           v: "5"
-          vmodule: "allocator*=6,pools*=6,dynamicresources=6,allocateddevices=6,dra_manager=6,extendeddynamicresources=6" # structured/internal/*/allocator*.go, DRA scheduler plugin
+          vmodule: "allocator=6,dynamicresources=6" # structured/allocator.go, DRA scheduler plugin
     controllerManager:
         extraArgs:
           v: "5"
           vmodule: "controller=6" # resourceclaim/controller.go - should have renamed it when copying the controller it was based on!
     apiServer:
         extraArgs:
-          runtime-config: "resource.k8s.io/v1alpha3=true,resource.k8s.io/v1beta1=true,resource.k8s.io/v1beta2=true,scheduling.k8s.io/v1alpha2=true"
+          runtime-config: "resource.k8s.io/v1alpha3=true,resource.k8s.io/v1beta1=true,resource.k8s.io/v1beta2=true"
   - |
     kind: InitConfiguration
     apiVersion: kubeadm.k8s.io/v1beta3
@@ -83,4 +78,3 @@ kubeadmConfigPatches:
 #    --config <(cat test/e2e/dra/kind.yaml; echo "  <some feature>: true")
 featureGates:
   DynamicResourceAllocation: true
-  NodeLogQuery: true

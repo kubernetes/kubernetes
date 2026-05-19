@@ -5,10 +5,7 @@
     "selfLink": "selfLinkValue",
     "resourceVersion": "resourceVersionValue",
     "continue": "continueValue",
-    "remainingItemCount": 4,
-    "shardInfo": {
-      "selector": "selectorValue"
-    }
+    "remainingItemCount": 4
   },
   "status": "statusValue",
   "message": "messageValue",

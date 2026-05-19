@@ -27,7 +27,6 @@ THIS_PKG="k8s.io/apiextensions-apiserver"
 
 kube::codegen::gen_helpers \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
-    --lint-rules known-tags-only,require-explicit-disablement \
     "${SCRIPT_ROOT}/pkg"
 
 if [[ -n "${API_KNOWN_VIOLATIONS_DIR:-}" ]]; then
@@ -50,11 +49,9 @@ kube::codegen::gen_openapi \
 kube::codegen::gen_client \
     --with-watch \
     --with-applyconfig \
-    --applyconfig-openapi-schema <(go run k8s.io/apiextensions-apiserver/pkg/generated/openapi/cmd/models-schema) \
     --output-dir "${SCRIPT_ROOT}/pkg/client" \
     --output-pkg "${THIS_PKG}/pkg/client" \
     --versioned-name "clientset" \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
     --prefers-protobuf \
-    --lint-rules known-tags-only,require-explicit-disablement \
     "${SCRIPT_ROOT}/pkg/apis"

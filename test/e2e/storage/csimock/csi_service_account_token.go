@@ -67,6 +67,7 @@ var _ = utils.SIGDescribe("CSI Mock volume service account token", func() {
 			},
 		}
 		for _, test := range tests {
+			test := test
 			csiServiceAccountTokenEnabled := test.tokenRequests != nil
 			ginkgo.It(test.desc, func(ctx context.Context) {
 				m.init(ctx, testParameters{

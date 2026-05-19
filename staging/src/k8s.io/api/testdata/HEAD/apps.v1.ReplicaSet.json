@@ -1849,8 +1849,10 @@
           ]
         },
         "hostnameOverride": "hostnameOverrideValue",
-        "schedulingGroup": {
-          "podGroupName": "podGroupNameValue"
+        "workloadRef": {
+          "name": "nameValue",
+          "podGroup": "podGroupValue",
+          "podGroupReplicaKey": "podGroupReplicaKeyValue"
         }
       }
     }

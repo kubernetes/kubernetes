@@ -279,6 +279,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount", func() {
 			},
 		}
 		for _, t := range tests {
+			t := t
 			testFunc := func(ctx context.Context) {
 				if processLabel == "" {
 					e2eskipper.Skipf("SELinux tests are supported only on %+v", getSupportedSELinuxDistros())
@@ -798,6 +799,7 @@ var _ = utils.SIGDescribe("CSI Mock selinux on mount metrics and SELinuxWarningC
 			},
 		}
 		for _, t := range tests {
+			t := t
 			testFunc := func(ctx context.Context) {
 				if processLabel == "" {
 					e2eskipper.Skipf("SELinux tests are supported only on %+v", getSupportedSELinuxDistros())

@@ -20,7 +20,6 @@ import (
 	"context"
 	"time"
 
-	"k8s.io/klog/v2"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 )
 
@@ -40,7 +39,7 @@ type ImagePullManager interface {
 	// RecordPullIntent() must match exactly one call of RecordImagePulled()/RecordImagePullFailed().
 	//
 	// `image` is the content of the pod's container `image` field.
-	RecordPullIntent(logger klog.Logger, image string) error
+	RecordPullIntent(image string) error
 	// RecordImagePulled writes a record of an image being successfully pulled
 	// with ImagePullCredentials.
 	//
@@ -97,9 +96,9 @@ type PullRecordsAccessor interface {
 	// for the given image.
 	ImagePullIntentExists(image string) (bool, error)
 	// WriteImagePullIntent writes a an intent record for the image into the database
-	WriteImagePullIntent(logger klog.Logger, image string) error
+	WriteImagePullIntent(image string) error
 	// DeleteImagePullIntent removes an `image` intent record from the database
-	DeleteImagePullIntent(logger klog.Logger, image string) error
+	DeleteImagePullIntent(image string) error
 
 	// ListImagePulledRecords lists the database ImagePulledRecords.
 	// Records that cannot be decoded will be ignored.
@@ -114,8 +113,8 @@ type PullRecordsAccessor interface {
 	// it returns a exists=true with err equal to the decoding error.
 	GetImagePulledRecord(imageRef string) (record *kubeletconfiginternal.ImagePulledRecord, exists bool, err error)
 	// WriteImagePulledRecord writes an ImagePulledRecord into the database.
-	WriteImagePulledRecord(logger klog.Logger, record *kubeletconfiginternal.ImagePulledRecord) error
+	WriteImagePulledRecord(record *kubeletconfiginternal.ImagePulledRecord) error
 	// DeleteImagePulledRecord removes an ImagePulledRecord for `imageRef` from the
 	// database.
-	DeleteImagePulledRecord(logger klog.Logger, imageRef string) error
+	DeleteImagePulledRecord(imageRef string) error
 }

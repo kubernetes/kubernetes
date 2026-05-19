@@ -133,27 +133,6 @@ func TestGetUnknownSchemaObject(t *testing.T) {
 	}
 }
 
-func TestGetValidateLabelColumnsWithCustomColumns(t *testing.T) {
-	streams, _, _, _ := genericiooptions.NewTestIOStreams()
-	labelColumns := []string{"app"}
-
-	outputCustom := "custom-columns=NAME:.metadata.name"
-	o := NewGetOptions("kubectl", streams)
-	o.PrintFlags.HumanReadableFlags.ColumnLabels = &labelColumns
-	o.PrintFlags.OutputFormat = &outputCustom
-	if err := o.Validate(); err == nil || !strings.Contains(err.Error(), "--label-columns option cannot be used") {
-		t.Fatalf("expected error for label-columns with custom-columns, got %v", err)
-	}
-
-	outputWide := "wide"
-	o = NewGetOptions("kubectl", streams)
-	o.PrintFlags.HumanReadableFlags.ColumnLabels = &labelColumns
-	o.PrintFlags.OutputFormat = &outputWide
-	if err := o.Validate(); err != nil {
-		t.Fatalf("expected no error for label-columns with wide output, got %v", err)
-	}
-}
-
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestGetSchemaObject(t *testing.T) {
 	tf := cmdtesting.NewTestFactory().WithNamespace("test")
@@ -2605,98 +2584,6 @@ object:
     terminationGracePeriodSeconds: 30
   status: {}
 type: DELETED
-`,
-		},
-		{
-			format: "kyaml",
-			expected: `---
-{
-  type: "ADDED",
-  object: {
-    apiVersion: "v1",
-    kind: "Pod",
-    metadata: {
-      name: "bar",
-      namespace: "test",
-      resourceVersion: "9",
-    },
-    spec: {
-      containers: null,
-      dnsPolicy: "ClusterFirst",
-      enableServiceLinks: true,
-      restartPolicy: "Always",
-      securityContext: {},
-      terminationGracePeriodSeconds: 30,
-    },
-    status: {},
-  },
-}
----
-{
-  type: "ADDED",
-  object: {
-    apiVersion: "v1",
-    kind: "Pod",
-    metadata: {
-      name: "foo",
-      namespace: "test",
-      resourceVersion: "10",
-    },
-    spec: {
-      containers: null,
-      dnsPolicy: "ClusterFirst",
-      enableServiceLinks: true,
-      restartPolicy: "Always",
-      securityContext: {},
-      terminationGracePeriodSeconds: 30,
-    },
-    status: {},
-  },
-}
----
-{
-  type: "MODIFIED",
-  object: {
-    apiVersion: "v1",
-    kind: "Pod",
-    metadata: {
-      name: "foo",
-      namespace: "test",
-      resourceVersion: "11",
-    },
-    spec: {
-      containers: null,
-      dnsPolicy: "ClusterFirst",
-      enableServiceLinks: true,
-      restartPolicy: "Always",
-      securityContext: {},
-      terminationGracePeriodSeconds: 30,
-    },
-    status: {},
-  },
-}
----
-{
-  type: "DELETED",
-  object: {
-    apiVersion: "v1",
-    kind: "Pod",
-    metadata: {
-      name: "foo",
-      namespace: "test",
-      resourceVersion: "12",
-    },
-    spec: {
-      containers: null,
-      dnsPolicy: "ClusterFirst",
-      enableServiceLinks: true,
-      restartPolicy: "Always",
-      securityContext: {},
-      terminationGracePeriodSeconds: 30,
-    },
-    status: {},
-  },
-}
 `,
 		},
 		{

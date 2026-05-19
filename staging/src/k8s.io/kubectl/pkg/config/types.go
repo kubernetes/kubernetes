@@ -115,12 +115,12 @@ const (
 // the logical AND of all checks corresponding to the specified fields within
 // the entry.
 type AllowlistEntry struct {
-	// Command matching is performed by first resolving the absolute path of both
+	// Name matching is performed by first resolving the absolute path of both
 	// the plugin and the name in the allowlist entry using `exec.LookPath`. It
 	// will be called on both, and the resulting strings must be equal. If
-	// either call to `exec.LookPath` results in an error, the `Command` check
+	// either call to `exec.LookPath` results in an error, the `Name` check
 	// will be considered a failure.
-	Command string
+	Name string
 }
 
 // AliasOverride stores the alias definitions.

@@ -38,6 +38,4 @@ const (
 	VolumeBinding                   = "VolumeBinding"
 	VolumeRestrictions              = "VolumeRestrictions"
 	VolumeZone                      = "VolumeZone"
-	TopologyPlacementGenerator      = "TopologyPlacementGenerator"
-	PodGroupPodsCount               = "PodGroupPodsCount"
 )

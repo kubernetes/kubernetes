@@ -102,7 +102,6 @@ func (c *ExtendedResourceCache) OnAdd(obj interface{}, isInInitialList bool) {
 		utilruntime.HandleErrorWithLogger(c.logger, nil, "Expected DeviceClass", "actual", fmt.Sprintf("%T", obj))
 		return
 	}
-	c.logger.V(5).Info("DeviceClass added", "deviceClass", klog.KObj(deviceClass))
 	c.updateResourceName2class(deviceClass, nil)
 	c.updateClass2ResourceName(deviceClass)
 
@@ -123,7 +122,6 @@ func (c *ExtendedResourceCache) OnUpdate(oldObj, newObj interface{}) {
 		utilruntime.HandleErrorWithLogger(c.logger, nil, "Expected DeviceClass", "actual", fmt.Sprintf("%T", oldObj))
 		return
 	}
-	c.logger.V(5).Info("DeviceClass updated", "deviceClass", klog.KObj(deviceClass))
 	c.updateResourceName2class(deviceClass, oldDeviceClass)
 	c.updateClass2ResourceName(deviceClass)
 
@@ -142,7 +140,6 @@ func (c *ExtendedResourceCache) OnDelete(obj interface{}) {
 		utilruntime.HandleErrorWithLogger(c.logger, nil, "Expected DeviceClass", "actual", fmt.Sprintf("%T", obj))
 		return
 	}
-	c.logger.V(5).Info("DeviceClass deleted", "deviceClass", klog.KObj(deviceClass))
 	c.removeResourceName2class(deviceClass)
 	c.removeClass2ResourceName(deviceClass)
 

@@ -279,18 +279,17 @@ func ResetObjectMetaForStatus(meta, existingMeta Object) {
 // MarshalJSON may get called on pointers or values, so implement MarshalJSON on value.
 // http://stackoverflow.com/questions/21390979/custom-marshaljson-never-gets-called-in-go
 func (f FieldsV1) MarshalJSON() ([]byte, error) {
-	raw := f.GetRawBytes()
-	if len(raw) == 0 {
+	if f.Raw == nil {
 		return []byte("null"), nil
 	}
 	if f.getContentType() == fieldsV1InvalidOrValidCBORObject {
 		var u map[string]interface{}
-		if err := cbor.Unmarshal(raw, &u); err != nil {
+		if err := cbor.Unmarshal(f.Raw, &u); err != nil {
 			return nil, fmt.Errorf("metav1.FieldsV1 cbor invalid: %w", err)
 		}
 		return utiljson.Marshal(u)
 	}
-	return raw, nil
+	return f.Raw, nil
 }
 
 // UnmarshalJSON implements json.Unmarshaler
@@ -299,7 +298,7 @@ func (f *FieldsV1) UnmarshalJSON(b []byte) error {
 		return errors.New("metav1.FieldsV1: UnmarshalJSON on nil pointer")
 	}
 	if !bytes.Equal(b, []byte("null")) {
-		f.SetRawBytes(b)
+		f.Raw = append(f.Raw[0:0], b...)
 	}
 	return nil
 }
@@ -308,18 +307,17 @@ var _ json.Marshaler = FieldsV1{}
 var _ json.Unmarshaler = &FieldsV1{}
 
 func (f FieldsV1) MarshalCBOR() ([]byte, error) {
-	raw := f.GetRawBytes()
-	if len(raw) == 0 {
+	if f.Raw == nil {
 		return cbor.Marshal(nil)
 	}
 	if f.getContentType() == fieldsV1InvalidOrValidJSONObject {
 		var u map[string]interface{}
-		if err := utiljson.Unmarshal(raw, &u); err != nil {
+		if err := utiljson.Unmarshal(f.Raw, &u); err != nil {
 			return nil, fmt.Errorf("metav1.FieldsV1 json invalid: %w", err)
 		}
 		return cbor.Marshal(u)
 	}
-	return raw, nil
+	return f.Raw, nil
 }
 
 var cborNull = []byte{0xf6}
@@ -329,7 +327,7 @@ func (f *FieldsV1) UnmarshalCBOR(b []byte) error {
 		return errors.New("metav1.FieldsV1: UnmarshalCBOR on nil pointer")
 	}
 	if !bytes.Equal(b, cborNull) {
-		f.SetRawBytes(b)
+		f.Raw = append(f.Raw[0:0], b...)
 	}
 	return nil
 }
@@ -364,13 +362,8 @@ const (
 // or, if a tag-enclosed map, an initial byte with major type "tag" (0xf6, 0xa0...0xbf, or
 // 0xc6...0xdb). The two sets of valid initial bytes don't intersect.
 func (f FieldsV1) getContentType() int {
-	reader := f.GetRawReader()
-	if reader.Size() > 0 {
-		var buf [1]byte
-		if _, err := reader.Read(buf[:]); err != nil {
-			return fieldsV1InvalidOrEmpty
-		}
-		p := buf[0]
+	if len(f.Raw) > 0 {
+		p := f.Raw[0]
 		switch p {
 		case 'n', '{', '\t', '\r', '\n', ' ':
 			return fieldsV1InvalidOrValidJSONObject

@@ -235,7 +235,7 @@ func TestReflectorHandleWatchStoppedBefore(t *testing.T) {
 			return resultCh
 		},
 	}
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, func(rv string, _ bool) { g.setLastSyncResourceVersion(rv) }, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
 	require.Equal(t, err, errorStopRequested)
 	// Ensure handleWatch calls ResultChan and Stop
 	assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
@@ -268,7 +268,7 @@ func TestReflectorHandleWatchStoppedAfter(t *testing.T) {
 			return resultCh
 		},
 	}
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, func(rv string, _ bool) { g.setLastSyncResourceVersion(rv) }, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
 	require.Equal(t, err, errorStopRequested)
 	// Ensure handleWatch calls ResultChan and Stop
 	assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
@@ -294,7 +294,7 @@ func TestReflectorHandleWatchResultChanClosedBefore(t *testing.T) {
 	}
 	// Simulate the result channel being closed by the producer before handleWatch is called.
 	close(resultCh)
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, func(rv string, _ bool) { g.setLastSyncResourceVersion(rv) }, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
 	require.Equal(t, &VeryShortWatchError{Name: g.name}, err)
 	// Ensure handleWatch calls ResultChan and Stop
 	assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
@@ -325,7 +325,7 @@ func TestReflectorHandleWatchResultChanClosedAfter(t *testing.T) {
 			return resultCh
 		},
 	}
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, func(rv string, _ bool) { g.setLastSyncResourceVersion(rv) }, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
 	require.Equal(t, &VeryShortWatchError{Name: g.name}, err)
 	// Ensure handleWatch calls ResultChan and Stop
 	assert.Equal(t, []string{"ResultChan", "Stop"}, calls)
@@ -338,7 +338,7 @@ func TestReflectorWatchHandler(t *testing.T) {
 	// watching after all the events have been consumed.
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancelCause(ctx)
-	setLastSyncResourceVersion := func(rv string, _ bool) {
+	setLastSyncResourceVersion := func(rv string) {
 		g.setLastSyncResourceVersion(rv)
 		if rv == "32" {
 			cancel(errors.New("LastSyncResourceVersion is 32"))
@@ -398,7 +398,7 @@ func TestReflectorStopWatch(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancelCause(ctx)
 	cancel(errors.New("don't run"))
-	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, func(rv string, _ bool) { g.setLastSyncResourceVersion(rv) }, g.clock, nevererrc)
+	err := handleWatch(ctx, time.Now(), fw, s, g.expectedType, g.expectedGVK, g.name, g.typeDescription, g.setLastSyncResourceVersion, g.clock, nevererrc)
 	require.Equal(t, err, errorStopRequested)
 }
 
@@ -745,14 +745,7 @@ func TestReflectorListAndWatchInitConnBackoff(t *testing.T) {
 				ctx, cancel := context.WithCancelCause(ctx)
 				connFails := test.numConnFails
 				fakeClock := testingclock.NewFakeClock(time.Unix(0, 0))
-				backoff := wait.Backoff{
-					Duration: time.Millisecond,
-					Cap:      maxBackoff,
-					Steps:    1000, // large number to not run out
-					Factor:   2.0,
-					Jitter:   1.0,
-				}
-				delayFn := backoff.DelayWithReset(fakeClock, 100*time.Millisecond)
+				bm := wait.NewExponentialBackoffManager(time.Millisecond, maxBackoff, 100*time.Millisecond, 2.0, 1.0, fakeClock)
 				done := make(chan struct{})
 				defer close(done)
 				go func() {
@@ -791,7 +784,7 @@ func TestReflectorListAndWatchInitConnBackoff(t *testing.T) {
 					name:              "test-reflector",
 					listerWatcher:     lw,
 					store:             NewFIFO(MetaNamespaceKeyFunc),
-					delayHandler:      delayFn,
+					backoffManager:    bm,
 					clock:             fakeClock,
 					watchErrorHandler: WatchErrorHandlerWithContext(DefaultWatchErrorHandler),
 				}
@@ -811,103 +804,28 @@ func TestReflectorListAndWatchInitConnBackoff(t *testing.T) {
 	}
 }
 
-func TestNewReflectorWithCustomBackoff(t *testing.T) {
-	testCases := []struct {
-		name          string
-		backoff       *wait.Backoff
-		numConnFails  int
-		expLowerBound time.Duration
-		expUpperBound time.Duration
-	}{
-		{
-			// Default backoff uses jitter so timing is non-deterministic
-			// Just verify it completes without error
-			name:          "default backoff",
-			backoff:       nil,
-			numConnFails:  2,
-			expLowerBound: 0,
-			expUpperBound: 10 * time.Second,
-		},
-		{
-			// Custom backoff: 10ms initial, 2x factor, no jitter, 100ms cap
-			// After 5 failures: 10 + 20 + 40 + 80 + 100 = 250ms
-			name: "custom backoff",
-			backoff: &wait.Backoff{
-				Duration: 10 * time.Millisecond,
-				Factor:   2.0,
-				Jitter:   0,
-				Steps:    100,
-				Cap:      100 * time.Millisecond,
-			},
-			numConnFails:  5,
-			expLowerBound: 250 * time.Millisecond,
-			expUpperBound: 300 * time.Millisecond,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-			ctx, cancel := context.WithCancelCause(ctx)
-			connFails := tc.numConnFails
-
-			lw := &ListWatch{
-				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-					return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "1"}}, nil
-				},
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					if connFails > 0 {
-						connFails--
-						return nil, syscall.ECONNREFUSED
-					}
-					cancel(errors.New("done"))
-					return watch.NewFake(), nil
-				},
-			}
-
-			opts := ReflectorOptions{
-				Backoff: tc.backoff,
-			}
-			r := NewReflectorWithOptions(lw, &v1.Pod{}, NewStore(MetaNamespaceKeyFunc), opts)
-
-			start := time.Now()
-			err := r.ListAndWatchWithContext(ctx)
-			elapsed := time.Since(start)
-
-			if err != nil {
-				t.Errorf("unexpected error %v", err)
-			}
-			if elapsed < tc.expLowerBound {
-				t.Errorf("expected lower bound %v, got %v", tc.expLowerBound, elapsed)
-			}
-			if elapsed > tc.expUpperBound {
-				t.Errorf("expected upper bound %v, got %v", tc.expUpperBound, elapsed)
-			}
-		})
-	}
-}
-
-type fakeDelayFunc struct {
+type fakeBackoff struct {
+	clock clock.Clock
 	calls int
 }
 
-func (f *fakeDelayFunc) delayFunc() time.Duration {
+func (f *fakeBackoff) Backoff() clock.Timer {
 	f.calls++
-	return 0
+	return f.clock.NewTimer(time.Duration(0))
 }
 
 func TestBackoffOnTooManyRequests(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	err := apierrors.NewTooManyRequests("too many requests", 1)
 	clock := &clock.RealClock{}
-	fd := &fakeDelayFunc{}
+	bm := &fakeBackoff{clock: clock}
 
 	lw := &ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "1"}}, nil
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			switch fd.calls {
+			switch bm.calls {
 			case 0:
 				return nil, err
 			case 1:
@@ -927,7 +845,7 @@ func TestBackoffOnTooManyRequests(t *testing.T) {
 		name:              "test-reflector",
 		listerWatcher:     lw,
 		store:             NewFIFO(MetaNamespaceKeyFunc),
-		delayHandler:      fd.delayFunc,
+		backoffManager:    bm,
 		clock:             clock,
 		watchErrorHandler: WatchErrorHandlerWithContext(DefaultWatchErrorHandler),
 	}
@@ -937,15 +855,15 @@ func TestBackoffOnTooManyRequests(t *testing.T) {
 		t.Fatal(err)
 	}
 	close(stopCh)
-	if fd.calls != 2 {
-		t.Errorf("unexpected watch backoff calls: %d", fd.calls)
+	if bm.calls != 2 {
+		t.Errorf("unexpected watch backoff calls: %d", bm.calls)
 	}
 }
 
 func TestNoRelistOnTooManyRequests(t *testing.T) {
 	err := apierrors.NewTooManyRequests("too many requests", 1)
 	clock := &clock.RealClock{}
-	fd := &fakeDelayFunc{}
+	bm := &fakeBackoff{clock: clock}
 	listCalls, watchCalls := 0, 0
 
 	lw := &ListWatch{
@@ -968,7 +886,7 @@ func TestNoRelistOnTooManyRequests(t *testing.T) {
 		name:              "test-reflector",
 		listerWatcher:     lw,
 		store:             NewFIFO(MetaNamespaceKeyFunc),
-		delayHandler:      fd.delayFunc,
+		backoffManager:    bm,
 		clock:             clock,
 		watchErrorHandler: WatchErrorHandlerWithContext(DefaultWatchErrorHandler),
 	}
@@ -1015,7 +933,7 @@ func TestRetryInternalError(t *testing.T) {
 	for _, tc := range testCases {
 		err := apierrors.NewInternalError(fmt.Errorf("etcdserver: no leader"))
 		fakeClock := testingclock.NewFakeClock(time.Now())
-		fd := &fakeDelayFunc{}
+		bm := &fakeBackoff{clock: fakeClock}
 
 		counter := 0
 
@@ -1043,7 +961,7 @@ func TestRetryInternalError(t *testing.T) {
 			name:              "test-reflector",
 			listerWatcher:     lw,
 			store:             NewFIFO(MetaNamespaceKeyFunc),
-			delayHandler:      fd.delayFunc,
+			backoffManager:    bm,
 			clock:             fakeClock,
 			watchErrorHandler: WatchErrorHandlerWithContext(DefaultWatchErrorHandler),
 		}

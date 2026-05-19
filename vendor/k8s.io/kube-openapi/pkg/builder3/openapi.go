@@ -436,8 +436,7 @@ func (o *openAPI) buildParameter(restParam common.Parameter) (ret *spec3.Paramet
 
 func (o *openAPI) buildDefinitionRecursively(name string) error {
 	uniqueName, extensions := o.config.GetDefinitionName(name)
-	escapedName := common.EscapeJsonPointer(uniqueName)
-	if _, ok := o.spec.Components.Schemas[escapedName]; ok {
+	if _, ok := o.spec.Components.Schemas[uniqueName]; ok {
 		return nil
 	}
 	if item, ok := o.definitions[name]; ok {
@@ -457,7 +456,7 @@ func (o *openAPI) buildDefinitionRecursively(name string) error {
 		// delete the embedded v2 schema if exists, otherwise no-op
 		delete(schema.VendorExtensible.Extensions, common.ExtensionV2Schema)
 		schema = builderutil.WrapRefs(schema)
-		o.spec.Components.Schemas[escapedName] = schema
+		o.spec.Components.Schemas[uniqueName] = schema
 		for _, v := range item.Dependencies {
 			if err := o.buildDefinitionRecursively(v); err != nil {
 				return err

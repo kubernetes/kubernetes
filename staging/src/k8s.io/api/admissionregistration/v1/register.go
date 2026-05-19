@@ -54,10 +54,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ValidatingAdmissionPolicyList{},
 		&ValidatingAdmissionPolicyBinding{},
 		&ValidatingAdmissionPolicyBindingList{},
-		&MutatingAdmissionPolicy{},
-		&MutatingAdmissionPolicyList{},
-		&MutatingAdmissionPolicyBinding{},
-		&MutatingAdmissionPolicyBindingList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

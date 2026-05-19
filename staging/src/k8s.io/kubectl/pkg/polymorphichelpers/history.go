@@ -21,7 +21,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"slices"
 	"text/tabwriter"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -39,6 +38,7 @@ import (
 	"k8s.io/kubectl/pkg/apps"
 	"k8s.io/kubectl/pkg/describe"
 	deploymentutil "k8s.io/kubectl/pkg/util/deployment"
+	sliceutil "k8s.io/kubectl/pkg/util/slice"
 )
 
 const (
@@ -142,7 +142,7 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 	for r := range historyInfo {
 		revisions = append(revisions, r)
 	}
-	slices.Sort(revisions)
+	sliceutil.SortInts64(revisions)
 
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "REVISION\tCHANGE-CAUSE\n")
@@ -255,7 +255,7 @@ func printHistory(history []*appsv1.ControllerRevision, revision int64, getPodTe
 	for r := range historyInfo {
 		revisions = append(revisions, r)
 	}
-	slices.Sort(revisions)
+	sliceutil.SortInts64(revisions)
 
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "REVISION\tCHANGE-CAUSE\n")
@@ -399,15 +399,15 @@ func statefulSetHistory(
 	namespace, name string) (*appsv1.StatefulSet, []*appsv1.ControllerRevision, error) {
 	sts, err := apps.StatefulSets(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to retrieve StatefulSet %s: %w", name, err)
+		return nil, nil, fmt.Errorf("failed to retrieve Statefulset %s: %s", name, err.Error())
 	}
 	selector, err := metav1.LabelSelectorAsSelector(sts.Spec.Selector)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create selector for StatefulSet %s: %w", name, err)
+		return nil, nil, fmt.Errorf("failed to create selector for StatefulSet %s: %s", name, err.Error())
 	}
 	accessor, err := meta.Accessor(sts)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to obtain accessor for StatefulSet %s: %w", name, err)
+		return nil, nil, fmt.Errorf("failed to obtain accessor for StatefulSet %s: %s", name, err.Error())
 	}
 	history, err := controlledHistoryV1(apps, namespace, selector, accessor)
 	if err != nil {

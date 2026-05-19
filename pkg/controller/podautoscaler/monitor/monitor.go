@@ -44,7 +44,6 @@ type Monitor interface {
 	ObserveHPAAddition()
 	ObserveHPADeletion()
 	ObserveDesiredReplicas(namespace, hpaName string, desiredReplicas int32)
-	ObserveHPARequeueSkips(group string, resource string)
 }
 
 type monitor struct{}
@@ -55,31 +54,27 @@ func New() Monitor {
 
 // ObserveReconciliationResult observes some metrics from a reconciliation result.
 func (r *monitor) ObserveReconciliationResult(action ActionLabel, err ErrorLabel, duration time.Duration) {
-	ReconciliationsTotal.WithLabelValues(string(action), string(err)).Inc()
-	ReconciliationsDuration.WithLabelValues(string(action), string(err)).Observe(duration.Seconds())
+	reconciliationsTotal.WithLabelValues(string(action), string(err)).Inc()
+	reconciliationsDuration.WithLabelValues(string(action), string(err)).Observe(duration.Seconds())
 }
 
 // ObserveMetricComputationResult observes some metrics from a metric computation result.
 func (r *monitor) ObserveMetricComputationResult(action ActionLabel, err ErrorLabel, duration time.Duration, metricType v2.MetricSourceType) {
-	MetricComputationTotal.WithLabelValues(string(action), string(err), string(metricType)).Inc()
-	MetricComputationDuration.WithLabelValues(string(action), string(err), string(metricType)).Observe(duration.Seconds())
+	metricComputationTotal.WithLabelValues(string(action), string(err), string(metricType)).Inc()
+	metricComputationDuration.WithLabelValues(string(action), string(err), string(metricType)).Observe(duration.Seconds())
 }
 
 // ObserveHPAAddition observes the addition of an HPA object.
 func (r *monitor) ObserveHPAAddition() {
-	NumHorizontalPodAutoscalers.Inc()
+	numHorizontalPodAutoscalers.Inc()
 }
 
 // ObserveHPADeletion observes the deletion of an HPA object.
 func (r *monitor) ObserveHPADeletion() {
-	NumHorizontalPodAutoscalers.Dec()
+	numHorizontalPodAutoscalers.Dec()
 }
 
 // ObserveDesiredReplicas records the desired replica count for an HPA object.
 func (r *monitor) ObserveDesiredReplicas(namespace, hpaName string, desiredReplicas int32) {
-	DesiredReplicasCount.WithLabelValues(namespace, hpaName).Set(float64(desiredReplicas))
-}
-
-func (r *monitor) ObserveHPARequeueSkips(group string, resource string) {
-	HPARequeueSkips.WithLabelValues(group, resource).Inc()
+	desiredReplicasCount.WithLabelValues(namespace, hpaName).Set(float64(desiredReplicas))
 }

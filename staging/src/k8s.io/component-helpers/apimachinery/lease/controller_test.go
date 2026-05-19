@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -252,7 +253,7 @@ func TestNewNodeLease(t *testing.T) {
 				t.Fatalf("the new lease must be newly allocated, but got same address as base")
 			}
 			if !apiequality.Semantic.DeepEqual(tc.expect, newLease) {
-				t.Errorf("expected %#v, got %#v", tc.expect, newLease)
+				t.Errorf("unexpected result from newLease: %s", cmp.Diff(tc.expect, newLease))
 			}
 		})
 	}

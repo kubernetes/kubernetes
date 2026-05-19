@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/api/validate/content"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
+	pathvalidation "k8s.io/apimachinery/pkg/api/validation/path"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -80,7 +80,7 @@ func ValidateNetworkPolicyPort(port *networking.NetworkPolicyPort, portPath *fie
 			}
 			if port.EndPort != nil {
 				if *port.EndPort < port.Port.IntVal {
-					allErrs = append(allErrs, field.Invalid(portPath.Child("endPort"), *port.EndPort, "must be greater than or equal to `port`"))
+					allErrs = append(allErrs, field.Invalid(portPath.Child("endPort"), port.Port.IntVal, "must be greater than or equal to `port`"))
 				}
 				for _, msg := range validation.IsValidPortNum(int(*port.EndPort)) {
 					allErrs = append(allErrs, field.Invalid(portPath.Child("endPort"), *port.EndPort, msg))
@@ -246,7 +246,7 @@ func ValidateNetworkPolicyUpdate(update, old *networking.NetworkPolicy, opts Net
 func ValidateIPBlock(ipb *networking.IPBlock, fldPath *field.Path, opts NetworkPolicyValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if ipb.CIDR == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("cidr"), "").MarkCoveredByDeclarative())
+		allErrs = append(allErrs, field.Required(fldPath.Child("cidr"), ""))
 		return allErrs
 	}
 	allErrs = append(allErrs, apivalidation.IsValidCIDRForLegacyField(fldPath.Child("cidr"), ipb.CIDR, opts.AllowCIDRsEvenIfInvalid)...)
@@ -605,7 +605,7 @@ func validateIngressTypedLocalObjectReference(params *api.TypedLocalObjectRefere
 	if params.Kind == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), ""))
 	} else {
-		for _, msg := range content.IsPathSegmentName(params.Kind) {
+		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Kind) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), params.Kind, msg))
 		}
 	}
@@ -613,7 +613,7 @@ func validateIngressTypedLocalObjectReference(params *api.TypedLocalObjectRefere
 	if params.Name == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	} else {
-		for _, msg := range content.IsPathSegmentName(params.Name) {
+		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Name) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), params.Name, msg))
 		}
 	}
@@ -632,27 +632,11 @@ func validateIngressClassParametersReference(params *networking.IngressClassPara
 		return allErrs
 	}
 
-	if params.APIGroup != nil {
-		for _, msg := range validation.IsDNS1123Subdomain(*params.APIGroup) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("apiGroup"), *params.APIGroup, msg))
-		}
-	}
-
-	if params.Kind == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("kind"), "")).MarkCoveredByDeclarative()
-	} else {
-		for _, msg := range content.IsPathSegmentName(params.Kind) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("kind"), params.Kind, msg))
-		}
-	}
-
-	if params.Name == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "")).MarkCoveredByDeclarative()
-	} else {
-		for _, msg := range content.IsPathSegmentName(params.Name) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), params.Name, msg))
-		}
-	}
+	allErrs = append(allErrs, validateIngressTypedLocalObjectReference(&api.TypedLocalObjectReference{
+		APIGroup: params.APIGroup,
+		Kind:     params.Kind,
+		Name:     params.Name,
+	}, fldPath)...)
 
 	if params.Scope == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("scope"), ""))
@@ -785,7 +769,7 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 	allErrs := field.ErrorList{}
 
 	if params == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("parentRef"), "").MarkCoveredByDeclarative())
+		allErrs = append(allErrs, field.Required(fldPath.Child("parentRef"), ""))
 		return allErrs
 	}
 
@@ -799,25 +783,25 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 
 	// resource is required
 	if params.Resource == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("resource"), "").MarkCoveredByDeclarative())
+		allErrs = append(allErrs, field.Required(fldPath.Child("resource"), ""))
 	} else {
-		for _, msg := range content.IsPathSegmentName(params.Resource) {
+		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Resource) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("resource"), params.Resource, msg))
 		}
 	}
 
 	// name is required
 	if params.Name == "" {
-		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "").MarkCoveredByDeclarative())
+		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	} else {
-		for _, msg := range content.IsPathSegmentName(params.Name) {
+		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Name) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), params.Name, msg))
 		}
 	}
 
 	// namespace is optional
 	if params.Namespace != "" {
-		for _, msg := range content.IsPathSegmentName(params.Namespace) {
+		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Namespace) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), params.Namespace, msg))
 		}
 	}
@@ -828,7 +812,7 @@ func validateIPAddressParentReference(params *networking.ParentReference, fldPat
 func ValidateIPAddressUpdate(update, old *networking.IPAddress) field.ErrorList {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.ParentRef, old.Spec.ParentRef, field.NewPath("spec").Child("parentRef")).MarkCoveredByDeclarative().WithOrigin("immutable")...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(update.Spec.ParentRef, old.Spec.ParentRef, field.NewPath("spec").Child("parentRef"))...)
 	return allErrs
 }
 

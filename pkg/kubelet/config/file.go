@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilio "k8s.io/utils/io"
 )
 
@@ -54,12 +55,12 @@ type sourceFile struct {
 	period         time.Duration
 	store          cache.Store
 	fileKeyMapping map[string]string
-	updates        chan<- sourceUpdate
+	updates        chan<- interface{}
 	watchEvents    chan *watchEvent
 }
 
 // NewSourceFile watches a config file for changes.
-func NewSourceFile(logger klog.Logger, path string, nodeName types.NodeName, period time.Duration, updates chan<- sourceUpdate) {
+func NewSourceFile(logger klog.Logger, path string, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) {
 	// "github.com/sigma/go-inotify" requires a path without trailing "/"
 	path = strings.TrimRight(path, string(os.PathSeparator))
 
@@ -68,13 +69,13 @@ func NewSourceFile(logger klog.Logger, path string, nodeName types.NodeName, per
 	config.run(logger)
 }
 
-func newSourceFile(path string, nodeName types.NodeName, period time.Duration, updates chan<- sourceUpdate) *sourceFile {
+func newSourceFile(path string, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) *sourceFile {
 	send := func(objs []interface{}) {
 		var pods []*v1.Pod
 		for _, o := range objs {
 			pods = append(pods, o.(*v1.Pod))
 		}
-		updates <- sourceUpdate{Pods: pods}
+		updates <- kubetypes.PodUpdate{Pods: pods, Op: kubetypes.SET, Source: kubetypes.FileSource}
 	}
 	store := cache.NewUndeltaStore(send, cache.MetaNamespaceKeyFunc)
 	return &sourceFile{
@@ -125,7 +126,7 @@ func (s *sourceFile) listConfig(logger klog.Logger) error {
 			return err
 		}
 		// Emit an update with an empty PodList to allow FileSource to be marked as seen
-		s.updates <- sourceUpdate{Pods: []*v1.Pod{}}
+		s.updates <- kubetypes.PodUpdate{Pods: []*v1.Pod{}, Op: kubetypes.SET, Source: kubetypes.FileSource}
 		return fmt.Errorf("path does not exist, ignoring")
 	}
 
@@ -137,7 +138,7 @@ func (s *sourceFile) listConfig(logger klog.Logger) error {
 		}
 		if len(pods) == 0 {
 			// Emit an update with an empty PodList to allow FileSource to be marked as seen
-			s.updates <- sourceUpdate{Pods: pods}
+			s.updates <- kubetypes.PodUpdate{Pods: pods, Op: kubetypes.SET, Source: kubetypes.FileSource}
 			return nil
 		}
 		return s.replaceStore(pods...)

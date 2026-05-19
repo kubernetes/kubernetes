@@ -17,7 +17,6 @@ limitations under the License.
 package ipaddress
 
 import (
-	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,21 +42,11 @@ func newIPAddress() networking.IPAddress {
 }
 
 func TestIPAddressStrategy(t *testing.T) {
-	ctx := genericapirequest.WithRequestInfo(
-		genericapirequest.NewDefaultContext(),
-		&genericapirequest.RequestInfo{
-			APIGroup:          "networking.k8s.io",
-			APIVersion:        "v1",
-			Resource:          "ipaddresses",
-			Name:              "192.168.1.1",
-			IsResourceRequest: true,
-			Verb:              "create",
-		},
-	)
+	ctx := genericapirequest.NewDefaultContext()
 	if Strategy.NamespaceScoped() {
 		t.Errorf("ipAddress must not be namespace scoped")
 	}
-	if Strategy.AllowCreateOnUpdate(context.Background()) {
+	if Strategy.AllowCreateOnUpdate() {
 		t.Errorf("ipAddress should not allow create on update")
 	}
 

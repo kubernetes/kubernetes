@@ -17,20 +17,16 @@ limitations under the License.
 package features
 
 import (
-	"k8s.io/component-helpers/nodedeclaredfeatures/features/extendwebsocketstokubelet"
+	"k8s.io/component-helpers/nodedeclaredfeatures"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/inplacepodresize"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/restartallcontainers"
-	"k8s.io/component-helpers/nodedeclaredfeatures/features/usernamespaceshostnetwork"
-	"k8s.io/component-helpers/nodedeclaredfeatures/types"
 )
 
 // AllFeatures is the central registry for all declared features.
 // New features are added to this list to be automatically included in both
 // discovery and inference logic.
-var AllFeatures = []types.Feature{
+var AllFeatures = []nodedeclaredfeatures.Feature{
 	restartallcontainers.Feature,
+	inplacepodresize.GuaranteedQoSPodCPUResizeFeature,
 	inplacepodresize.PodLevelResourcesResizeFeature,
-	extendwebsocketstokubelet.Feature,
-	inplacepodresize.NonSidecarInitContainerResizeFeature,
-	usernamespaceshostnetwork.Feature,
 }

@@ -19,7 +19,6 @@ limitations under the License.
 // +k8s:validation-gen-test-fixture=validateFalse
 
 // This is a test package.
-// +k8s:validation-gen-nolint
 package typeargs
 
 import (

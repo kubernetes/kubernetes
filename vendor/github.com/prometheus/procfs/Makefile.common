@@ -33,7 +33,7 @@ GOHOSTOS     ?= $(shell $(GO) env GOHOSTOS)
 GOHOSTARCH   ?= $(shell $(GO) env GOHOSTARCH)
 
 GO_VERSION        ?= $(shell $(GO) version)
-GO_VERSION_NUMBER ?= $(word 3, $(GO_VERSION))
+GO_VERSION_NUMBER ?= $(word 3, $(GO_VERSION))Error Parsing File
 PRE_GO_111        ?= $(shell echo $(GO_VERSION_NUMBER) | grep -E 'go1\.(10|[0-9])\.')
 
 PROMU        := $(FIRST_GOPATH)/bin/promu
@@ -61,8 +61,7 @@ PROMU_URL     := https://github.com/prometheus/promu/releases/download/v$(PROMU_
 SKIP_GOLANGCI_LINT :=
 GOLANGCI_LINT :=
 GOLANGCI_LINT_OPTS ?=
-GOLANGCI_LINT_VERSION ?= v2.1.5
-GOLANGCI_FMT_OPTS ?=
+GOLANGCI_LINT_VERSION ?= v2.0.2
 # golangci-lint only supports linux, darwin and windows platforms on i386/amd64/arm64.
 # windows isn't included here because of the path separator being different.
 ifeq ($(GOHOSTOS),$(filter $(GOHOSTOS),linux darwin))
@@ -139,7 +138,7 @@ common-deps:
 update-go-deps:
 	@echo ">> updating Go dependencies"
 	@for m in $$($(GO) list -mod=readonly -m -f '{{ if and (not .Indirect) (not .Main)}}{{.Path}}{{end}}' all); do \
-		$(GO) get $$m; \
+		$(GO) get -d $$m; \
 	done
 	$(GO) mod tidy
 
@@ -157,13 +156,9 @@ $(GOTEST_DIR):
 	@mkdir -p $@
 
 .PHONY: common-format
-common-format: $(GOLANGCI_LINT)
+common-format:
 	@echo ">> formatting code"
 	$(GO) fmt $(pkgs)
-ifdef GOLANGCI_LINT
-	@echo ">> formatting code with golangci-lint"
-	$(GOLANGCI_LINT) fmt $(GOLANGCI_FMT_OPTS)
-endif
 
 .PHONY: common-vet
 common-vet:
@@ -253,8 +248,8 @@ $(PROMU):
 	cp $(PROMU_TMP)/promu-$(PROMU_VERSION).$(GO_BUILD_PLATFORM)/promu $(FIRST_GOPATH)/bin/promu
 	rm -r $(PROMU_TMP)
 
-.PHONY: common-proto
-common-proto:
+.PHONY: proto
+proto:
 	@echo ">> generating code from proto files"
 	@./scripts/genproto.sh
 

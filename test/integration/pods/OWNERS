@@ -10,5 +10,3 @@ reviewers:
 emeritus_approvers:
   - vishh
   - dchen1107
-labels:
-  - sig/node

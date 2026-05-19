@@ -17,7 +17,6 @@ limitations under the License.
 package priorityclass
 
 import (
-	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +29,7 @@ func TestPriorityClassStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("PriorityClass must not be namespace scoped")
 	}
-	if Strategy.AllowCreateOnUpdate(context.Background()) {
+	if Strategy.AllowCreateOnUpdate() {
 		t.Errorf("PriorityClass should not allow create on update")
 	}
 

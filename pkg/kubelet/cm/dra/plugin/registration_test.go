@@ -17,7 +17,6 @@ limitations under the License.
 package plugin
 
 import (
-	"context"
 	"path"
 	"sort"
 	"strings"
@@ -38,7 +37,7 @@ import (
 	cgotesting "k8s.io/client-go/testing"
 	drapb "k8s.io/kubelet/pkg/apis/dra/v1beta1"
 	timedworkers "k8s.io/kubernetes/pkg/controller/tainteviction"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -48,7 +47,7 @@ const (
 	pluginB  = "pluginB"
 )
 
-func getFakeNode(context.Context) (*v1.Node, error) {
+func getFakeNode() (*v1.Node, error) {
 	return &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: nodeName}}, nil
 }
 
@@ -105,7 +104,7 @@ func getFakeClient(t *testing.T, nodeName, driverName string, slice *resourceapi
 
 func requireNoSlices(tCtx ktesting.TContext) {
 	tCtx.Helper()
-	tCtx.Eventually(func(tCtx ktesting.TContext) error {
+	ktesting.Eventually(tCtx, func(tCtx ktesting.TContext) error {
 		slices, err := tCtx.Client().ResourceV1().ResourceSlices().List(tCtx, metav1.ListOptions{})
 		if err != nil {
 			return err
@@ -203,12 +202,12 @@ func TestRegistrationHandler(t *testing.T) {
 			service := drapb.DRAPluginService
 			tmp := t.TempDir()
 			endpointA := path.Join(tmp, socketFileA)
-			teardownA, err := setupFakeGRPCServer(tCtx, service, endpointA)
+			teardownA, err := setupFakeGRPCServer(service, endpointA)
 			require.NoError(t, err)
 			tCtx.Cleanup(teardownA)
 
 			endpoint := path.Join(tmp, test.socketFile)
-			teardown, err := setupFakeGRPCServer(tCtx, service, endpoint)
+			teardown, err := setupFakeGRPCServer(service, endpoint)
 			require.NoError(t, err)
 			tCtx.Cleanup(teardown)
 
@@ -218,7 +217,7 @@ func TestRegistrationHandler(t *testing.T) {
 			if test.withClient {
 				fakeClient := getFakeClient(t, nodeName, test.driverName, getSlice("test-slice"))
 				client = fakeClient
-				tCtx = tCtx.WithClients(nil, nil, client, nil, nil)
+				tCtx = ktesting.WithClients(tCtx, nil, nil, client, nil, nil)
 			}
 
 			// The DRAPluginManager wipes all slices at startup.
@@ -307,7 +306,7 @@ func TestConnectionHandling(t *testing.T) {
 
 			slice := getSlice(sliceName)
 			client := getFakeClient(t, nodeName, driverName, slice)
-			tCtx = tCtx.WithClients(nil, nil, client, nil, nil)
+			tCtx = ktesting.WithClients(tCtx, nil, nil, client, nil, nil)
 
 			// The handler wipes all slices at startup.
 			draPlugins := NewDRAPluginManager(tCtx, client, getFakeNode, &mockStreamHandler{}, test.delay)
@@ -316,7 +315,7 @@ func TestConnectionHandling(t *testing.T) {
 
 			// Run GRPC service.
 			endpoint := path.Join(t.TempDir(), "dra.sock")
-			teardown, err := setupFakeGRPCServer(tCtx, service, endpoint)
+			teardown, err := setupFakeGRPCServer(service, endpoint)
 			require.NoError(t, err)
 			defer teardown()
 
@@ -345,7 +344,7 @@ func TestConnectionHandling(t *testing.T) {
 
 				// Start up gRPC server again.
 				tCtx.Log("Restarting plugin gRPC server")
-				teardown, err = setupFakeGRPCServer(tCtx, service, endpoint)
+				teardown, err = setupFakeGRPCServer(service, endpoint)
 				require.NoError(t, err)
 				defer teardown()
 

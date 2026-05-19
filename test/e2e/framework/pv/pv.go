@@ -433,7 +433,7 @@ func CreatePVsPVCs(ctx context.Context, numpvs, numpvcs int, c clientset.Interfa
 	pvsToCreate := numpvs - extraPVs // want the min(numpvs, numpvcs)
 
 	// create pvs and pvcs
-	for range pvsToCreate {
+	for i := 0; i < pvsToCreate; i++ {
 		pv, pvc, err := CreatePVPVC(ctx, c, timeouts, pvConfig, pvcConfig, ns, false)
 		if err != nil {
 			return pvMap, pvcMap, err

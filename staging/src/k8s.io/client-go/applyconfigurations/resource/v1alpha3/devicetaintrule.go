@@ -34,7 +34,7 @@ import (
 // This has the same effect as if the taint was specified directly
 // in the ResourceSlice by the DRA driver.
 type DeviceTaintRuleApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration `json:""`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
 	// Standard object metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// Spec specifies the selector and one taint.

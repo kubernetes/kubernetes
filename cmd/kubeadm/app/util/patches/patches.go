@@ -82,8 +82,6 @@ const (
 	KubeletConfiguration = "kubeletconfiguration"
 	// CoreDNSDeployment defines the corednsdeployment patch target.
 	CoreDNSDeployment = "corednsdeployment"
-	// KubeProxyDaemonSet defines the kubeproxydaemonset patch target.
-	KubeProxyDaemonSet = "kubeproxydaemonset"
 )
 
 var (
@@ -109,7 +107,6 @@ var (
 		kubeadmconstants.KubeScheduler,
 		KubeletConfiguration,
 		CoreDNSDeployment,
-		KubeProxyDaemonSet,
 	}
 )
 

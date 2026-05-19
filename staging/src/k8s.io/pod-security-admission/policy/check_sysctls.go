@@ -49,8 +49,6 @@ spec.securityContext.sysctls[*].name
 'net.ipv4.tcp_keepalive_probes'
 'net.ipv4.tcp_rmem'
 'net.ipv4.tcp_wmem'
-'net.ipv4.tcp_slow_start_after_idle'
-'net.ipv4.tcp_notsent_lowat'
 
 */
 
@@ -80,10 +78,6 @@ func CheckSysctls() Check {
 				MinimumVersion: api.MajorMinorVersion(1, 32),
 				CheckPod:       sysctlsV1Dot32,
 			},
-			{
-				MinimumVersion: api.MajorMinorVersion(1, 37),
-				CheckPod:       sysctlsV1Dot37,
-			},
 		},
 	}
 }
@@ -109,10 +103,6 @@ var (
 		"net.ipv4.tcp_rmem",
 		"net.ipv4.tcp_wmem",
 	))
-	sysctlsAllowedV1Dot37 = sysctlsAllowedV1Dot32.Union(sets.NewString(
-		"net.ipv4.tcp_slow_start_after_idle",
-		"net.ipv4.tcp_notsent_lowat",
-	))
 )
 
 func sysctlsV1Dot0(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
@@ -129,10 +119,6 @@ func sysctlsV1Dot29(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) Che
 
 func sysctlsV1Dot32(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
 	return sysctls(podMetadata, podSpec, sysctlsAllowedV1Dot32)
-}
-
-func sysctlsV1Dot37(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec) CheckResult {
-	return sysctls(podMetadata, podSpec, sysctlsAllowedV1Dot37)
 }
 
 func sysctls(podMetadata *metav1.ObjectMeta, podSpec *corev1.PodSpec, sysctls_allowed_set sets.String) CheckResult {

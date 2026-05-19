@@ -17,7 +17,6 @@ limitations under the License.
 package printers
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"reflect"
@@ -32,15 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/apimachinery/pkg/watch"
 )
-
-// cellBreakChars are characters that cause cell value truncation.
-// Formfeed is included because tabwriter treats it as a newline.
-const cellBreakChars = "\f\n\r"
-
-// flushInterval is the number of rows between tabwriter flushes when
-// streaming a large table. Flushing bounds memory while preserving
-// alignment via tabwriter.RememberWidths after the first flush.
-const flushInterval = 100
 
 var _ ResourcePrinter = &HumanReadablePrinter{}
 
@@ -180,56 +170,6 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 // for wide columns and filtered rows. It filters out rows that are Completed. You should call
 // decorateTable if you receive a table from a remote server before calling printTable.
 func printTable(table *metav1.Table, output io.Writer, options PrintOptions) error {
-	numColDefs := len(table.ColumnDefinitions)
-
-	// When writing to a tabwriter we flush periodically (see below) to bound
-	// memory. Because tabwriter's RememberWidths can only grow column widths
-	// on future flushes — not retroactively re-pad rows already written — we
-	// pre-scan all rows to learn the ultimate max cell width per column. We
-	// then pad either the header (with headers) or the first data row
-	// (NoHeaders) so the first flush sets widths matching the ultimate max.
-	// Without this, a wider cell appearing after row flushInterval causes
-	// misalignment. Width comparisons use byte length because tabwriter
-	// measures columns in bytes, not runes.
-	var maxCellWidths []int
-	tw, isTabwriter := output.(*tabwriter.Writer)
-	if isTabwriter && len(table.Rows) > 0 {
-		maxCellWidths = make([]int, numColDefs)
-		for _, row := range table.Rows {
-			for i, cell := range row.Cells {
-				if i >= numColDefs {
-					break
-				}
-				if !options.Wide && table.ColumnDefinitions[i].Priority != 0 {
-					continue
-				}
-				if cell == nil {
-					continue
-				}
-				var l int
-				if s, ok := cell.(string); ok {
-					l = len(s)
-				} else {
-					l = len(fmt.Sprint(cell))
-				}
-				if l > maxCellWidths[i] {
-					maxCellWidths[i] = l
-				}
-			}
-		}
-	}
-
-	// Find the last visible column so we can skip padding it — padding the
-	// final column would leave trailing whitespace without any alignment
-	// benefit (tabwriter doesn't right-pad the last column for data rows).
-	lastVisibleCol := -1
-	for i, column := range table.ColumnDefinitions {
-		if !options.Wide && column.Priority != 0 {
-			continue
-		}
-		lastVisibleCol = i
-	}
-
 	if !options.NoHeaders {
 		// avoid printing headers if we have no rows to display
 		if len(table.Rows) == 0 {
@@ -237,124 +177,60 @@ func printTable(table *metav1.Table, output io.Writer, options PrintOptions) err
 		}
 
 		first := true
-		for i, column := range table.ColumnDefinitions {
+		for _, column := range table.ColumnDefinitions {
 			if !options.Wide && column.Priority != 0 {
 				continue
 			}
 			if first {
 				first = false
 			} else {
-				output.Write([]byte{'\t'}) //nolint:errcheck
+				fmt.Fprint(output, "\t")
 			}
-			name := strings.ToUpper(column.Name)
-			io.WriteString(output, name) //nolint:errcheck
-			if i != lastVisibleCol && i < len(maxCellWidths) {
-				if pad := maxCellWidths[i] - len(name); pad > 0 {
-					output.Write(bytes.Repeat([]byte{' '}, pad)) //nolint:errcheck
-				}
-			}
+			fmt.Fprint(output, strings.ToUpper(column.Name))
 		}
-		output.Write([]byte{'\n'}) //nolint:errcheck
+		fmt.Fprintln(output)
 	}
-
-	// rowBuf accumulates tab-separated cell values for each row,
-	// reducing per-cell Write calls from ~3 (tab + value + truncation)
-	// down to 1 per row in the common case (no special characters).
-	// 40 bytes per column is a heuristic based on typical kubectl output:
-	// cell values range from ~5 bytes ("Ready") to ~45 bytes (FQDNs).
-	rowBuf := make([]byte, 0, numColDefs*40)
-
-	// When writing to a tabwriter with RememberWidths, flush periodically
-	// (flushInterval) to bound memory usage. After the first flush the
-	// tabwriter remembers column widths, so subsequent flushes produce
-	// consistently aligned output. For small tables or non-tabwriter
-	// outputs, no flushing happens here.
-	//
-	// NoHeaders mode: the header path above primes column widths by
-	// padding header cells to maxCellWidths. Without a header to prime
-	// widths, we instead pad the first data row's non-final cells using
-	// the same pre-scanned widths.
-	padFirstRow := isTabwriter && options.NoHeaders && len(maxCellWidths) > 0
-
-	for ri, row := range table.Rows {
-		rowBuf = rowBuf[:0]
+	for _, row := range table.Rows {
 		first := true
 		for i, cell := range row.Cells {
-			if i >= numColDefs {
+			if i >= len(table.ColumnDefinitions) {
 				// https://issue.k8s.io/66379
 				// don't panic in case of bad output from the server, with more cells than column definitions
 				break
 			}
-			if !options.Wide && table.ColumnDefinitions[i].Priority != 0 {
+			column := table.ColumnDefinitions[i]
+			if !options.Wide && column.Priority != 0 {
 				continue
 			}
 			if first {
 				first = false
 			} else {
-				rowBuf = append(rowBuf, '\t')
+				fmt.Fprint(output, "\t")
 			}
-			// Track byte length of the cell string we're about to
-			// write so we can pad to maxCellWidths without measuring
-			// through rowBuf (appendCellValue's slow path flushes
-			// rowBuf directly, making post-write measurement unsafe).
-			cellLen := 0
 			if cell != nil {
-				var cellStr string
 				switch val := cell.(type) {
 				case string:
-					cellStr = val
+					print := val
+					truncated := false
+					// Truncate at the first newline, carriage return or formfeed
+					// (treated as a newline by tabwriter).
+					breakchar := strings.IndexAny(print, "\f\n\r")
+					if breakchar >= 0 {
+						truncated = true
+						print = print[:breakchar]
+					}
+					WriteEscaped(output, print)
+					if truncated {
+						fmt.Fprint(output, "...")
+					}
 				default:
-					cellStr = fmt.Sprint(val)
-				}
-				cellLen = len(cellStr)
-				rowBuf = appendCellValue(output, rowBuf, cellStr)
-			}
-			if padFirstRow && ri == 0 && i != lastVisibleCol && i < len(maxCellWidths) {
-				if pad := maxCellWidths[i] - cellLen; pad > 0 {
-					rowBuf = append(rowBuf, bytes.Repeat([]byte{' '}, pad)...)
+					WriteEscaped(output, fmt.Sprint(val))
 				}
 			}
 		}
-		rowBuf = append(rowBuf, '\n')
-		output.Write(rowBuf) //nolint:errcheck
-
-		if isTabwriter && (ri+1)%flushInterval == 0 {
-			tw.Flush() //nolint:errcheck
-		}
+		fmt.Fprintln(output)
 	}
 	return nil
-}
-
-// appendCellValue appends a cell's display text to rowBuf. For the common
-// case (no special characters), this is a simple append with zero allocations.
-// When the value contains control characters or escape sequences, it flushes
-// the buffer, writes the sanitized value directly, and returns an empty buffer.
-func appendCellValue(w io.Writer, buf []byte, val string) []byte {
-	// Fast path: scan for characters that need special handling.
-	// cellBreakChars cause truncation; \x1b needs escaping.
-	// The vast majority of cell values contain neither.
-	idx := strings.IndexAny(val, cellSpecialChars)
-	if idx < 0 {
-		return append(buf, val...)
-	}
-
-	// Slow path: flush accumulated buffer, then handle the special value.
-	if len(buf) > 0 {
-		w.Write(buf) //nolint:errcheck
-		buf = buf[:0]
-	}
-
-	// Truncate at the first break character (newline, carriage return,
-	// or formfeed — which tabwriter treats as a newline).
-	breakchar := strings.IndexAny(val, cellBreakChars)
-	if breakchar >= 0 {
-		WriteEscaped(w, val[:breakchar]) //nolint:errcheck
-		io.WriteString(w, "...")         //nolint:errcheck
-	} else {
-		// No break chars, but contains terminal-unsafe chars that need escaping.
-		WriteEscaped(w, val) //nolint:errcheck
-	}
-	return buf
 }
 
 type cellValueFunc func(metav1.TableRow) (interface{}, error)

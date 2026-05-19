@@ -63,7 +63,7 @@ type B struct {
 
 type C struct {
 	A []A `json:"ca"`
-	B `json:""`
+	B `json:",inline"`
 	C string         `json:"cc"`
 	D *int64         `json:"cd"`
 	E map[string]int `json:"ce"`
@@ -103,20 +103,20 @@ type G struct {
 
 type H struct {
 	A A `json:"ha"`
-	C `json:""`
+	C `json:",inline"`
 }
 
 type I struct {
 	A A `json:"ia"`
-	H `json:""`
+	H `json:",inline"`
 
 	UL1 UnknownLevel1 `json:"ul1"`
 }
 
 type UnknownLevel1 struct {
 	A          int64 `json:"a"`
-	InlinedAA  `json:""`
-	InlinedAAA `json:""`
+	InlinedAA  `json:",inline"`
+	InlinedAAA `json:",inline"`
 }
 type InlinedAA struct {
 	AA int64 `json:"aa"`
@@ -128,8 +128,8 @@ type InlinedAAA struct {
 
 type UnknownLevel2 struct {
 	B          int64 `json:"b"`
-	InlinedBB  `json:""`
-	InlinedBBB `json:""`
+	InlinedBB  `json:",inline"`
+	InlinedBBB `json:",inline"`
 }
 type InlinedBB struct {
 	BB int64 `json:"bb"`
@@ -141,8 +141,8 @@ type InlinedBBB struct {
 
 type UnknownLevel3 struct {
 	C          int64 `json:"c"`
-	InlinedCC  `json:""`
-	InlinedCCC `json:""`
+	InlinedCC  `json:",inline"`
+	InlinedCCC `json:",inline"`
 }
 type InlinedCC struct {
 	CC int64 `json:"cc"`
@@ -964,6 +964,7 @@ func TestCustomToUnstructured(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
+		tc := tc
 		t.Run(tc.Data, func(t *testing.T) {
 			t.Parallel()
 			result, err := runtime.NewTestUnstructuredConverter(simpleEquality).ToUnstructured(&G{
@@ -988,6 +989,7 @@ func TestCustomToUnstructuredTopLevel(t *testing.T) {
 	}
 	expected := map[string]interface{}{"a": int64(1)}
 	for i, obj := range topLevelCases {
+		obj := obj
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			t.Parallel()
 			result, err := runtime.NewTestUnstructuredConverter(simpleEquality).ToUnstructured(obj)
@@ -1028,21 +1030,21 @@ func TestOmitempty(t *testing.T) {
 
 type InlineTestPrimitive struct {
 	NoNameTagPrimitive          int64 `json:""`
-	NoNameTagInlinePrimitive    int64 `json:""`
+	NoNameTagInlinePrimitive    int64 `json:",inline"`
 	NoNameTagOmitemptyPrimitive int64 `json:",omitempty"`
 }
 type InlineTestAnonymous struct {
 	NoTag
 	NoNameTag          `json:""`
 	NameTag            `json:"nameTagEmbedded"`
-	NoNameTagInline    `json:""`
+	NoNameTagInline    `json:",inline"`
 	NoNameTagOmitempty `json:",omitempty"`
 }
 type InlineTestNamed struct {
 	NoTag              NoTag
 	NoNameTag          NoNameTag          `json:""`
 	NameTag            NameTag            `json:"nameTagEmbedded"`
-	NoNameTagInline    NoNameTagInline    `json:""`
+	NoNameTagInline    NoNameTagInline    `json:",inline"`
 	NoNameTagOmitempty NoNameTagOmitempty `json:",omitempty"`
 }
 type NoTag struct {

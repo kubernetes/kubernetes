@@ -25,7 +25,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
-	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // PodBindingCall is used to bind the pod using the binding details.
@@ -51,7 +50,7 @@ func (pbc *PodBindingCall) Execute(ctx context.Context, client clientset.Interfa
 	logger := klog.FromContext(ctx)
 	logger.V(3).Info("Attempting to bind pod to node", "pod", klog.KObj(&pbc.binding.ObjectMeta), "node", pbc.binding.Target.Name)
 
-	return util.BindPod(ctx, client, pbc.binding)
+	return client.CoreV1().Pods(pbc.binding.Namespace).Bind(ctx, pbc.binding, metav1.CreateOptions{})
 }
 
 func (pbc *PodBindingCall) Sync(obj metav1.Object) (metav1.Object, error) {

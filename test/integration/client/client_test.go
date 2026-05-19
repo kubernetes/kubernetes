@@ -197,7 +197,7 @@ func TestAtomicPut(t *testing.T) {
 	testLabels := labels.Set{
 		"foo": "bar",
 	}
-	for i := range 5 {
+	for i := 0; i < 5; i++ {
 		// a: z, b: y, etc...
 		testLabels[string([]byte{byte('a' + i)})] = string([]byte{byte('z' - i)})
 	}
@@ -731,7 +731,7 @@ func TestSingleWatch(t *testing.T) {
 	}
 
 	rv1 := ""
-	for i := range 10 {
+	for i := 0; i < 10; i++ {
 		event := mkEvent(i)
 		got, err := client.CoreV1().Events("default").Create(context.TODO(), event, metav1.CreateOptions{})
 		if err != nil {
@@ -823,7 +823,7 @@ func TestMultiWatch(t *testing.T) {
 	watchesStarted := sync.WaitGroup{}
 
 	// make a bunch of pods and watch them
-	for i := range watcherCount {
+	for i := 0; i < watcherCount; i++ {
 		watchesStarted.Add(1)
 		name := fmt.Sprintf("multi-watch-%v", i)
 		got, err := client.CoreV1().Pods("default").Create(context.TODO(), &v1.Pod{
@@ -882,12 +882,12 @@ func TestMultiWatch(t *testing.T) {
 		changeToMake := make(chan int, unrelatedCount*2)
 		changeMade := make(chan int, unrelatedCount*2)
 		go func() {
-			for i := range unrelatedCount {
+			for i := 0; i < unrelatedCount; i++ {
 				changeToMake <- i
 			}
 			close(changeToMake)
 		}()
-		for range 50 {
+		for i := 0; i < 50; i++ {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -904,7 +904,7 @@ func TestMultiWatch(t *testing.T) {
 			}()
 		}
 
-		for i := range 2000 {
+		for i := 0; i < 2000; i++ {
 			<-changeMade
 			if (i+1)%50 == 0 {
 				log.Printf("%v: %v unrelated changes made", time.Now(), i+1)
@@ -918,12 +918,12 @@ func TestMultiWatch(t *testing.T) {
 		changeToMake := make(chan int, unrelatedCount*2)
 		changeMade := make(chan int, unrelatedCount*2)
 		go func() {
-			for i := range unrelatedCount {
+			for i := 0; i < unrelatedCount; i++ {
 				changeToMake <- i
 			}
 			close(changeToMake)
 		}()
-		for range 50 {
+		for i := 0; i < 50; i++ {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -953,7 +953,7 @@ func TestMultiWatch(t *testing.T) {
 			}()
 		}
 
-		for i := range 2000 {
+		for i := 0; i < 2000; i++ {
 			<-changeMade
 			if (i+1)%50 == 0 {
 				log.Printf("%v: %v unrelated changes made", time.Now(), i+1)
@@ -964,7 +964,7 @@ func TestMultiWatch(t *testing.T) {
 	// Now we still have changes being made in parallel, but at least 1000 have been made.
 	// Make some updates to send down the watches.
 	sentTimes := make(chan timePair, watcherCount*2)
-	for i := range watcherCount {
+	for i := 0; i < watcherCount; i++ {
 		go func(i int) {
 			name := fmt.Sprintf("multi-watch-%v", i)
 			pod, err := client.CoreV1().Pods("default").Get(context.TODO(), name, metav1.GetOptions{})
@@ -980,13 +980,13 @@ func TestMultiWatch(t *testing.T) {
 	}
 
 	sent := map[string]time.Time{}
-	for range watcherCount {
+	for i := 0; i < watcherCount; i++ {
 		tp := <-sentTimes
 		sent[tp.name] = tp.t
 	}
 	log.Printf("all changes made")
 	dur := map[string]time.Duration{}
-	for range watcherCount {
+	for i := 0; i < watcherCount; i++ {
 		tp := <-receivedTimes
 		delta := tp.t.Sub(sent[tp.name])
 		dur[tp.name] = delta

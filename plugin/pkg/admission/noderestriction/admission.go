@@ -86,7 +86,7 @@ type Plugin struct {
 	pvGetter             corev1lister.PersistentVolumeLister
 	csiTranslator        csitrans.CSITranslator
 
-	authz authorizer.UnconditionalAuthorizer
+	authz authorizer.Authorizer
 
 	inspectedFeatureGates                          bool
 	expansionRecoveryEnabled                       bool
@@ -100,7 +100,7 @@ var (
 	_ admission.Interface                                 = &Plugin{}
 	_ apiserveradmission.WantsExternalKubeInformerFactory = &Plugin{}
 	_ apiserveradmission.WantsFeatures                    = &Plugin{}
-	_ apiserveradmission.WantsUnconditionalAuthorizer     = &Plugin{}
+	_ apiserveradmission.WantsAuthorizer                  = &Plugin{}
 )
 
 // InspectFeatureGates allows setting bools without taking a dep on a global variable
@@ -160,8 +160,8 @@ func (p *Plugin) ValidateInitialization() error {
 	return nil
 }
 
-// SetUnconditionalAuthorizer sets the authorizer.
-func (p *Plugin) SetUnconditionalAuthorizer(authz authorizer.UnconditionalAuthorizer) {
+// SetAuthorizer sets the authorizer.
+func (p *Plugin) SetAuthorizer(authz authorizer.Authorizer) {
 	if p.serviceAccountNodeAudienceRestriction {
 		p.authz = authz
 	}
@@ -712,10 +712,10 @@ func (p *Plugin) validateNodeServiceAccountAudience(ctx context.Context, tr *aut
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("error authorizing %s to request tokens for audience %q: %w", userInfo.GetName(), requestedAudience, err)
+		return fmt.Errorf("audience %q not found in pod spec volume, error authorizing %s to request tokens for this audience: %w", requestedAudience, userInfo.GetName(), err)
 	}
 
-	return fmt.Errorf("%s is not authorized to request tokens for audience %q", userInfo.GetName(), requestedAudience)
+	return fmt.Errorf("audience %q not found in pod spec volume, %s is not authorized to request tokens for this audience", requestedAudience, userInfo.GetName())
 }
 
 func (p *Plugin) podReferencesAudience(ctx context.Context, pod *v1.Pod, audience string) (bool, error) {

@@ -1,4 +1,5 @@
 //go:build linux
+// +build linux
 
 /*
 Copyright 2024 The Kubernetes Authors.
@@ -100,9 +101,11 @@ var _ = SIGDescribe("Container Restart", feature.CriProxy, framework.WithSerial(
 			if err := resetCRIProxyInjector(e2eCriProxy); err != nil {
 				ginkgo.Skip("Skip the test since the CRI Proxy is undefined.")
 			}
-			ginkgo.DeferCleanup(func() error {
-				return resetCRIProxyInjector(e2eCriProxy)
-			})
+		})
+
+		ginkgo.AfterEach(func() {
+			err := resetCRIProxyInjector(e2eCriProxy)
+			framework.ExpectNoError(err)
 		})
 
 		ginkgo.It("Reduced default restart backs off.", func(ctx context.Context) {
@@ -126,9 +129,11 @@ var _ = SIGDescribe("Container Restart", feature.CriProxy, framework.WithSerial(
 			if err := resetCRIProxyInjector(e2eCriProxy); err != nil {
 				ginkgo.Skip("Skip the test since the CRI Proxy is undefined.")
 			}
-			ginkgo.DeferCleanup(func() error {
-				return resetCRIProxyInjector(e2eCriProxy)
-			})
+		})
+
+		ginkgo.AfterEach(func() {
+			err := resetCRIProxyInjector(e2eCriProxy)
+			framework.ExpectNoError(err)
 		})
 
 		ginkgo.It("Reduced default restart backs off.", func(ctx context.Context) {

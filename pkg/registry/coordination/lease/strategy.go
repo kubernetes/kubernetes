@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -32,12 +31,12 @@ import (
 
 // leaseStrategy implements verification logic for Leases.
 type leaseStrategy struct {
-	rest.DeclarativeValidation
+	runtime.ObjectTyper
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Lease objects.
-var Strategy = leaseStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
+var Strategy = leaseStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped returns true because all Lease' need to be within a namespace.
 func (leaseStrategy) NamespaceScoped() bool {
@@ -82,7 +81,7 @@ func (leaseStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is true for Lease; this means you may create one with a PUT request.
-func (leaseStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
+func (leaseStrategy) AllowCreateOnUpdate() bool {
 	return true
 }
 
@@ -97,6 +96,6 @@ func (leaseStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Obje
 }
 
 // AllowUnconditionalUpdate is the default update policy for Lease objects.
-func (leaseStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+func (leaseStrategy) AllowUnconditionalUpdate() bool {
 	return false
 }

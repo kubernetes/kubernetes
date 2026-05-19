@@ -25,7 +25,6 @@ import (
 	context "context"
 	fmt "fmt"
 
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -38,346 +37,34 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
-	// type NetworkPolicy
-	scheme.AddValidationFunc(
-		(*NetworkPolicy)(nil),
-		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-			switch op.Request.SubresourcePath() {
-			case "/":
-				return Validate_NetworkPolicy(
-					ctx, op, nil, /* fldPath */
-					obj.(*NetworkPolicy),
-					safe.Cast[*NetworkPolicy](oldObj))
-			}
-			return field.ErrorList{
-				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
-			}
-		})
 	// type Scale
-	scheme.AddValidationFunc(
-		(*Scale)(nil),
-		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-			switch op.Request.SubresourcePath() {
-			case "/scale":
-				return Validate_Scale(
-					ctx, op, nil, /* fldPath */
-					obj.(*Scale),
-					safe.Cast[*Scale](oldObj))
-			}
-			return field.ErrorList{
-				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
-			}
-		})
+	scheme.AddValidationFunc((*Scale)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/scale":
+			return Validate_Scale(ctx, op, nil /* fldPath */, obj.(*Scale), safe.Cast[*Scale](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	return nil
-}
-
-// Validate_IPBlock validates an instance of IPBlock according
-// to declarative validation rules in the API schema.
-func Validate_IPBlock(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *IPBlock) (errs field.ErrorList) {
-
-	{ // field IPBlock.CIDR
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *IPBlock) *string {
-				return &oldObj.CIDR
-			})
-		errs = append(errs, fn(fldPath.Child("cidr"), &obj.CIDR, oldVal, oldObj != nil)...)
-	}
-
-	// field IPBlock.Except has no validation
-	return errs
-}
-
-// Validate_NetworkPolicy validates an instance of NetworkPolicy according
-// to declarative validation rules in the API schema.
-func Validate_NetworkPolicy(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *NetworkPolicy) (errs field.ErrorList) {
-
-	// field NetworkPolicy.TypeMeta has no validation
-	// field NetworkPolicy.ObjectMeta has no validation
-
-	{ // field NetworkPolicy.Spec
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *NetworkPolicySpec,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call the type's validation function
-			errs = append(errs, Validate_NetworkPolicySpec(ctx, op, fldPath, obj, oldObj)...)
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *NetworkPolicy) *NetworkPolicySpec {
-				return &oldObj.Spec
-			})
-		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
-	}
-
-	return errs
-}
-
-// Validate_NetworkPolicyEgressRule validates an instance of NetworkPolicyEgressRule according
-// to declarative validation rules in the API schema.
-func Validate_NetworkPolicyEgressRule(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *NetworkPolicyEgressRule) (errs field.ErrorList) {
-
-	// field NetworkPolicyEgressRule.Ports has no validation
-
-	{ // field NetworkPolicyEgressRule.To
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []NetworkPolicyPeer,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_NetworkPolicyPeer); len(e) != 0 {
-				errs = append(errs, e...)
-			}
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *NetworkPolicyEgressRule) []NetworkPolicyPeer {
-				return oldObj.To
-			})
-		errs = append(errs, fn(fldPath.Child("to"), obj.To, oldVal, oldObj != nil)...)
-	}
-
-	return errs
-}
-
-// Validate_NetworkPolicyIngressRule validates an instance of NetworkPolicyIngressRule according
-// to declarative validation rules in the API schema.
-func Validate_NetworkPolicyIngressRule(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *NetworkPolicyIngressRule) (errs field.ErrorList) {
-
-	// field NetworkPolicyIngressRule.Ports has no validation
-
-	{ // field NetworkPolicyIngressRule.From
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []NetworkPolicyPeer,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_NetworkPolicyPeer); len(e) != 0 {
-				errs = append(errs, e...)
-			}
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *NetworkPolicyIngressRule) []NetworkPolicyPeer {
-				return oldObj.From
-			})
-		errs = append(errs, fn(fldPath.Child("from"), obj.From, oldVal, oldObj != nil)...)
-	}
-
-	return errs
-}
-
-// Validate_NetworkPolicyPeer validates an instance of NetworkPolicyPeer according
-// to declarative validation rules in the API schema.
-func Validate_NetworkPolicyPeer(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *NetworkPolicyPeer) (errs field.ErrorList) {
-
-	// field NetworkPolicyPeer.PodSelector has no validation
-	// field NetworkPolicyPeer.NamespaceSelector has no validation
-
-	{ // field NetworkPolicyPeer.IPBlock
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *IPBlock,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			// call the type's validation function
-			errs = append(errs, Validate_IPBlock(ctx, op, fldPath, obj, oldObj)...)
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *NetworkPolicyPeer) *IPBlock {
-				return oldObj.IPBlock
-			})
-		errs = append(errs, fn(fldPath.Child("ipBlock"), obj.IPBlock, oldVal, oldObj != nil)...)
-	}
-
-	return errs
-}
-
-// Validate_NetworkPolicySpec validates an instance of NetworkPolicySpec according
-// to declarative validation rules in the API schema.
-func Validate_NetworkPolicySpec(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *NetworkPolicySpec) (errs field.ErrorList) {
-
-	// field NetworkPolicySpec.PodSelector has no validation
-
-	{ // field NetworkPolicySpec.Ingress
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []NetworkPolicyIngressRule,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_NetworkPolicyIngressRule); len(e) != 0 {
-				errs = append(errs, e...)
-			}
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *NetworkPolicySpec) []NetworkPolicyIngressRule {
-				return oldObj.Ingress
-			})
-		errs = append(errs, fn(fldPath.Child("ingress"), obj.Ingress, oldVal, oldObj != nil)...)
-	}
-
-	{ // field NetworkPolicySpec.Egress
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []NetworkPolicyEgressRule,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_NetworkPolicyEgressRule); len(e) != 0 {
-				errs = append(errs, e...)
-			}
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *NetworkPolicySpec) []NetworkPolicyEgressRule {
-				return oldObj.Egress
-			})
-		errs = append(errs, fn(fldPath.Child("egress"), obj.Egress, oldVal, oldObj != nil)...)
-	}
-
-	// field NetworkPolicySpec.PolicyTypes has no validation
-	return errs
 }
 
 // Validate_Scale validates an instance of Scale according
 // to declarative validation rules in the API schema.
-func Validate_Scale(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *Scale) (errs field.ErrorList) {
-
+func Validate_Scale(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Scale) (errs field.ErrorList) {
 	// field Scale.TypeMeta has no validation
 	// field Scale.ObjectMeta has no validation
 
-	{ // field Scale.Spec
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *ScaleSpec,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field Scale.Spec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *ScaleSpec, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_ScaleSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *Scale) *ScaleSpec {
-				return &oldObj.Spec
-			})
-		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *Scale) *ScaleSpec { return &oldObj.Spec }), oldObj != nil)...)
 
 	// field Scale.Status has no validation
 	return errs
@@ -385,34 +72,19 @@ func Validate_Scale(
 
 // Validate_ScaleSpec validates an instance of ScaleSpec according
 // to declarative validation rules in the API schema.
-func Validate_ScaleSpec(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *ScaleSpec) (errs field.ErrorList) {
-
-	{ // field ScaleSpec.Replicas
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *int32,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_ScaleSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ScaleSpec) (errs field.ErrorList) {
+	// field ScaleSpec.Replicas
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *int32, oldValueCorrelated bool) (errs field.ErrorList) {
 			// optional value-type fields with zero-value defaults are purely documentation
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
-			if e := validate.Minimum(ctx, op, fldPath, obj, oldObj, 0).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.Minimum(ctx, op, fldPath, obj, oldObj, 0)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *ScaleSpec) *int32 {
-				return &oldObj.Replicas
-			})
-		errs = append(errs, fn(fldPath.Child("replicas"), &obj.Replicas, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("replicas"), &obj.Replicas, safe.Field(oldObj, func(oldObj *ScaleSpec) *int32 { return &oldObj.Replicas }), oldObj != nil)...)
 
 	return errs
 }

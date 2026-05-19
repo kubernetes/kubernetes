@@ -25,62 +25,62 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/utils/dump"
 	"k8s.io/utils/ptr"
 )
 
 func TestDetermineNeededServiceUpdates(t *testing.T) {
 	testCases := []struct {
 		name  string
-		a     sets.Set[string]
-		b     sets.Set[string]
-		union sets.Set[string]
-		xor   sets.Set[string]
+		a     sets.String
+		b     sets.String
+		union sets.String
+		xor   sets.String
 	}{
 		{
 			name:  "no services changed",
-			a:     sets.New[string]("a", "b", "c"),
-			b:     sets.New[string]("a", "b", "c"),
-			xor:   sets.New[string](),
-			union: sets.New[string]("a", "b", "c"),
+			a:     sets.NewString("a", "b", "c"),
+			b:     sets.NewString("a", "b", "c"),
+			xor:   sets.NewString(),
+			union: sets.NewString("a", "b", "c"),
 		},
 		{
 			name:  "all old services removed, new services added",
-			a:     sets.New[string]("a", "b", "c"),
-			b:     sets.New[string]("d", "e", "f"),
-			xor:   sets.New[string]("a", "b", "c", "d", "e", "f"),
-			union: sets.New[string]("a", "b", "c", "d", "e", "f"),
+			a:     sets.NewString("a", "b", "c"),
+			b:     sets.NewString("d", "e", "f"),
+			xor:   sets.NewString("a", "b", "c", "d", "e", "f"),
+			union: sets.NewString("a", "b", "c", "d", "e", "f"),
 		},
 		{
 			name:  "all old services removed, no new services added",
-			a:     sets.New[string]("a", "b", "c"),
-			b:     sets.New[string](),
-			xor:   sets.New[string]("a", "b", "c"),
-			union: sets.New[string]("a", "b", "c"),
+			a:     sets.NewString("a", "b", "c"),
+			b:     sets.NewString(),
+			xor:   sets.NewString("a", "b", "c"),
+			union: sets.NewString("a", "b", "c"),
 		},
 		{
 			name:  "no old services, but new services added",
-			a:     sets.New[string](),
-			b:     sets.New[string]("a", "b", "c"),
-			xor:   sets.New[string]("a", "b", "c"),
-			union: sets.New[string]("a", "b", "c"),
+			a:     sets.NewString(),
+			b:     sets.NewString("a", "b", "c"),
+			xor:   sets.NewString("a", "b", "c"),
+			union: sets.NewString("a", "b", "c"),
 		},
 		{
 			name:  "one service removed, one service added, two unchanged",
-			a:     sets.New[string]("a", "b", "c"),
-			b:     sets.New[string]("b", "c", "d"),
-			xor:   sets.New[string]("a", "d"),
-			union: sets.New[string]("a", "b", "c", "d"),
+			a:     sets.NewString("a", "b", "c"),
+			b:     sets.NewString("b", "c", "d"),
+			xor:   sets.NewString("a", "d"),
+			union: sets.NewString("a", "b", "c", "d"),
 		},
 		{
 			name:  "no services",
-			a:     sets.New[string](),
-			b:     sets.New[string](),
-			xor:   sets.New[string](),
-			union: sets.New[string](),
+			a:     sets.NewString(),
+			b:     sets.NewString(),
+			xor:   sets.NewString(),
+			union: sets.NewString(),
 		},
 	}
 
@@ -88,12 +88,12 @@ func TestDetermineNeededServiceUpdates(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			retval := determineNeededServiceUpdates(testCase.a, testCase.b, false)
 			if !retval.Equal(testCase.xor) {
-				t.Errorf("%s (with podChanged=false): expected: %v  got: %v", testCase.name, sets.List(testCase.xor), sets.List(retval))
+				t.Errorf("%s (with podChanged=false): expected: %v  got: %v", testCase.name, testCase.xor.List(), retval.List())
 			}
 
 			retval = determineNeededServiceUpdates(testCase.a, testCase.b, true)
 			if !retval.Equal(testCase.union) {
-				t.Errorf("%s (with podChanged=true): expected: %v  got: %v", testCase.name, sets.List(testCase.union), sets.List(retval))
+				t.Errorf("%s (with podChanged=true): expected: %v  got: %v", testCase.name, testCase.union.List(), retval.List())
 			}
 		})
 	}
@@ -364,32 +364,32 @@ func TestGetPodServicesToUpdate(t *testing.T) {
 	tests := []struct {
 		name   string
 		pod    *v1.Pod
-		expect sets.Set[string]
+		expect sets.String
 	}{
 		{
 			name:   "get servicesMemberships for pod-0",
 			pod:    pods[0],
-			expect: sets.New[string]("test/service-0"),
+			expect: sets.NewString("test/service-0"),
 		},
 		{
 			name:   "get servicesMemberships for pod-1",
 			pod:    pods[1],
-			expect: sets.New[string]("test/service-1"),
+			expect: sets.NewString("test/service-1"),
 		},
 		{
 			name:   "get servicesMemberships for pod-2",
 			pod:    pods[2],
-			expect: sets.New[string]("test/service-2"),
+			expect: sets.NewString("test/service-2"),
 		},
 		{
 			name:   "get servicesMemberships for pod-3",
 			pod:    pods[3],
-			expect: sets.New[string](),
+			expect: sets.NewString(),
 		},
 		{
 			name:   "get servicesMemberships for pod-4",
 			pod:    pods[4],
-			expect: sets.New[string](),
+			expect: sets.NewString(),
 		},
 	}
 	for _, test := range tests {
@@ -946,17 +946,5 @@ func TestDeepObjectPointer(t *testing.T) {
 		if hash1 != hash3 {
 			t.Errorf("hash1 (%d) and hash3(%d) must be the same because although they point to different objects, they have the same values for wheel size", hash1, hash3)
 		}
-	}
-}
-
-func TestNewPortMapKey_NilVsEmptySlice(t *testing.T) {
-	var nilPorts []discovery.EndpointPort
-	emptyPorts := []discovery.EndpointPort{}
-
-	nilKey := NewPortMapKey(nilPorts)
-	emptyKey := NewPortMapKey(emptyPorts)
-
-	if nilKey != emptyKey {
-		t.Errorf("NewPortMapKey should return the same key for nil and empty slice, got nil=%q empty=%q", nilKey, emptyKey)
 	}
 }

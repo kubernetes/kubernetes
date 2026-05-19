@@ -35,13 +35,13 @@ import (
 
 // strategy implements behavior for ConfigMap objects
 type strategy struct {
-	rest.DeclarativeValidation
+	runtime.ObjectTyper
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating ConfigMap
 // objects via the REST API.
-var Strategy = strategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
+var Strategy = strategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // Strategy should implement rest.RESTCreateStrategy
 var _ rest.RESTCreateStrategy = Strategy
@@ -71,7 +71,7 @@ func (strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []stri
 func (strategy) Canonicalize(obj runtime.Object) {
 }
 
-func (strategy) AllowCreateOnUpdate(ctx context.Context) bool {
+func (strategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
@@ -93,7 +93,7 @@ func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) [
 func dropDisabledFields(configMap *api.ConfigMap, oldConfigMap *api.ConfigMap) {
 }
 
-func (strategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+func (strategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 

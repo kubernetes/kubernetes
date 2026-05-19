@@ -102,6 +102,7 @@ type Packet struct {
 
 	Type PacketType `protobuf:"varint,1,opt,name=type,proto3,enum=PacketType" json:"type,omitempty"`
 	// Types that are assignable to Payload:
+	//
 	//	*Packet_DialRequest
 	//	*Packet_DialResponse
 	//	*Packet_Data

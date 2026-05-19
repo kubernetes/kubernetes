@@ -49,12 +49,10 @@ func RegisterConversions(s *runtime.Scheme) error {
 
 func autoConvert_v1alpha1_NodeControllerConfiguration_To_config_NodeControllerConfiguration(in *NodeControllerConfiguration, out *config.NodeControllerConfiguration, s conversion.Scope) error {
 	out.ConcurrentNodeSyncs = in.ConcurrentNodeSyncs
-	out.ConcurrentNodeStatusUpdates = in.ConcurrentNodeStatusUpdates
 	return nil
 }
 
 func autoConvert_config_NodeControllerConfiguration_To_v1alpha1_NodeControllerConfiguration(in *config.NodeControllerConfiguration, out *NodeControllerConfiguration, s conversion.Scope) error {
 	out.ConcurrentNodeSyncs = in.ConcurrentNodeSyncs
-	out.ConcurrentNodeStatusUpdates = in.ConcurrentNodeStatusUpdates
 	return nil
 }

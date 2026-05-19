@@ -210,6 +210,7 @@ func iimportCommon(fset *token.FileSet, getPackages GetPackagesFunc, data []byte
 	p := iimporter{
 		version: int(version),
 		ipath:   path,
+		aliases: aliases.Enabled(),
 		shallow: shallow,
 		reportf: reportf,
 
@@ -369,6 +370,7 @@ type iimporter struct {
 	version int
 	ipath   string
 
+	aliases bool
 	shallow bool
 	reportf ReportFunc // if non-nil, used to report bugs
 
@@ -430,10 +432,10 @@ func (p *iimporter) doDecl(pkg *types.Package, name string) {
 		errorf("%v.%v not in index", pkg, name)
 	}
 
-	r := &importReader{p: p}
+	r := &importReader{p: p, currPkg: pkg}
 	r.declReader.Reset(p.declData[off:])
 
-	r.obj(pkg, name)
+	r.obj(name)
 }
 
 func (p *iimporter) stringAt(off uint64) string {
@@ -549,6 +551,7 @@ func canReuse(def *types.Named, rhs types.Type) bool {
 type importReader struct {
 	p          *iimporter
 	declReader bytes.Reader
+	currPkg    *types.Package
 	prevFile   string
 	prevLine   int64
 	prevColumn int64
@@ -562,8 +565,7 @@ type importReader struct {
 // for 1.24, but the fix was not worth back-porting).
 var markBlack = func(name *types.TypeName) {}
 
-// obj decodes and declares the package-level object denoted by (pkg, name).
-func (r *importReader) obj(pkg *types.Package, name string) {
+func (r *importReader) obj(name string) {
 	tag := r.byte()
 	pos := r.pos()
 
@@ -574,27 +576,27 @@ func (r *importReader) obj(pkg *types.Package, name string) {
 			tparams = r.tparamList()
 		}
 		typ := r.typ()
-		obj := aliases.New(pos, pkg, name, typ, tparams)
+		obj := aliases.NewAlias(r.p.aliases, pos, r.currPkg, name, typ, tparams)
 		markBlack(obj) // workaround for golang/go#69912
 		r.declare(obj)
 
 	case constTag:
 		typ, val := r.value()
 
-		r.declare(types.NewConst(pos, pkg, name, typ, val))
+		r.declare(types.NewConst(pos, r.currPkg, name, typ, val))
 
 	case funcTag, genericFuncTag:
 		var tparams []*types.TypeParam
 		if tag == genericFuncTag {
 			tparams = r.tparamList()
 		}
-		sig := r.signature(pkg, nil, nil, tparams)
-		r.declare(types.NewFunc(pos, pkg, name, sig))
+		sig := r.signature(nil, nil, tparams)
+		r.declare(types.NewFunc(pos, r.currPkg, name, sig))
 
 	case typeTag, genericTypeTag:
 		// Types can be recursive. We need to setup a stub
 		// declaration before recursing.
-		obj := types.NewTypeName(pos, pkg, name, nil)
+		obj := types.NewTypeName(pos, r.currPkg, name, nil)
 		named := types.NewNamed(obj, nil, nil)
 
 		markBlack(obj) // workaround for golang/go#69912
@@ -614,7 +616,7 @@ func (r *importReader) obj(pkg *types.Package, name string) {
 			for n := r.uint64(); n > 0; n-- {
 				mpos := r.pos()
 				mname := r.ident()
-				recv := r.param(pkg)
+				recv := r.param()
 
 				// If the receiver has any targs, set those as the
 				// rparams of the method (since those are the
@@ -628,9 +630,9 @@ func (r *importReader) obj(pkg *types.Package, name string) {
 						rparams[i] = types.Unalias(targs.At(i)).(*types.TypeParam)
 					}
 				}
-				msig := r.signature(pkg, recv, rparams, nil)
+				msig := r.signature(recv, rparams, nil)
 
-				named.AddMethod(types.NewFunc(mpos, pkg, mname, msig))
+				named.AddMethod(types.NewFunc(mpos, r.currPkg, mname, msig))
 			}
 		}
 
@@ -642,12 +644,12 @@ func (r *importReader) obj(pkg *types.Package, name string) {
 			errorf("unexpected type param type")
 		}
 		name0 := tparamName(name)
-		tn := types.NewTypeName(pos, pkg, name0, nil)
+		tn := types.NewTypeName(pos, r.currPkg, name0, nil)
 		t := types.NewTypeParam(tn, nil)
 
 		// To handle recursive references to the typeparam within its
 		// bound, save the partial type in tparamIndex before reading the bounds.
-		id := ident{pkg, name}
+		id := ident{r.currPkg, name}
 		r.p.tparamIndex[id] = t
 		var implicit bool
 		if r.p.version >= iexportVersionGo1_18 {
@@ -670,7 +672,7 @@ func (r *importReader) obj(pkg *types.Package, name string) {
 	case varTag:
 		typ := r.typ()
 
-		v := types.NewVar(pos, pkg, name, typ)
+		v := types.NewVar(pos, r.currPkg, name, typ)
 		typesinternal.SetVarKind(v, typesinternal.PackageVar)
 		r.declare(v)
 
@@ -903,11 +905,11 @@ func (r *importReader) doType(base *types.Named) (res types.Type) {
 	case mapType:
 		return types.NewMap(r.typ(), r.typ())
 	case signatureType:
-		paramPkg := r.pkg()
-		return r.signature(paramPkg, nil, nil, nil)
+		r.currPkg = r.pkg()
+		return r.signature(nil, nil, nil)
 
 	case structType:
-		fieldPkg := r.pkg()
+		r.currPkg = r.pkg()
 
 		fields := make([]*types.Var, r.uint64())
 		tags := make([]string, len(fields))
@@ -930,7 +932,7 @@ func (r *importReader) doType(base *types.Named) (res types.Type) {
 			// discussed in iexport.go, this is not correct, but mostly works and is
 			// preferable to failing (for now at least).
 			if field == nil {
-				field = types.NewField(fpos, fieldPkg, fname, ftyp, emb)
+				field = types.NewField(fpos, r.currPkg, fname, ftyp, emb)
 			}
 
 			fields[i] = field
@@ -939,7 +941,7 @@ func (r *importReader) doType(base *types.Named) (res types.Type) {
 		return types.NewStruct(fields, tags)
 
 	case interfaceType:
-		methodPkg := r.pkg() // qualifies methods and their param/result vars
+		r.currPkg = r.pkg()
 
 		embeddeds := make([]types.Type, r.uint64())
 		for i := range embeddeds {
@@ -961,12 +963,12 @@ func (r *importReader) doType(base *types.Named) (res types.Type) {
 			// don't agree with this.
 			var recv *types.Var
 			if base != nil {
-				recv = types.NewVar(token.NoPos, methodPkg, "", base)
+				recv = types.NewVar(token.NoPos, r.currPkg, "", base)
 			}
-			msig := r.signature(methodPkg, recv, nil, nil)
+			msig := r.signature(recv, nil, nil)
 
 			if method == nil {
-				method = types.NewFunc(mpos, methodPkg, mname, msig)
+				method = types.NewFunc(mpos, r.currPkg, mname, msig)
 			}
 			methods[i] = method
 		}
@@ -1047,9 +1049,9 @@ func (r *importReader) objectPathObject() types.Object {
 	return obj
 }
 
-func (r *importReader) signature(paramPkg *types.Package, recv *types.Var, rparams []*types.TypeParam, tparams []*types.TypeParam) *types.Signature {
-	params := r.paramList(paramPkg)
-	results := r.paramList(paramPkg)
+func (r *importReader) signature(recv *types.Var, rparams []*types.TypeParam, tparams []*types.TypeParam) *types.Signature {
+	params := r.paramList()
+	results := r.paramList()
 	variadic := params.Len() > 0 && r.bool()
 	return types.NewSignatureType(recv, rparams, tparams, params, results, variadic)
 }
@@ -1068,19 +1070,19 @@ func (r *importReader) tparamList() []*types.TypeParam {
 	return xs
 }
 
-func (r *importReader) paramList(pkg *types.Package) *types.Tuple {
+func (r *importReader) paramList() *types.Tuple {
 	xs := make([]*types.Var, r.uint64())
 	for i := range xs {
-		xs[i] = r.param(pkg)
+		xs[i] = r.param()
 	}
 	return types.NewTuple(xs...)
 }
 
-func (r *importReader) param(pkg *types.Package) *types.Var {
+func (r *importReader) param() *types.Var {
 	pos := r.pos()
 	name := r.ident()
 	typ := r.typ()
-	return types.NewParam(pos, pkg, name, typ)
+	return types.NewParam(pos, r.currPkg, name, typ)
 }
 
 func (r *importReader) bool() bool {

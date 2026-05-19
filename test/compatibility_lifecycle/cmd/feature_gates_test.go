@@ -46,7 +46,7 @@ func TestVerifyAlphabeticOrder(t *testing.T) {
 		{
 			name: "ordered versioned specs",
 			keys: []string{
-				"SELinuxMount", "ServiceAccountTokenJTI",
+				"SchedulerQueueingHints", "SELinuxMount", "ServiceAccountTokenJTI",
 				"genericfeatures.AdmissionWebhookMatchConditions",
 				"genericfeatures.AggregatedDiscoveryEndpoint",
 			},
@@ -54,7 +54,7 @@ func TestVerifyAlphabeticOrder(t *testing.T) {
 		{
 			name: "unordered versioned specs",
 			keys: []string{
-				"ServiceAccountTokenJTI", "SELinuxMount",
+				"SELinuxMount", "SchedulerQueueingHints", "ServiceAccountTokenJTI",
 				"genericfeatures.AdmissionWebhookMatchConditions",
 				"genericfeatures.AggregatedDiscoveryEndpoint",
 			},
@@ -64,7 +64,7 @@ func TestVerifyAlphabeticOrder(t *testing.T) {
 			name: "unordered versioned specs with mixed pkg prefix",
 			keys: []string{
 				"genericfeatures.AdmissionWebhookMatchConditions",
-				"SELinuxMount", "ServiceAccountTokenJTI",
+				"SchedulerQueueingHints", "SELinuxMount", "ServiceAccountTokenJTI",
 				"genericfeatures.AggregatedDiscoveryEndpoint",
 			},
 			expectErr: true,
@@ -72,7 +72,7 @@ func TestVerifyAlphabeticOrder(t *testing.T) {
 		{
 			name: "unordered versioned specs with pkg prefix",
 			keys: []string{
-				"SELinuxMount", "ServiceAccountTokenJTI",
+				"SchedulerQueueingHints", "SELinuxMount", "ServiceAccountTokenJTI",
 				"genericfeatures.AggregatedDiscoveryEndpoint",
 				"genericfeatures.AdmissionWebhookMatchConditions",
 			},
@@ -108,7 +108,7 @@ func TestVerifyOrUpdateFeatureListVersioned(t *testing.T) {
     lockToDefault: false
     preRelease: Beta
     version: "1.30"
-- name: CustomCPUCFSQuotaPeriod
+- name: CPUCFSQuotaPeriod
   versionedSpecs:
   - default: false
     lockToDefault: false
@@ -136,9 +136,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
 )
-
-const CPUCFSQuotaPeriod featuregate.Feature = "CustomCPUCFSQuotaPeriod"
-
 var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
 	AppArmorFields: {
 		{Version: version.MajorMinor(1, 30), Default: true, PreRelease: featuregate.Beta},
@@ -169,9 +166,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
 )
-
-const CPUCFSQuotaPeriod featuregate.Feature = "CustomCPUCFSQuotaPeriod"
-
 var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
 	AppArmorFields: {
 		{Version: version.MajorMinor(1, 30), Default: true, PreRelease: featuregate.Beta},
@@ -202,7 +196,7 @@ var otherFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
     lockToDefault: false
     preRelease: Beta
     version: "1.30"
-- name: CustomCPUCFSQuotaPeriod
+- name: CPUCFSQuotaPeriod
   versionedSpecs:
   - default: false
     lockToDefault: false
@@ -282,9 +276,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
 )
-
-const CPUCFSQuotaPeriod featuregate.Feature = "CustomCPUCFSQuotaPeriod"
-
 var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
 	AppArmorFields: {
 		{Version: version.MajorMinor(1, 30), Default: true, PreRelease: featuregate.Beta},
@@ -321,7 +312,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
     lockToDefault: false
     preRelease: Beta
     version: "1.30"
-- name: CustomCPUCFSQuotaPeriod
+- name: CPUCFSQuotaPeriod
   versionedSpecs:
   - default: false
     lockToDefault: false
@@ -342,9 +333,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
 )
-
-const CPUCFSQuotaPeriod featuregate.Feature = "CustomCPUCFSQuotaPeriod"
-
 var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
 	CPUCFSQuotaPeriod: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
@@ -385,9 +373,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/featuregate"
 )
-
-const CPUCFSQuotaPeriod featuregate.Feature = "CustomCPUCFSQuotaPeriod"
-
 var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate.VersionedSpecs{
 	AppArmorFields: {
 		{Version: version.MajorMinor(1, 30), Default: true, PreRelease: featuregate.Beta},
@@ -416,7 +401,7 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
     lockToDefault: false
     preRelease: Beta
     version: "1.30"
-- name: CustomCPUCFSQuotaPeriod
+- name: CPUCFSQuotaPeriod
   versionedSpecs:
   - default: false
     lockToDefault: false
@@ -754,12 +739,13 @@ func TestParseFeatureSpec(t *testing.T) {
 }
 func TestVerifyFeatureRemoval(t *testing.T) {
 	tests := []struct {
-		name            string
-		featureList     []featureInfo
-		baseFeatureList []featureInfo
-		currentVersion  *version.Version
-		expectErr       bool
-		expectedErrMsg  string
+		name             string
+		featureList      []featureInfo
+		baseFeatureList  []featureInfo
+		currentVersion   *version.Version
+		thresholdVersion *version.Version
+		expectErr        bool
+		expectedErrMsg   string
 	}{
 		{
 			name: "no features removed",
@@ -876,10 +862,23 @@ func TestVerifyFeatureRemoval(t *testing.T) {
 			expectErr:      true,
 			expectedErrMsg: "feature FeatureD cannot be removed because it is in GA or Deprecated state and is not locked to default",
 		},
+		{
+			name: "GA feature removed at threshold version",
+			featureList: []featureInfo{
+				{Name: "FeatureA", VersionedSpecs: []featureSpec{{Version: "1.0", PreRelease: "Alpha"}}},
+			},
+			baseFeatureList: []featureInfo{
+				{Name: "FeatureA", VersionedSpecs: []featureSpec{{Version: "1.0", PreRelease: "Alpha"}}},
+				{Name: "FeatureC", VersionedSpecs: []featureSpec{{Version: "1.4", PreRelease: "GA", LockToDefault: true}}},
+			},
+			currentVersion:   version.MustParse("1.5"),
+			thresholdVersion: version.MustParse("1.4"),
+			expectErr:        false,
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			err := verifyFeatureRemoval(tc.featureList, tc.baseFeatureList, tc.currentVersion)
+			err := verifyFeatureRemoval(tc.featureList, tc.baseFeatureList, tc.currentVersion, tc.thresholdVersion)
 			if tc.expectErr {
 				if err == nil {
 					t.Fatalf("expected error, got nil")

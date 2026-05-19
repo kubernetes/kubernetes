@@ -104,12 +104,11 @@ func main() {
 		{ID: "Dev-2", Health: pluginapi.Healthy},
 	}
 
-	cdiEnabled := os.Getenv("CDI_ENABLED")
 	pluginSocksDir := os.Getenv("PLUGIN_SOCK_DIR")
+	logger.Info("pluginSocksDir: %s", pluginSocksDir)
 	if pluginSocksDir == "" {
 		pluginSocksDir = pluginapi.DevicePluginPath
 	}
-	logger.Info("Determined configuration", "CDI_ENABLED", cdiEnabled, "pluginSocksDir", pluginSocksDir)
 
 	socketPath := pluginSocksDir + "/dp." + fmt.Sprintf("%d", time.Now().Unix())
 
@@ -120,6 +119,8 @@ func main() {
 	}
 	dp1.SetAllocFunc(stubAllocFunc)
 
+	cdiEnabled := os.Getenv("CDI_ENABLED")
+	logger.Info("CDI_ENABLED: %s", cdiEnabled)
 	if cdiEnabled != "" {
 		if err := createCDIFile(logger, devs); err != nil {
 			panic(err)

@@ -754,28 +754,12 @@ func TestValidateFitArgs(t *testing.T) {
 			},
 			expect: `Unsupported value: "Invalid"`,
 		},
-		{
-			name: "ScoringStrategy: requestedToCapacityRatio field is missing",
-			args: config.NodeResourcesFitArgs{
-				ScoringStrategy: &config.ScoringStrategy{
-					Type: config.RequestedToCapacityRatio,
-				},
-			},
-			expect: "must be specified when type is RequestedToCapacityRatio",
-		},
 	}
 
 	for _, test := range argsTest {
 		t.Run(test.name, func(t *testing.T) {
-			err := ValidateNodeResourcesFitArgs(nil, &test.args)
-			if err != nil {
-				if test.expect == "" {
-					t.Errorf("case[%v]: unexpected validation error %v", test.name, err)
-				} else if !strings.Contains(err.Error(), test.expect) {
-					t.Errorf("case[%v]: error details do not include %v", test.name, err)
-				}
-			} else if test.expect != "" {
-				t.Errorf("case[%v]: expected validation error", test.name)
+			if err := ValidateNodeResourcesFitArgs(nil, &test.args); err != nil && (!strings.Contains(err.Error(), test.expect)) {
+				t.Errorf("case[%v]: error details do not include %v", test.name, err)
 			}
 		})
 	}
@@ -990,7 +974,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeRequired,
-					Field: "scoringStrategy.requestedToCapacityRatio.shape",
+					Field: "scoringStrategy.shape",
 				},
 			},
 		},
@@ -1042,7 +1026,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "scoringStrategy.requestedToCapacityRatio.shape[0].utilization",
+					Field: "scoringStrategy.shape[0].utilization",
 				},
 			},
 		},
@@ -1057,7 +1041,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "scoringStrategy.requestedToCapacityRatio.shape[0].utilization",
+					Field: "scoringStrategy.shape[0].utilization",
 				},
 			},
 		},
@@ -1076,7 +1060,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "scoringStrategy.requestedToCapacityRatio.shape[1].utilization",
+					Field: "scoringStrategy.shape[1].utilization",
 				},
 			},
 		},
@@ -1117,7 +1101,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "scoringStrategy.requestedToCapacityRatio.shape[2].utilization",
+					Field: "scoringStrategy.shape[2].utilization",
 				},
 			},
 		},
@@ -1132,7 +1116,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "scoringStrategy.requestedToCapacityRatio.shape[0].score",
+					Field: "scoringStrategy.shape[0].score",
 				},
 			},
 		},
@@ -1147,7 +1131,7 @@ func TestValidateRequestedToCapacityRatioScoringStrategy(t *testing.T) {
 			wantErrs: field.ErrorList{
 				{
 					Type:  field.ErrorTypeInvalid,
-					Field: "scoringStrategy.requestedToCapacityRatio.shape[0].score",
+					Field: "scoringStrategy.shape[0].score",
 				},
 			},
 		},

@@ -57,8 +57,8 @@ $GCE_METADATA_SERVER = "169.254.169.254"
 # exist until an initial HNS network has been created on the Windows node - see
 # Add_InitialHnsNetwork().
 $MGMT_ADAPTER_NAME = "vEthernet (Ethernet*"
-$CRICTL_VERSION = 'v1.36.0'
-$CRICTL_SHA512 = 'f8cd455d249a20db6350a597ba9043684aa011a38e416f9ca1317ee1b4803c5952ae97cd4f597cf9ca068ba218e28e82cd224fd4b38bb13705ccbce60c8d2d25'
+$CRICTL_VERSION = 'v1.34.0'
+$CRICTL_SHA512 = 'b062756922dc5c5f41c5b13922dfea379cb9f4ce2431d1676c7dbace4f45c28a99ee71fd6cdd6c6f3d7679d33ac0ff052208207fc3f341b4ad047512dad756cb'
 
 Import-Module -Force C:\common.psm1
 
@@ -2308,7 +2308,7 @@ function DownloadAndInstall-AuthProviderGcpBinary {
       Log-Output "Installing auth provider gcp binaries"
       $tmp_dir = 'C:\k8s_tmp'
       New-Item -Force -ItemType 'directory' $tmp_dir | Out-Null
-      $url = "${env:AUTH_PROVIDER_GCP_STORAGE_PATH}/${env:AUTH_PROVIDER_GCP_VERSION}/auth-provider-gcp/windows/amd64/$filename"
+      $url = "${env:AUTH_PROVIDER_GCP_STORAGE_PATH}/${env:AUTH_PROVIDER_GCP_VERSION}/windows_amd64/$filename"
       MustDownload-File -Hash $AUTH_PROVIDER_GCP_HASH_WINDOWS_AMD64 -Algorithm SHA512 -OutFile $tmp_dir\$filename -URLs $url
       Move-Item -Force $tmp_dir\$filename ${env:AUTH_PROVIDER_GCP_WINDOWS_BIN_DIR}
       Remove-Item -Force -Recurse $tmp_dir

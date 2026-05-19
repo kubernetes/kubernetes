@@ -239,10 +239,7 @@ profiles:
 						},
 						{
 							Name: "DynamicResources",
-							Args: &config.DynamicResourcesArgs{
-								FilterTimeout:  &metav1.Duration{Duration: 10 * time.Second},
-								BindingTimeout: &metav1.Duration{Duration: 10 * time.Minute},
-							},
+							Args: &config.DynamicResourcesArgs{FilterTimeout: &metav1.Duration{Duration: 10 * time.Second}},
 						},
 						{
 							Name: "InterPodAffinity",
@@ -395,10 +392,7 @@ profiles:
 						},
 						{
 							Name: "DynamicResources",
-							Args: &config.DynamicResourcesArgs{
-								FilterTimeout:  &metav1.Duration{Duration: 10 * time.Second},
-								BindingTimeout: &metav1.Duration{Duration: 10 * time.Minute},
-							},
+							Args: &config.DynamicResourcesArgs{FilterTimeout: &metav1.Duration{Duration: 10 * time.Second}},
 						},
 						{
 							Name: "InterPodAffinity",
@@ -474,10 +468,7 @@ profiles:
 						},
 						{
 							Name: "DynamicResources",
-							Args: &config.DynamicResourcesArgs{
-								FilterTimeout:  &metav1.Duration{Duration: 10 * time.Second},
-								BindingTimeout: &metav1.Duration{Duration: 10 * time.Minute},
-							},
+							Args: &config.DynamicResourcesArgs{FilterTimeout: &metav1.Duration{Duration: 10 * time.Second}},
 						},
 						{
 							Name: "NodeAffinity",

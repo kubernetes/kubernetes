@@ -482,7 +482,6 @@ type PodControlInterface interface {
 type RealPodControl struct {
 	KubeClient clientset.Interface
 	Recorder   record.EventRecorder
-	OnWrite    func(*v1.Pod, *metav1.OwnerReference)
 }
 
 var _ PodControlInterface = &RealPodControl{}
@@ -552,15 +551,11 @@ func (r RealPodControl) CreatePodsWithGenerateName(ctx context.Context, namespac
 	if len(generateName) > 0 {
 		pod.ObjectMeta.GenerateName = generateName
 	}
-	return r.createPods(ctx, namespace, pod, controllerObject, controllerRef)
+	return r.createPods(ctx, namespace, pod, controllerObject)
 }
 
 func (r RealPodControl) PatchPod(ctx context.Context, namespace, name string, data []byte) error {
-	pod, err := r.KubeClient.CoreV1().Pods(namespace).Patch(ctx, name, types.StrategicMergePatchType, data, metav1.PatchOptions{})
-	if err == nil && r.OnWrite != nil {
-		ownerRef := metav1.GetControllerOfNoCopy(pod)
-		r.OnWrite(pod, ownerRef)
-	}
+	_, err := r.KubeClient.CoreV1().Pods(namespace).Patch(ctx, name, types.StrategicMergePatchType, data, metav1.PatchOptions{})
 	return err
 }
 
@@ -589,7 +584,7 @@ func GetPodFromTemplate(template *v1.PodTemplateSpec, parentObject runtime.Objec
 	return pod, nil
 }
 
-func (r RealPodControl) createPods(ctx context.Context, namespace string, pod *v1.Pod, object runtime.Object, controllerRef *metav1.OwnerReference) error {
+func (r RealPodControl) createPods(ctx context.Context, namespace string, pod *v1.Pod, object runtime.Object) error {
 	if len(labels.Set(pod.Labels)) == 0 {
 		return fmt.Errorf("unable to create pods, no labels")
 	}
@@ -602,9 +597,6 @@ func (r RealPodControl) createPods(ctx context.Context, namespace string, pod *v
 		return err
 	}
 	logger := klog.FromContext(ctx)
-	if r.OnWrite != nil {
-		r.OnWrite(newPod, controllerRef)
-	}
 	accessor, err := meta.Accessor(object)
 	if err != nil {
 		logger.Error(err, "parentObject does not have ObjectMeta")
@@ -880,14 +872,18 @@ func (s ActivePodsWithRanks) Less(i, j int) bool {
 		readyTime1 := podReadyTime(s.Pods[i])
 		readyTime2 := podReadyTime(s.Pods[j])
 		if !readyTime1.Equal(readyTime2) {
-			if s.Now.IsZero() || readyTime1.IsZero() || readyTime2.IsZero() {
+			if !utilfeature.DefaultFeatureGate.Enabled(features.LogarithmicScaleDown) {
 				return afterOrZero(readyTime1, readyTime2)
+			} else {
+				if s.Now.IsZero() || readyTime1.IsZero() || readyTime2.IsZero() {
+					return afterOrZero(readyTime1, readyTime2)
+				}
+				rankDiff := logarithmicRankDiff(*readyTime1, *readyTime2, s.Now)
+				if rankDiff == 0 {
+					return s.Pods[i].UID < s.Pods[j].UID
+				}
+				return rankDiff < 0
 			}
-			rankDiff := logarithmicRankDiff(*readyTime1, *readyTime2, s.Now)
-			if rankDiff == 0 {
-				return s.Pods[i].UID < s.Pods[j].UID
-			}
-			return rankDiff < 0
 		}
 	}
 	// 7. Pods with containers with higher restart counts < lower restart counts
@@ -896,14 +892,18 @@ func (s ActivePodsWithRanks) Less(i, j int) bool {
 	}
 	// 8. Empty creation time pods < newer pods < older pods
 	if !s.Pods[i].CreationTimestamp.Equal(&s.Pods[j].CreationTimestamp) {
-		if s.Now.IsZero() || s.Pods[i].CreationTimestamp.IsZero() || s.Pods[j].CreationTimestamp.IsZero() {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.LogarithmicScaleDown) {
 			return afterOrZero(&s.Pods[i].CreationTimestamp, &s.Pods[j].CreationTimestamp)
+		} else {
+			if s.Now.IsZero() || s.Pods[i].CreationTimestamp.IsZero() || s.Pods[j].CreationTimestamp.IsZero() {
+				return afterOrZero(&s.Pods[i].CreationTimestamp, &s.Pods[j].CreationTimestamp)
+			}
+			rankDiff := logarithmicRankDiff(s.Pods[i].CreationTimestamp, s.Pods[j].CreationTimestamp, s.Now)
+			if rankDiff == 0 {
+				return s.Pods[i].UID < s.Pods[j].UID
+			}
+			return rankDiff < 0
 		}
-		rankDiff := logarithmicRankDiff(s.Pods[i].CreationTimestamp, s.Pods[j].CreationTimestamp, s.Now)
-		if rankDiff == 0 {
-			return s.Pods[i].UID < s.Pods[j].UID
-		}
-		return rankDiff < 0
 	}
 	return false
 }

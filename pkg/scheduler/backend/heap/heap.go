@@ -154,19 +154,17 @@ func (h *Heap[T]) AddOrUpdate(obj T) {
 	}
 }
 
-// Delete removes an item and returns the deleted obj.
-func (h *Heap[T]) Delete(obj T) T {
+// Delete removes an item.
+func (h *Heap[T]) Delete(obj T) error {
 	key := h.data.keyFunc(obj)
 	if item, ok := h.data.items[key]; ok {
-		obj := item.obj
 		heap.Remove(h.data, item.index)
 		if h.metricRecorder != nil {
 			h.metricRecorder.Dec()
 		}
-		return obj
+		return nil
 	}
-	var zero T
-	return zero
+	return fmt.Errorf("object not found")
 }
 
 // Peek returns the head of the heap without removing it.

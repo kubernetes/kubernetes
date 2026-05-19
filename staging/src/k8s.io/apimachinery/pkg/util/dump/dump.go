@@ -17,26 +17,38 @@ limitations under the License.
 package dump
 
 import (
-	"k8s.io/utils/dump"
+	"github.com/davecgh/go-spew/spew"
 )
 
-// Deprecated: Use k8s.io/utils/dump.Pretty instead.
-//
-//go:fix inline
+var prettyPrintConfig = &spew.ConfigState{
+	Indent:                  "  ",
+	DisableMethods:          true,
+	DisablePointerAddresses: true,
+	DisableCapacities:       true,
+}
+
+// The config MUST NOT be changed because that could change the result of a hash operation
+var prettyPrintConfigForHash = &spew.ConfigState{
+	Indent:                  " ",
+	SortKeys:                true,
+	DisableMethods:          true,
+	SpewKeys:                true,
+	DisablePointerAddresses: true,
+	DisableCapacities:       true,
+}
+
+// Pretty wrap the spew.Sdump with Indent, and disabled methods like error() and String()
+// The output may change over time, so for guaranteed output please take more direct control
 func Pretty(a interface{}) string {
-	return dump.Pretty(a)
+	return prettyPrintConfig.Sdump(a)
 }
 
-// Deprecated: Use k8s.io/utils/dump.ForHash instead.
-//
-//go:fix inline
+// ForHash keeps the original Spew.Sprintf format to ensure the same checksum
 func ForHash(a interface{}) string {
-	return dump.ForHash(a)
+	return prettyPrintConfigForHash.Sprintf("%#v", a)
 }
 
-// Deprecated: Use k8s.io/utils/dump.OneLine instead.
-//
-//go:fix inline
+// OneLine outputs the object in one line
 func OneLine(a interface{}) string {
-	return dump.OneLine(a)
+	return prettyPrintConfig.Sprintf("%#v", a)
 }

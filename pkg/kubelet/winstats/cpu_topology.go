@@ -1,4 +1,5 @@
 //go:build windows
+// +build windows
 
 /*
 Copyright 2024 The Kubernetes Authors.
@@ -31,8 +32,7 @@ import (
 var (
 	procGetLogicalProcessorInformationEx = modkernel32.NewProc("GetLogicalProcessorInformationEx")
 	getNumaAvailableMemoryNodeEx         = modkernel32.NewProc("GetNumaAvailableMemoryNodeEx")
-	procGetNumaNodeProcessorMask2        = modkernel32.NewProc("GetNumaNodeProcessorMask2")
-	procGetMaximumProcessorGroupCount    = modkernel32.NewProc("GetMaximumProcessorGroupCount")
+	procGetNumaNodeProcessorMaskEx       = modkernel32.NewProc("GetNumaNodeProcessorMaskEx")
 )
 
 type relationType int
@@ -110,30 +110,18 @@ func CpusToGroupAffinity(cpus []int) map[int]*GroupAffinity {
 }
 
 // GetCPUsForNUMANode queries the system for the CPUs that are part of the given NUMA node.
-// Uses GetNumaNodeProcessorMask2 which correctly returns all processor groups for NUMA nodes
-// spanning multiple groups (>64 logical processors). Requires Windows Server 2022+ (Build 20348+).
-func GetCPUsforNUMANode(nodeNumber uint16) ([]GroupAffinity, error) {
-	// Query the maximum number of processor groups to size the buffer.
-	r1, _, _ := procGetMaximumProcessorGroupCount.Call()
-	maxGroupCount := uint16(r1)
-	if maxGroupCount == 0 {
-		maxGroupCount = 1
-	}
+func GetCPUsforNUMANode(nodeNumber uint16) (*GroupAffinity, error) {
+	var affinity GroupAffinity
 
-	masks := make([]GroupAffinity, maxGroupCount)
-	var requiredCount uint16
-
-	r1, _, err := procGetNumaNodeProcessorMask2.Call(
+	r1, _, err := procGetNumaNodeProcessorMaskEx.Call(
 		uintptr(nodeNumber),
-		uintptr(unsafe.Pointer(&masks[0])),
-		uintptr(maxGroupCount),
-		uintptr(unsafe.Pointer(&requiredCount)),
+		uintptr(unsafe.Pointer(&affinity)),
 	)
 	if r1 == 0 {
-		return nil, fmt.Errorf("GetNumaNodeProcessorMask2 failed for NUMA node %d: %v", nodeNumber, err)
+		return nil, fmt.Errorf("Error getting CPU mask for NUMA node %d: %v", nodeNumber, err)
 	}
 
-	return masks[:requiredCount], nil
+	return &affinity, nil
 }
 
 type numaNodeRelationship struct {

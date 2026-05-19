@@ -59,10 +59,7 @@ func (w ConditionalWait) checkCondition(obj *unstructured.Unstructured) (bool, e
 		return false, nil
 	}
 	for _, conditionUncast := range conditions {
-		condition, ok := conditionUncast.(map[string]interface{})
-		if !ok {
-			continue
-		}
+		condition := conditionUncast.(map[string]interface{})
 		name, found, err := unstructured.NestedString(condition, "type")
 		if !found || err != nil || !strings.EqualFold(name, w.conditionName) {
 			continue
@@ -115,7 +112,7 @@ func getObjAndCheckCondition(ctx context.Context, info *resource.Info, o *WaitOp
 	errWaitTimeoutWithName := extendErrWaitTimeout(wait.ErrorInterrupted(nil), info) // nolint:staticcheck // SA1019
 	if o.Timeout == 0 {
 		// If timeout is zero we will fetch the object(s) once only and check
-		gottenObj, initObjGetErr := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Get(ctx, info.Name, metav1.GetOptions{})
+		gottenObj, initObjGetErr := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Get(context.Background(), info.Name, metav1.GetOptions{})
 		if initObjGetErr != nil {
 			return nil, false, initObjGetErr
 		}
@@ -139,13 +136,13 @@ func getObjAndCheckCondition(ctx context.Context, info *resource.Info, o *WaitOp
 	mapping := info.ResourceMapping() // used to pass back meaningful errors if object disappears
 	fieldSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
 	lw := cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
-		ListWithContextFunc: func(ctx context.Context, options metav1.ListOptions) (runtime.Object, error) {
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fieldSelector
-			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(ctx, options)
+			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(context.TODO(), options)
 		},
-		WatchFuncWithContext: func(ctx context.Context, options metav1.ListOptions) (watch.Interface, error) {
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 			options.FieldSelector = fieldSelector
-			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(ctx, options)
+			return o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(context.TODO(), options)
 		},
 	}, o.DynamicClient)
 
@@ -187,7 +184,7 @@ func getObjAndCheckCondition(ctx context.Context, info *resource.Info, o *WaitOp
 }
 
 func extendErrWaitTimeout(err error, info *resource.Info) error {
-	return fmt.Errorf("%w on %s/%s", err, info.Mapping.Resource.Resource, info.Name)
+	return fmt.Errorf("%s on %s/%s", err.Error(), info.Mapping.Resource.Resource, info.Name)
 }
 
 func getObservedGeneration(obj *unstructured.Unstructured, condition map[string]interface{}) (int64, bool) {

@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//go:build linux
-
 package manager
 
 import (
@@ -66,18 +64,6 @@ type containerInfo struct {
 	Spec          info.ContainerSpec
 }
 
-// atomicTime is a lock-free wrapper for storing and retrieving time values.
-// It stores time as Unix nanoseconds in an atomic.Int64, enabling concurrent
-// reads and writes without mutex contention.
-type atomicTime struct {
-	atomic.Int64
-}
-
-// Time returns the stored time value as a time.Time.
-func (t *atomicTime) Time() time.Time {
-	return time.Unix(0, t.Load())
-}
-
 type containerData struct {
 	oomEvents                uint64
 	handler                  container.ContainerHandler
@@ -91,8 +77,8 @@ type containerData struct {
 	housekeepingInterval     time.Duration
 	maxHousekeepingInterval  time.Duration
 	allowDynamicHousekeeping bool
-	infoLastUpdatedTime      atomicTime // Unix nano
-	statsLastUpdatedTime     atomicTime // Unix nano
+	infoLastUpdatedTime      time.Time
+	statsLastUpdatedTime     time.Time
 	lastErrorTime            time.Time
 	//  used to track time
 	clock clock.Clock
@@ -104,8 +90,7 @@ type containerData struct {
 	logUsage bool
 
 	// Tells the container to stop.
-	stop     chan struct{}
-	stopOnce sync.Once
+	stop chan struct{}
 
 	// Tells the container to immediately collect stats
 	onDemandChan chan chan struct{}
@@ -141,12 +126,7 @@ func (cd *containerData) Stop() error {
 	if err != nil {
 		return err
 	}
-	// Use sync.Once to ensure the channel is only closed once, preventing
-	// panic from concurrent calls to Stop() when multiple goroutines try
-	// to destroy the same container simultaneously.
-	cd.stopOnce.Do(func() {
-		close(cd.stop)
-	})
+	close(cd.stop)
 	cd.perfCollector.Destroy()
 	cd.resctrlCollector.Destroy()
 	return nil
@@ -165,7 +145,9 @@ func (cd *containerData) allowErrorLogging() bool {
 // periodic housekeeping to reset.  This should be used sparingly, as calling OnDemandHousekeeping frequently
 // can have serious performance costs.
 func (cd *containerData) OnDemandHousekeeping(maxAge time.Duration) {
-	timeSinceStatsLastUpdate := cd.clock.Since(cd.statsLastUpdatedTime.Time())
+	cd.lock.Lock()
+	timeSinceStatsLastUpdate := cd.clock.Since(cd.statsLastUpdatedTime)
+	cd.lock.Unlock()
 	if timeSinceStatsLastUpdate > maxAge {
 		housekeepingFinishedChan := make(chan struct{})
 		cd.onDemandChan <- housekeepingFinishedChan
@@ -190,7 +172,7 @@ func (cd *containerData) notifyOnDemand() {
 
 func (cd *containerData) GetInfo(shouldUpdateSubcontainers bool) (*containerInfo, error) {
 	// Get spec and subcontainers.
-	if cd.clock.Since(cd.infoLastUpdatedTime.Time()) > 5*time.Second || shouldUpdateSubcontainers {
+	if cd.clock.Since(cd.infoLastUpdatedTime) > 5*time.Second || shouldUpdateSubcontainers {
 		err := cd.updateSpec()
 		if err != nil {
 			return nil, err
@@ -201,7 +183,7 @@ func (cd *containerData) GetInfo(shouldUpdateSubcontainers bool) (*containerInfo
 				return nil, err
 			}
 		}
-		cd.infoLastUpdatedTime.Store(cd.clock.Now().UnixNano())
+		cd.infoLastUpdatedTime = cd.clock.Now()
 	}
 	cd.lock.Lock()
 	defer cd.lock.Unlock()
@@ -612,7 +594,9 @@ func (cd *containerData) housekeepingTick(timer <-chan time.Time, longHousekeepi
 		klog.V(3).Infof("[%s] Housekeeping took %s", cd.info.Name, duration)
 	}
 	cd.notifyOnDemand()
-	cd.statsLastUpdatedTime.Store(cd.clock.Now().UnixNano())
+	cd.lock.Lock()
+	defer cd.lock.Unlock()
+	cd.statsLastUpdatedTime = cd.clock.Now()
 	return true
 }
 

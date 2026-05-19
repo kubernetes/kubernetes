@@ -1348,7 +1348,9 @@ func testRollingUpdateLBConnectivityDisruption(ctx context.Context, f *framework
 	e2eservice.TestReachableHTTP(ctx, lbNameOrAddress, svcPort, timeout)
 
 	ginkgo.By("Starting a goroutine to continuously hit the DaemonSet's pods through the service's load balancer")
-	var totalRequests, networkErrors, httpErrors atomic.Uint64
+	var totalRequests uint64 = 0
+	var networkErrors uint64 = 0
+	var httpErrors uint64 = 0
 
 	pollCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -1356,7 +1358,7 @@ func testRollingUpdateLBConnectivityDisruption(ctx context.Context, f *framework
 		defer ginkgo.GinkgoRecover()
 
 		_ = wait.PollUntilContextCancel(pollCtx, time.Second/100, true, func(ctx context.Context) (bool, error) {
-			totalRequests.Add(1)
+			atomic.AddUint64(&totalRequests, 1)
 			client := &http.Client{
 				Transport: utilnet.SetTransportDefaults(&http.Transport{
 					DisableKeepAlives: true,
@@ -1369,24 +1371,24 @@ func testRollingUpdateLBConnectivityDisruption(ctx context.Context, f *framework
 			resp, err := client.Get(url)
 			if err != nil {
 				framework.Logf("Got error testing for reachability of %s: %v", url, err)
-				networkErrors.Add(1)
+				atomic.AddUint64(&networkErrors, 1)
 				return false, nil
 			}
 			defer func() { _ = resp.Body.Close() }()
 			if resp.StatusCode != http.StatusOK {
 				framework.Logf("Got bad status code: %d", resp.StatusCode)
-				httpErrors.Add(1)
+				atomic.AddUint64(&httpErrors, 1)
 				return false, nil
 			}
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
 				framework.Logf("Got error reading HTTP body: %v", err)
-				httpErrors.Add(1)
+				atomic.AddUint64(&httpErrors, 1)
 				return false, nil
 			}
 			if string(body) != msg {
 				framework.Logf("The response body does not contain expected string %s", string(body))
-				httpErrors.Add(1)
+				atomic.AddUint64(&httpErrors, 1)
 				return false, nil
 			}
 			return false, nil
@@ -1441,9 +1443,9 @@ func testRollingUpdateLBConnectivityDisruption(ctx context.Context, f *framework
 		framework.ExpectNoError(err, "error waiting for daemon pods to be ready")
 
 		// assert that the HTTP requests success rate is above the acceptable threshold after this rolling update
-		currentTotalRequests := totalRequests.Load()
-		currentNetworkErrors := networkErrors.Load()
-		currentHTTPErrors := httpErrors.Load()
+		currentTotalRequests := atomic.LoadUint64(&totalRequests)
+		currentNetworkErrors := atomic.LoadUint64(&networkErrors)
+		currentHTTPErrors := atomic.LoadUint64(&httpErrors)
 
 		partialTotalRequests := currentTotalRequests - previousTotalRequests
 		partialNetworkErrors := currentNetworkErrors - previousNetworkErrors

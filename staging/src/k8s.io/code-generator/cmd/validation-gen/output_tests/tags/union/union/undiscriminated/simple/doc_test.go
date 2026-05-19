@@ -28,7 +28,7 @@ func Test(t *testing.T) {
 
 	st.Value(&Struct{}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
 		field.Invalid(nil, nil, "must specify one of"),
-	}.WithOrigin("union"))
+	})
 
 	st.Value(&Struct{M1: &M1{}}).ExpectValid()
 	st.Value(&Struct{M2: &M2{}}).ExpectValid()
@@ -40,20 +40,20 @@ func Test(t *testing.T) {
 	// Empty slice/map are "not set" (same as nil for union membership)
 	st.Value(&Struct{M5: []string{}}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
 		field.Invalid(nil, nil, "must specify one of"),
-	}.WithOrigin("union"))
+	})
 	st.Value(&Struct{M6: map[string]string{}}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
 		field.Invalid(nil, nil, "must specify one of"),
-	}.WithOrigin("union"))
+	})
 
 	st.Value(&Struct{M1: &M1{}, M2: &M2{}}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
 		field.Invalid(nil, nil, "must specify exactly one of"),
-	}.WithOrigin("union"))
+	})
 	st.Value(&Struct{M1: &M1{}, M3: "a string"}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
 		field.Invalid(nil, nil, "must specify exactly one of"),
-	}.WithOrigin("union"))
+	})
 	st.Value(&Struct{M1: &M1{}, M4: ptr.To("a string")}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
 		field.Invalid(nil, nil, "must specify exactly one of"),
-	}.WithOrigin("union"))
+	})
 
 	// Update only considers whether a field was set, not the value.
 	st.Value(&Struct{M3: "a string"}).OldValue(&Struct{M3: "different string"}).ExpectValid()
@@ -70,6 +70,6 @@ func Test(t *testing.T) {
 	// Test update with nil old value (simulates new map entry or newly-set pointer field during update).
 	// Union validation should still detect the empty union even though oldObj is nil.
 	st.Value(&Struct{}).OldValue(nil).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring().ByOrigin(), field.ErrorList{
-		field.Invalid(nil, nil, "must specify one of").WithOrigin("union"),
+		field.Invalid(nil, nil, "must specify one of"),
 	})
 }

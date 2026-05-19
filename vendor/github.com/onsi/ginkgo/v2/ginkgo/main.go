@@ -41,7 +41,6 @@ func main() {
 			{Name: "nodot", Deprecation: types.Deprecations.Nodot()},
 		},
 	}
-	program.Commands = append(program.Commands, program.BuildCompletionCommand())
 
 	program.RunAndExit(os.Args)
 }

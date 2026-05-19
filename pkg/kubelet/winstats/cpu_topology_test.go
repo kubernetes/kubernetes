@@ -1,4 +1,5 @@
 //go:build windows
+// +build windows
 
 /*
 Copyright 2024 The Kubernetes Authors.
@@ -288,24 +289,6 @@ func Test_convertWinApiToCadvisorApi(t *testing.T) {
 						{
 							Id:      1,
 							Threads: []int{0, 64},
-						},
-					},
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name:                 "multi-group NUMA node (128 cpus across 2 groups)",
-			buffer:               createProcessorRelationships(makeRange(0, 127)),
-			expectedNumOfCores:   1,
-			expectedNumOfSockets: 1,
-			expectedNodes: []cadvisorapi.Node{
-				{
-					Id: 0,
-					Cores: []cadvisorapi.Core{
-						{
-							Id:      1,
-							Threads: makeRange(0, 127),
 						},
 					},
 				},

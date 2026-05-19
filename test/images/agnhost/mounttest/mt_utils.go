@@ -1,4 +1,5 @@
 //go:build !windows
+// +build !windows
 
 /*
 Copyright 2019 The Kubernetes Authors.
@@ -28,6 +29,9 @@ func umask(mask int) int {
 	return syscall.Umask(mask)
 }
 
+// Defined by Linux (sys/statfs.h) - the type number for tmpfs mounts.
+const linuxTmpfsMagic = 0x01021994
+
 func fsType(path string) error {
 	if path == "" {
 		return nil
@@ -39,7 +43,11 @@ func fsType(path string) error {
 		return err
 	}
 
-	fmt.Printf("mount type of %q: %s\n", path, formatFsType(int64(buf.Type)))
+	if buf.Type == linuxTmpfsMagic {
+		fmt.Printf("mount type of %q: tmpfs\n", path)
+	} else {
+		fmt.Printf("mount type of %q: %v\n", path, buf.Type)
+	}
 
 	return nil
 }

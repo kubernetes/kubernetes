@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -35,12 +34,12 @@ import (
 
 // podDisruptionBudgetStrategy implements verification logic for PodDisruptionBudgets.
 type podDisruptionBudgetStrategy struct {
-	rest.DeclarativeValidation
+	runtime.ObjectTyper
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating PodDisruptionBudget objects.
-var Strategy = podDisruptionBudgetStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
+var Strategy = podDisruptionBudgetStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped returns true because all PodDisruptionBudget' need to be within a namespace.
 func (podDisruptionBudgetStrategy) NamespaceScoped() bool {
@@ -105,7 +104,7 @@ func (podDisruptionBudgetStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is true for PodDisruptionBudget; this means you may create one with a PUT request.
-func (podDisruptionBudgetStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
+func (podDisruptionBudgetStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
@@ -124,7 +123,7 @@ func (podDisruptionBudgetStrategy) WarningsOnUpdate(ctx context.Context, obj, ol
 
 // AllowUnconditionalUpdate is the default update policy for PodDisruptionBudget objects. Status update should
 // only be allowed if version match.
-func (podDisruptionBudgetStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+func (podDisruptionBudgetStrategy) AllowUnconditionalUpdate() bool {
 	return false
 }
 

@@ -718,11 +718,10 @@ func (rn *RNode) MustString() string {
 
 // Content returns Node Content field.
 func (rn *RNode) Content() []*yaml.Node {
-	yNode := rn.YNode()
-	if yNode == nil {
+	if rn == nil {
 		return nil
 	}
-	return yNode.Content
+	return rn.YNode().Content
 }
 
 // Fields returns the list of field names for a MappingNode.
@@ -757,11 +756,7 @@ func (rn *RNode) FieldRNodes() ([]*RNode, error) {
 // Field returns a fieldName, fieldValue pair for MappingNodes.
 // Returns nil for non-MappingNodes.
 func (rn *RNode) Field(field string) *MapNode {
-	yNode := rn.YNode()
-	if yNode == nil {
-		return nil
-	}
-	if yNode.Kind != yaml.MappingNode {
+	if rn.YNode().Kind != yaml.MappingNode {
 		return nil
 	}
 	var result *MapNode
@@ -897,11 +892,7 @@ func (rn *RNode) ElementValuesList(keys []string) ([][]string, error) {
 // Element returns the element in the list which contains the field matching the value.
 // Returns nil for non-SequenceNodes or if no Element matches.
 func (rn *RNode) Element(key, value string) *RNode {
-	yNode := rn.YNode()
-	if yNode == nil {
-		return nil
-	}
-	if yNode.Kind != yaml.SequenceNode {
+	if rn.YNode().Kind != yaml.SequenceNode {
 		return nil
 	}
 	elem, err := rn.Pipe(MatchElement(key, value))
@@ -915,11 +906,7 @@ func (rn *RNode) Element(key, value string) *RNode {
 // corresponding values[i].
 // Returns nil for non-SequenceNodes or if no Element matches.
 func (rn *RNode) ElementList(keys []string, values []string) *RNode {
-	yNode := rn.YNode()
-	if yNode == nil {
-		return nil
-	}
-	if yNode.Kind != yaml.SequenceNode {
+	if rn.YNode().Kind != yaml.SequenceNode {
 		return nil
 	}
 	elem, err := rn.Pipe(MatchElementList(keys, values))
@@ -973,17 +960,12 @@ func (rn *RNode) GetAssociativeKey() string {
 
 // MarshalJSON creates a byte slice from the RNode.
 func (rn *RNode) MarshalJSON() ([]byte, error) {
-	yNode := rn.YNode()
-	if yNode == nil {
-		return []byte("null"), nil
-	}
-
 	s, err := rn.String()
 	if err != nil {
 		return nil, err
 	}
 
-	if yNode.Kind == SequenceNode {
+	if rn.YNode().Kind == SequenceNode {
 		var a []interface{}
 		if err := Unmarshal([]byte(s), &a); err != nil {
 			return nil, err
@@ -995,7 +977,6 @@ func (rn *RNode) MarshalJSON() ([]byte, error) {
 	if err := Unmarshal([]byte(s), &m); err != nil {
 		return nil, err
 	}
-
 	return json.Marshal(m)
 }
 

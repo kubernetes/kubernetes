@@ -58,7 +58,7 @@ type fsPullRecordsAccessor struct {
 
 // NewFSPullRecordsAccessor returns an accessor for the ImagePullIntent/ImagePulledRecord
 // records with a filesystem as the backing database.
-func NewFSPullRecordsAccessor(logger klog.Logger, kubeletDir string) (PullRecordsAccessor, error) {
+func NewFSPullRecordsAccessor(kubeletDir string) (PullRecordsAccessor, error) {
 	kubeletConfigEncoder, kubeletConfigDecoder, err := createKubeletConfigSchemeEncoderDecoder()
 	if err != nil {
 		return nil, err
@@ -80,11 +80,11 @@ func NewFSPullRecordsAccessor(logger klog.Logger, kubeletDir string) (PullRecord
 		return nil, err
 	}
 
-	accessor.recordsVersionMigration(logger)
+	accessor.recordsVersionMigration()
 	return NewMeteringRecordsAccessor(accessor, fsPullIntentsSize, fsPulledRecordsSize), nil
 }
 
-func (f *fsPullRecordsAccessor) recordsVersionMigration(logger klog.Logger) {
+func (f *fsPullRecordsAccessor) recordsVersionMigration() {
 	err := processDirFiles(f.pullingDir,
 		func(filePath string, fileContent []byte) error {
 			intent, isCurrentVersion, err := decodeIntent(f.decoder, fileContent)
@@ -92,14 +92,14 @@ func (f *fsPullRecordsAccessor) recordsVersionMigration(logger klog.Logger) {
 				return fmt.Errorf("failed to decode ImagePullIntent from file %q: %w", filePath, err)
 			}
 			if !isCurrentVersion {
-				if err := f.WriteImagePullIntent(logger, intent.Image); err != nil {
+				if err := f.WriteImagePullIntent(intent.Image); err != nil {
 					return fmt.Errorf("failed to migrate ImagePullIntent for image %q to the current version: %w", intent.Image, err)
 				}
 			}
 			return nil
 		})
 	if err != nil {
-		logger.Error(err, "Error migrating image pull intents")
+		klog.ErrorS(err, "Error migrating image pull intents")
 	}
 	err = processDirFiles(f.pulledDir,
 		func(filePath string, fileContent []byte) error {
@@ -108,7 +108,7 @@ func (f *fsPullRecordsAccessor) recordsVersionMigration(logger klog.Logger) {
 				return fmt.Errorf("failed to decode ImagePulledRecord from file %q: %w", filePath, err)
 			}
 			if !isCurrentVersion {
-				if err := f.WriteImagePulledRecord(logger, pullRecord); err != nil {
+				if err := f.WriteImagePulledRecord(pullRecord); err != nil {
 					return fmt.Errorf("failed to migrate ImagePulledRecord for image ref %q to the current version: %w", pullRecord.ImageRef, err)
 				}
 			}
@@ -116,11 +116,11 @@ func (f *fsPullRecordsAccessor) recordsVersionMigration(logger klog.Logger) {
 		})
 
 	if err != nil {
-		logger.Error(err, "Error migrating image pulled records")
+		klog.ErrorS(err, "Error migrating image pulled records")
 	}
 }
 
-func (f *fsPullRecordsAccessor) WriteImagePullIntent(logger klog.Logger, image string) error {
+func (f *fsPullRecordsAccessor) WriteImagePullIntent(image string) error {
 	intent := kubeletconfiginternal.ImagePullIntent{
 		Image: image,
 	}
@@ -166,7 +166,7 @@ func (f *fsPullRecordsAccessor) ImagePullIntentExists(image string) (bool, error
 	return intent.Image == image, nil
 }
 
-func (f *fsPullRecordsAccessor) DeleteImagePullIntent(logger klog.Logger, image string) error {
+func (f *fsPullRecordsAccessor) DeleteImagePullIntent(image string) error {
 	err := os.Remove(filepath.Join(f.pullingDir, cacheFilename(image)))
 	if os.IsNotExist(err) {
 		return nil
@@ -207,7 +207,7 @@ func (f *fsPullRecordsAccessor) ListImagePulledRecords() ([]*kubeletconfigintern
 	return pullRecords, err
 }
 
-func (f *fsPullRecordsAccessor) WriteImagePulledRecord(logger klog.Logger, pulledRecord *kubeletconfiginternal.ImagePulledRecord) error {
+func (f *fsPullRecordsAccessor) WriteImagePulledRecord(pulledRecord *kubeletconfiginternal.ImagePulledRecord) error {
 	recordBytes := bytes.NewBuffer([]byte{})
 	if err := f.encoder.Encode(pulledRecord, recordBytes); err != nil {
 		return fmt.Errorf("failed to serialize ImagePulledRecord: %w", err)
@@ -216,7 +216,7 @@ func (f *fsPullRecordsAccessor) WriteImagePulledRecord(logger klog.Logger, pulle
 	return writeFile(f.pulledDir, cacheFilename(pulledRecord.ImageRef), recordBytes.Bytes())
 }
 
-func (f *fsPullRecordsAccessor) DeleteImagePulledRecord(logger klog.Logger, imageRef string) error {
+func (f *fsPullRecordsAccessor) DeleteImagePulledRecord(imageRef string) error {
 	err := os.Remove(filepath.Join(f.pulledDir, cacheFilename(imageRef)))
 	if os.IsNotExist(err) {
 		return nil

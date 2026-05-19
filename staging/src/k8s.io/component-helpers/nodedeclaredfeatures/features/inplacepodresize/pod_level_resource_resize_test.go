@@ -19,21 +19,12 @@ package inplacepodresize
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/component-helpers/nodedeclaredfeatures/types"
+	"k8s.io/component-helpers/nodedeclaredfeatures"
+	test "k8s.io/component-helpers/nodedeclaredfeatures/testing"
 )
-
-func TestPodLevelResourcesResizeFeature_Requirements(t *testing.T) {
-	feature := &podLevelResourcesResizeFeature{}
-	reqs := feature.Requirements()
-	if reqs == nil {
-		t.Fatalf("Feature %s returned nil Requirements", feature.Name())
-	}
-	if reqs.EnabledFeatureGates == nil || len(reqs.EnabledFeatureGates) != 1 || reqs.EnabledFeatureGates[0] != IPPRPodLevelResourcesFeatureGate {
-		t.Fatalf("Feature %s Requirements should declare exactly the %s feature gate", feature.Name(), IPPRPodLevelResourcesFeatureGate)
-	}
-}
 
 func TestPodLevelResourcesResizeFeatureDiscover(t *testing.T) {
 	tests := []struct {
@@ -55,32 +46,31 @@ func TestPodLevelResourcesResizeFeatureDiscover(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := &types.NodeConfiguration{FeatureGates: types.FeatureGateMap{IPPRPodLevelResourcesFeatureGate: tt.featureGate}}
+			mockFG := test.NewMockFeatureGate(t)
+			mockFG.EXPECT().Enabled(IPPRPodLevelResourcesFeatureGate).Return(tt.featureGate)
+
+			cfg := &nodedeclaredfeatures.NodeConfiguration{FeatureGates: mockFG}
 			enabled := PodLevelResourcesResizeFeature.Discover(cfg)
-			if want, got := tt.expected, enabled; want != got {
-				t.Fatalf("want=%v,got=%v", want, got)
-			}
+			assert.Equal(t, tt.expected, enabled)
 		})
 	}
 }
 
 func TestPodLevelResourcesResizeFeatureInferForScheduling(t *testing.T) {
-	podInfo := &types.PodInfo{Spec: &v1.PodSpec{}, Status: &v1.PodStatus{}}
-	if PodLevelResourcesResizeFeature.InferForScheduling(podInfo) {
-		t.Fatalf("InferForScheduling should always be false")
-	}
+	podInfo := &nodedeclaredfeatures.PodInfo{Spec: &v1.PodSpec{}, Status: &v1.PodStatus{}}
+	assert.False(t, PodLevelResourcesResizeFeature.InferForScheduling(podInfo), "InferForScheduling should always be false")
 }
 
 func TestPodLevelResourcesResizeFeatureInferForUpdate(t *testing.T) {
 	tests := []struct {
 		name       string
-		oldPodInfo *types.PodInfo
-		newPodInfo *types.PodInfo
+		oldPodInfo *nodedeclaredfeatures.PodInfo
+		newPodInfo *nodedeclaredfeatures.PodInfo
 		expected   bool
 	}{
 		{
 			name: "NoResourcesChanged",
-			oldPodInfo: &types.PodInfo{
+			oldPodInfo: &nodedeclaredfeatures.PodInfo{
 				Spec: &v1.PodSpec{
 					Resources: &v1.ResourceRequirements{
 						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
@@ -89,7 +79,7 @@ func TestPodLevelResourcesResizeFeatureInferForUpdate(t *testing.T) {
 				},
 				Status: &v1.PodStatus{},
 			},
-			newPodInfo: &types.PodInfo{
+			newPodInfo: &nodedeclaredfeatures.PodInfo{
 				Spec: &v1.PodSpec{
 					Resources: &v1.ResourceRequirements{
 						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
@@ -102,11 +92,11 @@ func TestPodLevelResourcesResizeFeatureInferForUpdate(t *testing.T) {
 		},
 		{
 			name: "ResourcesAdded",
-			oldPodInfo: &types.PodInfo{
+			oldPodInfo: &nodedeclaredfeatures.PodInfo{
 				Spec:   &v1.PodSpec{},
 				Status: &v1.PodStatus{},
 			},
-			newPodInfo: &types.PodInfo{
+			newPodInfo: &nodedeclaredfeatures.PodInfo{
 				Spec: &v1.PodSpec{
 					Resources: &v1.ResourceRequirements{
 						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
@@ -119,7 +109,7 @@ func TestPodLevelResourcesResizeFeatureInferForUpdate(t *testing.T) {
 		},
 		{
 			name: "ResourcesRemoved",
-			oldPodInfo: &types.PodInfo{
+			oldPodInfo: &nodedeclaredfeatures.PodInfo{
 				Spec: &v1.PodSpec{
 					Resources: &v1.ResourceRequirements{
 						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
@@ -128,7 +118,7 @@ func TestPodLevelResourcesResizeFeatureInferForUpdate(t *testing.T) {
 				},
 				Status: &v1.PodStatus{},
 			},
-			newPodInfo: &types.PodInfo{
+			newPodInfo: &nodedeclaredfeatures.PodInfo{
 				Spec:   &v1.PodSpec{},
 				Status: &v1.PodStatus{},
 			},
@@ -136,7 +126,7 @@ func TestPodLevelResourcesResizeFeatureInferForUpdate(t *testing.T) {
 		},
 		{
 			name: "ResourcesChanged",
-			oldPodInfo: &types.PodInfo{
+			oldPodInfo: &nodedeclaredfeatures.PodInfo{
 				Spec: &v1.PodSpec{
 					Resources: &v1.ResourceRequirements{
 						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
@@ -145,7 +135,7 @@ func TestPodLevelResourcesResizeFeatureInferForUpdate(t *testing.T) {
 				},
 				Status: &v1.PodStatus{},
 			},
-			newPodInfo: &types.PodInfo{
+			newPodInfo: &nodedeclaredfeatures.PodInfo{
 				Spec: &v1.PodSpec{
 					Resources: &v1.ResourceRequirements{
 						Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("2")},
@@ -158,11 +148,11 @@ func TestPodLevelResourcesResizeFeatureInferForUpdate(t *testing.T) {
 		},
 		{
 			name: "NilResources",
-			oldPodInfo: &types.PodInfo{
+			oldPodInfo: &nodedeclaredfeatures.PodInfo{
 				Spec:   &v1.PodSpec{},
 				Status: &v1.PodStatus{},
 			},
-			newPodInfo: &types.PodInfo{
+			newPodInfo: &nodedeclaredfeatures.PodInfo{
 				Spec:   &v1.PodSpec{},
 				Status: &v1.PodStatus{},
 			},
@@ -172,9 +162,7 @@ func TestPodLevelResourcesResizeFeatureInferForUpdate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if want, got := tt.expected, PodLevelResourcesResizeFeature.InferForUpdate(tt.oldPodInfo, tt.newPodInfo); want != got {
-				t.Fatalf("want=%v,got=%v", want, got)
-			}
+			assert.Equal(t, tt.expected, PodLevelResourcesResizeFeature.InferForUpdate(tt.oldPodInfo, tt.newPodInfo))
 		})
 	}
 }

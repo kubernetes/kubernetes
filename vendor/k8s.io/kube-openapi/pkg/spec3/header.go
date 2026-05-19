@@ -22,7 +22,6 @@ import (
 	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
 	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
-	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/jsontext"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -55,16 +54,16 @@ func (h *Header) MarshalJSON() ([]byte, error) {
 	return swag.ConcatJSON(b1, b2, b3), nil
 }
 
-func (h *Header) MarshalJSONTo(enc *jsontext.Encoder) error {
+func (h *Header) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
 	var x struct {
 		Ref         string              `json:"$ref,omitempty"`
 		HeaderProps headerPropsOmitZero `json:",inline"`
-		Extensions  spec.Extensions     `json:",inline"`
+		spec.Extensions
 	}
 	x.Ref = h.Refable.Ref.String()
 	x.Extensions = internal.SanitizeExtensions(h.Extensions)
 	x.HeaderProps = headerPropsOmitZero(h.HeaderProps)
-	return jsonv2.MarshalEncode(enc, x)
+	return opts.MarshalNext(enc, x)
 }
 
 func (h *Header) UnmarshalJSON(data []byte) error {
@@ -84,12 +83,12 @@ func (h *Header) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (h *Header) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+func (h *Header) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
 	var x struct {
-		Extensions spec.Extensions `json:",inline"`
+		spec.Extensions
 		HeaderProps
 	}
-	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
+	if err := opts.UnmarshalNext(dec, &x); err != nil {
 		return err
 	}
 	if err := internal.JSONRefFromMap(&h.Ref.Ref, x.Extensions); err != nil {

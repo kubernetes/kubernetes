@@ -72,7 +72,7 @@ func (s String) ConvertToNative(typeDesc reflect.Type) (any, error) {
 		case anyValueType:
 			// Primitives must be wrapped before being set on an Any field.
 			return anypb.New(wrapperspb.String(string(s)))
-		case JSONValueType:
+		case jsonValueType:
 			// Convert to a protobuf representation of a JSON String.
 			return structpb.NewStringValue(string(s)), nil
 		case stringWrapperType:

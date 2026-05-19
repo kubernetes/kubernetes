@@ -1,4 +1,5 @@
 //go:build windows
+// +build windows
 
 /*
 Copyright 2021 The Kubernetes Authors.
@@ -37,7 +38,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
-	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
+	"k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	fakehcn "k8s.io/kubernetes/pkg/proxy/winkernel/testing"
 	netutils "k8s.io/utils/net"
@@ -113,7 +114,7 @@ func NewFakeProxier(t *testing.T, nodeName string, nodeIP net.IP, networkType st
 	// enable `WinDSR` feature gate
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, kubefeatures.WinDSR, true)
 
-	config := kubeproxyconfig.KubeProxyWinkernelConfiguration{
+	config := config.KubeProxyWinkernelConfiguration{
 		SourceVip:             sourceVip,
 		EnableDSR:             enableDSR,
 		NetworkName:           testNetwork,

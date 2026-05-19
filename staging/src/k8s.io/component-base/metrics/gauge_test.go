@@ -560,7 +560,7 @@ func TestGaugeWithLabelValueAllowList(t *testing.T) {
 			})
 			g := NewGaugeVec(opts, labels)
 			registry.MustRegister(g)
-			SetLabelAllowList(labelAllowValues)
+			SetLabelAllowListFromCLI(labelAllowValues)
 			for _, lv := range test.labelValues {
 				g.WithLabelValues(lv...).Set(100.0)
 			}

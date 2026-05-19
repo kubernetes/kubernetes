@@ -37,7 +37,7 @@ func (s SpanStubs) Snapshots() []tracesdk.ReadOnlySpan {
 	}
 
 	ro := make([]tracesdk.ReadOnlySpan, len(s))
-	for i := range s {
+	for i := 0; i < len(s); i++ {
 		ro[i] = s[i].Snapshot()
 	}
 	return ro

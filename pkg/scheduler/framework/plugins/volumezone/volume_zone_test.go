@@ -270,9 +270,10 @@ func TestSingleZone(t *testing.T) {
 			node := &framework.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
-				pvLister:  pvLister,
-				pvcLister: pvcLister,
-				scLister:  nil,
+				pvLister:                  pvLister,
+				pvcLister:                 pvcLister,
+				scLister:                  nil,
+				enableSchedulingQueueHint: false,
 			}
 			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod, nil)
 			if diff := cmp.Diff(preFilterStatus, test.wantPreFilterStatus); diff != "" {
@@ -402,9 +403,10 @@ func TestMultiZone(t *testing.T) {
 			node := &framework.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
-				pvLister:  pvLister,
-				pvcLister: pvcLister,
-				scLister:  nil,
+				pvLister:                  pvLister,
+				pvcLister:                 pvcLister,
+				scLister:                  nil,
+				enableSchedulingQueueHint: false,
 			}
 			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod, nil)
 			if diff := cmp.Diff(preFilterStatus, test.wantPreFilterStatus); diff != "" {
@@ -527,9 +529,10 @@ func TestWithBinding(t *testing.T) {
 			node := &framework.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
-				pvLister:  pvLister,
-				pvcLister: pvcLister,
-				scLister:  scLister,
+				pvLister:                  pvLister,
+				pvcLister:                 pvcLister,
+				scLister:                  scLister,
+				enableSchedulingQueueHint: false,
 			}
 			_, preFilterStatus := p.PreFilter(ctx, state, test.Pod, nil)
 			if diff := cmp.Diff(preFilterStatus, test.wantPreFilterStatus); diff != "" {

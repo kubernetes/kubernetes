@@ -23,9 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
-	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -54,10 +52,10 @@ func validNewWorkload() *scheduling.Workload {
 			Name: "foo",
 		},
 		Spec: scheduling.WorkloadSpec{
-			PodGroupTemplates: []scheduling.PodGroupTemplate{
+			PodGroups: []scheduling.PodGroup{
 				{
 					Name: "bar",
-					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
+					Policy: scheduling.PodGroupPolicy{
 						Gang: &scheduling.GangSchedulingPolicy{
 							MinCount: 5,
 						},
@@ -68,19 +66,11 @@ func validNewWorkload() *scheduling.Workload {
 	}
 }
 
-func newTester(t *testing.T, storage *genericregistry.Store) *genericregistrytest.Tester {
-	return genericregistrytest.New(t, storage).SetRequestInfo(&genericapirequest.RequestInfo{
-		APIGroup:   "scheduling.k8s.io",
-		APIVersion: "v1alpha2",
-		Resource:   "workloads",
-	})
-}
-
 func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := newTester(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store)
 	test.TestCreate(
 		validNewWorkload(),
 		// invalid cases
@@ -96,16 +86,11 @@ func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := newTester(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store)
 	test.TestUpdate(
 		// valid
 		validNewWorkload(),
 		// valid update
-		// noop change
-		func(obj runtime.Object) runtime.Object {
-			return obj
-		},
-		// invalid update
 		// Set ControllerRef
 		func(obj runtime.Object) runtime.Object {
 			w := obj.(*scheduling.Workload)
@@ -119,7 +104,7 @@ func TestUpdate(t *testing.T) {
 		// Update MinCount
 		func(obj runtime.Object) runtime.Object {
 			w := obj.(*scheduling.Workload)
-			w.Spec.PodGroupTemplates[0].SchedulingPolicy.Gang.MinCount = 4
+			w.Spec.PodGroups[0].Policy.Gang.MinCount = 4
 			return w
 		},
 	)
@@ -129,7 +114,7 @@ func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := newTester(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store)
 	test.TestDelete(validNewWorkload())
 }
 
@@ -137,7 +122,7 @@ func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := newTester(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store)
 	test.TestGet(validNewWorkload())
 }
 
@@ -145,7 +130,7 @@ func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := newTester(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store)
 	test.TestList(validNewWorkload())
 }
 
@@ -153,7 +138,7 @@ func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
-	test := newTester(t, storage.Store)
+	test := genericregistrytest.New(t, storage.Store)
 	test.TestWatch(
 		validNewWorkload(),
 		// matching labels

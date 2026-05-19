@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/networking"
@@ -38,12 +37,12 @@ const (
 
 // ingressStrategy implements verification logic for Replication Ingress.
 type ingressStrategy struct {
-	rest.DeclarativeValidation
+	runtime.ObjectTyper
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Replication Ingress objects.
-var Strategy = ingressStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
+var Strategy = ingressStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped returns true because all Ingress' need to be within a namespace.
 func (ingressStrategy) NamespaceScoped() bool {
@@ -115,7 +114,7 @@ func (ingressStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for Ingress; this means POST is needed to create one.
-func (ingressStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
+func (ingressStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
@@ -130,7 +129,7 @@ func (ingressStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Ob
 }
 
 // AllowUnconditionalUpdate is the default update policy for Ingress objects.
-func (ingressStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+func (ingressStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 

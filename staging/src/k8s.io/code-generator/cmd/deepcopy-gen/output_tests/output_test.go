@@ -23,6 +23,7 @@ import (
 
 	"sigs.k8s.io/randfill"
 
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/code-generator/cmd/deepcopy-gen/output_tests/aliases"
 	"k8s.io/code-generator/cmd/deepcopy-gen/output_tests/builtins"
 	"k8s.io/code-generator/cmd/deepcopy-gen/output_tests/interfaces"
@@ -30,7 +31,6 @@ import (
 	"k8s.io/code-generator/cmd/deepcopy-gen/output_tests/pointer"
 	"k8s.io/code-generator/cmd/deepcopy-gen/output_tests/slices"
 	"k8s.io/code-generator/cmd/deepcopy-gen/output_tests/structs"
-	"k8s.io/utils/dump"
 )
 
 func TestWithValueFuzzer(t *testing.T) {

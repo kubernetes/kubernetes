@@ -1,4 +1,5 @@
 //go:build !linux
+// +build !linux
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -18,7 +19,5 @@ limitations under the License.
 
 package kubelet
 
-import "k8s.io/klog/v2"
-
 // Do nothing.
-func (kl *Kubelet) initNetworkUtil(logger klog.Logger) {}
+func (kl *Kubelet) initNetworkUtil() {}

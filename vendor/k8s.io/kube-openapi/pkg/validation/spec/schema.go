@@ -23,7 +23,6 @@ import (
 	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
 	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
-	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/jsontext"
 )
 
 // BooleanProperty creates a boolean property
@@ -518,10 +517,10 @@ func (s Schema) MarshalJSON() ([]byte, error) {
 	return swag.ConcatJSON(b1, b2, b3, b4, b5, b6), nil
 }
 
-func (s Schema) MarshalJSONTo(enc *jsontext.Encoder) error {
+func (s Schema) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
 	type ArbitraryKeys map[string]interface{}
 	var x struct {
-		ArbitraryKeys      ArbitraryKeys              `json:",inline"`
+		ArbitraryKeys
 		SchemaProps        schemaPropsOmitZero        `json:",inline"`
 		SwaggerSchemaProps swaggerSchemaPropsOmitZero `json:",inline"`
 		Schema             string                     `json:"$schema,omitempty"`
@@ -540,7 +539,7 @@ func (s Schema) MarshalJSONTo(enc *jsontext.Encoder) error {
 	x.SwaggerSchemaProps = swaggerSchemaPropsOmitZero(s.SwaggerSchemaProps)
 	x.Ref = s.Ref.String()
 	x.Schema = string(s.Schema)
-	return jsonv2.MarshalEncode(enc, x)
+	return opts.MarshalNext(enc, x)
 }
 
 // UnmarshalJSON marshal this from JSON
@@ -596,13 +595,13 @@ func (s *Schema) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (s *Schema) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+func (s *Schema) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
 	var x struct {
-		Extensions Extensions `json:",inline"`
+		Extensions
 		SchemaProps
 		SwaggerSchemaProps
 	}
-	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
+	if err := opts.UnmarshalNext(dec, &x); err != nil {
 		return err
 	}
 

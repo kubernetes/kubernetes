@@ -11,7 +11,6 @@ import (
 	"go/ast"
 	"go/token"
 	"log"
-	"reflect"
 	"slices"
 	"sort"
 	"strconv"
@@ -66,7 +65,7 @@ func sortImports(localPrefix string, tokFile *token.File, f *ast.File) {
 }
 
 // mergeImports merges all the import declarations into the first one.
-// Taken from golang.org/x/tools/go/ast/astutil.
+// Taken from golang.org/x/tools/ast/astutil.
 // This does not adjust line numbers properly
 func mergeImports(f *ast.File) {
 	if len(f.Decls) <= 1 {
@@ -90,7 +89,7 @@ func mergeImports(f *ast.File) {
 		first.Lparen = first.Pos()
 		// Move the imports of the other import declaration to the first one.
 		for _, spec := range gen.Specs {
-			updateBasicLitPos(spec.(*ast.ImportSpec).Path, first.Pos())
+			spec.(*ast.ImportSpec).Path.ValuePos = first.Pos()
 			first.Specs = append(first.Specs, spec)
 		}
 		f.Decls = slices.Delete(f.Decls, i, i+1)
@@ -99,7 +98,7 @@ func mergeImports(f *ast.File) {
 }
 
 // declImports reports whether gen contains an import of path.
-// Taken from golang.org/x/tools/go/ast/astutil.
+// Taken from golang.org/x/tools/ast/astutil.
 func declImports(gen *ast.GenDecl, path string) bool {
 	if gen.Tok != token.IMPORT {
 		return false
@@ -222,7 +221,7 @@ func sortSpecs(localPrefix string, tokFile *token.File, f *ast.File, specs []ast
 		if s.Name != nil {
 			s.Name.NamePos = pos[i].Start
 		}
-		updateBasicLitPos(s.Path, pos[i].Start)
+		s.Path.ValuePos = pos[i].Start
 		s.EndPos = pos[i].End
 		nextSpecPos := pos[i].End
 
@@ -297,17 +296,3 @@ type byCommentPos []*ast.CommentGroup
 func (x byCommentPos) Len() int           { return len(x) }
 func (x byCommentPos) Swap(i, j int)      { x[i], x[j] = x[j], x[i] }
 func (x byCommentPos) Less(i, j int) bool { return x[i].Pos() < x[j].Pos() }
-
-// updateBasicLitPos updates lit.Pos,
-// ensuring that lit.End (if set) is displaced by the same amount.
-// (See https://go.dev/issue/76395.)
-func updateBasicLitPos(lit *ast.BasicLit, pos token.Pos) {
-	len := lit.End() - lit.Pos()
-	lit.ValuePos = pos
-	// TODO(adonovan): after go1.26, simplify to:
-	//   lit.ValueEnd = pos + len
-	v := reflect.ValueOf(lit).Elem().FieldByName("ValueEnd")
-	if v.IsValid() && v.Int() != 0 {
-		v.SetInt(int64(pos + len))
-	}
-}

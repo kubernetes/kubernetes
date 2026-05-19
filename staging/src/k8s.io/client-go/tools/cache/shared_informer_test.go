@@ -25,7 +25,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"testing/synctest"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -47,7 +46,6 @@ import (
 )
 
 type testListener struct {
-	printlnFunc       func(string) // Some, but not all tests use this for per-test output.
 	lock              sync.RWMutex
 	resyncPeriod      time.Duration
 	expectedItemNames sets.Set[string]
@@ -75,18 +73,9 @@ func (l *testListener) OnUpdate(old, new interface{}) {
 func (l *testListener) OnDelete(obj interface{}) {
 }
 
-func (l *testListener) println(msg string) {
-	msg = l.name + ": " + msg
-	if l.printlnFunc != nil {
-		l.printlnFunc(msg)
-	} else {
-		fmt.Println(msg)
-	}
-}
-
 func (l *testListener) handle(obj interface{}) {
 	key, _ := MetaNamespaceKeyFunc(obj)
-	l.println(fmt.Sprintf("handle: %v", key))
+	fmt.Printf("%s: handle: %v\n", l.name, key)
 	l.lock.Lock()
 	defer l.lock.Unlock()
 	objectMeta, _ := meta.Accessor(obj)
@@ -94,7 +83,7 @@ func (l *testListener) handle(obj interface{}) {
 }
 
 func (l *testListener) ok() bool {
-	l.println("polling")
+	fmt.Println("polling")
 	err := wait.PollImmediate(100*time.Millisecond, 2*time.Second, func() (bool, error) {
 		if l.satisfiedExpectations() {
 			return true, nil
@@ -106,9 +95,9 @@ func (l *testListener) ok() bool {
 	}
 
 	// wait just a bit to allow any unexpected stragglers to come in
-	l.println("sleeping")
+	fmt.Println("sleeping")
 	time.Sleep(1 * time.Second)
-	l.println("final check")
+	fmt.Println("final check")
 	return l.satisfiedExpectations()
 }
 
@@ -117,12 +106,6 @@ func (l *testListener) satisfiedExpectations() bool {
 	defer l.lock.RUnlock()
 
 	return sets.New(l.receivedItemNames...).Equal(l.expectedItemNames)
-}
-
-func (l *testListener) reset() {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-	l.receivedItemNames = nil
 }
 
 func eventHandlerCount(i SharedInformer) int {
@@ -225,34 +208,6 @@ func TestIndexer(t *testing.T) {
 }
 
 func TestListenerResyncPeriods(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) { testListenerResyncPeriods(t, 0) })
-}
-
-func TestListenerResyncPeriodsDelayed(t *testing.T) {
-	// sharedProcessor used to deadlock when sharedProcessor.run happened
-	// to be reached after the first sharedProcessor.distribute.
-	// This artififical delay simulates that situation.
-	//
-	// Must not run in parallel to other tests, but it doesn't need to:
-	// it doesn't sleep in real-world time and therefore completes quickly.
-	synctest.Test(t, func(t *testing.T) { testListenerResyncPeriods(t, time.Second) })
-}
-
-func testListenerResyncPeriods(t *testing.T, startupDelay time.Duration) {
-	start := time.Now()
-	println := func(msg string) {
-		delta := time.Since(start)
-		t.Logf("%s: %s", delta, msg)
-	}
-
-	if startupDelay > 0 {
-		hook := func() {
-			time.Sleep(startupDelay)
-		}
-		sharedProcessorRunHook.Store(&hook)
-		defer sharedProcessorRunHook.Store(nil)
-	}
-
 	// source simulates an apiserver object endpoint.
 	source := newFakeControllerSource(t)
 	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
@@ -261,19 +216,20 @@ func testListenerResyncPeriods(t *testing.T, startupDelay time.Duration) {
 	// create the shared informer and resync every 1s
 	informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
 
+	clock := testingclock.NewFakeClock(time.Now())
+	informer.clock = clock
+	informer.processor.clock = clock
+
 	// listener 1, never resync
 	listener1 := newTestListener("listener1", 0, "pod1", "pod2")
-	listener1.printlnFunc = println
 	informer.AddEventHandlerWithResyncPeriod(listener1, listener1.resyncPeriod)
 
 	// listener 2, resync every 2s
 	listener2 := newTestListener("listener2", 2*time.Second, "pod1", "pod2")
-	listener2.printlnFunc = println
 	informer.AddEventHandlerWithResyncPeriod(listener2, listener2.resyncPeriod)
 
 	// listener 3, resync every 3s
 	listener3 := newTestListener("listener3", 3*time.Second, "pod1", "pod2")
-	listener3.printlnFunc = println
 	informer.AddEventHandlerWithResyncPeriod(listener3, listener3.resyncPeriod)
 	listeners := []*testListener{listener1, listener2, listener3}
 
@@ -285,65 +241,59 @@ func testListenerResyncPeriods(t *testing.T, startupDelay time.Duration) {
 		wg.Wait()
 	}()
 
-	// We must potentially advance time to unblock sharedProcess.run,
-	// otherwise synctest.Wait() below returns without anything
-	// being done.
-	time.Sleep(startupDelay)
-
-	// Ensure all listeners got the initial after the initial processing, at the initial start time.
-	//
-	// synctest.Wait doesn't detect deadlocks involving mutexes: they are considered not durably
-	// blocking, so in case of such a deadlock it'll just keep waiting until the entire unit test
-	// times out. The backtraces then show the deadlock.
-	synctest.Wait()
+	// ensure all listeners got the initial List
 	for _, listener := range listeners {
-		if !listener.satisfiedExpectations() {
-			t.Errorf("%s: %s: expected %v, got %v", time.Since(start), listener.name, listener.expectedItemNames, listener.receivedItemNames)
+		if !listener.ok() {
+			t.Errorf("%s: expected %v, got %v", listener.name, listener.expectedItemNames, listener.receivedItemNames)
 		}
 	}
 
 	// reset
 	for _, listener := range listeners {
-		listener.reset()
+		listener.receivedItemNames = []string{}
 	}
 
 	// advance so listener2 gets a resync
-	time.Sleep(2*time.Second - startupDelay)
-	synctest.Wait()
+	clock.Step(2 * time.Second)
 
 	// make sure listener2 got the resync
-	if !listener2.satisfiedExpectations() {
-		t.Errorf("%s: %s: expected %v, got %v", time.Since(start), listener2.name, listener2.expectedItemNames, listener2.receivedItemNames)
+	if !listener2.ok() {
+		t.Errorf("%s: expected %v, got %v", listener2.name, listener2.expectedItemNames, listener2.receivedItemNames)
 	}
+
+	// wait a bit to give errant items a chance to go to 1 and 3
+	time.Sleep(1 * time.Second)
 
 	// make sure listeners 1 and 3 got nothing
 	if len(listener1.receivedItemNames) != 0 {
-		t.Errorf("%s: listener1: should not have resynced (got %d)", time.Since(start), len(listener1.receivedItemNames))
+		t.Errorf("listener1: should not have resynced (got %d)", len(listener1.receivedItemNames))
 	}
 	if len(listener3.receivedItemNames) != 0 {
-		t.Errorf("%s: listener3: should not have resynced (got %d)", time.Since(start), len(listener3.receivedItemNames))
+		t.Errorf("listener3: should not have resynced (got %d)", len(listener3.receivedItemNames))
 	}
 
 	// reset
 	for _, listener := range listeners {
-		listener.reset()
+		listener.receivedItemNames = []string{}
 	}
 
 	// advance so listener3 gets a resync
-	time.Sleep(1 * time.Second)
-	synctest.Wait()
+	clock.Step(1 * time.Second)
 
 	// make sure listener3 got the resync
-	if !listener3.satisfiedExpectations() {
-		t.Errorf("%s: %s: expected %v, got %v", time.Since(start), listener3.name, listener3.expectedItemNames, listener3.receivedItemNames)
+	if !listener3.ok() {
+		t.Errorf("%s: expected %v, got %v", listener3.name, listener3.expectedItemNames, listener3.receivedItemNames)
 	}
+
+	// wait a bit to give errant items a chance to go to 1 and 2
+	time.Sleep(1 * time.Second)
 
 	// make sure listeners 1 and 2 got nothing
 	if len(listener1.receivedItemNames) != 0 {
-		t.Errorf("%s: listener1: should not have resynced (got %d)", time.Since(start), len(listener1.receivedItemNames))
+		t.Errorf("listener1: should not have resynced (got %d)", len(listener1.receivedItemNames))
 	}
 	if len(listener2.receivedItemNames) != 0 {
-		t.Errorf("%s: listener2: should not have resynced (got %d)", time.Since(start), len(listener2.receivedItemNames))
+		t.Errorf("listener2: should not have resynced (got %d)", len(listener2.receivedItemNames))
 	}
 }
 
@@ -1134,13 +1084,8 @@ func TestAddWhileActive(t *testing.T) {
 		return
 	}
 
-	select {
-	case <-handle1.HasSyncedChecker().Done():
-		if !handle1.HasSynced() {
-			t.Error("Not synced after channel said we are synced??")
-		}
-	case <-time.After(10 * time.Second):
-		t.Error("Not synced 10 seconds after Run??")
+	if !handle1.HasSynced() {
+		t.Error("Not synced after Run??")
 	}
 
 	listener2.lock.Lock() // ensure we observe it before it has synced

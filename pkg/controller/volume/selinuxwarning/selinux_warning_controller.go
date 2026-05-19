@@ -29,6 +29,7 @@ import (
 	errorutils "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformersv1 "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -129,7 +130,7 @@ func NewController(
 	}
 	csiTranslator := csitrans.New()
 	c.csiTranslator = csiTranslator
-	c.cmpm = csimigration.NewPluginManager(csiTranslator)
+	c.cmpm = csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
 
 	// Index pods by its PVC keys. Then we don't need to iterate all pods every time to find
 	// pods which reference given PVC.
@@ -472,7 +473,7 @@ func (c *Controller) syncPod(ctx context.Context, pod *v1.Pod) error {
 			if volumeutil.IsMultipleSELinuxLabelsError(err) {
 				c.eventRecorder.Eventf(pod, v1.EventTypeWarning, "MultipleSELinuxLabels", "Volume %q is mounted twice with different SELinux labels inside this pod", mount)
 			}
-			logger.V(4).Info("failed to get SELinux label", "pod", klog.KObj(pod), "volume", mount, "err", err)
+			logger.V(4).Error(err, "failed to get SELinux label", "pod", klog.KObj(pod), "volume", mount)
 			errs = append(errs, err)
 			continue
 		}
@@ -535,7 +536,7 @@ func (c *Controller) reportConflictEvents(logger klog.Logger, conflicts []volume
 	for _, conflict := range conflicts {
 		pod, err := c.podLister.Pods(conflict.Pod.Namespace).Get(conflict.Pod.Name)
 		if err != nil {
-			logger.V(2).Info("failed to get first pod for event", "pod", conflict.Pod, "err", err)
+			logger.V(2).Error(err, "failed to get first pod for event", "pod", conflict.Pod)
 			// It does not make sense to report a conflict that has been resolved by deleting one of the pods.
 			return
 		}

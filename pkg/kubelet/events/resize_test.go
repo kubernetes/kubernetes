@@ -24,12 +24,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2/ktesting"
 	"k8s.io/utils/ptr"
 )
 
 func TestPodResizeCompletedMsg(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
 	tests := []struct {
 		name               string
 		containers         []testContainer
@@ -82,14 +80,13 @@ func TestPodResizeCompletedMsg(t *testing.T) {
 				}
 			}
 
-			msg := PodResizeCompletedMsg(logger, pod, test.observedGeneration)
+			msg := PodResizeCompletedMsg(pod, test.observedGeneration)
 			assert.Equal(t, test.expected, msg)
 		})
 	}
 }
 
 func TestPodResizeStartedMsg(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
 	tests := []struct {
 		name               string
 		allocated          []testContainer
@@ -153,14 +150,13 @@ func TestPodResizeStartedMsg(t *testing.T) {
 				}
 			}
 
-			msg := PodResizeStartedMsg(logger, allocatedPod, test.observedGeneration)
+			msg := PodResizeStartedMsg(allocatedPod, test.observedGeneration)
 			assert.Equal(t, test.expected, msg)
 		})
 	}
 }
 
 func TestPodResizeErrorMsg(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
 	tests := []struct {
 		name               string
 		allocated          []testContainer
@@ -227,14 +223,13 @@ func TestPodResizeErrorMsg(t *testing.T) {
 				}
 			}
 
-			msg := PodResizeErrorMsg(logger, allocatedPod, test.observedGeneration, test.errMsg)
+			msg := PodResizeErrorMsg(allocatedPod, test.observedGeneration, test.errMsg)
 			assert.Equal(t, test.expected, msg)
 		})
 	}
 }
 
 func TestPodResizePendingMsg(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
 	tests := []struct {
 		name               string
 		desired            []testContainer
@@ -304,7 +299,7 @@ func TestPodResizePendingMsg(t *testing.T) {
 				}
 			}
 
-			msg := PodResizePendingMsg(logger, pod, test.reason, test.message, test.observedGeneration)
+			msg := PodResizePendingMsg(pod, test.reason, test.message, test.observedGeneration)
 			assert.Equal(t, test.expected, msg)
 		})
 	}

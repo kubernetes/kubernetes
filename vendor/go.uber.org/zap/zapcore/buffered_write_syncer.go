@@ -188,33 +188,32 @@ func (s *BufferedWriteSyncer) flushLoop() {
 // Stop closes the buffer, cleans up background goroutines, and flushes
 // remaining unwritten data.
 func (s *BufferedWriteSyncer) Stop() (err error) {
+	var stopped bool
+
 	// Critical section.
-	stopped := func() bool {
+	func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 
 		if !s.initialized {
-			return false
+			return
 		}
 
-		if s.stopped {
-			return false
+		stopped = s.stopped
+		if stopped {
+			return
 		}
 		s.stopped = true
 
 		s.ticker.Stop()
 		close(s.stop) // tell flushLoop to stop
-		return true
+		<-s.done      // and wait until it has
 	}()
 
-	// Not initialized, or already stopped, no need for any cleanup.
+	// Don't call Sync on consecutive Stops.
 	if !stopped {
-		return
+		err = s.Sync()
 	}
 
-	// Wait for flushLoop to end outside of the lock, as it may need the lock to complete.
-	// See https://github.com/uber-go/zap/issues/1428 for details.
-	<-s.done
-
-	return s.Sync()
+	return err
 }

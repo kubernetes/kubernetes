@@ -28,10 +28,8 @@ type unschedulablePods struct {
 	// podInfoMap is a map key by a pod's full-name and the value is a pointer to the QueuedPodInfo.
 	podInfoMap map[string]*framework.QueuedPodInfo
 	keyFunc    func(*v1.Pod) string
-	// unschedulableRecorder and gatedRecorder track the number of pods in the unschedulable queue.
-	// unschedulableRecorder tracks standard unschedulable pods, while gatedRecorder tracks pods
-	// that are specifically blocked by scheduling gates. These recorders handle
-	// increments, decrements, and transitions (Gated <-> Ungated).
+	// unschedulableRecorder/gatedRecorder updates the counter when elements of an unschedulablePods
+	// get added or removed, and it does nothing if it's nil.
 	unschedulableRecorder, gatedRecorder metrics.MetricRecorder
 }
 
@@ -45,34 +43,14 @@ func newUnschedulablePods(unschedulableRecorder, gatedRecorder metrics.MetricRec
 	}
 }
 
-// updateMetricsOnStateChange handles the metric accounting when a pod changes
-// between Gated and Unschedulable states.
-func (u *unschedulablePods) updateMetricsOnStateChange(gatedBefore, isGated bool) {
-	if gatedBefore == isGated {
-		return
-	}
-
-	if gatedBefore {
-		// Transition: Gated -> Ungated
-		u.gatedRecorder.Dec()
-		u.unschedulableRecorder.Inc()
-	} else {
-		// Transition: Ungated -> Gated
-		u.gatedRecorder.Inc()
-		u.unschedulableRecorder.Dec()
-	}
-}
-
 // addOrUpdate adds a pod to the unschedulable podInfoMap.
 // The event should show which event triggered the addition and is used for the metric recording.
-func (u *unschedulablePods) addOrUpdate(pInfo *framework.QueuedPodInfo, gatedBefore bool, event string) {
+func (u *unschedulablePods) addOrUpdate(pInfo *framework.QueuedPodInfo, event string) {
 	podID := u.keyFunc(pInfo.Pod)
-	if _, exists := u.podInfoMap[podID]; exists {
-		u.updateMetricsOnStateChange(gatedBefore, pInfo.Gated())
-	} else {
-		if pInfo.Gated() {
+	if _, exists := u.podInfoMap[podID]; !exists {
+		if pInfo.Gated() && u.gatedRecorder != nil {
 			u.gatedRecorder.Inc()
-		} else {
+		} else if !pInfo.Gated() && u.unschedulableRecorder != nil {
 			u.unschedulableRecorder.Inc()
 		}
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("unschedulable", event).Inc()
@@ -85,9 +63,9 @@ func (u *unschedulablePods) addOrUpdate(pInfo *framework.QueuedPodInfo, gatedBef
 func (u *unschedulablePods) delete(pod *v1.Pod, gated bool) {
 	podID := u.keyFunc(pod)
 	if _, exists := u.podInfoMap[podID]; exists {
-		if gated {
+		if gated && u.gatedRecorder != nil {
 			u.gatedRecorder.Dec()
-		} else {
+		} else if !gated && u.unschedulableRecorder != nil {
 			u.unschedulableRecorder.Dec()
 		}
 	}
@@ -107,6 +85,10 @@ func (u *unschedulablePods) get(pod *v1.Pod) *framework.QueuedPodInfo {
 // clear removes all the entries from the unschedulable podInfoMap.
 func (u *unschedulablePods) clear() {
 	u.podInfoMap = make(map[string]*framework.QueuedPodInfo)
-	u.unschedulableRecorder.Clear()
-	u.gatedRecorder.Clear()
+	if u.unschedulableRecorder != nil {
+		u.unschedulableRecorder.Clear()
+	}
+	if u.gatedRecorder != nil {
+		u.gatedRecorder.Clear()
+	}
 }

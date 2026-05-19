@@ -403,7 +403,7 @@ func TestSummaryWithLabelValueAllowList(t *testing.T) {
 			})
 			c := NewSummaryVec(opts, labels)
 			registry.MustRegister(c)
-			SetLabelAllowList(labelAllowValues)
+			SetLabelAllowListFromCLI(labelAllowValues)
 
 			for _, lv := range test.labelValues {
 				c.WithLabelValues(lv...).Observe(1.0)

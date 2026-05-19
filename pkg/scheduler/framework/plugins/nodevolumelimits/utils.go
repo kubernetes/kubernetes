@@ -17,13 +17,17 @@ limitations under the License.
 package nodevolumelimits
 
 import (
+	"strings"
+
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 )
 
 // isCSIMigrationOn returns a boolean value indicating whether
 // the CSI migration has been enabled for a particular storage plugin.
-func isCSIMigrationOn(csiNode *storagev1.CSINode, pluginName string) bool {
+func isCSIMigrationOn(csiNode *storagev1.CSINode, pluginName string, enableCSIMigrationPortworx bool) bool {
 	if csiNode == nil || len(pluginName) == 0 {
 		return false
 	}
@@ -34,7 +38,9 @@ func isCSIMigrationOn(csiNode *storagev1.CSINode, pluginName string) bool {
 	case csilibplugins.AWSEBSInTreePluginName:
 		return true
 	case csilibplugins.PortworxVolumePluginName:
-		return true
+		if !enableCSIMigrationPortworx {
+			return false
+		}
 	case csilibplugins.GCEPDInTreePluginName:
 		return true
 	case csilibplugins.AzureDiskInTreePluginName:
@@ -44,4 +50,22 @@ func isCSIMigrationOn(csiNode *storagev1.CSINode, pluginName string) bool {
 	default:
 		return false
 	}
+
+	// The plugin name should be listed in the CSINode object annotation.
+	// This indicates that the plugin has been migrated to a CSI driver in the node.
+	csiNodeAnn := csiNode.GetAnnotations()
+	if csiNodeAnn == nil {
+		return false
+	}
+
+	var mpaSet sets.Set[string]
+	mpa := csiNodeAnn[v1.MigratedPluginsAnnotationKey]
+	if len(mpa) == 0 {
+		mpaSet = sets.New[string]()
+	} else {
+		tok := strings.Split(mpa, ",")
+		mpaSet = sets.New(tok...)
+	}
+
+	return mpaSet.Has(pluginName)
 }

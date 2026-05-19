@@ -17,7 +17,9 @@
 ARG BASEIMAGE
 FROM $BASEIMAGE
 
-RUN clean-install wget bash netcat-openbsd
+CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
+
+RUN clean-install wget bash netcat
 
 ADD on-start.sh /
 

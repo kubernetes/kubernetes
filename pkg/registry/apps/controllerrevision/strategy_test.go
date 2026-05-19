@@ -17,7 +17,6 @@ limitations under the License.
 package controllerrevision
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 
@@ -35,7 +34,7 @@ func TestStrategy_NamespaceScoped(t *testing.T) {
 }
 
 func TestStrategy_AllowCreateOnUpdate(t *testing.T) {
-	if Strategy.AllowCreateOnUpdate(context.Background()) {
+	if Strategy.AllowCreateOnUpdate() {
 		t.Error("ControllerRevision should not be created on update")
 	}
 }

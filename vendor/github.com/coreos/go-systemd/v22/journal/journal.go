@@ -41,6 +41,6 @@ const (
 )
 
 // Print prints a message to the local systemd journal using Send().
-func Print(priority Priority, format string, a ...any) error {
+func Print(priority Priority, format string, a ...interface{}) error {
 	return Send(fmt.Sprintf(format, a...), priority, nil)
 }

@@ -173,7 +173,7 @@ func NewCmdGet(parent string, f cmdutil.Factory, streams genericiooptions.IOStre
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.Run(f, args))
 		},
-		SuggestFor: []string{"list", "ls"},
+		SuggestFor: []string{"list", "ps"},
 	}
 
 	o.PrintFlags.AddFlags(cmd)
@@ -311,12 +311,6 @@ func (o *GetOptions) Validate() error {
 		outputOption := *o.PrintFlags.OutputFormat
 		if outputOption != "" && outputOption != "wide" {
 			return fmt.Errorf("--show-labels option cannot be used with %s printer", outputOption)
-		}
-	}
-	if o.PrintFlags.HumanReadableFlags.ColumnLabels != nil && len(*o.PrintFlags.HumanReadableFlags.ColumnLabels) > 0 && o.PrintFlags.OutputFormat != nil {
-		outputOption := *o.PrintFlags.OutputFormat
-		if strings.HasPrefix(outputOption, "custom-columns") {
-			return fmt.Errorf("--label-columns option cannot be used with %s printer", outputOption)
 		}
 	}
 	if o.OutputWatchEvents && !(o.Watch || o.WatchOnly) {

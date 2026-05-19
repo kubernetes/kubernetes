@@ -40,54 +40,67 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
 	// type CertificateSigningRequest
-	scheme.AddValidationFunc(
-		(*certificatesv1.CertificateSigningRequest)(nil),
-		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-			switch op.Request.SubresourcePath() {
-			case "/", "/approval", "/status":
-				return Validate_CertificateSigningRequest(
-					ctx, op, nil, /* fldPath */
-					obj.(*certificatesv1.CertificateSigningRequest),
-					safe.Cast[*certificatesv1.CertificateSigningRequest](oldObj))
-			}
-			return field.ErrorList{
-				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
-			}
-		})
+	scheme.AddValidationFunc((*certificatesv1.CertificateSigningRequest)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/", "/approval", "/status":
+			return Validate_CertificateSigningRequest(ctx, op, nil /* fldPath */, obj.(*certificatesv1.CertificateSigningRequest), safe.Cast[*certificatesv1.CertificateSigningRequest](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type CertificateSigningRequestList
+	scheme.AddValidationFunc((*certificatesv1.CertificateSigningRequestList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_CertificateSigningRequestList(ctx, op, nil /* fldPath */, obj.(*certificatesv1.CertificateSigningRequestList), safe.Cast[*certificatesv1.CertificateSigningRequestList](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	return nil
 }
 
 // Validate_CertificateSigningRequest validates an instance of CertificateSigningRequest according
 // to declarative validation rules in the API schema.
-func Validate_CertificateSigningRequest(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *certificatesv1.CertificateSigningRequest) (errs field.ErrorList) {
-
+func Validate_CertificateSigningRequest(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *certificatesv1.CertificateSigningRequest) (errs field.ErrorList) {
 	// field certificatesv1.CertificateSigningRequest.TypeMeta has no validation
 	// field certificatesv1.CertificateSigningRequest.ObjectMeta has no validation
 	// field certificatesv1.CertificateSigningRequest.Spec has no validation
 
-	{ // field certificatesv1.CertificateSigningRequest.Status
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *certificatesv1.CertificateSigningRequestStatus,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field certificatesv1.CertificateSigningRequest.Status
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *certificatesv1.CertificateSigningRequestStatus, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_CertificateSigningRequestStatus(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *certificatesv1.CertificateSigningRequest) *certificatesv1.CertificateSigningRequestStatus {
-				return &oldObj.Status
-			})
-		errs = append(errs, fn(fldPath.Child("status"), &obj.Status, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("status"), &obj.Status, safe.Field(oldObj, func(oldObj *certificatesv1.CertificateSigningRequest) *certificatesv1.CertificateSigningRequestStatus {
+			return &oldObj.Status
+		}), oldObj != nil)...)
+
+	return errs
+}
+
+// Validate_CertificateSigningRequestList validates an instance of CertificateSigningRequestList according
+// to declarative validation rules in the API schema.
+func Validate_CertificateSigningRequestList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *certificatesv1.CertificateSigningRequestList) (errs field.ErrorList) {
+	// field certificatesv1.CertificateSigningRequestList.TypeMeta has no validation
+	// field certificatesv1.CertificateSigningRequestList.ListMeta has no validation
+
+	// field certificatesv1.CertificateSigningRequestList.Items
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []certificatesv1.CertificateSigningRequest, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_CertificateSigningRequest)...)
+			return
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *certificatesv1.CertificateSigningRequestList) []certificatesv1.CertificateSigningRequest {
+			return oldObj.Items
+		}), oldObj != nil)...)
 
 	return errs
 }
@@ -96,57 +109,42 @@ var zeroOrOneOfMembershipFor_k8s_io_api_certificates_v1_CertificateSigningReques
 
 // Validate_CertificateSigningRequestStatus validates an instance of CertificateSigningRequestStatus according
 // to declarative validation rules in the API schema.
-func Validate_CertificateSigningRequestStatus(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *certificatesv1.CertificateSigningRequestStatus) (errs field.ErrorList) {
-
-	{ // field certificatesv1.CertificateSigningRequestStatus.Conditions
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []certificatesv1.CertificateSigningRequestCondition,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_CertificateSigningRequestStatus(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *certificatesv1.CertificateSigningRequestStatus) (errs field.ErrorList) {
+	// field certificatesv1.CertificateSigningRequestStatus.Conditions
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []certificatesv1.CertificateSigningRequestCondition, oldValueCorrelated bool) (errs field.ErrorList) {
 			// Uniqueness validation is implemented via custom, handwritten validation
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			if e := validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_api_certificates_v1_CertificateSigningRequestStatus_conditions_,
-				func(list []certificatesv1.CertificateSigningRequestCondition) bool {
-					for i := range list {
-						if list[i].Type == "Approved" {
-							return true
-						}
+			errs = append(errs, validate.ZeroOrOneOfUnion(ctx, op, fldPath, obj, oldObj, zeroOrOneOfMembershipFor_k8s_io_api_certificates_v1_CertificateSigningRequestStatus_conditions_, func(list []certificatesv1.CertificateSigningRequestCondition) bool {
+				for i := range list {
+					if list[i].Type == "Approved" {
+						return true
 					}
-					return false
-				},
-				func(list []certificatesv1.CertificateSigningRequestCondition) bool {
-					for i := range list {
-						if list[i].Type == "Denied" {
-							return true
-						}
+				}
+				return false
+			}, func(list []certificatesv1.CertificateSigningRequestCondition) bool {
+				for i := range list {
+					if list[i].Type == "Denied" {
+						return true
 					}
-					return false
-				}).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+				}
+				return false
+			})...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *certificatesv1.CertificateSigningRequestStatus) []certificatesv1.CertificateSigningRequestCondition {
-				return oldObj.Conditions
-			})
-		errs = append(errs, fn(fldPath.Child("conditions"), obj.Conditions, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("conditions"), obj.Conditions, safe.Field(oldObj, func(oldObj *certificatesv1.CertificateSigningRequestStatus) []certificatesv1.CertificateSigningRequestCondition {
+			return oldObj.Conditions
+		}), oldObj != nil)...)
 
 	// field certificatesv1.CertificateSigningRequestStatus.Certificate has no validation
 	return errs

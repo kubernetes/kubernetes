@@ -82,11 +82,11 @@ func (fischerStrategy) Validate(ctx context.Context, obj runtime.Object) field.E
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (fischerStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
 
-func (fischerStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
+func (fischerStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-func (fischerStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+func (fischerStrategy) AllowUnconditionalUpdate() bool {
 	return false
 }
 

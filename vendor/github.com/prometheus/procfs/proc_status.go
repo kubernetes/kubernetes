@@ -1,4 +1,4 @@
-// Copyright The Prometheus Authors
+// Copyright 2018 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -16,7 +16,7 @@ package procfs
 import (
 	"bytes"
 	"math/bits"
-	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -94,7 +94,8 @@ func (p Proc) NewStatus() (ProcStatus, error) {
 
 	s := ProcStatus{PID: p.PID}
 
-	for line := range strings.SplitSeq(string(data), "\n") {
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
 		if !bytes.Contains([]byte(line), []byte(":")) {
 			continue
 		}
@@ -221,7 +222,7 @@ func calcCpusAllowedList(cpuString string) []uint64 {
 
 	}
 
-	slices.Sort(g)
+	sort.Slice(g, func(i, j int) bool { return g[i] < g[j] })
 	return g
 }
 

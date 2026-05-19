@@ -57,8 +57,7 @@ var pluginConfigs = []configv1.PluginConfig{
 				Kind:       "DynamicResourcesArgs",
 				APIVersion: "kubescheduler.config.k8s.io/v1",
 			},
-			FilterTimeout:  &metav1.Duration{Duration: 10 * time.Second},
-			BindingTimeout: &metav1.Duration{Duration: 10 * time.Minute},
+			FilterTimeout: &metav1.Duration{Duration: 10 * time.Second},
 		}},
 	},
 	{
@@ -280,8 +279,7 @@ func TestSchedulerDefaults(t *testing.T) {
 										Kind:       "DynamicResourcesArgs",
 										APIVersion: "kubescheduler.config.k8s.io/v1",
 									},
-									FilterTimeout:  &metav1.Duration{Duration: 10 * time.Second},
-									BindingTimeout: &metav1.Duration{Duration: 10 * time.Minute},
+									FilterTimeout: &metav1.Duration{Duration: 10 * time.Second},
 								}},
 							},
 							{
@@ -373,7 +371,6 @@ func TestSchedulerDefaults(t *testing.T) {
 									{Name: names.NodeResourcesBalancedAllocation, Weight: ptr.To[int32](1)},
 									{Name: names.ImageLocality, Weight: ptr.To[int32](1)},
 									{Name: names.DefaultBinder},
-									{Name: names.NodeDeclaredFeatures},
 								},
 							},
 							Bind: configv1.PluginSet{

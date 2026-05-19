@@ -27,7 +27,6 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel/trace"
-
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
@@ -384,7 +383,7 @@ func (im *realImageGCManager) GarbageCollect(ctx context.Context, beganGC time.T
 	// Check valid capacity.
 	if capacity == 0 {
 		err := goerrors.New("invalid capacity 0 on image filesystem")
-		im.recorder.Eventf(im.nodeRef, v1.EventTypeWarning, events.InvalidDiskCapacity, "%s", err.Error())
+		im.recorder.Eventf(im.nodeRef, v1.EventTypeWarning, events.InvalidDiskCapacity, err.Error())
 		return err
 	}
 
@@ -579,7 +578,7 @@ func (im *realImageGCManager) imagesInEvictionOrder(ctx context.Context, freeTim
 			imageID := getImageIDFromTuple(image)
 			// Ensure imageID is valid or else continue
 			if imageID == "" {
-				im.recorder.Eventf(im.nodeRef, v1.EventTypeWarning, events.InvalidImageID, "ImageID is not valid, skipping, image: %v", image)
+				im.recorder.Eventf(im.nodeRef, v1.EventTypeWarning, "ImageID is not valid, skipping, ImageID: %v", imageID)
 				continue
 			}
 			images = append(images, evictionInfo{

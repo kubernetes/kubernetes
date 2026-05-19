@@ -18,7 +18,6 @@ package upgrade
 
 import (
 	"bytes"
-	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,8 +32,25 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
-//go:embed testdata/config-token.yaml
-var testConfigToken string
+const testConfigToken = `apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data:
+    server: localhost:8000
+  name: prod
+contexts:
+- context:
+    cluster: prod
+    namespace: default
+    user: default-service-account
+  name: default
+current-context: default
+kind: Config
+users:
+- name: kubernetes-admin
+  user:
+    client-certificate-data:
+`
 
 func TestEnforceRequirements(t *testing.T) {
 	tmpDir := t.TempDir()

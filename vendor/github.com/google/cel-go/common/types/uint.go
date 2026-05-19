@@ -100,7 +100,7 @@ func (i Uint) ConvertToNative(typeDesc reflect.Type) (any, error) {
 		case anyValueType:
 			// Primitives must be wrapped before being set on an Any field.
 			return anypb.New(wrapperspb.UInt64(uint64(i)))
-		case JSONValueType:
+		case jsonValueType:
 			// JSON can accurately represent 32-bit uints as floating point values.
 			if i.isJSONSafe() {
 				return structpb.NewNumberValue(float64(i)), nil

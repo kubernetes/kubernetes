@@ -19,8 +19,6 @@ package ingressclass
 import (
 	"context"
 
-	"k8s.io/apiserver/pkg/registry/rest"
-
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -33,13 +31,13 @@ import (
 // ingressClassStrategy implements verification logic for IngressClass
 // resources.
 type ingressClassStrategy struct {
-	rest.DeclarativeValidation
+	runtime.ObjectTyper
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating
 // IngressClass objects.
-var Strategy = ingressClassStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
+var Strategy = ingressClassStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped returns false because IngressClass is a non-namespaced
 // resource.
@@ -83,7 +81,7 @@ func (ingressClassStrategy) Canonicalize(obj runtime.Object) {
 
 // AllowCreateOnUpdate is false for IngressClass; this means POST is needed to
 // create one.
-func (ingressClassStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
+func (ingressClassStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
@@ -102,6 +100,6 @@ func (ingressClassStrategy) WarningsOnUpdate(ctx context.Context, obj, old runti
 
 // AllowUnconditionalUpdate is the default update policy for IngressClass
 // objects.
-func (ingressClassStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+func (ingressClassStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }

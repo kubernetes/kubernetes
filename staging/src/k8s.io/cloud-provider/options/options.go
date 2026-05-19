@@ -242,9 +242,7 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, allControllers
 	// sync back to component config
 	// TODO: find more elegant way than syncing back the values.
 	c.ComponentConfig.NodeStatusUpdateFrequency = o.NodeStatusUpdateFrequency
-	if err = o.NodeController.ApplyTo(&c.ComponentConfig.NodeController); err != nil {
-		return err
-	}
+	c.ComponentConfig.NodeController.ConcurrentNodeSyncs = o.NodeController.ConcurrentNodeSyncs
 
 	return nil
 }

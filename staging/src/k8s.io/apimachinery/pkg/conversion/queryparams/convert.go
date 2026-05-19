@@ -34,8 +34,8 @@ type Unmarshaler interface {
 }
 
 func jsonTag(field reflect.StructField) (string, bool) {
-	structTag, exists := field.Tag.Lookup("json")
-	if !exists || len(structTag) == 0 {
+	structTag := field.Tag.Get("json")
+	if len(structTag) == 0 {
 		return "", false
 	}
 	parts := strings.Split(structTag, ",")

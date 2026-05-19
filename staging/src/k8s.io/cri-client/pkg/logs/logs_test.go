@@ -31,104 +31,138 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utiltesting "k8s.io/client-go/util/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	apitesting "k8s.io/cri-api/pkg/apis/testing"
 	"k8s.io/utils/ptr"
 )
+
+func TestLogOptions(t *testing.T) {
+	var (
+		line         = int64(8)
+		bytes        = int64(64)
+		timestamp    = metav1.Now()
+		sinceseconds = int64(10)
+	)
+	for c, test := range []struct {
+		apiOpts *v1.PodLogOptions
+		expect  *LogOptions
+	}{
+		{ // empty options
+			apiOpts: &v1.PodLogOptions{},
+			expect:  &LogOptions{tail: -1, bytes: -1},
+		},
+		{ // test tail lines
+			apiOpts: &v1.PodLogOptions{TailLines: &line},
+			expect:  &LogOptions{tail: line, bytes: -1},
+		},
+		{ // test limit bytes
+			apiOpts: &v1.PodLogOptions{LimitBytes: &bytes},
+			expect:  &LogOptions{tail: -1, bytes: bytes},
+		},
+		{ // test since timestamp
+			apiOpts: &v1.PodLogOptions{SinceTime: &timestamp},
+			expect:  &LogOptions{tail: -1, bytes: -1, since: timestamp.Time},
+		},
+		{ // test since seconds
+			apiOpts: &v1.PodLogOptions{SinceSeconds: &sinceseconds},
+			expect:  &LogOptions{tail: -1, bytes: -1, since: timestamp.Add(-10 * time.Second)},
+		},
+	} {
+		t.Logf("TestCase #%d: %+v", c, test)
+		opts := NewLogOptions(test.apiOpts, timestamp.Time)
+		assert.Equal(t, test.expect, opts)
+	}
+}
 
 func TestReadLogs(t *testing.T) {
 	file, err := os.CreateTemp("", "TestFollowLogs")
 	if err != nil {
 		t.Fatalf("unable to create temp file")
 	}
-	t.Cleanup(func() {
-		if err := file.Close(); err != nil {
-			t.Logf("failed to close file: %v", err)
-		}
-		if err := os.Remove(file.Name()); err != nil {
-			t.Logf("failed to remove file: %v", err)
-		}
-	})
+	defer utiltesting.CloseAndRemove(t, file)
 	file.WriteString(`{"log":"line1\n","stream":"stdout","time":"2020-09-27T11:18:01.00000000Z"}` + "\n")
 	file.WriteString(`{"log":"line2\n","stream":"stdout","time":"2020-09-27T11:18:02.00000000Z"}` + "\n")
 	file.WriteString(`{"log":"line3\n","stream":"stdout","time":"2020-09-27T11:18:03.00000000Z"}` + "\n")
 
 	testCases := []struct {
-		name     string
-		opts     LogOptions
-		expected string
+		name          string
+		podLogOptions v1.PodLogOptions
+		expected      string
 	}{
 		{
-			name:     "default pod log options should output all lines",
-			opts:     LogOptions{},
-			expected: "line1\nline2\nline3\n",
+			name:          "default pod log options should output all lines",
+			podLogOptions: v1.PodLogOptions{},
+			expected:      "line1\nline2\nline3\n",
 		},
 		{
 			name: "using TailLines 2 should output last 2 lines",
-			opts: LogOptions{
+			podLogOptions: v1.PodLogOptions{
 				TailLines: ptr.To[int64](2),
 			},
 			expected: "line2\nline3\n",
 		},
 		{
 			name: "using TailLines 4 should output all lines when the log has less than 4 lines",
-			opts: LogOptions{
+			podLogOptions: v1.PodLogOptions{
 				TailLines: ptr.To[int64](4),
 			},
 			expected: "line1\nline2\nline3\n",
 		},
 		{
 			name: "using TailLines 0 should output nothing",
-			opts: LogOptions{
+			podLogOptions: v1.PodLogOptions{
 				TailLines: ptr.To[int64](0),
 			},
 			expected: "",
 		},
 		{
 			name: "using LimitBytes 9 should output first 9 bytes",
-			opts: LogOptions{
+			podLogOptions: v1.PodLogOptions{
 				LimitBytes: ptr.To[int64](9),
 			},
 			expected: "line1\nlin",
 		},
 		{
 			name: "using LimitBytes 100 should output all bytes when the log has less than 100 bytes",
-			opts: LogOptions{
+			podLogOptions: v1.PodLogOptions{
 				LimitBytes: ptr.To[int64](100),
 			},
 			expected: "line1\nline2\nline3\n",
 		},
 		{
 			name: "using LimitBytes 0 should output nothing",
-			opts: LogOptions{
+			podLogOptions: v1.PodLogOptions{
 				LimitBytes: ptr.To[int64](0),
 			},
 			expected: "",
 		},
 		{
 			name: "using SinceTime should output lines with a time on or after the specified time",
-			opts: LogOptions{
-				Since: time.Date(2020, time.Month(9), 27, 11, 18, 02, 0, time.UTC),
+			podLogOptions: v1.PodLogOptions{
+				SinceTime: &metav1.Time{Time: time.Date(2020, time.Month(9), 27, 11, 18, 02, 0, time.UTC)},
 			},
 			expected: "line2\nline3\n",
 		},
 		{
 			name: "using SinceTime now should output nothing",
-			opts: LogOptions{
-				Since: time.Now(),
+			podLogOptions: v1.PodLogOptions{
+				SinceTime: &metav1.Time{Time: time.Now()},
 			},
 			expected: "",
 		},
 		{
 			name: "using follow should output all log lines",
-			opts: LogOptions{
+			podLogOptions: v1.PodLogOptions{
 				Follow: true,
 			},
 			expected: "line1\nline2\nline3\n",
 		},
 		{
 			name: "using follow combined with TailLines 2 should output the last 2 lines",
-			opts: LogOptions{
+			podLogOptions: v1.PodLogOptions{
 				Follow:    true,
 				TailLines: ptr.To[int64](2),
 			},
@@ -136,9 +170,9 @@ func TestReadLogs(t *testing.T) {
 		},
 		{
 			name: "using follow combined with SinceTime should output lines with a time on or after the specified time",
-			opts: LogOptions{
-				Follow: true,
-				Since:  time.Date(2020, time.Month(9), 27, 11, 18, 02, 0, time.UTC),
+			podLogOptions: v1.PodLogOptions{
+				Follow:    true,
+				SinceTime: &metav1.Time{Time: time.Date(2020, time.Month(9), 27, 11, 18, 02, 0, time.UTC)},
 			},
 			expected: "line2\nline3\n",
 		},
@@ -156,13 +190,14 @@ func TestReadLogs(t *testing.T) {
 				},
 			}
 			// If follow is specified, mark the container as exited or else ReadLogs will run indefinitely
-			if tc.opts.Follow {
+			if tc.podLogOptions.Follow {
 				fakeRuntimeService.Containers[containerID].State = runtimeapi.ContainerState_CONTAINER_EXITED
 			}
 
+			opts := NewLogOptions(&tc.podLogOptions, time.Now())
 			stdoutBuf := bytes.NewBuffer(nil)
 			stderrBuf := bytes.NewBuffer(nil)
-			err = ReadLogs(context.TODO(), file.Name(), containerID, &tc.opts, fakeRuntimeService, stdoutBuf, stderrBuf)
+			err = ReadLogs(context.TODO(), nil, file.Name(), containerID, opts, fakeRuntimeService, stdoutBuf, stderrBuf)
 
 			if err != nil {
 				t.Fatal(err.Error())
@@ -200,10 +235,11 @@ func TestReadRotatedLog(t *testing.T) {
 	// Start to follow the container's log.
 	fileName := file.Name()
 	go func(ctx context.Context) {
-		opts := LogOptions{
+		podLogOptions := v1.PodLogOptions{
 			Follow: true,
 		}
-		_ = ReadLogs(ctx, fileName, containerID, &opts, fakeRuntimeService, stdoutBuf, stderrBuf)
+		opts := NewLogOptions(&podLogOptions, time.Now())
+		_ = ReadLogs(ctx, nil, fileName, containerID, opts, fakeRuntimeService, stdoutBuf, stderrBuf)
 	}(ctx)
 
 	// log in stdout
@@ -376,7 +412,7 @@ func TestWriteLogs(t *testing.T) {
 		}
 		stdoutBuf := bytes.NewBuffer(nil)
 		stderrBuf := bytes.NewBuffer(nil)
-		w := newLogWriter(stdoutBuf, stderrBuf, &LogOptions{Since: test.since, Timestamp: test.timestamp})
+		w := newLogWriter(stdoutBuf, stderrBuf, &LogOptions{since: test.since, timestamp: test.timestamp, bytes: -1})
 		err := w.write(msg, true)
 		assert.NoError(t, err)
 		assert.Equal(t, test.expectStdout, stdoutBuf.String())
@@ -438,7 +474,7 @@ func TestWriteLogsWithBytesLimit(t *testing.T) {
 		}
 		stdoutBuf := bytes.NewBuffer(nil)
 		stderrBuf := bytes.NewBuffer(nil)
-		w := newLogWriter(stdoutBuf, stderrBuf, &LogOptions{Timestamp: test.timestamp, LimitBytes: ptr.To(int64(test.bytes))})
+		w := newLogWriter(stdoutBuf, stderrBuf, &LogOptions{timestamp: test.timestamp, bytes: int64(test.bytes)})
 		for i := 0; i < test.stdoutLines; i++ {
 			msg.stream = runtimeapi.Stdout
 			if err := w.write(msg, true); err != nil {
@@ -485,7 +521,7 @@ func TestReadLogsLimitsWithTimestamps(t *testing.T) {
 	var buf bytes.Buffer
 	w := io.MultiWriter(&buf)
 
-	err = ReadLogs(context.Background(), tmpfile.Name(), "", &LogOptions{Timestamp: true}, nil, w, w)
+	err = ReadLogs(context.Background(), nil, tmpfile.Name(), "", &LogOptions{tail: -1, bytes: -1, timestamp: true}, nil, w, w)
 	assert.NoError(t, err)
 
 	lineCount := 0
@@ -543,16 +579,11 @@ func TestOnlyStdoutStream(t *testing.T) {
 			expectedStdout: "out1\nou",
 		},
 	}
-
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
 			stdoutBuf := bytes.NewBuffer(nil)
-			var bytesPtr *int64
-			if tc.limitBytes >= 0 {
-				bytesPtr = ptr.To(tc.limitBytes)
-			}
 			w := newLogWriter(stdoutBuf, nil, &LogOptions{
-				LimitBytes: bytesPtr,
+				bytes: tc.limitBytes,
 			})
 			for _, msg := range msgs {
 				err := w.write(msg, false)

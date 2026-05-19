@@ -40,8 +40,8 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	apiserverfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
-	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -58,13 +58,13 @@ import (
 
 // podStrategy implements behavior for Pods
 type podStrategy struct {
-	rest.DeclarativeValidation
+	runtime.ObjectTyper
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Pod
 // objects via the REST API.
-var Strategy = podStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
+var Strategy = podStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped is true for pods.
 func (podStrategy) NamespaceScoped() bool {
@@ -133,7 +133,7 @@ func (podStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for pods.
-func (podStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
+func (podStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
@@ -155,7 +155,7 @@ func (podStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object
 }
 
 // AllowUnconditionalUpdate allows pods to be overwritten
-func (podStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+func (podStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
@@ -384,7 +384,9 @@ func dropNonResizeUpdates(newPod, oldPod *api.Pod) *api.Pod {
 	metav1.ResetObjectMetaForStatus(&newPod.ObjectMeta, &oldPod.ObjectMeta)
 
 	newPod.Spec.Containers = containers
-	newPod.Spec.InitContainers = initContainers
+	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarContainers) {
+		newPod.Spec.InitContainers = initContainers
+	}
 
 	return newPod
 }
@@ -451,11 +453,15 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 
 // MatchPod returns a generic matcher for a given label and field selector.
 func MatchPod(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
+	var indexFields = []string{"spec.nodeName"}
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageNamespaceIndex) && !utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.BtreeWatchCache) {
+		indexFields = append(indexFields, "metadata.namespace")
+	}
 	return storage.SelectionPredicate{
 		Label:       label,
 		Field:       field,
 		GetAttrs:    GetAttrs,
-		IndexFields: []string{"spec.nodeName"},
+		IndexFields: indexFields,
 	}
 }
 
@@ -473,11 +479,24 @@ func NodeNameIndexFunc(obj interface{}) ([]string, error) {
 	return []string{pod.Spec.NodeName}, nil
 }
 
+// NamespaceIndexFunc return value name of given object.
+func NamespaceIndexFunc(obj interface{}) ([]string, error) {
+	pod, ok := obj.(*api.Pod)
+	if !ok {
+		return nil, fmt.Errorf("not a pod")
+	}
+	return []string{pod.Namespace}, nil
+}
+
 // Indexers returns the indexers for pod storage.
 func Indexers() *cache.Indexers {
-	return &cache.Indexers{
+	var indexers = cache.Indexers{
 		storage.FieldIndex("spec.nodeName"): NodeNameIndexFunc,
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.StorageNamespaceIndex) && !utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.BtreeWatchCache) {
+		indexers[storage.FieldIndex("metadata.namespace")] = NamespaceIndexFunc
+	}
+	return &indexers
 }
 
 // ToSelectableFields returns a field set that represents the object
@@ -716,7 +735,7 @@ func AttachLocation(
 	connInfo client.ConnectionInfoGetter,
 	name string,
 	opts *api.PodAttachOptions,
-) (*url.URL, *client.ConnectionInfo, error) {
+) (*url.URL, http.RoundTripper, error) {
 	return streamLocation(ctx, getter, connInfo, name, opts, opts.Container, "attach")
 }
 
@@ -728,7 +747,7 @@ func ExecLocation(
 	connInfo client.ConnectionInfoGetter,
 	name string,
 	opts *api.PodExecOptions,
-) (*url.URL, *client.ConnectionInfo, error) {
+) (*url.URL, http.RoundTripper, error) {
 	return streamLocation(ctx, getter, connInfo, name, opts, opts.Container, "exec")
 }
 
@@ -740,7 +759,7 @@ func streamLocation(
 	opts runtime.Object,
 	container,
 	path string,
-) (*url.URL, *client.ConnectionInfo, error) {
+) (*url.URL, http.RoundTripper, error) {
 	pod, err := getPod(ctx, getter, name)
 	if err != nil {
 		return nil, nil, err
@@ -772,7 +791,7 @@ func streamLocation(
 		Path:     fmt.Sprintf("/%s/%s/%s/%s", path, pod.Namespace, pod.Name, container),
 		RawQuery: params.Encode(),
 	}
-	return loc, nodeInfo, nil
+	return loc, nodeInfo.Transport, nil
 }
 
 // PortForwardLocation returns the port-forward URL for a pod.
@@ -782,7 +801,7 @@ func PortForwardLocation(
 	connInfo client.ConnectionInfoGetter,
 	name string,
 	opts *api.PodPortForwardOptions,
-) (*url.URL, *client.ConnectionInfo, error) {
+) (*url.URL, http.RoundTripper, error) {
 	pod, err := getPod(ctx, getter, name)
 	if err != nil {
 		return nil, nil, err
@@ -807,7 +826,7 @@ func PortForwardLocation(
 		Path:     fmt.Sprintf("/portForward/%s/%s", pod.Namespace, pod.Name),
 		RawQuery: params.Encode(),
 	}
-	return loc, nodeInfo, nil
+	return loc, nodeInfo.Transport, nil
 }
 
 // validateContainer validate container is valid for pod, return valid container

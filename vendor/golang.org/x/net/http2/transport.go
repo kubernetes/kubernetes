@@ -376,23 +376,10 @@ type ClientConn struct {
 	// completely unresponsive connection.
 	pendingResets int
 
-	// readBeforeStreamID is the smallest stream ID that has not been followed by
-	// a frame read from the peer. We use this to determine when a request may
-	// have been sent to a completely unresponsive connection:
-	// If the request ID is less than readBeforeStreamID, then we have had some
-	// indication of life on the connection since sending the request.
-	readBeforeStreamID uint32
-
 	// reqHeaderMu is a 1-element semaphore channel controlling access to sending new requests.
 	// Write to reqHeaderMu to lock it, read from it to unlock.
 	// Lock reqmu BEFORE mu or wmu.
 	reqHeaderMu chan struct{}
-
-	// internalStateHook reports state changes back to the net/http.ClientConn.
-	// Note that this is different from the user state hook registered by
-	// net/http.ClientConn.SetStateHook: The internal hook calls ClientConn,
-	// which calls the user hook.
-	internalStateHook func()
 
 	// wmu is held while writing.
 	// Acquire BEFORE mu when holding both, to avoid blocking mu on network writes.
@@ -712,12 +699,19 @@ func canRetryError(err error) bool {
 		return true
 	}
 	if se, ok := err.(StreamError); ok {
+		if se.Code == ErrCodeProtocol && se.Cause == errFromPeer {
+			// See golang/go#47635, golang/go#42777
+			return true
+		}
 		return se.Code == ErrCodeRefusedStream
 	}
 	return false
 }
 
 func (t *Transport) dialClientConn(ctx context.Context, addr string, singleUse bool) (*ClientConn, error) {
+	if t.transportTestHooks != nil {
+		return t.newClientConn(nil, singleUse)
+	}
 	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, err
@@ -726,7 +720,7 @@ func (t *Transport) dialClientConn(ctx context.Context, addr string, singleUse b
 	if err != nil {
 		return nil, err
 	}
-	return t.newClientConn(tconn, singleUse, nil)
+	return t.newClientConn(tconn, singleUse)
 }
 
 func (t *Transport) newTLSConfig(host string) *tls.Config {
@@ -778,10 +772,10 @@ func (t *Transport) expectContinueTimeout() time.Duration {
 }
 
 func (t *Transport) NewClientConn(c net.Conn) (*ClientConn, error) {
-	return t.newClientConn(c, t.disableKeepAlives(), nil)
+	return t.newClientConn(c, t.disableKeepAlives())
 }
 
-func (t *Transport) newClientConn(c net.Conn, singleUse bool, internalStateHook func()) (*ClientConn, error) {
+func (t *Transport) newClientConn(c net.Conn, singleUse bool) (*ClientConn, error) {
 	conf := configFromTransport(t)
 	cc := &ClientConn{
 		t:                           t,
@@ -803,7 +797,6 @@ func (t *Transport) newClientConn(c net.Conn, singleUse bool, internalStateHook 
 		pings:                       make(map[[8]byte]chan struct{}),
 		reqHeaderMu:                 make(chan struct{}, 1),
 		lastActive:                  time.Now(),
-		internalStateHook:           internalStateHook,
 	}
 	if t.transportTestHooks != nil {
 		t.transportTestHooks.newclientconn(cc)
@@ -1044,7 +1037,10 @@ func (cc *ClientConn) idleStateLocked() (st clientConnIdleState) {
 		maxConcurrentOkay = cc.currentRequestCountLocked() < int(cc.maxConcurrentStreams)
 	}
 
-	st.canTakeNewRequest = maxConcurrentOkay && cc.isUsableLocked()
+	st.canTakeNewRequest = cc.goAway == nil && !cc.closed && !cc.closing && maxConcurrentOkay &&
+		!cc.doNotReuse &&
+		int64(cc.nextStreamID)+2*int64(cc.pendingRequests) < math.MaxInt32 &&
+		!cc.tooIdleLocked()
 
 	// If this connection has never been used for a request and is closed,
 	// then let it take a request (which will fail).
@@ -1060,31 +1056,6 @@ func (cc *ClientConn) idleStateLocked() (st clientConnIdleState) {
 	return
 }
 
-func (cc *ClientConn) isUsableLocked() bool {
-	return cc.goAway == nil &&
-		!cc.closed &&
-		!cc.closing &&
-		!cc.doNotReuse &&
-		int64(cc.nextStreamID)+2*int64(cc.pendingRequests) < math.MaxInt32 &&
-		!cc.tooIdleLocked()
-}
-
-// canReserveLocked reports whether a net/http.ClientConn can reserve a slot on this conn.
-//
-// This follows slightly different rules than clientConnIdleState.canTakeNewRequest.
-// We only permit reservations up to the conn's concurrency limit.
-// This differs from ClientConn.ReserveNewRequest, which permits reservations
-// past the limit when StrictMaxConcurrentStreams is set.
-func (cc *ClientConn) canReserveLocked() bool {
-	if cc.currentRequestCountLocked() >= int(cc.maxConcurrentStreams) {
-		return false
-	}
-	if !cc.isUsableLocked() {
-		return false
-	}
-	return true
-}
-
 // currentRequestCountLocked reports the number of concurrency slots currently in use,
 // including active streams, reserved slots, and reset streams waiting for acknowledgement.
 func (cc *ClientConn) currentRequestCountLocked() int {
@@ -1094,14 +1065,6 @@ func (cc *ClientConn) currentRequestCountLocked() int {
 func (cc *ClientConn) canTakeNewRequestLocked() bool {
 	st := cc.idleStateLocked()
 	return st.canTakeNewRequest
-}
-
-// availableLocked reports the number of concurrency slots available.
-func (cc *ClientConn) availableLocked() int {
-	if !cc.canTakeNewRequestLocked() {
-		return 0
-	}
-	return max(0, int(cc.maxConcurrentStreams)-cc.currentRequestCountLocked())
 }
 
 // tooIdleLocked reports whether this connection has been been sitting idle
@@ -1128,7 +1091,6 @@ func (cc *ClientConn) closeConn() {
 	t := time.AfterFunc(250*time.Millisecond, cc.forceCloseConn)
 	defer t.Stop()
 	cc.tconn.Close()
-	cc.maybeCallStateHook()
 }
 
 // A tls.Conn.Close can hang for a long time if the peer is unresponsive.
@@ -1654,8 +1616,6 @@ func (cs *clientStream) cleanupWriteRequest(err error) {
 	}
 	bodyClosed := cs.reqBodyClosed
 	closeOnIdle := cc.singleUse || cc.doNotReuse || cc.t.disableKeepAlives() || cc.goAway != nil
-	// Have we read any frames from the connection since sending this request?
-	readSinceStream := cc.readBeforeStreamID > cs.ID
 	cc.mu.Unlock()
 	if mustCloseBody {
 		cs.reqBody.Close()
@@ -1687,10 +1647,8 @@ func (cs *clientStream) cleanupWriteRequest(err error) {
 				//
 				// This could be due to the server becoming unresponsive.
 				// To avoid sending too many requests on a dead connection,
-				// if we haven't read any frames from the connection since
-				// sending this request, we let it continue to consume
-				// a concurrency slot until we can confirm the server is
-				// still responding.
+				// we let the request continue to consume a concurrency slot
+				// until we can confirm the server is still responding.
 				// We do this by sending a PING frame along with the RST_STREAM
 				// (unless a ping is already in flight).
 				//
@@ -1701,7 +1659,7 @@ func (cs *clientStream) cleanupWriteRequest(err error) {
 				// because it's short lived and will probably be closed before
 				// we get the ping response.
 				ping := false
-				if !closeOnIdle && !readSinceStream {
+				if !closeOnIdle {
 					cc.mu.Lock()
 					// rstStreamPingsBlocked works around a gRPC behavior:
 					// see comment on the field for details.
@@ -1735,7 +1693,6 @@ func (cs *clientStream) cleanupWriteRequest(err error) {
 	}
 
 	close(cs.donec)
-	cc.maybeCallStateHook()
 }
 
 // awaitOpenSlotForStreamLocked waits until len(streams) < maxConcurrentStreams.
@@ -2772,11 +2729,6 @@ func (rl *clientConnReadLoop) endStreamError(cs *clientStream, err error) {
 	cs.abortStream(err)
 }
 
-func (rl *clientConnReadLoop) endStreamErrorLocked(cs *clientStream, err error) {
-	cs.readAborted = true
-	cs.abortStreamLocked(err)
-}
-
 // Constants passed to streamByID for documentation purposes.
 const (
 	headerOrDataFrame    = true
@@ -2793,7 +2745,6 @@ func (rl *clientConnReadLoop) streamByID(id uint32, headerOrData bool) *clientSt
 		// See comment on ClientConn.rstStreamPingsBlocked for details.
 		rl.cc.rstStreamPingsBlocked = false
 	}
-	rl.cc.readBeforeStreamID = rl.cc.nextStreamID
 	cs := rl.cc.streams[id]
 	if cs != nil && !cs.readAborted {
 		return cs
@@ -2844,7 +2795,6 @@ func (rl *clientConnReadLoop) processSettings(f *SettingsFrame) error {
 
 func (rl *clientConnReadLoop) processSettingsNoWrite(f *SettingsFrame) error {
 	cc := rl.cc
-	defer cc.maybeCallStateHook()
 	cc.mu.Lock()
 	defer cc.mu.Unlock()
 
@@ -2858,9 +2808,6 @@ func (rl *clientConnReadLoop) processSettingsNoWrite(f *SettingsFrame) error {
 
 	var seenMaxConcurrentStreams bool
 	err := f.ForeachSetting(func(s Setting) error {
-		if err := s.Valid(); err != nil {
-			return err
-		}
 		switch s.ID {
 		case SettingMaxFrameSize:
 			cc.maxFrameSize = s.Val
@@ -2892,6 +2839,9 @@ func (rl *clientConnReadLoop) processSettingsNoWrite(f *SettingsFrame) error {
 			cc.henc.SetMaxDynamicTableSize(s.Val)
 			cc.peerMaxHeaderTableSize = s.Val
 		case SettingEnableConnectProtocol:
+			if err := s.Valid(); err != nil {
+				return err
+			}
 			// If the peer wants to send us SETTINGS_ENABLE_CONNECT_PROTOCOL,
 			// we require that it do so in the first SETTINGS frame.
 			//
@@ -2944,7 +2894,7 @@ func (rl *clientConnReadLoop) processWindowUpdate(f *WindowUpdateFrame) error {
 	if !fl.add(int32(f.Increment)) {
 		// For stream, the sender sends RST_STREAM with an error code of FLOW_CONTROL_ERROR
 		if cs != nil {
-			rl.endStreamErrorLocked(cs, StreamError{
+			rl.endStreamError(cs, StreamError{
 				StreamID: f.StreamID,
 				Code:     ErrCodeFlowControl,
 			})
@@ -3025,7 +2975,6 @@ func (cc *ClientConn) Ping(ctx context.Context) error {
 func (rl *clientConnReadLoop) processPing(f *PingFrame) error {
 	if f.IsAck() {
 		cc := rl.cc
-		defer cc.maybeCallStateHook()
 		cc.mu.Lock()
 		defer cc.mu.Unlock()
 		// If ack, notify listener if any
@@ -3226,6 +3175,10 @@ func (gz *gzipReader) Close() error {
 	return gz.body.Close()
 }
 
+type errorReader struct{ err error }
+
+func (r errorReader) Read(p []byte) (int, error) { return 0, r.err }
+
 // isConnectionCloseRequest reports whether req should use its own
 // connection for a single request and then close the connection.
 func isConnectionCloseRequest(req *http.Request) bool {
@@ -3245,13 +3198,9 @@ func registerHTTPSProtocol(t *http.Transport, rt noDialH2RoundTripper) (err erro
 }
 
 // noDialH2RoundTripper is a RoundTripper which only tries to complete the request
-// if there's already a cached connection to the host.
+// if there's already has a cached connection to the host.
 // (The field is exported so it can be accessed via reflect from net/http; tested
 // by TestNoDialH2RoundTripperType)
-//
-// A noDialH2RoundTripper is registered with http1.Transport.RegisterProtocol,
-// and the http1.Transport can use type assertions to call non-RoundTrip methods on it.
-// This lets us expose, for example, NewClientConn to net/http.
 type noDialH2RoundTripper struct{ *Transport }
 
 func (rt noDialH2RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -3260,85 +3209,6 @@ func (rt noDialH2RoundTripper) RoundTrip(req *http.Request) (*http.Response, err
 		return nil, http.ErrSkipAltProtocol
 	}
 	return res, err
-}
-
-func (rt noDialH2RoundTripper) NewClientConn(conn net.Conn, internalStateHook func()) (http.RoundTripper, error) {
-	tr := rt.Transport
-	cc, err := tr.newClientConn(conn, tr.disableKeepAlives(), internalStateHook)
-	if err != nil {
-		return nil, err
-	}
-
-	// RoundTrip should block when the conn is at its concurrency limit,
-	// not return an error. Setting strictMaxConcurrentStreams enables this.
-	cc.strictMaxConcurrentStreams = true
-
-	return netHTTPClientConn{cc}, nil
-}
-
-// netHTTPClientConn wraps ClientConn and implements the interface net/http expects from
-// the RoundTripper returned by NewClientConn.
-type netHTTPClientConn struct {
-	cc *ClientConn
-}
-
-func (cc netHTTPClientConn) RoundTrip(req *http.Request) (*http.Response, error) {
-	return cc.cc.RoundTrip(req)
-}
-
-func (cc netHTTPClientConn) Close() error {
-	return cc.cc.Close()
-}
-
-func (cc netHTTPClientConn) Err() error {
-	cc.cc.mu.Lock()
-	defer cc.cc.mu.Unlock()
-	if cc.cc.closed {
-		return errors.New("connection closed")
-	}
-	return nil
-}
-
-func (cc netHTTPClientConn) Reserve() error {
-	defer cc.cc.maybeCallStateHook()
-	cc.cc.mu.Lock()
-	defer cc.cc.mu.Unlock()
-	if !cc.cc.canReserveLocked() {
-		return errors.New("connection is unavailable")
-	}
-	cc.cc.streamsReserved++
-	return nil
-}
-
-func (cc netHTTPClientConn) Release() {
-	defer cc.cc.maybeCallStateHook()
-	cc.cc.mu.Lock()
-	defer cc.cc.mu.Unlock()
-	// We don't complain if streamsReserved is 0.
-	//
-	// This is consistent with RoundTrip: both Release and RoundTrip will
-	// consume a reservation iff one exists.
-	if cc.cc.streamsReserved > 0 {
-		cc.cc.streamsReserved--
-	}
-}
-
-func (cc netHTTPClientConn) Available() int {
-	cc.cc.mu.Lock()
-	defer cc.cc.mu.Unlock()
-	return cc.cc.availableLocked()
-}
-
-func (cc netHTTPClientConn) InFlight() int {
-	cc.cc.mu.Lock()
-	defer cc.cc.mu.Unlock()
-	return cc.cc.currentRequestCountLocked()
-}
-
-func (cc *ClientConn) maybeCallStateHook() {
-	if cc.internalStateHook != nil {
-		cc.internalStateHook()
-	}
 }
 
 func (t *Transport) idleConnTimeout() time.Duration {

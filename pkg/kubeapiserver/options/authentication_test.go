@@ -42,6 +42,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
+	"k8s.io/apiserver/pkg/features"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -245,6 +246,18 @@ func TestAuthenticationValidate(t *testing.T) {
 				FlagsSet:      true,
 			},
 			expectErr: "authentication-config file and oidc-* flags are mutually exclusive",
+		},
+		{
+			name:                         "test when authentication config file and anonymous-auth flags are set AnonymousAuthConfigurableEndpoints disabled",
+			disabledFeatures:             []featuregate.Feature{features.AnonymousAuthConfigurableEndpoints},
+			testAuthenticationConfigFile: "configfile",
+			testAnonymous: &AnonymousAuthenticationOptions{
+				Allow:    true,
+				FlagsSet: true,
+			},
+			// This allows us to disable the AnonymousAuthConfigurableEndpoints
+			// feature-gate, otherwise this feature-gate cannot be disabled.
+			emulationVersion: version.MustParse("1.33"),
 		},
 		{
 			name:       "overlapping CA without allowed-names",
@@ -541,10 +554,11 @@ func TestWithTokenGetterFunction(t *testing.T) {
 
 func TestToAuthenticationConfig_Anonymous(t *testing.T) {
 	testCases := []struct {
-		name         string
-		args         []string
-		expectConfig kubeauthenticator.Config
-		expectErr    string
+		name                     string
+		args                     []string
+		expectConfig             kubeauthenticator.Config
+		enableAnonymousEndpoints bool
+		expectErr                string
 	}{
 		{
 			name: "flag-none",
@@ -574,7 +588,20 @@ func TestToAuthenticationConfig_Anonymous(t *testing.T) {
 			},
 		},
 		{
-			name: "file-anonymous-disabled",
+			name: "file-anonymous-disabled-AnonymousAuthConfigurableEndpoints-disabled",
+			args: []string{
+				"--authentication-config=" + writeTempFile(t, `
+apiVersion: apiserver.config.k8s.io/v1
+kind: AuthenticationConfiguration
+anonymous:
+  enabled: false
+`),
+			},
+			expectErr: "anonymous is not supported when AnonymousAuthConfigurableEndpoints feature gate is disabled",
+		},
+		{
+			name:                     "file-anonymous-disabled-AnonymousAuthConfigurableEndpoints-enabled",
+			enableAnonymousEndpoints: true,
 			args: []string{
 				"--authentication-config=" + writeTempFile(t, `
 apiVersion: apiserver.config.k8s.io/v1
@@ -599,7 +626,8 @@ anonymous:
 			},
 		},
 		{
-			name: "file-anonymous-enabled",
+			name:                     "file-anonymous-enabled-AnonymousAuthConfigurableEndpoints-enabled",
+			enableAnonymousEndpoints: true,
 			args: []string{
 				"--authentication-config=" + writeTempFile(t, `
 apiVersion: apiserver.config.k8s.io/v1
@@ -624,7 +652,8 @@ anonymous:
 			},
 		},
 		{
-			name: "file-anonymous-disabled-with-conditions",
+			name:                     "file-anonymous-disabled-with-conditions-AnonymousAuthConfigurableEndpoints-enabled",
+			enableAnonymousEndpoints: true,
 			args: []string{
 				"--authentication-config=" + writeTempFile(t, `
 apiVersion: apiserver.config.k8s.io/v1
@@ -638,7 +667,8 @@ anonymous:
 			expectErr: "enabled should be set to true when conditions are defined",
 		},
 		{
-			name: "file-anonymous-missing-with-conditions",
+			name:                     "file-anonymous-missing-with-conditions-AnonymousAuthConfigurableEndpoints-enabled",
+			enableAnonymousEndpoints: true,
 			args: []string{
 				"--authentication-config=" + writeTempFile(t, `
 apiVersion: apiserver.config.k8s.io/v1
@@ -651,7 +681,8 @@ anonymous:
 			expectErr: "enabled should be set to true when conditions are defined",
 		},
 		{
-			name: "file-anonymous-enabled-with-conditions",
+			name:                     "file-anonymous-enabled-with-conditions-AnonymousAuthConfigurableEndpoints-enabled",
+			enableAnonymousEndpoints: true,
 			args: []string{
 				"--authentication-config=" + writeTempFile(t, `
 apiVersion: apiserver.config.k8s.io/v1
@@ -694,7 +725,8 @@ anonymous:
 			},
 		},
 		{
-			name: "flag-anonymous-enabled-file-anonymous-enabled",
+			name:                     "flag-anonymous-enabled-file-anonymous-enabled-AnonymousAuthConfigurableEndpoints-enabled",
+			enableAnonymousEndpoints: true,
 			args: []string{"--anonymous-auth=True",
 				"--authentication-config=" + writeTempFile(t, `
 apiVersion: apiserver.config.k8s.io/v1
@@ -706,7 +738,8 @@ anonymous:
 			expectErr: "--anonymous-auth flag cannot be set when anonymous field is configured in authentication configuration file",
 		},
 		{
-			name: "flag-anonymous-enabled-file-anonymous-notset",
+			name:                     "flag-anonymous-enabled-file-anonymous-notset-AnonymousAuthConfigurableEndpoints-enabled",
+			enableAnonymousEndpoints: true,
 			args: []string{"--anonymous-auth=True",
 				"--authentication-config=" + writeTempFile(t, `
 apiVersion: apiserver.config.k8s.io/v1
@@ -759,6 +792,11 @@ jwt:
 
 	for _, testcase := range testCases {
 		t.Run(testcase.name, func(t *testing.T) {
+			if !testcase.enableAnonymousEndpoints {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AnonymousAuthConfigurableEndpoints, testcase.enableAnonymousEndpoints)
+
 			opts := NewBuiltInAuthenticationOptions().WithAnonymous()
 			pf := pflag.NewFlagSet("test-builtin-authentication-opts", pflag.ContinueOnError)
 			opts.AddFlags(pf)
@@ -1089,9 +1127,10 @@ jwt:
 
 func TestValidateOIDCOptions(t *testing.T) {
 	testCases := []struct {
-		name      string
-		args      []string
-		expectErr string
+		name                                  string
+		args                                  []string
+		structuredAuthenticationConfigEnabled bool
+		expectErr                             string
 	}{
 		{
 			name: "issuer url and client id are not set",
@@ -1123,6 +1162,13 @@ func TestValidateOIDCOptions(t *testing.T) {
 				"--oidc-issuer-url=https://testIssuerURL",
 			},
 			expectErr: "",
+		},
+		{
+			name: "authentication-config file, feature gate is not enabled",
+			args: []string{
+				"--authentication-config=configfile",
+			},
+			expectErr: "set --feature-gates=StructuredAuthenticationConfiguration=true to use authentication-config file",
 		},
 		{
 			name: "authentication-config file, --oidc-issuer-url is set",
@@ -1201,7 +1247,8 @@ func TestValidateOIDCOptions(t *testing.T) {
 			args: []string{
 				"--authentication-config=configfile",
 			},
-			expectErr: "",
+			expectErr:                             "",
+			structuredAuthenticationConfigEnabled: true,
 		},
 		{
 			name: "authentication-config file, --oidc-username-claim flag explicitly set with default value should error",
@@ -1216,12 +1263,18 @@ func TestValidateOIDCOptions(t *testing.T) {
 			args: []string{
 				"--authentication-config=configfile",
 			},
-			expectErr: "",
+			structuredAuthenticationConfigEnabled: true,
+			expectErr:                             "",
 		},
 	}
 
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
+			if !tt.structuredAuthenticationConfigEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
+			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StructuredAuthenticationConfiguration, tt.structuredAuthenticationConfigEnabled)
+
 			opts := NewBuiltInAuthenticationOptions().WithOIDC()
 			pf := pflag.NewFlagSet("test-builtin-authentication-opts", pflag.ContinueOnError)
 			opts.AddFlags(pf)

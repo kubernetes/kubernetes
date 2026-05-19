@@ -30,13 +30,14 @@ func TestRunner(t *testing.T) {
 	)
 	done := make(chan struct{}, 20)
 	for i := 0; i < 10; i++ {
+		iCopy := i
 		funcs = append(funcs, func(c chan struct{}) {
 			lock.Lock()
-			events = append(events, fmt.Sprintf("%v starting\n", i))
+			events = append(events, fmt.Sprintf("%v starting\n", iCopy))
 			lock.Unlock()
 			<-c
 			lock.Lock()
-			events = append(events, fmt.Sprintf("%v stopping\n", i))
+			events = append(events, fmt.Sprintf("%v stopping\n", iCopy))
 			lock.Unlock()
 			done <- struct{}{}
 		})

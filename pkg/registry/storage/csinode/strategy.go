@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/storage"
@@ -30,13 +29,13 @@ import (
 
 // csiNodeStrategy implements behavior for CSINode objects
 type csiNodeStrategy struct {
-	rest.DeclarativeValidation
+	runtime.ObjectTyper
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating
 // CSINode objects via the REST API.
-var Strategy = csiNodeStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
+var Strategy = csiNodeStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 func (csiNodeStrategy) NamespaceScoped() bool {
 	return false
@@ -48,7 +47,13 @@ func (csiNodeStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object)
 
 func (csiNodeStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	csiNode := obj.(*storage.CSINode)
-	return validation.ValidateCSINode(csiNode)
+	validateOptions := validation.CSINodeValidationOptions{
+		AllowLongNodeID: true,
+	}
+
+	errs := validation.ValidateCSINode(csiNode, validateOptions)
+
+	return errs
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -58,7 +63,7 @@ func (csiNodeStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object)
 func (csiNodeStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (csiNodeStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
+func (csiNodeStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
@@ -69,7 +74,12 @@ func (csiNodeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Ob
 func (csiNodeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newCSINodeObj := obj.(*storage.CSINode)
 	oldCSINodeObj := old.(*storage.CSINode)
-	return validation.ValidateCSINodeUpdate(newCSINodeObj, oldCSINodeObj)
+	validateOptions := validation.CSINodeValidationOptions{
+		AllowLongNodeID: true,
+	}
+
+	errorList := validation.ValidateCSINode(newCSINodeObj, validateOptions)
+	return append(errorList, validation.ValidateCSINodeUpdate(newCSINodeObj, oldCSINodeObj, validateOptions)...)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -77,6 +87,6 @@ func (csiNodeStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Ob
 	return nil
 }
 
-func (csiNodeStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+func (csiNodeStrategy) AllowUnconditionalUpdate() bool {
 	return false
 }

@@ -15,6 +15,7 @@
 package etcdserver
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/binary"
@@ -174,7 +175,7 @@ func (s *EtcdServer) Txn(ctx context.Context, r *pb.TxnRequest) (*pb.TxnResponse
 		var resp *pb.TxnResponse
 		var err error
 		chk := func(ai *auth.AuthInfo) error {
-			return apply2.CheckTxnAuth(s.authStore, ai, s.lessor, r)
+			return txn.CheckTxnAuth(s.authStore, ai, r)
 		}
 
 		defer func(start time.Time) {
@@ -250,11 +251,6 @@ func (s *EtcdServer) LeaseGrant(ctx context.Context, r *pb.LeaseGrantRequest) (*
 		// only use positive int64 id's
 		r.ID = int64(s.reqIDGen.Next() & ((1 << 63) - 1))
 	}
-
-	if err := s.requireAuthInfo(ctx); err != nil {
-		return nil, err
-	}
-
 	resp, err := s.raftRequestOnce(ctx, pb.InternalRaftRequest{LeaseGrant: r})
 	if err != nil {
 		return nil, err
@@ -275,10 +271,6 @@ func (s *EtcdServer) waitAppliedIndex() error {
 }
 
 func (s *EtcdServer) LeaseRevoke(ctx context.Context, r *pb.LeaseRevokeRequest) (*pb.LeaseRevokeResponse, error) {
-	if err := s.requireAuthInfo(ctx); err != nil {
-		return nil, err
-	}
-
 	resp, err := s.raftRequestOnce(ctx, pb.InternalRaftRequest{LeaseRevoke: r})
 	if err != nil {
 		return nil, err
@@ -302,10 +294,6 @@ func (s *EtcdServer) LeaseRenew(ctx context.Context, id lease.LeaseID) (int64, e
 			return 0, err
 		}
 
-		if err := s.checkLeaseRenew(ctx, id); err != nil {
-			return 0, err
-		}
-
 		ttl, err := s.lessor.Renew(id)
 		if err == nil { // already requested to primary lessor(leader)
 			return ttl, nil
@@ -324,11 +312,6 @@ func (s *EtcdServer) LeaseRenew(ctx context.Context, id lease.LeaseID) (int64, e
 		if lerr != nil {
 			return -1, lerr
 		}
-
-		if err := s.checkLeaseRenew(ctx, id); err != nil {
-			return 0, err
-		}
-
 		for _, url := range leader.PeerURLs {
 			lurl := url + leasehttp.LeasePrefix
 			ttl, err := leasehttp.RenewHTTP(cctx, id, lurl, s.peerRt)
@@ -346,39 +329,6 @@ func (s *EtcdServer) LeaseRenew(ctx context.Context, id lease.LeaseID) (int64, e
 	return -1, errors.ErrCanceled
 }
 
-func (s *EtcdServer) checkLeaseRenew(ctx context.Context, leaseID lease.LeaseID) error {
-	rev := s.AuthStore().Revision()
-	if !s.AuthStore().IsAuthEnabled() {
-		return nil
-	}
-
-	authInfo, err := s.AuthInfoFromCtx(ctx)
-	if err != nil {
-		return err
-	}
-	if authInfo == nil {
-		return auth.ErrUserEmpty
-	}
-
-	if s.AuthStore().IsAdminPermitted(authInfo) == nil {
-		return nil
-	}
-
-	l := s.lessor.Lookup(leaseID)
-	if l != nil {
-		for _, key := range l.Keys() {
-			if err := s.AuthStore().IsPutPermitted(authInfo, []byte(key)); err != nil {
-				return err
-			}
-		}
-	}
-
-	if rev != s.AuthStore().Revision() {
-		return auth.ErrAuthOldRevision
-	}
-	return nil
-}
-
 func (s *EtcdServer) checkLeaseTimeToLive(ctx context.Context, leaseID lease.LeaseID) (uint64, error) {
 	rev := s.AuthStore().Revision()
 	if !s.AuthStore().IsAuthEnabled() {
@@ -390,10 +340,6 @@ func (s *EtcdServer) checkLeaseTimeToLive(ctx context.Context, leaseID lease.Lea
 	}
 	if authInfo == nil {
 		return rev, auth.ErrUserEmpty
-	}
-
-	if s.AuthStore().IsAdminPermitted(authInfo) == nil {
-		return rev, nil
 	}
 
 	l := s.lessor.Lookup(leaseID)
@@ -471,10 +417,6 @@ func (s *EtcdServer) leaseTimeToLive(ctx context.Context, r *pb.LeaseTimeToLiveR
 }
 
 func (s *EtcdServer) LeaseTimeToLive(ctx context.Context, r *pb.LeaseTimeToLiveRequest) (*pb.LeaseTimeToLiveResponse, error) {
-	if err := s.requireAuthInfo(ctx); err != nil {
-		return nil, err
-	}
-
 	var rev uint64
 	var err error
 	if r.Keys {
@@ -508,52 +450,13 @@ func (s *EtcdServer) newHeader() *pb.ResponseHeader {
 }
 
 // LeaseLeases is really ListLeases !???
-func (s *EtcdServer) LeaseLeases(ctx context.Context, _ *pb.LeaseLeasesRequest) (*pb.LeaseLeasesResponse, error) {
+func (s *EtcdServer) LeaseLeases(_ context.Context, _ *pb.LeaseLeasesRequest) (*pb.LeaseLeasesResponse, error) {
 	ls := s.lessor.Leases()
-
-	if err := s.checkLeaseLeases(ctx, ls); err != nil {
-		return nil, err
-	}
-
 	lss := make([]*pb.LeaseStatus, len(ls))
 	for i := range ls {
 		lss[i] = &pb.LeaseStatus{ID: int64(ls[i].ID)}
 	}
 	return &pb.LeaseLeasesResponse{Header: s.newHeader(), Leases: lss}, nil
-}
-
-func (s *EtcdServer) checkLeaseLeases(ctx context.Context, leases []*lease.Lease) error {
-	rev := s.AuthStore().Revision()
-
-	if !s.AuthStore().IsAuthEnabled() {
-		return nil
-	}
-
-	authInfo, err := s.AuthInfoFromCtx(ctx)
-	if err != nil {
-		return err
-	}
-
-	if authInfo == nil {
-		return auth.ErrUserEmpty
-	}
-
-	if err := s.AuthStore().IsAdminPermitted(authInfo); err == nil {
-		return nil
-	}
-
-	for _, l := range leases {
-		for _, key := range l.Keys() {
-			if err := s.AuthStore().IsRangePermitted(authInfo, []byte(key), []byte{}); err != nil {
-				return err
-			}
-		}
-	}
-
-	if rev != s.AuthStore().Revision() {
-		return auth.ErrAuthOldRevision
-	}
-	return nil
 }
 
 func (s *EtcdServer) waitLeader(ctx context.Context) (*membership.Member, error) {
@@ -901,6 +804,7 @@ func (s *EtcdServer) Watchable() mvcc.WatchableKV { return s.KV() }
 
 func (s *EtcdServer) linearizableReadLoop() {
 	for {
+		requestID := s.reqIDGen.Next()
 		leaderChangedNotifier := s.leaderChanged.Receive()
 		select {
 		case <-leaderChangedNotifier:
@@ -920,7 +824,7 @@ func (s *EtcdServer) linearizableReadLoop() {
 		s.readNotifier = nextnr
 		s.readMu.Unlock()
 
-		confirmedIndex, err := s.requestCurrentIndex(leaderChangedNotifier)
+		confirmedIndex, err := s.requestCurrentIndex(leaderChangedNotifier, requestID)
 		if isStopped(err) {
 			return
 		}
@@ -955,10 +859,7 @@ func isStopped(err error) bool {
 	return errorspkg.Is(err, raft.ErrStopped) || errorspkg.Is(err, errors.ErrStopped)
 }
 
-func (s *EtcdServer) requestCurrentIndex(leaderChangedNotifier <-chan struct{}) (uint64, error) {
-	requestIDs := map[uint64]struct{}{}
-	requestID := s.reqIDGen.Next()
-	requestIDs[requestID] = struct{}{}
+func (s *EtcdServer) requestCurrentIndex(leaderChangedNotifier <-chan struct{}, requestID uint64) (uint64, error) {
 	err := s.sendReadIndex(requestID)
 	if err != nil {
 		return 0, err
@@ -975,22 +876,18 @@ func (s *EtcdServer) requestCurrentIndex(leaderChangedNotifier <-chan struct{}) 
 	for {
 		select {
 		case rs := <-s.r.readStateC:
-			// Check again if leader changed as when multiple channels are ready, select picks randomly.
-			select {
-			case <-leaderChangedNotifier:
-				readIndexFailed.Inc()
-				return 0, errors.ErrLeaderChanged
-			default:
-			}
-			responseID := uint64(0)
-			if len(rs.RequestCtx) == 8 {
-				responseID = binary.BigEndian.Uint64(rs.RequestCtx)
-			}
-			if _, ok := requestIDs[responseID]; !ok {
+			requestIDBytes := uint64ToBigEndianBytes(requestID)
+			gotOwnResponse := bytes.Equal(rs.RequestCtx, requestIDBytes)
+			if !gotOwnResponse {
 				// a previous request might time out. now we should ignore the response of it and
 				// continue waiting for the response of the current requests.
+				responseID := uint64(0)
+				if len(rs.RequestCtx) == 8 {
+					responseID = binary.BigEndian.Uint64(rs.RequestCtx)
+				}
 				lg.Warn(
 					"ignored out-of-date read index response; local node read indexes queueing up and waiting to be in sync with leader",
+					zap.Uint64("sent-request-id", requestID),
 					zap.Uint64("received-request-id", responseID),
 				)
 				slowReadIndex.Inc()
@@ -1004,8 +901,6 @@ func (s *EtcdServer) requestCurrentIndex(leaderChangedNotifier <-chan struct{}) 
 		case <-firstCommitInTermNotifier:
 			firstCommitInTermNotifier = s.firstCommitInTerm.Receive()
 			lg.Info("first commit in current term: resending ReadIndex request")
-			requestID = s.reqIDGen.Next()
-			requestIDs[requestID] = struct{}{}
 			err := s.sendReadIndex(requestID)
 			if err != nil {
 				return 0, err
@@ -1018,8 +913,6 @@ func (s *EtcdServer) requestCurrentIndex(leaderChangedNotifier <-chan struct{}) 
 				zap.Uint64("sent-request-id", requestID),
 				zap.Duration("retry-timeout", readIndexRetryTime),
 			)
-			requestID = s.reqIDGen.Next()
-			requestIDs[requestID] = struct{}{}
 			err := s.sendReadIndex(requestID)
 			if err != nil {
 				return 0, err
@@ -1158,20 +1051,4 @@ func (s *EtcdServer) downgradeCancel(ctx context.Context) (*pb.DowngradeResponse
 	}
 	resp := pb.DowngradeResponse{Version: version.Cluster(s.ClusterVersion().String())}
 	return &resp, nil
-}
-
-func (s *EtcdServer) requireAuthInfo(ctx context.Context) error {
-	if !s.authStore.IsAuthEnabled() {
-		return nil
-	}
-
-	authInfo, err := s.AuthInfoFromCtx(ctx)
-	if err != nil {
-		return err
-	}
-
-	if authInfo == nil {
-		return auth.ErrUserEmpty
-	}
-	return nil
 }

@@ -28,7 +28,6 @@ import (
 	"k8s.io/client-go/transport"
 
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	"k8s.io/apiserver/pkg/server/egressselector"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	utilpeerproxy "k8s.io/apiserver/pkg/util/peerproxy"
 	coordinationv1informers "k8s.io/client-go/informers/coordination/v1"
@@ -53,9 +52,7 @@ func BuildPeerProxy(
 	peerAdvertiseAddress reconcilers.PeerAdvertiseAddress,
 	apiServerID string,
 	reconciler reconcilers.PeerEndpointLeaseReconciler,
-	serializer runtime.NegotiatedSerializer,
-	es *egressselector.EgressSelector,
-) (utilpeerproxy.Interface, error) {
+	serializer runtime.NegotiatedSerializer) (utilpeerproxy.Interface, error) {
 	if proxyClientCertFile == "" {
 		return nil, fmt.Errorf("error building peer proxy handler, proxy-cert-file not specified")
 	}
@@ -71,19 +68,6 @@ func BuildPeerProxy(
 			CAFile:     peerCAFile,
 			ServerName: "kubernetes.default.svc",
 		}}
-
-	if es != nil {
-		egressDialer, err := es.Lookup(egressselector.ControlPlane.AsNetworkContext())
-		if err != nil {
-			return nil, err
-		}
-
-		// We only set the DialHolder if an egress dialer is explicitly configured for the
-		// ControlPlane network context, otherwise the transport will fall back to the default direct dialer.
-		if egressDialer != nil {
-			proxyClientConfig.DialHolder = &transport.DialHolder{Dial: egressDialer}
-		}
-	}
 
 	return utilpeerproxy.NewPeerProxyHandler(
 		apiServerID,

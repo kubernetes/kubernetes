@@ -136,7 +136,7 @@ func (o *NamespaceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	return err
 }
 
-// Run performs the execution of the 'create namespace' sub command
+// Run calls the CreateSubcommandOptions.Run in NamespaceOpts instance
 func (o *NamespaceOptions) Run() error {
 	namespace := o.createNamespace()
 	if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, namespace, scheme.DefaultJSONEncoder()); err != nil {

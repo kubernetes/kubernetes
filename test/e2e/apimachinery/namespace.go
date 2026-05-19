@@ -52,7 +52,7 @@ func extinguish(ctx context.Context, f *framework.Framework, totalNS int, maxAll
 	ginkgo.By("Creating testing namespaces")
 	wg := &sync.WaitGroup{}
 	wg.Add(totalNS)
-	for n := range totalNS {
+	for n := 0; n < totalNS; n++ {
 		go func(n int) {
 			defer wg.Done()
 			defer ginkgo.GinkgoRecover()

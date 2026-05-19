@@ -20,12 +20,15 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	versionutil "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/component-base/version"
 	ndf "k8s.io/component-helpers/nodedeclaredfeatures"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
@@ -38,9 +41,6 @@ const (
 	Name = names.NodeDeclaredFeatures
 	// preFilterStateKey is the key in CycleState used to store the pod's feature requirements.
 	preFilterStateKey fwk.StateKey = "PreFilter" + Name
-	// errReasonUnsatisfiedRequirements is the status reason given when a node's declared features
-	// doesn't meet the pod's required features.
-	errReasonUnsatisfiedRequirements = "node(s) didn't match Pod's required features"
 )
 
 // preFilterState computed at PreFilter and used at Filter.
@@ -76,7 +76,10 @@ func New(ctx context.Context, plArgs runtime.Object, fh fwk.Handle, fts feature.
 		// Disabled, won't do anything.
 		return &NodeDeclaredFeatures{}, nil
 	}
-	ndfFramework := ndf.DefaultFramework
+	ndfFramework, err := ndf.New(features.AllFeatures)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create node feature framework: %w", err)
+	}
 	ver, err := versionutil.Parse(version.Get().String())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse version: %w", err)
@@ -95,7 +98,7 @@ func (pl *NodeDeclaredFeatures) PreFilter(ctx context.Context, cycleState fwk.Cy
 	if err != nil {
 		return nil, fwk.AsStatus(err)
 	}
-	if reqs.IsEmpty() {
+	if reqs.Len() == 0 {
 		return nil, fwk.NewStatus(fwk.Skip)
 	}
 	cycleState.Write(preFilterStateKey, &preFilterState{reqs: reqs})
@@ -116,13 +119,12 @@ func (pl *NodeDeclaredFeatures) Filter(ctx context.Context, cycleState fwk.Cycle
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
-	// Don't use ndf.MatchNodeFeatureSet(...) here since we don't want to pay the cost of computing the feature diff.
-	isMatch, err := s.reqs.IsSubset(nodeInfo.GetNodeDeclaredFeatures())
+	result, err := ndf.MatchNodeFeatureSet(s.reqs, nodeInfo.GetNodeDeclaredFeatures())
 	if err != nil {
 		return fwk.AsStatus(err)
 	}
-	if !isMatch {
-		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, errReasonUnsatisfiedRequirements)
+	if !result.IsMatch {
+		return fwk.NewStatus(fwk.UnschedulableAndUnresolvable, fmt.Sprintf("node declared features check failed - unsatisfied requirements: %s", strings.Join(result.UnsatisfiedRequirements, ", ")))
 	}
 	return nil
 }
@@ -133,8 +135,9 @@ func (pl *NodeDeclaredFeatures) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk
 	if err != nil {
 		return nil, fwk.AsStatus(err)
 	}
+	featuresList := sets.List(fs.Set)
 	return []fwk.SignFragment{
-		{Key: fwk.FeaturesSignerName, Value: fs.String()},
+		{Key: fwk.FeaturesSignerName, Value: featuresList},
 	}, nil
 }
 
@@ -149,8 +152,8 @@ func (pl *NodeDeclaredFeatures) EventsToRegister(_ context.Context) ([]fwk.Clust
 			QueueingHintFn: pl.isSchedulableAfterNodeChange,
 		},
 		{
-			Event:          fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.Update},
-			QueueingHintFn: pl.isSchedulableAfterTargetPodUpdate,
+			Event:          fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.Update},
+			QueueingHintFn: pl.isSchedulableAfterPodUpdate,
 		},
 	}, nil
 }
@@ -167,12 +170,16 @@ func getPreFilterState(cycleState fwk.CycleState) (*preFilterState, error) {
 	return s, nil
 }
 
-func (pl *NodeDeclaredFeatures) isSchedulableAfterTargetPodUpdate(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+func (pl *NodeDeclaredFeatures) isSchedulableAfterPodUpdate(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 	oldPod, newPod, err := util.As[*v1.Pod](oldObj, newObj)
 	if err != nil {
 		return fwk.Queue, err
 	}
-
+	// If the pod that was updated is not the target pod, then we don't need to re-evaluate it.
+	if pod.UID != newPod.UID {
+		logger.V(5).Info("the update event is not for targetPod, skipping queueing", "pod", klog.KObj(newPod))
+		return fwk.QueueSkip, nil
+	}
 	oldPodInfo := &ndf.PodInfo{Spec: &oldPod.Spec}
 	newPodInfo := &ndf.PodInfo{Spec: &newPod.Spec}
 	oldReqs, err := pl.ndfFramework.InferForPodScheduling(oldPodInfo, pl.version)

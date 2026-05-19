@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
@@ -47,9 +46,7 @@ const acceptV1JSON = "application/json"
 const acceptV2JSON = "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList"
 const acceptV2JSONNoPeer = "application/json;g=apidiscovery.k8s.io;v=v2;as=APIGroupDiscoveryList;profile=nopeer"
 
-// Discovery integration tests frequently need to wait through aggregator,
-// API registration, and discovery document convergence on contended CI nodes.
-const maxTimeout = 120 * time.Second
+const maxTimeout = 10 * time.Second
 
 type testClient interface {
 	kubernetes.Interface
@@ -142,16 +139,9 @@ func (a applyAPIService) Do(ctx context.Context, client testClient) error {
 
 func (a applyAPIService) Cleanup(ctx context.Context, client testClient) error {
 	name := a.Version + "." + a.Group
-
-	// Capture the UID of the existing object (if it exists)
-	var uid types.UID
-	if obj, err := client.ApiregistrationV1().APIServices().Get(ctx, name, metav1.GetOptions{}); err == nil {
-		uid = obj.UID
-	}
-
 	err := client.ApiregistrationV1().APIServices().Delete(ctx, name, metav1.DeleteOptions{})
 
-	if err != nil && !errors.IsNotFound(err) {
+	if !errors.IsNotFound(err) {
 		return err
 	}
 
@@ -161,21 +151,15 @@ func (a applyAPIService) Cleanup(ctx context.Context, client testClient) error {
 		maxTimeout,
 		true,
 		func(ctx context.Context) (done bool, err error) {
-			obj, err := client.ApiregistrationV1().APIServices().Get(ctx, name, metav1.GetOptions{})
-			switch {
-			case errors.IsNotFound(err):
-				// object is gone
-				return true, nil
-			case err == nil && obj.UID != uid:
-				// the instance we were waiting for is gone
-				return true, nil
-			case err != nil:
-				// some other error occurred
-				return false, err
-			default:
-				// the instance we were waiting for is still around
+			_, err = client.ApiregistrationV1().APIServices().Get(ctx, name, metav1.GetOptions{})
+			if err == nil {
 				return false, nil
 			}
+
+			if !errors.IsNotFound(err) {
+				return false, err
+			}
+			return true, nil
 		},
 	)
 
@@ -224,16 +208,9 @@ func (a applyCRD) Do(ctx context.Context, client testClient) error {
 
 func (a applyCRD) Cleanup(ctx context.Context, client testClient) error {
 	name := a.Names.Plural + "." + a.Group
-
-	// Capture the UID of the existing object (if it exists)
-	var uid types.UID
-	if obj, err := client.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, name, metav1.GetOptions{}); err == nil {
-		uid = obj.UID
-	}
-
 	err := client.ApiextensionsV1().CustomResourceDefinitions().Delete(ctx, name, metav1.DeleteOptions{})
 
-	if err != nil && !errors.IsNotFound(err) {
+	if !errors.IsNotFound(err) {
 		return err
 	}
 
@@ -243,21 +220,15 @@ func (a applyCRD) Cleanup(ctx context.Context, client testClient) error {
 		maxTimeout,
 		true,
 		func(ctx context.Context) (done bool, err error) {
-			obj, err := client.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, name, metav1.GetOptions{})
-			switch {
-			case errors.IsNotFound(err):
-				// object is gone
-				return true, nil
-			case err == nil && obj.UID != uid:
-				// the instance we were waiting for is gone
-				return true, nil
-			case err != nil:
-				// some other error occurred
-				return false, err
-			default:
-				// the instance we were waiting for is still around
+			_, err = client.ApiextensionsV1().CustomResourceDefinitions().Get(ctx, name, metav1.GetOptions{})
+			if err == nil {
 				return false, nil
 			}
+
+			if !errors.IsNotFound(err) {
+				return false, err
+			}
+			return true, nil
 		},
 	)
 

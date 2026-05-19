@@ -66,7 +66,7 @@ func (j *JSONPb) marshalTo(w io.Writer, v interface{}) error {
 
 var (
 	// protoMessageType is stored to prevent constant lookup of the same type at runtime.
-	protoMessageType = reflect.TypeFor[proto.Message]()
+	protoMessageType = reflect.TypeOf((*proto.Message)(nil)).Elem()
 )
 
 // marshalNonProto marshals a non-message field of a protobuf message.
@@ -325,9 +325,9 @@ type protoEnum interface {
 	EnumDescriptor() ([]byte, []int)
 }
 
-var typeProtoEnum = reflect.TypeFor[protoEnum]()
+var typeProtoEnum = reflect.TypeOf((*protoEnum)(nil)).Elem()
 
-var typeProtoMessage = reflect.TypeFor[proto.Message]()
+var typeProtoMessage = reflect.TypeOf((*proto.Message)(nil)).Elem()
 
 // Delimiter for newline encoded JSON streams.
 func (j *JSONPb) Delimiter() []byte {

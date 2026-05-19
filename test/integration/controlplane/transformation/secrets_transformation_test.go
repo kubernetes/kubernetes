@@ -23,6 +23,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -97,7 +98,7 @@ resources:
 // 2. Secrets are decrypted on read
 // when EncryptionConfiguration is passed to KubeAPI server.
 func TestSecretsShouldBeTransformed(t *testing.T) {
-	testCases := []struct {
+	var testCases = []struct {
 		transformerConfigContent string
 		transformerPrefix        string
 		unSealFunc               unSealSecret
@@ -256,7 +257,7 @@ func TestAllowUnsafeMalformedObjectDeletionFeature(t *testing.T) {
 			finalEvent := make(chan struct{})
 			finalSecretName := "final-secret"
 			_, err = informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-				AddFunc: func(obj any) {
+				AddFunc: func(obj interface{}) {
 					if obj, err := meta.Accessor(obj); err == nil && obj.GetName() == finalSecretName {
 						close(finalEvent)
 					}
@@ -267,9 +268,7 @@ func TestAllowUnsafeMalformedObjectDeletionFeature(t *testing.T) {
 			}
 
 			lister := informer.Lister()
-			informerCtx, informerCancel := context.WithCancel(test)
-			defer informerCancel()
-			factory.Start(informerCtx.Done())
+			factory.Start(test.Done())
 			waitForSyncCtx, waitForSyncCancel := context.WithTimeout(context.Background(), wait.ForeverTestTimeout)
 			defer waitForSyncCancel()
 			if !cache.WaitForCacheSync(waitForSyncCtx.Done(), informer.Informer().HasSynced) {
@@ -285,19 +284,20 @@ func TestAllowUnsafeMalformedObjectDeletionFeature(t *testing.T) {
 			// the secret created in step b will be undecryptable
 			now := time.Now()
 			encryptionConf := filepath.Join(test.configDir, encryptionConfigFileName)
-			body, _ := os.ReadFile(encryptionConf)
+			body, _ := ioutil.ReadFile(encryptionConf)
 			t.Logf("file before write: %s", body)
 			// we replace the existing key with a new key from a different provider
 			if err := os.WriteFile(encryptionConf, []byte(aesCBCConfigYAML), 0o644); err != nil {
 				t.Fatalf("failed to write encryption config that's going to make decryption fail")
 			}
-			body, _ = os.ReadFile(encryptionConf)
+			body, _ = ioutil.ReadFile(encryptionConf)
 			t.Logf("file after write: %s", body)
 
 			// i) wait for the breaking changes to take effect
 			testCtx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			// dynamic encryption config reload takes about 1m, so can't use wait.ForeverTestTimeout
+			// TODO: dynamic encryption config reload takes about 1m, so can't use
+			// wait.ForeverTestTimeout just yet, investigate and reduce the reload time.
 			err = wait.PollUntilContextTimeout(testCtx, 1*time.Second, 2*time.Minute, true, func(ctx context.Context) (done bool, err error) {
 				_, err = test.restClient.CoreV1().Secrets(testNamespace).Get(ctx, secretCorrupt, metav1.GetOptions{})
 				var got apierrors.APIStatus
@@ -342,7 +342,7 @@ func TestAllowUnsafeMalformedObjectDeletionFeature(t *testing.T) {
 			// on the other hand, we have not granted the 'delete-ignore-read-errors'
 			// verb to the user yet, so we expect admission to deny the delete request
 			options := metav1.DeleteOptions{
-				IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To(true),
+				IgnoreStoreReadErrorWithClusterBreakingPotential: ptr.To[bool](true),
 			}
 			err = test.restClient.CoreV1().Secrets(testNamespace).Delete(context.Background(), secretCorrupt, options)
 			tc.corrupObjDeleteWithOption.verify(t, err)
@@ -582,15 +582,8 @@ func TestListCorruptObjects(t *testing.T) {
 
 func permitUserToDoVerbOnSecret(t *testing.T, client *clientset.Clientset, user, namespace string, verbs []string) {
 	t.Helper()
-	grantUserVerbsOnResource(t, client, user, namespace, verbs, "", "secrets")
-}
 
-// grantUserVerbsOnResource creates an RBAC Role and RoleBinding that grant the
-// given user the specified verbs on a resource in the given namespace.
-func grantUserVerbsOnResource(t *testing.T, client *clientset.Clientset, user, namespace string, verbs []string, apiGroup, resource string) {
-	t.Helper()
-
-	name := fmt.Sprintf("%s-can-do-%s-on-%s-in-%s", user, strings.Join(verbs, "-"), resource, namespace)
+	name := fmt.Sprintf("%s-can-do-%s-on-secrets-in-%s", user, strings.Join(verbs, "-"), namespace)
 	_, err := client.RbacV1().Roles(namespace).Create(context.TODO(), &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -599,8 +592,8 @@ func grantUserVerbsOnResource(t *testing.T, client *clientset.Clientset, user, n
 		Rules: []rbacv1.PolicyRule{
 			{
 				Verbs:     verbs,
-				APIGroups: []string{apiGroup},
-				Resources: []string{resource},
+				APIGroups: []string{""},
+				Resources: []string{"secrets"},
 			},
 		},
 	}, metav1.CreateOptions{})
@@ -630,7 +623,7 @@ func grantUserVerbsOnResource(t *testing.T, client *clientset.Clientset, user, n
 	}
 
 	authutil.WaitForNamedAuthorizationUpdate(t, context.TODO(), client.AuthorizationV1(),
-		user, namespace, verbs[0], "", schema.GroupResource{Group: apiGroup, Resource: resource}, true)
+		user, namespace, verbs[0], "", schema.GroupResource{Resource: "secrets"}, true)
 }
 
 // Baseline (no enveloping) - use to contrast with enveloping benchmarks.
@@ -666,8 +659,8 @@ func runBenchmark(b *testing.B, transformerConfig string) {
 }
 
 func unSealWithGCMTransformer(ctx context.Context, cipherText []byte, dataCtx value.Context,
-	transformerConfig apiserverv1.ProviderConfiguration,
-) ([]byte, error) {
+	transformerConfig apiserverv1.ProviderConfiguration) ([]byte, error) {
+
 	block, err := newAESCipher(transformerConfig.AESGCM.Keys[0].Secret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create block cipher: %v", err)
@@ -687,8 +680,8 @@ func unSealWithGCMTransformer(ctx context.Context, cipherText []byte, dataCtx va
 }
 
 func unSealWithCBCTransformer(ctx context.Context, cipherText []byte, dataCtx value.Context,
-	transformerConfig apiserverv1.ProviderConfiguration,
-) ([]byte, error) {
+	transformerConfig apiserverv1.ProviderConfiguration) ([]byte, error) {
+
 	block, err := newAESCipher(transformerConfig.AESCBC.Keys[0].Secret)
 	if err != nil {
 		return nil, err

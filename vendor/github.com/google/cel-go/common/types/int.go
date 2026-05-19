@@ -120,7 +120,7 @@ func (i Int) ConvertToNative(typeDesc reflect.Type) (any, error) {
 		case int64WrapperType:
 			// Convert the value to a wrapperspb.Int64Value.
 			return wrapperspb.Int64(int64(i)), nil
-		case JSONValueType:
+		case jsonValueType:
 			// The proto-to-JSON conversion rules would convert all 64-bit integer values to JSON
 			// decimal strings. Because CEL ints might come from the automatic widening of 32-bit
 			// values in protos, the JSON type is chosen dynamically based on the value.

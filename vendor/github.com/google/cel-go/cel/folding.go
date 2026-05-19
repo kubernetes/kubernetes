@@ -38,7 +38,7 @@ func MaxConstantFoldIterations(limit int) ConstantFoldingOption {
 	}
 }
 
-// FoldKnownValues adds an Activation which provides known values for the folding evaluator
+// Adds an Activation which provides known values for the folding evaluator
 //
 // Any values the activation provides will be used by the constant folder and turned into
 // literals in the AST.

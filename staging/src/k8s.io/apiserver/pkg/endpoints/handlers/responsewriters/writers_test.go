@@ -32,11 +32,8 @@ import (
 	"os"
 	"reflect"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
-
-	"sigs.k8s.io/yaml"
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
@@ -674,15 +671,12 @@ func randPod(b *testing.B, pod *v1.Pod, r *rand.Rand) {
 
 func benchmarkItems(b *testing.B, file string, n int) *v1.PodList {
 	pod := v1.Pod{}
-	data, err := os.ReadFile(file)
+	f, err := os.Open(file)
 	if err != nil {
-		b.Fatalf("Failed to read %q: %v", file, err)
+		b.Fatalf("Failed to open %q: %v", file, err)
 	}
-	if strings.HasSuffix(file, ".yaml") {
-		err = yaml.Unmarshal(data, &pod)
-	} else {
-		err = json.Unmarshal(data, &pod)
-	}
+	defer f.Close()
+	err = json.NewDecoder(f).Decode(&pod)
 	if err != nil {
 		b.Fatalf("Failed to decode %q: %v", file, err)
 	}
@@ -755,7 +749,7 @@ func BenchmarkSerializeObject(b *testing.B) {
 				{"Json", toJSON},
 				{"Protobuf", toProtoBuf},
 			}
-			podList := benchmarkItems(b, "testdata/exemplar_pod.yaml", count)
+			podList := benchmarkItems(b, "testdata/pod.json", count)
 			for _, media := range medias {
 				b.Run(fmt.Sprintf("MediaType=%s", media.name), func(b *testing.B) {
 					payload := media.convert(b, podList)

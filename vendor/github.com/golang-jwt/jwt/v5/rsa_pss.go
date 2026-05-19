@@ -1,3 +1,6 @@
+//go:build go1.4
+// +build go1.4
+
 package jwt
 
 import (
@@ -79,7 +82,7 @@ func init() {
 
 // Verify implements token verification for the SigningMethod.
 // For this verify method, key must be an rsa.PublicKey struct
-func (m *SigningMethodRSAPSS) Verify(signingString string, sig []byte, key any) error {
+func (m *SigningMethodRSAPSS) Verify(signingString string, sig []byte, key interface{}) error {
 	var rsaKey *rsa.PublicKey
 	switch k := key.(type) {
 	case *rsa.PublicKey:
@@ -105,7 +108,7 @@ func (m *SigningMethodRSAPSS) Verify(signingString string, sig []byte, key any) 
 
 // Sign implements token signing for the SigningMethod.
 // For this signing method, key must be an rsa.PrivateKey struct
-func (m *SigningMethodRSAPSS) Sign(signingString string, key any) ([]byte, error) {
+func (m *SigningMethodRSAPSS) Sign(signingString string, key interface{}) ([]byte, error) {
 	var rsaKey *rsa.PrivateKey
 
 	switch k := key.(type) {

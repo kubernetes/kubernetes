@@ -27,24 +27,6 @@ set -o pipefail
 
 KUBE_CODEGEN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
-# This file is intended for out-of-tree projects running code generators.
-# In that context, all in-tree Kubernetes types (e.g. metav1.TypeMeta,
-# resource.Quantity) live in the read-only Go module cache, so generators
-# must not attempt to write output files for them. These packages are passed
-# as --readonly-pkg to generators that support it (validation-gen, openapi-gen).
-# NOTE: These must be passed as separate arguments using an array loop, not
-# via "$(printf ...)". Double-quoting a printf command substitution collapses
-# the output into a single argument, which silently breaks flag parsing.
-KUBE_CODEGEN_READONLY_PKGS=(
-    k8s.io/apimachinery/pkg/apis/meta/v1
-    k8s.io/apimachinery/pkg/api/resource
-    k8s.io/apimachinery/pkg/runtime
-    k8s.io/apimachinery/pkg/types
-    k8s.io/apimachinery/pkg/util/intstr
-    k8s.io/apimachinery/pkg/version
-    time
-)
-
 # Callers which want a specific tag of the k8s.io/code-generator repo should
 # set the KUBE_CODEGEN_TAG to the tag name, e.g. KUBE_CODEGEN_TAG="release-1.32"
 # before sourcing this file.
@@ -99,17 +81,11 @@ function kube::codegen::internal::grep() {
 #     An optional list (this flag may be specified multiple times) of "extra"
 #     directories to consider during conversion generation.
 #
-#   --lint-rules <string>
-#     An optional comma-separated list of lint rules to enable on the
-#     generators. See the --lint-rules flag on the individual generators for
-#     supported values (e.g. "known-tags-only,require-explicit-disablement").
-#
 function kube::codegen::gen_helpers() {
     local in_dir=""
     local boilerplate="${KUBE_CODEGEN_ROOT}/hack/boilerplate.go.txt"
     local v="${KUBE_VERBOSE:-0}"
     local extra_peers=()
-    local lint_rules=""
 
     while [ "$#" -gt 0 ]; do
         case "$1" in
@@ -119,10 +95,6 @@ function kube::codegen::gen_helpers() {
                 ;;
             "--extra-peer-dir")
                 extra_peers+=("$2")
-                shift 2
-                ;;
-            "--lint-rules")
-                lint_rules="$2"
                 shift 2
                 ;;
             *)
@@ -143,11 +115,6 @@ function kube::codegen::gen_helpers() {
     if [ -z "${in_dir}" ]; then
         echo "input-dir argument is required" >&2
         return 1
-    fi
-
-    local lint_args=()
-    if [ -n "${lint_rules}" ]; then
-        lint_args+=("--lint-rules" "${lint_rules}")
     fi
 
     (
@@ -193,7 +160,6 @@ function kube::codegen::gen_helpers() {
             -v "${v}" \
             --output-file zz_generated.deepcopy.go \
             --go-header-file "${boilerplate}" \
-            "${lint_args[@]:+"${lint_args[@]}"}" \
             "${input_pkgs[@]}"
     fi
 
@@ -213,7 +179,6 @@ function kube::codegen::gen_helpers() {
           | LC_ALL=C sort -u
     )
 
-
     if [ "${#input_pkgs[@]}" != 0 ]; then
         echo "Generating validation code for ${#input_pkgs[@]} targets"
 
@@ -223,16 +188,10 @@ function kube::codegen::gen_helpers() {
             -name zz_generated.validations.go \
             | xargs -0 rm -f
 
-        local readonly_args=()
-        for pkg in "${KUBE_CODEGEN_READONLY_PKGS[@]}"; do
-            readonly_args+=("--readonly-pkg" "${pkg}")
-        done
         "${GOBIN}/validation-gen" \
             -v "${v}" \
             --output-file zz_generated.validations.go \
-            "${readonly_args[@]}" \
             --go-header-file "${boilerplate}" \
-            "${lint_args[@]:+"${lint_args[@]}"}" \
             "${input_pkgs[@]}"
     fi
 
@@ -265,7 +224,6 @@ function kube::codegen::gen_helpers() {
             -v "${v}" \
             --output-file zz_generated.defaults.go \
             --go-header-file "${boilerplate}" \
-            "${lint_args[@]:+"${lint_args[@]}"}" \
             "${input_pkgs[@]}"
     fi
 
@@ -303,7 +261,6 @@ function kube::codegen::gen_helpers() {
             --output-file zz_generated.conversion.go \
             --go-header-file "${boilerplate}" \
             "${extra_peer_args[@]:+"${extra_peer_args[@]}"}" \
-            "${lint_args[@]:+"${lint_args[@]}"}" \
             "${input_pkgs[@]}"
     fi
 }
@@ -451,15 +408,6 @@ function kube::codegen::gen_openapi() {
             -name zz_generated.openapi.go \
             | xargs -0 rm -f
 
-        local readonly_args=()
-        for pkg in "${KUBE_CODEGEN_READONLY_PKGS[@]}"; do
-            readonly_args+=("--readonly-pkg" "${pkg}")
-        done
-        # These apimachinery packages are passed as explicit inputs
-        # because they contain types referenced by most API types
-        # (e.g. ObjectMeta, Quantity). openapi-gen needs them for
-        # type resolution even though they are not in the caller's
-        # input directory.
         "${GOBIN}/openapi-gen" \
             -v "${v}" \
             --output-file zz_generated.openapi.go \
@@ -468,7 +416,6 @@ function kube::codegen::gen_openapi() {
             --output-pkg "${out_pkg}" \
             --report-filename "${new_report}" \
             --output-model-name-file="${output_model_name_file}" \
-            "${readonly_args[@]}" \
             "k8s.io/apimachinery/pkg/apis/meta/v1" \
             "k8s.io/apimachinery/pkg/runtime" \
             "k8s.io/apimachinery/pkg/version" \
@@ -547,11 +494,6 @@ function kube::codegen::gen_openapi() {
 #   --prefers-protobuf
 #     Enables generation of clientsets that use protobuf for API requests.
 #
-#   --lint-rules <string>
-#     An optional comma-separated list of lint rules to enable on the
-#     generators. See the --lint-rules flag on the individual generators for
-#     supported values (e.g. "known-tags-only,require-explicit-disablement").
-#
 function kube::codegen::gen_client() {
     local in_dir=""
     local one_input_api=""
@@ -570,7 +512,6 @@ function kube::codegen::gen_client() {
     local plural_exceptions=""
     local v="${KUBE_VERBOSE:-0}"
     local prefers_protobuf="false"
-    local lint_rules=""
 
     while [ "$#" -gt 0 ]; do
         case "$1" in
@@ -634,10 +575,6 @@ function kube::codegen::gen_client() {
                 prefers_protobuf="true"
                 shift
                 ;;
-            "--lint-rules")
-                lint_rules="$2"
-                shift 2
-                ;;
             *)
                 if [[ "$1" =~ ^-- ]]; then
                     echo "unknown argument: $1" >&2
@@ -663,11 +600,6 @@ function kube::codegen::gen_client() {
     fi
     if [ -z "${out_pkg}" ]; then
         echo "--output-pkg is required" >&2
-    fi
-
-    local lint_args=()
-    if [ -n "${lint_rules}" ]; then
-        lint_args+=("--lint-rules" "${lint_rules}")
     fi
 
     mkdir -p "${out_dir}"
@@ -732,7 +664,6 @@ function kube::codegen::gen_client() {
             --output-pkg "${applyconfig_pkg}" \
             --external-applyconfigurations "${applyconfig_external}" \
             --openapi-schema "${applyconfig_openapi_schema}" \
-            "${lint_args[@]:+"${lint_args[@]}"}" \
             "${input_pkgs[@]}"
     fi
 
@@ -759,7 +690,6 @@ function kube::codegen::gen_client() {
         --input-base "$(cd "${in_dir}" && pwd -P)" `# must be absolute path or Go import path"` \
         --plural-exceptions "${plural_exceptions}" \
         --prefers-protobuf="${prefers_protobuf}" \
-        "${lint_args[@]:+"${lint_args[@]}"}" \
         "${inputs[@]}"
 
     if [ "${watchable}" == "true" ]; then
@@ -778,7 +708,6 @@ function kube::codegen::gen_client() {
             --output-dir "${out_dir}/${listers_subdir}" \
             --output-pkg "${out_pkg}/${listers_subdir}" \
             --plural-exceptions "${plural_exceptions}" \
-            "${lint_args[@]:+"${lint_args[@]}"}" \
             "${input_pkgs[@]}"
 
         echo "Generating informer code for ${#input_pkgs[@]} targets"
@@ -798,7 +727,6 @@ function kube::codegen::gen_client() {
             --versioned-clientset-package "${out_pkg}/${clientset_subdir}/${clientset_versioned_name}" \
             --listers-package "${out_pkg}/${listers_subdir}" \
             --plural-exceptions "${plural_exceptions}" \
-            "${lint_args[@]:+"${lint_args[@]}"}" \
             "${input_pkgs[@]}"
     fi
 }
@@ -818,24 +746,15 @@ function kube::codegen::gen_client() {
 #   --boilerplate <string = path_to_kube_codegen_boilerplate>
 #     An optional override for the header file to insert into generated files.
 #
-#   --lint-rules <string>
-#     An optional comma-separated list of lint rules to enable on the
-#     generator. See register-gen's --lint-rules flag for supported values.
-#
 function kube::codegen::gen_register() {
     local in_dir=""
     local boilerplate="${KUBE_CODEGEN_ROOT}/hack/boilerplate.go.txt"
     local v="${KUBE_VERBOSE:-0}"
-    local lint_rules=""
 
     while [ "$#" -gt 0 ]; do
         case "$1" in
             "--boilerplate")
                 boilerplate="$2"
-                shift 2
-                ;;
-            "--lint-rules")
-                lint_rules="$2"
                 shift 2
                 ;;
             *)
@@ -856,11 +775,6 @@ function kube::codegen::gen_register() {
     if [ -z "${in_dir}" ]; then
         echo "input-dir argument is required" >&2
         return 1
-    fi
-
-    local lint_args=()
-    if [ -n "${lint_rules}" ]; then
-        lint_args+=("--lint-rules" "${lint_rules}")
     fi
 
     (
@@ -903,7 +817,6 @@ function kube::codegen::gen_register() {
             -v "${v}" \
             --output-file zz_generated.register.go \
             --go-header-file "${boilerplate}" \
-            "${lint_args[@]:+"${lint_args[@]}"}" \
             "${input_pkgs[@]}"
     fi
 }

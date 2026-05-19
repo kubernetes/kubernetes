@@ -200,17 +200,16 @@ func TestPodVolumesExist(t *testing.T) {
 
 	tCtx := ktesting.Init(t)
 	defer tCtx.Cancel("test has completed")
-
 	go kubelet.volumeManager.Run(tCtx, kubelet.sourcesReady)
 
 	kubelet.podManager.SetPods(pods)
 	for _, pod := range pods {
-		err := kubelet.volumeManager.WaitForAttachAndMount(tCtx, pod)
+		err := kubelet.volumeManager.WaitForAttachAndMount(context.Background(), pod)
 		assert.NoError(t, err)
 	}
 
 	for _, pod := range pods {
-		podVolumesExist := kubelet.podVolumesExist(tCtx.Logger(), pod.UID)
+		podVolumesExist := kubelet.podVolumesExist(pod.UID)
 		assert.True(t, podVolumesExist, "pod %q", pod.UID)
 	}
 }

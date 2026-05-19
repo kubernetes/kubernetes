@@ -39,124 +39,71 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	// type ItemList
-	scheme.AddValidationFunc(
-		(*ItemList)(nil),
-		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-			switch op.Request.SubresourcePath() {
-			case "/":
-				return Validate_ItemList(
-					ctx, op, nil, /* fldPath */
-					obj.(*ItemList),
-					safe.Cast[*ItemList](oldObj))
-			}
-			return field.ErrorList{
-				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
-			}
-		})
+	scheme.AddValidationFunc((*ItemList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_ItemList(ctx, op, nil /* fldPath */, obj.(*ItemList), safe.Cast[*ItemList](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	// type StructSlice
-	scheme.AddValidationFunc(
-		(*StructSlice)(nil),
-		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-			switch op.Request.SubresourcePath() {
-			case "/":
-				return Validate_StructSlice(
-					ctx, op, nil, /* fldPath */
-					obj.(*StructSlice),
-					safe.Cast[*StructSlice](oldObj))
-			}
-			return field.ErrorList{
-				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
-			}
-		})
+	scheme.AddValidationFunc((*StructSlice)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_StructSlice(ctx, op, nil /* fldPath */, obj.(*StructSlice), safe.Cast[*StructSlice](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	return nil
 }
 
 // Validate_Item validates an instance of Item according
 // to declarative validation rules in the API schema.
-func Validate_Item(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *Item) (errs field.ErrorList) {
-
+func Validate_Item(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) (errs field.ErrorList) {
 	// field Item.Key has no validation
 
-	{ // field Item.Data
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj map[string]string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field Item.Data
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj map[string]string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
-			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Data"); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field Data")...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *Item) map[string]string {
-				return oldObj.Data
-			})
-		errs = append(errs, fn(fldPath.Child("data"), obj.Data, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("data"), obj.Data, safe.Field(oldObj, func(oldObj *Item) map[string]string { return oldObj.Data }), oldObj != nil)...)
 
 	return errs
 }
 
 // Validate_ItemList validates an instance of ItemList according
 // to declarative validation rules in the API schema.
-func Validate_ItemList(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *ItemList) (errs field.ErrorList) {
-
+func Validate_ItemList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ItemList) (errs field.ErrorList) {
 	// field ItemList.TypeMeta has no validation
 
-	{ // field ItemList.Items
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []Item,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field ItemList.Items
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []Item, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a Item, b Item) bool { return a.Key == b.Key }); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a Item, b Item) bool { return a.Key == b.Key })...)
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a Item, b Item) bool { return a.Key == b.Key }, validate.SemanticDeepEqual, Validate_Item); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a Item, b Item) bool { return a.Key == b.Key }, validate.SemanticDeepEqual, Validate_Item)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *ItemList) []Item {
-				return oldObj.Items
-			})
-		errs = append(errs, fn(fldPath.Child("items"), obj.Items, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *ItemList) []Item { return oldObj.Items }), oldObj != nil)...)
 
 	return errs
 }
 
 // Validate_MixedKeyStruct validates an instance of MixedKeyStruct according
 // to declarative validation rules in the API schema.
-func Validate_MixedKeyStruct(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *MixedKeyStruct) (errs field.ErrorList) {
-
-	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type MixedKeyStruct"); len(e) != 0 {
-		errs = append(errs, e...)
-	}
+func Validate_MixedKeyStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MixedKeyStruct) (errs field.ErrorList) {
+	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type MixedKeyStruct")...)
 
 	// field MixedKeyStruct.Key1 has no validation
 	// field MixedKeyStruct.Key2 has no validation
@@ -166,13 +113,8 @@ func Validate_MixedKeyStruct(
 
 // Validate_NonComparableStruct validates an instance of NonComparableStruct according
 // to declarative validation rules in the API schema.
-func Validate_NonComparableStruct(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *NonComparableStruct) (errs field.ErrorList) {
-
-	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type NonComparableStruct"); len(e) != 0 {
-		errs = append(errs, e...)
-	}
+func Validate_NonComparableStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NonComparableStruct) (errs field.ErrorList) {
+	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type NonComparableStruct")...)
 
 	// field NonComparableStruct.IntPtrField has no validation
 	return errs
@@ -180,13 +122,8 @@ func Validate_NonComparableStruct(
 
 // Validate_NonComparableStructWithKey validates an instance of NonComparableStructWithKey according
 // to declarative validation rules in the API schema.
-func Validate_NonComparableStructWithKey(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *NonComparableStructWithKey) (errs field.ErrorList) {
-
-	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type NonComparableStructWithKey"); len(e) != 0 {
-		errs = append(errs, e...)
-	}
+func Validate_NonComparableStructWithKey(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NonComparableStructWithKey) (errs field.ErrorList) {
+	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type NonComparableStructWithKey")...)
 
 	// field NonComparableStructWithKey.Key has no validation
 	// field NonComparableStructWithKey.IntPtrField has no validation
@@ -195,13 +132,8 @@ func Validate_NonComparableStructWithKey(
 
 // Validate_PtrKeyStruct validates an instance of PtrKeyStruct according
 // to declarative validation rules in the API schema.
-func Validate_PtrKeyStruct(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *PtrKeyStruct) (errs field.ErrorList) {
-
-	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type PtrKeyStruct"); len(e) != 0 {
-		errs = append(errs, e...)
-	}
+func Validate_PtrKeyStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *PtrKeyStruct) (errs field.ErrorList) {
+	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type PtrKeyStruct")...)
 
 	// field PtrKeyStruct.Key has no validation
 	// field PtrKeyStruct.Data has no validation
@@ -210,348 +142,182 @@ func Validate_PtrKeyStruct(
 
 // Validate_StructSlice validates an instance of StructSlice according
 // to declarative validation rules in the API schema.
-func Validate_StructSlice(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *StructSlice) (errs field.ErrorList) {
-
+func Validate_StructSlice(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *StructSlice) (errs field.ErrorList) {
 	// field StructSlice.TypeMeta has no validation
 
-	{ // field StructSlice.AtomicSliceStringField
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []StringType,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field StructSlice.AtomicSliceStringField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []StringType, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *StringType) field.ErrorList {
-					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field AtomicSliceStringField[*]")
-				}); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *StringType) field.ErrorList {
+				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field AtomicSliceStringField[*]")
+			})...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *StructSlice) []StringType {
-				return oldObj.AtomicSliceStringField
-			})
-		errs = append(errs, fn(fldPath.Child("atomicSliceStringField"), obj.AtomicSliceStringField, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("atomicSliceStringField"), obj.AtomicSliceStringField, safe.Field(oldObj, func(oldObj *StructSlice) []StringType { return oldObj.AtomicSliceStringField }), oldObj != nil)...)
 
-	{ // field StructSlice.AtomicSliceTypeField
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj IntSliceType,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field StructSlice.AtomicSliceTypeField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj IntSliceType, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
-					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field AtomicSliceTypeField[*]")
-				}); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *int) field.ErrorList {
+				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field AtomicSliceTypeField[*]")
+			})...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *StructSlice) IntSliceType {
-				return oldObj.AtomicSliceTypeField
-			})
-		errs = append(errs, fn(fldPath.Child("atomicSliceTypeField"), obj.AtomicSliceTypeField, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("atomicSliceTypeField"), obj.AtomicSliceTypeField, safe.Field(oldObj, func(oldObj *StructSlice) IntSliceType { return oldObj.AtomicSliceTypeField }), oldObj != nil)...)
 
-	{ // field StructSlice.AtomicSliceComparableField
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []ComparableStruct,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field StructSlice.AtomicSliceComparableField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []ComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ComparableStruct) field.ErrorList {
-					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field AtomicSliceComparableField[*]")
-				}); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ComparableStruct) field.ErrorList {
+				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field AtomicSliceComparableField[*]")
+			})...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *StructSlice) []ComparableStruct {
-				return oldObj.AtomicSliceComparableField
-			})
-		errs = append(errs, fn(fldPath.Child("atomicSliceComparableField"), obj.AtomicSliceComparableField, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("atomicSliceComparableField"), obj.AtomicSliceComparableField, safe.Field(oldObj, func(oldObj *StructSlice) []ComparableStruct { return oldObj.AtomicSliceComparableField }), oldObj != nil)...)
 
-	{ // field StructSlice.AtomicSliceNonComparableField
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []NonComparableStruct,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field StructSlice.AtomicSliceNonComparableField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []NonComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NonComparableStruct) field.ErrorList {
-					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field AtomicSliceNonComparableField[*]")
-				}); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NonComparableStruct) field.ErrorList {
+				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field AtomicSliceNonComparableField[*]")
+			})...)
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_NonComparableStruct); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_NonComparableStruct)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *StructSlice) []NonComparableStruct {
-				return oldObj.AtomicSliceNonComparableField
-			})
-		errs = append(errs, fn(fldPath.Child("atomicSliceNonComparableField"), obj.AtomicSliceNonComparableField, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("atomicSliceNonComparableField"), obj.AtomicSliceNonComparableField, safe.Field(oldObj, func(oldObj *StructSlice) []NonComparableStruct { return oldObj.AtomicSliceNonComparableField }), oldObj != nil)...)
 
-	{ // field StructSlice.SetSliceComparableField
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []ComparableStruct,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field StructSlice.SetSliceComparableField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []ComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ComparableStruct) field.ErrorList {
-					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field SetSliceComparableField[*]")
-				}); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ComparableStruct) field.ErrorList {
+				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field SetSliceComparableField[*]")
+			})...)
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *StructSlice) []ComparableStruct {
-				return oldObj.SetSliceComparableField
-			})
-		errs = append(errs, fn(fldPath.Child("setSliceComparableField"), obj.SetSliceComparableField, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("setSliceComparableField"), obj.SetSliceComparableField, safe.Field(oldObj, func(oldObj *StructSlice) []ComparableStruct { return oldObj.SetSliceComparableField }), oldObj != nil)...)
 
-	{ // field StructSlice.SetSliceNonComparableField
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []NonComparableStruct,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field StructSlice.SetSliceNonComparableField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []NonComparableStruct, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NonComparableStruct) field.ErrorList {
-					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field SetSliceNonComparableField[*]")
-				}); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NonComparableStruct) field.ErrorList {
+				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field SetSliceNonComparableField[*]")
+			})...)
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual)...)
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil, Validate_NonComparableStruct); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, nil, Validate_NonComparableStruct)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *StructSlice) []NonComparableStruct {
-				return oldObj.SetSliceNonComparableField
-			})
-		errs = append(errs, fn(fldPath.Child("setSliceNonComparableField"), obj.SetSliceNonComparableField, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("setSliceNonComparableField"), obj.SetSliceNonComparableField, safe.Field(oldObj, func(oldObj *StructSlice) []NonComparableStruct { return oldObj.SetSliceNonComparableField }), oldObj != nil)...)
 
-	{ // field StructSlice.MapSliceComparableField
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []ComparableStructWithKey,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field StructSlice.MapSliceComparableField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []ComparableStructWithKey, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a ComparableStructWithKey, b ComparableStructWithKey) bool { return a.Key == b.Key }, validate.DirectEqual,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ComparableStructWithKey) field.ErrorList {
-					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field MapSliceComparableField[*]")
-				}); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a ComparableStructWithKey, b ComparableStructWithKey) bool { return a.Key == b.Key }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ComparableStructWithKey) field.ErrorList {
+				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field MapSliceComparableField[*]")
+			})...)
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a ComparableStructWithKey, b ComparableStructWithKey) bool { return a.Key == b.Key }); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a ComparableStructWithKey, b ComparableStructWithKey) bool { return a.Key == b.Key })...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *StructSlice) []ComparableStructWithKey {
-				return oldObj.MapSliceComparableField
-			})
-		errs = append(errs, fn(fldPath.Child("mapSliceComparableField"), obj.MapSliceComparableField, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("mapSliceComparableField"), obj.MapSliceComparableField, safe.Field(oldObj, func(oldObj *StructSlice) []ComparableStructWithKey { return oldObj.MapSliceComparableField }), oldObj != nil)...)
 
-	{ // field StructSlice.MapSliceNonComparableField
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []NonComparableStructWithKey,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field StructSlice.MapSliceNonComparableField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []NonComparableStructWithKey, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a NonComparableStructWithKey, b NonComparableStructWithKey) bool { return a.Key == b.Key }, validate.SemanticDeepEqual,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NonComparableStructWithKey) field.ErrorList {
-					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field MapSliceNonComparableField[*]")
-				}); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a NonComparableStructWithKey, b NonComparableStructWithKey) bool { return a.Key == b.Key }, validate.SemanticDeepEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NonComparableStructWithKey) field.ErrorList {
+				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field MapSliceNonComparableField[*]")
+			})...)
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a NonComparableStructWithKey, b NonComparableStructWithKey) bool { return a.Key == b.Key }); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a NonComparableStructWithKey, b NonComparableStructWithKey) bool { return a.Key == b.Key })...)
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a NonComparableStructWithKey, b NonComparableStructWithKey) bool { return a.Key == b.Key }, validate.SemanticDeepEqual, Validate_NonComparableStructWithKey); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a NonComparableStructWithKey, b NonComparableStructWithKey) bool { return a.Key == b.Key }, validate.SemanticDeepEqual, Validate_NonComparableStructWithKey)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *StructSlice) []NonComparableStructWithKey {
-				return oldObj.MapSliceNonComparableField
-			})
-		errs = append(errs, fn(fldPath.Child("mapSliceNonComparableField"), obj.MapSliceNonComparableField, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("mapSliceNonComparableField"), obj.MapSliceNonComparableField, safe.Field(oldObj, func(oldObj *StructSlice) []NonComparableStructWithKey { return oldObj.MapSliceNonComparableField }), oldObj != nil)...)
 
-	{ // field StructSlice.MapSlicePtrKeyField
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []PtrKeyStruct,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field StructSlice.MapSlicePtrKeyField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []PtrKeyStruct, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a PtrKeyStruct, b PtrKeyStruct) bool {
-					return ((a.Key == nil && b.Key == nil) || (a.Key != nil && b.Key != nil && *a.Key == *b.Key))
-				}, validate.SemanticDeepEqual,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *PtrKeyStruct) field.ErrorList {
-					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field MapSlicePtrKeyField[*]")
-				}); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a PtrKeyStruct, b PtrKeyStruct) bool {
+				return ((a.Key == nil && b.Key == nil) || (a.Key != nil && b.Key != nil && *a.Key == *b.Key))
+			}, validate.SemanticDeepEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *PtrKeyStruct) field.ErrorList {
+				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field MapSlicePtrKeyField[*]")
+			})...)
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a PtrKeyStruct, b PtrKeyStruct) bool {
-					return ((a.Key == nil && b.Key == nil) || (a.Key != nil && b.Key != nil && *a.Key == *b.Key))
-				}); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a PtrKeyStruct, b PtrKeyStruct) bool {
+				return ((a.Key == nil && b.Key == nil) || (a.Key != nil && b.Key != nil && *a.Key == *b.Key))
+			})...)
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a PtrKeyStruct, b PtrKeyStruct) bool {
-					return ((a.Key == nil && b.Key == nil) || (a.Key != nil && b.Key != nil && *a.Key == *b.Key))
-				}, validate.SemanticDeepEqual, Validate_PtrKeyStruct); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a PtrKeyStruct, b PtrKeyStruct) bool {
+				return ((a.Key == nil && b.Key == nil) || (a.Key != nil && b.Key != nil && *a.Key == *b.Key))
+			}, validate.SemanticDeepEqual, Validate_PtrKeyStruct)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *StructSlice) []PtrKeyStruct {
-				return oldObj.MapSlicePtrKeyField
-			})
-		errs = append(errs, fn(fldPath.Child("mapSlicePtrKeyField"), obj.MapSlicePtrKeyField, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("mapSlicePtrKeyField"), obj.MapSlicePtrKeyField, safe.Field(oldObj, func(oldObj *StructSlice) []PtrKeyStruct { return oldObj.MapSlicePtrKeyField }), oldObj != nil)...)
 
-	{ // field StructSlice.MapSliceMixedKeyField
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []MixedKeyStruct,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field StructSlice.MapSliceMixedKeyField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []MixedKeyStruct, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a MixedKeyStruct, b MixedKeyStruct) bool {
-					return ((a.Key1 == nil && b.Key1 == nil) || (a.Key1 != nil && b.Key1 != nil && *a.Key1 == *b.Key1)) && a.Key2 == b.Key2
-				}, validate.SemanticDeepEqual,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MixedKeyStruct) field.ErrorList {
-					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field MapSliceMixedKeyField[*]")
-				}); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a MixedKeyStruct, b MixedKeyStruct) bool {
+				return ((a.Key1 == nil && b.Key1 == nil) || (a.Key1 != nil && b.Key1 != nil && *a.Key1 == *b.Key1)) && a.Key2 == b.Key2
+			}, validate.SemanticDeepEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MixedKeyStruct) field.ErrorList {
+				return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field MapSliceMixedKeyField[*]")
+			})...)
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a MixedKeyStruct, b MixedKeyStruct) bool {
-					return ((a.Key1 == nil && b.Key1 == nil) || (a.Key1 != nil && b.Key1 != nil && *a.Key1 == *b.Key1)) && a.Key2 == b.Key2
-				}); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a MixedKeyStruct, b MixedKeyStruct) bool {
+				return ((a.Key1 == nil && b.Key1 == nil) || (a.Key1 != nil && b.Key1 != nil && *a.Key1 == *b.Key1)) && a.Key2 == b.Key2
+			})...)
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a MixedKeyStruct, b MixedKeyStruct) bool {
-					return ((a.Key1 == nil && b.Key1 == nil) || (a.Key1 != nil && b.Key1 != nil && *a.Key1 == *b.Key1)) && a.Key2 == b.Key2
-				}, validate.SemanticDeepEqual, Validate_MixedKeyStruct); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a MixedKeyStruct, b MixedKeyStruct) bool {
+				return ((a.Key1 == nil && b.Key1 == nil) || (a.Key1 != nil && b.Key1 != nil && *a.Key1 == *b.Key1)) && a.Key2 == b.Key2
+			}, validate.SemanticDeepEqual, Validate_MixedKeyStruct)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *StructSlice) []MixedKeyStruct {
-				return oldObj.MapSliceMixedKeyField
-			})
-		errs = append(errs, fn(fldPath.Child("mapSliceMixedKeyField"), obj.MapSliceMixedKeyField, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("mapSliceMixedKeyField"), obj.MapSliceMixedKeyField, safe.Field(oldObj, func(oldObj *StructSlice) []MixedKeyStruct { return oldObj.MapSliceMixedKeyField }), oldObj != nil)...)
 
 	return errs
 }

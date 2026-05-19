@@ -26,7 +26,6 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	gentype "k8s.io/client-go/gentype"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
-	applyconfigurationapiregistrationv1 "k8s.io/kube-aggregator/pkg/client/applyconfiguration/apiregistration/v1"
 	scheme "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme"
 )
 
@@ -48,21 +47,18 @@ type APIServiceInterface interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*apiregistrationv1.APIServiceList, error)
 	Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error)
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *apiregistrationv1.APIService, err error)
-	Apply(ctx context.Context, aPIService *applyconfigurationapiregistrationv1.APIServiceApplyConfiguration, opts metav1.ApplyOptions) (result *apiregistrationv1.APIService, err error)
-	// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
-	ApplyStatus(ctx context.Context, aPIService *applyconfigurationapiregistrationv1.APIServiceApplyConfiguration, opts metav1.ApplyOptions) (result *apiregistrationv1.APIService, err error)
 	APIServiceExpansion
 }
 
 // aPIServices implements APIServiceInterface
 type aPIServices struct {
-	*gentype.ClientWithListAndApply[*apiregistrationv1.APIService, *apiregistrationv1.APIServiceList, *applyconfigurationapiregistrationv1.APIServiceApplyConfiguration]
+	*gentype.ClientWithList[*apiregistrationv1.APIService, *apiregistrationv1.APIServiceList]
 }
 
 // newAPIServices returns a APIServices
 func newAPIServices(c *ApiregistrationV1Client) *aPIServices {
 	return &aPIServices{
-		gentype.NewClientWithListAndApply[*apiregistrationv1.APIService, *apiregistrationv1.APIServiceList, *applyconfigurationapiregistrationv1.APIServiceApplyConfiguration](
+		gentype.NewClientWithList[*apiregistrationv1.APIService, *apiregistrationv1.APIServiceList](
 			"apiservices",
 			c.RESTClient(),
 			scheme.ParameterCodec,

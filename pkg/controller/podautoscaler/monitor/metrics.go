@@ -30,37 +30,37 @@ const (
 )
 
 var (
-	ReconciliationsTotal = metrics.NewCounterVec(
+	reconciliationsTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      hpaControllerSubsystem,
 			Name:           "reconciliations_total",
 			Help:           "Number of reconciliations of HPA controller. The label 'action' should be either 'scale_down', 'scale_up', or 'none'. Also, the label 'error' should be either 'spec', 'internal', or 'none'. Note that if both spec and internal errors happen during a reconciliation, the first one to occur is reported in `error` label.",
-			StabilityLevel: metrics.BETA,
+			StabilityLevel: metrics.ALPHA,
 		}, []string{"action", "error"})
-	ReconciliationsDuration = metrics.NewHistogramVec(
+	reconciliationsDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      hpaControllerSubsystem,
 			Name:           "reconciliation_duration_seconds",
 			Help:           "The time(seconds) that the HPA controller takes to reconcile once. The label 'action' should be either 'scale_down', 'scale_up', or 'none'. Also, the label 'error' should be either 'spec', 'internal', or 'none'. Note that if both spec and internal errors happen during a reconciliation, the first one to occur is reported in `error` label.",
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
-			StabilityLevel: metrics.BETA,
+			StabilityLevel: metrics.ALPHA,
 		}, []string{"action", "error"})
-	MetricComputationTotal = metrics.NewCounterVec(
+	metricComputationTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      hpaControllerSubsystem,
 			Name:           "metric_computation_total",
 			Help:           "Number of metric computations. The label 'action' should be either 'scale_down', 'scale_up', or 'none'. Also, the label 'error' should be either 'spec', 'internal', or 'none'. The label 'metric_type' corresponds to HPA.spec.metrics[*].type",
-			StabilityLevel: metrics.BETA,
+			StabilityLevel: metrics.ALPHA,
 		}, []string{"action", "error", "metric_type"})
-	MetricComputationDuration = metrics.NewHistogramVec(
+	metricComputationDuration = metrics.NewHistogramVec(
 		&metrics.HistogramOpts{
 			Subsystem:      hpaControllerSubsystem,
 			Name:           "metric_computation_duration_seconds",
 			Help:           "The time(seconds) that the HPA controller takes to calculate one metric. The label 'action' should be either 'scale_down', 'scale_up', or 'none'. The label 'error' should be either 'spec', 'internal', or 'none'. The label 'metric_type' corresponds to HPA.spec.metrics[*].type",
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
-			StabilityLevel: metrics.BETA,
+			StabilityLevel: metrics.ALPHA,
 		}, []string{"action", "error", "metric_type"})
-	NumHorizontalPodAutoscalers = metrics.NewGauge(
+	numHorizontalPodAutoscalers = metrics.NewGauge(
 		&metrics.GaugeOpts{
 			Subsystem:      hpaControllerSubsystem,
 			Name:           "num_horizontal_pod_autoscalers",
@@ -68,7 +68,7 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
-	DesiredReplicasCount = metrics.NewGaugeVec(
+	desiredReplicasCount = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      hpaControllerSubsystem,
 			Name:           "desired_replicas",
@@ -76,26 +76,13 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"namespace", "hpa_name"})
 
-	// HPARequeueSkips track the number of hpa syncs skipped due to a stale
-	// watch cache.
-	HPARequeueSkips = metrics.NewCounterVec(
-		&metrics.CounterOpts{
-			Subsystem:      hpaControllerSubsystem,
-			Name:           "stale_sync_skips_total",
-			Help:           "Total number of HPA syncs skipped due to a stale watch cache.",
-			StabilityLevel: metrics.ALPHA,
-		},
-		[]string{"group", "resource"},
-	)
-
 	metricsList = []metrics.Registerable{
-		ReconciliationsTotal,
-		ReconciliationsDuration,
-		MetricComputationTotal,
-		MetricComputationDuration,
-		NumHorizontalPodAutoscalers,
-		DesiredReplicasCount,
-		HPARequeueSkips,
+		reconciliationsTotal,
+		reconciliationsDuration,
+		metricComputationTotal,
+		metricComputationDuration,
+		numHorizontalPodAutoscalers,
+		desiredReplicasCount,
 	}
 )
 

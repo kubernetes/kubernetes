@@ -37,7 +37,6 @@ import (
 	"k8s.io/apiserver/pkg/storage/cacher/delegator"
 	"k8s.io/apiserver/pkg/storage/cacher/metrics"
 	"k8s.io/apiserver/pkg/storage/cacher/progress"
-	"k8s.io/apiserver/pkg/storage/cacher/store"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/tracing"
@@ -122,7 +121,7 @@ type watchCache struct {
 	// history" i.e. from the moment just after the newest cached watched event.
 	// It is necessary to effectively allow clients to start watching at now.
 	// NOTE: We assume that <store> is thread-safe.
-	store store.Indexer
+	store storeIndexer
 
 	// ResourceVersion up to which the watchCache is propagated.
 	resourceVersion uint64
@@ -157,7 +156,7 @@ type watchCache struct {
 	waitingUntilFresh *progress.ConditionalProgressRequester
 
 	// Stores previous snapshots of orderedLister to allow serving requests from previous revisions.
-	snapshots           store.Snapshotter
+	snapshots           Snapshotter
 	snapshottingEnabled atomic.Bool
 
 	getCurrentRV func(context.Context) (uint64, error)
@@ -184,7 +183,7 @@ func newWatchCache(
 		upperBoundCapacity:  capacityUpperBound(eventFreshDuration),
 		startIndex:          0,
 		endIndex:            0,
-		store:               store.NewIndexer(indexers),
+		store:               newStoreIndexer(indexers),
 		resourceVersion:     0,
 		listResourceVersion: 0,
 		eventHandler:        eventHandler,
@@ -197,7 +196,7 @@ func newWatchCache(
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
 		wc.snapshottingEnabled.Store(true)
-		wc.snapshots = store.NewSnapshotter()
+		wc.snapshots = newStoreSnapshotter()
 	}
 	metrics.WatchCacheCapacity.WithLabelValues(groupResource.Group, groupResource.Resource).Set(float64(wc.capacity))
 	wc.cond = sync.NewCond(wc.RLocker())
@@ -238,7 +237,7 @@ func (w *watchCache) Add(obj interface{}) error {
 	}
 	event := watch.Event{Type: watch.Added, Object: object}
 
-	f := func(elem *store.Element) error { return w.store.Add(elem) }
+	f := func(elem *storeElement) error { return w.store.Add(elem) }
 	return w.processEvent(event, resourceVersion, f)
 }
 
@@ -250,7 +249,7 @@ func (w *watchCache) Update(obj interface{}) error {
 	}
 	event := watch.Event{Type: watch.Modified, Object: object}
 
-	f := func(elem *store.Element) error { return w.store.Update(elem) }
+	f := func(elem *storeElement) error { return w.store.Update(elem) }
 	return w.processEvent(event, resourceVersion, f)
 }
 
@@ -262,7 +261,7 @@ func (w *watchCache) Delete(obj interface{}) error {
 	}
 	event := watch.Event{Type: watch.Deleted, Object: object}
 
-	f := func(elem *store.Element) error { return w.store.Delete(elem) }
+	f := func(elem *storeElement) error { return w.store.Delete(elem) }
 	return w.processEvent(event, resourceVersion, f)
 }
 
@@ -280,14 +279,14 @@ func (w *watchCache) objectToVersionedRuntimeObject(obj interface{}) (runtime.Ob
 
 // processEvent is safe as long as there is at most one call to it in flight
 // at any point in time.
-func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, updateFunc func(*store.Element) error) error {
+func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, updateFunc func(*storeElement) error) error {
 	metrics.EventsReceivedCounter.WithLabelValues(w.groupResource.Group, w.groupResource.Resource).Inc()
 
 	key, err := w.keyFunc(event.Object)
 	if err != nil {
 		return fmt.Errorf("couldn't compute key: %v", err)
 	}
-	elem := &store.Element{Key: key, Object: event.Object}
+	elem := &storeElement{Key: key, Object: event.Object}
 	elem.Labels, elem.Fields, err = w.getAttrsFunc(event.Object)
 	if err != nil {
 		return err
@@ -313,7 +312,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 		return err
 	}
 	if exists {
-		previousElem := previous.(*store.Element)
+		previousElem := previous.(*storeElement)
 		wcEvent.PrevObject = previousElem.Object
 		wcEvent.PrevObjLabels = previousElem.Labels
 		wcEvent.PrevObjFields = previousElem.Fields
@@ -332,7 +331,7 @@ func (w *watchCache) processEvent(event watch.Event, resourceVersion uint64, upd
 			return err
 		}
 		if w.snapshots != nil && w.snapshottingEnabled.Load() {
-			if orderedLister, ordered := w.store.(store.OrderedLister); ordered {
+			if orderedLister, ordered := w.store.(orderedLister); ordered {
 				if w.isCacheFullLocked() {
 					oldestRV := w.cache[w.startIndex%w.capacity].ResourceVersion
 					w.snapshots.RemoveLess(oldestRV)
@@ -438,7 +437,7 @@ func (w *watchCache) UpdateResourceVersion(resourceVersion string) {
 	metrics.RecordResourceVersion(w.groupResource, rv)
 }
 
-// List returns list of pointers to <store.Element> objects.
+// List returns list of pointers to <storeElement> objects.
 func (w *watchCache) List() []interface{} {
 	return w.store.List()
 }
@@ -496,7 +495,7 @@ func (s sortableStoreElements) Len() int {
 }
 
 func (s sortableStoreElements) Less(i, j int) bool {
-	return s[i].(*store.Element).Key < s[j].(*store.Element).Key
+	return s[i].(*storeElement).Key < s[j].(*storeElement).Key
 }
 
 func (s sortableStoreElements) Swap(i, j int) {
@@ -653,7 +652,7 @@ func (w *watchCache) listLatestRV(key, continueKey string, matchValues []storage
 			}, matchValue.IndexName, err
 		}
 	}
-	if store, ok := w.store.(store.OrderedLister); ok {
+	if store, ok := w.store.(orderedLister); ok {
 		result := store.ListPrefix(key, continueKey)
 		return listResp{
 			Items:           result,
@@ -671,9 +670,9 @@ func (w *watchCache) listLatestRV(key, continueKey string, matchValues []storage
 func filterPrefixAndOrder(prefix string, items []interface{}) ([]interface{}, error) {
 	var result []interface{}
 	for _, item := range items {
-		elem, ok := item.(*store.Element)
+		elem, ok := item.(*storeElement)
 		if !ok {
-			return nil, fmt.Errorf("non *store.Element returned from storage: %v", item)
+			return nil, fmt.Errorf("non *storeElement returned from storage: %v", item)
 		}
 		if !hasPathPrefix(elem.Key, prefix) {
 			continue
@@ -724,7 +723,7 @@ func (w *watchCache) Get(obj interface{}) (interface{}, bool, error) {
 		return nil, false, fmt.Errorf("couldn't compute key: %v", err)
 	}
 
-	return w.store.Get(&store.Element{Key: key, Object: object})
+	return w.store.Get(&storeElement{Key: key, Object: object})
 }
 
 // GetByKey returns pointer to <storeElement>.
@@ -753,7 +752,7 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 		if err != nil {
 			return err
 		}
-		toReplace = append(toReplace, &store.Element{
+		toReplace = append(toReplace, &storeElement{
 			Key:    key,
 			Object: object,
 			Labels: objLabels,
@@ -778,7 +777,7 @@ func (w *watchCache) Replace(objs []interface{}, resourceVersion string) error {
 	}
 	if w.snapshots != nil {
 		w.snapshots.Reset()
-		if orderedLister, ordered := w.store.(store.OrderedLister); ordered && w.snapshottingEnabled.Load() {
+		if orderedLister, ordered := w.store.(orderedLister); ordered && w.snapshottingEnabled.Load() {
 			w.snapshots.Add(version, orderedLister)
 		}
 	}

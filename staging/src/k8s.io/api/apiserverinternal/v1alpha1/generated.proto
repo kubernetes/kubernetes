@@ -31,70 +31,59 @@ option go_package = "k8s.io/api/apiserverinternal/v1alpha1";
 // An API server instance reports the version it can decode and the version it
 // encodes objects to when persisting objects in the backend.
 message ServerStorageVersion {
-  // apiServerID is the ID of the reporting API server.
-  // +required
+  // The ID of the reporting API server.
   optional string apiServerID = 1;
 
-  // encodingVersion the API server encodes the object to when persisting it in
+  // The API server encodes the object to this version when persisting it in
   // the backend (e.g., etcd).
-  // +required
   optional string encodingVersion = 2;
 
-  // decodableVersions are the encoding versions the API server can handle to decode.
   // The API server can decode objects encoded in these versions.
   // The encodingVersion must be included in the decodableVersions.
   // +listType=set
-  // +required
   repeated string decodableVersions = 3;
 
-  // servedVersions lists all versions the API server can serve.
+  // The API server can serve these versions.
   // DecodableVersions must include all ServedVersions.
   // +listType=set
-  // +optional
   repeated string servedVersions = 4;
 }
 
 // Storage version of a specific resource.
-// +k8s:supportsSubresource="/status"
 message StorageVersion {
-  // metadata is the standard object metadata.
   // The name is <group>.<resource>.
-  // +required
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
-  // spec is an empty spec. It is here to comply with Kubernetes API style.
-  // +optional
+  // Spec is an empty spec. It is here to comply with Kubernetes API style.
   optional StorageVersionSpec spec = 2;
 
-  // status on the version the API server instance can decode from and
+  // API server instances report the version they can decode and the version they
   // encode objects to when persisting objects in the backend.
-  // +optional
   optional StorageVersionStatus status = 3;
 }
 
 // Describes the state of the storageVersion at a certain point.
 message StorageVersionCondition {
-  // type of the condition.
+  // Type of the condition.
   // +required
   optional string type = 1;
 
-  // status of the condition, one of True, False, Unknown.
+  // Status of the condition, one of True, False, Unknown.
   // +required
   optional string status = 2;
 
-  // observedGeneration represents the .metadata.generation that the condition was set based upon, if field is set.
+  // If set, this represents the .metadata.generation that the condition was set based upon.
   // +optional
   optional int64 observedGeneration = 3;
 
-  // lastTransitionTime is the last time the condition transitioned from one status to another.
-  // +optional
+  // Last time the condition transitioned from one status to another.
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
 
-  // reason for the condition's last transition.
+  // The reason for the condition's last transition.
   // +required
   optional string reason = 5;
 
-  // message is a human readable string indicating details about the transition.
+  // A human readable message indicating details about the transition.
   // +required
   optional string message = 6;
 }
@@ -117,21 +106,20 @@ message StorageVersionSpec {
 // API server instances report the versions they can decode and the version they
 // encode objects to when persisting objects in the backend.
 message StorageVersionStatus {
-  // storageVersions lists the reported versions per API server instance.
+  // The reported versions per API server instance.
   // +optional
   // +listType=map
   // +listMapKey=apiServerID
   repeated ServerStorageVersion storageVersions = 1;
 
-  // commonEncodingVersion is set to an encoding storage version if all API server
-  // instances share that same version. If they don't share one storage version, this
-  // field is left empty.
+  // If all API server instances agree on the same encoding storage version,
+  // then this field is set to that version. Otherwise this field is left empty.
   // API servers should finish updating its storageVersionStatus entry before
   // serving write operations, so that this field will be in sync with the reality.
   // +optional
   optional string commonEncodingVersion = 2;
 
-  // conditions lists the latest available observations of the storageVersion's state.
+  // The latest available observations of the storageVersion's state.
   // +optional
   // +listType=map
   // +listMapKey=type

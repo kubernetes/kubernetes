@@ -1,4 +1,5 @@
 //go:build !windows
+// +build !windows
 
 /*
 Copyright 2022 The Kubernetes Authors.
@@ -314,6 +315,7 @@ func TestEnvelopeTransformerStaleness(t *testing.T) {
 	}
 
 	for _, tt := range testCases {
+		tt := tt
 		t.Run(tt.desc, func(t *testing.T) {
 			t.Parallel()
 
@@ -511,6 +513,7 @@ func TestTransformToStorageError(t *testing.T) {
 	}
 
 	for _, tt := range testCases {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -656,6 +659,7 @@ func TestValidateAnnotations(t *testing.T) {
 	}
 	t.Run("success", func(t *testing.T) {
 		for i := range successCases {
+			i := i
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				t.Parallel()
 				if err := validateAnnotations(successCases[i]); err != nil {
@@ -693,6 +697,7 @@ func TestValidateAnnotations(t *testing.T) {
 
 	t.Run("name error", func(t *testing.T) {
 		for i := range annotationsNameErrorCases {
+			i := i
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				t.Parallel()
 				err := validateAnnotations(annotationsNameErrorCases[i].annotations)
@@ -720,6 +725,7 @@ func TestValidateAnnotations(t *testing.T) {
 	}
 	t.Run("size error", func(t *testing.T) {
 		for i := range annotationsSizeErrorCases {
+			i := i
 			t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 				t.Parallel()
 				err := validateAnnotations(annotationsSizeErrorCases[i].annotations)
@@ -764,6 +770,7 @@ func TestValidateKeyID(t *testing.T) {
 	}
 
 	for _, tt := range testCases {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			errCode, err := ValidateKeyID(tt.keyID)
@@ -816,6 +823,7 @@ func TestValidateEncryptedDEKSource(t *testing.T) {
 	}
 
 	for _, tt := range testCases {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			err := validateEncryptedDEKSource(tt.encryptedDEKSource)
@@ -1021,6 +1029,7 @@ func TestEnvelopeLogging(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.desc, func(t *testing.T) {
 			var buf bytes.Buffer
 			klog.SetOutput(&buf)
@@ -1162,7 +1171,9 @@ func TestGenerateCacheKey(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		for _, tc2 := range testCases {
+			tc2 := tc2
 			t.Run(fmt.Sprintf("%+v-%+v", tc, tc2), func(t *testing.T) {
 				key1, err1 := generateCacheKey(tc.encryptedDEKSourceType, tc.encryptedDEKSource, tc.keyID, tc.annotations)
 				key2, err2 := generateCacheKey(tc2.encryptedDEKSourceType, tc2.encryptedDEKSource, tc2.keyID, tc2.annotations)
@@ -1230,6 +1241,7 @@ func TestGenerateTransformer(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 

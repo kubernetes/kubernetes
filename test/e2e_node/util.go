@@ -18,6 +18,7 @@ package e2enode
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -29,7 +30,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"k8s.io/kubernetes/pkg/util/procfs"
@@ -53,7 +53,6 @@ import (
 	stats "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubelet/pkg/types"
 	"k8s.io/kubernetes/pkg/cluster/ports"
-	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/podresources"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -86,7 +85,6 @@ const (
 	// state files
 	cpuManagerStateFile    = "/var/lib/kubelet/cpu_manager_state"
 	memoryManagerStateFile = "/var/lib/kubelet/memory_manager_state"
-	usernsStateFiles       = "/var/lib/kubelet/pods/*/userns"
 )
 
 var (
@@ -181,22 +179,10 @@ func addAfterEachForCleaningUpPods(f *framework.Framework) {
 	})
 }
 
-func addBeforeEachForCleaningUpPods(f *framework.Framework) {
-	ginkgo.BeforeEach(func(ctx context.Context) {
-		ginkgo.By("Deleting any Pods created by previous test(s) in all namespaces")
-		l, err := e2epod.NewPodClient(f).List(ctx, metav1.ListOptions{})
-		framework.ExpectNoError(err)
-		for _, p := range l.Items {
-			framework.Logf("Deleting pod: %s in %s", p.Name, p.Namespace)
-			e2epod.NewPodClient(f).DeleteSync(ctx, p.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
-		}
-	})
-}
-
 func waitForKubeletToStart(ctx context.Context, f *framework.Framework) {
 	// wait until the kubelet health check will succeed
 	gomega.Eventually(ctx, func() bool {
-		return e2enode.HealthCheck(kubeletHealthCheckURL)
+		return kubeletHealthCheck(kubeletHealthCheckURL)
 	}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
 
 	// Wait for the Kubelet to be ready.
@@ -293,12 +279,12 @@ func logKubeletLatencyMetrics(ctx context.Context, metricNames ...string) {
 }
 
 // getCRIClient connects CRI and returns CRI runtime service clients and image service client.
-func getCRIClient(ctx context.Context) (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
+func getCRIClient() (internalapi.RuntimeService, internalapi.ImageManagerService, error) {
 	// connection timeout for CRI service connection
+	logger := klog.Background()
 	const connectionTimeout = 2 * time.Minute
 	runtimeEndpoint := framework.TestContext.ContainerRuntimeEndpoint
-	useStreaming := utilfeature.DefaultFeatureGate.Enabled(features.CRIListStreaming)
-	r, err := remote.NewRemoteRuntimeService(ctx, runtimeEndpoint, connectionTimeout, noop.NewTracerProvider(), useStreaming)
+	r, err := remote.NewRemoteRuntimeService(runtimeEndpoint, connectionTimeout, noop.NewTracerProvider(), &logger)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -308,7 +294,7 @@ func getCRIClient(ctx context.Context) (internalapi.RuntimeService, internalapi.
 		//explicitly specified
 		imageManagerEndpoint = framework.TestContext.ImageServiceEndpoint
 	}
-	i, err := remote.NewRemoteImageService(ctx, imageManagerEndpoint, connectionTimeout, noop.NewTracerProvider(), useStreaming)
+	i, err := remote.NewRemoteImageService(imageManagerEndpoint, connectionTimeout, noop.NewTracerProvider(), &logger)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -433,7 +419,7 @@ func mustStopKubelet(ctx context.Context, f *framework.Framework) func(ctx conte
 
 	// wait until the kubelet health check fail
 	gomega.Eventually(ctx, func() bool {
-		return e2enode.HealthCheck(kubeletHealthCheckURL)
+		return kubeletHealthCheck(kubeletHealthCheckURL)
 	}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("kubelet was expected to be stopped but it is still running"))
 
 	return func(ctx context.Context) {
@@ -442,6 +428,27 @@ func mustStopKubelet(ctx context.Context, f *framework.Framework) func(ctx conte
 		framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
 		waitForKubeletToStart(ctx, f)
 	}
+}
+
+func kubeletHealthCheck(url string) bool {
+	insecureTransport := http.DefaultTransport.(*http.Transport).Clone()
+	insecureTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	insecureHTTPClient := &http.Client{
+		Transport: insecureTransport,
+	}
+
+	req, err := http.NewRequest("HEAD", url, nil)
+	if err != nil {
+		return false
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", framework.TestContext.BearerToken))
+	resp, err := insecureHTTPClient.Do(req)
+	if err != nil {
+		klog.Warningf("Health check on %q failed, error=%v", url, err)
+	} else if resp.StatusCode != http.StatusOK {
+		klog.Warningf("Health check on %q failed, status=%d", url, resp.StatusCode)
+	}
+	return err == nil && resp.StatusCode == http.StatusOK
 }
 
 func toCgroupFsName(cgroupName cm.CgroupName) string {
@@ -481,7 +488,7 @@ func withFeatureGate(feature featuregate.Feature, desired bool) func() {
 // a pristine environment. The only way known so far to do that is to introduce this wait.
 // Worth noting, however, that this makes the test runtime much bigger.
 func waitForAllContainerRemoval(ctx context.Context, podName, podNS string) {
-	rs, _, err := getCRIClient(ctx)
+	rs, _, err := getCRIClient()
 	framework.ExpectNoError(err)
 	gomega.Eventually(ctx, func(ctx context.Context) error {
 		containers, err := rs.ListContainers(ctx, &runtimeapi.ContainerFilter{
@@ -589,7 +596,6 @@ func nodeNameOrIP() string {
 }
 
 func deletePodSyncByName(ctx context.Context, f *framework.Framework, podName string) {
-	ginkgo.GinkgoHelper()
 	gp := int64(0)
 	delOpts := metav1.DeleteOptions{
 		GracePeriodSeconds: &gp,
@@ -604,7 +610,7 @@ func deletePods(ctx context.Context, f *framework.Framework, podNames []string) 
 }
 
 func waitForContainerRemoval(ctx context.Context, containerName, podName, podNS string) {
-	rs, _, err := getCRIClient(ctx)
+	rs, _, err := getCRIClient()
 	framework.ExpectNoError(err)
 	gomega.Eventually(ctx, func(ctx context.Context) bool {
 		containers, err := rs.ListContainers(ctx, &runtimeapi.ContainerFilter{
@@ -619,25 +625,4 @@ func waitForContainerRemoval(ctx context.Context, containerName, podName, podNS 
 		}
 		return len(containers) == 0
 	}, 2*time.Minute, 1*time.Second).Should(gomega.BeTrueBecause("Containers were expected to be removed"))
-}
-
-func deletePodsAsync(ctx context.Context, f *framework.Framework, podMap map[string]*v1.Pod) {
-	ginkgo.GinkgoHelper()
-	var wg sync.WaitGroup
-	for _, pod := range podMap {
-		wg.Add(1)
-		go func(podNS, podName string) {
-			defer ginkgo.GinkgoRecover()
-			defer wg.Done()
-			deletePodSyncAndWait(ctx, f, podNS, podName)
-		}(pod.Namespace, pod.Name)
-	}
-	wg.Wait()
-}
-
-func deletePodSyncAndWait(ctx context.Context, f *framework.Framework, podNS, podName string) {
-	framework.Logf("deleting pod: %s/%s", podNS, podName)
-	deletePodSyncByName(ctx, f, podName)
-	waitForAllContainerRemoval(ctx, podName, podNS)
-	framework.Logf("deleted pod: %s/%s", podNS, podName)
 }

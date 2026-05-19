@@ -1,4 +1,5 @@
 //go:build linux
+// +build linux
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -37,7 +38,7 @@ type streamer interface {
 var _ streamer = &oomparser.OomParser{}
 
 type realWatcher struct {
-	recorder    record.EventRecorderLogger
+	recorder    record.EventRecorder
 	oomStreamer streamer
 }
 
@@ -45,7 +46,7 @@ var _ Watcher = &realWatcher{}
 
 // NewWatcher creates and initializes a OOMWatcher backed by Cadvisor as
 // the oom streamer.
-func NewWatcher(recorder record.EventRecorderLogger) (Watcher, error) {
+func NewWatcher(recorder record.EventRecorder) (Watcher, error) {
 	// for test purpose
 	_, ok := recorder.(*record.FakeRecorder)
 	if ok {
@@ -77,7 +78,7 @@ func (ow *realWatcher) Start(ctx context.Context, ref *v1.ObjectReference) error
 
 	go func() {
 		logger := klog.FromContext(ctx)
-		defer runtime.HandleCrashWithContext(ctx)
+		defer runtime.HandleCrash()
 
 		for event := range outStream {
 			if event.VictimContainerName == recordEventContainerName {
@@ -86,7 +87,7 @@ func (ow *realWatcher) Start(ctx context.Context, ref *v1.ObjectReference) error
 				if event.ProcessName != "" && event.Pid != 0 {
 					eventMsg = fmt.Sprintf("%s, victim process: %s, pid: %d", eventMsg, event.ProcessName, event.Pid)
 				}
-				ow.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeWarning, systemOOMEvent, "%s", eventMsg)
+				ow.recorder.Eventf(ref, v1.EventTypeWarning, systemOOMEvent, eventMsg)
 			}
 		}
 		logger.Error(nil, "Unexpectedly stopped receiving OOM notifications")

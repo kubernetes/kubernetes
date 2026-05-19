@@ -190,7 +190,7 @@ func (w *AtomicWriter) Write(payload map[string]FileProjection, setPerms func(su
 		// (5)
 		tsDir, err := w.newTimestampDir()
 		if err != nil {
-			klog.Errorf("%s: error creating new ts data directory: %v", w.logContext, err)
+			klog.V(4).Infof("%s: error creating new ts data directory: %v", w.logContext, err)
 			return err
 		}
 		tsDirName := filepath.Base(tsDir)
@@ -445,7 +445,7 @@ func (w *AtomicWriter) writePayloadToDir(payload map[string]FileProjection, dir 
 			continue
 		}
 
-		if err := w.lchown(fullPath, int(*fileProjection.FsUser), -1); err != nil {
+		if err := w.chown(fullPath, int(*fileProjection.FsUser), -1); err != nil {
 			klog.Errorf("%s: unable to change file %s with owner %v: %v", w.logContext, fullPath, int(*fileProjection.FsUser), err)
 			return err
 		}
@@ -465,7 +465,7 @@ func (w *AtomicWriter) writePayloadToDir(payload map[string]FileProjection, dir 
 // foo -> ..data/foo
 // baz -> ..data/baz
 func (w *AtomicWriter) createUserVisibleFiles(payload map[string]FileProjection) error {
-	for userVisiblePath, fileProjection := range payload {
+	for userVisiblePath := range payload {
 		slashpos := strings.Index(userVisiblePath, string(os.PathSeparator))
 		if slashpos == -1 {
 			slashpos = len(userVisiblePath)
@@ -479,15 +479,6 @@ func (w *AtomicWriter) createUserVisibleFiles(payload map[string]FileProjection)
 
 			err = os.Symlink(dataDirFile, visibleFile)
 			if err != nil {
-				return err
-			}
-
-			if fileProjection.FsUser == nil {
-				continue
-			}
-
-			if err := w.lchown(visibleFile, int(*fileProjection.FsUser), -1); err != nil {
-				klog.Errorf("%s: unable to change file %s with owner %v: %v", w.logContext, visibleFile, int(*fileProjection.FsUser), err)
 				return err
 			}
 		}

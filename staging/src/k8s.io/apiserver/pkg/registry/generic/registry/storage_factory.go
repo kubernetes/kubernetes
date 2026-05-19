@@ -37,7 +37,7 @@ func StorageWithCacher() generic.StorageDecorator {
 	return func(
 		storageConfig *storagebackend.ConfigForResource,
 		resourcePrefix string,
-		cacheKeyFunc func(obj runtime.Object) (string, error),
+		keyFunc func(obj runtime.Object) (string, error),
 		newFunc func() runtime.Object,
 		newListFunc func() runtime.Object,
 		getAttrsFunc storage.AttrFunc,
@@ -59,7 +59,7 @@ func StorageWithCacher() generic.StorageDecorator {
 			GroupResource:       storageConfig.GroupResource,
 			EventsHistoryWindow: storageConfig.EventsHistoryWindow,
 			ResourcePrefix:      resourcePrefix,
-			KeyFunc:             cacheKeyFunc,
+			KeyFunc:             keyFunc,
 			NewFunc:             newFunc,
 			NewListFunc:         newListFunc,
 			GetAttrsFunc:        getAttrsFunc,

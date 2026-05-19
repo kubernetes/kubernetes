@@ -17,7 +17,6 @@ limitations under the License.
 package statefulset
 
 import (
-	"context"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -38,7 +37,7 @@ func TestStatefulSetStrategy(t *testing.T) {
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("StatefulSet must be namespace scoped")
 	}
-	if Strategy.AllowCreateOnUpdate(context.Background()) {
+	if Strategy.AllowCreateOnUpdate() {
 		t.Errorf("StatefulSet should not allow create on update")
 	}
 
@@ -277,7 +276,7 @@ func TestStatefulSetStatusStrategy(t *testing.T) {
 	if !StatusStrategy.NamespaceScoped() {
 		t.Errorf("StatefulSet must be namespace scoped")
 	}
-	if StatusStrategy.AllowCreateOnUpdate(context.Background()) {
+	if StatusStrategy.AllowCreateOnUpdate() {
 		t.Errorf("StatefulSet should not allow create on update")
 	}
 	validSelector := map[string]string{"a": "b"}

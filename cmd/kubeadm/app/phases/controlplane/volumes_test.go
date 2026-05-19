@@ -1,4 +1,5 @@
 //go:build !windows
+// +build !windows
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -25,7 +26,7 @@ import (
 	"reflect"
 	"testing"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -526,6 +527,9 @@ func TestGetHostPathVolumesForTheControlPlane(t *testing.T) {
 		t.Run(rt.name, func(t *testing.T) {
 			mounts := getHostPathVolumesForTheControlPlane(rt.cfg)
 
+			// Avoid unit test errors when the flexvolume is mounted
+			delete(mounts.volumes[kubeadmconstants.KubeControllerManager], flexvolumeDirVolumeName)
+			delete(mounts.volumeMounts[kubeadmconstants.KubeControllerManager], flexvolumeDirVolumeName)
 			if !reflect.DeepEqual(mounts.volumes, rt.vol) {
 				t.Errorf(
 					"failed getHostPathVolumesForTheControlPlane:\n\texpected: %v\n\t  actual: %v",

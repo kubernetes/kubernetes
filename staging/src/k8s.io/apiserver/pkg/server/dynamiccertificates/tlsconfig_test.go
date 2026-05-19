@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/utils/dump"
+	"k8s.io/apimachinery/pkg/util/dump"
 )
 
 var serverKey = []byte(`-----BEGIN RSA PRIVATE KEY-----

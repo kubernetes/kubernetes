@@ -128,6 +128,7 @@ uml0obOEy+ON91k+SWTJ3ggmF/U=
 	var wg sync.WaitGroup
 
 	for _, tt := range configurations {
+		tt := tt
 		wg.Add(1)
 		go func() {
 			defer wg.Done()

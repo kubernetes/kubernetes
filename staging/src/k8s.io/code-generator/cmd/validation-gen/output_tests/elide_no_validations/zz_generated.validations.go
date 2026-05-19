@@ -25,7 +25,6 @@ import (
 	context "context"
 	fmt "fmt"
 
-	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
@@ -39,433 +38,85 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	// type T1
-	scheme.AddValidationFunc(
-		(*T1)(nil),
-		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-			switch op.Request.SubresourcePath() {
-			case "/":
-				return Validate_T1(
-					ctx, op, nil, /* fldPath */
-					obj.(*T1),
-					safe.Cast[*T1](oldObj))
-			}
-			return field.ErrorList{
-				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
-			}
-		})
+	scheme.AddValidationFunc((*T1)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_T1(ctx, op, nil /* fldPath */, obj.(*T1), safe.Cast[*T1](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	return nil
-}
-
-// Validate_DeepTypedefMap validates an instance of DeepTypedefMap according
-// to declarative validation rules in the API schema.
-func Validate_DeepTypedefMap(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj DeepTypedefMap) (errs field.ErrorList) {
-
-	// iterate the map and call the value type's validation function
-	if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, Validate_OtherStruct); len(e) != 0 {
-		errs = append(errs, e...)
-	}
-
-	return errs
-}
-
-// Validate_DeepTypedefSlice validates an instance of DeepTypedefSlice according
-// to declarative validation rules in the API schema.
-func Validate_DeepTypedefSlice(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj DeepTypedefSlice) (errs field.ErrorList) {
-
-	if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
-		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *OtherStruct) field.ErrorList {
-			return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type DeepTypedefSlice")
-		}); len(e) != 0 {
-		errs = append(errs, e...)
-	}
-
-	// iterate the list and call the type's validation function
-	if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_OtherStruct); len(e) != 0 {
-		errs = append(errs, e...)
-	}
-
-	return errs
-}
-
-// Validate_DoubleDeepTypedefMap validates an instance of DoubleDeepTypedefMap according
-// to declarative validation rules in the API schema.
-func Validate_DoubleDeepTypedefMap(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj DoubleDeepTypedefMap) (errs field.ErrorList) {
-
-	// iterate the map and call the value type's validation function
-	if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, Validate_OtherStruct); len(e) != 0 {
-		errs = append(errs, e...)
-	}
-
-	return errs
-}
-
-// Validate_DoubleDeepTypedefSlice validates an instance of DoubleDeepTypedefSlice according
-// to declarative validation rules in the API schema.
-func Validate_DoubleDeepTypedefSlice(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj DoubleDeepTypedefSlice) (errs field.ErrorList) {
-
-	// iterate the list and call the type's validation function
-	if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_OtherStruct); len(e) != 0 {
-		errs = append(errs, e...)
-	}
-
-	return errs
 }
 
 // Validate_HasFieldVal validates an instance of HasFieldVal according
 // to declarative validation rules in the API schema.
-func Validate_HasFieldVal(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *HasFieldVal) (errs field.ErrorList) {
-
-	{ // field HasFieldVal.S
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_HasFieldVal(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *HasFieldVal) (errs field.ErrorList) {
+	// field HasFieldVal.S
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
-			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field HasFieldVal.S"); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field HasFieldVal.S")...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *HasFieldVal) *string {
-				return &oldObj.S
-			})
-		errs = append(errs, fn(fldPath.Child("s"), &obj.S, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("s"), &obj.S, safe.Field(oldObj, func(oldObj *HasFieldVal) *string { return &oldObj.S }), oldObj != nil)...)
 
 	return errs
 }
 
 // Validate_HasTypeVal validates an instance of HasTypeVal according
 // to declarative validation rules in the API schema.
-func Validate_HasTypeVal(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *HasTypeVal) (errs field.ErrorList) {
-
-	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type HasTypeVal"); len(e) != 0 {
-		errs = append(errs, e...)
-	}
+func Validate_HasTypeVal(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *HasTypeVal) (errs field.ErrorList) {
+	errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type HasTypeVal")...)
 
 	// field HasTypeVal.S has no validation
 	return errs
 }
 
-// Validate_OtherStruct validates an instance of OtherStruct according
-// to declarative validation rules in the API schema.
-func Validate_OtherStruct(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *OtherStruct) (errs field.ErrorList) {
-
-	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type OtherStruct"); len(e) != 0 {
-		errs = append(errs, e...)
-	}
-
-	// field OtherStruct.S has no validation
-	return errs
-}
-
 // Validate_T1 validates an instance of T1 according
 // to declarative validation rules in the API schema.
-func Validate_T1(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *T1) (errs field.ErrorList) {
-
+func Validate_T1(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *T1) (errs field.ErrorList) {
 	// field T1.TypeMeta has no validation
 
-	{ // field T1.HasTypeVal
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *HasTypeVal,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field T1.HasTypeVal
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *HasTypeVal, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_HasTypeVal(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *T1) *HasTypeVal {
-				return &oldObj.HasTypeVal
-			})
-		errs = append(errs, fn(fldPath.Child("hasTypeVal"), &obj.HasTypeVal, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("hasTypeVal"), &obj.HasTypeVal, safe.Field(oldObj, func(oldObj *T1) *HasTypeVal { return &oldObj.HasTypeVal }), oldObj != nil)...)
 
-	{ // field T1.HasFieldVal
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *HasFieldVal,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field T1.HasFieldVal
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *HasFieldVal, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_HasFieldVal(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *T1) *HasFieldVal {
-				return &oldObj.HasFieldVal
-			})
-		errs = append(errs, fn(fldPath.Child("hasFieldVal"), &obj.HasFieldVal, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("hasFieldVal"), &obj.HasFieldVal, safe.Field(oldObj, func(oldObj *T1) *HasFieldVal { return &oldObj.HasFieldVal }), oldObj != nil)...)
 
 	// field T1.HasNoVal has no validation
 
-	{ // field T1.HasNoValFieldVal
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *HasNoVal,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field T1.HasNoValFieldVal
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *HasNoVal, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
-			if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T1.HasNoValFieldVal"); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "field T1.HasNoValFieldVal")...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *T1) *HasNoVal {
-				return &oldObj.HasNoValFieldVal
-			})
-		errs = append(errs, fn(fldPath.Child("hasNoValFieldVal"), &obj.HasNoValFieldVal, oldVal, oldObj != nil)...)
-	}
-
-	{ // field T1.ValidatedSlice
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj TypedefSliceWithValidations,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call the type's validation function
-			errs = append(errs, Validate_TypedefSliceWithValidations(ctx, op, fldPath, obj, oldObj)...)
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *T1) TypedefSliceWithValidations {
-				return oldObj.ValidatedSlice
-			})
-		errs = append(errs, fn(fldPath.Child("validatedSlice"), obj.ValidatedSlice, oldVal, oldObj != nil)...)
-	}
-
-	{ // field T1.ValidatedMap
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj TypedefMapWithValidations,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call the type's validation function
-			errs = append(errs, Validate_TypedefMapWithValidations(ctx, op, fldPath, obj, oldObj)...)
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *T1) TypedefMapWithValidations {
-				return oldObj.ValidatedMap
-			})
-		errs = append(errs, fn(fldPath.Child("validatedMap"), obj.ValidatedMap, oldVal, oldObj != nil)...)
-	}
-
-	{ // field T1.ValidatedMapKey
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj TypedefMapWithKeyValidations,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call the type's validation function
-			errs = append(errs, Validate_TypedefMapWithKeyValidations(ctx, op, fldPath, obj, oldObj)...)
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *T1) TypedefMapWithKeyValidations {
-				return oldObj.ValidatedMapKey
-			})
-		errs = append(errs, fn(fldPath.Child("validatedMapKey"), obj.ValidatedMapKey, oldVal, oldObj != nil)...)
-	}
-
-	{ // field T1.DeepValidatedSlice
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj DeepTypedefSlice,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call the type's validation function
-			errs = append(errs, Validate_DeepTypedefSlice(ctx, op, fldPath, obj, oldObj)...)
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *T1) DeepTypedefSlice {
-				return oldObj.DeepValidatedSlice
-			})
-		errs = append(errs, fn(fldPath.Child("deepValidatedSlice"), obj.DeepValidatedSlice, oldVal, oldObj != nil)...)
-	}
-
-	{ // field T1.DeepValidatedMap
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj DeepTypedefMap,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call the type's validation function
-			errs = append(errs, Validate_DeepTypedefMap(ctx, op, fldPath, obj, oldObj)...)
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *T1) DeepTypedefMap {
-				return oldObj.DeepValidatedMap
-			})
-		errs = append(errs, fn(fldPath.Child("deepValidatedMap"), obj.DeepValidatedMap, oldVal, oldObj != nil)...)
-	}
-
-	{ // field T1.DoubleDeepValidatedSlice
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj DoubleDeepTypedefSlice,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call the type's validation function
-			errs = append(errs, Validate_DoubleDeepTypedefSlice(ctx, op, fldPath, obj, oldObj)...)
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *T1) DoubleDeepTypedefSlice {
-				return oldObj.DoubleDeepValidatedSlice
-			})
-		errs = append(errs, fn(fldPath.Child("doubleDeepValidatedSlice           "), obj.DoubleDeepValidatedSlice, oldVal, oldObj != nil)...)
-	}
-
-	{ // field T1.DoubleDeepValidatedMap
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj DoubleDeepTypedefMap,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call the type's validation function
-			errs = append(errs, Validate_DoubleDeepTypedefMap(ctx, op, fldPath, obj, oldObj)...)
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *T1) DoubleDeepTypedefMap {
-				return oldObj.DoubleDeepValidatedMap
-			})
-		errs = append(errs, fn(fldPath.Child("doubleDeepValidatedMap"), obj.DoubleDeepValidatedMap, oldVal, oldObj != nil)...)
-	}
-
-	return errs
-}
-
-// Validate_TypedefMapWithKeyValidations validates an instance of TypedefMapWithKeyValidations according
-// to declarative validation rules in the API schema.
-func Validate_TypedefMapWithKeyValidations(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj TypedefMapWithKeyValidations) (errs field.ErrorList) {
-
-	// iterate the map and call the key type's validation function
-	if e := validate.EachMapKey(ctx, op, fldPath, obj, oldObj, Validate_ValidatedKeyType); len(e) != 0 {
-		errs = append(errs, e...)
-	}
-
-	return errs
-}
-
-// Validate_TypedefMapWithValidations validates an instance of TypedefMapWithValidations according
-// to declarative validation rules in the API schema.
-func Validate_TypedefMapWithValidations(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj TypedefMapWithValidations) (errs field.ErrorList) {
-
-	// iterate the map and call the value type's validation function
-	if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, Validate_OtherStruct); len(e) != 0 {
-		errs = append(errs, e...)
-	}
-
-	return errs
-}
-
-// Validate_TypedefSliceWithValidations validates an instance of TypedefSliceWithValidations according
-// to declarative validation rules in the API schema.
-func Validate_TypedefSliceWithValidations(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj TypedefSliceWithValidations) (errs field.ErrorList) {
-
-	// iterate the list and call the type's validation function
-	if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_OtherStruct); len(e) != 0 {
-		errs = append(errs, e...)
-	}
-
-	return errs
-}
-
-// Validate_ValidatedKeyType validates an instance of ValidatedKeyType according
-// to declarative validation rules in the API schema.
-func Validate_ValidatedKeyType(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *ValidatedKeyType) (errs field.ErrorList) {
-
-	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type ValidatedKeyType"); len(e) != 0 {
-		errs = append(errs, e...)
-	}
+		}(fldPath.Child("hasNoValFieldVal"), &obj.HasNoValFieldVal, safe.Field(oldObj, func(oldObj *T1) *HasNoVal { return &oldObj.HasNoValFieldVal }), oldObj != nil)...)
 
 	return errs
 }

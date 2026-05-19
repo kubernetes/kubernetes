@@ -64,10 +64,11 @@ var _ = sigDescribe(feature.Windows, "Density", framework.WithSerial(), framewor
 		}
 
 		for _, testArg := range dTests {
-			desc := fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval", testArg.podsNr, testArg.interval)
+			itArg := testArg
+			desc := fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval", itArg.podsNr, itArg.interval)
 			ginkgo.It(desc, func(ctx context.Context) {
-				testArg.createMethod = "batch"
-				runDensityBatchTest(ctx, f, testArg)
+				itArg.createMethod = "batch"
+				runDensityBatchTest(ctx, f, itArg)
 			})
 		}
 	})
@@ -224,7 +225,7 @@ func newInformerWatchPod(ctx context.Context, f *framework.Framework, mutex *syn
 func newDensityTestPods(numPods int, volume bool, imageName, podType string) []*v1.Pod {
 	var pods []*v1.Pod
 
-	for range numPods {
+	for i := 0; i < numPods; i++ {
 
 		podName := "test-" + string(uuid.NewUUID())
 		pod := v1.Pod{

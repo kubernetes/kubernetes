@@ -19,7 +19,6 @@ package profile
 import (
 	"fmt"
 	"regexp"
-	"slices"
 	"strings"
 )
 
@@ -41,7 +40,13 @@ func simplifyFunc(f string) string {
 	// Account for unsimplified names -- try  to remove the argument list by trimming
 	// starting from the first '(', but skipping reserved names that have '('.
 	for _, ind := range bracketRx.FindAllStringSubmatchIndex(funcName, -1) {
-		foundReserved := slices.Contains(reservedNames, funcName[ind[0]:ind[1]])
+		foundReserved := false
+		for _, res := range reservedNames {
+			if funcName[ind[0]:ind[1]] == res {
+				foundReserved = true
+				break
+			}
+		}
 		if !foundReserved {
 			funcName = funcName[:ind[0]]
 			break

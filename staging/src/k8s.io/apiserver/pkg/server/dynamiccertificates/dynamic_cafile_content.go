@@ -155,7 +155,7 @@ func (c *DynamicFileCAContent) RunOnce(ctx context.Context) error {
 
 // Run starts the controller and blocks until stopCh is closed.
 func (c *DynamicFileCAContent) Run(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrashWithContext(ctx)
+	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
 	klog.InfoS("Starting controller", "name", c.name)

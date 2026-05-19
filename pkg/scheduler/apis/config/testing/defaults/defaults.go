@@ -47,7 +47,6 @@ var PluginsV1 = &config.Plugins{
 			{Name: names.NodeResourcesBalancedAllocation, Weight: 1},
 			{Name: names.ImageLocality, Weight: 1},
 			{Name: names.DefaultBinder},
-			{Name: names.NodeDeclaredFeatures},
 		},
 	},
 }
@@ -78,7 +77,6 @@ var ExpandedPluginsV1 = &config.Plugins{
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
 			{Name: names.DynamicResources},
-			{Name: names.NodeDeclaredFeatures},
 		},
 	},
 	Filter: config.PluginSet{
@@ -96,7 +94,6 @@ var ExpandedPluginsV1 = &config.Plugins{
 			{Name: names.PodTopologySpread},
 			{Name: names.InterPodAffinity},
 			{Name: names.DynamicResources},
-			{Name: names.NodeDeclaredFeatures},
 		},
 	},
 	PostFilter: config.PluginSet{
@@ -159,11 +156,6 @@ var ExpandedPluginsV1 = &config.Plugins{
 			{Name: names.DefaultBinder},
 		},
 	},
-	PlacementScore: config.PluginSet{
-		Enabled: []config.Plugin{
-			{Name: names.NodeResourcesFit, Weight: 1},
-		},
-	},
 }
 
 // PluginConfigsV1 default plugin configurations.
@@ -178,8 +170,7 @@ var PluginConfigsV1 = []config.PluginConfig{
 	{
 		Name: "DynamicResources",
 		Args: &config.DynamicResourcesArgs{
-			FilterTimeout:  &metav1.Duration{Duration: 10 * time.Second},
-			BindingTimeout: &metav1.Duration{Duration: 10 * time.Minute},
+			FilterTimeout: &metav1.Duration{Duration: 10 * time.Second},
 		},
 	},
 	{

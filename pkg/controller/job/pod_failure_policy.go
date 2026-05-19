@@ -18,10 +18,11 @@ package job
 
 import (
 	"fmt"
-	"slices"
 
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // matchPodFailurePolicy returns information about matching a given failed pod
@@ -46,7 +47,9 @@ func matchPodFailurePolicy(podFailurePolicy *batch.PodFailurePolicy, failedPod *
 				case batch.PodFailurePolicyActionIgnore:
 					return nil, false, &ignore
 				case batch.PodFailurePolicyActionFailIndex:
-					return nil, true, &failIndex
+					if feature.DefaultFeatureGate.Enabled(features.JobBackoffLimitPerIndex) {
+						return nil, true, &failIndex
+					}
 				case batch.PodFailurePolicyActionCount:
 					return nil, true, &count
 				case batch.PodFailurePolicyActionFailJob:
@@ -61,7 +64,9 @@ func matchPodFailurePolicy(podFailurePolicy *batch.PodFailurePolicy, failedPod *
 				case batch.PodFailurePolicyActionIgnore:
 					return nil, false, &ignore
 				case batch.PodFailurePolicyActionFailIndex:
-					return nil, true, &failIndex
+					if feature.DefaultFeatureGate.Enabled(features.JobBackoffLimitPerIndex) {
+						return nil, true, &failIndex
+					}
 				case batch.PodFailurePolicyActionCount:
 					return nil, true, &count
 				case batch.PodFailurePolicyActionFailJob:
@@ -117,9 +122,19 @@ func getMatchingContainerFromList(containerStatuses []v1.ContainerStatus, requir
 func isOnExitCodesOperatorMatching(exitCode int32, requirement *batch.PodFailurePolicyOnExitCodesRequirement) bool {
 	switch requirement.Operator {
 	case batch.PodFailurePolicyOnExitCodesOpIn:
-		return slices.Contains(requirement.Values, exitCode)
+		for _, value := range requirement.Values {
+			if value == exitCode {
+				return true
+			}
+		}
+		return false
 	case batch.PodFailurePolicyOnExitCodesOpNotIn:
-		return !slices.Contains(requirement.Values, exitCode)
+		for _, value := range requirement.Values {
+			if value == exitCode {
+				return false
+			}
+		}
+		return true
 	default:
 		return false
 	}

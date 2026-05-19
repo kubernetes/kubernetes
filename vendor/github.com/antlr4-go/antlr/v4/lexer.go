@@ -207,7 +207,7 @@ func (b *BaseLexer) NextToken() Token {
 		for {
 			b.thetype = TokenInvalidType
 
-			ttype := b.safeMatch() // Defaults to LexerSkip
+			ttype := b.safeMatch()
 
 			if b.input.LA(1) == TokenEOF {
 				b.hitEOF = true

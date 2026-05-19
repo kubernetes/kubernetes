@@ -71,7 +71,7 @@ import (
 func (lvl AtomicLevel) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err := lvl.serveHTTP(w, r); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		_, _ = fmt.Fprintf(w, "internal error: %v", err)
+		fmt.Fprintf(w, "internal error: %v", err)
 	}
 }
 

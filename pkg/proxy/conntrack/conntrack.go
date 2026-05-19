@@ -1,4 +1,5 @@
 //go:build linux
+// +build linux
 
 /*
 Copyright 2016 The Kubernetes Authors.
@@ -24,14 +25,16 @@ import (
 	"github.com/vishvananda/netlink"
 
 	"k8s.io/client-go/util/retry"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy/util"
 )
 
 // Interface for dealing with conntrack
 type Interface interface {
 	ListEntries(ipFamily uint8) ([]*netlink.ConntrackFlow, error)
-	// DeleteEntries deletes the given conntrack entries.
-	DeleteEntries(ipFamily uint8, flows []*netlink.ConntrackFlow) (int, error)
+	// ClearEntries deletes conntrack entries for connections of the given IP family,
+	// filtered by the given filters.
+	ClearEntries(ipFamily uint8, filters ...netlink.CustomConntrackFilter) (int, error)
 }
 
 // netlinkHandler allows consuming real and mockable implementation for testing.
@@ -64,19 +67,19 @@ func (ct *conntracker) ListEntries(ipFamily uint8) (entries []*netlink.Conntrack
 	return entries, err
 }
 
-// DeleteEntries deletes the given conntrack entries on the specified IP family.
-// It returns the number of deleted entries and an error if any.
-func (ct *conntracker) DeleteEntries(ipFamily uint8, flows []*netlink.ConntrackFlow) (int, error) {
-	if len(flows) == 0 {
+// ClearEntries deletes conntrack entries for connections of the given IP family,
+// filtered by the given filters.
+func (ct *conntracker) ClearEntries(ipFamily uint8, filters ...netlink.CustomConntrackFilter) (int, error) {
+	if len(filters) == 0 {
+		klog.V(7).InfoS("no conntrack filters provided")
 		return 0, nil
 	}
 
-	filter := newFlowFilter(flows)
 	var n uint
 	var err error
 	err = retry.OnError(util.MaxAttemptsEINTR, util.ShouldRetryOnEINTR, func() error {
 		var count uint
-		count, err = ct.handler.ConntrackDeleteFilters(netlink.ConntrackTable, netlink.InetFamily(ipFamily), filter)
+		count, err = ct.handler.ConntrackDeleteFilters(netlink.ConntrackTable, netlink.InetFamily(ipFamily), filters...)
 		n += count
 		return err
 	})

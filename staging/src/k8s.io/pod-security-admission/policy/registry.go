@@ -18,7 +18,7 @@ package policy
 
 import (
 	"fmt"
-	"slices"
+	"sort"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -163,8 +163,8 @@ func populate(r *checkRegistry, validChecks []Check) {
 	}
 
 	// Sort the IDs to maintain consistent error messages.
-	slices.Sort(restrictedIDs)
-	slices.Sort(baselineIDs)
+	sort.Slice(restrictedIDs, func(i, j int) bool { return restrictedIDs[i] < restrictedIDs[j] })
+	sort.Slice(baselineIDs, func(i, j int) bool { return baselineIDs[i] < baselineIDs[j] })
 	orderedIDs := append(baselineIDs, restrictedIDs...) // Baseline checks first, then restricted.
 
 	for v := api.MajorMinorVersion(1, 0); v.Older(nextMinor(r.maxVersion)); v = nextMinor(v) {

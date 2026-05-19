@@ -29,7 +29,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/utils/dump"
+	"k8s.io/apimachinery/pkg/util/dump"
 )
 
 func TestVisitorHttpGet(t *testing.T) {

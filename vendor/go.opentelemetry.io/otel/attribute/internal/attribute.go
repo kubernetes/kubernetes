@@ -11,63 +11,80 @@ import (
 	"reflect"
 )
 
-// sliceElem is the exact set of element types stored in attribute slice values.
-// Using a closed set prevents accidental instantiations for unsupported types.
-type sliceElem interface {
-	bool | int64 | float64 | string
-}
-
-// SliceValue converts a slice into an array with the same elements.
-func SliceValue[T sliceElem](v []T) any {
-	// Keep only the common tiny-slice cases out of reflection. Extending this
-	// much further increases code size for diminishing benefit while larger
-	// slices still need the generic reflective path to preserve comparability.
-	// This matches the short lengths that show up most often in local
-	// benchmarks and semantic convention examples while leaving larger, less
-	// predictable slices on the generic reflective path.
-	switch len(v) {
-	case 0:
-		return [0]T{}
-	case 1:
-		return [1]T{v[0]}
-	case 2:
-		return [2]T{v[0], v[1]}
-	case 3:
-		return [3]T{v[0], v[1], v[2]}
-	}
-
-	return sliceValueReflect(v)
-}
-
-// AsSlice converts an array into a slice with the same elements.
-func AsSlice[T sliceElem](v any) []T {
-	// Mirror the small fixed-array fast path used by SliceValue.
-	switch a := v.(type) {
-	case [0]T:
-		return []T{}
-	case [1]T:
-		return []T{a[0]}
-	case [2]T:
-		return []T{a[0], a[1]}
-	case [3]T:
-		return []T{a[0], a[1], a[2]}
-	}
-
-	return asSliceReflect[T](v)
-}
-
-func sliceValueReflect[T sliceElem](v []T) any {
-	cp := reflect.New(reflect.ArrayOf(len(v), reflect.TypeFor[T]())).Elem()
+// BoolSliceValue converts a bool slice into an array with same elements as slice.
+func BoolSliceValue(v []bool) any {
+	cp := reflect.New(reflect.ArrayOf(len(v), reflect.TypeFor[bool]())).Elem()
 	reflect.Copy(cp, reflect.ValueOf(v))
 	return cp.Interface()
 }
 
-func asSliceReflect[T sliceElem](v any) []T {
+// Int64SliceValue converts an int64 slice into an array with same elements as slice.
+func Int64SliceValue(v []int64) any {
+	cp := reflect.New(reflect.ArrayOf(len(v), reflect.TypeFor[int64]())).Elem()
+	reflect.Copy(cp, reflect.ValueOf(v))
+	return cp.Interface()
+}
+
+// Float64SliceValue converts a float64 slice into an array with same elements as slice.
+func Float64SliceValue(v []float64) any {
+	cp := reflect.New(reflect.ArrayOf(len(v), reflect.TypeFor[float64]())).Elem()
+	reflect.Copy(cp, reflect.ValueOf(v))
+	return cp.Interface()
+}
+
+// StringSliceValue converts a string slice into an array with same elements as slice.
+func StringSliceValue(v []string) any {
+	cp := reflect.New(reflect.ArrayOf(len(v), reflect.TypeFor[string]())).Elem()
+	reflect.Copy(cp, reflect.ValueOf(v))
+	return cp.Interface()
+}
+
+// AsBoolSlice converts a bool array into a slice into with same elements as array.
+func AsBoolSlice(v any) []bool {
 	rv := reflect.ValueOf(v)
-	if !rv.IsValid() || rv.Kind() != reflect.Array || rv.Type().Elem() != reflect.TypeFor[T]() {
+	if rv.Type().Kind() != reflect.Array {
 		return nil
 	}
-	cpy := make([]T, rv.Len())
+	cpy := make([]bool, rv.Len())
+	if len(cpy) > 0 {
+		_ = reflect.Copy(reflect.ValueOf(cpy), rv)
+	}
+	return cpy
+}
+
+// AsInt64Slice converts an int64 array into a slice into with same elements as array.
+func AsInt64Slice(v any) []int64 {
+	rv := reflect.ValueOf(v)
+	if rv.Type().Kind() != reflect.Array {
+		return nil
+	}
+	cpy := make([]int64, rv.Len())
+	if len(cpy) > 0 {
+		_ = reflect.Copy(reflect.ValueOf(cpy), rv)
+	}
+	return cpy
+}
+
+// AsFloat64Slice converts a float64 array into a slice into with same elements as array.
+func AsFloat64Slice(v any) []float64 {
+	rv := reflect.ValueOf(v)
+	if rv.Type().Kind() != reflect.Array {
+		return nil
+	}
+	cpy := make([]float64, rv.Len())
+	if len(cpy) > 0 {
+		_ = reflect.Copy(reflect.ValueOf(cpy), rv)
+	}
+	return cpy
+}
+
+// AsStringSlice converts a string array into a slice into with same elements as array.
+func AsStringSlice(v any) []string {
+	rv := reflect.ValueOf(v)
+	if rv.Type().Kind() != reflect.Array {
+		return nil
+	}
+	cpy := make([]string, rv.Len())
 	if len(cpy) > 0 {
 		_ = reflect.Copy(reflect.ValueOf(cpy), rv)
 	}

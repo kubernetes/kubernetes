@@ -30,7 +30,7 @@ func TestWarningsOnCreate(t *testing.T) {
 }
 
 func TestAllowCreateOnUpdate(t *testing.T) {
-	if Strategy.AllowCreateOnUpdate(context.Background()) != false {
+	if Strategy.AllowCreateOnUpdate() != false {
 		t.Errorf("Got true, want false")
 	}
 }
@@ -42,7 +42,7 @@ func TestWarningsOnUpdate(t *testing.T) {
 }
 
 func TestAllowUnconditionalUpdate(t *testing.T) {
-	if Strategy.AllowUnconditionalUpdate(context.Background()) != false {
+	if Strategy.AllowUnconditionalUpdate() != false {
 		t.Errorf("Got true, want false")
 	}
 }

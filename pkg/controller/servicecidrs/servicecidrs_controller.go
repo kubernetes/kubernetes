@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/netip"
-	"slices"
 	"sync"
 	"time"
 
@@ -417,8 +416,10 @@ func (c *Controller) canDeleteCIDR(ctx context.Context, serviceCIDR *networkinga
 }
 
 func (c *Controller) addServiceCIDRFinalizerIfNeeded(ctx context.Context, cidr *networkingapiv1.ServiceCIDR) error {
-	if slices.Contains(cidr.GetFinalizers(), ServiceCIDRProtectionFinalizer) {
-		return nil
+	for _, f := range cidr.GetFinalizers() {
+		if f == ServiceCIDRProtectionFinalizer {
+			return nil
+		}
 	}
 
 	patch := map[string]interface{}{
@@ -440,7 +441,14 @@ func (c *Controller) addServiceCIDRFinalizerIfNeeded(ctx context.Context, cidr *
 }
 
 func (c *Controller) removeServiceCIDRFinalizerIfNeeded(ctx context.Context, cidr *networkingapiv1.ServiceCIDR) error {
-	if !slices.Contains(cidr.GetFinalizers(), ServiceCIDRProtectionFinalizer) {
+	found := false
+	for _, f := range cidr.GetFinalizers() {
+		if f == ServiceCIDRProtectionFinalizer {
+			found = true
+			break
+		}
+	}
+	if !found {
 		return nil
 	}
 	patch := map[string]interface{}{

@@ -1,4 +1,1 @@
-*.out
-*.cov
-.idea
-.env
+secrets.yml

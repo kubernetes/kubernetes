@@ -27,12 +27,12 @@ import (
 //
 // ValidatingAdmissionPolicyStatus represents the status of an admission validation policy.
 type ValidatingAdmissionPolicyStatusApplyConfiguration struct {
-	// observedGeneration is the generation observed by the controller.
+	// The generation observed by the controller.
 	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
-	// typeChecking contains the results of type checking for each expression.
+	// The results of type checking for each expression.
 	// Presence of this field indicates the completion of the type checking.
 	TypeChecking *TypeCheckingApplyConfiguration `json:"typeChecking,omitempty"`
-	// conditions represent the latest available observations of a policy's current state.
+	// The conditions represent the latest available observations of a policy's current state.
 	Conditions []metav1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 }
 

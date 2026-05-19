@@ -28,11 +28,11 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/dump"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/utils/dump"
 )
 
 // semanticIgnoreResourceVersion does semantic deep equality checks for objects
@@ -106,7 +106,7 @@ func GetPodUpdateProjectionKey(oldObj, newObj interface{}) *PodProjectionKey {
 	}
 }
 
-func GetServicesToUpdate(serviceLister v1listers.ServiceLister, key *PodProjectionKey) (sets.Set[string], error) {
+func GetServicesToUpdate(serviceLister v1listers.ServiceLister, key *PodProjectionKey) (sets.String, error) {
 	if key == nil {
 		return nil, nil
 	}
@@ -130,13 +130,13 @@ func GetServicesToUpdate(serviceLister v1listers.ServiceLister, key *PodProjecti
 }
 
 // getServicesForPod returns a set of services matching the given pod's namespace and labels (via service selector).
-func getServicesForPod(serviceLister v1listers.ServiceLister, namespace string, podLabels labels.Set) (sets.Set[string], error) {
+func getServicesForPod(serviceLister v1listers.ServiceLister, namespace string, podLabels labels.Set) (sets.String, error) {
 	services, err := serviceLister.Services(namespace).List(labels.Everything())
 	if err != nil {
 		return nil, err
 	}
 
-	set := sets.Set[string]{}
+	set := sets.String{}
 	for _, service := range services {
 		if service.Spec.Selector == nil {
 			// If the service has a nil selector this means selectors match nothing, not everything.
@@ -159,10 +159,6 @@ type PortMapKey string
 
 // NewPortMapKey generates a PortMapKey from endpoint ports.
 func NewPortMapKey(endpointPorts []discovery.EndpointPort) PortMapKey {
-	// Normalize nil to empty slice so they hash the same.
-	if endpointPorts == nil {
-		endpointPorts = []discovery.EndpointPort{}
-	}
 	sort.Sort(portsInOrder(endpointPorts))
 	return PortMapKey(deepHashObjectToString(endpointPorts))
 }
@@ -269,7 +265,7 @@ func hostNameAndDomainAreEqual(pod1, pod2 *v1.Pod) bool {
 		pod1.Spec.Subdomain == pod2.Spec.Subdomain
 }
 
-func determineNeededServiceUpdates(oldServices, services sets.Set[string], podChanged bool) sets.Set[string] {
+func determineNeededServiceUpdates(oldServices, services sets.String, podChanged bool) sets.String {
 	if podChanged {
 		// if the labels and pod changed, all services need to be updated
 		services = services.Union(oldServices)

@@ -28,7 +28,7 @@ package v1
 // key-value pairs as environment variables.
 type ConfigMapEnvSourceApplyConfiguration struct {
 	// The ConfigMap to select from.
-	LocalObjectReferenceApplyConfiguration `json:""`
+	LocalObjectReferenceApplyConfiguration `json:",inline"`
 	// Specify whether the ConfigMap must be defined
 	Optional *bool `json:"optional,omitempty"`
 }

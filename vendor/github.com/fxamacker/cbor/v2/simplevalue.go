@@ -93,6 +93,6 @@ func (sv *SimpleValue) unmarshalCBOR(data []byte) error {
 	// It is safe to cast val to uint8 here because
 	// - data is already verified to be well-formed CBOR simple value and
 	// - val is <= math.MaxUint8.
-	*sv = SimpleValue(val) //nolint:gosec
+	*sv = SimpleValue(val)
 	return nil
 }

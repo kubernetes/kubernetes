@@ -1,4 +1,5 @@
 //go:build windows
+// +build windows
 
 /*
 Copyright 2024 The Kubernetes Authors.
@@ -19,7 +20,6 @@ limitations under the License.
 package nodeshutdown
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -40,7 +39,6 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
-	testutilsktesting "k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 )
@@ -93,7 +91,7 @@ func TestFeatureEnabled(t *testing.T) {
 				NodeRef:                         nodeRef,
 				GetPodsFunc:                     activePodsFunc,
 				KillPodFunc:                     killPodsFunc,
-				SyncNodeStatusFunc:              func(context.Context) {},
+				SyncNodeStatusFunc:              func() {},
 				ShutdownGracePeriodRequested:    tc.shutdownGracePeriodRequested,
 				ShutdownGracePeriodCriticalPods: 0,
 				StateDirectory:                  os.TempDir(),
@@ -107,7 +105,7 @@ func Test_managerImpl_ProcessShutdownEvent(t *testing.T) {
 	var (
 		fakeRecorder      = &record.FakeRecorder{}
 		fakeVolumeManager = volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false)
-		syncNodeStatus    = func(context.Context) {}
+		syncNodeStatus    = func() {}
 		nodeRef           = &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 		fakeclock         = testingclock.NewFakeClock(time.Now())
 	)
@@ -119,7 +117,7 @@ func Test_managerImpl_ProcessShutdownEvent(t *testing.T) {
 		shutdownGracePeriodByPodPriority []kubeletconfig.ShutdownGracePeriodByPodPriority
 		getPods                          eviction.ActivePodsFunc
 		killPodFunc                      eviction.KillPodFunc
-		syncNodeStatus                   func(context.Context)
+		syncNodeStatus                   func()
 		nodeShuttingDownNow              bool
 		clock                            clock.Clock
 	}
@@ -228,11 +226,8 @@ func Test_managerImpl_ProcessShutdownEvent(t *testing.T) {
 		},
 	}
 
-	tCtx := testutilsktesting.Init(t)
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Use a buffered logger because this test asserts log output.
 			logger := ktesting.NewLogger(t,
 				ktesting.NewConfig(
 					ktesting.BufferLogs(true),
@@ -254,11 +249,8 @@ func Test_managerImpl_ProcessShutdownEvent(t *testing.T) {
 					clock:                            tt.fields.clock,
 				},
 			}
-			err := m.ProcessShutdownEvent(tCtx)
-			if tt.wantErr {
-				require.Error(t, err, "managerImpl.processShutdownEvent() should return an error")
-			} else {
-				require.NoError(t, err, "managerImpl.processShutdownEvent() should not return an error")
+			if err := m.ProcessShutdownEvent(); (err != nil) != tt.wantErr {
+				t.Errorf("managerImpl.processShutdownEvent() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
 			underlier, ok := logger.GetSink().(ktesting.Underlier)

@@ -65,14 +65,12 @@ import (
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 	nodeutil "k8s.io/component-helpers/node/util"
 	"k8s.io/klog/v2"
-	configv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/apis"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
-	v1alpha1conversion "k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1"
 	"k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	proxymetrics "k8s.io/kubernetes/pkg/proxy/metrics"
@@ -188,19 +186,11 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 		flagz:  flagzReader,
 	}
 
-	externalConfig := &configv1alpha1.KubeProxyConfiguration{}
-	if err := v1alpha1conversion.Convert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(config, externalConfig, nil); err != nil {
-		return nil, fmt.Errorf("unable to convert configz: %w", err)
-	}
-	externalConfig.SetGroupVersionKind(configv1alpha1.SchemeGroupVersion.WithKind("KubeProxyConfiguration"))
-
 	cz, err := configz.New(kubeproxyconfig.GroupName)
 	if err != nil {
-		return nil, fmt.Errorf("unable to register configz: %w", err)
+		return nil, fmt.Errorf("unable to register configz: %s", err)
 	}
-	if err := cz.Set(externalConfig); err != nil {
-		return nil, fmt.Errorf("unable to set configz: %w", err)
-	}
+	cz.Set(config)
 
 	if len(config.ShowHiddenMetricsForVersion) > 0 {
 		metrics.SetShowHidden()
@@ -217,7 +207,8 @@ func newProxyServer(ctx context.Context, config *kubeproxyconfig.KubeProxyConfig
 	}
 
 	// NodeManager makes an informer that selects for the node where this kube-proxy is running
-	s.NodeManager, err = proxy.NewNodeManager(ctx, s.Client, s.NodeName, s.Config)
+	s.NodeManager, err = proxy.NewNodeManager(ctx, s.Client, s.Config.ConfigSyncPeriod.Duration,
+		s.NodeName, s.Config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR)
 	if err != nil {
 		return nil, err
 	}
@@ -579,16 +570,13 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 		return err
 	}
 
-	labelSelectorNoProxyName := labels.NewSelector().Add(*noProxyName)
-	labelSelectorNoHeadlessEndpoints := labels.NewSelector().Add(*noHeadlessEndpoints)
+	labelSelector := labels.NewSelector()
+	labelSelector = labelSelector.Add(*noProxyName, *noHeadlessEndpoints)
 
-	// Make informer that contains no filters
-	informerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.Config.ConfigSyncPeriod.Duration)
-
-	// Make informers that filter out objects that do not contain a service.kubernetes.io/headless label
-	endpointSliceInformerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.Config.ConfigSyncPeriod.Duration,
+	// Make informers that filter out objects that want a non-default service proxy.
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.Config.ConfigSyncPeriod.Duration,
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
-			options.LabelSelector = labelSelectorNoHeadlessEndpoints.String()
+			options.LabelSelector = labelSelector.String()
 		}))
 
 	// Create configs (i.e. Watches for Services, EndpointSlices and ServiceCIDRs)
@@ -598,14 +586,14 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	// don't watch headless services for kube-proxy, they are proxied by DNS.
 	serviceInformerFactory := informers.NewSharedInformerFactoryWithOptions(s.Client, s.Config.ConfigSyncPeriod.Duration,
 		informers.WithTweakListOptions(func(options *metav1.ListOptions) {
-			options.LabelSelector = labelSelectorNoProxyName.String()
+			options.LabelSelector = labelSelector.String()
 			options.FieldSelector = fields.OneTermNotEqualSelector("spec.clusterIP", v1.ClusterIPNone).String()
 		}))
 	serviceConfig := config.NewServiceConfig(ctx, serviceInformerFactory.Core().V1().Services(), s.Config.ConfigSyncPeriod.Duration)
 	serviceConfig.RegisterEventHandler(s.Proxier)
 	go serviceConfig.Run(ctx.Done())
 
-	endpointSliceConfig := config.NewEndpointSliceConfig(ctx, endpointSliceInformerFactory.Discovery().V1().EndpointSlices(), s.Config.ConfigSyncPeriod.Duration)
+	endpointSliceConfig := config.NewEndpointSliceConfig(ctx, informerFactory.Discovery().V1().EndpointSlices(), s.Config.ConfigSyncPeriod.Duration)
 	endpointSliceConfig.RegisterEventHandler(s.Proxier)
 	go endpointSliceConfig.Run(ctx.Done())
 
@@ -617,7 +605,6 @@ func (s *ProxyServer) Run(ctx context.Context) error {
 	// This has to start after the calls to NewServiceConfig because that
 	// function must configure its shared informer event handlers first.
 	informerFactory.Start(wait.NeverStop)
-	endpointSliceInformerFactory.Start(wait.NeverStop)
 	serviceInformerFactory.Start(wait.NeverStop)
 
 	// hollow-proxy doesn't need node config, and we don't create nodeManager for hollow-proxy.

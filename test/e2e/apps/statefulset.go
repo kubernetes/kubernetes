@@ -1574,7 +1574,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(err)
 
 			claimNames := make([]string, 4)
-			for i := range 4 {
+			for i := 0; i < 4; i++ {
 				claimNames[i] = fmt.Sprintf("%s-%s-%d", statefulPodMounts[0].Name, ssName, i)
 			}
 
@@ -2034,7 +2034,7 @@ func uncordonNode(ctx context.Context, c clientset.Interface, oldData, newData [
 
 func kubectlExecWithRetries(ns string, args ...string) (out string) {
 	var err error
-	for range 3 {
+	for i := 0; i < 3; i++ {
 		if out, err = e2ekubectl.RunKubectl(ns, args...); err == nil {
 			return
 		}

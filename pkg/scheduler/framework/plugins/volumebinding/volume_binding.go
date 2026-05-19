@@ -105,6 +105,19 @@ func (pl *VolumeBinding) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFr
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *VolumeBinding) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	// Pods may fail to find available PVs because the node labels do not
+	// match the storage class's allowed topologies or PV's node affinity.
+	// A new or updated node may make pods schedulable.
+	//
+	// A note about UpdateNodeTaint event:
+	// Ideally, it's supposed to register only Add | UpdateNodeLabel because UpdateNodeTaint will never change the result from this plugin.
+	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
+	// See: https://github.com/kubernetes/kubernetes/issues/109437
+	nodeActionType := fwk.Add | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint
+	if pl.fts.EnableSchedulingQueueHint {
+		// When scheduling queue hint is enabled, we don't use the problematic preCheck and don't need to register UpdateNodeTaint event.
+		nodeActionType = fwk.Add | fwk.UpdateNodeLabel
+	}
 	events := []fwk.ClusterEventWithHint{
 		// Pods may fail because of missing or mis-configured storage class
 		// (e.g., allowedTopologies, volumeBindingMode), and hence may become
@@ -115,10 +128,7 @@ func (pl *VolumeBinding) EventsToRegister(_ context.Context) ([]fwk.ClusterEvent
 		{Event: fwk.ClusterEvent{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeClaimChange},
 		{Event: fwk.ClusterEvent{Resource: fwk.PersistentVolume, ActionType: fwk.Add | fwk.Update}},
 
-		// Pods may fail to find available PVs because the node labels do not
-		// match the storage class's allowed topologies or PV's node affinity.
-		// A new or updated node may make pods schedulable.
-		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeLabel}},
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}},
 
 		// We rely on CSI node to translate in-tree PV to CSI.
 		// TODO: kube-schduler will unregister the CSINode events once all the volume plugins has completed their CSI migration.
@@ -542,21 +552,20 @@ var errNoPodVolumeForNode = fmt.Errorf("no pod volume found for node")
 
 // PreBindPreFlight is called before PreBind, and determines whether PreBind is going to do something for this pod, or not.
 // It checks state.podVolumesByNode to determine whether there are any pod volumes for the node and hence the plugin has to handle them at PreBind.
-func (pl *VolumeBinding) PreBindPreFlight(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) (*fwk.PreBindPreFlightResult, *fwk.Status) {
-	result := &fwk.PreBindPreFlightResult{AllowParallel: true}
+func (pl *VolumeBinding) PreBindPreFlight(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
 	s, err := getStateData(state)
 	if err != nil {
-		return result, fwk.AsStatus(err)
+		return fwk.AsStatus(err)
 	}
 	if s.allBound {
 		// no need to bind volumes
-		return result, fwk.NewStatus(fwk.Skip)
+		return fwk.NewStatus(fwk.Skip)
 	}
 
 	if _, ok := s.podVolumesByNode[nodeName]; !ok {
-		return result, fwk.AsStatus(fmt.Errorf("%w %q", errNoPodVolumeForNode, nodeName))
+		return fwk.AsStatus(fmt.Errorf("%w %q", errNoPodVolumeForNode, nodeName))
 	}
-	return result, nil
+	return nil
 }
 
 // PreBind will make the API update with the assumed bindings and wait until

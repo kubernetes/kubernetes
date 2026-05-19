@@ -2,22 +2,39 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build go1.25
-
 package typesinternal
+
+// TODO(adonovan): when CL 645115 lands, define the go1.25 version of
+// this API that actually does something.
 
 import "go/types"
 
-type VarKind = types.VarKind
+type VarKind uint8
 
 const (
-	PackageVar = types.PackageVar
-	LocalVar   = types.LocalVar
-	RecvVar    = types.RecvVar
-	ParamVar   = types.ParamVar
-	ResultVar  = types.ResultVar
-	FieldVar   = types.FieldVar
+	_          VarKind = iota // (not meaningful)
+	PackageVar                // a package-level variable
+	LocalVar                  // a local variable
+	RecvVar                   // a method receiver variable
+	ParamVar                  // a function parameter variable
+	ResultVar                 // a function result variable
+	FieldVar                  // a struct field
 )
 
-func GetVarKind(v *types.Var) VarKind       { return v.Kind() }
-func SetVarKind(v *types.Var, kind VarKind) { v.SetKind(kind) }
+func (kind VarKind) String() string {
+	return [...]string{
+		0:          "VarKind(0)",
+		PackageVar: "PackageVar",
+		LocalVar:   "LocalVar",
+		RecvVar:    "RecvVar",
+		ParamVar:   "ParamVar",
+		ResultVar:  "ResultVar",
+		FieldVar:   "FieldVar",
+	}[kind]
+}
+
+// GetVarKind returns an invalid VarKind.
+func GetVarKind(v *types.Var) VarKind { return 0 }
+
+// SetVarKind has no effect.
+func SetVarKind(v *types.Var, kind VarKind) {}

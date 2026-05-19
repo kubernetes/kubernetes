@@ -16,10 +16,7 @@ limitations under the License.
 
 package userns
 
-import (
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog/v2"
-)
+import "k8s.io/apimachinery/pkg/types"
 
 // Here go types that are common for all supported OS (windows, linux).
 
@@ -27,6 +24,6 @@ type userNsPodsManager interface {
 	HandlerSupportsUserNamespaces(runtimeHandler string) (bool, error)
 	GetPodDir(podUID types.UID) string
 	ListPodsFromDisk() ([]types.UID, error)
-	GetKubeletMappings(logger klog.Logger, idsPerPod uint32) (uint32, uint32, error)
+	GetKubeletMappings(idsPerPod uint32) (uint32, uint32, error)
 	GetMaxPods() int
 }

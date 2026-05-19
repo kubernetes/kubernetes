@@ -112,9 +112,6 @@ var _ = SIGDescribe("Device Plugin Failures:", framework.WithNodeConformance(), 
 			return nil
 		})
 
-		ginkgo.By("Wait enough for unix socket to be open")
-		time.Sleep(time.Second)
-
 		err := plugin.RegisterDevicePlugin(ctx, f.UniqueName, resourceName, []*kubeletdevicepluginv1beta1.Device{{ID: "testdevice", Health: kubeletdevicepluginv1beta1.Healthy}})
 		defer plugin.Stop() // should stop even if registration failed
 		gomega.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("failed to get device plugin options")))
@@ -133,9 +130,6 @@ var _ = SIGDescribe("Device Plugin Failures:", framework.WithNodeConformance(), 
 		resourceName := fmt.Sprintf("test.device/%s", f.UniqueName)
 		devices := []*kubeletdevicepluginv1beta1.Device{{ID: "testdevice", Health: kubeletdevicepluginv1beta1.Healthy}}
 		plugin := testdeviceplugin.NewDevicePlugin(nil)
-
-		ginkgo.By("Wait enough for unix socket to be open")
-		time.Sleep(time.Second)
 
 		err := plugin.RegisterDevicePlugin(ctx, f.UniqueName, resourceName, devices)
 		defer plugin.Stop() // should stop even if registration failed
@@ -162,9 +156,6 @@ var _ = SIGDescribe("Device Plugin Failures:", framework.WithNodeConformance(), 
 		resourceName := fmt.Sprintf("test.device/%s", f.UniqueName)
 		devices := []*kubeletdevicepluginv1beta1.Device{{ID: "testdevice", Health: kubeletdevicepluginv1beta1.Healthy}}
 		plugin := testdeviceplugin.NewDevicePlugin(nil)
-
-		ginkgo.By("Wait enough for unix socket to be open")
-		time.Sleep(time.Second)
 
 		err := plugin.RegisterDevicePlugin(ctx, f.UniqueName, resourceName, devices)
 		defer plugin.Stop() // should stop even if registration failed
@@ -224,9 +215,6 @@ var _ = SIGDescribe("Device Plugin Failures:", framework.WithNodeConformance(), 
 		}
 		plugin := testdeviceplugin.NewDevicePlugin(nil)
 
-		ginkgo.By("Wait enough for unix socket to be open")
-		time.Sleep(time.Second)
-
 		err := plugin.RegisterDevicePlugin(ctx, f.UniqueName, resourceName, devices)
 		defer plugin.Stop() // should stop even if registration failed
 		gomega.Expect(err).To(gomega.Succeed())
@@ -281,9 +269,6 @@ var _ = SIGDescribe("Device Plugin Failures:", framework.WithNodeConformance(), 
 			return nil
 		})
 
-		ginkgo.By("Wait enough for unix socket to be open")
-		time.Sleep(time.Second)
-
 		err := plugin.RegisterDevicePlugin(ctx, f.UniqueName, resourceName, devices)
 		defer plugin.Stop() // should stop even if registration failed
 		gomega.Expect(err).To(gomega.Succeed())
@@ -315,9 +300,6 @@ var _ = SIGDescribe("Device Plugin Failures:", framework.WithNodeConformance(), 
 			}
 			return nil
 		})
-
-		ginkgo.By("Wait enough for unix socket to be open")
-		time.Sleep(time.Second)
 
 		err := plugin.RegisterDevicePlugin(ctx, f.UniqueName, resourceName, devices)
 		defer plugin.Stop() // should stop even if registration failed
@@ -353,9 +335,6 @@ var _ = SIGDescribe("Device Plugin Failures:", framework.WithNodeConformance(), 
 		gomega.Eventually(getNodeResourceValues, nodeStatusUpdateTimeout, f.Timeouts.Poll).WithContext(ctx).WithArguments(resourceName).Should(gomega.Equal(ResourceValue{Allocatable: -1, Capacity: -1}))
 
 		plugin := testdeviceplugin.NewDevicePlugin(nil)
-
-		ginkgo.By("Wait enough for unix socket to be open")
-		time.Sleep(time.Second)
 
 		err := plugin.RegisterDevicePlugin(ctx, f.UniqueName, resourceName, devices)
 		defer plugin.Stop() // should stop even if registration failed

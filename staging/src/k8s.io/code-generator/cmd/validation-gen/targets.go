@@ -23,12 +23,9 @@ import (
 	"slices"
 	"strings"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/code-generator/cmd/validation-gen/validators"
-	"k8s.io/code-generator/pkg/apidefinitions"
 	"k8s.io/gengo/v2"
-	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/generator"
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
@@ -37,7 +34,8 @@ import (
 
 // These are the comment tags that carry parameters for validation generation.
 const (
-	mainTagName           = "k8s:validation-gen"                 // defines which types to generate validation for
+	tagName               = "k8s:validation-gen"
+	inputTagName          = "k8s:validation-gen-input"
 	schemeRegistryTagName = "k8s:validation-gen-scheme-registry" // defaults to k8s.io/apimachinery/pkg.runtime.Scheme
 	testFixtureTagName    = "k8s:validation-gen-test-fixture"    // if set, generate go test files for test fixtures.  Supported values: "validateFalse".
 
@@ -50,51 +48,50 @@ const (
 )
 
 var (
-	runtimePkg   = "k8s.io/apimachinery/pkg/runtime"
-	schemeType   = types.Name{Package: runtimePkg, Name: "Scheme"}
-	metav1Pkg    = "k8s.io/apimachinery/pkg/apis/meta/v1"
-	listMetaType = types.Name{Package: metav1Pkg, Name: "ListMeta"}
+	runtimePkg = "k8s.io/apimachinery/pkg/runtime"
+	schemeType = types.Name{Package: runtimePkg, Name: "Scheme"}
 )
 
-// extractAndParseTag extracts all the values for a given tag, according to the
-// tag grammar.
-func extractAndParseTag(tagName string, comments []string) ([]codetags.Tag, error) {
-	extracted := codetags.Extract("+", comments)
-	var tags []codetags.Tag
-	for key, lines := range extracted {
-		if key != tagName {
-			continue
-		}
-		t, err := codetags.ParseAll(lines)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse tags: %w: %s", err, lines)
-		}
-		tags = append(tags, t...)
-	}
-	return tags, nil
-}
-
-// validationTypeMatch returns the +k8s:validation-gen tag values for pkg,
-// or false if validation-gen should not run.
-func validationTypeMatch(pkg *types.Package, idOpts []apidefinitions.Option) ([]string, bool) {
-	info, err := apidefinitions.Identify(pkg, apidefinitions.Validation, idOpts...)
-	if err != nil {
-		klog.Fatal(err)
-	}
-	if !info.ShouldGenerate() {
-		return nil, false
-	}
-	return info.TypeFilters(), true
-}
-
-// TODO: this can just accept a single bool
-func checkMainTag(comments []string, require ...string) bool {
-	// TODO: convert to extractAndParseTag() and update all callers to use quoted values
-	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{mainTagName}, comments)
+func extractTag(comments []string) ([]string, bool) {
+	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{tagName}, comments)
 	if err != nil {
 		klog.Fatalf("Failed to extract tags: %v", err)
 	}
-	values, found := tags[mainTagName]
+	values, found := tags[tagName]
+	if !found || len(values) == 0 {
+		return nil, false
+	}
+
+	result := make([]string, len(values))
+	for i, tag := range values {
+		result[i] = tag.Value
+	}
+	return result, true
+}
+
+func extractInputTag(comments []string) []string {
+	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{inputTagName}, comments)
+	if err != nil {
+		klog.Fatalf("Failed to extract input tags: %v", err)
+	}
+	values, found := tags[inputTagName]
+	if !found {
+		return nil
+	}
+
+	result := make([]string, len(values))
+	for i, tag := range values {
+		result[i] = tag.Value
+	}
+	return result
+}
+
+func checkTag(comments []string, require ...string) bool {
+	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{tagName}, comments)
+	if err != nil {
+		klog.Fatalf("Failed to extract tags: %v", err)
+	}
+	values, found := tags[tagName]
 	if !found {
 		return false
 	}
@@ -112,7 +109,6 @@ func checkMainTag(comments []string, require ...string) bool {
 }
 
 func schemeRegistryTag(pkg *types.Package) types.Name {
-	// TODO: convert to extractAndParseTag() and update all callers to use quoted values
 	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{schemeRegistryTagName}, pkg.Comments)
 	if err != nil {
 		klog.Fatalf("Failed to extract scheme registry tags: %v", err)
@@ -131,32 +127,34 @@ func isSubresourceTag(t *types.Type) (string, bool) {
 	var comments []string
 	comments = append(comments, t.SecondClosestCommentLines...)
 	comments = append(comments, t.CommentLines...)
-	tags, err := extractAndParseTag(isSubresourceTagName, comments)
+	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{isSubresourceTagName}, comments)
 	if err != nil {
 		klog.Fatalf("Failed to extract isSubresource tags: %v", err)
 	}
-	if len(tags) == 0 {
+	values, found := tags[isSubresourceTagName]
+	if !found || len(values) == 0 {
 		return "", false
 	}
-	if len(tags) > 1 {
+	if len(values) > 1 {
 		panic(fmt.Sprintf("Type %q contains more than one usage of %q", t.Name.String(), isSubresourceTagName))
 	}
-	return tags[0].Value, true
+	return values[0].Value, true
 }
 
 func supportedSubresourceTags(t *types.Type) sets.Set[string] {
 	var comments []string
 	comments = append(comments, t.SecondClosestCommentLines...)
 	comments = append(comments, t.CommentLines...)
-	tags, err := extractAndParseTag(supportsSubresourceTagName, comments)
+	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{supportsSubresourceTagName}, comments)
 	if err != nil {
 		klog.Fatalf("Failed to extract supportedSubresource tags: %v", err)
 	}
-	if len(tags) == 0 {
+	values, found := tags[supportsSubresourceTagName]
+	if !found || len(values) == 0 {
 		return sets.New[string]()
 	}
 	subresources := sets.New[string]()
-	for _, tag := range tags {
+	for _, tag := range values {
 		subresources.Insert(tag.Value)
 	}
 	return subresources
@@ -166,7 +164,6 @@ var testFixtureTagValues = sets.New("validateFalse")
 
 func testFixtureTag(pkg *types.Package) sets.Set[string] {
 	result := sets.New[string]()
-	// TODO: convert to extractAndParseTag() and update all callers to use quoted values
 	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{testFixtureTagName}, pkg.Comments)
 	if err != nil {
 		klog.Fatalf("Failed to extract test fixture tags: %v", err)
@@ -217,12 +214,7 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	var idOpts []apidefinitions.Option
-	if len(args.LintRules) > 0 {
-		idOpts = append(idOpts, apidefinitions.WithLintRules(args.LintRules...))
-	}
-
-	var targetList []generator.Target
+	var targets []generator.Target
 
 	// First load other "input" packages.  We do this as a single call because
 	// it is MUCH faster.
@@ -230,20 +222,23 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 	pkgToInput := map[string]string{}
 	for _, input := range context.Inputs {
 		klog.V(4).Infof("considering pkg %q", input)
+
 		pkg := context.Universe[input]
 
-		info, err := apidefinitions.Identify(pkg, apidefinitions.Validation, idOpts...)
-		if err != nil {
-			klog.Fatal(err)
+		// if the types are not in the same package where the validation
+		// functions are to be emitted
+		inputTags := extractInputTag(pkg.Comments)
+		if len(inputTags) > 1 {
+			panic(fmt.Sprintf("there may only be one input tag, got %#v", inputTags))
 		}
-		if !info.ShouldGenerate() {
-			continue
-		}
+		if len(inputTags) == 1 {
+			inputPath := inputTags[0]
+			if strings.HasPrefix(inputPath, "./") || strings.HasPrefix(inputPath, "../") {
+				// this is a relative dir, which will not work under gomodules.
+				// join with the local package path, but warn
+				klog.Fatalf("relative path (%s=%s) is not supported; use full package path (as used by 'import') instead", inputTagName, inputPath)
+			}
 
-		// +k8s:validation-gen-input may direct the generator at types in
-		// a different package than the one where validators will be emitted.
-		inputPath := info.ExternalTypes()
-		if inputPath != pkg.Path {
 			klog.V(4).Infof("  input pkg %v", inputPath)
 			inputPkgs = append(inputPkgs, inputPath)
 			pkgToInput[input] = inputPath
@@ -297,11 +292,7 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 	}
 
 	// Create a linter to collect errors as we go.
-	linter := newLinter(lintRules(validator)...)
-
-	// groupKindReports accumulates Reports across every input, keyed by
-	// GroupKind so testTargets emits exactly one SimpleTarget per Kind.
-	groupKindReports := map[schema.GroupKind][]*report{}
+	linter := newLinter()
 
 	// Build a cache of type->callNode for every type we need.
 	for _, input := range context.Inputs {
@@ -311,33 +302,23 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 
 		schemeRegistry := schemeRegistryTag(pkg)
 
-		typesWith, found := validationTypeMatch(pkg, idOpts)
+		typesWith, found := extractTag(pkg.Comments)
 		if !found {
-			klog.V(2).InfoS("  did not find required tag", "tag", mainTagName)
+			klog.V(2).InfoS("  did not find required tag", "tag", tagName)
 			continue
 		}
 		if len(typesWith) == 1 && typesWith[0] == "" {
-			klog.Fatalf("found package tag %q with no value", mainTagName)
+			klog.Fatalf("found package tag %q with no value", tagName)
 		}
 		shouldCreateObjectValidationFn := func(t *types.Type) bool {
 			// opt-out
-			if checkMainTag(t.SecondClosestCommentLines, "false") {
+			if checkTag(t.SecondClosestCommentLines, "false") {
 				return false
 			}
 			// opt-in
-			if checkMainTag(t.SecondClosestCommentLines, "true") {
+			if checkTag(t.SecondClosestCommentLines, "true") {
 				return true
 			}
-
-			// skip types that embed metav1.ListMeta
-			if t.Kind == types.Struct {
-				for _, member := range t.Members {
-					if member.Embedded && member.Type.Name == listMetaType {
-						return false
-					}
-				}
-			}
-
 			// all types
 			for _, v := range typesWith {
 				if v == "*" && !namer.IsPrivateGoName(t.Name.Name) {
@@ -381,17 +362,18 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 			}
 		}
 
-		extracted := codetags.Extract("+", pkg.Comments)
-		if _, ok := extracted["k8s:validation-gen-nolint"]; !ok {
-			for _, t := range rootTypes {
-				klog.V(3).InfoS("linting root-type", "type", t)
-				if err := linter.lintType(t); err != nil {
-					klog.Fatalf("failed to lint type %q: %v", t.Name, err)
-				}
+		for _, t := range rootTypes {
+			klog.V(3).InfoS("linting root-type", "type", t)
+			if err := linter.lintType(t); err != nil {
+				klog.Fatalf("failed to lint type %q: %v", t.Name, err)
 			}
 		}
+		if args.LintOnly {
+			klog.V(4).Info("Lint is set, skip appending targets")
+			continue
+		}
 
-		targetList = append(targetList,
+		targets = append(targets,
 			&generator.SimpleTarget{
 				PkgName:       pkg.Name,
 				PkgPath:       pkg.Path,
@@ -417,19 +399,7 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 					return generators
 				},
 			})
-
-		// Accumulate per-Kind rules; testTargets emits after the loop.
-		if args.TestOutputRoot != "" {
-			collectReports(typesPkg, rootTypes, td, groupKindReports)
-		}
 	}
-
-	// Emit per-Kind coverage test targets. No-op when --test-output-root is empty.
-	allowlist, err := loadAllowlist(args.TestAllowlist)
-	if err != nil {
-		klog.Fatalf("loading allowlist: %v", err)
-	}
-	targetList = append(targetList, testTargets(args.TestOutputRoot, args.TestOutputFilePrefix, groupKindReports, allowlist, boilerplate)...)
 
 	if len(linter.lintErrors) > 0 {
 		buf := strings.Builder{}
@@ -440,9 +410,13 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 				buf.WriteString(fmt.Sprintf("    %s\n", err.Error()))
 			}
 		}
-		klog.Fatalf("lint failed:\n%s", buf.String())
+		if args.LintOnly {
+			klog.Fatalf("lint failed:\n%s", buf.String())
+		} else {
+			klog.Warningf("lint failed:\n%s", buf.String())
+		}
 	}
-	return targetList
+	return targets
 }
 
 func isTypeWith(t *types.Type, typesWith []string) bool {

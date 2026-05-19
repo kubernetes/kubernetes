@@ -55,10 +55,9 @@ var _ ContainerManager = &FakeContainerManager{}
 func NewFakeContainerManager() *FakeContainerManager {
 	return &FakeContainerManager{
 		PodContainerManager: NewFakePodContainerManager(),
-		// Use klog.TODO() because we currently do not have a proper logger to pass in.
-		// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-		cpuManager:    cpumanager.NewFakeManager(klog.TODO()),
-		memoryManager: memorymanager.NewFakeManager(klog.TODO()),
+		// Using klog.Background() for fake/test implementations where no real context is available
+		cpuManager:    cpumanager.NewFakeManager(klog.Background()),
+		memoryManager: memorymanager.NewFakeManager(klog.Background()),
 	}
 }
 

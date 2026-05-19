@@ -207,19 +207,9 @@ func TestRVSync(t *testing.T) {
 		expectKubeActions  []kubetesting.Action
 	}{
 		{
-			name: "Migration not active",
-			key:  "inactive-svm",
-			svm:  newSVMWithConditions("inactive-svm", "", []metav1.Condition{}),
-		},
-		{
 			name: "Successful RV acquisition",
 			key:  "test-svm",
-			svm: newSVMWithConditions("test-svm", "", []metav1.Condition{
-				{
-					Type:   string(svmv1beta1.MigrationRunning),
-					Status: metav1.ConditionTrue,
-				},
-			}),
+			svm:  newSVM("test-svm", ""),
 			discoveryResources: &metav1.APIResourceList{
 				GroupVersion: "apps/v1",
 				APIResources: []metav1.APIResource{
@@ -235,12 +225,7 @@ func TestRVSync(t *testing.T) {
 				kubetesting.NewUpdateAction(
 					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
-					newSVMWithConditions("test-svm", "12345", []metav1.Condition{
-						{
-							Type:   string(svmv1beta1.MigrationRunning),
-							Status: metav1.ConditionTrue,
-						},
-					}),
+					newSVM("test-svm", "12345"),
 				),
 			},
 		},
@@ -248,11 +233,6 @@ func TestRVSync(t *testing.T) {
 			name: "SVM not found",
 			key:  "non-existent-svm",
 			svm:  nil,
-		},
-		{
-			name: "SVM has no CRD condition",
-			key:  "succeeded-svm",
-			svm:  newSVM("succeeded-svm", ""),
 		},
 		{
 			name: "SVM already succeeded",
@@ -277,22 +257,12 @@ func TestRVSync(t *testing.T) {
 		{
 			name: "RV already set",
 			key:  "rv-set-svm",
-			svm: newSVMWithConditions("rv-set-svm", "123", []metav1.Condition{
-				{
-					Type:   string(svmv1beta1.MigrationRunning),
-					Status: metav1.ConditionTrue,
-				},
-			}),
+			svm:  newSVM("rv-set-svm", "123"),
 		},
 		{
 			name: "Resource not migratable",
 			key:  "not-migratable-svm",
-			svm: newSVMWithConditions("not-migratable-svm", "", []metav1.Condition{
-				{
-					Type:   string(svmv1beta1.MigrationRunning),
-					Status: metav1.ConditionTrue,
-				},
-			}),
+			svm:  newSVM("not-migratable-svm", ""),
 			discoveryResources: &metav1.APIResourceList{
 				GroupVersion: "apps/v1",
 				APIResources: []metav1.APIResource{
@@ -305,10 +275,6 @@ func TestRVSync(t *testing.T) {
 					"",
 					newSVMWithConditions("not-migratable-svm", "", []metav1.Condition{
 						{
-							Type:   string(svmv1beta1.MigrationRunning),
-							Status: metav1.ConditionTrue,
-						},
-						{
 							Type:   string(svmv1beta1.MigrationFailed),
 							Status: metav1.ConditionTrue,
 						},
@@ -319,12 +285,7 @@ func TestRVSync(t *testing.T) {
 		{
 			name: "Metadata list error",
 			key:  "metadata-error-svm",
-			svm: newSVMWithConditions("metadata-error-svm", "", []metav1.Condition{
-				{
-					Type:   string(svmv1beta1.MigrationRunning),
-					Status: metav1.ConditionTrue,
-				},
-			}),
+			svm:  newSVM("metadata-error-svm", ""),
 			discoveryResources: &metav1.APIResourceList{
 				GroupVersion: "apps/v1",
 				APIResources: []metav1.APIResource{
@@ -338,12 +299,7 @@ func TestRVSync(t *testing.T) {
 		{
 			name: "Invalid RV returned",
 			key:  "invalid-rv-svm",
-			svm: newSVMWithConditions("invalid-rv-svm", "", []metav1.Condition{
-				{
-					Type:   string(svmv1beta1.MigrationRunning),
-					Status: metav1.ConditionTrue,
-				},
-			}),
+			svm:  newSVM("invalid-rv-svm", ""),
 			discoveryResources: &metav1.APIResourceList{
 				GroupVersion: "apps/v1",
 				APIResources: []metav1.APIResource{
@@ -360,10 +316,6 @@ func TestRVSync(t *testing.T) {
 					svmv1beta1.SchemeGroupVersion.WithResource("storageversionmigrations"),
 					"",
 					newSVMWithConditions("invalid-rv-svm", "", []metav1.Condition{
-						{
-							Type:   string(svmv1beta1.MigrationRunning),
-							Status: metav1.ConditionTrue,
-						},
 						{
 							Type:   string(svmv1beta1.MigrationFailed),
 							Status: metav1.ConditionTrue,
@@ -481,14 +433,6 @@ func filterListWatchActions(actions []kubetesting.Action) []kubetesting.Action {
 	return filteredActions
 }
 
-type testRESTMapper struct {
-	meta.RESTMapper
-}
-
-func (m *testRESTMapper) Reset() {
-	meta.MaybeResetRESTMapper(m.RESTMapper)
-}
-
 // newTestRVController creates a new ResourceVersionController for testing.
 func newTestRVController(
 	kubeClient kubernetes.Interface,
@@ -505,7 +449,7 @@ func newTestRVController(
 		metadataClient:  metadataClient,
 		svmListers:      svmInformer.Lister(),
 		svmSynced:       func() bool { return true },
-		mapper:          &testRESTMapper{mapper},
+		mapper:          mapper,
 	}
 	return rvController
 }

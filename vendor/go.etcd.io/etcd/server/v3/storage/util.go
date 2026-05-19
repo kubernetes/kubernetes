@@ -131,9 +131,6 @@ func GetEffectiveNodeIDsFromWALEntries(lg *zap.Logger, snap *raftpb.Snapshot, en
 		for _, id := range snap.Metadata.ConfState.Voters {
 			ids[id] = true
 		}
-		for _, id := range snap.Metadata.ConfState.Learners {
-			ids[id] = true
-		}
 	}
 	for _, e := range ents {
 		if e.Type != raftpb.EntryConfChange {

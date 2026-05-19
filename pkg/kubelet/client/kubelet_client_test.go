@@ -24,7 +24,6 @@ import (
 	"net/http/httptest"
 	"net/http/httputil"
 	"net/url"
-	"slices"
 	"strconv"
 	"testing"
 
@@ -282,13 +281,12 @@ func TestNewNodeConnectionInfoGetter(t *testing.T) {
 
 func TestGetConnectionInfo(t *testing.T) {
 	tests := []struct {
-		name                 string
-		nodeGetter           NodeGetter
-		nodeName             types.NodeName
-		expectedHost         string
-		expectedPort         string
-		expectedNodeFeatures []string
-		expectError          bool
+		name         string
+		nodeGetter   NodeGetter
+		nodeName     types.NodeName
+		expectedHost string
+		expectedPort string
+		expectError  bool
 	}{
 		{
 			name: "valid node with kubelet endpoint port",
@@ -306,11 +304,10 @@ func TestGetConnectionInfo(t *testing.T) {
 					},
 				},
 			},
-			nodeName:             "test-node",
-			expectedHost:         "203.0.113.10",
-			expectedPort:         "10250",
-			expectedNodeFeatures: nil,
-			expectError:          false,
+			nodeName:     "test-node",
+			expectedHost: "203.0.113.10",
+			expectedPort: "10250",
+			expectError:  false,
 		},
 		{
 			name: "valid node without kubelet endpoint port (uses default)",
@@ -327,11 +324,10 @@ func TestGetConnectionInfo(t *testing.T) {
 					},
 				},
 			},
-			nodeName:             "test-node",
-			expectedHost:         "192.168.1.10",
-			expectedPort:         "10250", // default port
-			expectedNodeFeatures: nil,
-			expectError:          false,
+			nodeName:     "test-node",
+			expectedHost: "192.168.1.10",
+			expectedPort: "10250", // default port
+			expectError:  false,
 		},
 		{
 			name: "node with external IP preferred",
@@ -349,11 +345,10 @@ func TestGetConnectionInfo(t *testing.T) {
 					},
 				},
 			},
-			nodeName:             "test-node",
-			expectedHost:         "203.0.113.10", // External IP should be preferred when available
-			expectedPort:         "10250",
-			expectedNodeFeatures: nil,
-			expectError:          false,
+			nodeName:     "test-node",
+			expectedHost: "203.0.113.10", // External IP should be preferred when available
+			expectedPort: "10250",
+			expectError:  false,
 		},
 		{
 			name: "node not found",
@@ -378,72 +373,6 @@ func TestGetConnectionInfo(t *testing.T) {
 			},
 			nodeName:    "test-node",
 			expectError: true,
-		},
-		{
-			name: "node with one declared feature",
-			nodeGetter: &mockNodeGetter{
-				node: &v1.Node{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-node"},
-					Status: v1.NodeStatus{
-						Addresses: []v1.NodeAddress{
-							{Type: v1.NodeInternalIP, Address: "192.168.1.10"},
-						},
-						DaemonEndpoints: v1.NodeDaemonEndpoints{
-							KubeletEndpoint: v1.DaemonEndpoint{Port: 10250},
-						},
-						DeclaredFeatures: []string{"ExtendWebSocketsToKubelet"},
-					},
-				},
-			},
-			nodeName:             "test-node",
-			expectedHost:         "192.168.1.10",
-			expectedPort:         "10250",
-			expectedNodeFeatures: []string{"ExtendWebSocketsToKubelet"},
-			expectError:          false,
-		},
-		{
-			name: "node with multiple declared features",
-			nodeGetter: &mockNodeGetter{
-				node: &v1.Node{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-node"},
-					Status: v1.NodeStatus{
-						Addresses: []v1.NodeAddress{
-							{Type: v1.NodeInternalIP, Address: "192.168.1.10"},
-						},
-						DaemonEndpoints: v1.NodeDaemonEndpoints{
-							KubeletEndpoint: v1.DaemonEndpoint{Port: 10250},
-						},
-						DeclaredFeatures: []string{"ExtendWebSocketsToKubelet", "SomeOtherFeature"},
-					},
-				},
-			},
-			nodeName:             "test-node",
-			expectedHost:         "192.168.1.10",
-			expectedPort:         "10250",
-			expectedNodeFeatures: []string{"ExtendWebSocketsToKubelet", "SomeOtherFeature"},
-			expectError:          false,
-		},
-		{
-			name: "node with empty declared features",
-			nodeGetter: &mockNodeGetter{
-				node: &v1.Node{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-node"},
-					Status: v1.NodeStatus{
-						Addresses: []v1.NodeAddress{
-							{Type: v1.NodeInternalIP, Address: "192.168.1.10"},
-						},
-						DaemonEndpoints: v1.NodeDaemonEndpoints{
-							KubeletEndpoint: v1.DaemonEndpoint{Port: 10250},
-						},
-						DeclaredFeatures: []string{},
-					},
-				},
-			},
-			nodeName:             "test-node",
-			expectedHost:         "192.168.1.10",
-			expectedPort:         "10250",
-			expectedNodeFeatures: []string{},
-			expectError:          false,
 		},
 	}
 
@@ -496,10 +425,6 @@ func TestGetConnectionInfo(t *testing.T) {
 
 			if connInfo.InsecureSkipTLSVerifyTransport == nil {
 				t.Errorf("expected non-nil InsecureSkipTLSVerifyTransport")
-			}
-
-			if !slices.Equal(connInfo.NodeFeatures, tt.expectedNodeFeatures) {
-				t.Errorf("expected NodeFeatures %v, got %v", tt.expectedNodeFeatures, connInfo.NodeFeatures)
 			}
 		})
 	}

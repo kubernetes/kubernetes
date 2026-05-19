@@ -60,8 +60,7 @@ type handlerRunner struct {
 }
 
 type podStatusProvider interface {
-	GetPod(ctx context.Context, podUID types.UID) (*kubecontainer.Pod, error)
-	GetPodStatus(ctx context.Context, pod *kubecontainer.Pod) (*kubecontainer.PodStatus, error)
+	GetPodStatus(ctx context.Context, uid types.UID, name, namespace string) (*kubecontainer.PodStatus, error)
 }
 
 // NewHandlerRunner returns a configured lifecycle handler for a container.
@@ -130,13 +129,10 @@ func (hr *handlerRunner) runHTTPHandler(ctx context.Context, pod *v1.Pod, contai
 	host := handler.HTTPGet.Host
 	podIP := host
 	if len(host) == 0 {
-		runtimePod, err := hr.containerManager.GetPod(ctx, pod.UID)
+		status, err := hr.containerManager.GetPodStatus(ctx, pod.UID, pod.Name, pod.Namespace)
 		if err != nil {
-			return fmt.Errorf("unable to get pod, event handlers may be invalid: %w", err)
-		}
-		status, err := hr.containerManager.GetPodStatus(ctx, runtimePod)
-		if err != nil {
-			return fmt.Errorf("unable to get pod status, event handlers may be invalid: %w", err)
+			logger.Error(err, "Unable to get pod info, event handlers may be invalid.", "pod", klog.KObj(pod))
+			return err
 		}
 		if len(status.IPs) == 0 {
 			return fmt.Errorf("failed to find networking container: %v", status)
@@ -271,11 +267,11 @@ func (c *declaredFeaturesAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmit
 		}
 	}
 
-	if reqs.IsEmpty() {
+	if reqs.Len() == 0 {
 		return PodAdmitResult{Admit: true}
 	}
 
-	matchResult, err := c.ndfFramework.MatchNodeFeatureSet(reqs, c.ndfSet)
+	matchResult, err := ndf.MatchNodeFeatureSet(reqs, c.ndfSet)
 	if err != nil {
 		return PodAdmitResult{
 			Admit:   false,

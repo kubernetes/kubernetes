@@ -209,6 +209,7 @@ type PodVolumeClaims struct {
 type volumeBinder struct {
 	kubeClient                  clientset.Interface
 	enableVolumeAttributesClass bool
+	enableCSIMigrationPortworx  bool
 
 	classLister   storagelisters.StorageClassLister
 	podLister     corelisters.PodLister
@@ -261,6 +262,7 @@ func NewVolumeBinder(
 	b := &volumeBinder{
 		kubeClient:                  kubeClient,
 		enableVolumeAttributesClass: fts.EnableVolumeAttributesClass,
+		enableCSIMigrationPortworx:  fts.EnableCSIMigrationPortworx,
 		podLister:                   podInformer.Lister(),
 		classLister:                 storageClassInformer.Lister(),
 		nodeLister:                  nodeInformer.Lister(),
@@ -1064,7 +1066,7 @@ func (a byPVCSize) Less(i, j int) bool {
 }
 
 // isCSIMigrationOnForPlugin checks if CSI migration is enabled for a given plugin.
-func isCSIMigrationOnForPlugin(pluginName string) bool {
+func isCSIMigrationOnForPlugin(pluginName string, enableCSIMigrationPortworx bool) bool {
 	switch pluginName {
 	case csiplugins.AWSEBSInTreePluginName:
 		return true
@@ -1075,7 +1077,7 @@ func isCSIMigrationOnForPlugin(pluginName string) bool {
 	case csiplugins.CinderInTreePluginName:
 		return true
 	case csiplugins.PortworxVolumePluginName:
-		return true
+		return enableCSIMigrationPortworx
 	}
 	return false
 }
@@ -1114,7 +1116,7 @@ func (b *volumeBinder) tryTranslatePVToCSI(logger klog.Logger, pv *v1.Persistent
 		return nil, fmt.Errorf("could not get plugin name from pv: %v", err)
 	}
 
-	if !isCSIMigrationOnForPlugin(pluginName) {
+	if !isCSIMigrationOnForPlugin(pluginName, b.enableCSIMigrationPortworx) {
 		return pv, nil
 	}
 

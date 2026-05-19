@@ -28,7 +28,6 @@ import (
 // updatePodCIDR updates the pod CIDR in the runtime state if it is different
 // from the current CIDR. Return true if pod CIDR is actually changed.
 func (kl *Kubelet) updatePodCIDR(ctx context.Context, cidr string) (bool, error) {
-	logger := klog.FromContext(ctx)
 	kl.updatePodCIDRMux.Lock()
 	defer kl.updatePodCIDRMux.Unlock()
 
@@ -45,7 +44,7 @@ func (kl *Kubelet) updatePodCIDR(ctx context.Context, cidr string) (bool, error)
 		// But it is better to be on the safe side to still return true here.
 		return true, fmt.Errorf("failed to update pod CIDR: %v", err)
 	}
-	logger.Info("Updating Pod CIDR", "originalPodCIDR", podCIDR, "newPodCIDR", cidr)
+	klog.InfoS("Updating Pod CIDR", "originalPodCIDR", podCIDR, "newPodCIDR", cidr)
 	kl.runtimeState.setPodCIDR(cidr)
 	return true, nil
 }
@@ -53,6 +52,8 @@ func (kl *Kubelet) updatePodCIDR(ctx context.Context, cidr string) (bool, error)
 // GetPodDNS returns DNS settings for the pod.
 // This function is defined in kubecontainer.RuntimeHelper interface so we
 // have to implement it.
-func (kl *Kubelet) GetPodDNS(ctx context.Context, pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
-	return kl.dnsConfigurer.GetPodDNS(ctx, pod)
+func (kl *Kubelet) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
+	// Use context.TODO() because we currently do not have a proper context to pass in.
+	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
+	return kl.dnsConfigurer.GetPodDNS(context.TODO(), pod)
 }

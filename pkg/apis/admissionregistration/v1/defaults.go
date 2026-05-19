@@ -117,11 +117,3 @@ func SetDefaults_MatchResources(obj *admissionregistrationv1.MatchResources) {
 		obj.ObjectSelector = &selector
 	}
 }
-
-// SetDefaults_MutatingAdmissionPolicySpec sets defaults for MutatingAdmissionPolicySpec
-func SetDefaults_MutatingAdmissionPolicySpec(obj *admissionregistrationv1.MutatingAdmissionPolicySpec) {
-	if obj.FailurePolicy == nil {
-		policy := admissionregistrationv1.Fail
-		obj.FailurePolicy = &policy
-	}
-}

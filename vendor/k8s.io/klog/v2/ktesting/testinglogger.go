@@ -302,12 +302,12 @@ func (l tlogger) Info(level int, msg string, kvList ...interface{}) {
 
 	l.shared.t.Helper()
 	buf := buffer.GetBuffer()
-	l.shared.formatter.FormatKVs(&buf.Buffer, l.values, kvList)
+	l.shared.formatter.MergeAndFormatKVs(&buf.Buffer, l.values, kvList)
 	l.log(LogInfo, msg, level, buf, nil, kvList)
 }
 
 func (l tlogger) Enabled(level int) bool {
-	return l.shared.config.vstate.Enabled(verbosity.Level(level), l.shared.callDepth+1)
+	return l.shared.config.vstate.Enabled(verbosity.Level(level), 1)
 }
 
 func (l tlogger) Error(err error, msg string, kvList ...interface{}) {
@@ -320,11 +320,10 @@ func (l tlogger) Error(err error, msg string, kvList ...interface{}) {
 
 	l.shared.t.Helper()
 	buf := buffer.GetBuffer()
-	var errKV []interface{}
 	if err != nil {
-		errKV = []interface{}{"err", err}
+		l.shared.formatter.KVFormat(&buf.Buffer, "err", err)
 	}
-	l.shared.formatter.FormatKVs(&buf.Buffer, errKV, l.values, kvList)
+	l.shared.formatter.MergeAndFormatKVs(&buf.Buffer, l.values, kvList)
 	l.log(LogError, msg, 0, buf, err, kvList)
 }
 

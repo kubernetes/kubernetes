@@ -146,11 +146,15 @@ func (r *NodeAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attribu
 		case resourceSlice:
 			return r.authorizeResourceSlice(nodeName, attrs)
 		case nodeResource:
-			return r.authorizeNode(nodeName, attrs)
+			if r.features.Enabled(features.AuthorizeNodeWithSelectors) {
+				return r.authorizeNode(nodeName, attrs)
+			}
 		case podResource:
-			return r.authorizePod(nodeName, attrs)
+			if r.features.Enabled(features.AuthorizeNodeWithSelectors) {
+				return r.authorizePod(nodeName, attrs)
+			}
 		case pcrResource:
-			if r.features.Enabled(features.PodCertificateRequest) {
+			if r.features.Enabled(features.PodCertificateRequest) && r.features.Enabled(features.AuthorizeNodeWithSelectors) {
 				return r.authorizePodCertificateRequest(nodeName, attrs)
 			}
 			return authorizer.DecisionNoOpinion, "", nil
@@ -355,16 +359,25 @@ func (r *NodeAuthorizer) authorizeResourceSlice(nodeName string, attrs authorize
 		// is allowed by recording a graph edge.
 		return r.authorize(nodeName, sliceVertexType, attrs)
 	case "watch", "list", "deletecollection":
-		// only allow a scoped fieldSelector
-		reqs, _ := attrs.GetFieldSelector()
-		for _, req := range reqs {
-			if req.Field == resourceapi.ResourceSliceSelectorNodeName && req.Operator == selection.Equals && req.Value == nodeName {
-				return authorizer.DecisionAllow, "", nil
+		if r.features.Enabled(features.AuthorizeNodeWithSelectors) {
+			// only allow a scoped fieldSelector
+			reqs, _ := attrs.GetFieldSelector()
+			for _, req := range reqs {
+				if req.Field == resourceapi.ResourceSliceSelectorNodeName && req.Operator == selection.Equals && req.Value == nodeName {
+					return authorizer.DecisionAllow, "", nil
+				}
 			}
+			// deny otherwise
+			klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
+			return authorizer.DecisionNoOpinion, "can only list/watch/deletecollection resourceslices with nodeName field selector", nil
+		} else {
+			// Allow broad list/watch access if AuthorizeNodeWithSelectors is not enabled.
+			//
+			// The NodeRestriction admission plugin (plugin/pkg/admission/noderestriction)
+			// ensures that the node is not deleting some ResourceSlice belonging to
+			// some other node.
+			return authorizer.DecisionAllow, "", nil
 		}
-		// deny otherwise
-		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
-		return authorizer.DecisionNoOpinion, "can only list/watch/deletecollection resourceslices with nodeName field selector", nil
 	default:
 		klog.V(2).Infof("NODE DENY: '%s' %#v", nodeName, attrs)
 		return authorizer.DecisionNoOpinion, "only the following verbs are allowed for a ResourceSlice: get, watch, list, create, update, patch, delete, deletecollection", nil

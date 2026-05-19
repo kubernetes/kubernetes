@@ -625,8 +625,8 @@ func TestRelatedPodsLookup(t *testing.T) {
 }
 
 func TestWatchControllers(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
-	fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
+
+	fakeWatch := watch.NewFake()
 	client := fake.NewSimpleClientset()
 	client.PrependWatchReactor("replicasets", core.DefaultWatchReactor(fakeWatch, nil))
 	stopCh := make(chan struct{})
@@ -676,10 +676,10 @@ func TestWatchControllers(t *testing.T) {
 }
 
 func TestWatchPods(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
+	_, ctx := ktesting.NewTestContext(t)
 	client := fake.NewSimpleClientset()
 
-	fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
+	fakeWatch := watch.NewFake()
 	client.PrependWatchReactor("pods", core.DefaultWatchReactor(fakeWatch, nil))
 
 	stopCh := make(chan struct{})
@@ -1631,7 +1631,7 @@ func TestDoNotAdoptOrCreateIfBeingDeletedRace(t *testing.T) {
 }
 
 func TestReplicaSetAvailabilityCheck(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	_, ctx := ktesting.NewTestContext(t)
 
 	labelMap := map[string]string{"foo": "bar"}
 	rs := newReplicaSet(4, labelMap)
@@ -1665,7 +1665,7 @@ func TestReplicaSetAvailabilityCheck(t *testing.T) {
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 
-	err := manager.syncReplicaSet(tCtx, GetKey(rs, t))
+	err := manager.syncReplicaSet(ctx, GetKey(rs, t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1703,7 +1703,9 @@ func TestReplicaSetAvailabilityCheck(t *testing.T) {
 	}
 
 	// RS should be re-queued after 700ms to recompute .status.availableReplicas (200ms extra for the test).
-	tCtx.Eventually(manager.queue.Len).WithTimeout(900*time.Millisecond).
+	ktesting.Eventually(ctx, func(tCtx ktesting.TContext) int {
+		return manager.queue.Len()
+	}).WithTimeout(900*time.Millisecond).
 		WithPolling(10*time.Millisecond).
 		Should(gomega.Equal(1), " RS should be re-queued to recompute .status.availableReplicas")
 

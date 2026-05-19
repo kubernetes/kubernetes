@@ -11,7 +11,6 @@ import (
 // A NodeType is the type of a Node.
 type NodeType uint32
 
-//go:generate stringer -type NodeType
 const (
 	ErrorNode NodeType = iota
 	TextNode

@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -55,7 +54,7 @@ func GetTestVolumeSpec(volumeName string, diskName v1.UniqueVolumeName) *volume.
 	}
 }
 
-func CreateTestClient(logger klog.Logger) *fake.Clientset {
+func CreateTestClient() *fake.Clientset {
 	var extraPods *v1.PodList
 	var volumeAttachments *storagev1.VolumeAttachmentList
 	var pvs *v1.PersistentVolumeList
@@ -194,7 +193,7 @@ func CreateTestClient(logger klog.Logger) *fake.Clientset {
 		return true, createAction.GetObject(), nil
 	})
 
-	fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
+	fakeWatch := watch.NewFake()
 	fakeClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
 
 	return fakeClient

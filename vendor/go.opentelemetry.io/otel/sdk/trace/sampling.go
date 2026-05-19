@@ -69,17 +69,17 @@ type traceIDRatioSampler struct {
 }
 
 func (ts traceIDRatioSampler) ShouldSample(p SamplingParameters) SamplingResult {
-	state := trace.SpanContextFromContext(p.ParentContext).TraceState()
+	psc := trace.SpanContextFromContext(p.ParentContext)
 	x := binary.BigEndian.Uint64(p.TraceID[8:16]) >> 1
 	if x < ts.traceIDUpperBound {
 		return SamplingResult{
 			Decision:   RecordAndSample,
-			Tracestate: state,
+			Tracestate: psc.TraceState(),
 		}
 	}
 	return SamplingResult{
 		Decision:   Drop,
-		Tracestate: state,
+		Tracestate: psc.TraceState(),
 	}
 }
 
@@ -94,20 +94,12 @@ func (ts traceIDRatioSampler) Description() string {
 //
 //nolint:revive // revive complains about stutter of `trace.TraceIDRatioBased`
 func TraceIDRatioBased(fraction float64) Sampler {
-	// Cannot use AlwaysSample() and NeverSample(), must return spec-compliant descriptions.
-	// See https://opentelemetry.io/docs/specs/otel/trace/sdk/#traceidratiobased.
 	if fraction >= 1 {
-		return predeterminedSampler{
-			description: "TraceIDRatioBased{1}",
-			decision:    RecordAndSample,
-		}
+		return AlwaysSample()
 	}
 
 	if fraction <= 0 {
-		return predeterminedSampler{
-			description: "TraceIDRatioBased{0}",
-			decision:    Drop,
-		}
+		fraction = 0
 	}
 
 	return &traceIDRatioSampler{
@@ -118,15 +110,14 @@ func TraceIDRatioBased(fraction float64) Sampler {
 
 type alwaysOnSampler struct{}
 
-func (alwaysOnSampler) ShouldSample(p SamplingParameters) SamplingResult {
+func (as alwaysOnSampler) ShouldSample(p SamplingParameters) SamplingResult {
 	return SamplingResult{
 		Decision:   RecordAndSample,
 		Tracestate: trace.SpanContextFromContext(p.ParentContext).TraceState(),
 	}
 }
 
-func (alwaysOnSampler) Description() string {
-	// https://opentelemetry.io/docs/specs/otel/trace/sdk/#alwayson
+func (as alwaysOnSampler) Description() string {
 	return "AlwaysOnSampler"
 }
 
@@ -140,37 +131,20 @@ func AlwaysSample() Sampler {
 
 type alwaysOffSampler struct{}
 
-func (alwaysOffSampler) ShouldSample(p SamplingParameters) SamplingResult {
+func (as alwaysOffSampler) ShouldSample(p SamplingParameters) SamplingResult {
 	return SamplingResult{
 		Decision:   Drop,
 		Tracestate: trace.SpanContextFromContext(p.ParentContext).TraceState(),
 	}
 }
 
-func (alwaysOffSampler) Description() string {
-	// https://opentelemetry.io/docs/specs/otel/trace/sdk/#alwaysoff
+func (as alwaysOffSampler) Description() string {
 	return "AlwaysOffSampler"
 }
 
 // NeverSample returns a Sampler that samples no traces.
 func NeverSample() Sampler {
 	return alwaysOffSampler{}
-}
-
-type predeterminedSampler struct {
-	description string
-	decision    SamplingDecision
-}
-
-func (s predeterminedSampler) ShouldSample(p SamplingParameters) SamplingResult {
-	return SamplingResult{
-		Decision:   s.decision,
-		Tracestate: trace.SpanContextFromContext(p.ParentContext).TraceState(),
-	}
-}
-
-func (s predeterminedSampler) Description() string {
-	return s.description
 }
 
 // ParentBased returns a sampler decorator which behaves differently,
@@ -305,32 +279,4 @@ func (pb parentBased) Description() string {
 		pb.config.localParentSampled.Description(),
 		pb.config.localParentNotSampled.Description(),
 	)
-}
-
-// AlwaysRecord returns a sampler decorator which ensures that every span
-// is passed to the SpanProcessor, even those that would be normally dropped.
-// It converts `Drop` decisions from the root sampler into `RecordOnly` decisions,
-// allowing processors to see all spans without sending them to exporters. This is
-// typically used to enable accurate span-to-metrics processing.
-func AlwaysRecord(root Sampler) Sampler {
-	return alwaysRecord{root}
-}
-
-type alwaysRecord struct {
-	root Sampler
-}
-
-func (ar alwaysRecord) ShouldSample(p SamplingParameters) SamplingResult {
-	rootSamplerSamplingResult := ar.root.ShouldSample(p)
-	if rootSamplerSamplingResult.Decision == Drop {
-		return SamplingResult{
-			Decision:   RecordOnly,
-			Tracestate: trace.SpanContextFromContext(p.ParentContext).TraceState(),
-		}
-	}
-	return rootSamplerSamplingResult
-}
-
-func (ar alwaysRecord) Description() string {
-	return "AlwaysRecord{root:" + ar.root.Description() + "}"
 }

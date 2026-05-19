@@ -31,6 +31,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -44,7 +45,6 @@ import (
 	"k8s.io/kubectl/pkg/util/completion"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
-	streamhttp "k8s.io/streaming/pkg/httpstream"
 )
 
 // PortForwardOptions contains all the options for running the port-forward cli command.
@@ -136,20 +136,20 @@ type defaultPortForwarder struct {
 	genericiooptions.IOStreams
 }
 
-func createDialer(method string, url *url.URL, opts PortForwardOptions) (streamhttp.Dialer, error) {
+func createDialer(method string, url *url.URL, opts PortForwardOptions) (httpstream.Dialer, error) {
 	transport, upgrader, err := spdy.RoundTripperFor(opts.Config)
 	if err != nil {
 		return nil, err
 	}
-	dialer := spdy.NewDialerForStreaming(upgrader, &http.Client{Transport: transport}, method, url)
+	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, method, url)
 	if !cmdutil.PortForwardWebsockets.IsDisabled() {
-		tunnelingDialer, err := portforward.NewSPDYOverWebsocketDialerForStreaming(url, opts.Config)
+		tunnelingDialer, err := portforward.NewSPDYOverWebsocketDialer(url, opts.Config)
 		if err != nil {
 			return nil, err
 		}
 		// First attempt tunneling (websocket) dialer, then fallback to spdy dialer.
-		dialer = portforward.NewFallbackDialerForStreaming(tunnelingDialer, dialer, func(err error) bool {
-			return streamhttp.IsUpgradeFailure(err) || streamhttp.IsHTTPSProxyError(err)
+		dialer = portforward.NewFallbackDialer(tunnelingDialer, dialer, func(err error) bool {
+			return httpstream.IsUpgradeFailure(err) || httpstream.IsHTTPSProxyError(err)
 		})
 	}
 	return dialer, nil
@@ -160,7 +160,7 @@ func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts Po
 	if err != nil {
 		return err
 	}
-	fw, err := portforward.NewOnAddressesForStreaming(dialer, opts.Address, opts.Ports, opts.StopChannel, opts.ReadyChannel, f.Out, f.ErrOut)
+	fw, err := portforward.NewOnAddresses(dialer, opts.Address, opts.Ports, opts.StopChannel, opts.ReadyChannel, f.Out, f.ErrOut)
 	if err != nil {
 		return err
 	}
@@ -411,6 +411,7 @@ func (o PortForwardOptions) Validate() error {
 }
 
 // Deprecated: Use RunPortForwardContext instead, which allows canceling.
+// RunPortForward implements all the necessary functionality for port-forward cmd.
 func (o PortForwardOptions) RunPortForward() error {
 	return o.RunPortForwardContext(context.Background())
 }

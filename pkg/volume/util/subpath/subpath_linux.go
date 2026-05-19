@@ -1,4 +1,5 @@
 //go:build linux
+// +build linux
 
 /*
 Copyright 2014 The Kubernetes Authors.
@@ -111,7 +112,7 @@ func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, strin
 		if !samePath {
 			// It's already mounted but not what we want, unmount it
 			if err = mounter.Unmount(bindPathTarget); err != nil {
-				return false, "", fmt.Errorf("error unmounting %s: %w", bindPathTarget, err)
+				return false, "", fmt.Errorf("error ummounting %s: %s", bindPathTarget, err)
 			}
 		} else {
 			// It's already mounted

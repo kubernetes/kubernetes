@@ -6,13 +6,12 @@ package tracetransform // import "go.opentelemetry.io/otel/exporters/otlp/otlptr
 import (
 	"math"
 
-	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
-
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/sdk/instrumentation"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 // Spans transforms a slice of OpenTelemetry spans into a slice of OTLP
@@ -113,7 +112,7 @@ func span(sd tracesdk.ReadOnlySpan) *tracepb.Span {
 	if psid := sd.Parent().SpanID(); psid.IsValid() {
 		s.ParentSpanId = psid[:]
 	}
-	s.Flags = buildSpanFlagsWith(sd.SpanContext().TraceFlags(), sd.Parent())
+	s.Flags = buildSpanFlags(sd.Parent())
 
 	return s
 }
@@ -155,11 +154,12 @@ func links(links []tracesdk.Link) []*tracepb.Span_Link {
 	for _, otLink := range links {
 		// This redefinition is necessary to prevent otLink.*ID[:] copies
 		// being reused -- in short we need a new otLink per iteration.
+		otLink := otLink
 
 		tid := otLink.SpanContext.TraceID()
 		sid := otLink.SpanContext.SpanID()
 
-		flags := buildSpanFlagsWith(otLink.SpanContext.TraceFlags(), otLink.SpanContext)
+		flags := buildSpanFlags(otLink.SpanContext)
 
 		sl = append(sl, &tracepb.Span_Link{
 			TraceId:                tid[:],
@@ -172,15 +172,13 @@ func links(links []tracesdk.Link) []*tracepb.Span_Link {
 	return sl
 }
 
-func buildSpanFlagsWith(tf trace.TraceFlags, parent trace.SpanContext) uint32 {
-	// Lower 8 bits are the W3C TraceFlags; always indicate that we know whether the parent is remote
-	flags := uint32(tf) | uint32(tracepb.SpanFlags_SPAN_FLAGS_CONTEXT_HAS_IS_REMOTE_MASK)
-	// Set the parent-is-remote bit when applicable
-	if parent.IsRemote() {
-		flags |= uint32(tracepb.SpanFlags_SPAN_FLAGS_CONTEXT_IS_REMOTE_MASK)
+func buildSpanFlags(sc trace.SpanContext) uint32 {
+	flags := tracepb.SpanFlags_SPAN_FLAGS_CONTEXT_HAS_IS_REMOTE_MASK
+	if sc.IsRemote() {
+		flags |= tracepb.SpanFlags_SPAN_FLAGS_CONTEXT_IS_REMOTE_MASK
 	}
 
-	return flags // nolint:gosec // Flags is a bitmask and can't be negative
+	return uint32(flags) // nolint:gosec // Flags is a bitmask and can't be negative
 }
 
 // spanEvents transforms span Events to an OTLP span events.
@@ -191,7 +189,7 @@ func spanEvents(es []tracesdk.Event) []*tracepb.Span_Event {
 
 	events := make([]*tracepb.Span_Event, len(es))
 	// Transform message events
-	for i := range es {
+	for i := 0; i < len(es); i++ {
 		events[i] = &tracepb.Span_Event{
 			Name:                   es[i].Name,
 			TimeUnixNano:           uint64(max(0, es[i].Time.UnixNano())), // nolint:gosec // Overflow checked.

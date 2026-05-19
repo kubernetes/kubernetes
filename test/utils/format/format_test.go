@@ -26,8 +26,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
-	_ "k8s.io/kubernetes/test/utils/ktesting/format" // Register YAML formatting.
 )
 
 func TestGomegaFormatObject(t *testing.T) {
@@ -37,7 +35,7 @@ func TestGomegaFormatObject(t *testing.T) {
 		indentation uint
 	}{
 		"int":            {value: 1, expected: `<int>: 1`},
-		"string":         {value: "hello world", expected: `<string>: hello world`},
+		"string":         {value: "hello world", expected: `<string>: "hello world"`},
 		"struct":         {value: myStruct{a: 1, b: 2}, expected: `<format_test.myStruct>: {a: 1, b: 2}`},
 		"gomegastringer": {value: typeWithGomegaStringer(2), expected: `<format_test.typeWithGomegaStringer>: my stringer 2`},
 		"pod": {value: v1.Pod{}, expected: `<v1.Pod>: 

@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/user"
-	peerproxymetrics "k8s.io/apiserver/pkg/util/peerproxy/metrics"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
@@ -52,7 +51,7 @@ const (
 )
 
 func (h *peerProxyHandler) RunPeerDiscoveryCacheSync(ctx context.Context, workers int) {
-	defer utilruntime.HandleCrashWithContext(ctx)
+	defer utilruntime.HandleCrash()
 	defer h.peerLeaseQueue.ShutDown()
 	defer func() {
 		err := h.apiserverIdentityInformer.Informer().RemoveEventHandler(h.leaseRegistration)
@@ -95,7 +94,6 @@ func (h *peerProxyHandler) syncPeerDiscoveryCache(ctx context.Context) error {
 	// Rebuild the peer discovery cache from available leases.
 	leases, err := h.apiserverIdentityInformer.Lister().List(h.identityLeaseLabelSelector)
 	if err != nil {
-		peerproxymetrics.IncPeerDiscoverySyncError(ctx, peerproxymetrics.DiscoveryErrorLeaseList)
 		utilruntime.HandleError(err)
 		return err
 	}
@@ -117,17 +115,28 @@ func (h *peerProxyHandler) syncPeerDiscoveryCache(ctx context.Context) error {
 		}
 	}
 
-	// Store unfiltered data to raw cache and trigger refilter.
-	// The refilter worker (single writer to filtered cache) will apply exclusions.
-	h.rawPeerDiscoveryCache.Store(newCache)
-	h.gvExclusionManager.TriggerRefilter()
+	// Apply exclusion filter to the cache.
+	if len(newCache) != 0 {
+		if filteredCache, peerDiscoveryChanged := h.filterPeerDiscoveryCache(newCache); peerDiscoveryChanged {
+			newCache = filteredCache
+		}
+	}
+
+	h.storePeerDiscoveryCacheAndInvalidate(newCache)
 	return fetchDiscoveryErr
+}
+
+// storePeerDiscoveryCacheAndInvalidate stores the new peer discovery cache and always calls the invalidation callback if set.
+func (h *peerProxyHandler) storePeerDiscoveryCacheAndInvalidate(newCache map[string]PeerDiscoveryCacheEntry) {
+	h.peerDiscoveryInfoCache.Store(newCache)
+	if callback := h.cacheInvalidationCallback.Load(); callback != nil {
+		(*callback)()
+	}
 }
 
 func (h *peerProxyHandler) fetchNewDiscoveryFor(ctx context.Context, serverID string) (PeerDiscoveryCacheEntry, error) {
 	hostport, err := h.hostportInfo(serverID)
 	if err != nil {
-		peerproxymetrics.IncPeerDiscoverySyncError(ctx, peerproxymetrics.DiscoveryErrorHostPortResolution)
 		return PeerDiscoveryCacheEntry{}, fmt.Errorf("failed to get host port info from identity lease for server %s: %w", serverID, err)
 	}
 
@@ -145,7 +154,6 @@ func (h *peerProxyHandler) fetchNewDiscoveryFor(ctx context.Context, serverID st
 	for _, path := range discoveryPaths {
 		discoveryResponse, discoveryErr = h.aggregateDiscovery(ctx, path, hostport)
 		if discoveryErr != nil {
-			peerproxymetrics.IncPeerDiscoverySyncError(ctx, peerproxymetrics.DiscoveryErrorFetch)
 			klog.ErrorS(discoveryErr, "error querying discovery endpoint for serverID", "path", path, "serverID", serverID)
 			continue
 		}
@@ -200,7 +208,7 @@ func (h *peerProxyHandler) aggregateDiscovery(ctx context.Context, path string, 
 	req.Header.Add("Accept", discovery.AcceptV2NoPeer+","+discovery.AcceptV2+","+discovery.AcceptV1)
 
 	writer := responsewriterutil.NewInMemoryResponseWriter()
-	h.proxyRequestToDestinationAPIServer(req, writer, hostport, schema.GroupVersionResource{})
+	h.proxyRequestToDestinationAPIServer(req, writer, hostport)
 	if writer.RespCode() != http.StatusOK {
 		return nil, fmt.Errorf("discovery request failed with status: %d", writer.RespCode())
 	}
@@ -279,8 +287,14 @@ func (h *peerProxyHandler) isValidPeerIdentityLease(obj interface{}) (*v1.Lease,
 
 func (h *peerProxyHandler) findServiceableByPeerFromPeerDiscoveryCache(gvr schema.GroupVersionResource) []string {
 	var serviceableByIDs []string
-	cacheMap := h.gvExclusionManager.GetFilteredPeerDiscoveryCache()
-	if len(cacheMap) == 0 {
+	cache := h.peerDiscoveryInfoCache.Load()
+	if cache == nil {
+		return serviceableByIDs
+	}
+
+	cacheMap, ok := cache.(map[string]PeerDiscoveryCacheEntry)
+	if !ok {
+		klog.Warning("Invalid cache type in peerDiscoveryInfoCache")
 		return serviceableByIDs
 	}
 

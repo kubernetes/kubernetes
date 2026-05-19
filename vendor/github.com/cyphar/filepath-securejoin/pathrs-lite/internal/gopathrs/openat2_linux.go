@@ -41,7 +41,6 @@ func openat2(dir fd.Fd, path string, how *unix.OpenHow) (*os.File, error) {
 			if err != nil {
 				return nil, err
 			}
-			_ = file.Close()
 			file = newFile
 		}
 	}

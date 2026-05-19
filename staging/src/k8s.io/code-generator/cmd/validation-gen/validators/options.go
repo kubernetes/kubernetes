@@ -36,11 +36,11 @@ func init() {
 
 type ifTagValidator struct {
 	enabled   bool
-	validator TagValidationExtractor
+	validator Validator
 }
 
 func (itv *ifTagValidator) Init(cfg Config) {
-	itv.validator = cfg.TagValidator
+	itv.validator = cfg.Validator
 }
 
 func (itv ifTagValidator) TagName() string {
@@ -65,32 +65,29 @@ func (itv ifTagValidator) GetValidations(context Context, tag codetags.Tag) (Val
 	if !ok {
 		return Validations{}, fmt.Errorf("missing required option name positional argument")
 	}
-
-	validations, err := itv.validator.ExtractTagValidations(context, *tag.ValueTag)
-	if err != nil {
+	result := Validations{}
+	if validations, err := itv.validator.ExtractValidations(context, *tag.ValueTag); err != nil {
 		return Validations{}, err
-	}
-
-	return WrapFunctions(validations, func(fn FunctionGen, scope DeferredScope) FunctionGen {
-		objType := context.Type
-		if scope == ParentContext {
-			objType = context.ParentType
+	} else {
+		for _, fn := range validations.Functions {
+			f := Function(itv.TagName(), fn.Flags, ifOption, optionArg.Value, itv.enabled, WrapperFunction{Function: fn, ObjType: context.Type})
+			result.Variables = append(result.Variables, validations.Variables...)
+			result.AddFunction(f)
 		}
-
-		return Function(itv.TagName(), fn.Flags, ifOption, optionArg.Value, itv.enabled, WrapperFunction{Function: fn, ObjType: objType})
-	}), nil
+		return result, nil
+	}
 }
 
 func (itv ifTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            itv.TagName(),
-		StabilityLevel: TagStabilityLevelBeta,
+		StabilityLevel: Alpha,
 		Args: []TagArgDoc{{
 			Description: "<option>",
 			Type:        codetags.ArgTypeString,
 			Required:    true,
 		}},
-		Scopes: sets.List(itv.ValidScopes()),
+		Scopes: itv.ValidScopes().UnsortedList(),
 	}
 
 	doc.PayloadsType = codetags.ValueTypeTag

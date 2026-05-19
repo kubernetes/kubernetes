@@ -22,7 +22,6 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/apiserver/pkg/storage/cacher/store"
 )
 
 // watchCacheInterval serves as an abstraction over a source
@@ -137,11 +136,11 @@ func (s sortableWatchCacheEvents) Swap(i, j int) {
 // returned by Next() need to be events from a List() done on the underlying store of
 // the watch cache.
 // The items returned in the interval will be sorted by Key.
-func newCacheIntervalFromStore(resourceVersion uint64, indexer store.Indexer, key string, matchesSingle bool) (*watchCacheInterval, error) {
+func newCacheIntervalFromStore(resourceVersion uint64, store storeIndexer, key string, matchesSingle bool) (*watchCacheInterval, error) {
 	buffer := &watchCacheIntervalBuffer{}
 	var allItems []interface{}
 	if matchesSingle {
-		item, exists, err := indexer.GetByKey(key)
+		item, exists, err := store.GetByKey(key)
 		if err != nil {
 			return nil, err
 		}
@@ -150,11 +149,11 @@ func newCacheIntervalFromStore(resourceVersion uint64, indexer store.Indexer, ke
 			allItems = append(allItems, item)
 		}
 	} else {
-		allItems = indexer.List()
+		allItems = store.List()
 	}
 	buffer.buffer = make([]*watchCacheEvent, len(allItems))
 	for i, item := range allItems {
-		elem, ok := item.(*store.Element)
+		elem, ok := item.(*storeElement)
 		if !ok {
 			return nil, fmt.Errorf("not a storeElement: %v", elem)
 		}
@@ -168,9 +167,7 @@ func newCacheIntervalFromStore(resourceVersion uint64, indexer store.Indexer, ke
 		}
 		buffer.endIndex++
 	}
-	if _, ordered := indexer.(store.OrderedLister); !ordered {
-		sort.Sort(sortableWatchCacheEvents(buffer.buffer))
-	}
+	sort.Sort(sortableWatchCacheEvents(buffer.buffer))
 	ci := &watchCacheInterval{
 		startIndex: 0,
 		// Simulate that we already have all the events we're looking for.

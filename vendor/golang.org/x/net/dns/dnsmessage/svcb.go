@@ -5,7 +5,9 @@
 package dnsmessage
 
 import (
+	"math"
 	"slices"
+	"strings"
 )
 
 // An SVCBResource is an SVCB Resource record.
@@ -21,18 +23,19 @@ func (r *SVCBResource) realType() Type {
 
 // GoString implements fmt.GoStringer.GoString.
 func (r *SVCBResource) GoString() string {
-	b := []byte("dnsmessage.SVCBResource{" +
-		"Priority: " + printUint16(r.Priority) + ", " +
-		"Target: " + r.Target.GoString() + ", " +
-		"Params: []dnsmessage.SVCParam{")
+	var b strings.Builder
+	b.WriteString("dnsmessage.SVCBResource{")
+	b.WriteString("Priority: " + printUint16(r.Priority) + ", ")
+	b.WriteString("Target: " + r.Target.GoString() + ", ")
+	b.WriteString("Params: []dnsmessage.SVCParam{")
 	if len(r.Params) > 0 {
-		b = append(b, r.Params[0].GoString()...)
+		b.WriteString(r.Params[0].GoString())
 		for _, p := range r.Params[1:] {
-			b = append(b, ", "+p.GoString()...)
+			b.WriteString(", " + p.GoString())
 		}
 	}
-	b = append(b, "}}"...)
-	return string(b)
+	b.WriteString("}}")
+	return b.String()
 }
 
 // An HTTPSResource is an HTTPS Resource record.
@@ -173,7 +176,7 @@ func (r *SVCBResource) pack(msg []byte, _ map[string]uint16, _ int) ([]byte, err
 		if i > 0 && param.Key <= previousKey {
 			return oldMsg, &nestedError{"SVCBResource.Params", errParamOutOfOrder}
 		}
-		if len(param.Value) > (1<<16)-1 {
+		if len(param.Value) > math.MaxUint16 {
 			return oldMsg, &nestedError{"SVCBResource.Params", errTooLongSVCBValue}
 		}
 		msg = packUint16(msg, uint16(param.Key))

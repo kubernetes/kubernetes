@@ -1,4 +1,5 @@
 //go:build linux
+// +build linux
 
 /*
 Copyright 2016 The Kubernetes Authors.
@@ -59,8 +60,8 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/framework/debug/init"
 	_ "k8s.io/kubernetes/test/e2e/framework/metrics/init"
 	_ "k8s.io/kubernetes/test/e2e/framework/node/init"
+	_ "k8s.io/kubernetes/test/utils/format"
 	"k8s.io/kubernetes/test/utils/ktesting"
-	_ "k8s.io/kubernetes/test/utils/ktesting/format"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -251,7 +252,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func(ctx context.Context) []byte {
 
 	if framework.TestContext.CriProxyEnabled {
 		framework.Logf("Start cri proxy")
-		rs, is, err := getCRIClient(ctx)
+		rs, is, err := getCRIClient()
 		framework.ExpectNoError(err)
 
 		e2eCriProxy = criproxy.NewRemoteRuntimeProxy(rs, is)

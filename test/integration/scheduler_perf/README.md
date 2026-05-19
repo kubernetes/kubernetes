@@ -33,7 +33,7 @@ Currently the test suite has the following:
 
 ```shell
 # In Kubernetes root path
-make test-integration WHAT=./test/integration/scheduler_perf/... KUBE_CACHE_MUTATION_DETECTOR=false KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" FULL_LOG=y ARTIFACTS=/tmp SHORT=-short=false KUBE_TEST_ARGS='-run=^$ -benchtime=1x -bench=BenchmarkPerfScheduling'
+make test-integration WHAT=./test/integration/scheduler_perf/... KUBE_CACHE_MUTATION_DETECTOR=false KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" FULL_LOG=y ARTIFACTS=/tmp SHORT=-short=false KUBE_TEST_ARGS='-run=^$ -benchtime=1ns -bench=BenchmarkPerfScheduling'
 ```
 
 The output can used for [`benchstat`](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat)
@@ -51,7 +51,7 @@ a comma-separated list of label names. Each label may have a `+` or `-` as prefi
 be set. For example, this runs all performance benchmarks except those that are labeled
 as "integration-test":
 ```shell
-make test-integration WHAT=./test/integration/scheduler_perf/... KUBE_CACHE_MUTATION_DETECTOR=false KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" SHORT=-short=false ARTIFACTS=/tmp FULL_LOG=y KUBE_TEST_ARGS='-run=^$ -benchtime=1x -bench=BenchmarkPerfScheduling -perf-scheduling-label-filter=performance,-integration-test'
+make test-integration WHAT=./test/integration/scheduler_perf/... KUBE_CACHE_MUTATION_DETECTOR=false KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" SHORT=-short=false ARTIFACTS=/tmp FULL_LOG=y KUBE_TEST_ARGS='-run=^$ -benchtime=1ns -bench=BenchmarkPerfScheduling -perf-scheduling-label-filter=performance,-integration-test'
 ```
 
 Once the benchmark is finished, JSON files with metrics are available in the subdirectories (`test/integration/scheduler_perf/config/<topic>`). 
@@ -60,21 +60,19 @@ You can use `-data-items-dir` to generate the metrics files elsewhere.
 
 In case you want to run a specific test in the suite, you can specify the test through `-bench` flag:
 
-Also, bench time is explicitly set to run each test only once (`-benchtime=1x` flag).
+Also, bench time is explicitly set to 1ns (`-benchtime=1ns` flag) so each test is run only once.
 Otherwise, the golang benchmark framework will try to run a test more than once in case it ran for less than 1s.
 
 ```shell
 # In Kubernetes root path
-make test-integration WHAT=./test/integration/scheduler_perf/... KUBE_CACHE_MUTATION_DETECTOR=false KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" SHORT=-short=false ARTIFACTS=/tmp FULL_LOG=y KUBE_TEST_ARGS='-run=^$ -benchtime=1x -bench=BenchmarkPerfScheduling/SchedulingBasic/5000Nodes/5000InitPods/1000PodsToSchedule'
+make test-integration WHAT=./test/integration/scheduler_perf/... KUBE_CACHE_MUTATION_DETECTOR=false KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" SHORT=-short=false ARTIFACTS=/tmp FULL_LOG=y KUBE_TEST_ARGS='-run=^$ -benchtime=1ns -bench=BenchmarkPerfScheduling/SchedulingBasic/5000Nodes/5000InitPods/1000PodsToSchedule'
 ```
-
-To run a test with profiler you need to target a specific package directory as `go test` does not support profiling across multiple packages.
 
 To produce a cpu profile:
 
 ```shell
 # In Kubernetes root path
-make test-integration WHAT=./test/integration/scheduler_perf/misc KUBE_CACHE_MUTATION_DETECTOR=false KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" FULL_LOG=y ARTIFACTS=/tmp SHORT=-short=false KUBE_TEST_ARGS='-run=^$ -benchtime=1x -bench=BenchmarkPerfScheduling -cpuprofile ~/cpu-profile.out'
+make test-integration WHAT=./test/integration/scheduler_perf/... KUBE_CACHE_MUTATION_DETECTOR=false KUBE_TIMEOUT=-timeout=1h ETCD_LOGLEVEL=warn KUBE_TEST_VMODULE="''" FULL_LOG=y ARTIFACTS=/tmp SHORT=-short=false KUBE_TEST_ARGS='-run=^$ -benchtime=1ns -bench=BenchmarkPerfScheduling -cpuprofile ~/cpu-profile.out'
 ```
 
 Here some explanations for those parameters:
@@ -167,15 +165,14 @@ Most test cases have a threshold set for the largest `performance` workloads.
 By default, these are defined for the `Average` statistic of the `SchedulingThroughput` metric. 
 It is possible to use other metric by configuring `thresholdMetricSelector` per test case or workload. 
 
-If the actual metric value is below the threshold, the test will fail.
-
 ### How to calculate the threshold
 
-The current values for scheduling throughput thresholds were calculated through an analysis of historical data, taking the minimum average value from the most recent 250 test runs.
-
-It's important to note that any test failure will result in a workflow failure,
-and consecutive workflow failures will raise an alert.
-Our goal is to set the thresholds somewhat pessimistically to minimize flakiness.
+The initial values for scheduling throughput thresholds were calculated through an analysis of historical data, 
+specifically focusing on the minimum, average, and standard deviation values for each workload 
+(see [#126871](https://github.com/kubernetes/kubernetes/pull/126871)). 
+Our goal is to set the thresholds somewhat pessimistically to minimize flakiness, 
+so it's recommended to set the threshold slightly below the observed historical minimum. 
+Depending on variability of data, the threshold can be lowered more. 
 
 Thresholds should be adjusted based on the flakiness level and minima observed in the future. 
 Remember to set the value for newly added test cases as well, 

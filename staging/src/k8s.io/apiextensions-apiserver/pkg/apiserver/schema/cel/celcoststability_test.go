@@ -1235,9 +1235,12 @@ func TestCelCostStability(t *testing.T) {
 	}
 
 	for _, tt := range cases {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			for validRule, expectedCost := range tt.expectCost {
+				validRule := validRule
+				expectedCost := expectedCost
 				testName := validRule
 				if len(testName) > 127 {
 					testName = testName[:127]
@@ -2090,9 +2093,12 @@ func TestCelEstimatedCostStability(t *testing.T) {
 	}
 
 	for _, tt := range cases {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			for validRule, expectedCost := range tt.expectCost {
+				validRule := validRule
+				expectedCost := expectedCost
 				testName := validRule
 				if len(testName) > 127 {
 					testName = testName[:127]

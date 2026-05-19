@@ -26,7 +26,7 @@ import (
 // each exec credential provider. Kubelet reads this configuration from disk and enables
 // each provider as specified by the CredentialProvider type.
 type CredentialProviderConfig struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 
 	// providers is a list of credential provider plugins that will be enabled by the kubelet.
 	// Multiple providers may match against a single image, in which case credentials
@@ -101,7 +101,7 @@ type ExecEnvVar struct {
 //
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ImagePullIntent struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 
 	// Image is the image spec from a Container's `image` field.
 	// The filename is a SHA-256 hash of this value. This is to avoid filename-unsafe
@@ -117,7 +117,7 @@ type ImagePullIntent struct {
 //
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ImagePulledRecord struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 
 	// LastUpdatedTime is the time of the last update to this record
 	LastUpdatedTime metav1.Time `json:"lastUpdatedTime"`

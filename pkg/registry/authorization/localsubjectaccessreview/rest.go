@@ -25,17 +25,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 	authorizationvalidation "k8s.io/kubernetes/pkg/apis/authorization/validation"
 	authorizationutil "k8s.io/kubernetes/pkg/registry/authorization/util"
 )
 
 type REST struct {
-	authorizer authorizer.UnconditionalAuthorizer
+	authorizer authorizer.Authorizer
 }
 
-func NewREST(authorizer authorizer.UnconditionalAuthorizer) *REST {
+func NewREST(authorizer authorizer.Authorizer) *REST {
 	return &REST{authorizer}
 }
 
@@ -63,6 +65,13 @@ func (r *REST) Create(ctx context.Context, obj runtime.Object, createValidation 
 	localSubjectAccessReview, ok := obj.(*authorizationapi.LocalSubjectAccessReview)
 	if !ok {
 		return nil, apierrors.NewBadRequest(fmt.Sprintf("not a LocaLocalSubjectAccessReview: %#v", obj))
+	}
+	// clear fields if the featuregate is disabled
+	if !utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AuthorizeWithSelectors) {
+		if localSubjectAccessReview.Spec.ResourceAttributes != nil {
+			localSubjectAccessReview.Spec.ResourceAttributes.FieldSelector = nil
+			localSubjectAccessReview.Spec.ResourceAttributes.LabelSelector = nil
+		}
 	}
 
 	if errs := authorizationvalidation.ValidateLocalSubjectAccessReview(localSubjectAccessReview); len(errs) > 0 {

@@ -17,10 +17,10 @@
 REGISTRY ?= staging-k8s.gcr.io
 IMAGE = $(REGISTRY)/pause
 
-TAG ?= 3.10.2
+TAG ?= 3.10.1
 REV = $(shell git describe --contains --always --match='v*')
 
-# Architectures supported: amd64, arm64, ppc64le and s390x
+# Architectures supported: amd64, arm, arm64, ppc64le and s390x
 ARCH ?= amd64
 # Operating systems supported: linux, windows
 OS ?= linux
@@ -32,13 +32,13 @@ OUTPUT_TYPE ?= docker
 BASE.linux := scratch
 # Source for windows pause image base is located at https://github.com/microsoft/windows-pause-image-base
 # BASE.windows includes separate manifests per os.version.
-BASE.windows := mcr.microsoft.com/oss/v2/kubernetes/windows-pause-image-base:v0.4.1@sha256:ba474944e82cac8913e0a402c7727c35d469977026b636bf460f0d52112c4e4f
+BASE.windows := mcr.microsoft.com/oss/kubernetes/windows-pause-image-base:v0.4.1@sha256:37cc10768383b55611d724a05eb18564cb5184c89b0c2faa7d4eff63475092df
 BASE := ${BASE.${OS}}
 
 JQ_IMAGE := ghcr.io/jqlang/jq@sha256:a186dcd84a1e28bb48cdf3d7768b890d08621a87bb651fadb7db6815a6bf5ad5
 
 ALL_OS = linux windows
-ALL_ARCH.linux = amd64 arm64 ppc64le s390x
+ALL_ARCH.linux = amd64 arm arm64 ppc64le s390x
 ALL_OS_ARCH.linux = $(foreach arch, ${ALL_ARCH.linux}, linux-$(arch))
 ALL_ARCH.windows = amd64
 # ALL_OSVERSIONS lists all os.versions in BASE.windows.
@@ -69,6 +69,7 @@ export DOCKER_CLI_EXPERIMENTAL=enabled
 
 TRIPLE.windows-amd64 := x86_64-w64-mingw32
 TRIPLE.linux-amd64 := x86_64-linux-gnu
+TRIPLE.linux-arm := arm-linux-gnueabihf
 TRIPLE.linux-arm64 := aarch64-linux-gnu
 TRIPLE.linux-ppc64le := powerpc64le-linux-gnu
 TRIPLE.linux-s390x := s390x-linux-gnu
@@ -123,7 +124,7 @@ bin/wincat-windows-${ARCH}: windows/wincat/wincat.go
 
 container: .container-${OS}-$(ARCH)
 .container-linux-$(ARCH): bin/$(BIN)-$(OS)-$(ARCH)
-	docker buildx build --pull --output=type=${OUTPUT_TYPE} --platform ${OS}/$(ARCH) \
+	docker buildx build --provenance=false --sbom=false --pull --output=type=${OUTPUT_TYPE} --platform ${OS}/$(ARCH) \
 		-t $(IMAGE):$(TAG)-${OS}-$(ARCH) --build-arg BASE=${BASE} --build-arg ARCH=$(ARCH) .
 	touch $@
 

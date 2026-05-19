@@ -125,23 +125,20 @@ func (b *dnsBuilder) Build(target resolver.Target, cc resolver.ClientConn, opts 
 	// IP address.
 	if ipAddr, err := formatIP(host); err == nil {
 		addr := []resolver.Address{{Addr: ipAddr + ":" + port}}
-		cc.UpdateState(resolver.State{
-			Addresses: addr,
-			Endpoints: []resolver.Endpoint{{Addresses: addr}},
-		})
+		cc.UpdateState(resolver.State{Addresses: addr})
 		return deadResolver{}, nil
 	}
 
 	// DNS address (non-IP).
 	ctx, cancel := context.WithCancel(context.Background())
 	d := &dnsResolver{
-		host:                host,
-		port:                port,
-		ctx:                 ctx,
-		cancel:              cancel,
-		cc:                  cc,
-		rn:                  make(chan struct{}, 1),
-		enableServiceConfig: envconfig.EnableTXTServiceConfig && !opts.DisableServiceConfig,
+		host:                 host,
+		port:                 port,
+		ctx:                  ctx,
+		cancel:               cancel,
+		cc:                   cc,
+		rn:                   make(chan struct{}, 1),
+		disableServiceConfig: opts.DisableServiceConfig,
 	}
 
 	d.resolver, err = internal.NewNetResolver(target.URL.Host)
@@ -184,8 +181,8 @@ type dnsResolver struct {
 	// finishes, race detector sometimes will warn lookup (READ the lookup
 	// function pointers) inside watcher() goroutine has data race with
 	// replaceNetFunc (WRITE the lookup function pointers).
-	wg                  sync.WaitGroup
-	enableServiceConfig bool
+	wg                   sync.WaitGroup
+	disableServiceConfig bool
 }
 
 // ResolveNow invoke an immediate resolution of the target that this
@@ -345,19 +342,11 @@ func (d *dnsResolver) lookup() (*resolver.State, error) {
 		return nil, hostErr
 	}
 
-	eps := make([]resolver.Endpoint, 0, len(addrs))
-	for _, addr := range addrs {
-		eps = append(eps, resolver.Endpoint{Addresses: []resolver.Address{addr}})
-	}
-
-	state := resolver.State{
-		Addresses: addrs,
-		Endpoints: eps,
-	}
+	state := resolver.State{Addresses: addrs}
 	if len(srv) > 0 {
 		state = grpclbstate.Set(state, &grpclbstate.State{BalancerAddresses: srv})
 	}
-	if d.enableServiceConfig {
+	if !d.disableServiceConfig {
 		state.ServiceConfig = d.lookupTXT(ctx)
 	}
 	return &state, nil

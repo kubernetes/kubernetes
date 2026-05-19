@@ -25,14 +25,10 @@ import (
 )
 
 const (
-	// Deprecated: UnknownLeader is only used by MultiLock, which is deprecated.
 	UnknownLeader = "leaderelection.k8s.io/unknown"
 )
 
-// Deprecated: MultiLock was used to facilitate migration from non-lease
-// based leader election to lease-based leader election. Support for
-// non-lease locks was removed in Kubernetes 1.28, making MultiLock
-// non-functional. Use LeaseLock directly instead.
+// MultiLock is used for lock's migration
 type MultiLock struct {
 	Primary   Interface
 	Secondary Interface
@@ -103,7 +99,6 @@ func (ml *MultiLock) Identity() string {
 	return ml.Primary.Identity()
 }
 
-// Deprecated: ConcatRawRecord is only used by MultiLock, which is deprecated.
 func ConcatRawRecord(primaryRaw, secondaryRaw []byte) []byte {
 	return bytes.Join([][]byte{primaryRaw, secondaryRaw}, []byte(","))
 }

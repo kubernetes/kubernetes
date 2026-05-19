@@ -17,7 +17,6 @@ limitations under the License.
 package openapiv3
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -73,35 +72,26 @@ func NewAggregationController(openAPIAggregationManager aggregator.SpecProxier) 
 	return c
 }
 
-// Run is a legacy wrapper that starts the controller.
-//
-//logcheck:context // RunWithContext should be used instead of Run in code which supports contextual logging.
+// Run starts OpenAPI AggregationController
 func (c *AggregationController) Run(stopCh <-chan struct{}) {
-	c.RunWithContext(wait.ContextForChannel(stopCh))
-}
-
-// RunWithContext starts OpenAPI V3 AggregationController and blocks until the context is cancelled.
-func (c *AggregationController) RunWithContext(ctx context.Context) {
-	defer utilruntime.HandleCrashWithContext(ctx)
+	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	logger := klog.FromContext(ctx)
-	logger.Info("Starting OpenAPI V3 AggregationController")
-	defer logger.Info("Shutting down OpenAPI V3 AggregationController")
+	klog.Info("Starting OpenAPI V3 AggregationController")
+	defer klog.Info("Shutting down OpenAPI V3 AggregationController")
 
-	go wait.UntilWithContext(ctx, c.runWorker, time.Second)
+	go wait.Until(c.runWorker, time.Second, stopCh)
 
-	<-ctx.Done()
+	<-stopCh
 }
 
-func (c *AggregationController) runWorker(ctx context.Context) {
-	logger := klog.FromContext(ctx)
-	for c.processNextWorkItem(logger) {
+func (c *AggregationController) runWorker() {
+	for c.processNextWorkItem() {
 	}
 }
 
 // processNextWorkItem deals with one key off the queue.  It returns false when it's time to quit.
-func (c *AggregationController) processNextWorkItem(logger klog.Logger) bool {
+func (c *AggregationController) processNextWorkItem() bool {
 	key, quit := c.queue.Get()
 	defer c.queue.Done(key)
 	if quit {
@@ -111,9 +101,9 @@ func (c *AggregationController) processNextWorkItem(logger klog.Logger) bool {
 	if aggregator.IsLocalAPIService(key) {
 		// for local delegation targets that are aggregated once per second, log at
 		// higher level to avoid flooding the log
-		logger.V(6).Info("OpenAPI AggregationController: Processing item", "key", key)
+		klog.V(6).Infof("OpenAPI AggregationController: Processing item %s", key)
 	} else {
-		logger.V(4).Info("OpenAPI AggregationController: Processing item", "key", key)
+		klog.V(4).Infof("OpenAPI AggregationController: Processing item %s", key)
 	}
 
 	action, err := c.syncHandler(key)
@@ -126,17 +116,17 @@ func (c *AggregationController) processNextWorkItem(logger klog.Logger) bool {
 	switch action {
 	case syncRequeue:
 		if aggregator.IsLocalAPIService(key) {
-			logger.V(7).Info("OpenAPI AggregationController: action for local item: Requeue", "key", key, "duration", successfulUpdateDelayLocal)
+			klog.V(7).Infof("OpenAPI AggregationController: action for local item %s: Requeue after %s.", key, successfulUpdateDelayLocal)
 			c.queue.AddAfter(key, successfulUpdateDelayLocal)
 		} else {
-			logger.V(7).Info("OpenAPI AggregationController: action for item: Requeue", "key", key)
+			klog.V(7).Infof("OpenAPI AggregationController: action for item %s: Requeue.", key)
 			c.queue.AddAfter(key, successfulUpdateDelay)
 		}
 	case syncRequeueRateLimited:
-		logger.Info("OpenAPI AggregationController: action for item: Rate Limited Requeue", "key", key)
+		klog.Infof("OpenAPI AggregationController: action for item %s: Rate Limited Requeue.", key)
 		c.queue.AddRateLimited(key)
 	case syncNothing:
-		logger.Info("OpenAPI AggregationController: action for item: Nothing (removed from the queue)", "key", key)
+		klog.Infof("OpenAPI AggregationController: action for item %s: Nothing (removed from the queue).", key)
 	}
 
 	return true

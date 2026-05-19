@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"sync"
 )
 
 // This file allows the user to collect statistics about the runtime of the ANTLR runtime. It is not enabled by default
@@ -29,7 +30,7 @@ type goRunStats struct {
 	// within this package.
 	//
 	jStats            []*JStatRec
-	jStatsLock        RWMutex
+	jStatsLock        sync.RWMutex
 	topN              int
 	topNByMax         []*JStatRec
 	topNByUsed        []*JStatRec

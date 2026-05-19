@@ -166,17 +166,9 @@ type attrFactory struct {
 // The namespaceNames represent the names the variable could have based on namespace
 // resolution rules.
 func (r *attrFactory) AbsoluteAttribute(id int64, names ...string) NamespacedAttribute {
-	disambiguateNames := false
-	for idx, name := range names {
-		if strings.HasPrefix(name, ".") {
-			disambiguateNames = true
-			names[idx] = strings.TrimPrefix(name, ".")
-		}
-	}
 	return &absoluteAttribute{
 		id:                     id,
 		namespaceNames:         names,
-		disambiguateNames:      disambiguateNames,
 		qualifiers:             []Qualifier{},
 		adapter:                r.adapter,
 		provider:               r.provider,
@@ -201,19 +193,10 @@ func (r *attrFactory) ConditionalAttribute(id int64, expr Interpretable, t, f At
 // MaybeAttribute collects variants of unchecked AbsoluteAttribute values which could either be
 // direct variable accesses or some combination of variable access with qualification.
 func (r *attrFactory) MaybeAttribute(id int64, name string) Attribute {
-	var names []string
-	// When there's a single name with a dot prefix, it indicates that the 'maybe' attribute is a
-	// globally namespaced identifier.
-	if strings.HasPrefix(name, ".") {
-		names = append(names, name)
-	} else {
-		// In all other cases, the candidate names should be inferred.
-		names = r.container.ResolveCandidateNames(name)
-	}
 	return &maybeAttribute{
 		id: id,
 		attrs: []NamespacedAttribute{
-			r.AbsoluteAttribute(id, names...),
+			r.AbsoluteAttribute(id, r.container.ResolveCandidateNames(name)...),
 		},
 		adapter:  r.adapter,
 		provider: r.provider,
@@ -259,13 +242,10 @@ type absoluteAttribute struct {
 	// namespaceNames represent the names the variable could have based on declared container
 	// (package) of the expression.
 	namespaceNames []string
-	// disambiguateNames indicates whether the namespaceNames require disambiguation with local variables.
-	disambiguateNames bool
-
-	qualifiers []Qualifier
-	adapter    types.Adapter
-	provider   types.Provider
-	fac        AttributeFactory
+	qualifiers     []Qualifier
+	adapter        types.Adapter
+	provider       types.Provider
+	fac            AttributeFactory
 
 	errorOnBadPresenceTest bool
 }
@@ -324,34 +304,15 @@ func (a *absoluteAttribute) String() string {
 // a type, then the result is `nil`, `error` with the error indicating the name of the first
 // variable searched as missing.
 func (a *absoluteAttribute) Resolve(vars Activation) (any, error) {
-	// unwrap any local activations to ensure that we reach the variables provided as input
-	// to the expression in the event that we need to disambiguate between global and local
-	// variables.
-	//
-	// Presently, only dynamic and constant slot activations created during comprehensions
-	// support 'unwrapping', which is consistent with how local variables are introduced into CEL.
-	var inputVars Activation
-	if a.disambiguateNames {
-		inputVars = vars
-		wrapped, ok := inputVars.(activationWrapper)
-		for ok {
-			inputVars = wrapped.Unwrap()
-			wrapped, ok = inputVars.(activationWrapper)
-		}
-	}
 	for _, nm := range a.namespaceNames {
 		// If the variable is found, process it. Otherwise, wait until the checks to
 		// determine whether the type is unknown before returning.
-		v := vars
-		if a.disambiguateNames {
-			v = inputVars
-		}
-		obj, found := v.ResolveName(nm)
+		obj, found := vars.ResolveName(nm)
 		if found {
 			if celErr, ok := obj.(*types.Err); ok {
 				return nil, celErr.Unwrap()
 			}
-			obj, isOpt, err := applyQualifiers(v, obj, a.qualifiers)
+			obj, isOpt, err := applyQualifiers(vars, obj, a.qualifiers)
 			if err != nil {
 				return nil, err
 			}

@@ -54,7 +54,7 @@ func (d *flexVolumeDetacher) UnmountDevice(deviceMountPath string) error {
 
 	pathExists, pathErr := mount.PathExists(deviceMountPath)
 	if !pathExists {
-		klog.Warningf("Unmount skipped because path does not exist: %v", deviceMountPath)
+		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", deviceMountPath)
 		return nil
 	}
 	if pathErr != nil && !mount.IsCorruptedMnt(pathErr) {
@@ -71,7 +71,7 @@ func (d *flexVolumeDetacher) UnmountDevice(deviceMountPath string) error {
 	}
 
 	if notmnt {
-		klog.Warningf("Path %v already unmounted", deviceMountPath)
+		klog.Warningf("Warning: Path: %v already unmounted", deviceMountPath)
 	} else {
 		call := d.plugin.NewDriverCall(unmountDeviceCmd)
 		call.Append(deviceMountPath)

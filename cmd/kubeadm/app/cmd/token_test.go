@@ -18,7 +18,6 @@ package cmd
 
 import (
 	"bytes"
-	_ "embed"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -39,10 +38,29 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
-//go:embed testdata/token-config.yaml
-var testConfigToken string
-
-const tokenExpectedRegex = "^\\S{6}\\.\\S{16}\n$"
+const (
+	tokenExpectedRegex = "^\\S{6}\\.\\S{16}\n$"
+	testConfigToken    = `apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data:
+    server: localhost:8000
+  name: prod
+contexts:
+- context:
+    cluster: prod
+    namespace: default
+    user: default-service-account
+  name: default
+current-context: default
+kind: Config
+users:
+- name: kubernetes-admin
+  user:
+    client-certificate-data:
+    client-key-data:
+`
+)
 
 func TestRunGenerateToken(t *testing.T) {
 	var buf bytes.Buffer

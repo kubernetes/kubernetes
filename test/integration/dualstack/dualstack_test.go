@@ -240,6 +240,7 @@ func TestCreateServiceSingleStackIPv4(t *testing.T) {
 				}
 
 				for i, tc := range testcases {
+					tc := tc
 					t.Run(tc.name, func(t *testing.T) {
 
 						svc := &v1.Service{
@@ -482,6 +483,7 @@ func TestCreateServiceSingleStackIPv6(t *testing.T) {
 				}
 
 				for i, tc := range testcases {
+					tc := tc
 					t.Run(tc.name, func(t *testing.T) {
 
 						svc := &v1.Service{
@@ -761,6 +763,7 @@ func TestCreateServiceDualStackIPv4IPv6(t *testing.T) {
 				}
 
 				for i, tc := range testcases {
+					tc := tc
 					t.Run(tc.name, func(t *testing.T) {
 
 						svc := &v1.Service{
@@ -1008,6 +1011,7 @@ func TestCreateServiceDualStackIPv6IPv4(t *testing.T) {
 				}
 
 				for i, tc := range testcases {
+					tc := tc
 					t.Run(tc.name, func(t *testing.T) {
 
 						svc := &v1.Service{

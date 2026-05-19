@@ -13,6 +13,7 @@
 // limitations under the License.
 
 //go:build !windows
+// +build !windows
 
 // Package journal provides write bindings to the local systemd journal.
 // It is implemented in pure Go and connects to the journal directly over its
@@ -30,6 +31,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"os"
 	"strconv"
@@ -106,7 +108,7 @@ func fdIsJournalStream(fd int) (bool, error) {
 	var expectedStat syscall.Stat_t
 	_, err := fmt.Sscanf(journalStream, "%d:%d", &expectedStat.Dev, &expectedStat.Ino)
 	if err != nil {
-		return false, fmt.Errorf("failed to parse JOURNAL_STREAM=%q: %w", journalStream, err)
+		return false, fmt.Errorf("failed to parse JOURNAL_STREAM=%q: %v", journalStream, err)
 	}
 
 	var stat syscall.Stat_t
@@ -192,7 +194,7 @@ func appendVariable(w io.Writer, name, value string) {
 		 * - the data, followed by a newline
 		 */
 		fmt.Fprintln(w, name)
-		_ = binary.Write(w, binary.LittleEndian, uint64(len(value)))
+		binary.Write(w, binary.LittleEndian, uint64(len(value)))
 		fmt.Fprintln(w, value)
 	} else {
 		/* just write the variable and value all on one line */
@@ -212,7 +214,7 @@ func validVarName(name string) error {
 	}
 
 	for _, c := range name {
-		if ('A' > c || c > 'Z') && ('0' > c || c > '9') && c != '_' {
+		if !(('A' <= c && c <= 'Z') || ('0' <= c && c <= '9') || c == '_') {
 			return errors.New("Variable name contains invalid characters")
 		}
 	}
@@ -237,7 +239,7 @@ func isSocketSpaceError(err error) bool {
 
 // tempFd creates a temporary, unlinked file under `/dev/shm`.
 func tempFd() (*os.File, error) {
-	file, err := os.CreateTemp("/dev/shm/", "journal.XXXXX")
+	file, err := ioutil.TempFile("/dev/shm/", "journal.XXXXX")
 	if err != nil {
 		return nil, err
 	}

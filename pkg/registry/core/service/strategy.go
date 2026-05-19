@@ -28,26 +28,27 @@ import (
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
-	"k8s.io/apiserver/pkg/registry/rest"
 	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	serviceapi "k8s.io/kubernetes/pkg/api/service"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // svcStrategy implements behavior for Services
 type svcStrategy struct {
-	rest.DeclarativeValidation
+	runtime.ObjectTyper
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Services
 // objects via the REST API.
-var Strategy = svcStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
+var Strategy = svcStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped is true for services.
 func (svcStrategy) NamespaceScoped() bool {
@@ -100,7 +101,7 @@ func (svcStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []s
 func (svcStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (svcStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
+func (svcStrategy) AllowCreateOnUpdate() bool {
 	return true
 }
 
@@ -114,7 +115,7 @@ func (svcStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object
 	return serviceapi.GetWarningsForService(obj.(*api.Service), old.(*api.Service))
 }
 
-func (svcStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+func (svcStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
@@ -124,7 +125,13 @@ func (svcStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 //	if !utilfeature.DefaultFeatureGate.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
 //	    newSvc.Spec.MyFeature = nil
 //	}
-func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {}
+func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
+	// Drop condition for TrafficDistribution field.
+	isTrafficDistributionInUse := (oldSvc != nil && oldSvc.Spec.TrafficDistribution != nil)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceTrafficDistribution) && !isTrafficDistributionInUse {
+		newSvc.Spec.TrafficDistribution = nil
+	}
+}
 
 type serviceStatusStrategy struct {
 	svcStrategy

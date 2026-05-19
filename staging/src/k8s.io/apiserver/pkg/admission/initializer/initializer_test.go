@@ -115,12 +115,10 @@ var _ initializer.WantsExternalKubeClientSet = &WantExternalKubeClientSet{}
 
 // WantAuthorizerAdmission is a test stub that fulfills the WantsAuthorizer interface.
 type WantAuthorizerAdmission struct {
-	auth authorizer.UnconditionalAuthorizer
+	auth authorizer.Authorizer
 }
 
-func (self *WantAuthorizerAdmission) SetUnconditionalAuthorizer(a authorizer.UnconditionalAuthorizer) {
-	self.auth = a
-}
+func (self *WantAuthorizerAdmission) SetAuthorizer(a authorizer.Authorizer) { self.auth = a }
 func (self *WantAuthorizerAdmission) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	return nil
 }
@@ -128,7 +126,7 @@ func (self *WantAuthorizerAdmission) Handles(o admission.Operation) bool { retur
 func (self *WantAuthorizerAdmission) ValidateInitialization() error      { return nil }
 
 var _ admission.Interface = &WantAuthorizerAdmission{}
-var _ initializer.WantsUnconditionalAuthorizer = &WantAuthorizerAdmission{}
+var _ initializer.WantsAuthorizer = &WantAuthorizerAdmission{}
 
 // WantDrainedNotification is a test stub that filfills the WantsDrainedNotification interface.
 type WantDrainedNotification struct {

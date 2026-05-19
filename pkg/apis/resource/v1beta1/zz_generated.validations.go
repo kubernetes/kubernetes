@@ -43,126 +43,111 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
 	// type DeviceClass
-	scheme.AddValidationFunc(
-		(*resourcev1beta1.DeviceClass)(nil),
-		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-			switch op.Request.SubresourcePath() {
-			case "/":
-				return Validate_DeviceClass(
-					ctx, op, nil, /* fldPath */
-					obj.(*resourcev1beta1.DeviceClass),
-					safe.Cast[*resourcev1beta1.DeviceClass](oldObj))
-			}
-			return field.ErrorList{
-				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
-			}
-		})
+	scheme.AddValidationFunc((*resourcev1beta1.DeviceClass)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_DeviceClass(ctx, op, nil /* fldPath */, obj.(*resourcev1beta1.DeviceClass), safe.Cast[*resourcev1beta1.DeviceClass](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type DeviceClassList
+	scheme.AddValidationFunc((*resourcev1beta1.DeviceClassList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_DeviceClassList(ctx, op, nil /* fldPath */, obj.(*resourcev1beta1.DeviceClassList), safe.Cast[*resourcev1beta1.DeviceClassList](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	// type ResourceClaim
-	scheme.AddValidationFunc(
-		(*resourcev1beta1.ResourceClaim)(nil),
-		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-			switch op.Request.SubresourcePath() {
-			case "/", "/status":
-				return Validate_ResourceClaim(
-					ctx, op, nil, /* fldPath */
-					obj.(*resourcev1beta1.ResourceClaim),
-					safe.Cast[*resourcev1beta1.ResourceClaim](oldObj))
-			}
-			return field.ErrorList{
-				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
-			}
-		})
+	scheme.AddValidationFunc((*resourcev1beta1.ResourceClaim)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/", "/status":
+			return Validate_ResourceClaim(ctx, op, nil /* fldPath */, obj.(*resourcev1beta1.ResourceClaim), safe.Cast[*resourcev1beta1.ResourceClaim](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type ResourceClaimList
+	scheme.AddValidationFunc((*resourcev1beta1.ResourceClaimList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_ResourceClaimList(ctx, op, nil /* fldPath */, obj.(*resourcev1beta1.ResourceClaimList), safe.Cast[*resourcev1beta1.ResourceClaimList](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	// type ResourceClaimTemplate
-	scheme.AddValidationFunc(
-		(*resourcev1beta1.ResourceClaimTemplate)(nil),
-		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-			switch op.Request.SubresourcePath() {
-			case "/":
-				return Validate_ResourceClaimTemplate(
-					ctx, op, nil, /* fldPath */
-					obj.(*resourcev1beta1.ResourceClaimTemplate),
-					safe.Cast[*resourcev1beta1.ResourceClaimTemplate](oldObj))
-			}
-			return field.ErrorList{
-				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
-			}
-		})
+	scheme.AddValidationFunc((*resourcev1beta1.ResourceClaimTemplate)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_ResourceClaimTemplate(ctx, op, nil /* fldPath */, obj.(*resourcev1beta1.ResourceClaimTemplate), safe.Cast[*resourcev1beta1.ResourceClaimTemplate](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type ResourceClaimTemplateList
+	scheme.AddValidationFunc((*resourcev1beta1.ResourceClaimTemplateList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_ResourceClaimTemplateList(ctx, op, nil /* fldPath */, obj.(*resourcev1beta1.ResourceClaimTemplateList), safe.Cast[*resourcev1beta1.ResourceClaimTemplateList](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	// type ResourceSlice
-	scheme.AddValidationFunc(
-		(*resourcev1beta1.ResourceSlice)(nil),
-		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-			switch op.Request.SubresourcePath() {
-			case "/":
-				return Validate_ResourceSlice(
-					ctx, op, nil, /* fldPath */
-					obj.(*resourcev1beta1.ResourceSlice),
-					safe.Cast[*resourcev1beta1.ResourceSlice](oldObj))
-			}
-			return field.ErrorList{
-				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
-			}
-		})
+	scheme.AddValidationFunc((*resourcev1beta1.ResourceSlice)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_ResourceSlice(ctx, op, nil /* fldPath */, obj.(*resourcev1beta1.ResourceSlice), safe.Cast[*resourcev1beta1.ResourceSlice](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
+	// type ResourceSliceList
+	scheme.AddValidationFunc((*resourcev1beta1.ResourceSliceList)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_ResourceSliceList(ctx, op, nil /* fldPath */, obj.(*resourcev1beta1.ResourceSliceList), safe.Cast[*resourcev1beta1.ResourceSliceList](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	return nil
 }
 
 // Validate_AllocatedDeviceStatus validates an instance of AllocatedDeviceStatus according
 // to declarative validation rules in the API schema.
-func Validate_AllocatedDeviceStatus(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.AllocatedDeviceStatus) (errs field.ErrorList) {
-
+func Validate_AllocatedDeviceStatus(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.AllocatedDeviceStatus) (errs field.ErrorList) {
 	// field resourcev1beta1.AllocatedDeviceStatus.Driver has no validation
 	// field resourcev1beta1.AllocatedDeviceStatus.Pool has no validation
 	// field resourcev1beta1.AllocatedDeviceStatus.Device has no validation
 
-	{ // field resourcev1beta1.AllocatedDeviceStatus.ShareID
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.AllocatedDeviceStatus.ShareID
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			if e := validate.UUID(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.UUID(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.AllocatedDeviceStatus) *string {
-				return oldObj.ShareID
-			})
-		errs = append(errs, fn(fldPath.Child("shareID"), obj.ShareID, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("shareID"), obj.ShareID, safe.Field(oldObj, func(oldObj *resourcev1beta1.AllocatedDeviceStatus) *string { return oldObj.ShareID }), oldObj != nil)...)
 
 	// field resourcev1beta1.AllocatedDeviceStatus.Conditions has no validation
 	// field resourcev1beta1.AllocatedDeviceStatus.Data has no validation
 
-	{ // field resourcev1beta1.AllocatedDeviceStatus.NetworkData
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *resourcev1beta1.NetworkDeviceData,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.AllocatedDeviceStatus.NetworkData
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta1.NetworkDeviceData, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -171,13 +156,9 @@ func Validate_AllocatedDeviceStatus(
 			// call the type's validation function
 			errs = append(errs, Validate_NetworkDeviceData(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.AllocatedDeviceStatus) *resourcev1beta1.NetworkDeviceData {
-				return oldObj.NetworkData
-			})
-		errs = append(errs, fn(fldPath.Child("networkData"), obj.NetworkData, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("networkData"), obj.NetworkData, safe.Field(oldObj, func(oldObj *resourcev1beta1.AllocatedDeviceStatus) *resourcev1beta1.NetworkDeviceData {
+			return oldObj.NetworkData
+		}), oldObj != nil)...)
 
 	return errs
 }
@@ -186,44 +167,28 @@ var symbolsForAllocationConfigSource = sets.New(resourcev1beta1.AllocationConfig
 
 // Validate_AllocationConfigSource validates an instance of AllocationConfigSource according
 // to declarative validation rules in the API schema.
-func Validate_AllocationConfigSource(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.AllocationConfigSource) (errs field.ErrorList) {
-
-	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForAllocationConfigSource, nil).MarkAlpha(); len(e) != 0 {
-		errs = append(errs, e...)
-	}
+func Validate_AllocationConfigSource(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.AllocationConfigSource) (errs field.ErrorList) {
+	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForAllocationConfigSource, nil)...)
 
 	return errs
 }
 
 // Validate_AllocationResult validates an instance of AllocationResult according
 // to declarative validation rules in the API schema.
-func Validate_AllocationResult(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.AllocationResult) (errs field.ErrorList) {
-
-	{ // field resourcev1beta1.AllocationResult.Devices
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *resourcev1beta1.DeviceAllocationResult,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_AllocationResult(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.AllocationResult) (errs field.ErrorList) {
+	// field resourcev1beta1.AllocationResult.Devices
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceAllocationResult, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_DeviceAllocationResult(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.AllocationResult) *resourcev1beta1.DeviceAllocationResult {
-				return &oldObj.Devices
-			})
-		errs = append(errs, fn(fldPath.Child("devices"), &obj.Devices, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("devices"), &obj.Devices, safe.Field(oldObj, func(oldObj *resourcev1beta1.AllocationResult) *resourcev1beta1.DeviceAllocationResult {
+			return &oldObj.Devices
+		}), oldObj != nil)...)
 
 	// field resourcev1beta1.AllocationResult.NodeSelector has no validation
 	// field resourcev1beta1.AllocationResult.AllocationTimestamp has no validation
@@ -232,331 +197,181 @@ func Validate_AllocationResult(
 
 // Validate_BasicDevice validates an instance of BasicDevice according
 // to declarative validation rules in the API schema.
-func Validate_BasicDevice(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.BasicDevice) (errs field.ErrorList) {
-
-	{ // field resourcev1beta1.BasicDevice.Attributes
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_BasicDevice(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.BasicDevice) (errs field.ErrorList) {
+	// field resourcev1beta1.BasicDevice.Attributes
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// iterate the map and call the value type's validation function
-			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_DeviceAttribute); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.SemanticDeepEqual, Validate_DeviceAttribute)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.BasicDevice) map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute {
-				return oldObj.Attributes
-			})
-		errs = append(errs, fn(fldPath.Child("attributes"), obj.Attributes, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("attributes"), obj.Attributes, safe.Field(oldObj, func(oldObj *resourcev1beta1.BasicDevice) map[resourcev1beta1.QualifiedName]resourcev1beta1.DeviceAttribute {
+			return oldObj.Attributes
+		}), oldObj != nil)...)
 
 	// field resourcev1beta1.BasicDevice.Capacity has no validation
 
-	{ // field resourcev1beta1.BasicDevice.ConsumesCounters
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []resourcev1beta1.DeviceCounterConsumption,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.BasicDevice.ConsumesCounters
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta1.DeviceCounterConsumption, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 2); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 2).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a resourcev1beta1.DeviceCounterConsumption, b resourcev1beta1.DeviceCounterConsumption) bool {
-					return a.CounterSet == b.CounterSet
-				}).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a resourcev1beta1.DeviceCounterConsumption, b resourcev1beta1.DeviceCounterConsumption) bool {
+				return a.CounterSet == b.CounterSet
+			})...)
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a resourcev1beta1.DeviceCounterConsumption, b resourcev1beta1.DeviceCounterConsumption) bool {
-					return a.CounterSet == b.CounterSet
-				}, validate.SemanticDeepEqual, Validate_DeviceCounterConsumption); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a resourcev1beta1.DeviceCounterConsumption, b resourcev1beta1.DeviceCounterConsumption) bool {
+				return a.CounterSet == b.CounterSet
+			}, validate.SemanticDeepEqual, Validate_DeviceCounterConsumption)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.BasicDevice) []resourcev1beta1.DeviceCounterConsumption {
-				return oldObj.ConsumesCounters
-			})
-		errs = append(errs, fn(fldPath.Child("consumesCounters"), obj.ConsumesCounters, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("consumesCounters"), obj.ConsumesCounters, safe.Field(oldObj, func(oldObj *resourcev1beta1.BasicDevice) []resourcev1beta1.DeviceCounterConsumption {
+			return oldObj.ConsumesCounters
+		}), oldObj != nil)...)
 
 	// field resourcev1beta1.BasicDevice.NodeName has no validation
 	// field resourcev1beta1.BasicDevice.NodeSelector has no validation
 	// field resourcev1beta1.BasicDevice.AllNodes has no validation
 
-	{ // field resourcev1beta1.BasicDevice.Taints
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []resourcev1beta1.DeviceTaint,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.BasicDevice.Taints
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta1.DeviceTaint, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceTaint); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceTaint)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.BasicDevice) []resourcev1beta1.DeviceTaint {
-				return oldObj.Taints
-			})
-		errs = append(errs, fn(fldPath.Child("taints"), obj.Taints, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("taints"), obj.Taints, safe.Field(oldObj, func(oldObj *resourcev1beta1.BasicDevice) []resourcev1beta1.DeviceTaint { return oldObj.Taints }), oldObj != nil)...)
 
 	// field resourcev1beta1.BasicDevice.BindsToNode has no validation
 
-	{ // field resourcev1beta1.BasicDevice.BindingConditions
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.BasicDevice.BindingConditions
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 4); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 4).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.BasicDevice) []string {
-				return oldObj.BindingConditions
-			})
-		errs = append(errs, fn(fldPath.Child("bindingConditions"), obj.BindingConditions, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("bindingConditions"), obj.BindingConditions, safe.Field(oldObj, func(oldObj *resourcev1beta1.BasicDevice) []string { return oldObj.BindingConditions }), oldObj != nil)...)
 
-	{ // field resourcev1beta1.BasicDevice.BindingFailureConditions
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.BasicDevice.BindingFailureConditions
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 4); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 4).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.BasicDevice) []string {
-				return oldObj.BindingFailureConditions
-			})
-		errs = append(errs, fn(fldPath.Child("bindingFailureConditions"), obj.BindingFailureConditions, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("bindingFailureConditions"), obj.BindingFailureConditions, safe.Field(oldObj, func(oldObj *resourcev1beta1.BasicDevice) []string { return oldObj.BindingFailureConditions }), oldObj != nil)...)
 
 	// field resourcev1beta1.BasicDevice.AllowMultipleAllocations has no validation
-	// field resourcev1beta1.BasicDevice.NodeAllocatableResourceMappings has no validation
 	return errs
 }
 
 // Validate_CounterSet validates an instance of CounterSet according
 // to declarative validation rules in the API schema.
-func Validate_CounterSet(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.CounterSet) (errs field.ErrorList) {
-
-	{ // field resourcev1beta1.CounterSet.Name
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_CounterSet(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.CounterSet) (errs field.ErrorList) {
+	// field resourcev1beta1.CounterSet.Name
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			if e := validate.ShortName(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.ShortName(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.CounterSet) *string {
-				return &oldObj.Name
-			})
-		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *resourcev1beta1.CounterSet) *string { return &oldObj.Name }), oldObj != nil)...)
 
-	{ // field resourcev1beta1.CounterSet.Counters
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj map[string]resourcev1beta1.Counter,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.RequiredMap(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			if e := validate.EachMapKey(ctx, op, fldPath, obj, oldObj, validate.ShortName).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.CounterSet) map[string]resourcev1beta1.Counter {
-				return oldObj.Counters
-			})
-		errs = append(errs, fn(fldPath.Child("counters"), obj.Counters, oldVal, oldObj != nil)...)
-	}
-
+	// field resourcev1beta1.CounterSet.Counters has no validation
 	return errs
 }
 
 // Validate_Device validates an instance of Device according
 // to declarative validation rules in the API schema.
-func Validate_Device(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.Device) (errs field.ErrorList) {
-
+func Validate_Device(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.Device) (errs field.ErrorList) {
 	// field resourcev1beta1.Device.Name has no validation
 
-	{ // field resourcev1beta1.Device.Basic
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *resourcev1beta1.BasicDevice,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.Device.Basic
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta1.BasicDevice, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_BasicDevice(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.Device) *resourcev1beta1.BasicDevice {
-				return oldObj.Basic
-			})
-		errs = append(errs, fn(fldPath.Child("basic"), obj.Basic, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("basic"), obj.Basic, safe.Field(oldObj, func(oldObj *resourcev1beta1.Device) *resourcev1beta1.BasicDevice { return oldObj.Basic }), oldObj != nil)...)
 
 	return errs
 }
 
 // Validate_DeviceAllocationConfiguration validates an instance of DeviceAllocationConfiguration according
 // to declarative validation rules in the API schema.
-func Validate_DeviceAllocationConfiguration(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.DeviceAllocationConfiguration) (errs field.ErrorList) {
-
-	{ // field resourcev1beta1.DeviceAllocationConfiguration.Source
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *resourcev1beta1.AllocationConfigSource,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_DeviceAllocationConfiguration(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceAllocationConfiguration) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceAllocationConfiguration.Source
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta1.AllocationConfigSource, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -566,71 +381,47 @@ func Validate_DeviceAllocationConfiguration(
 			// call the type's validation function
 			errs = append(errs, Validate_AllocationConfigSource(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceAllocationConfiguration) *resourcev1beta1.AllocationConfigSource {
-				return &oldObj.Source
-			})
-		errs = append(errs, fn(fldPath.Child("source"), &obj.Source, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("source"), &obj.Source, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceAllocationConfiguration) *resourcev1beta1.AllocationConfigSource {
+			return &oldObj.Source
+		}), oldObj != nil)...)
 
-	{ // field resourcev1beta1.DeviceAllocationConfiguration.Requests
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceAllocationConfiguration.Requests
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceAllocationConfiguration) []string {
-				return oldObj.Requests
-			})
-		errs = append(errs, fn(fldPath.Child("requests"), obj.Requests, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("requests"), obj.Requests, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceAllocationConfiguration) []string { return oldObj.Requests }), oldObj != nil)...)
 
-	{ // field resourcev1beta1.DeviceAllocationConfiguration.DeviceConfiguration
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *resourcev1beta1.DeviceConfiguration,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceAllocationConfiguration.DeviceConfiguration
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceConfiguration, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_DeviceConfiguration(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceAllocationConfiguration) *resourcev1beta1.DeviceConfiguration {
-				return &oldObj.DeviceConfiguration
-			})
-		errs = append(errs, fn(safe.Value(fldPath, func() *field.Path { return fldPath.Child("resourcev1beta1.DeviceConfiguration") }), &obj.DeviceConfiguration, oldVal, oldObj != nil)...)
-	}
+		}(safe.Value(fldPath, func() *field.Path { return fldPath.Child("resourcev1beta1.DeviceConfiguration") }), &obj.DeviceConfiguration, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceAllocationConfiguration) *resourcev1beta1.DeviceConfiguration {
+			return &oldObj.DeviceConfiguration
+		}), oldObj != nil)...)
 
 	return errs
 }
@@ -639,808 +430,470 @@ var symbolsForDeviceAllocationMode = sets.New(resourcev1beta1.DeviceAllocationMo
 
 // Validate_DeviceAllocationMode validates an instance of DeviceAllocationMode according
 // to declarative validation rules in the API schema.
-func Validate_DeviceAllocationMode(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.DeviceAllocationMode) (errs field.ErrorList) {
-
-	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForDeviceAllocationMode, nil).MarkAlpha(); len(e) != 0 {
-		errs = append(errs, e...)
-	}
+func Validate_DeviceAllocationMode(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceAllocationMode) (errs field.ErrorList) {
+	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForDeviceAllocationMode, nil)...)
 
 	return errs
 }
 
 // Validate_DeviceAllocationResult validates an instance of DeviceAllocationResult according
 // to declarative validation rules in the API schema.
-func Validate_DeviceAllocationResult(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.DeviceAllocationResult) (errs field.ErrorList) {
-
-	{ // field resourcev1beta1.DeviceAllocationResult.Results
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []resourcev1beta1.DeviceRequestAllocationResult,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_DeviceAllocationResult(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceAllocationResult) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceAllocationResult.Results
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta1.DeviceRequestAllocationResult, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceRequestAllocationResult); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceRequestAllocationResult)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceAllocationResult) []resourcev1beta1.DeviceRequestAllocationResult {
-				return oldObj.Results
-			})
-		errs = append(errs, fn(fldPath.Child("results"), obj.Results, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("results"), obj.Results, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceAllocationResult) []resourcev1beta1.DeviceRequestAllocationResult {
+			return oldObj.Results
+		}), oldObj != nil)...)
 
-	{ // field resourcev1beta1.DeviceAllocationResult.Config
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []resourcev1beta1.DeviceAllocationConfiguration,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceAllocationResult.Config
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta1.DeviceAllocationConfiguration, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 64); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 64).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceAllocationConfiguration); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceAllocationConfiguration)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceAllocationResult) []resourcev1beta1.DeviceAllocationConfiguration {
-				return oldObj.Config
-			})
-		errs = append(errs, fn(fldPath.Child("config"), obj.Config, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("config"), obj.Config, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceAllocationResult) []resourcev1beta1.DeviceAllocationConfiguration {
+			return oldObj.Config
+		}), oldObj != nil)...)
 
 	return errs
 }
 
-var unionMembershipFor_k8s_io_api_resource_v1beta1_DeviceAttribute_ = validate.NewUnionMembership(validate.NewUnionMember("int"), validate.NewUnionMember("bool"), validate.NewUnionMember("string"), validate.NewUnionMember("version"), validate.NewUnionMember("ints"), validate.NewUnionMember("bools"), validate.NewUnionMember("strings"), validate.NewUnionMember("versions"))
+var unionMembershipFor_k8s_io_api_resource_v1beta1_DeviceAttribute_ = validate.NewUnionMembership(validate.NewUnionMember("int"), validate.NewUnionMember("bool"), validate.NewUnionMember("string"), validate.NewUnionMember("version"))
 
 // Validate_DeviceAttribute validates an instance of DeviceAttribute according
 // to declarative validation rules in the API schema.
-func Validate_DeviceAttribute(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.DeviceAttribute) (errs field.ErrorList) {
+func Validate_DeviceAttribute(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceAttribute) (errs field.ErrorList) {
+	errs = append(errs, validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_api_resource_v1beta1_DeviceAttribute_, func(obj *resourcev1beta1.DeviceAttribute) bool {
+		if obj == nil {
+			return false
+		}
+		return obj.IntValue != nil
+	}, func(obj *resourcev1beta1.DeviceAttribute) bool {
+		if obj == nil {
+			return false
+		}
+		return obj.BoolValue != nil
+	}, func(obj *resourcev1beta1.DeviceAttribute) bool {
+		if obj == nil {
+			return false
+		}
+		return obj.StringValue != nil
+	}, func(obj *resourcev1beta1.DeviceAttribute) bool {
+		if obj == nil {
+			return false
+		}
+		return obj.VersionValue != nil
+	})...)
 
-	if e := validate.Union(ctx, op, fldPath, obj, oldObj, unionMembershipFor_k8s_io_api_resource_v1beta1_DeviceAttribute_,
-		func(obj *resourcev1beta1.DeviceAttribute) bool {
-			if obj == nil {
-				return false
-			}
-			return obj.IntValue != nil
-		},
-		func(obj *resourcev1beta1.DeviceAttribute) bool {
-			if obj == nil {
-				return false
-			}
-			return obj.BoolValue != nil
-		},
-		func(obj *resourcev1beta1.DeviceAttribute) bool {
-			if obj == nil {
-				return false
-			}
-			return obj.StringValue != nil
-		},
-		func(obj *resourcev1beta1.DeviceAttribute) bool {
-			if obj == nil {
-				return false
-			}
-			return obj.VersionValue != nil
-		},
-		func(obj *resourcev1beta1.DeviceAttribute) bool {
-			if obj == nil {
-				return false
-			}
-			return len(obj.IntValues) != 0
-		},
-		func(obj *resourcev1beta1.DeviceAttribute) bool {
-			if obj == nil {
-				return false
-			}
-			return len(obj.BoolValues) != 0
-		},
-		func(obj *resourcev1beta1.DeviceAttribute) bool {
-			if obj == nil {
-				return false
-			}
-			return len(obj.StringValues) != 0
-		},
-		func(obj *resourcev1beta1.DeviceAttribute) bool {
-			if obj == nil {
-				return false
-			}
-			return len(obj.VersionValues) != 0
-		}).MarkAlpha(); len(e) != 0 {
-		errs = append(errs, e...)
-	}
-
-	{ // field resourcev1beta1.DeviceAttribute.IntValue
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *int64,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceAttribute.IntValue
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *int64, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceAttribute) *int64 {
-				return oldObj.IntValue
-			})
-		errs = append(errs, fn(fldPath.Child("int"), obj.IntValue, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("int"), obj.IntValue, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceAttribute) *int64 { return oldObj.IntValue }), oldObj != nil)...)
 
-	{ // field resourcev1beta1.DeviceAttribute.BoolValue
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *bool,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceAttribute.BoolValue
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *bool, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceAttribute) *bool {
-				return oldObj.BoolValue
-			})
-		errs = append(errs, fn(fldPath.Child("bool"), obj.BoolValue, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("bool"), obj.BoolValue, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceAttribute) *bool { return oldObj.BoolValue }), oldObj != nil)...)
 
-	{ // field resourcev1beta1.DeviceAttribute.StringValue
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceAttribute.StringValue
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceAttribute) *string {
-				return oldObj.StringValue
-			})
-		errs = append(errs, fn(fldPath.Child("string"), obj.StringValue, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("string"), obj.StringValue, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceAttribute) *string { return oldObj.StringValue }), oldObj != nil)...)
 
-	{ // field resourcev1beta1.DeviceAttribute.VersionValue
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceAttribute.VersionValue
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceAttribute) *string {
-				return oldObj.VersionValue
-			})
-		errs = append(errs, fn(fldPath.Child("version"), obj.VersionValue, oldVal, oldObj != nil)...)
-	}
-
-	{ // field resourcev1beta1.DeviceAttribute.IntValues
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []int64,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceAttribute) []int64 {
-				return oldObj.IntValues
-			})
-		errs = append(errs, fn(fldPath.Child("ints"), obj.IntValues, oldVal, oldObj != nil)...)
-	}
-
-	{ // field resourcev1beta1.DeviceAttribute.BoolValues
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []bool,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceAttribute) []bool {
-				return oldObj.BoolValues
-			})
-		errs = append(errs, fn(fldPath.Child("bools"), obj.BoolValues, oldVal, oldObj != nil)...)
-	}
-
-	{ // field resourcev1beta1.DeviceAttribute.StringValues
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil,
-				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-					return validate.MaxBytes(ctx, op, fldPath, obj, oldObj, 64)
-				}).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceAttribute) []string {
-				return oldObj.StringValues
-			})
-		errs = append(errs, fn(fldPath.Child("strings"), obj.StringValues, oldVal, oldObj != nil)...)
-	}
-
-	{ // field resourcev1beta1.DeviceAttribute.VersionValues
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceAttribute) []string {
-				return oldObj.VersionValues
-			})
-		errs = append(errs, fn(fldPath.Child("versions"), obj.VersionValues, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("version"), obj.VersionValue, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceAttribute) *string { return oldObj.VersionValue }), oldObj != nil)...)
 
 	return errs
 }
 
 // Validate_DeviceClaim validates an instance of DeviceClaim according
 // to declarative validation rules in the API schema.
-func Validate_DeviceClaim(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.DeviceClaim) (errs field.ErrorList) {
-
-	{ // field resourcev1beta1.DeviceClaim.Requests
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []resourcev1beta1.DeviceRequest,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_DeviceClaim(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceClaim) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceClaim.Requests
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta1.DeviceRequest, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a resourcev1beta1.DeviceRequest, b resourcev1beta1.DeviceRequest) bool { return a.Name == b.Name }).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a resourcev1beta1.DeviceRequest, b resourcev1beta1.DeviceRequest) bool { return a.Name == b.Name })...)
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a resourcev1beta1.DeviceRequest, b resourcev1beta1.DeviceRequest) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_DeviceRequest); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a resourcev1beta1.DeviceRequest, b resourcev1beta1.DeviceRequest) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_DeviceRequest)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceClaim) []resourcev1beta1.DeviceRequest {
-				return oldObj.Requests
-			})
-		errs = append(errs, fn(fldPath.Child("requests"), obj.Requests, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("requests"), obj.Requests, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceClaim) []resourcev1beta1.DeviceRequest { return oldObj.Requests }), oldObj != nil)...)
 
-	{ // field resourcev1beta1.DeviceClaim.Constraints
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []resourcev1beta1.DeviceConstraint,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceClaim.Constraints
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta1.DeviceConstraint, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceConstraint); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceConstraint)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceClaim) []resourcev1beta1.DeviceConstraint {
-				return oldObj.Constraints
-			})
-		errs = append(errs, fn(fldPath.Child("constraints"), obj.Constraints, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("constraints"), obj.Constraints, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceClaim) []resourcev1beta1.DeviceConstraint {
+			return oldObj.Constraints
+		}), oldObj != nil)...)
 
-	{ // field resourcev1beta1.DeviceClaim.Config
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []resourcev1beta1.DeviceClaimConfiguration,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceClaim.Config
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta1.DeviceClaimConfiguration, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceClaimConfiguration); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceClaimConfiguration)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceClaim) []resourcev1beta1.DeviceClaimConfiguration {
-				return oldObj.Config
-			})
-		errs = append(errs, fn(fldPath.Child("config"), obj.Config, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("config"), obj.Config, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceClaim) []resourcev1beta1.DeviceClaimConfiguration {
+			return oldObj.Config
+		}), oldObj != nil)...)
 
 	return errs
 }
 
 // Validate_DeviceClaimConfiguration validates an instance of DeviceClaimConfiguration according
 // to declarative validation rules in the API schema.
-func Validate_DeviceClaimConfiguration(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.DeviceClaimConfiguration) (errs field.ErrorList) {
-
-	{ // field resourcev1beta1.DeviceClaimConfiguration.Requests
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_DeviceClaimConfiguration(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceClaimConfiguration) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceClaimConfiguration.Requests
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceClaimConfiguration) []string {
-				return oldObj.Requests
-			})
-		errs = append(errs, fn(fldPath.Child("requests"), obj.Requests, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("requests"), obj.Requests, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceClaimConfiguration) []string { return oldObj.Requests }), oldObj != nil)...)
 
-	{ // field resourcev1beta1.DeviceClaimConfiguration.DeviceConfiguration
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *resourcev1beta1.DeviceConfiguration,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceClaimConfiguration.DeviceConfiguration
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceConfiguration, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_DeviceConfiguration(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceClaimConfiguration) *resourcev1beta1.DeviceConfiguration {
-				return &oldObj.DeviceConfiguration
-			})
-		errs = append(errs, fn(safe.Value(fldPath, func() *field.Path { return fldPath.Child("resourcev1beta1.DeviceConfiguration") }), &obj.DeviceConfiguration, oldVal, oldObj != nil)...)
-	}
+		}(safe.Value(fldPath, func() *field.Path { return fldPath.Child("resourcev1beta1.DeviceConfiguration") }), &obj.DeviceConfiguration, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceClaimConfiguration) *resourcev1beta1.DeviceConfiguration {
+			return &oldObj.DeviceConfiguration
+		}), oldObj != nil)...)
 
 	return errs
 }
 
 // Validate_DeviceClass validates an instance of DeviceClass according
 // to declarative validation rules in the API schema.
-func Validate_DeviceClass(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.DeviceClass) (errs field.ErrorList) {
-
+func Validate_DeviceClass(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceClass) (errs field.ErrorList) {
 	// field resourcev1beta1.DeviceClass.TypeMeta has no validation
 
-	{ // field resourcev1beta1.DeviceClass.ObjectMeta
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *v1.ObjectMeta,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceClass.ObjectMeta
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *v1.ObjectMeta, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
-			func() { // cohort = "name"
+			func() { // cohort name
 				earlyReturn := false
-				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "name",
-					func(o *v1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.OptionalValue).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "name", func(o *v1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.OptionalValue); len(e) != 0 {
 					earlyReturn = true
 				}
 				if earlyReturn {
 					return // do not proceed
 				}
-				if e := validate.Subfield(ctx, op, fldPath, obj, oldObj, "name",
-					func(o *v1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.LongName).MarkAlpha(); len(e) != 0 {
-					errs = append(errs, e...)
-				}
+				errs = append(errs, validate.Subfield(ctx, op, fldPath, obj, oldObj, "name", func(o *v1.ObjectMeta) *string { return &o.Name }, validate.DirectEqualPtr, validate.LongName)...)
 			}()
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceClass) *v1.ObjectMeta {
-				return &oldObj.ObjectMeta
-			})
-		errs = append(errs, fn(fldPath.Child("metadata"), &obj.ObjectMeta, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("metadata"), &obj.ObjectMeta, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceClass) *v1.ObjectMeta { return &oldObj.ObjectMeta }), oldObj != nil)...)
 
-	{ // field resourcev1beta1.DeviceClass.Spec
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *resourcev1beta1.DeviceClassSpec,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceClass.Spec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceClassSpec, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_DeviceClassSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceClass) *resourcev1beta1.DeviceClassSpec {
-				return &oldObj.Spec
-			})
-		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceClass) *resourcev1beta1.DeviceClassSpec { return &oldObj.Spec }), oldObj != nil)...)
 
 	return errs
 }
 
 // Validate_DeviceClassConfiguration validates an instance of DeviceClassConfiguration according
 // to declarative validation rules in the API schema.
-func Validate_DeviceClassConfiguration(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.DeviceClassConfiguration) (errs field.ErrorList) {
-
-	{ // field resourcev1beta1.DeviceClassConfiguration.DeviceConfiguration
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *resourcev1beta1.DeviceConfiguration,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_DeviceClassConfiguration(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceClassConfiguration) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceClassConfiguration.DeviceConfiguration
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceConfiguration, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_DeviceConfiguration(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceClassConfiguration) *resourcev1beta1.DeviceConfiguration {
-				return &oldObj.DeviceConfiguration
-			})
-		errs = append(errs, fn(safe.Value(fldPath, func() *field.Path { return fldPath.Child("resourcev1beta1.DeviceConfiguration") }), &obj.DeviceConfiguration, oldVal, oldObj != nil)...)
-	}
+		}(safe.Value(fldPath, func() *field.Path { return fldPath.Child("resourcev1beta1.DeviceConfiguration") }), &obj.DeviceConfiguration, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceClassConfiguration) *resourcev1beta1.DeviceConfiguration {
+			return &oldObj.DeviceConfiguration
+		}), oldObj != nil)...)
+
+	return errs
+}
+
+// Validate_DeviceClassList validates an instance of DeviceClassList according
+// to declarative validation rules in the API schema.
+func Validate_DeviceClassList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceClassList) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceClassList.TypeMeta has no validation
+	// field resourcev1beta1.DeviceClassList.ListMeta has no validation
+
+	// field resourcev1beta1.DeviceClassList.Items
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta1.DeviceClass, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceClass)...)
+			return
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceClassList) []resourcev1beta1.DeviceClass { return oldObj.Items }), oldObj != nil)...)
 
 	return errs
 }
 
 // Validate_DeviceClassSpec validates an instance of DeviceClassSpec according
 // to declarative validation rules in the API schema.
-func Validate_DeviceClassSpec(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.DeviceClassSpec) (errs field.ErrorList) {
-
-	{ // field resourcev1beta1.DeviceClassSpec.Selectors
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []resourcev1beta1.DeviceSelector,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_DeviceClassSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceClassSpec) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceClassSpec.Selectors
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta1.DeviceSelector, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceClassSpec) []resourcev1beta1.DeviceSelector {
-				return oldObj.Selectors
-			})
-		errs = append(errs, fn(fldPath.Child("selectors"), obj.Selectors, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("selectors"), obj.Selectors, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceClassSpec) []resourcev1beta1.DeviceSelector {
+			return oldObj.Selectors
+		}), oldObj != nil)...)
 
-	{ // field resourcev1beta1.DeviceClassSpec.Config
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []resourcev1beta1.DeviceClassConfiguration,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceClassSpec.Config
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta1.DeviceClassConfiguration, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceClassConfiguration); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceClassConfiguration)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceClassSpec) []resourcev1beta1.DeviceClassConfiguration {
-				return oldObj.Config
-			})
-		errs = append(errs, fn(fldPath.Child("config"), obj.Config, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("config"), obj.Config, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceClassSpec) []resourcev1beta1.DeviceClassConfiguration {
+			return oldObj.Config
+		}), oldObj != nil)...)
 
-	{ // field resourcev1beta1.DeviceClassSpec.ExtendedResourceName
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceClassSpec.ExtendedResourceName
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			if e := validate.ExtendedResourceName(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.ExtendedResourceName(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceClassSpec) *string {
-				return oldObj.ExtendedResourceName
-			})
-		errs = append(errs, fn(fldPath.Child("extendedResourceName"), obj.ExtendedResourceName, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("extendedResourceName"), obj.ExtendedResourceName, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceClassSpec) *string { return oldObj.ExtendedResourceName }), oldObj != nil)...)
 
 	return errs
 }
 
 // Validate_DeviceConfiguration validates an instance of DeviceConfiguration according
 // to declarative validation rules in the API schema.
-func Validate_DeviceConfiguration(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.DeviceConfiguration) (errs field.ErrorList) {
-
-	{ // field resourcev1beta1.DeviceConfiguration.Opaque
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *resourcev1beta1.OpaqueDeviceConfiguration,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_DeviceConfiguration(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceConfiguration) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceConfiguration.Opaque
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta1.OpaqueDeviceConfiguration, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -1449,89 +902,60 @@ func Validate_DeviceConfiguration(
 			// call the type's validation function
 			errs = append(errs, Validate_OpaqueDeviceConfiguration(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceConfiguration) *resourcev1beta1.OpaqueDeviceConfiguration {
-				return oldObj.Opaque
-			})
-		errs = append(errs, fn(fldPath.Child("opaque"), obj.Opaque, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("opaque"), obj.Opaque, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceConfiguration) *resourcev1beta1.OpaqueDeviceConfiguration {
+			return oldObj.Opaque
+		}), oldObj != nil)...)
 
 	return errs
 }
 
 // Validate_DeviceConstraint validates an instance of DeviceConstraint according
 // to declarative validation rules in the API schema.
-func Validate_DeviceConstraint(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.DeviceConstraint) (errs field.ErrorList) {
-
-	{ // field resourcev1beta1.DeviceConstraint.Requests
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_DeviceConstraint(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceConstraint) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceConstraint.Requests
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceConstraint) []string {
-				return oldObj.Requests
-			})
-		errs = append(errs, fn(fldPath.Child("requests"), obj.Requests, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("requests"), obj.Requests, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceConstraint) []string { return oldObj.Requests }), oldObj != nil)...)
 
-	{ // field resourcev1beta1.DeviceConstraint.MatchAttribute
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *resourcev1beta1.FullyQualifiedName,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceConstraint.MatchAttribute
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta1.FullyQualifiedName, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			if e := validate.ResourceFullyQualifiedName(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.ResourceFullyQualifiedName(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceConstraint) *resourcev1beta1.FullyQualifiedName {
-				return oldObj.MatchAttribute
-			})
-		errs = append(errs, fn(fldPath.Child("matchAttribute"), obj.MatchAttribute, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("matchAttribute"), obj.MatchAttribute, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceConstraint) *resourcev1beta1.FullyQualifiedName {
+			return oldObj.MatchAttribute
+		}), oldObj != nil)...)
 
 	// field resourcev1beta1.DeviceConstraint.DistinctAttribute has no validation
 	return errs
@@ -1539,132 +963,69 @@ func Validate_DeviceConstraint(
 
 // Validate_DeviceCounterConsumption validates an instance of DeviceCounterConsumption according
 // to declarative validation rules in the API schema.
-func Validate_DeviceCounterConsumption(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.DeviceCounterConsumption) (errs field.ErrorList) {
-
-	{ // field resourcev1beta1.DeviceCounterConsumption.CounterSet
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_DeviceCounterConsumption(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceCounterConsumption) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceCounterConsumption.CounterSet
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			if e := validate.ShortName(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.ShortName(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceCounterConsumption) *string {
-				return &oldObj.CounterSet
-			})
-		errs = append(errs, fn(fldPath.Child("counterSet"), &obj.CounterSet, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("counterSet"), &obj.CounterSet, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceCounterConsumption) *string { return &oldObj.CounterSet }), oldObj != nil)...)
 
-	{ // field resourcev1beta1.DeviceCounterConsumption.Counters
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj map[string]resourcev1beta1.Counter,
-			oldValueCorrelated bool) (errs field.ErrorList) {
-			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.RequiredMap(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
-			}
-			if e := validate.EachMapKey(ctx, op, fldPath, obj, oldObj, validate.ShortName).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
-			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceCounterConsumption) map[string]resourcev1beta1.Counter {
-				return oldObj.Counters
-			})
-		errs = append(errs, fn(fldPath.Child("counters"), obj.Counters, oldVal, oldObj != nil)...)
-	}
-
+	// field resourcev1beta1.DeviceCounterConsumption.Counters has no validation
 	return errs
 }
 
 // Validate_DeviceRequest validates an instance of DeviceRequest according
 // to declarative validation rules in the API schema.
-func Validate_DeviceRequest(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.DeviceRequest) (errs field.ErrorList) {
-
+func Validate_DeviceRequest(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceRequest) (errs field.ErrorList) {
 	// field resourcev1beta1.DeviceRequest.Name has no validation
 	// field resourcev1beta1.DeviceRequest.DeviceClassName has no validation
 
-	{ // field resourcev1beta1.DeviceRequest.Selectors
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []resourcev1beta1.DeviceSelector,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceRequest.Selectors
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta1.DeviceSelector, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceRequest) []resourcev1beta1.DeviceSelector {
-				return oldObj.Selectors
-			})
-		errs = append(errs, fn(fldPath.Child("selectors"), obj.Selectors, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("selectors"), obj.Selectors, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceRequest) []resourcev1beta1.DeviceSelector { return oldObj.Selectors }), oldObj != nil)...)
 
-	{ // field resourcev1beta1.DeviceRequest.AllocationMode
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *resourcev1beta1.DeviceAllocationMode,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceRequest.AllocationMode
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceAllocationMode, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
@@ -1673,94 +1034,58 @@ func Validate_DeviceRequest(
 			// call the type's validation function
 			errs = append(errs, Validate_DeviceAllocationMode(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceRequest) *resourcev1beta1.DeviceAllocationMode {
-				return &oldObj.AllocationMode
-			})
-		errs = append(errs, fn(fldPath.Child("allocationMode"), &obj.AllocationMode, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("allocationMode"), &obj.AllocationMode, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceRequest) *resourcev1beta1.DeviceAllocationMode {
+			return &oldObj.AllocationMode
+		}), oldObj != nil)...)
 
 	// field resourcev1beta1.DeviceRequest.Count has no validation
 	// field resourcev1beta1.DeviceRequest.AdminAccess has no validation
 
-	{ // field resourcev1beta1.DeviceRequest.FirstAvailable
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []resourcev1beta1.DeviceSubRequest,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceRequest.FirstAvailable
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta1.DeviceSubRequest, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 8); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 8).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a resourcev1beta1.DeviceSubRequest, b resourcev1beta1.DeviceSubRequest) bool {
-					return a.Name == b.Name
-				}).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a resourcev1beta1.DeviceSubRequest, b resourcev1beta1.DeviceSubRequest) bool {
+				return a.Name == b.Name
+			})...)
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a resourcev1beta1.DeviceSubRequest, b resourcev1beta1.DeviceSubRequest) bool {
-					return a.Name == b.Name
-				}, validate.SemanticDeepEqual, Validate_DeviceSubRequest); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a resourcev1beta1.DeviceSubRequest, b resourcev1beta1.DeviceSubRequest) bool {
+				return a.Name == b.Name
+			}, validate.SemanticDeepEqual, Validate_DeviceSubRequest)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceRequest) []resourcev1beta1.DeviceSubRequest {
-				return oldObj.FirstAvailable
-			})
-		errs = append(errs, fn(fldPath.Child("firstAvailable"), obj.FirstAvailable, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("firstAvailable"), obj.FirstAvailable, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceRequest) []resourcev1beta1.DeviceSubRequest {
+			return oldObj.FirstAvailable
+		}), oldObj != nil)...)
 
-	{ // field resourcev1beta1.DeviceRequest.Tolerations
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []resourcev1beta1.DeviceToleration,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceRequest.Tolerations
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta1.DeviceToleration, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceToleration); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceToleration)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceRequest) []resourcev1beta1.DeviceToleration {
-				return oldObj.Tolerations
-			})
-		errs = append(errs, fn(fldPath.Child("tolerations"), obj.Tolerations, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("tolerations"), obj.Tolerations, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceRequest) []resourcev1beta1.DeviceToleration {
+			return oldObj.Tolerations
+		}), oldObj != nil)...)
 
 	// field resourcev1beta1.DeviceRequest.Capacity has no validation
 	return errs
@@ -1768,208 +1093,142 @@ func Validate_DeviceRequest(
 
 // Validate_DeviceRequestAllocationResult validates an instance of DeviceRequestAllocationResult according
 // to declarative validation rules in the API schema.
-func Validate_DeviceRequestAllocationResult(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.DeviceRequestAllocationResult) (errs field.ErrorList) {
-
+func Validate_DeviceRequestAllocationResult(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceRequestAllocationResult) (errs field.ErrorList) {
 	// field resourcev1beta1.DeviceRequestAllocationResult.Request has no validation
 
-	{ // field resourcev1beta1.DeviceRequestAllocationResult.Driver
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceRequestAllocationResult.Driver
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			if e := validate.LongNameCaseless(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
-			if e := validate.MaxLength(ctx, op, fldPath, obj, oldObj, 63).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.LongNameCaseless(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceRequestAllocationResult) *string {
-				return &oldObj.Driver
-			})
-		errs = append(errs, fn(fldPath.Child("driver"), &obj.Driver, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("driver"), &obj.Driver, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceRequestAllocationResult) *string { return &oldObj.Driver }), oldObj != nil)...)
 
-	{ // field resourcev1beta1.DeviceRequestAllocationResult.Pool
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceRequestAllocationResult.Pool
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			if e := validate.ResourcePoolName(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.ResourcePoolName(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceRequestAllocationResult) *string {
-				return &oldObj.Pool
-			})
-		errs = append(errs, fn(fldPath.Child("pool"), &obj.Pool, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("pool"), &obj.Pool, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceRequestAllocationResult) *string { return &oldObj.Pool }), oldObj != nil)...)
 
 	// field resourcev1beta1.DeviceRequestAllocationResult.Device has no validation
 	// field resourcev1beta1.DeviceRequestAllocationResult.AdminAccess has no validation
 
-	{ // field resourcev1beta1.DeviceRequestAllocationResult.Tolerations
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []resourcev1beta1.DeviceToleration,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceRequestAllocationResult.Tolerations
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta1.DeviceToleration, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 16); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceToleration); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceToleration)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceRequestAllocationResult) []resourcev1beta1.DeviceToleration {
-				return oldObj.Tolerations
-			})
-		errs = append(errs, fn(fldPath.Child("tolerations"), obj.Tolerations, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("tolerations"), obj.Tolerations, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceRequestAllocationResult) []resourcev1beta1.DeviceToleration {
+			return oldObj.Tolerations
+		}), oldObj != nil)...)
 
-	{ // field resourcev1beta1.DeviceRequestAllocationResult.BindingConditions
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceRequestAllocationResult.BindingConditions
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 4); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 4).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceRequestAllocationResult) []string {
-				return oldObj.BindingConditions
-			})
-		errs = append(errs, fn(fldPath.Child("bindingConditions"), obj.BindingConditions, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("bindingConditions"), obj.BindingConditions, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceRequestAllocationResult) []string { return oldObj.BindingConditions }), oldObj != nil)...)
 
-	{ // field resourcev1beta1.DeviceRequestAllocationResult.BindingFailureConditions
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceRequestAllocationResult.BindingFailureConditions
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 4); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 4).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceRequestAllocationResult) []string {
-				return oldObj.BindingFailureConditions
-			})
-		errs = append(errs, fn(fldPath.Child("bindingFailureConditions"), obj.BindingFailureConditions, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("bindingFailureConditions"), obj.BindingFailureConditions, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceRequestAllocationResult) []string {
+			return oldObj.BindingFailureConditions
+		}), oldObj != nil)...)
 
-	{ // field resourcev1beta1.DeviceRequestAllocationResult.ShareID
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *types.UID,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceRequestAllocationResult.ShareID
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *types.UID, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			if e := validate.UUID(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.UUID(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceRequestAllocationResult) *types.UID {
-				return oldObj.ShareID
-			})
-		errs = append(errs, fn(fldPath.Child("shareID"), obj.ShareID, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("shareID"), obj.ShareID, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceRequestAllocationResult) *types.UID { return oldObj.ShareID }), oldObj != nil)...)
 
 	// field resourcev1beta1.DeviceRequestAllocationResult.ConsumedCapacity has no validation
 	return errs
@@ -1977,139 +1236,79 @@ func Validate_DeviceRequestAllocationResult(
 
 // Validate_DeviceSubRequest validates an instance of DeviceSubRequest according
 // to declarative validation rules in the API schema.
-func Validate_DeviceSubRequest(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.DeviceSubRequest) (errs field.ErrorList) {
-
+func Validate_DeviceSubRequest(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceSubRequest) (errs field.ErrorList) {
 	// field resourcev1beta1.DeviceSubRequest.Name has no validation
 
-	{ // field resourcev1beta1.DeviceSubRequest.DeviceClassName
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceSubRequest.DeviceClassName
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			if e := validate.LongName(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.LongName(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceSubRequest) *string {
-				return &oldObj.DeviceClassName
-			})
-		errs = append(errs, fn(fldPath.Child("deviceClassName"), &obj.DeviceClassName, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("deviceClassName"), &obj.DeviceClassName, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceSubRequest) *string { return &oldObj.DeviceClassName }), oldObj != nil)...)
 
-	{ // field resourcev1beta1.DeviceSubRequest.Selectors
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []resourcev1beta1.DeviceSelector,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceSubRequest.Selectors
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta1.DeviceSelector, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 32); len(e) != 0 {
 				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceSubRequest) []resourcev1beta1.DeviceSelector {
-				return oldObj.Selectors
-			})
-		errs = append(errs, fn(fldPath.Child("selectors"), obj.Selectors, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("selectors"), obj.Selectors, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceSubRequest) []resourcev1beta1.DeviceSelector {
+			return oldObj.Selectors
+		}), oldObj != nil)...)
 
-	{ // field resourcev1beta1.DeviceSubRequest.AllocationMode
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *resourcev1beta1.DeviceAllocationMode,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceSubRequest.AllocationMode
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceAllocationMode, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_DeviceAllocationMode(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceSubRequest) *resourcev1beta1.DeviceAllocationMode {
-				return &oldObj.AllocationMode
-			})
-		errs = append(errs, fn(fldPath.Child("allocationMode"), &obj.AllocationMode, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("allocationMode"), &obj.AllocationMode, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceSubRequest) *resourcev1beta1.DeviceAllocationMode {
+			return &oldObj.AllocationMode
+		}), oldObj != nil)...)
 
 	// field resourcev1beta1.DeviceSubRequest.Count has no validation
 
-	{ // field resourcev1beta1.DeviceSubRequest.Tolerations
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []resourcev1beta1.DeviceToleration,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceSubRequest.Tolerations
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta1.DeviceToleration, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceToleration); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_DeviceToleration)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceSubRequest) []resourcev1beta1.DeviceToleration {
-				return oldObj.Tolerations
-			})
-		errs = append(errs, fn(fldPath.Child("tolerations"), obj.Tolerations, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("tolerations"), obj.Tolerations, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceSubRequest) []resourcev1beta1.DeviceToleration {
+			return oldObj.Tolerations
+		}), oldObj != nil)...)
 
 	// field resourcev1beta1.DeviceSubRequest.Capacity has no validation
 	return errs
@@ -2117,27 +1316,20 @@ func Validate_DeviceSubRequest(
 
 // Validate_DeviceTaint validates an instance of DeviceTaint according
 // to declarative validation rules in the API schema.
-func Validate_DeviceTaint(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.DeviceTaint) (errs field.ErrorList) {
-
+func Validate_DeviceTaint(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceTaint) (errs field.ErrorList) {
 	// field resourcev1beta1.DeviceTaint.Key has no validation
 	// field resourcev1beta1.DeviceTaint.Value has no validation
 
-	{ // field resourcev1beta1.DeviceTaint.Effect
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *resourcev1beta1.DeviceTaintEffect,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceTaint.Effect
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceTaintEffect, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -2147,13 +1339,7 @@ func Validate_DeviceTaint(
 			// call the type's validation function
 			errs = append(errs, Validate_DeviceTaintEffect(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceTaint) *resourcev1beta1.DeviceTaintEffect {
-				return &oldObj.Effect
-			})
-		errs = append(errs, fn(fldPath.Child("effect"), &obj.Effect, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("effect"), &obj.Effect, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceTaint) *resourcev1beta1.DeviceTaintEffect { return &oldObj.Effect }), oldObj != nil)...)
 
 	// field resourcev1beta1.DeviceTaint.TimeAdded has no validation
 	return errs
@@ -2163,117 +1349,63 @@ var symbolsForDeviceTaintEffect = sets.New(resourcev1beta1.DeviceTaintEffectNoEx
 
 // Validate_DeviceTaintEffect validates an instance of DeviceTaintEffect according
 // to declarative validation rules in the API schema.
-func Validate_DeviceTaintEffect(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.DeviceTaintEffect) (errs field.ErrorList) {
-
-	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForDeviceTaintEffect, nil).MarkAlpha(); len(e) != 0 {
-		errs = append(errs, e...)
-	}
+func Validate_DeviceTaintEffect(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceTaintEffect) (errs field.ErrorList) {
+	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForDeviceTaintEffect, nil)...)
 
 	return errs
 }
 
 // Validate_DeviceToleration validates an instance of DeviceToleration according
 // to declarative validation rules in the API schema.
-func Validate_DeviceToleration(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.DeviceToleration) (errs field.ErrorList) {
-
-	{ // field resourcev1beta1.DeviceToleration.Key
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_DeviceToleration(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceToleration) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceToleration.Key
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			if e := validate.LabelKey(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.LabelKey(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceToleration) *string {
-				return &oldObj.Key
-			})
-		errs = append(errs, fn(fldPath.Child("key"), &obj.Key, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("key"), &obj.Key, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceToleration) *string { return &oldObj.Key }), oldObj != nil)...)
 
-	{ // field resourcev1beta1.DeviceToleration.Operator
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *resourcev1beta1.DeviceTolerationOperator,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceToleration.Operator
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceTolerationOperator, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
-			}
-			// call field-attached validations
-			earlyReturn := false
-			// optional fields with default values are effectively required
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_DeviceTolerationOperator(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceToleration) *resourcev1beta1.DeviceTolerationOperator {
-				return &oldObj.Operator
-			})
-		errs = append(errs, fn(fldPath.Child("operator"), &obj.Operator, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("operator"), &obj.Operator, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceToleration) *resourcev1beta1.DeviceTolerationOperator {
+			return &oldObj.Operator
+		}), oldObj != nil)...)
 
 	// field resourcev1beta1.DeviceToleration.Value has no validation
 
-	{ // field resourcev1beta1.DeviceToleration.Effect
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *resourcev1beta1.DeviceTaintEffect,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.DeviceToleration.Effect
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceTaintEffect, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
-			}
-			// call field-attached validations
-			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				earlyReturn = true
-			}
-			if earlyReturn {
-				return // do not proceed
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_DeviceTaintEffect(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.DeviceToleration) *resourcev1beta1.DeviceTaintEffect {
-				return &oldObj.Effect
-			})
-		errs = append(errs, fn(fldPath.Child("effect"), &obj.Effect, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("effect"), &obj.Effect, safe.Field(oldObj, func(oldObj *resourcev1beta1.DeviceToleration) *resourcev1beta1.DeviceTaintEffect {
+			return &oldObj.Effect
+		}), oldObj != nil)...)
 
 	// field resourcev1beta1.DeviceToleration.TolerationSeconds has no validation
 	return errs
@@ -2283,164 +1415,102 @@ var symbolsForDeviceTolerationOperator = sets.New(resourcev1beta1.DeviceTolerati
 
 // Validate_DeviceTolerationOperator validates an instance of DeviceTolerationOperator according
 // to declarative validation rules in the API schema.
-func Validate_DeviceTolerationOperator(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.DeviceTolerationOperator) (errs field.ErrorList) {
-
-	if e := validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForDeviceTolerationOperator, nil).MarkAlpha(); len(e) != 0 {
-		errs = append(errs, e...)
-	}
+func Validate_DeviceTolerationOperator(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceTolerationOperator) (errs field.ErrorList) {
+	errs = append(errs, validate.Enum(ctx, op, fldPath, obj, oldObj, symbolsForDeviceTolerationOperator, nil)...)
 
 	return errs
 }
 
 // Validate_NetworkDeviceData validates an instance of NetworkDeviceData according
 // to declarative validation rules in the API schema.
-func Validate_NetworkDeviceData(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.NetworkDeviceData) (errs field.ErrorList) {
-
-	{ // field resourcev1beta1.NetworkDeviceData.InterfaceName
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_NetworkDeviceData(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.NetworkDeviceData) (errs field.ErrorList) {
+	// field resourcev1beta1.NetworkDeviceData.InterfaceName
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			if e := validate.MaxBytes(ctx, op, fldPath, obj, oldObj, 256).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.MaxLength(ctx, op, fldPath, obj, oldObj, 256)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.NetworkDeviceData) *string {
-				return &oldObj.InterfaceName
-			})
-		errs = append(errs, fn(fldPath.Child("interfaceName"), &obj.InterfaceName, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("interfaceName"), &obj.InterfaceName, safe.Field(oldObj, func(oldObj *resourcev1beta1.NetworkDeviceData) *string { return &oldObj.InterfaceName }), oldObj != nil)...)
 
-	{ // field resourcev1beta1.NetworkDeviceData.IPs
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.NetworkDeviceData.IPs
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 16); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 16).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// lists with set semantics require unique values
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, validate.DirectEqual)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.NetworkDeviceData) []string {
-				return oldObj.IPs
-			})
-		errs = append(errs, fn(fldPath.Child("ips"), obj.IPs, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("ips"), obj.IPs, safe.Field(oldObj, func(oldObj *resourcev1beta1.NetworkDeviceData) []string { return oldObj.IPs }), oldObj != nil)...)
 
-	{ // field resourcev1beta1.NetworkDeviceData.HardwareAddress
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.NetworkDeviceData.HardwareAddress
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			if e := validate.MaxBytes(ctx, op, fldPath, obj, oldObj, 128).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.MaxLength(ctx, op, fldPath, obj, oldObj, 128)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.NetworkDeviceData) *string {
-				return &oldObj.HardwareAddress
-			})
-		errs = append(errs, fn(fldPath.Child("hardwareAddress"), &obj.HardwareAddress, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("hardwareAddress"), &obj.HardwareAddress, safe.Field(oldObj, func(oldObj *resourcev1beta1.NetworkDeviceData) *string { return &oldObj.HardwareAddress }), oldObj != nil)...)
 
 	return errs
 }
 
 // Validate_OpaqueDeviceConfiguration validates an instance of OpaqueDeviceConfiguration according
 // to declarative validation rules in the API schema.
-func Validate_OpaqueDeviceConfiguration(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.OpaqueDeviceConfiguration) (errs field.ErrorList) {
-
-	{ // field resourcev1beta1.OpaqueDeviceConfiguration.Driver
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_OpaqueDeviceConfiguration(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.OpaqueDeviceConfiguration) (errs field.ErrorList) {
+	// field resourcev1beta1.OpaqueDeviceConfiguration.Driver
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
-			if e := validate.MaxLength(ctx, op, fldPath, obj, oldObj, 63).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
-			if e := validate.LongNameCaseless(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.LongNameCaseless(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.OpaqueDeviceConfiguration) *string {
-				return &oldObj.Driver
-			})
-		errs = append(errs, fn(fldPath.Child("driver"), &obj.Driver, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("driver"), &obj.Driver, safe.Field(oldObj, func(oldObj *resourcev1beta1.OpaqueDeviceConfiguration) *string { return &oldObj.Driver }), oldObj != nil)...)
 
 	// field resourcev1beta1.OpaqueDeviceConfiguration.Parameters has no validation
 	return errs
@@ -2448,27 +1518,20 @@ func Validate_OpaqueDeviceConfiguration(
 
 // Validate_ResourceClaim validates an instance of ResourceClaim according
 // to declarative validation rules in the API schema.
-func Validate_ResourceClaim(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.ResourceClaim) (errs field.ErrorList) {
-
+func Validate_ResourceClaim(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.ResourceClaim) (errs field.ErrorList) {
 	// field resourcev1beta1.ResourceClaim.TypeMeta has no validation
 	// field resourcev1beta1.ResourceClaim.ObjectMeta has no validation
 
-	{ // field resourcev1beta1.ResourceClaim.Spec
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *resourcev1beta1.ResourceClaimSpec,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.ResourceClaim.Spec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta1.ResourceClaimSpec, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -2478,93 +1541,80 @@ func Validate_ResourceClaim(
 			// call the type's validation function
 			errs = append(errs, Validate_ResourceClaimSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.ResourceClaim) *resourcev1beta1.ResourceClaimSpec {
-				return &oldObj.Spec
-			})
-		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *resourcev1beta1.ResourceClaim) *resourcev1beta1.ResourceClaimSpec { return &oldObj.Spec }), oldObj != nil)...)
 
-	{ // field resourcev1beta1.ResourceClaim.Status
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *resourcev1beta1.ResourceClaimStatus,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.ResourceClaim.Status
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta1.ResourceClaimStatus, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_ResourceClaimStatus(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.ResourceClaim) *resourcev1beta1.ResourceClaimStatus {
-				return &oldObj.Status
-			})
-		errs = append(errs, fn(fldPath.Child("status"), &obj.Status, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("status"), &obj.Status, safe.Field(oldObj, func(oldObj *resourcev1beta1.ResourceClaim) *resourcev1beta1.ResourceClaimStatus {
+			return &oldObj.Status
+		}), oldObj != nil)...)
+
+	return errs
+}
+
+// Validate_ResourceClaimList validates an instance of ResourceClaimList according
+// to declarative validation rules in the API schema.
+func Validate_ResourceClaimList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.ResourceClaimList) (errs field.ErrorList) {
+	// field resourcev1beta1.ResourceClaimList.TypeMeta has no validation
+	// field resourcev1beta1.ResourceClaimList.ListMeta has no validation
+
+	// field resourcev1beta1.ResourceClaimList.Items
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta1.ResourceClaim, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_ResourceClaim)...)
+			return
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *resourcev1beta1.ResourceClaimList) []resourcev1beta1.ResourceClaim { return oldObj.Items }), oldObj != nil)...)
 
 	return errs
 }
 
 // Validate_ResourceClaimSpec validates an instance of ResourceClaimSpec according
 // to declarative validation rules in the API schema.
-func Validate_ResourceClaimSpec(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.ResourceClaimSpec) (errs field.ErrorList) {
-
-	{ // field resourcev1beta1.ResourceClaimSpec.Devices
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *resourcev1beta1.DeviceClaim,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_ResourceClaimSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.ResourceClaimSpec) (errs field.ErrorList) {
+	// field resourcev1beta1.ResourceClaimSpec.Devices
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta1.DeviceClaim, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_DeviceClaim(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.ResourceClaimSpec) *resourcev1beta1.DeviceClaim {
-				return &oldObj.Devices
-			})
-		errs = append(errs, fn(fldPath.Child("devices"), &obj.Devices, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("devices"), &obj.Devices, safe.Field(oldObj, func(oldObj *resourcev1beta1.ResourceClaimSpec) *resourcev1beta1.DeviceClaim { return &oldObj.Devices }), oldObj != nil)...)
 
 	return errs
 }
 
 // Validate_ResourceClaimStatus validates an instance of ResourceClaimStatus according
 // to declarative validation rules in the API schema.
-func Validate_ResourceClaimStatus(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.ResourceClaimStatus) (errs field.ErrorList) {
-
-	{ // field resourcev1beta1.ResourceClaimStatus.Allocation
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *resourcev1beta1.AllocationResult,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_ResourceClaimStatus(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.ResourceClaimStatus) (errs field.ErrorList) {
+	// field resourcev1beta1.ResourceClaimStatus.Allocation
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta1.AllocationResult, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
-			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.UpdatePointer(ctx, op, fldPath, obj, oldObj, validate.NoModify); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -2574,286 +1624,237 @@ func Validate_ResourceClaimStatus(
 			// call the type's validation function
 			errs = append(errs, Validate_AllocationResult(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.ResourceClaimStatus) *resourcev1beta1.AllocationResult {
-				return oldObj.Allocation
-			})
-		errs = append(errs, fn(fldPath.Child("allocation"), obj.Allocation, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("allocation"), obj.Allocation, safe.Field(oldObj, func(oldObj *resourcev1beta1.ResourceClaimStatus) *resourcev1beta1.AllocationResult {
+			return oldObj.Allocation
+		}), oldObj != nil)...)
 
-	{ // field resourcev1beta1.ResourceClaimStatus.ReservedFor
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []resourcev1beta1.ResourceClaimConsumerReference,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.ResourceClaimStatus.ReservedFor
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta1.ResourceClaimConsumerReference, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 256); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 256).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a resourcev1beta1.ResourceClaimConsumerReference, b resourcev1beta1.ResourceClaimConsumerReference) bool {
-					return a.UID == b.UID
-				}).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a resourcev1beta1.ResourceClaimConsumerReference, b resourcev1beta1.ResourceClaimConsumerReference) bool {
+				return a.UID == b.UID
+			})...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.ResourceClaimStatus) []resourcev1beta1.ResourceClaimConsumerReference {
-				return oldObj.ReservedFor
-			})
-		errs = append(errs, fn(fldPath.Child("reservedFor"), obj.ReservedFor, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("reservedFor"), obj.ReservedFor, safe.Field(oldObj, func(oldObj *resourcev1beta1.ResourceClaimStatus) []resourcev1beta1.ResourceClaimConsumerReference {
+			return oldObj.ReservedFor
+		}), oldObj != nil)...)
 
-	{ // field resourcev1beta1.ResourceClaimStatus.Devices
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []resourcev1beta1.AllocatedDeviceStatus,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.ResourceClaimStatus.Devices
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta1.AllocatedDeviceStatus, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a resourcev1beta1.AllocatedDeviceStatus, b resourcev1beta1.AllocatedDeviceStatus) bool {
-					return a.Driver == b.Driver && a.Device == b.Device && a.Pool == b.Pool && ((a.ShareID == nil && b.ShareID == nil) || (a.ShareID != nil && b.ShareID != nil && *a.ShareID == *b.ShareID))
-				}).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a resourcev1beta1.AllocatedDeviceStatus, b resourcev1beta1.AllocatedDeviceStatus) bool {
+				return a.Driver == b.Driver && a.Device == b.Device && a.Pool == b.Pool && ((a.ShareID == nil && b.ShareID == nil) || (a.ShareID != nil && b.ShareID != nil && *a.ShareID == *b.ShareID))
+			})...)
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a resourcev1beta1.AllocatedDeviceStatus, b resourcev1beta1.AllocatedDeviceStatus) bool {
-					return a.Driver == b.Driver && a.Device == b.Device && a.Pool == b.Pool && ((a.ShareID == nil && b.ShareID == nil) || (a.ShareID != nil && b.ShareID != nil && *a.ShareID == *b.ShareID))
-				}, validate.SemanticDeepEqual, Validate_AllocatedDeviceStatus); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a resourcev1beta1.AllocatedDeviceStatus, b resourcev1beta1.AllocatedDeviceStatus) bool {
+				return a.Driver == b.Driver && a.Device == b.Device && a.Pool == b.Pool && ((a.ShareID == nil && b.ShareID == nil) || (a.ShareID != nil && b.ShareID != nil && *a.ShareID == *b.ShareID))
+			}, validate.SemanticDeepEqual, Validate_AllocatedDeviceStatus)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.ResourceClaimStatus) []resourcev1beta1.AllocatedDeviceStatus {
-				return oldObj.Devices
-			})
-		errs = append(errs, fn(fldPath.Child("devices"), obj.Devices, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("devices"), obj.Devices, safe.Field(oldObj, func(oldObj *resourcev1beta1.ResourceClaimStatus) []resourcev1beta1.AllocatedDeviceStatus {
+			return oldObj.Devices
+		}), oldObj != nil)...)
 
 	return errs
 }
 
 // Validate_ResourceClaimTemplate validates an instance of ResourceClaimTemplate according
 // to declarative validation rules in the API schema.
-func Validate_ResourceClaimTemplate(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.ResourceClaimTemplate) (errs field.ErrorList) {
-
+func Validate_ResourceClaimTemplate(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.ResourceClaimTemplate) (errs field.ErrorList) {
 	// field resourcev1beta1.ResourceClaimTemplate.TypeMeta has no validation
 	// field resourcev1beta1.ResourceClaimTemplate.ObjectMeta has no validation
 
-	{ // field resourcev1beta1.ResourceClaimTemplate.Spec
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *resourcev1beta1.ResourceClaimTemplateSpec,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.ResourceClaimTemplate.Spec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta1.ResourceClaimTemplateSpec, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_ResourceClaimTemplateSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.ResourceClaimTemplate) *resourcev1beta1.ResourceClaimTemplateSpec {
-				return &oldObj.Spec
-			})
-		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *resourcev1beta1.ResourceClaimTemplate) *resourcev1beta1.ResourceClaimTemplateSpec {
+			return &oldObj.Spec
+		}), oldObj != nil)...)
+
+	return errs
+}
+
+// Validate_ResourceClaimTemplateList validates an instance of ResourceClaimTemplateList according
+// to declarative validation rules in the API schema.
+func Validate_ResourceClaimTemplateList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.ResourceClaimTemplateList) (errs field.ErrorList) {
+	// field resourcev1beta1.ResourceClaimTemplateList.TypeMeta has no validation
+	// field resourcev1beta1.ResourceClaimTemplateList.ListMeta has no validation
+
+	// field resourcev1beta1.ResourceClaimTemplateList.Items
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta1.ResourceClaimTemplate, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_ResourceClaimTemplate)...)
+			return
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *resourcev1beta1.ResourceClaimTemplateList) []resourcev1beta1.ResourceClaimTemplate {
+			return oldObj.Items
+		}), oldObj != nil)...)
 
 	return errs
 }
 
 // Validate_ResourceClaimTemplateSpec validates an instance of ResourceClaimTemplateSpec according
 // to declarative validation rules in the API schema.
-func Validate_ResourceClaimTemplateSpec(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.ResourceClaimTemplateSpec) (errs field.ErrorList) {
-
+func Validate_ResourceClaimTemplateSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.ResourceClaimTemplateSpec) (errs field.ErrorList) {
 	// field resourcev1beta1.ResourceClaimTemplateSpec.ObjectMeta has no validation
 
-	{ // field resourcev1beta1.ResourceClaimTemplateSpec.Spec
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *resourcev1beta1.ResourceClaimSpec,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.ResourceClaimTemplateSpec.Spec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta1.ResourceClaimSpec, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_ResourceClaimSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.ResourceClaimTemplateSpec) *resourcev1beta1.ResourceClaimSpec {
-				return &oldObj.Spec
-			})
-		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *resourcev1beta1.ResourceClaimTemplateSpec) *resourcev1beta1.ResourceClaimSpec {
+			return &oldObj.Spec
+		}), oldObj != nil)...)
 
 	return errs
 }
 
 // Validate_ResourceSlice validates an instance of ResourceSlice according
 // to declarative validation rules in the API schema.
-func Validate_ResourceSlice(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.ResourceSlice) (errs field.ErrorList) {
-
+func Validate_ResourceSlice(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.ResourceSlice) (errs field.ErrorList) {
 	// field resourcev1beta1.ResourceSlice.TypeMeta has no validation
 	// field resourcev1beta1.ResourceSlice.ObjectMeta has no validation
 
-	{ // field resourcev1beta1.ResourceSlice.Spec
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *resourcev1beta1.ResourceSliceSpec,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.ResourceSlice.Spec
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *resourcev1beta1.ResourceSliceSpec, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_ResourceSliceSpec(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.ResourceSlice) *resourcev1beta1.ResourceSliceSpec {
-				return &oldObj.Spec
-			})
-		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("spec"), &obj.Spec, safe.Field(oldObj, func(oldObj *resourcev1beta1.ResourceSlice) *resourcev1beta1.ResourceSliceSpec { return &oldObj.Spec }), oldObj != nil)...)
+
+	return errs
+}
+
+// Validate_ResourceSliceList validates an instance of ResourceSliceList according
+// to declarative validation rules in the API schema.
+func Validate_ResourceSliceList(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.ResourceSliceList) (errs field.ErrorList) {
+	// field resourcev1beta1.ResourceSliceList.TypeMeta has no validation
+	// field resourcev1beta1.ResourceSliceList.ListMeta has no validation
+
+	// field resourcev1beta1.ResourceSliceList.Items
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta1.ResourceSlice, oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
+			}
+			// iterate the list and call the type's validation function
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_ResourceSlice)...)
+			return
+		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *resourcev1beta1.ResourceSliceList) []resourcev1beta1.ResourceSlice { return oldObj.Items }), oldObj != nil)...)
 
 	return errs
 }
 
 // Validate_ResourceSliceSpec validates an instance of ResourceSliceSpec according
 // to declarative validation rules in the API schema.
-func Validate_ResourceSliceSpec(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *resourcev1beta1.ResourceSliceSpec) (errs field.ErrorList) {
-
+func Validate_ResourceSliceSpec(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *resourcev1beta1.ResourceSliceSpec) (errs field.ErrorList) {
 	// field resourcev1beta1.ResourceSliceSpec.Driver has no validation
 	// field resourcev1beta1.ResourceSliceSpec.Pool has no validation
 	// field resourcev1beta1.ResourceSliceSpec.NodeName has no validation
 	// field resourcev1beta1.ResourceSliceSpec.NodeSelector has no validation
 	// field resourcev1beta1.ResourceSliceSpec.AllNodes has no validation
 
-	{ // field resourcev1beta1.ResourceSliceSpec.Devices
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []resourcev1beta1.Device,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.ResourceSliceSpec.Devices
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta1.Device, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Device); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Device)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.ResourceSliceSpec) []resourcev1beta1.Device {
-				return oldObj.Devices
-			})
-		errs = append(errs, fn(fldPath.Child("devices"), obj.Devices, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("devices"), obj.Devices, safe.Field(oldObj, func(oldObj *resourcev1beta1.ResourceSliceSpec) []resourcev1beta1.Device { return oldObj.Devices }), oldObj != nil)...)
 
 	// field resourcev1beta1.ResourceSliceSpec.PerDeviceNodeSelection has no validation
 
-	{ // field resourcev1beta1.ResourceSliceSpec.SharedCounters
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj []resourcev1beta1.CounterSet,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field resourcev1beta1.ResourceSliceSpec.SharedCounters
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj []resourcev1beta1.CounterSet, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if equality.Semantic.DeepEqual(obj, oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
+				return nil
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 8); len(e) != 0 {
+				errs = append(errs, e...)
 				earlyReturn = true
 			}
-			if e := validate.MaxItems(ctx, op, fldPath, obj, oldObj, 8).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
-				errs = append(errs, e...)
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// lists with map semantics require unique keys
-			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
-				func(a resourcev1beta1.CounterSet, b resourcev1beta1.CounterSet) bool { return a.Name == b.Name }).MarkAlpha(); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a resourcev1beta1.CounterSet, b resourcev1beta1.CounterSet) bool { return a.Name == b.Name })...)
 			// iterate the list and call the type's validation function
-			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj,
-				func(a resourcev1beta1.CounterSet, b resourcev1beta1.CounterSet) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_CounterSet); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, func(a resourcev1beta1.CounterSet, b resourcev1beta1.CounterSet) bool { return a.Name == b.Name }, validate.SemanticDeepEqual, Validate_CounterSet)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *resourcev1beta1.ResourceSliceSpec) []resourcev1beta1.CounterSet {
-				return oldObj.SharedCounters
-			})
-		errs = append(errs, fn(fldPath.Child("sharedCounters"), obj.SharedCounters, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("sharedCounters"), obj.SharedCounters, safe.Field(oldObj, func(oldObj *resourcev1beta1.ResourceSliceSpec) []resourcev1beta1.CounterSet {
+			return oldObj.SharedCounters
+		}), oldObj != nil)...)
 
 	return errs
 }

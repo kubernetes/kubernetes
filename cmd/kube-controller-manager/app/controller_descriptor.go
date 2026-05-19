@@ -48,12 +48,13 @@ type Controller interface {
 type ControllerConstructor func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error)
 
 type ControllerDescriptor struct {
-	name                    string
-	constructor             ControllerConstructor
-	requiredFeatureGates    []featuregate.Feature
-	aliases                 []string
-	isDisabledByDefault     bool
-	requiresSpecialHandling bool
+	name                      string
+	constructor               ControllerConstructor
+	requiredFeatureGates      []featuregate.Feature
+	aliases                   []string
+	isDisabledByDefault       bool
+	isCloudProviderController bool
+	requiresSpecialHandling   bool
 }
 
 func (r *ControllerDescriptor) Name() string {
@@ -78,6 +79,10 @@ func (r *ControllerDescriptor) IsDisabledByDefault() bool {
 	return r.isDisabledByDefault
 }
 
+func (r *ControllerDescriptor) IsCloudProviderController() bool {
+	return r.isCloudProviderController
+}
+
 // RequiresSpecialHandling should return true only in a special non-generic controllers like ServiceAccountTokenController
 func (r *ControllerDescriptor) RequiresSpecialHandling() bool {
 	return r.requiresSpecialHandling
@@ -96,6 +101,11 @@ func (r *ControllerDescriptor) BuildController(ctx context.Context, controllerCt
 				"requiredFeatureGates", r.GetRequiredFeatureGates())
 			return nil, nil
 		}
+	}
+
+	if r.IsCloudProviderController() {
+		logger.Info("Skipping a cloud provider controller", "controller", controllerName)
+		return nil, nil
 	}
 
 	ctx = klog.NewContext(ctx, klog.LoggerWithName(logger, controllerName))
@@ -184,7 +194,6 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	register(newGarbageCollectorControllerDescriptor())
 	register(newDaemonSetControllerDescriptor())
 	register(newJobControllerDescriptor())
-	register(newPodGroupProtectionControllerDescriptor())
 	register(newDeploymentControllerDescriptor())
 	register(newReplicaSetControllerDescriptor())
 	register(newHorizontalPodAutoscalerControllerDescriptor())
@@ -200,6 +209,11 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	register(newTokenCleanerControllerDescriptor())
 	register(newNodeIpamControllerDescriptor())
 	register(newNodeLifecycleControllerDescriptor())
+
+	register(newServiceLBControllerDescriptor())          // cloud provider controller
+	register(newNodeRouteControllerDescriptor())          // cloud provider controller
+	register(newCloudNodeLifecycleControllerDescriptor()) // cloud provider controller
+
 	register(newPersistentVolumeBinderControllerDescriptor())
 	register(newPersistentVolumeAttachDetachControllerDescriptor())
 	register(newPersistentVolumeExpanderControllerDescriptor())
@@ -215,7 +229,6 @@ func NewControllerDescriptors() map[string]*ControllerDescriptor {
 	// feature gated
 	register(newStorageVersionGarbageCollectorControllerDescriptor())
 	register(newResourceClaimControllerDescriptor())
-	register(newResourcePoolStatusRequestControllerDescriptor())
 	register(newDeviceTaintEvictionControllerDescriptor())
 	register(newLegacyServiceAccountTokenCleanerControllerDescriptor())
 	register(newValidatingAdmissionPolicyStatusControllerDescriptor())

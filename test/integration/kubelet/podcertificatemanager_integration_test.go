@@ -56,7 +56,7 @@ func TestPodCertificateManager(t *testing.T) {
 		kubeapiservertesting.NewDefaultTestServerOptions(),
 		[]string{
 			"--authorization-mode=Node,RBAC",
-			"--feature-gates=PodCertificateRequest=true",
+			"--feature-gates=AuthorizeNodeWithSelectors=true,PodCertificateRequest=true",
 			fmt.Sprintf("--runtime-config=%s=true", certsv1beta1.SchemeGroupVersion),
 		},
 		framework.SharedEtcd(),
@@ -306,7 +306,6 @@ func TestPodCertificateManager(t *testing.T) {
 	gotPCRClone.ObjectMeta.Namespace = gotPCR.ObjectMeta.Namespace
 	gotPCRClone.Spec.PKIXPublicKey = nil
 	gotPCRClone.Spec.ProofOfPossession = nil
-	gotPCRClone.Spec.StubPKCS10Request = nil
 	gotPCRClone.Status = certsv1beta1.PodCertificateRequestStatus{}
 	if diff := cmp.Diff(gotPCRClone, wantPCR); diff != "" {
 		t.Fatalf("PodCertificateManager created a bad PCR; diff (-got +want)\n%s", diff)

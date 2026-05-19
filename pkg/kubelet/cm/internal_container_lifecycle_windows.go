@@ -1,4 +1,5 @@
 //go:build windows
+// +build windows
 
 /*
 Copyright 2020 The Kubernetes Authors.
@@ -52,11 +53,11 @@ func (i *internalContainerLifecycleImpl) PreCreateContainer(logger klog.Logger, 
 	// Gather all CPUs associated with the selected NUMA nodes
 	var allNumaNodeCPUs []winstats.GroupAffinity
 	for _, numaNode := range sets.List(numaNodes) {
-		affinities, err := winstats.GetCPUsforNUMANode(uint16(numaNode))
+		affinity, err := winstats.GetCPUsforNUMANode(uint16(numaNode))
 		if err != nil {
 			return fmt.Errorf("failed to get CPUs for NUMA node %d: %v", numaNode, err)
 		}
-		allNumaNodeCPUs = append(allNumaNodeCPUs, affinities...)
+		allNumaNodeCPUs = append(allNumaNodeCPUs, *affinity)
 	}
 
 	var finalCPUSet = computeFinalCpuSet(allocatedCPUs, allNumaNodeCPUs)

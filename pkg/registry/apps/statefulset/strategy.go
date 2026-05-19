@@ -36,12 +36,12 @@ import (
 
 // statefulSetStrategy implements verification logic for Replication StatefulSets.
 type statefulSetStrategy struct {
-	rest.DeclarativeValidation
+	runtime.ObjectTyper
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Replication StatefulSet objects.
-var Strategy = statefulSetStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
+var Strategy = statefulSetStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // Make sure we correctly implement the interface.
 var _ = rest.GarbageCollectionDeleteStrategy(Strategy)
@@ -151,7 +151,7 @@ func (statefulSetStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for StatefulSet; this means POST is needed to create one.
-func (statefulSetStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
+func (statefulSetStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
@@ -183,7 +183,7 @@ func (statefulSetStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtim
 }
 
 // AllowUnconditionalUpdate is the default update policy for StatefulSet objects.
-func (statefulSetStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+func (statefulSetStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 

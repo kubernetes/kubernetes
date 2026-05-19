@@ -31,28 +31,25 @@ type Features struct {
 	EnableDRAConsumableCapacity                   bool
 	EnableDRADeviceTaints                         bool
 	EnableDRADeviceBindingConditions              bool
-	EnableDRAListTypeAttributes                   bool
-	EnableDRANodeAllocatableResources             bool
 	EnableDRAPartitionableDevices                 bool
 	EnableDRAResourceClaimDeviceStatus            bool
 	EnableDRASchedulerFilterTimeout               bool
-	EnableDRAWorkloadResourceClaims               bool
 	EnableDynamicResourceAllocation               bool
 	EnableVolumeAttributesClass                   bool
+	EnableCSIMigrationPortworx                    bool
 	EnableVolumeLimitScaling                      bool
 	EnableNodeInclusionPolicyInPodTopologySpread  bool
 	EnableMatchLabelKeysInPodTopologySpread       bool
 	EnableInPlacePodVerticalScaling               bool
+	EnableSidecarContainers                       bool
+	EnableSchedulingQueueHint                     bool
 	EnableAsyncPreemption                         bool
 	EnablePodLevelResources                       bool
 	EnableStorageCapacityScoring                  bool
 	EnableNodeDeclaredFeatures                    bool
 	EnableGangScheduling                          bool
-	EnableGenericWorkload                         bool
 	EnableTaintTolerationComparisonOperators      bool
 	EnableInPlacePodLevelResourcesVerticalScaling bool
-	EnableTopologyAwareWorkloadScheduling         bool
-	EnableWorkloadAwarePreemption                 bool
 }
 
 // NewSchedulerFeaturesFromGates copies the current state of the feature gates into the struct.
@@ -63,28 +60,25 @@ func NewSchedulerFeaturesFromGates(featureGate featuregate.FeatureGate) Features
 		EnableDRAAdminAccess:                          featureGate.Enabled(features.DRAAdminAccess),
 		EnableDRAConsumableCapacity:                   featureGate.Enabled(features.DRAConsumableCapacity),
 		EnableDRADeviceTaints:                         featureGate.Enabled(features.DRADeviceTaints),
-		EnableDRAListTypeAttributes:                   featureGate.Enabled(features.DRAListTypeAttributes),
 		EnableDRASchedulerFilterTimeout:               featureGate.Enabled(features.DRASchedulerFilterTimeout),
 		EnableDRAResourceClaimDeviceStatus:            featureGate.Enabled(features.DRAResourceClaimDeviceStatus),
 		EnableDRADeviceBindingConditions:              featureGate.Enabled(features.DRADeviceBindingConditions),
-		EnableDRAWorkloadResourceClaims:               featureGate.Enabled(features.DRAWorkloadResourceClaims),
 		EnableDynamicResourceAllocation:               featureGate.Enabled(features.DynamicResourceAllocation),
 		EnableVolumeAttributesClass:                   featureGate.Enabled(features.VolumeAttributesClass),
+		EnableCSIMigrationPortworx:                    featureGate.Enabled(features.CSIMigrationPortworx),
 		EnableVolumeLimitScaling:                      featureGate.Enabled(features.VolumeLimitScaling),
 		EnableNodeInclusionPolicyInPodTopologySpread:  featureGate.Enabled(features.NodeInclusionPolicyInPodTopologySpread),
 		EnableMatchLabelKeysInPodTopologySpread:       featureGate.Enabled(features.MatchLabelKeysInPodTopologySpread),
 		EnableInPlacePodVerticalScaling:               featureGate.Enabled(features.InPlacePodVerticalScaling),
+		EnableSidecarContainers:                       featureGate.Enabled(features.SidecarContainers),
+		EnableSchedulingQueueHint:                     featureGate.Enabled(features.SchedulerQueueingHints),
 		EnableAsyncPreemption:                         featureGate.Enabled(features.SchedulerAsyncPreemption),
 		EnablePodLevelResources:                       featureGate.Enabled(features.PodLevelResources),
 		EnableDRAPartitionableDevices:                 featureGate.Enabled(features.DRAPartitionableDevices),
 		EnableStorageCapacityScoring:                  featureGate.Enabled(features.StorageCapacityScoring),
 		EnableNodeDeclaredFeatures:                    featureGate.Enabled(features.NodeDeclaredFeatures),
 		EnableGangScheduling:                          featureGate.Enabled(features.GangScheduling),
-		EnableGenericWorkload:                         featureGate.Enabled(features.GenericWorkload),
 		EnableTaintTolerationComparisonOperators:      featureGate.Enabled(features.TaintTolerationComparisonOperators),
 		EnableInPlacePodLevelResourcesVerticalScaling: featureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling),
-		EnableTopologyAwareWorkloadScheduling:         featureGate.Enabled(features.TopologyAwareWorkloadScheduling),
-		EnableDRANodeAllocatableResources:             featureGate.Enabled(features.DRANodeAllocatableResources),
-		EnableWorkloadAwarePreemption:                 featureGate.Enabled(features.WorkloadAwarePreemption),
 	}
 }

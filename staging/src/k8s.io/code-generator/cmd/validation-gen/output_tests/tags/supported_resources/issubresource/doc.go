@@ -19,7 +19,6 @@ limitations under the License.
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 
 // This is a test package.
-// +k8s:validation-gen-nolint
 package issubresource
 
 import "k8s.io/code-generator/cmd/validation-gen/testscheme"
@@ -28,7 +27,7 @@ var localSchemeBuilder = testscheme.New()
 
 // Root resource is supported by default
 
-// +k8s:isSubresource="/scale"
+// +k8s:isSubresource=/scale
 
 // T1 is a test type
 type T1 struct {

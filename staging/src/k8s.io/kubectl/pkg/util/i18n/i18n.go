@@ -121,9 +121,7 @@ func loadSystemLanguage() string {
 	}
 	pieces := strings.Split(langStr, ".")
 	if len(pieces) != 2 {
-		if langStr != "C" {
-			klog.V(3).Infof("Unexpected system language (%s), defaulting to en_US", langStr)
-		}
+		klog.V(3).Infof("Unexpected system language (%s), defaulting to en_US", langStr)
 		return "default"
 	}
 	return pieces[0]

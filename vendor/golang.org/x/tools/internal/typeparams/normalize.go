@@ -160,7 +160,8 @@ func computeTermSetInternal(t types.Type, seen map[types.Type]*termSet, depth in
 		// The term set of an interface is the intersection of the term sets of its
 		// embedded types.
 		tset.terms = allTermlist
-		for embedded := range u.EmbeddedTypes() {
+		for i := 0; i < u.NumEmbeddeds(); i++ {
+			embedded := u.EmbeddedType(i)
 			if _, ok := embedded.Underlying().(*types.TypeParam); ok {
 				return nil, fmt.Errorf("invalid embedded type %T", embedded)
 			}
@@ -173,7 +174,8 @@ func computeTermSetInternal(t types.Type, seen map[types.Type]*termSet, depth in
 	case *types.Union:
 		// The term set of a union is the union of term sets of its terms.
 		tset.terms = nil
-		for t := range u.Terms() {
+		for i := 0; i < u.Len(); i++ {
+			t := u.Term(i)
 			var terms termlist
 			switch t.Type().Underlying().(type) {
 			case *types.Interface:

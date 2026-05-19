@@ -107,7 +107,7 @@ type pluginManager struct {
 var _ PluginManager = &pluginManager{}
 
 func (pm *pluginManager) Run(ctx context.Context, sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
-	defer runtime.HandleCrashWithContext(ctx)
+	defer runtime.HandleCrash()
 
 	logger := klog.FromContext(ctx)
 

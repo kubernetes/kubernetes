@@ -44,18 +44,18 @@ type PodStatusPatchCall struct {
 	podRef klog.ObjectRef
 	// podStatus contains the actual status of the pod.
 	podStatus *v1.PodStatus
-	// newConditions is a list of conditions to update.
-	newConditions []*v1.PodCondition
+	// newCondition is a condition to update.
+	newCondition *v1.PodCondition
 	// nominatingInfo is a nominating info to update.
 	nominatingInfo *fwk.NominatingInfo
 }
 
-func NewPodStatusPatchCall(pod *v1.Pod, conditions []*v1.PodCondition, nominatingInfo *fwk.NominatingInfo) *PodStatusPatchCall {
+func NewPodStatusPatchCall(pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) *PodStatusPatchCall {
 	return &PodStatusPatchCall{
 		podUID:         pod.UID,
 		podRef:         klog.KObj(pod),
 		podStatus:      pod.Status.DeepCopy(),
-		newConditions:  conditions,
+		newCondition:   condition,
 		nominatingInfo: nominatingInfo,
 	}
 }
@@ -68,17 +68,14 @@ func (psuc *PodStatusPatchCall) UID() types.UID {
 	return psuc.podUID
 }
 
-// syncStatus syncs the given status with conditions and nominatingInfo. It returns true if anything was actually updated.
-func syncStatus(status *v1.PodStatus, condition []*v1.PodCondition, nominatingInfo *fwk.NominatingInfo) bool {
+// syncStatus syncs the given status with condition and nominatingInfo. It returns true if anything was actually updated.
+func syncStatus(status *v1.PodStatus, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) bool {
 	nnnNeedsUpdate := nominatingInfo.Mode() == fwk.ModeOverride && status.NominatedNodeName != nominatingInfo.NominatedNodeName
-	anyUpdated := false
-	for _, cond := range condition {
-		updated := podutil.UpdatePodCondition(status, cond)
-		if updated {
-			anyUpdated = true
+	if condition != nil {
+		if !podutil.UpdatePodCondition(status, condition) && !nnnNeedsUpdate {
+			return false
 		}
-	}
-	if !anyUpdated && !nnnNeedsUpdate {
+	} else if !nnnNeedsUpdate {
 		return false
 	}
 	if nnnNeedsUpdate {
@@ -91,21 +88,18 @@ func (psuc *PodStatusPatchCall) Execute(ctx context.Context, client clientset.In
 	psuc.lock.Lock()
 	// Executed flag is set not to race with podStatus write in Sync afterwards.
 	psuc.executed = true
-	conditions := make([]*v1.PodCondition, 0, len(psuc.newConditions))
-	for _, condition := range psuc.newConditions {
-		conditions = append(conditions, condition.DeepCopy())
-	}
+	condition := psuc.newCondition.DeepCopy()
 	podStatusCopy := psuc.podStatus.DeepCopy()
 	psuc.lock.Unlock()
 
 	logger := klog.FromContext(ctx)
-	for _, condition := range conditions {
+	if condition != nil {
 		logger.V(3).Info("Updating pod condition", "pod", psuc.podRef, "conditionType", condition.Type, "conditionStatus", condition.Status, "conditionReason", condition.Reason)
 	}
 
 	// Sync status to have the condition and nominatingInfo applied on a podStatusCopy.
-	anySynced := syncStatus(podStatusCopy, conditions, psuc.nominatingInfo)
-	if !anySynced {
+	synced := syncStatus(podStatusCopy, condition, psuc.nominatingInfo)
+	if !synced {
 		logger.V(5).Info("Pod status patch call does not need to be executed because it has no effect", "pod", psuc.podRef)
 		return nil
 	}
@@ -132,16 +126,13 @@ func (psuc *PodStatusPatchCall) Sync(obj metav1.Object) (metav1.Object, error) {
 		// because otherwise it's irrelevant and might race.
 		psuc.podStatus = pod.Status.DeepCopy()
 	}
-	newConditions := make([]*v1.PodCondition, 0, len(psuc.newConditions))
-	for _, condition := range psuc.newConditions {
-		newConditions = append(newConditions, condition.DeepCopy())
-	}
+	newCondition := psuc.newCondition.DeepCopy()
 	psuc.lock.Unlock()
 
 	podCopy := pod.DeepCopy()
-	// Sync status to have the condition and nominatingInfo applied on a podCopy.
-	anySynced := syncStatus(&podCopy.Status, newConditions, psuc.nominatingInfo)
-	if !anySynced {
+	// Sync passed pod's status with the call's condition and nominatingInfo.
+	synced := syncStatus(&podCopy.Status, newCondition, psuc.nominatingInfo)
+	if !synced {
 		return pod, nil
 	}
 	return podCopy, nil
@@ -156,17 +147,9 @@ func (psuc *PodStatusPatchCall) Merge(oldCall fwk.APICall) error {
 		// Set a nominatingInfo from an old call if the new one is no-op.
 		psuc.nominatingInfo = oldPsuc.nominatingInfo
 	}
-	for _, cond := range oldPsuc.newConditions {
-		found := false
-		for _, newCond := range psuc.newConditions {
-			if newCond.Type == cond.Type {
-				found = true
-				break
-			}
-		}
-		if !found {
-			psuc.newConditions = append(psuc.newConditions, cond)
-		}
+	if psuc.newCondition == nil && oldPsuc.newCondition != nil {
+		// Set a condition from an old call if the new one is nil.
+		psuc.newCondition = oldPsuc.newCondition
 	}
 	return nil
 }
@@ -193,10 +176,8 @@ func (psuc *PodStatusPatchCall) IsNoOp() bool {
 	if nnnNeedsUpdate {
 		return false
 	}
-	for _, condition := range psuc.newConditions {
-		if conditionNeedsUpdate(psuc.podStatus, condition) {
-			return false
-		}
+	if psuc.newCondition == nil {
+		return true
 	}
-	return true
+	return !conditionNeedsUpdate(psuc.podStatus, psuc.newCondition)
 }

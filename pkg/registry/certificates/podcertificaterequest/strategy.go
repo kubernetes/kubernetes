@@ -41,7 +41,7 @@ import (
 
 // strategy implements behavior for PodCertificateRequests.
 type Strategy struct {
-	rest.DeclarativeValidation
+	runtime.ObjectTyper
 	names.NameGenerator
 }
 
@@ -51,8 +51,8 @@ var _ rest.RESTDeleteStrategy = (*Strategy)(nil)
 
 func NewStrategy() *Strategy {
 	return &Strategy{
-		DeclarativeValidation: rest.DeclarativeValidation{Scheme: legacyscheme.Scheme},
-		NameGenerator:         names.SimpleNameGenerator,
+		ObjectTyper:   legacyscheme.Scheme,
+		NameGenerator: names.SimpleNameGenerator,
 	}
 }
 
@@ -76,7 +76,7 @@ func (s *Strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []s
 
 func (s *Strategy) Canonicalize(obj runtime.Object) {}
 
-func (s *Strategy) AllowCreateOnUpdate(ctx context.Context) bool {
+func (s *Strategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
@@ -96,18 +96,18 @@ func (s *Strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object
 	return nil
 }
 
-func (s *Strategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+func (s *Strategy) AllowUnconditionalUpdate() bool {
 	return false
 }
 
 // StatusStrategy is the strategy for the status subresource.
 type StatusStrategy struct {
 	*Strategy
-	authorizer authorizer.UnconditionalAuthorizer
+	authorizer authorizer.Authorizer
 	clock      clock.PassiveClock
 }
 
-func NewStatusStrategy(strategy *Strategy, authorizer authorizer.UnconditionalAuthorizer, clock clock.PassiveClock) *StatusStrategy {
+func NewStatusStrategy(strategy *Strategy, authorizer authorizer.Authorizer, clock clock.PassiveClock) *StatusStrategy {
 	return &StatusStrategy{
 		Strategy:   strategy,
 		authorizer: authorizer,
@@ -119,8 +119,7 @@ func NewStatusStrategy(strategy *Strategy, authorizer authorizer.UnconditionalAu
 // and should not be modified by the user.
 func (s *StatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
-		"certificates.k8s.io/v1beta1": fieldpath.NewSet(
-			fieldpath.MakePathOrDie("metadata"),
+		"certificates.k8s.io/v1alpha1": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("spec"),
 		),
 	}

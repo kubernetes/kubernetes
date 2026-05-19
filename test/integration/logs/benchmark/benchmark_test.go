@@ -317,7 +317,7 @@ func generateOutput(b *testing.B, config loadGeneratorConfig, files ...*os.File)
 			defer wg.Done()
 
 			acc := 0.0
-			for range n {
+			for i := 0; i < n; i++ {
 				if acc > 100 {
 					klog.ErrorS(err, msg, "key", "value")
 					acc -= 100

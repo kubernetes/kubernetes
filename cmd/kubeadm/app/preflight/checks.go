@@ -19,7 +19,6 @@ package preflight
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -31,7 +30,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 	"time"
 
@@ -96,7 +94,7 @@ func (crc ContainerRuntimeCheck) Check() (warnings, errorList []error) {
 	if err := containerRuntime.Connect(); err != nil {
 		return nil, []error{errors.Wrap(err, "could not connect to the container runtime")}
 	}
-	defer containerRuntime.Close(context.Background())
+	defer containerRuntime.Close()
 
 	if err := containerRuntime.IsRunning(); err != nil {
 		errorList = append(errorList, err)
@@ -127,17 +125,17 @@ func (crvc ContainerRuntimeVersionCheck) Check() (warnings, errorList []error) {
 	if err := containerRuntime.Connect(); err != nil {
 		return nil, []error{errors.Wrap(err, "could not connect to the container runtime")}
 	}
-	defer containerRuntime.Close(context.Background())
+	defer containerRuntime.Close()
 
 	ok, err := containerRuntime.IsRuntimeConfigImplemented()
 	if err != nil {
 		return nil, []error{errors.Wrap(err, "could not check if the runtime config is available")}
 	}
 	if !ok {
-		// TODO: return an error once the kubelet version is 1.38 or higher.
+		// TODO: return an error once the kubelet version is 1.36 or higher.
 		// https://github.com/kubernetes/kubeadm/issues/3229
 		err := errors.New("You must update your container runtime to a version that supports the CRI method RuntimeConfig. " +
-			"Falling back to using cgroupDriver from kubelet config will be removed in 1.38. " +
+			"Falling back to using cgroupDriver from kubelet config will be removed in 1.36. " +
 			"For more information, see https://git.k8s.io/enhancements/keps/sig-node/4033-group-driver-detection-over-cri")
 		warnings = append(warnings, err)
 	}
@@ -223,13 +221,11 @@ func (fc FirewalldCheck) Check() (warnings, errorList []error) {
 
 // PortOpenCheck ensures the given port is available for use.
 type PortOpenCheck struct {
-	address    string
-	port       int
-	label      string
-	listenFunc func(string, string) (net.Listener, error)
+	port  int
+	label string
 }
 
-// Name returns name for PortOpenCheck. If not known, will return "Port-XXXX" based on port number
+// Name returns name for PortOpenCheck. If not known, will return "PortXXXX" based on port number
 func (poc PortOpenCheck) Name() string {
 	if poc.label != "" {
 		return poc.label
@@ -239,19 +235,9 @@ func (poc PortOpenCheck) Name() string {
 
 // Check validates if the particular port is available.
 func (poc PortOpenCheck) Check() (warnings, errorList []error) {
-	klog.V(1).Infof("validating availability of port %d on address %q", poc.port, poc.address)
+	klog.V(1).Infof("validating availability of port %d", poc.port)
 
-	listenAddress := ":" + strconv.Itoa(poc.port)
-	if poc.address != "" {
-		listenAddress = net.JoinHostPort(poc.address, strconv.Itoa(poc.port))
-	}
-
-	listen := poc.listenFunc
-	if listen == nil {
-		listen = net.Listen
-	}
-
-	ln, err := listen("tcp", listenAddress)
+	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", poc.port))
 	if err != nil {
 		errorList = []error{errors.Errorf("Port %d is in use", poc.port)}
 	}
@@ -897,7 +883,7 @@ func (ipc ImagePullCheck) Check() (warnings, errorList []error) {
 	if err := containerRuntime.Connect(); err != nil {
 		return nil, []error{errors.Wrap(err, "could not connect to the container runtime")}
 	}
-	defer containerRuntime.Close(context.Background())
+	defer containerRuntime.Close()
 
 	// Handle unsupported image pull policy and policy Never.
 	policy := ipc.imagePullPolicy
@@ -981,13 +967,6 @@ func (MemCheck) Name() string {
 // InitNodeChecks returns checks specific to "kubeadm init"
 func InitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguration, ignorePreflightErrors sets.Set[string], isSecondaryControlPlane bool, downloadCerts bool) ([]Checker, error) {
 	manifestsDir := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ManifestsSubDirName)
-
-	// Check if the user has configured a bind address for control plane components
-	// in extraArgs. If so, use it for the PortOpenCheck to avoid false positives.
-	apiServerBindAddress, _ := kubeadmapi.GetArgValue(cfg.APIServer.ExtraArgs, "bind-address", -1)
-	schedulerBindAddress, _ := kubeadmapi.GetArgValue(cfg.Scheduler.ExtraArgs, "bind-address", -1)
-	controllerManagerBindAddress, _ := kubeadmapi.GetArgValue(cfg.ControllerManager.ExtraArgs, "bind-address", -1)
-
 	checks := []Checker{
 		NumCPUCheck{NumCPU: kubeadmconstants.ControlPlaneNumCPU},
 		// Linux only
@@ -995,9 +974,9 @@ func InitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguratio
 		MemCheck{Mem: kubeadmconstants.ControlPlaneMem},
 		KubernetesVersionCheck{KubernetesVersion: cfg.KubernetesVersion, KubeadmVersion: kubeadmversion.Get().GitVersion},
 		FirewalldCheck{ports: []int{int(cfg.LocalAPIEndpoint.BindPort), kubeadmconstants.KubeletPort}},
-		PortOpenCheck{port: int(cfg.LocalAPIEndpoint.BindPort), address: apiServerBindAddress},
-		PortOpenCheck{port: kubeadmconstants.KubeSchedulerPort, address: schedulerBindAddress},
-		PortOpenCheck{port: kubeadmconstants.KubeControllerManagerPort, address: controllerManagerBindAddress},
+		PortOpenCheck{port: int(cfg.LocalAPIEndpoint.BindPort)},
+		PortOpenCheck{port: kubeadmconstants.KubeSchedulerPort},
+		PortOpenCheck{port: kubeadmconstants.KubeControllerManagerPort},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeAPIServer, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeControllerManager, manifestsDir)},
 		FileAvailableCheck{Path: kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.KubeScheduler, manifestsDir)},
@@ -1064,16 +1043,10 @@ func InitNodeChecks(execer utilsexec.Interface, cfg *kubeadmapi.InitConfiguratio
 	}
 
 	if cfg.Etcd.Local != nil {
-		// Only do etcd related checks when required to install a local etcd.
-		// Etcd uses the same IP as the API server advertise address, not the bind address.
-		// Use the --advertise-address from extraArgs if defined, otherwise fall back to LocalAPIEndpoint.AdvertiseAddress.
-		etcdAddress := cfg.LocalAPIEndpoint.AdvertiseAddress
-		if advertiseAddress, _ := kubeadmapi.GetArgValue(cfg.APIServer.ExtraArgs, "advertise-address", -1); advertiseAddress != "" {
-			etcdAddress = advertiseAddress
-		}
+		// Only do etcd related checks when required to install a local etcd
 		checks = append(checks,
-			PortOpenCheck{port: kubeadmconstants.EtcdListenClientPort, address: etcdAddress},
-			PortOpenCheck{port: kubeadmconstants.EtcdListenPeerPort, address: etcdAddress},
+			PortOpenCheck{port: kubeadmconstants.EtcdListenClientPort},
+			PortOpenCheck{port: kubeadmconstants.EtcdListenPeerPort},
 			DirAvailableCheck{Path: cfg.Etcd.Local.DataDir},
 		)
 	}

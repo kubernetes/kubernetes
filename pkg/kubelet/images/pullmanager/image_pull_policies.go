@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	imageref "github.com/distribution/reference"
+	dockerref "github.com/distribution/reference"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -110,19 +110,11 @@ func (p *NeverVerifyAllowlistedImages) RequireCredentialVerificationForImage(ima
 }
 
 func (p *NeverVerifyAllowlistedImages) imageMatches(image string) bool {
-	noTagsName, err := trimImageTagDigest(image)
-	if err != nil {
-		// in a best-effort manner, we should still attempt to match with what
-		// we've got from the user
-		noTagsName = image
-	}
-
-	if p.absoluteURLs.Has(noTagsName) {
+	if p.absoluteURLs.Has(image) {
 		return true
 	}
-
 	for _, prefix := range p.prefixes {
-		if strings.HasPrefix(noTagsName, prefix) {
+		if strings.HasPrefix(image, prefix) {
 			return true
 		}
 	}
@@ -163,12 +155,12 @@ func getAllowlistImagePattern(pattern string) (string, bool, error) {
 			return "", false, fmt.Errorf("at least registry hostname is required")
 		}
 	} else { // not a wildcard
-		image, err := trimImageTagDigest(trimmedPattern)
+		image, err := dockerref.ParseNormalizedNamed(trimmedPattern)
 		if err != nil {
 			return "", false, fmt.Errorf("failed to parse as an image name: %w", err)
 		}
 
-		if trimmedPattern != image {
+		if trimmedPattern != image.Name() { // image.Name() returns the image name without tag/digest
 			return "", false, fmt.Errorf("neither tag nor digest is accepted in an image reference: %s", pattern)
 		}
 
@@ -176,37 +168,4 @@ func getAllowlistImagePattern(pattern string) (string, bool, error) {
 	}
 
 	return trimmedPattern, true, nil
-}
-
-// trimImageTagDigest trims digest and tag from an image name
-func trimImageTagDigest(image string) (string, error) {
-	imageParsed, err := imageref.Parse(image)
-	if err != nil {
-		return "", err
-	}
-	var tag, digest string
-	if tagged, ok := imageParsed.(imageref.Tagged); ok {
-		tag = tagged.Tag()
-	}
-	if digested, ok := imageParsed.(imageref.Digested); ok {
-		digest = digested.Digest().String()
-	}
-
-	if len(digest) > 0 {
-		var foundDigest bool
-		image, foundDigest = strings.CutSuffix(image, "@"+digest)
-		if !foundDigest {
-			return "", fmt.Errorf("digest was not specified last, this does not appear to be a valid image spec: %q", image)
-		}
-	}
-
-	if len(tag) > 0 {
-		var tagFound bool
-		image, tagFound = strings.CutSuffix(image, ":"+tag)
-		if !tagFound {
-			return "", fmt.Errorf("tag %q was not specified last (or before the digest), this does not appear to be a valid image spec: %q", tag, image)
-		}
-	}
-
-	return image, nil
 }

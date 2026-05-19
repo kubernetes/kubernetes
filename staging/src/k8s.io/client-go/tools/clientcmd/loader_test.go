@@ -122,7 +122,6 @@ func TestNonExistentCommandLineFile(t *testing.T) {
 	}
 }
 
-//nolint:logcheck // Tests klog APIs.
 func TestToleratingMissingFiles(t *testing.T) {
 	envVarValue := "bogus"
 	loadingRules := ClientConfigLoadingRules{
@@ -147,7 +146,6 @@ func TestToleratingMissingFiles(t *testing.T) {
 	}
 }
 
-//nolint:logcheck // Tests klog APIs.
 func TestWarningMissingFiles(t *testing.T) {
 	envVarValue := "bogus"
 	t.Setenv(RecommendedConfigPathEnvVar, envVarValue)
@@ -173,7 +171,6 @@ func TestWarningMissingFiles(t *testing.T) {
 	}
 }
 
-//nolint:logcheck // Tests klog APIs.
 func TestNoWarningMissingFiles(t *testing.T) {
 	envVarValue := "bogus"
 	t.Setenv(RecommendedConfigPathEnvVar, envVarValue)

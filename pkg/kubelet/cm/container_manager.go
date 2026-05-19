@@ -60,7 +60,7 @@ const (
 
 type ActivePodsFunc func() []*v1.Pod
 
-type GetNodeFunc func(context.Context) (*v1.Node, error)
+type GetNodeFunc func() (*v1.Node, error)
 
 // Manages the containers running on a machine.
 type ContainerManager interface {
@@ -193,7 +193,6 @@ type NodeConfig struct {
 	CPUManagerReconcilePeriod    time.Duration
 	MemoryManagerPolicy          string
 	MemoryManagerReservedMemory  []kubeletconfig.MemoryReservation
-	MemoryReservationPolicy      kubeletconfig.MemoryReservationPolicy
 	PodPidsLimit                 int64
 	EnforceCPULimits             bool
 	CPUCFSQuotaPeriod            time.Duration
@@ -225,25 +224,25 @@ func int64Slice(in []int) []int64 {
 	return out
 }
 
-func podHasExclusiveCPUs(logger klog.Logger, cr cpuAllocationReader, pod *v1.Pod) bool {
+func podHasExclusiveCPUs(cr cpuAllocationReader, pod *v1.Pod) bool {
 	for _, container := range pod.Spec.InitContainers {
-		if containerHasExclusiveCPUs(logger, cr, pod, &container) {
+		if containerHasExclusiveCPUs(cr, pod, &container) {
 			return true
 		}
 	}
 	for _, container := range pod.Spec.Containers {
-		if containerHasExclusiveCPUs(logger, cr, pod, &container) {
+		if containerHasExclusiveCPUs(cr, pod, &container) {
 			return true
 		}
 	}
-	logger.V(4).Info("Pod contains no container with pinned cpus", "podName", pod.Name)
+	klog.V(4).InfoS("Pod contains no container with pinned cpus", "podName", pod.Name)
 	return false
 }
 
-func containerHasExclusiveCPUs(logger klog.Logger, cr cpuAllocationReader, pod *v1.Pod, container *v1.Container) bool {
+func containerHasExclusiveCPUs(cr cpuAllocationReader, pod *v1.Pod, container *v1.Container) bool {
 	exclusiveCPUs := cr.GetExclusiveCPUs(string(pod.UID), container.Name)
 	if !exclusiveCPUs.IsEmpty() {
-		logger.V(4).Info("Container has pinned cpus", "podName", pod.Name, "containerName", container.Name)
+		klog.V(4).InfoS("Container has pinned cpus", "podName", pod.Name, "containerName", container.Name)
 		return true
 	}
 	return false

@@ -11,9 +11,7 @@ import (
 
 // CoreType returns the core type of T or nil if T does not have a core type.
 //
-// As of Go1.25, the notion of a core type has been removed from the language spec.
-// See https://go.dev/blog/coretypes for more details.
-// TODO(mkalil): We should eventually consider removing all uses of CoreType.
+// See https://go.dev/ref/spec#Core_types for the definition of a core type.
 func CoreType(T types.Type) types.Type {
 	U := T.Underlying()
 	if _, ok := U.(*types.Interface); !ok {
@@ -36,7 +34,7 @@ func CoreType(T types.Type) types.Type {
 	}
 
 	if identical == len(terms) {
-		// From the deprecated core types spec:
+		// https://go.dev/ref/spec#Core_types
 		// "There is a single type U which is the underlying type of all types in the type set of T"
 		return U
 	}
@@ -44,7 +42,7 @@ func CoreType(T types.Type) types.Type {
 	if !ok {
 		return nil // no core type as identical < len(terms) and U is not a channel.
 	}
-	// From the deprecated core types spec:
+	// https://go.dev/ref/spec#Core_types
 	// "the type chan E if T contains only bidirectional channels, or the type chan<- E or
 	// <-chan E depending on the direction of the directional channels present."
 	for chans := identical; chans < len(terms); chans++ {

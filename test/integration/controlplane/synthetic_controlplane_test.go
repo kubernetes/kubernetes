@@ -293,21 +293,21 @@ func constructBody(val string, size int, field string, t *testing.T) *appsv1.Dep
 	switch field {
 	case "labels":
 		labelsMap := map[string]string{}
-		for i := range size {
+		for i := 0; i < size; i++ {
 			key := val + strconv.Itoa(i)
 			labelsMap[key] = val
 		}
 		deploymentObject.ObjectMeta.Labels = labelsMap
 	case "annotations":
 		annotationsMap := map[string]string{}
-		for i := range size {
+		for i := 0; i < size; i++ {
 			key := val + strconv.Itoa(i)
 			annotationsMap[key] = val
 		}
 		deploymentObject.ObjectMeta.Annotations = annotationsMap
 	case "finalizers":
 		finalizerString := []string{}
-		for range size {
+		for i := 0; i < size; i++ {
 			finalizerString = append(finalizerString, val)
 		}
 		deploymentObject.ObjectMeta.Finalizers = finalizerString
@@ -732,9 +732,9 @@ func TestUpdateNodeObjects(t *testing.T) {
 		}
 	}
 
-	for k := range listers {
+	for k := 0; k < listers; k++ {
 		go func(lister int) {
-			for i := range iterations {
+			for i := 0; i < iterations; i++ {
 				_, err := c.Nodes().List(context.TODO(), metav1.ListOptions{})
 				if err != nil {
 					fmt.Printf("[list:%d] error after %d: %v\n", lister, i, err)
@@ -745,7 +745,7 @@ func TestUpdateNodeObjects(t *testing.T) {
 		}(k)
 	}
 
-	for k := range watchers {
+	for k := 0; k < watchers; k++ {
 		go func(lister int) {
 			w, err := c.Nodes().Watch(context.TODO(), metav1.ListOptions{})
 			if err != nil {
@@ -769,10 +769,10 @@ func TestUpdateNodeObjects(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(nodes - listers)
 
-	for j := range nodes {
+	for j := 0; j < nodes; j++ {
 		go func(node int) {
 			var lastCount int
-			for i := range iterations {
+			for i := 0; i < iterations; i++ {
 				if i%100 == 0 {
 					fmt.Printf("[%d] iteration %d ...\n", node, i)
 				}

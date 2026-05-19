@@ -557,7 +557,7 @@ func (c *Command) FlagErrorFunc() (f func(*Command, error) error) {
 	}
 }
 
-const minUsagePadding = 25
+var minUsagePadding = 25
 
 // UsagePadding return padding for the usage.
 func (c *Command) UsagePadding() int {
@@ -567,7 +567,7 @@ func (c *Command) UsagePadding() int {
 	return c.parent.commandsMaxUseLen
 }
 
-const minCommandPathPadding = 11
+var minCommandPathPadding = 11
 
 // CommandPathPadding return padding for the command path.
 func (c *Command) CommandPathPadding() int {
@@ -577,7 +577,7 @@ func (c *Command) CommandPathPadding() int {
 	return c.parent.commandsMaxCommandPathLen
 }
 
-const minNamePadding = 11
+var minNamePadding = 11
 
 // NamePadding returns padding for the name.
 func (c *Command) NamePadding() int {
@@ -1939,7 +1939,7 @@ type tmplFunc struct {
 	fn   func(io.Writer, interface{}) error
 }
 
-const defaultUsageTemplate = `Usage:{{if .Runnable}}
+var defaultUsageTemplate = `Usage:{{if .Runnable}}
   {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
   {{.CommandPath}} [command]{{end}}{{if gt (len .Aliases) 0}}
 
@@ -2039,7 +2039,7 @@ func defaultUsageFunc(w io.Writer, in interface{}) error {
 	return nil
 }
 
-const defaultHelpTemplate = `{{with (or .Long .Short)}}{{. | trimTrailingWhitespaces}}
+var defaultHelpTemplate = `{{with (or .Long .Short)}}{{. | trimTrailingWhitespaces}}
 
 {{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}`
 
@@ -2061,7 +2061,7 @@ func defaultHelpFunc(w io.Writer, in interface{}) error {
 	return nil
 }
 
-const defaultVersionTemplate = `{{with .DisplayName}}{{printf "%s " .}}{{end}}{{printf "version %s" .Version}}
+var defaultVersionTemplate = `{{with .DisplayName}}{{printf "%s " .}}{{end}}{{printf "version %s" .Version}}
 `
 
 // defaultVersionFunc is equivalent to executing defaultVersionTemplate. The two should be changed in sync.

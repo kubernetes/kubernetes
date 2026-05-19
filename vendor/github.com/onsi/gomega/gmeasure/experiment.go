@@ -456,7 +456,10 @@ func (e *Experiment) Sample(callback func(idx int), samplingConfig SamplingConfi
 	if samplingConfig.N > 0 {
 		maxN = samplingConfig.N
 	}
-	numParallel := max(samplingConfig.NumParallel, 1)
+	numParallel := 1
+	if samplingConfig.NumParallel > numParallel {
+		numParallel = samplingConfig.NumParallel
+	}
 	minSamplingInterval := samplingConfig.MinSamplingInterval
 
 	work := make(chan int)

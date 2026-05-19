@@ -6,43 +6,27 @@ package cbor
 import (
 	"reflect"
 	"sort"
-	"strconv"
 	"strings"
 )
 
-// field holds shared struct field metadata returned by getFields().
 type field struct {
-	name      string
-	nameAsInt int64 // used to match field name with CBOR int
-	idx       []int
-	typ       reflect.Type // used during cache building only
-	keyAsInt  bool         // used to encode/decode field name as int
-	tagged    bool         // used to choose dominant field (at the same level tagged fields dominate untagged fields)
-	omitEmpty bool         // used to skip empty field
-	omitZero  bool         // used to skip zero field
-}
-
-type fields []*field
-
-// encodingField extends field with encoding-specific data.
-type encodingField struct {
-	field
+	name               string
+	nameAsInt          int64 // used to decoder to match field name with CBOR int
 	cborName           []byte
-	cborNameByteString []byte // major type 2 name encoding if cborName has major type 3
+	cborNameByteString []byte // major type 2 name encoding iff cborName has major type 3
+	idx                []int
+	typ                reflect.Type
 	ef                 encodeFunc
 	ief                isEmptyFunc
 	izf                isZeroFunc
+	typInfo            *typeInfo // used to decoder to reuse type info
+	tagged             bool      // used to choose dominant field (at the same level tagged fields dominate untagged fields)
+	omitEmpty          bool      // used to skip empty field
+	omitZero           bool      // used to skip zero field
+	keyAsInt           bool      // used to encode/decode field name as int
 }
 
-type encodingFields []*encodingField
-
-// decodingField extends field with decoding-specific data.
-type decodingField struct {
-	field
-	typInfo *typeInfo // used by decoder to reuse type info
-}
-
-type decodingFields []*decodingField
+type fields []*field
 
 // indexFieldSorter sorts fields by field idx at each level, breaking ties with idx depth.
 type indexFieldSorter struct {
@@ -64,7 +48,7 @@ func (x *indexFieldSorter) Less(i, j int) bool {
 			return iIdx[k] < jIdx[k]
 		}
 	}
-	return len(iIdx) < len(jIdx)
+	return len(iIdx) <= len(jIdx)
 }
 
 // nameLevelAndTagFieldSorter sorts fields by field name, idx depth, and presence of tag.
@@ -84,10 +68,6 @@ func (x *nameLevelAndTagFieldSorter) Less(i, j int) bool {
 	fi, fj := x.fields[i], x.fields[j]
 	if fi.name != fj.name {
 		return fi.name < fj.name
-	}
-	// Fields with the same name but different keyAsInt are in separate namespaces.
-	if fi.keyAsInt != fj.keyAsInt {
-		return fi.keyAsInt
 	}
 	if len(fi.idx) != len(fj.idx) {
 		return len(fi.idx) < len(fj.idx)
@@ -137,37 +117,22 @@ func getFields(t reflect.Type) (flds fields, structOptions string) {
 		}
 	}
 
-	// Normalize keyasint field names to their canonical integer string form.
-	// This ensures that "01", "+1", and "1" are treated as the same key
-	// during deduplication.
-	for _, f := range flds {
-		if f.keyAsInt {
-			nameAsInt, err := strconv.Atoi(f.name)
-			if err != nil {
-				continue // Leave invalid names for callers to report.
-			}
-			f.nameAsInt = int64(nameAsInt)
-			f.name = strconv.Itoa(nameAsInt)
-		}
-	}
-
 	sort.Sort(&nameLevelAndTagFieldSorter{flds})
 
 	// Keep visible fields.
 	j := 0 // index of next unique field
 	for i := 0; i < len(flds); {
 		name := flds[i].name
-		keyAsInt := flds[i].keyAsInt
 		if i == len(flds)-1 || // last field
-			name != flds[i+1].name || flds[i+1].keyAsInt != keyAsInt || // field i has unique (name, keyAsInt)
+			name != flds[i+1].name || // field i has unique field name
 			len(flds[i].idx) < len(flds[i+1].idx) || // field i is at a less nested level than field i+1
 			(flds[i].tagged && !flds[i+1].tagged) { // field i is tagged while field i+1 is not
 			flds[j] = flds[i]
 			j++
 		}
 
-		// Skip fields with the same (name, keyAsInt).
-		for i++; i < len(flds) && name == flds[i].name && keyAsInt == flds[i].keyAsInt; i++ { //nolint:revive
+		// Skip fields with the same field name.
+		for i++; i < len(flds) && name == flds[i].name; i++ { //nolint:revive
 		}
 	}
 	if j != len(flds) {

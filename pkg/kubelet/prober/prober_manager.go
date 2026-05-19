@@ -124,7 +124,7 @@ func NewManager(
 	readinessManager results.Manager,
 	startupManager results.Manager,
 	runner kubecontainer.CommandRunner,
-	recorder record.EventRecorderLogger) Manager {
+	recorder record.EventRecorder) Manager {
 
 	prober := newProber(runner, recorder)
 	return &manager{

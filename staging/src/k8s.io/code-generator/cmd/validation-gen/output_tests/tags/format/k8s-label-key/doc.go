@@ -19,7 +19,6 @@ limitations under the License.
 
 // Package format is the internal version of the API.
 // +k8s:validation:internal
-// +k8s:validation-gen-nolint
 package format
 
 import "k8s.io/code-generator/cmd/validation-gen/testscheme"

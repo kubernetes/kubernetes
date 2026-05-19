@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: hostname
+  annotations:
+    cloud.google.com/neg: '{"ingress":true,"exposed_ports":{"80":{},"443":{}}}'
+spec:
+  ports:
+  - port: 80
+    name: host1
+    protocol: TCP
+    targetPort: 8000
+  - port: 443
+    name: host2
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    run: hostname
+  sessionAffinity: None
+  type: ClusterIP

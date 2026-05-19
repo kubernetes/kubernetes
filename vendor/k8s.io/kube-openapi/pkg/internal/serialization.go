@@ -24,7 +24,7 @@ import (
 // DeterministicMarshal calls the jsonv2 library with the deterministic
 // flag in order to have stable marshaling.
 func DeterministicMarshal(in any) ([]byte, error) {
-	return jsonv2.Marshal(in, jsonv2.Deterministic(true))
+	return jsonv2.MarshalOptions{Deterministic: true}.Marshal(jsonv2.EncodeOptions{}, in)
 }
 
 // JSONRefFromMap populates a json reference object if the map v contains a $ref key.

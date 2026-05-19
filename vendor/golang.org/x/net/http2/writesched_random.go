@@ -10,8 +10,6 @@ import "math"
 // priorities. Control frames like SETTINGS and PING are written before DATA
 // frames, but if no control frames are queued and multiple streams have queued
 // HEADERS or DATA frames, Pop selects a ready stream arbitrarily.
-//
-// Deprecated: User-provided write schedulers are deprecated.
 func NewRandomWriteScheduler() WriteScheduler {
 	return &randomWriteScheduler{sq: make(map[uint32]*writeQueue)}
 }

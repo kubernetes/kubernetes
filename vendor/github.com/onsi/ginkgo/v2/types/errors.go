@@ -450,15 +450,6 @@ func (g ginkgoErrors) InvalidEmptySemVerConstraint(cl CodeLocation) error {
 	}
 }
 
-func (g ginkgoErrors) InvalidEmptyComponentForSemVerConstraint(cl CodeLocation) error {
-	return GinkgoError{
-		Heading:      "Invalid Empty Component for ComponentSemVerConstraint",
-		Message:      "ComponentSemVerConstraint requires a non-empty component name",
-		CodeLocation: cl,
-		DocLink: "spec-semantic-version-filtering",
-	}
-}
-
 /* Table errors */
 func (g ginkgoErrors) MultipleEntryBodyFunctionsForTable(cl CodeLocation) error {
 	return GinkgoError{

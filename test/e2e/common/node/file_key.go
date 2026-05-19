@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
@@ -39,7 +38,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("FileKeyRef", feature.EnvFiles, framework.WithFeatureGate(features.EnvFiles), func() {
+var _ = SIGDescribe("FileKeyRef", framework.WithFeatureGate(features.EnvFiles), func() {
 	f := framework.NewDefaultFramework("filekeyref")
 	f.NamespacePodSecurityLevel = admissionapi.LevelBaseline
 

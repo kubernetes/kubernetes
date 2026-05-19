@@ -17,14 +17,12 @@ limitations under the License.
 package drain
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"math"
 	"os"
 	"reflect"
-	"slices"
 	"sort"
 	"strconv"
 	"testing"
@@ -40,7 +38,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 	ktest "k8s.io/client-go/testing"
-	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 )
 
 func TestDeletePods(t *testing.T) {
@@ -464,66 +461,6 @@ func TestDeleteOrEvict(t *testing.T) {
 	}
 }
 
-func TestDeleteOrEvictWithDryRunServer(t *testing.T) {
-	testCases := []struct {
-		description     string
-		disableEviction bool
-	}{
-		{
-			description:     "Eviction enabled with server dry-run",
-			disableEviction: false,
-		},
-		{
-			description:     "Eviction disabled with server dry-run",
-			disableEviction: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.description, func(t *testing.T) {
-			var buf bytes.Buffer
-			h := &Helper{
-				Out:                &buf,
-				GracePeriodSeconds: 10,
-				DisableEviction:    tc.disableEviction,
-				DryRunStrategy:     cmdutil.DryRunServer,
-			}
-
-			var allPods []runtime.Object
-			var podsToDelete []corev1.Pod
-
-			for i := 1; i <= 2; i++ {
-				pod := corev1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      fmt.Sprintf("mypod-%d", i),
-						Namespace: "default",
-					},
-				}
-				allPods = append(allPods, &pod)
-				podsToDelete = append(podsToDelete, pod)
-			}
-
-			k := fake.NewSimpleClientset(allPods...)
-
-			// This reactor intercepts delete requests with DryRun set and returns success without
-			// removing the object, simulating real API server dry-run behavior.
-			k.PrependReactor("delete", "pods", func(actions ktest.Action) (bool, runtime.Object, error) {
-				deleteAction := actions.(ktest.DeleteAction)
-				if slices.Contains(deleteAction.GetDeleteOptions().DryRun, metav1.DryRunAll) {
-					return true, nil, nil
-				}
-				return false, nil, nil
-			})
-			addEvictionSupport(t, k, "v1")
-			h.Client = k
-
-			if err := h.DeleteOrEvictPods(podsToDelete); err != nil {
-				t.Fatalf("error from DeleteOrEvictPods: %v", err)
-			}
-		})
-	}
-}
-
 func mockFilterSkip(_ corev1.Pod) PodDeleteStatus {
 	return MakePodDeleteStatusSkip()
 }
@@ -599,9 +536,7 @@ func TestEvictDuringNamespaceTerminating(t *testing.T) {
 	testNamespace := "default"
 
 	retryDelay := 5 * time.Millisecond
-	// Give the helper enough room for a retry plus scheduler jitter on loaded CI
-	// hosts. A 10ms total timeout is too small under -race.
-	globalTimeout := 20 * retryDelay
+	globalTimeout := 2 * retryDelay
 
 	tests := []struct {
 		description string

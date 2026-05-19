@@ -58,7 +58,7 @@ func Register(plugins *admission.Plugins) {
 type gcPermissionsEnforcement struct {
 	*admission.Handler
 
-	authorizer authorizer.UnconditionalAuthorizer
+	authorizer authorizer.Authorizer
 
 	restMapper meta.RESTMapper
 
@@ -293,7 +293,7 @@ func newBlockingOwnerDeletionRefs(newObj, oldObj runtime.Object) []metav1.OwnerR
 	return ret
 }
 
-func (a *gcPermissionsEnforcement) SetUnconditionalAuthorizer(authorizer authorizer.UnconditionalAuthorizer) {
+func (a *gcPermissionsEnforcement) SetAuthorizer(authorizer authorizer.Authorizer) {
 	a.authorizer = authorizer
 }
 

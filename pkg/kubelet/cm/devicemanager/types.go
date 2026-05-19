@@ -89,9 +89,6 @@ type Manager interface {
 	// and is consulted to make Topology aware resource alignments per Pod
 	GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint
 
-	// AllocatePod is called to trigger the allocation of resources to a pod.
-	AllocatePod(pod *v1.Pod) error
-
 	// UpdateAllocatedDevices frees any Devices that are bound to terminated pods.
 	UpdateAllocatedDevices()
 

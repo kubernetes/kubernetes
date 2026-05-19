@@ -278,7 +278,7 @@ func TestLegacyServiceAccountTokenTracking(t *testing.T) {
 
 			var wg sync.WaitGroup
 			concurrency := 5
-			for range concurrency {
+			for i := 0; i < concurrency; i++ {
 				wg.Add(1)
 				go func() {
 					doServiceAccountAPIRequests(t, roClient, myns, true, true, false)

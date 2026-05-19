@@ -63,13 +63,6 @@ type journalServer struct{}
 // to journalctl on the current system. It supports content-encoding of
 // gzip to reduce total content size.
 func (journalServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	if req.Method != http.MethodGet && req.Method != http.MethodPost {
-		// Only GET and POST are supported for journal log queries.
-		w.Header().Set("Allow", "GET, POST")
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
 	var out io.Writer = w
 
 	nlq, errs := newNodeLogQuery(req.URL.Query())
@@ -439,7 +432,7 @@ func heuristicsCopyFileLog(ctx context.Context, w io.Writer, logDir, logFileName
 func safeServiceName(s string) error {
 	// Max length of a service name is 256 across supported OSes
 	if len(s) > maxServiceLength {
-		return fmt.Errorf("length must be less than %d", maxServiceLength)
+		return fmt.Errorf("length must be less than 100")
 	}
 
 	if reServiceNameUnsafeCharacters.MatchString(s) {

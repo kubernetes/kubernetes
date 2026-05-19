@@ -28,7 +28,6 @@ func OCIPlatformToProto(platforms []oci.Platform) []*Platform {
 			OSVersion:    platforms[i].OSVersion,
 			Architecture: platforms[i].Architecture,
 			Variant:      platforms[i].Variant,
-			OSFeatures:   platforms[i].OSFeatures,
 		}
 	}
 	return ap
@@ -44,7 +43,6 @@ func OCIPlatformFromProto(platforms []*Platform) []oci.Platform {
 			OSVersion:    platforms[i].OSVersion,
 			Architecture: platforms[i].Architecture,
 			Variant:      platforms[i].Variant,
-			OSFeatures:   platforms[i].OSFeatures,
 		}
 	}
 	return op

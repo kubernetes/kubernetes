@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"slices"
 	"strings"
 	"time"
 
@@ -190,8 +189,8 @@ type PersistentVolumeController struct {
 	// version errors in API server and other checks in this controller),
 	// however overall speed of multi-worker controller would be lower than if
 	// it runs single thread only.
-	claimQueue  workqueue.TypedRateLimitingInterface[string]
-	volumeQueue workqueue.TypedRateLimitingInterface[string]
+	claimQueue  *workqueue.Typed[string]
+	volumeQueue *workqueue.Typed[string]
 
 	// Map of scheduled/running operations.
 	runningOperations goroutinemap.GoRoutineMap
@@ -1325,22 +1324,6 @@ func (ctrl *PersistentVolumeController) deleteVolumeOperation(ctx context.Contex
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("DeleteVolumeOperation started", "volumeName", volume.Name)
 
-	plugin, err := ctrl.findDeletablePlugin(volume)
-	if err != nil {
-		if _, err := ctrl.updateVolumePhaseWithEvent(ctx, volume, v1.VolumeFailed, v1.EventTypeWarning, events.VolumeFailedDelete, err.Error()); err != nil {
-			logger.V(4).Info("DeleteVolumeOperation: failed to mark volume as failed", "volumeName", volume.Name, "err", err)
-			// Save failed, retry on the next deletion attempt
-			return "", err
-		}
-	}
-	if plugin == nil {
-		// External deleter is requested, do nothing
-		logger.V(3).Info("External deleter for volume requested, ignoring", "volumeName", volume.Name)
-		return "", nil
-	}
-	pluginName := plugin.GetPluginName()
-	logger.V(5).Info("Found a deleter plugin for volume", "pluginName", pluginName, "volumeName", volume.Name)
-
 	// This method may have been waiting for a volume lock for some time.
 	// Previous deleteVolumeOperation might just have saved an updated version, so
 	// read current volume state now.
@@ -1350,6 +1333,12 @@ func (ctrl *PersistentVolumeController) deleteVolumeOperation(ctx context.Contex
 		return "", nil
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
+		if newVolume.GetDeletionTimestamp() != nil {
+			logger.V(3).Info("Volume is already being deleted", "volumeName", volume.Name)
+			return "", nil
+		}
+	}
 	needsReclaim, err := ctrl.isVolumeReleased(logger, newVolume)
 	if err != nil {
 		logger.V(3).Info("Error reading claim for volume", "volumeName", volume.Name, "err", err)
@@ -1360,7 +1349,7 @@ func (ctrl *PersistentVolumeController) deleteVolumeOperation(ctx context.Contex
 		return "", nil
 	}
 
-	err = ctrl.doDeleteVolume(ctx, plugin, volume)
+	pluginName, deleted, err := ctrl.doDeleteVolume(ctx, volume)
 	if err != nil {
 		// Delete failed, update the volume and emit an event.
 		logger.V(3).Info("Deletion of volume failed", "volumeName", volume.Name, "err", err)
@@ -1381,6 +1370,10 @@ func (ctrl *PersistentVolumeController) deleteVolumeOperation(ctx context.Contex
 		// Despite the volume being Failed, the controller will retry deleting
 		// the volume in every syncVolume() call.
 		return pluginName, err
+	}
+	if !deleted {
+		// The volume waits for deletion by an external plugin. Do nothing.
+		return pluginName, nil
 	}
 
 	logger.V(4).Info("DeleteVolumeOperation: success", "volumeName", volume.Name)
@@ -1503,17 +1496,29 @@ func (ctrl *PersistentVolumeController) findNonScheduledPodsByPVC(pvc *v1.Persis
 // the volume plugin name. Also, it returns 'true', when the volume was deleted and
 // 'false' when the volume cannot be deleted because the deleter is external. No
 // error should be reported in this case.
-func (ctrl *PersistentVolumeController) doDeleteVolume(ctx context.Context, plugin vol.DeletableVolumePlugin, volume *v1.PersistentVolume) error {
+func (ctrl *PersistentVolumeController) doDeleteVolume(ctx context.Context, volume *v1.PersistentVolume) (string, bool, error) {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("doDeleteVolume", "volumeName", volume.Name)
 	var err error
 
+	plugin, err := ctrl.findDeletablePlugin(volume)
+	if err != nil {
+		return "", false, err
+	}
+	if plugin == nil {
+		// External deleter is requested, do nothing
+		logger.V(3).Info("External deleter for volume requested, ignoring", "volumeName", volume.Name)
+		return "", false, nil
+	}
+
+	// Plugin found
 	pluginName := plugin.GetPluginName()
+	logger.V(5).Info("Found a deleter plugin for volume", "pluginName", pluginName, "volumeName", volume.Name)
 	spec := vol.NewSpecFromPersistentVolume(volume, false)
 	deleter, err := plugin.NewDeleter(logger, spec)
 	if err != nil {
 		// Cannot create deleter
-		return fmt.Errorf("failed to create deleter for volume %q: %w", volume.Name, err)
+		return pluginName, false, fmt.Errorf("failed to create deleter for volume %q: %w", volume.Name, err)
 	}
 
 	opComplete := util.OperationCompleteHook(pluginName, "volume_delete")
@@ -1521,16 +1526,22 @@ func (ctrl *PersistentVolumeController) doDeleteVolume(ctx context.Context, plug
 	opComplete(volumetypes.CompleteFuncParam{Err: &err})
 	if err != nil {
 		// Deleter failed
-		return err
+		return pluginName, false, err
 	}
 	logger.V(2).Info("Volume deleted", "volumeName", volume.Name)
-	if err := ctrl.removeDeletionProtectionFinalizer(ctx, volume); err != nil {
-		return err
+	// Remove in-tree delete finalizer on the PV as the volume has been deleted from the underlying storage
+	if utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
+		err = ctrl.removeDeletionProtectionFinalizer(ctx, volume)
+		if err != nil {
+			return pluginName, true, err
+		}
 	}
-	return nil
+	return pluginName, true, nil
 }
 
 func (ctrl *PersistentVolumeController) removeDeletionProtectionFinalizer(ctx context.Context, volume *v1.PersistentVolume) error {
+	var err error
+	pvUpdateNeeded := false
 	// Retrieve latest version
 	logger := klog.FromContext(ctx)
 	newVolume, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Get(ctx, volume.Name, metav1.GetOptions{})
@@ -1541,8 +1552,12 @@ func (ctrl *PersistentVolumeController) removeDeletionProtectionFinalizer(ctx co
 	volume = newVolume
 	volumeClone := volume.DeepCopy()
 	pvFinalizers := volumeClone.Finalizers
-	if pvFinalizers != nil && slices.Contains(pvFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer) {
-		volumeClone.SetFinalizers(slice.RemoveString(pvFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil))
+	if pvFinalizers != nil && slice.ContainsString(pvFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil) {
+		pvUpdateNeeded = true
+		pvFinalizers = slice.RemoveString(pvFinalizers, storagehelpers.PVDeletionInTreeProtectionFinalizer, nil)
+	}
+	if pvUpdateNeeded {
+		volumeClone.SetFinalizers(pvFinalizers)
 		_, err = ctrl.kubeClient.CoreV1().PersistentVolumes().Update(ctx, volumeClone, metav1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("persistent volume controller can't update finalizer: %v", err)
@@ -1725,9 +1740,11 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 	metav1.SetMetaDataAnnotation(&volume.ObjectMeta, storagehelpers.AnnBoundByController, "yes")
 	metav1.SetMetaDataAnnotation(&volume.ObjectMeta, storagehelpers.AnnDynamicallyProvisioned, plugin.GetPluginName())
 
-	if volume.Spec.PersistentVolumeReclaimPolicy == v1.PersistentVolumeReclaimDelete {
-		// Add In-Tree protection finalizer here only when the reclaim policy is `Delete`
-		volume.SetFinalizers([]string{storagehelpers.PVDeletionInTreeProtectionFinalizer})
+	if utilfeature.DefaultFeatureGate.Enabled(features.HonorPVReclaimPolicy) {
+		if volume.Spec.PersistentVolumeReclaimPolicy == v1.PersistentVolumeReclaimDelete {
+			// Add In-Tree protection finalizer here only when the reclaim policy is `Delete`
+			volume.SetFinalizers([]string{storagehelpers.PVDeletionInTreeProtectionFinalizer})
+		}
 	}
 
 	// Try to create the PV object several times
@@ -1764,27 +1781,25 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 		logger.V(3).Info(strerr)
 		ctrl.eventRecorder.Event(claim, v1.EventTypeWarning, events.ProvisioningFailed, strerr)
 
-		delPlugin, deleteErr := ctrl.findDeletablePlugin(volume)
-		if deleteErr == nil {
-			if delPlugin == nil {
+		var deleteErr error
+		var deleted bool
+		for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
+			_, deleted, deleteErr = ctrl.doDeleteVolume(ctx, volume)
+			if deleteErr == nil && deleted {
+				// Delete succeeded
+				logger.V(4).Info("provisionClaimOperation: cleaning volume succeeded", "PVC", klog.KObj(claim), "volumeName", volume.Name)
+				break
+			}
+			if !deleted {
 				// This is unreachable code, the volume was provisioned by an
 				// internal plugin and therefore there MUST be an internal
 				// plugin that deletes it.
 				logger.Error(nil, "Error finding internal deleter for volume plugin", "plugin", plugin.GetPluginName())
-				return pluginName, nil
+				break
 			}
-
-			for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
-				deleteErr = ctrl.doDeleteVolume(ctx, delPlugin, volume)
-				if deleteErr == nil {
-					// Delete succeeded
-					logger.V(4).Info("provisionClaimOperation: cleaning volume succeeded", "PVC", klog.KObj(claim), "volumeName", volume.Name)
-					break
-				}
-				// Delete failed, try again after a while.
-				logger.V(3).Info("Failed to delete volume", "volumeName", volume.Name, "err", deleteErr)
-				time.Sleep(ctrl.createProvisionedPVInterval)
-			}
+			// Delete failed, try again after a while.
+			logger.V(3).Info("Failed to delete volume", "volumeName", volume.Name, "err", deleteErr)
+			time.Sleep(ctrl.createProvisionedPVInterval)
 		}
 
 		if deleteErr != nil {

@@ -35,24 +35,15 @@ import (
 	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
-type fakeManager struct {
-	Manager internal.Manager
-	Error   error
-}
+type fakeManager struct{}
 
 var _ internal.Manager = &fakeManager{}
 
-func (f *fakeManager) Update(liveObj, newObj runtime.Object, managed internal.Managed, manager string) (runtime.Object, internal.Managed, error) {
-	if f.Error != nil {
-		return nil, nil, f.Error
-	}
-	if f.Manager != nil {
-		return f.Manager.Update(liveObj, newObj, managed, manager)
-	}
+func (*fakeManager) Update(_, newObj runtime.Object, managed internal.Managed, _ string) (runtime.Object, internal.Managed, error) {
 	return newObj, managed, nil
 }
 
-func (f *fakeManager) Apply(_, _ runtime.Object, _ internal.Managed, _ string, _ bool) (runtime.Object, internal.Managed, error) {
+func (*fakeManager) Apply(_, _ runtime.Object, _ internal.Managed, _ string, _ bool) (runtime.Object, internal.Managed, error) {
 	panic("not implemented")
 }
 
@@ -138,7 +129,7 @@ func TestCapUpdateManagers(t *testing.T) {
 		if err != nil {
 			panic(fmt.Sprintf("error building ManagedFieldsEntry for test: %v", err))
 		}
-		return metav1.NewFieldsV1(string(b))
+		return &metav1.FieldsV1{Raw: b}
 	}
 
 	entry := func(name string, version string, order int, fields *metav1.FieldsV1) metav1.ManagedFieldsEntry {
@@ -281,7 +272,7 @@ func expectManagesField(t *testing.T, f managedfieldstest.TestFieldManager, m st
 	for _, e := range f.ManagedFields() {
 		if e.Manager == m {
 			var s fieldpath.Set
-			err := s.FromJSON(bytes.NewReader(e.FieldsV1.GetRawBytes()))
+			err := s.FromJSON(bytes.NewReader(e.FieldsV1.Raw))
 			if err != nil {
 				t.Fatalf("error parsing managedFields for %v: %v: %#v", m, err, f.ManagedFields())
 			}

@@ -1,4 +1,4 @@
-// Copyright The Prometheus Authors
+// Copyright 2019 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -73,16 +73,15 @@ func parseARPEntries(data []byte) ([]ARPEntry, error) {
 		columns := strings.Fields(line)
 		width := len(columns)
 
-		switch width {
-		case expectedHeaderWidth, 0:
+		if width == expectedHeaderWidth || width == 0 {
 			continue
-		case expectedDataWidth:
+		} else if width == expectedDataWidth {
 			entry, err := parseARPEntry(columns)
 			if err != nil {
 				return []ARPEntry{}, fmt.Errorf("%w: Failed to parse ARP entry: %v: %w", ErrFileParse, entry, err)
 			}
 			entries = append(entries, entry)
-		default:
+		} else {
 			return []ARPEntry{}, fmt.Errorf("%w: %d columns found, but expected %d: %w", ErrFileParse, width, expectedDataWidth, err)
 		}
 

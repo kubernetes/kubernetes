@@ -16,8 +16,6 @@ limitations under the License.
 
 package remotecommand
 
-import "k8s.io/klog/v2"
-
 // streamProtocolV5 add support for V5 of the remote command subprotocol.
 // For the streamProtocolHandler, this version is the same as V4.
 type streamProtocolV5 struct {
@@ -32,6 +30,6 @@ func newStreamProtocolV5(options StreamOptions) streamProtocolHandler {
 	}
 }
 
-func (p *streamProtocolV5) stream(logger klog.Logger, conn streamCreator, ready chan<- struct{}) error {
-	return p.streamProtocolV4.stream(logger, conn, ready)
+func (p *streamProtocolV5) stream(conn streamCreator, ready chan<- struct{}) error {
+	return p.streamProtocolV4.stream(conn, ready)
 }

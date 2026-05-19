@@ -102,23 +102,11 @@ const (
 	AlwaysVerify ImagePullCredentialsVerificationPolicy = "AlwaysVerify"
 )
 
-// MemoryReservationPolicy defines how the kubelet applies cgroup v2 memory protection.
-type MemoryReservationPolicy string
-
-const (
-	// NoneMemoryReservationPolicy disables memory.min protection for containers and pods.
-	// This is the default to maintain node stability by preventing "locked" memory.
-	NoneMemoryReservationPolicy MemoryReservationPolicy = "None"
-	// TieredReservationMemoryReservationPolicy enables tiered memory protection:
-	// memory.min for Guaranteed pods, memory.low for Burstable pods.
-	TieredReservationMemoryReservationPolicy MemoryReservationPolicy = "TieredReservation"
-)
-
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // KubeletConfiguration contains the configuration for the Kubelet
 type KubeletConfiguration struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 
 	// enableServer enables Kubelet's secured server.
 	// Note: Kubelet's insecure port is controlled by the readOnlyPort option.
@@ -192,16 +180,6 @@ type KubeletConfiguration struct {
 	// Default: nil
 	// +optional
 	TLSCipherSuites []string `json:"tlsCipherSuites,omitempty"`
-	// tlsCurvePreferences is the set of allowed key exchange mechanisms for the server,
-	// specified as numeric Go crypto/tls CurveID values.
-	// The supported values depend on the Go version used.
-	// See https://pkg.go.dev/crypto/tls#CurveID for values supported for each Go version.
-	// The order of the list is ignored, and key exchange mechanisms are
-	// chosen by Go from this list using an internal preference order.
-	// If empty, the default Go curves will be used.
-	// Default: nil
-	// +optional
-	TLSCurvePreferences []int32 `json:"tlsCurvePreferences,omitempty"`
 	// tlsMinVersion is the minimum TLS version supported.
 	// Values are from tls package constants (https://golang.org/pkg/crypto/tls/#pkg-constants).
 	// Default: ""
@@ -357,8 +335,6 @@ type KubeletConfiguration struct {
 	NodeLeaseDurationSeconds int32 `json:"nodeLeaseDurationSeconds,omitempty"`
 	// imageMinimumGCAge is the minimum age for an unused image before it is
 	// garbage collected.
-	// The field value must be greater than 0.
-	// If unset or 0, defaults to 2m.
 	// Default: "2m"
 	// +optional
 	ImageMinimumGCAge metav1.Duration `json:"imageMinimumGCAge,omitempty"`
@@ -755,11 +731,10 @@ type KubeletConfiguration struct {
 	KubeReservedCgroup string `json:"kubeReservedCgroup,omitempty"`
 	// This flag specifies the various Node Allocatable enforcements that Kubelet needs to perform.
 	// This flag accepts a list of options. Acceptable options are `none`, `pods`,
-	// `system-reserved`, `system-reserved-compressible`, `kube-reserved`, and `kube-reserved-compressible`.
+	// `system-reserved` and `kube-reserved`.
 	// If `none` is specified, no other options may be specified.
-	// When a `system-reserved` option is in the list, systemReservedCgroup must be specified.
-	// When a `kube-reserved` option is in the list, kubeReservedCgroup must be specified.
-	// If a `compressible` option is specified, the corresponding non-compressible option may not be specified.
+	// When `system-reserved` is in the list, systemReservedCgroup must be specified.
+	// When `kube-reserved` is in the list, kubeReservedCgroup must be specified.
 	// This field is supported only when `cgroupsPerQOS` is set to true.
 	// Refer to [Node Allocatable](https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable)
 	// for more information.
@@ -804,6 +779,7 @@ type KubeletConfiguration struct {
 	// Enabling this feature has security implications. The recommendation is to enable it on a need basis for debugging
 	// purposes and disabling otherwise.
 	// Default: false
+	// +featureGate=NodeLogQuery
 	// +optional
 	EnableSystemLogQuery *bool `json:"enableSystemLogQuery,omitempty"`
 	// shutdownGracePeriod specifies the total duration that the node should delay the
@@ -899,16 +875,6 @@ type KubeletConfiguration struct {
 	// +featureGate=MemoryQoS
 	// +optional
 	MemoryThrottlingFactor *float64 `json:"memoryThrottlingFactor,omitempty"`
-	// MemoryReservationPolicy controls how the kubelet applies cgroup v2 memory protection.
-	// "None" (default): The kubelet does not set memory.min for containers and pods,
-	// ensuring no hard memory is locked by the kernel.
-	// "TieredReservation": The kubelet sets cgroup v2 memory.min for Guaranteed pods and memory.low for Burstable pods based on memory requests.
-	// Guaranteed memory is never reclaimed by the kernel; Burstable memory is preferentially retained but may be reclaimed under extreme pressure.
-	// See https://kep.k8s.io/2570 for more details.
-	// Default: None
-	// +featureGate=MemoryQoS
-	// +optional
-	MemoryReservationPolicy MemoryReservationPolicy `json:"memoryReservationPolicy,omitempty"`
 	// registerWithTaints are an array of taints to add to a node object when
 	// the kubelet registers itself. This only takes effect when registerNode
 	// is true and upon the initial registration of the node.
@@ -957,6 +923,7 @@ type KubeletConfiguration struct {
 	FailCgroupV1 *bool `json:"failCgroupV1,omitempty"`
 
 	// UserNamespaces contains User Namespace configurations.
+	// +featureGate=UserNamespacesSupport
 	// +optional
 	UserNamespaces *UserNamespaces `json:"userNamespaces,omitempty"`
 }
@@ -1040,7 +1007,7 @@ type KubeletAnonymousAuthentication struct {
 // This type is used internally by the Kubelet for tracking checkpointed dynamic configs.
 // It exists in the kubeletconfig API group because it is classified as a versioned input to the Kubelet.
 type SerializedNodeConfigSource struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 	// source is the source that we are serializing.
 	// +optional
 	Source v1.NodeConfigSource `json:"source,omitempty" protobuf:"bytes,1,opt,name=source"`
@@ -1084,7 +1051,7 @@ type CrashLoopBackOffConfig struct {
 // each exec credential provider. Kubelet reads this configuration from disk and enables
 // each provider as specified by the CredentialProvider type.
 type CredentialProviderConfig struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 
 	// providers is a list of credential provider plugins that will be enabled by the kubelet.
 	// Multiple providers may match against a single image, in which case credentials
@@ -1164,6 +1131,7 @@ type UserNamespaces struct {
 	// Changing the value may require recreating all containers on the node.
 	//
 	// Default: 65536
+	// +featureGate=UserNamespacesSupport
 	// +optional
 	IDsPerPod *int64 `json:"idsPerPod,omitempty"`
 }
@@ -1172,7 +1140,7 @@ type UserNamespaces struct {
 //
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ImagePullIntent struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 
 	// Image is the image spec from a Container's `image` field.
 	// The filename is a SHA-256 hash of this value. This is to avoid filename-unsafe
@@ -1188,7 +1156,7 @@ type ImagePullIntent struct {
 //
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ImagePulledRecord struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 
 	// LastUpdatedTime is the time of the last update to this record
 	LastUpdatedTime metav1.Time `json:"lastUpdatedTime"`

@@ -63,17 +63,12 @@ func slogOutput(file string, line int, now time.Time, err error, s severity.Seve
 	}
 
 	// See printS.
-	qMsg := make([]byte, 0, 1024)
-	qMsg = strconv.AppendQuote(qMsg, msg)
-
 	b := buffer.GetBuffer()
-	b.Write(qMsg)
-
-	var errKV []interface{}
+	b.WriteString(strconv.Quote(msg))
 	if err != nil {
-		errKV = []interface{}{"err", err}
+		serialize.KVListFormat(&b.Buffer, "err", err)
 	}
-	serialize.FormatKVs(&b.Buffer, errKV, kvList)
+	serialize.KVListFormat(&b.Buffer, kvList...)
 
 	// See print + header.
 	buf := logging.formatHeader(s, file, line, now)

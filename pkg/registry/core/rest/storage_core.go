@@ -100,12 +100,12 @@ type legacyProvider struct {
 	primaryServiceClusterIPAllocator ipallocator.Interface
 	serviceClusterIPAllocators       map[api.IPFamily]ipallocator.Interface
 	serviceNodePortAllocator         *portallocator.PortAllocator
-	authorizer                       authorizer.UnconditionalAuthorizer
+	authorizer                       authorizer.Authorizer
 
 	startServiceNodePortsRepair, startServiceClusterIPRepair func(onFirstSuccess func(), stopCh chan struct{})
 }
 
-func New(c Config, authorizer authorizer.UnconditionalAuthorizer) (*legacyProvider, error) {
+func New(c Config, authorizer authorizer.Authorizer) (*legacyProvider, error) {
 	rangeRegistries, serviceClusterIPAllocator, serviceIPAllocators, serviceNodePortAllocator, err := c.newServiceIPAllocators()
 	if err != nil {
 		return nil, err
@@ -534,12 +534,8 @@ func (p *legacyProvider) PostStartHook() (string, genericapiserver.PostStartHook
 		}()
 		select {
 		case <-done:
-
-		case <-context.Done():
-			return goerrors.New("unable to perform initial IP and Port allocation check (context cancelled)")
-
 		case <-time.After(time.Minute):
-			return goerrors.New("unable to perform initial IP and Port allocation check (timeout)")
+			return goerrors.New("unable to perform initial IP and Port allocation check")
 		}
 
 		return nil

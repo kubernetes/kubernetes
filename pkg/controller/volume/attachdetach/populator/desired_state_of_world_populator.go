@@ -140,6 +140,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods(logger klog.L
 		default:
 			volumeActionFlag := util.DetermineVolumeAction(
 				informerPod,
+				dswp.desiredStateOfWorld,
 				true /* default volume action */)
 
 			if volumeActionFlag {

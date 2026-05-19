@@ -26,6 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
@@ -70,7 +71,7 @@ type ProxyHealthServer struct {
 	httpFactory httpServerFactory
 	clock       clock.Clock
 
-	nodeManager nodeManager
+	nodeManager *proxy.NodeManager
 
 	addr          string
 	healthTimeout time.Duration
@@ -80,17 +81,12 @@ type ProxyHealthServer struct {
 	oldestPendingQueuedMap map[v1.IPFamily]time.Time
 }
 
-// interface to break an import chain between pkg/proxy and pkg/proxy/healthcheck
-type nodeManager interface {
-	Node() *v1.Node
-}
-
 // NewProxyHealthServer returns a proxy health http server.
-func NewProxyHealthServer(addr string, healthTimeout time.Duration, nodeManager nodeManager) *ProxyHealthServer {
+func NewProxyHealthServer(addr string, healthTimeout time.Duration, nodeManager *proxy.NodeManager) *ProxyHealthServer {
 	return newProxyHealthServer(stdNetListener{}, stdHTTPServerFactory{}, clock.RealClock{}, addr, healthTimeout, nodeManager)
 }
 
-func newProxyHealthServer(listener listener, httpServerFactory httpServerFactory, c clock.Clock, addr string, healthTimeout time.Duration, nodeManager nodeManager) *ProxyHealthServer {
+func newProxyHealthServer(listener listener, httpServerFactory httpServerFactory, c clock.Clock, addr string, healthTimeout time.Duration, nodeManager *proxy.NodeManager) *ProxyHealthServer {
 	return &ProxyHealthServer{
 		listener:      listener,
 		httpFactory:   httpServerFactory,
@@ -203,8 +199,7 @@ func (hs *ProxyHealthServer) Run(ctx context.Context) error {
 	serveMux.Handle("/livez", livezHandler{hs: hs})
 	server := hs.httpFactory.New(serveMux)
 
-	// using MultiListen to support both IPv4 and IPv6 addresses.
-	listener, err := hs.listener.Listen(ctx, "tcp", hs.addr)
+	listener, err := hs.listener.Listen(ctx, hs.addr)
 	if err != nil {
 		return fmt.Errorf("failed to start proxy healthz on %s: %w", hs.addr, err)
 	}

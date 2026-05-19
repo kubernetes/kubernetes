@@ -18,7 +18,6 @@ package validators
 
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
 )
@@ -53,16 +52,15 @@ func (immutableTagValidator) GetValidations(context Context, _ codetags.Tag) (Va
 	var result Validations
 
 	// Use ShortCircuit flag so immutable runs in the same group as +k8s:optional.
-	result.AddFunction(Function(immutableTagName, ShortCircuit, immutableValidator).
-		WithEmits(Emission{field.ErrorTypeInvalid, "immutable", ""}))
+	result.AddFunction(Function(immutableTagName, ShortCircuit, immutableValidator))
 	return result, nil
 }
 
 func (itv immutableTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            itv.TagName(),
-		StabilityLevel: TagStabilityLevelBeta,
-		Scopes:         sets.List(itv.ValidScopes()),
+		StabilityLevel: Alpha,
+		Scopes:         itv.ValidScopes().UnsortedList(),
 		Description:    "Indicates that a field may not be updated.",
 	}
 }

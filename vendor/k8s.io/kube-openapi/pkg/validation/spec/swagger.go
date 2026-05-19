@@ -21,7 +21,6 @@ import (
 	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
 	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
-	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/jsontext"
 )
 
 // Swagger this is the root document object for the API specification.
@@ -51,14 +50,14 @@ func (s Swagger) MarshalJSON() ([]byte, error) {
 }
 
 // MarshalJSON marshals this swagger structure to json
-func (s Swagger) MarshalJSONTo(enc *jsontext.Encoder) error {
+func (s Swagger) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
 	var x struct {
-		Extensions Extensions `json:",inline"`
+		Extensions
 		SwaggerProps
 	}
 	x.Extensions = internal.SanitizeExtensions(s.Extensions)
 	x.SwaggerProps = s.SwaggerProps
-	return jsonv2.MarshalEncode(enc, x)
+	return opts.MarshalNext(enc, x)
 }
 
 // UnmarshalJSON unmarshals a swagger spec from json
@@ -77,16 +76,16 @@ func (s *Swagger) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (s *Swagger) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+func (s *Swagger) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
 	// Note: If you're willing to make breaking changes, it is possible to
 	// optimize this and other usages of this pattern:
 	// https://github.com/kubernetes/kube-openapi/pull/319#discussion_r983165948
 	var x struct {
-		Extensions Extensions `json:",inline"`
+		Extensions
 		SwaggerProps
 	}
 
-	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
+	if err := opts.UnmarshalNext(dec, &x); err != nil {
 		return err
 	}
 	s.Extensions = internal.SanitizeExtensions(x.Extensions)
@@ -147,15 +146,15 @@ func (s SchemaOrBool) MarshalJSON() ([]byte, error) {
 }
 
 // MarshalJSON convert this object to JSON
-func (s SchemaOrBool) MarshalJSONTo(enc *jsontext.Encoder) error {
+func (s SchemaOrBool) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
 	if s.Schema != nil {
-		return jsonv2.MarshalEncode(enc, s.Schema)
+		return opts.MarshalNext(enc, s.Schema)
 	}
 
 	if s.Schema == nil && !s.Allows {
-		return enc.WriteToken(jsontext.False)
+		return enc.WriteToken(jsonv2.False)
 	}
-	return enc.WriteToken(jsontext.True)
+	return enc.WriteToken(jsonv2.True)
 }
 
 // UnmarshalJSON converts this bool or schema object from a JSON structure
@@ -179,17 +178,17 @@ func (s *SchemaOrBool) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (s *SchemaOrBool) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+func (s *SchemaOrBool) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
 	switch k := dec.PeekKind(); k {
 	case '{':
-		err := jsonv2.UnmarshalDecode(dec, &s.Schema)
+		err := opts.UnmarshalNext(dec, &s.Schema)
 		if err != nil {
 			return err
 		}
 		s.Allows = true
 		return nil
 	case 't', 'f':
-		err := jsonv2.UnmarshalDecode(dec, &s.Allows)
+		err := opts.UnmarshalNext(dec, &s.Allows)
 		if err != nil {
 			return err
 		}
@@ -220,14 +219,14 @@ func (s SchemaOrStringArray) MarshalJSON() ([]byte, error) {
 }
 
 // MarshalJSON converts this schema object or array into JSON structure
-func (s SchemaOrStringArray) MarshalJSONTo(enc *jsontext.Encoder) error {
+func (s SchemaOrStringArray) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
 	if len(s.Property) > 0 {
-		return jsonv2.MarshalEncode(enc, s.Property)
+		return opts.MarshalNext(enc, s.Property)
 	}
 	if s.Schema != nil {
-		return jsonv2.MarshalEncode(enc, s.Schema)
+		return opts.MarshalNext(enc, s.Schema)
 	}
-	return enc.WriteToken(jsontext.Null)
+	return enc.WriteToken(jsonv2.Null)
 }
 
 // UnmarshalJSON converts this schema object or array from a JSON structure
@@ -257,12 +256,12 @@ func (s *SchemaOrStringArray) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (s *SchemaOrStringArray) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+func (s *SchemaOrStringArray) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
 	switch dec.PeekKind() {
 	case '{':
-		return jsonv2.UnmarshalDecode(dec, &s.Schema)
+		return opts.UnmarshalNext(dec, &s.Schema)
 	case '[':
-		return jsonv2.UnmarshalDecode(dec, &s.Property)
+		return opts.UnmarshalNext(dec, &s.Property)
 	default:
 		_, err := dec.ReadValue()
 		return err
@@ -333,14 +332,14 @@ func (s *StringOrArray) UnmarshalJSON(data []byte) error {
 	}
 }
 
-func (s *StringOrArray) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+func (s *StringOrArray) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
 	switch k := dec.PeekKind(); k {
 	case '[':
 		*s = StringOrArray{}
-		return jsonv2.UnmarshalDecode(dec, (*[]string)(s))
+		return opts.UnmarshalNext(dec, (*[]string)(s))
 	case '"':
 		*s = StringOrArray{""}
-		return jsonv2.UnmarshalDecode(dec, &(*s)[0])
+		return opts.UnmarshalNext(dec, &(*s)[0])
 	case 'n':
 		// Throw out null token
 		_, _ = dec.ReadToken()
@@ -393,11 +392,11 @@ func (s SchemaOrArray) MarshalJSON() ([]byte, error) {
 }
 
 // MarshalJSON converts this schema object or array into JSON structure
-func (s SchemaOrArray) MarshalJSONTo(enc *jsontext.Encoder) error {
+func (s SchemaOrArray) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
 	if s.Schemas != nil {
-		return jsonv2.MarshalEncode(enc, s.Schemas)
+		return opts.MarshalNext(enc, s.Schemas)
 	}
-	return jsonv2.MarshalEncode(enc, s.Schema)
+	return opts.MarshalNext(enc, s.Schema)
 }
 
 // UnmarshalJSON converts this schema object or array from a JSON structure
@@ -427,12 +426,12 @@ func (s *SchemaOrArray) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (s *SchemaOrArray) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+func (s *SchemaOrArray) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
 	switch dec.PeekKind() {
 	case '{':
-		return jsonv2.UnmarshalDecode(dec, &s.Schema)
+		return opts.UnmarshalNext(dec, &s.Schema)
 	case '[':
-		return jsonv2.UnmarshalDecode(dec, &s.Schemas)
+		return opts.UnmarshalNext(dec, &s.Schemas)
 	default:
 		_, err := dec.ReadValue()
 		return err

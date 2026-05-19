@@ -702,19 +702,20 @@ Default limits may need to be increased for systems handling very large data (e.
 
 ## Status
 
-v2.9.1 (Mar 29-30, 2026) includes important bugfixes, defensive checks, improved code quality, and more tests.  Although not public, the fuzzer was also improved by adding more fuzz tests.
+[v2.9.0](https://github.com/fxamacker/cbor/releases/tag/v2.9.0) (Jul 13, 2025) improved interoperability/transcoding between CBOR & JSON, refactored tests, and improved docs.
+- Add opt-in support for `encoding.TextMarshaler` and `encoding.TextUnmarshaler` to encode and decode from CBOR text string.
+- Add opt-in support for `json.Marshaler` and `json.Unmarshaler` via user-provided transcoding function.
+- Update docs for TimeMode, Tag, RawTag, and add example for Embedded JSON Tag for CBOR.
 
-v2.9.1 passed fuzz tests and is production quality.
+v2.9.0 passed fuzz tests and is production quality.
 
 The minimum version of Go required to build:
 - v2.8.0 and newer releases require go 1.20+.
 - v2.7.1 and older releases require go 1.17+.
 
-For more details, see [v2.9.1 release notes](https://github.com/fxamacker/cbor/releases).
+For more details, see [release notes](https://github.com/fxamacker/cbor/releases).
 
 ### Prior Releases
-
-[v2.9.0](https://github.com/fxamacker/cbor/releases/tag/v2.9.0) (Jul 13, 2025) improved interoperability/transcoding between CBOR & JSON, refactored tests, and improved docs.   It passed fuzz tests (billions of executions) and is production quality.
 
 [v2.8.0](https://github.com/fxamacker/cbor/releases/tag/v2.8.0) (March 30, 2025) is a small release primarily to add `omitzero` option to struct field tags and fix bugs.   It passed fuzz tests (billions of executions) and is production quality.
 

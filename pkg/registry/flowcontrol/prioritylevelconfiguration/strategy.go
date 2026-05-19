@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
@@ -34,12 +33,12 @@ import (
 
 // priorityLevelConfigurationStrategy implements verification logic for priority level configurations.
 type priorityLevelConfigurationStrategy struct {
-	rest.DeclarativeValidation
+	runtime.ObjectTyper
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating priority level configuration objects.
-var Strategy = priorityLevelConfigurationStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
+var Strategy = priorityLevelConfigurationStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped returns false because all PriorityClasses are global.
 func (priorityLevelConfigurationStrategy) NamespaceScoped() bool {
@@ -95,9 +94,8 @@ func (priorityLevelConfigurationStrategy) Validate(ctx context.Context, obj runt
 	// That means we should not allow 0 values to be introduced, either
 	// via v1 or v1beta3(with the roundtrip annotation) until we know
 	// all servers are at 1.29+ and will honor the zero value correctly.
-	plc := obj.(*flowcontrol.PriorityLevelConfiguration)
 	opts := validation.PriorityLevelValidationOptions{}
-	return validation.ValidatePriorityLevelConfiguration(plc, getRequestGroupVersion(ctx), opts)
+	return validation.ValidatePriorityLevelConfiguration(obj.(*flowcontrol.PriorityLevelConfiguration), getRequestGroupVersion(ctx), opts)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -109,12 +107,12 @@ func (priorityLevelConfigurationStrategy) WarningsOnCreate(ctx context.Context, 
 func (priorityLevelConfigurationStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (priorityLevelConfigurationStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+func (priorityLevelConfigurationStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
 // AllowCreateOnUpdate is false for priority-level-configurations; this means a POST is needed to create one.
-func (priorityLevelConfigurationStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
+func (priorityLevelConfigurationStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 

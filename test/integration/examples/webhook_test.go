@@ -39,7 +39,7 @@ import (
 func TestWebhookLoopback(t *testing.T) {
 	webhookPath := "/webhook-test"
 
-	var called atomic.Int32
+	called := int32(0)
 
 	tCtx := ktesting.Init(t)
 	client, _, tearDownFn := framework.StartTestServer(tCtx, t, framework.TestServerSetup{
@@ -56,7 +56,7 @@ func TestWebhookLoopback(t *testing.T) {
 					if attrs.GetUser().GetName() != "system:apiserver" {
 						t.Errorf("expected user %q, got %q", "system:apiserver", attrs.GetUser().GetName())
 					}
-					called.Add(1)
+					atomic.AddInt32(&called, 1)
 				}
 				return audit.RequestAuditConfig{
 					Level: auditinternal.LevelNone,
@@ -96,7 +96,7 @@ func TestWebhookLoopback(t *testing.T) {
 		if err == nil {
 			t.Fatal("Unexpected success")
 		}
-		if called.Load() > 0 {
+		if called > 0 {
 			return true, nil
 		}
 		t.Logf("%v", err)

@@ -104,7 +104,7 @@ func (c *Client) ResourceSlices() cgoresource.ResourceSliceInterface {
 	)
 }
 
-// IsWatchListSemanticsUnSupported informs the reflector that this client
+// IsWatchListSemanticsSupported informs the reflector that this client
 // doesn't support WatchList semantics.
 //
 // This is a synthetic method whose sole purpose is to satisfy the optional

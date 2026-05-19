@@ -165,10 +165,6 @@ type LatencyTrackers struct {
 	// When called multiple times, the latency incurred inside to
 	// decode func each time will be summed up.
 	DecodeTracker DurationTracker
-
-	// ImpersonationTracker tracks the latency incurred in resolving impersonation.
-	// This includes mode selection, authorization checks, and cache lookups.
-	ImpersonationTracker DurationTracker
 }
 
 type latencyTrackersKeyType int
@@ -197,7 +193,6 @@ func WithLatencyTrackersAndCustomClock(parent context.Context, c clock.Clock) co
 		SerializationTracker:     newSumLatencyTracker(c),
 		ResponseWriteTracker:     newSumLatencyTracker(c),
 		DecodeTracker:            newSumLatencyTracker(c),
-		ImpersonationTracker:     newSumLatencyTracker(c),
 	})
 }
 
@@ -291,14 +286,6 @@ func TrackDecodeLatency(ctx context.Context, d time.Duration) {
 	}
 }
 
-// TrackImpersonationLatency is used to track latency incurred
-// in resolving impersonation for the request.
-func TrackImpersonationLatency(ctx context.Context, d time.Duration) {
-	if tracker, ok := LatencyTrackersFrom(ctx); ok {
-		tracker.ImpersonationTracker.TrackDuration(d)
-	}
-}
-
 // AuditAnnotationsFromLatencyTrackers will inspect each latency tracker
 // associated with the request context and return a set of audit
 // annotations that can be added to the API audit entry.
@@ -314,7 +301,6 @@ func AuditAnnotationsFromLatencyTrackers(ctx context.Context) map[string]string 
 		apfQueueWaitLatencyKey      = "apiserver.latency.k8s.io/apf-queue-wait"
 		authenticationLatencyKey    = "apiserver.latency.k8s.io/authentication"
 		authorizationLatencyKey     = "apiserver.latency.k8s.io/authorization"
-		impersonationLatencyKey     = "apiserver.latency.k8s.io/impersonation"
 	)
 
 	tracker, ok := LatencyTrackersFrom(ctx)
@@ -352,9 +338,6 @@ func AuditAnnotationsFromLatencyTrackers(ctx context.Context) map[string]string 
 	}
 	if latency := tracker.AuthorizationTracker.GetLatency(); latency != 0 {
 		annotations[authorizationLatencyKey] = latency.String()
-	}
-	if latency := tracker.ImpersonationTracker.GetLatency(); latency != 0 {
-		annotations[impersonationLatencyKey] = latency.String()
 	}
 	return annotations
 }

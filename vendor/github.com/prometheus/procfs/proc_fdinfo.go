@@ -1,4 +1,4 @@
-// Copyright The Prometheus Authors
+// Copyright 2019 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -60,16 +60,15 @@ func (p Proc) FDInfo(fd string) (*ProcFDInfo, error) {
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	for scanner.Scan() {
 		text = scanner.Text()
-		switch {
-		case rPos.MatchString(text):
+		if rPos.MatchString(text) {
 			pos = rPos.FindStringSubmatch(text)[1]
-		case rFlags.MatchString(text):
+		} else if rFlags.MatchString(text) {
 			flags = rFlags.FindStringSubmatch(text)[1]
-		case rMntID.MatchString(text):
+		} else if rMntID.MatchString(text) {
 			mntid = rMntID.FindStringSubmatch(text)[1]
-		case rIno.MatchString(text):
+		} else if rIno.MatchString(text) {
 			ino = rIno.FindStringSubmatch(text)[1]
-		case rInotify.MatchString(text):
+		} else if rInotify.MatchString(text) {
 			newInotify, err := parseInotifyInfo(text)
 			if err != nil {
 				return nil, err

@@ -29,6 +29,7 @@ import (
 type probeConnectivityArgs struct {
 	nsFrom              string
 	podFrom             string
+	containerFrom       string
 	addrTo              string
 	protocol            v1.Protocol
 	toPort              int
@@ -88,7 +89,7 @@ func ProbePodToPodConnectivity(prober Prober, allPods []TestPod, dnsDomain strin
 	}
 	close(jobs)
 
-	for range size {
+	for i := 0; i < size; i++ {
 		result := <-results
 		job := result.Job
 		if result.Err != nil {
@@ -131,6 +132,7 @@ func probeWorker(prober Prober, jobs <-chan *ProbeJob, results chan<- *ProbeJobR
 		connected, command, err := prober.probeConnectivity(&probeConnectivityArgs{
 			nsFrom:              podFrom.Namespace,
 			podFrom:             podFrom.Name,
+			containerFrom:       podFrom.ContainerName,
 			addrTo:              job.PodTo.ServiceIP,
 			protocol:            job.Protocol,
 			toPort:              job.ToPort,

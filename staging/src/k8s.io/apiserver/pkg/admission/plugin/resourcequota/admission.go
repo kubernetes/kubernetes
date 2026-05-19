@@ -26,6 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	resourcequotaapi "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota"
+	v1 "k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota/v1"
 	"k8s.io/apiserver/pkg/admission/plugin/resourcequota/apis/resourcequota/validation"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
@@ -37,7 +38,7 @@ import (
 const PluginName = "ResourceQuota"
 
 var (
-	namespaceGVK          = corev1.SchemeGroupVersion.WithKind("Namespace").GroupKind()
+	namespaceGVK          = v1.SchemeGroupVersion.WithKind("Namespace").GroupKind()
 	stopChUnconfiguredErr = fmt.Errorf("quota configuration configured between stop channel")
 )
 

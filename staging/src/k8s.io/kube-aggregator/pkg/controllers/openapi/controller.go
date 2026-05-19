@@ -17,7 +17,6 @@ limitations under the License.
 package openapi
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -71,42 +70,32 @@ func NewAggregationController(downloader *aggregator.Downloader, openAPIAggregat
 	return c
 }
 
-// Run is a legacy wrapper that starts the controller.
-//
-//logcheck:context // RunWithContext should be used instead of Run in code which supports contextual logging.
+// Run starts OpenAPI AggregationController
 func (c *AggregationController) Run(stopCh <-chan struct{}) {
-	c.RunWithContext(wait.ContextForChannel(stopCh))
-}
-
-// RunWithContext starts OpenAPI AggregationController and blocks until the context is cancelled.
-func (c *AggregationController) RunWithContext(ctx context.Context) {
-	defer utilruntime.HandleCrashWithContext(ctx)
+	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	logger := klog.FromContext(ctx)
-	logger.Info("Starting OpenAPI AggregationController")
-	defer logger.Info("Shutting down OpenAPI AggregationController")
+	klog.Info("Starting OpenAPI AggregationController")
+	defer klog.Info("Shutting down OpenAPI AggregationController")
 
-	go wait.UntilWithContext(ctx, c.runWorker, time.Second)
+	go wait.Until(c.runWorker, time.Second, stopCh)
 
-	<-ctx.Done()
+	<-stopCh
 }
 
-func (c *AggregationController) runWorker(ctx context.Context) {
-	logger := klog.FromContext(ctx)
-	for c.processNextWorkItem(logger) {
+func (c *AggregationController) runWorker() {
+	for c.processNextWorkItem() {
 	}
 }
 
 // processNextWorkItem deals with one key off the queue.  It returns false when it's time to quit.
-func (c *AggregationController) processNextWorkItem(logger klog.Logger) bool {
+func (c *AggregationController) processNextWorkItem() bool {
 	key, quit := c.queue.Get()
 	defer c.queue.Done(key)
 	if quit {
 		return false
 	}
-
-	logger.V(4).Info("OpenAPI AggregationController: Processing item", "key", key)
+	klog.V(4).Infof("OpenAPI AggregationController: Processing item %s", key)
 
 	action, err := c.syncHandler(key)
 	if err != nil {
@@ -117,7 +106,7 @@ func (c *AggregationController) processNextWorkItem(logger klog.Logger) bool {
 	case syncRequeue:
 		c.queue.AddAfter(key, successfulUpdateDelay)
 	case syncRequeueRateLimited:
-		logger.Info("OpenAPI AggregationController: action for item: Rate Limited Requeue", "key", key)
+		klog.Infof("OpenAPI AggregationController: action for item %s: Rate Limited Requeue.", key)
 		c.queue.AddRateLimited(key)
 	case syncNothing:
 		c.queue.Forget(key)

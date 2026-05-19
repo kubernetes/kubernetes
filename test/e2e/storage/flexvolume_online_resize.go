@@ -170,7 +170,7 @@ var _ = utils.SIGDescribe(feature.Flexvolumes, "Mounted flexvolume volume expand
 		framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 		pvcConditions := pvc.Status.Conditions
-		testsuites.ExpectNoResizeConditions(pvcConditions)
+		gomega.Expect(pvcConditions).To(gomega.BeEmpty(), "pvc should not have conditions")
 	})
 })
 

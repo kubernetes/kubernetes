@@ -2196,6 +2196,7 @@ func TestValidationExpressions(t *testing.T) {
 	}
 
 	for i := range tests {
+		i := i
 		t.Run(tests[i].name, func(t *testing.T) {
 			t.Parallel()
 			tt := tests[i]
@@ -2917,6 +2918,7 @@ func TestValidationExpressionsAtSchemaLevels(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			ctx := context.TODO()
@@ -4591,6 +4593,7 @@ func TestOptionalOldSelf(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		tp := true
 		for i := range tt.schema.XValidations {
 			tt.schema.XValidations[i].OptionalOldSelf = &tp
@@ -4746,6 +4749,7 @@ func TestOptionalOldSelfCheckForNull(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		tp := true
 		for i := range tt.schema.XValidations {
 			tt.schema.XValidations[i].OptionalOldSelf = &tp

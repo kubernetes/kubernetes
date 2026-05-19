@@ -210,11 +210,6 @@ const (
 	// built-in ClusterRole.
 	ClusterAdminsGroupAndClusterRoleBinding = "kubeadm:cluster-admins"
 
-	// KubeletAPIAdminClusterRoleBindingName is the name of the ClusterRoleBinding for the apiserver kubelet client
-	KubeletAPIAdminClusterRoleBindingName = "kubeadm:apiserver-kubelet-client"
-	// KubeletAPIAdminClusterRoleName is the name of the built-in ClusterRole for kubelet API access
-	KubeletAPIAdminClusterRoleName = "system:kubelet-api-admin"
-
 	// KubernetesAPICallTimeout specifies how long kubeadm should wait for API calls
 	KubernetesAPICallTimeout = 1 * time.Minute
 	// KubernetesAPICallRetryInterval defines how long kubeadm should wait before retrying a failed API operation
@@ -282,6 +277,10 @@ const (
 	// This is added to control plane nodes to preserve backwards compatibility with a legacy behavior.
 	LabelExcludeFromExternalLB = "node.kubernetes.io/exclude-from-external-load-balancers"
 
+	// AnnotationKubeadmCRISocket specifies the annotation kubeadm uses to preserve the crisocket information given to kubeadm at
+	// init/join time for use later. kubeadm annotates the node object with this information
+	AnnotationKubeadmCRISocket = "kubeadm.alpha.kubernetes.io/cri-socket"
+
 	// KubeadmConfigConfigMap specifies in what ConfigMap in the kube-system namespace the `kubeadm init` configuration should be stored
 	KubeadmConfigConfigMap = "kubeadm-config"
 
@@ -327,7 +326,7 @@ const (
 	MinExternalEtcdVersion = "3.5.24-0"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.6.11-0"
+	DefaultEtcdVersion = "3.6.6-0"
 
 	// Etcd defines variable used internally when referring to etcd component
 	Etcd = "etcd"
@@ -365,7 +364,7 @@ const (
 	CoreDNSImageName = "coredns"
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
-	CoreDNSVersion = "v1.14.2"
+	CoreDNSVersion = "v1.13.1"
 
 	// ClusterConfigurationKind is the string kind value for the ClusterConfiguration struct
 	ClusterConfigurationKind = "ClusterConfiguration"
@@ -443,7 +442,7 @@ const (
 	ModeNode string = "Node"
 
 	// PauseVersion indicates the default pause image version for kubeadm
-	PauseVersion = "3.10.2"
+	PauseVersion = "3.10.1"
 
 	// CgroupDriverSystemd holds the systemd driver type
 	CgroupDriverSystemd = "systemd"
@@ -479,6 +478,12 @@ var (
 		Effect: v1.TaintEffectNoSchedule,
 	}
 
+	// ControlPlaneToleration is the toleration to apply on the PodSpec for being able to run that Pod on the control-plane
+	ControlPlaneToleration = v1.Toleration{
+		Key:    LabelNodeRoleControlPlane,
+		Effect: v1.TaintEffectNoSchedule,
+	}
+
 	// ControlPlaneComponents defines the control-plane component names
 	ControlPlaneComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
 
@@ -491,27 +496,16 @@ var (
 	// CurrentKubernetesVersion specifies current Kubernetes version supported by kubeadm
 	CurrentKubernetesVersion = getSkewedKubernetesVersion(0)
 
-	// SupportedEtcdVersion lists officially supported etcd versions with corresponding
-	// Kubernetes releases.
-	//
+	// SupportedEtcdVersion lists officially supported etcd versions with corresponding Kubernetes releases
 	// If you are updating the versions in this map, make sure to also update:
 	// - MinExternalEtcdVersion: with the minimum etcd version from this map.
-	// - DefaultEtcdVersion: with etcd version used for the current k8s release.
-	//
-	// The maximum length of the map should be 3. kubeadm supports a maximum skew of -1
-	// with the control plane version, but before a release the oldest k8s version in this
-	// map will be the only stable version, thus one additional version is required
-	// to be unit tested.
-	//
-	// This map should not be used directly in kubeadm code. Instead, it should be used with
-	// EtcdSupportedVersion(), as it allows for returning a valid version even if the input
-	// k8s version key is not defined (out of bounds). This allows for kubeadm to assume
-	// an etcd version even if the map is not yet updated before a release. The user will
-	// get a warning in that case, so ideally the map should be updated for each release.
+	// - DefaultEtcdVersion: with etcd version used for the current k8s release (0).
+	// The maximum length of the map should be 2, as kubeadm supports a maximum skew of -1
+	// with the control plane version.
 	SupportedEtcdVersion = map[uint8]string{
-		34: "3.6.11-0",
-		35: "3.6.11-0",
-		36: "3.6.11-0",
+		uint8(getSkewedKubernetesVersion(-2).Minor()): "3.5.24-0",
+		uint8(getSkewedKubernetesVersion(-1).Minor()): "3.6.6-0",
+		uint8(getSkewedKubernetesVersion(0).Minor()):  "3.6.6-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows

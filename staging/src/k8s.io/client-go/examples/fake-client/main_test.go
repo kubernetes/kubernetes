@@ -41,13 +41,9 @@ func TestFakeClient(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	// A catch-all watch reactor that allows us to inject the watcherStarted channel.
 	client.PrependWatchReactor("*", func(action clienttesting.Action) (handled bool, ret watch.Interface, err error) {
-		var opts metav1.ListOptions
-		if watchAction, ok := action.(clienttesting.WatchActionImpl); ok {
-			opts = watchAction.ListOptions
-		}
 		gvr := action.GetResource()
 		ns := action.GetNamespace()
-		watch, err := client.Tracker().Watch(gvr, ns, opts)
+		watch, err := client.Tracker().Watch(gvr, ns)
 		if err != nil {
 			return false, nil, err
 		}

@@ -34,7 +34,7 @@ import (
 // more information.
 // Deployment enables declarative updates for Pods and ReplicaSets.
 type DeploymentApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration `json:""`
+	v1.TypeMetaApplyConfiguration `json:",inline"`
 	// Standard object metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// Specification of the desired behavior of the Deployment.

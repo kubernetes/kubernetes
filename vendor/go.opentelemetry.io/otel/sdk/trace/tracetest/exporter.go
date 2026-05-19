@@ -25,10 +25,10 @@ func NewNoopExporter() *NoopExporter {
 type NoopExporter struct{}
 
 // ExportSpans handles export of spans by dropping them.
-func (*NoopExporter) ExportSpans(context.Context, []trace.ReadOnlySpan) error { return nil }
+func (nsb *NoopExporter) ExportSpans(context.Context, []trace.ReadOnlySpan) error { return nil }
 
 // Shutdown stops the exporter by doing nothing.
-func (*NoopExporter) Shutdown(context.Context) error { return nil }
+func (nsb *NoopExporter) Shutdown(context.Context) error { return nil }
 
 var _ trace.SpanExporter = (*InMemoryExporter)(nil)
 

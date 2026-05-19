@@ -85,19 +85,7 @@
               "int": 2,
               "bool": true,
               "string": "stringValue",
-              "version": "versionValue",
-              "ints": [
-                6
-              ],
-              "bools": [
-                true
-              ],
-              "strings": [
-                "stringsValue"
-              ],
-              "versions": [
-                "versionsValue"
-              ]
+              "version": "versionValue"
             }
           },
           "capacity": {
@@ -167,13 +155,7 @@
           "bindingFailureConditions": [
             "bindingFailureConditionsValue"
           ],
-          "allowMultipleAllocations": true,
-          "nodeAllocatableResourceMappings": {
-            "nodeAllocatableResourceMappingsKey": {
-              "capacityKey": "capacityKeyValue",
-              "allocationMultiplier": "0"
-            }
-          }
+          "allowMultipleAllocations": true
         }
       }
     ],

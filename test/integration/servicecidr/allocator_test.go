@@ -111,7 +111,7 @@ func TestServiceAllocation(t *testing.T) {
 			}
 
 			// make 5 more services to take up all IPs
-			for i := range 5 {
+			for i := 0; i < 5; i++ {
 				if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc(i), metav1.CreateOptions{}); err != nil {
 					t.Error(err)
 				}
@@ -139,14 +139,9 @@ func TestServiceAllocation(t *testing.T) {
 				t.Fatalf("got unexpected error: %v", err)
 			}
 
-			// The ipallocator has an informer, and it needs to wait for the deletion to be propagated before it can allocate the IP again.
-			// This time creating the second service should work, assume a maximum of 2 seconds for the informer to catch up.
-			err = wait.PollUntilContextTimeout(context.Background(), 250*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
-				_, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(ctx, svc(8), metav1.CreateOptions{})
-				return err == nil, nil
-			})
-			if err != nil {
-				t.Fatalf("unexpected creation failure: %v", err)
+			// This time creating the second service should work.
+			if _, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc(8), metav1.CreateOptions{}); err != nil {
+				t.Fatalf("got unexpected error: %v", err)
 			}
 		})
 	}
@@ -199,7 +194,7 @@ func TestServiceAllocIPAddressLargeCIDR(t *testing.T) {
 	}
 
 	// create 5 random services and check that the Services have an IP associated
-	for i := range 5 {
+	for i := 0; i < 5; i++ {
 		svc, err := client.CoreV1().Services(metav1.NamespaceDefault).Create(tCtx, svc(i), metav1.CreateOptions{})
 		if err != nil {
 			t.Error(err)
@@ -331,7 +326,7 @@ func TestSkewedAllocatorsRollback(t *testing.T) {
 	}
 
 	// create 5 random services and check that the Services have an IP associated
-	for i := range 5 {
+	for i := 0; i < 5; i++ {
 		service, err := kubeclient1.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc(i), metav1.CreateOptions{})
 		if err != nil {
 			t.Error(err)
@@ -566,7 +561,7 @@ func TestFlagsIPAllocator(t *testing.T) {
 	}
 
 	// create 5 random services and check that the Services have an IP associated
-	for i := range 5 {
+	for i := 0; i < 5; i++ {
 		service, err := kubeclient1.CoreV1().Services(metav1.NamespaceDefault).Create(context.TODO(), svc(i), metav1.CreateOptions{})
 		if err != nil {
 			t.Error(err)

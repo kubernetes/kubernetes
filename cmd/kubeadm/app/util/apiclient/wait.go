@@ -315,7 +315,7 @@ func (w *KubeWaiter) WaitForControlPlaneComponents(podMap map[string]*v1.Pod, ap
 		}(comp)
 	}
 
-	for range components {
+	for i := 0; i < len(components); i++ {
 		if err := <-errChan; err != nil {
 			errs = append(errs, err)
 		}

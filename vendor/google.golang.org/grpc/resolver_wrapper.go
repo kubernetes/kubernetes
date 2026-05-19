@@ -69,7 +69,6 @@ func (ccr *ccResolverWrapper) start() error {
 	errCh := make(chan error)
 	ccr.serializer.TrySchedule(func(ctx context.Context) {
 		if ctx.Err() != nil {
-			errCh <- ctx.Err()
 			return
 		}
 		opts := resolver.BuildOptions{

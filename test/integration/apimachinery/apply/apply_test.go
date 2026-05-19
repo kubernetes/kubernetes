@@ -36,7 +36,7 @@ import (
 	controlplaneapiserver "k8s.io/kubernetes/pkg/controlplane/apiserver"
 	testapigrouprest "k8s.io/kubernetes/pkg/registry/testapigroup/rest"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 )
@@ -73,7 +73,7 @@ func TestApply(t *testing.T) {
 		tCtx.Log("Stopping the apiserver...")
 		server.TearDownFn()
 	})
-	tCtx = tCtx.WithRESTConfig(server.ClientConfig)
+	tCtx = ktesting.WithRESTConfig(tCtx, server.ClientConfig)
 
 	// More sub-tests could be added here. Currently there's only one.
 	tCtx.Run("optional-list-map-key", testOptionalListMapKey)

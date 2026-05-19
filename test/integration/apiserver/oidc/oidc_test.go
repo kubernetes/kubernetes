@@ -34,7 +34,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -64,6 +63,7 @@ import (
 	kubeapiserverapptesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/kubeapiserver/options"
+	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/kubernetes/test/integration/framework"
 	utilsoidc "k8s.io/kubernetes/test/utils/oidc"
 	"k8s.io/kubernetes/test/utils/oidc/handlers"
@@ -411,6 +411,7 @@ jwt:
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, singleTestRunner(useAuthenticationConfig, rsaGenerateKey, tt))
 	}
 
@@ -553,6 +554,7 @@ func TestUpdatingRefreshTokenInCaseOfExpiredIDToken(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			expiredIDToken, stubRefreshToken := fetchExpiredToken(t, oidcServer, caCert, signingPrivateKey)
 			clientConfig := configureClientConfigForOIDC(t, apiServer.ClientConfig, defaultOIDCClientID, certPath, expiredIDToken, stubRefreshToken, oidcServer.URL())
@@ -1049,6 +1051,7 @@ jwt:
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			oidcServer, apiServer, signingPrivateKey, caCert, certPath := tt.configureInfrastructure(t, tt.authConfigFn, rsaGenerateKey)
@@ -1508,6 +1511,7 @@ jwt:
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			authenticationconfigmetrics.ResetMetricsForTest()
 			defer authenticationconfigmetrics.ResetMetricsForTest()
@@ -1671,6 +1675,7 @@ func TestStructuredAuthenticationDiscoveryURL(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			caCertContent, _, caFilePath, caKeyFilePath := generateCert(t)
@@ -1859,7 +1864,7 @@ jwt:
 	adminClient := kubernetes.NewForConfigOrDie(apiServer.ClientConfig)
 	gotMetricStrings := getMetrics(t, ctx, adminClient, "apiserver_authentication_jwt_authenticator_jwks_")
 
-	slices.Sort(wantMetricStrings)
+	wantMetricStrings = slice.SortStrings(wantMetricStrings)
 
 	if diff := cmp.Diff(wantMetricStrings, gotMetricStrings); diff != "" {
 		t.Errorf("unexpected metrics diff (-want +got): %s", diff)
@@ -1980,7 +1985,7 @@ jwt:
 	}
 	gotMetricStrings := getMetrics(t, ctx, adminClient, "apiserver_authentication_jwt_authenticator_jwks_")
 
-	slices.Sort(wantMetricStrings)
+	wantMetricStrings = slice.SortStrings(wantMetricStrings)
 	if diff := cmp.Diff(wantMetricStrings, gotMetricStrings); diff != "" {
 		t.Errorf("unexpected metrics before reload diff (-want +got): %s", diff)
 	}
@@ -2034,7 +2039,7 @@ jwt:
 		fmt.Sprintf(`apiserver_authentication_jwt_authenticator_jwks_fetch_last_key_set_info{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",hash="%s",jwt_issuer_hash="%s"} 1`, keySetHash1, jwtIssuerHash1),
 		fmt.Sprintf(`apiserver_authentication_jwt_authenticator_jwks_fetch_last_timestamp_seconds{apiserver_id_hash="sha256:3c607df3b2bf22c9d9f01d5314b4bbf411c48ef43ff44ff29b1d55b41367c795",jwt_issuer_hash="%s",result="success"} FP`, jwtIssuerHash1),
 	}
-	slices.Sort(wantMetricStringsAfterReload)
+	wantMetricStringsAfterReload = slice.SortStrings(wantMetricStringsAfterReload)
 
 	err = wait.PollUntilContextTimeout(ctx, time.Second, 120*time.Second, true, func(ctx context.Context) (done bool, err error) {
 		gotMetricStrings := getMetrics(t, ctx, adminClient, "apiserver_authentication_jwt_authenticator_jwks_")
@@ -2096,9 +2101,7 @@ func getMetrics(t *testing.T, ctx context.Context, adminClient *kubernetes.Clien
 		}
 	}
 
-	slices.Sort(gotMetricStrings)
-
-	return gotMetricStrings
+	return slice.SortStrings(gotMetricStrings)
 }
 
 func rsaGenerateKey(t *testing.T) (*rsa.PrivateKey, *rsa.PublicKey) {
@@ -2219,7 +2222,7 @@ func startTestAPIServerForOIDC[L utilsoidc.JosePublicKey](t *testing.T, c apiSer
 
 	var customFlags []string
 	if len(c.authenticationConfigYAML) > 0 {
-		customFlags = []string{fmt.Sprintf("--authentication-config=%s", utilsoidc.WriteTempFile(t, c.authenticationConfigYAML))}
+		customFlags = []string{fmt.Sprintf("--authentication-config=%s", writeTempFile(t, c.authenticationConfigYAML))}
 		if c.needsEgressProxyOnStart {
 			udsName := filepath.Join(t.TempDir(), "uds")
 			ready := make(chan struct{})
@@ -2241,7 +2244,7 @@ egressSelections:
       uds:
         udsName: %s
 `, udsName)
-			customFlags = append(customFlags, fmt.Sprintf("--egress-selector-config-file=%s", utilsoidc.WriteTempFile(t, egressConfig)))
+			customFlags = append(customFlags, fmt.Sprintf("--egress-selector-config-file=%s", writeTempFile(t, egressConfig)))
 		}
 	} else {
 		customFlags = []string{
@@ -2356,6 +2359,23 @@ func generateCert(t *testing.T) (cert, key []byte, certFilePath, keyFilePath str
 	require.NoError(t, err)
 
 	return cert, key, certFilePath, keyFilePath
+}
+
+func writeTempFile(t *testing.T, content string) string {
+	t.Helper()
+	file, err := os.CreateTemp("", "oidc-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.Remove(file.Name()); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if err := os.WriteFile(file.Name(), []byte(content), 0600); err != nil {
+		t.Fatal(err)
+	}
+	return file.Name()
 }
 
 // indentCertificateAuthority indents the certificate authority to match

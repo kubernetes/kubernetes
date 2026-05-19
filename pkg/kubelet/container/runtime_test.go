@@ -603,11 +603,11 @@ func TestRuntimeStatusString(t *testing.T) {
 			{Name: "handler1", SupportsRecursiveReadOnlyMounts: true, SupportsUserNamespaces: false},
 			{Name: "handler2", SupportsRecursiveReadOnlyMounts: false, SupportsUserNamespaces: true},
 		},
-		Features: &RuntimeFeatures{SupplementalGroupsPolicy: true, UserNamespacesHostNetwork: true},
+		Features: &RuntimeFeatures{SupplementalGroupsPolicy: true},
 	}
 
 	result := status.String()
-	expected := "Runtime Conditions: RuntimeReady=true reason:ready message:runtime is ready, NetworkReady=false reason:not ready message:network is not ready; Handlers: Name=handler1 SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: false, Name=handler2 SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: true, Features: SupplementalGroupsPolicy: true UserNamespacesHostNetwork: true"
+	expected := "Runtime Conditions: RuntimeReady=true reason:ready message:runtime is ready, NetworkReady=false reason:not ready message:network is not ready; Handlers: Name=handler1 SupportsRecursiveReadOnlyMounts: true SupportsUserNamespaces: false, Name=handler2 SupportsRecursiveReadOnlyMounts: false SupportsUserNamespaces: true, Features: SupplementalGroupsPolicy: true"
 	assert.Equal(t, expected, result, "String()")
 }
 
@@ -688,20 +688,18 @@ func TestRuntimeFeaturesString(t *testing.T) {
 		expected string
 	}{
 		{
-			name: "features with both flags true",
+			name: "features with SupplementalGroupsPolicy true",
 			features: &RuntimeFeatures{
-				SupplementalGroupsPolicy:  true,
-				UserNamespacesHostNetwork: true,
+				SupplementalGroupsPolicy: true,
 			},
-			expected: "SupplementalGroupsPolicy: true UserNamespacesHostNetwork: true",
+			expected: "SupplementalGroupsPolicy: true",
 		},
 		{
-			name: "features with both flags false",
+			name: "features with SupplementalGroupsPolicy false",
 			features: &RuntimeFeatures{
-				SupplementalGroupsPolicy:  false,
-				UserNamespacesHostNetwork: false,
+				SupplementalGroupsPolicy: false,
 			},
-			expected: "SupplementalGroupsPolicy: false UserNamespacesHostNetwork: false",
+			expected: "SupplementalGroupsPolicy: false",
 		},
 		{
 			name:     "nil features",

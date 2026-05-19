@@ -19,7 +19,6 @@ package disruption
 import (
 	"context"
 	"fmt"
-	"slices"
 	"sync"
 	"time"
 
@@ -441,7 +440,13 @@ func verifyGroupKind(controllerRef *metav1.OwnerReference, expectedKind string, 
 		return false, nil
 	}
 
-	return slices.Contains(expectedGroups, gv.Group), nil
+	for _, group := range expectedGroups {
+		if group == gv.Group {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func (dc *DisruptionController) Run(ctx context.Context) {

@@ -74,6 +74,12 @@ func getParentNameAndOrdinal(pod *v1.Pod) (string, int) {
 	return parent, ordinal
 }
 
+// getParentName gets the name of pod's parent StatefulSet. If pod has not parent, the empty string is returned.
+func getParentName(pod *v1.Pod) string {
+	parent, _ := getParentNameAndOrdinal(pod)
+	return parent
+}
+
 // getOrdinal gets pod's ordinal. If pod has no ordinal, -1 is returned.
 func getOrdinal(pod *v1.Pod) int {
 	_, ordinal := getParentNameAndOrdinal(pod)
@@ -115,8 +121,7 @@ func getPersistentVolumeClaimName(set *apps.StatefulSet, claim *v1.PersistentVol
 
 // isMemberOf tests if pod is a member of set.
 func isMemberOf(set *apps.StatefulSet, pod *v1.Pod) bool {
-	parent, _ := getParentNameAndOrdinal(pod)
-	return parent == set.Name
+	return getParentName(pod) == set.Name
 }
 
 // identityMatches returns true if pod has a valid identity and network identity for a member of set.
@@ -467,9 +472,14 @@ func isPending(pod *v1.Pod) bool {
 	return pod.Status.Phase == v1.PodPending
 }
 
-// isTerminalPhase returns true if pod has a Phase of PodFailed or PodSucceeded.
-func isTerminalPhase(pod *v1.Pod) bool {
-	return pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded
+// isFailed returns true if pod has a Phase of PodFailed
+func isFailed(pod *v1.Pod) bool {
+	return pod.Status.Phase == v1.PodFailed
+}
+
+// isSucceeded returns true if pod has a Phase of PodSucceeded
+func isSucceeded(pod *v1.Pod) bool {
+	return pod.Status.Phase == v1.PodSucceeded
 }
 
 // isTerminating returns true if pod's DeletionTimestamp has been set
@@ -622,11 +632,13 @@ func inconsistentStatus(set *apps.StatefulSet, status *apps.StatefulSetStatus) b
 		status.UpdateRevision != set.Status.UpdateRevision
 }
 
-// completeUpdate completes an update when all of set's replica Pods have been updated
-// to the updateRevision. status's currentRevision is set to updateRevision and status's
-// currentReplicas is set to updateReplicas.
-func completeUpdate(set *apps.StatefulSet, status *apps.StatefulSetStatus) {
-	if status.UpdatedReplicas == *set.Spec.Replicas &&
+// completeRollingUpdate completes a rolling update when all of set's replica Pods have been updated
+// to the updateRevision. status's currentRevision is set to updateRevision and its' updateRevision
+// is set to the empty string. status's currentReplicas is set to updateReplicas and its updateReplicas
+// are set to 0.
+func completeRollingUpdate(set *apps.StatefulSet, status *apps.StatefulSetStatus) {
+	if set.Spec.UpdateStrategy.Type == apps.RollingUpdateStatefulSetStrategyType &&
+		status.UpdatedReplicas == *set.Spec.Replicas &&
 		status.ReadyReplicas == *set.Spec.Replicas &&
 		status.Replicas == *set.Spec.Replicas {
 		status.CurrentReplicas = status.UpdatedReplicas

@@ -1,4 +1,5 @@
 //go:build linux
+// +build linux
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -24,6 +25,7 @@ import (
 	"encoding/base32"
 	"fmt"
 	"net"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -37,17 +39,18 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
-	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/conntrack"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	"k8s.io/kubernetes/pkg/proxy/runner"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 	netutils "k8s.io/utils/net"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/knftables"
@@ -94,32 +97,38 @@ const (
 	firewallCheckChain = "firewall-check"
 
 	// masquerading
-	masqueradingChain     = "masquerading"
-	hairpinConnectionsSet = "hairpin-connections"
+	markMasqChain     = "mark-for-masquerade"
+	masqueradingChain = "masquerading"
 )
 
 // NewDualStackProxier creates a MetaProxier instance, with IPv4 and IPv6 proxies.
 func NewDualStackProxier(
 	ctx context.Context,
-	config *kubeproxyconfig.KubeProxyConfiguration,
+	syncPeriod time.Duration,
+	minSyncPeriod time.Duration,
+	masqueradeAll bool,
+	masqueradeBit int,
 	localDetectors map[v1.IPFamily]proxyutil.LocalTrafficDetector,
 	nodeName string,
 	nodeIPs map[v1.IPFamily]net.IP,
 	recorder events.EventRecorder,
 	healthzServer *healthcheck.ProxyHealthServer,
+	nodePortAddresses []string,
 	initOnly bool,
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
-	ipv4Proxier, err := NewProxier(ctx, config, v1.IPv4Protocol,
+	ipv4Proxier, err := NewProxier(ctx, v1.IPv4Protocol,
+		syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit,
 		localDetectors[v1.IPv4Protocol], nodeName, nodeIPs[v1.IPv4Protocol],
-		recorder, healthzServer, initOnly)
+		recorder, healthzServer, nodePortAddresses, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
-	ipv6Proxier, err := NewProxier(ctx, config, v1.IPv6Protocol,
+	ipv6Proxier, err := NewProxier(ctx, v1.IPv6Protocol,
+		syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit,
 		localDetectors[v1.IPv6Protocol], nodeName, nodeIPs[v1.IPv6Protocol],
-		recorder, healthzServer, initOnly)
+		recorder, healthzServer, nodePortAddresses, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
 	}
@@ -150,6 +159,7 @@ type Proxier struct {
 	// updating nftables with some partial data after kube-proxy restart.
 	endpointSlicesSynced bool
 	servicesSynced       bool
+	syncedOnce           bool
 	lastFullSync         time.Time
 	needFullSync         bool
 	initialized          int32
@@ -161,7 +171,6 @@ type Proxier struct {
 	nftables       knftables.Interface
 	masqueradeAll  bool
 	masqueradeMark string
-	masqueradeRule string
 	conntrack      conntrack.Interface
 	localDetector  proxyutil.LocalTrafficDetector
 	nodeName       string
@@ -192,7 +201,6 @@ type Proxier struct {
 	noEndpointServices  *nftElementStorage
 	noEndpointNodePorts *nftElementStorage
 	serviceNodePorts    *nftElementStorage
-	hairpinConnections  *nftElementStorage
 }
 
 // Proxier implements proxy.Provider
@@ -200,13 +208,17 @@ var _ proxy.Provider = &Proxier{}
 
 // NewProxier returns a new single-stack NFTables proxier.
 func NewProxier(ctx context.Context,
-	config *kubeproxyconfig.KubeProxyConfiguration,
 	ipFamily v1.IPFamily,
+	syncPeriod time.Duration,
+	minSyncPeriod time.Duration,
+	masqueradeAll bool,
+	masqueradeBit int,
 	localDetector proxyutil.LocalTrafficDetector,
 	nodeName string,
 	nodeIP net.IP,
 	recorder events.EventRecorder,
 	healthzServer *healthcheck.ProxyHealthServer,
+	nodePortAddressStrings []string,
 	initOnly bool,
 ) (*Proxier, error) {
 	logger := klog.LoggerWithValues(klog.FromContext(ctx), "ipFamily", ipFamily)
@@ -222,16 +234,13 @@ func NewProxier(ctx context.Context,
 	}
 
 	// Generate the masquerade mark to use for SNAT rules.
-	masqueradeValue := 1 << uint(*config.NFTables.MasqueradeBit)
+	masqueradeValue := 1 << uint(masqueradeBit)
 	masqueradeMark := fmt.Sprintf("%#08x", masqueradeValue)
 	logger.V(2).Info("Using nftables mark for masquerade", "mark", masqueradeMark)
 
-	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, config.NodePortAddresses)
+	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
 
-	serviceHealthServer := healthcheck.NewServiceHealthServer(nodeName, recorder, nodePortAddresses, healthzServer, ipFamily)
-
-	syncPeriod := config.SyncPeriod.Duration
-	minSyncPeriod := config.MinSyncPeriod.Duration
+	serviceHealthServer := healthcheck.NewServiceHealthServer(nodeName, recorder, nodePortAddresses, healthzServer)
 
 	proxier := &Proxier{
 		ipFamily:            ipFamily,
@@ -242,9 +251,8 @@ func NewProxier(ctx context.Context,
 		needFullSync:        true,
 		syncPeriod:          syncPeriod,
 		nftables:            nft,
-		masqueradeAll:       config.Linux.MasqueradeAll,
+		masqueradeAll:       masqueradeAll,
 		masqueradeMark:      masqueradeMark,
-		masqueradeRule:      fmt.Sprintf("mark set mark or %s", masqueradeMark),
 		conntrack:           conntrack.New(),
 		localDetector:       localDetector,
 		nodeName:            nodeName,
@@ -262,7 +270,6 @@ func NewProxier(ctx context.Context,
 		noEndpointServices:  newNFTElementStorage("map", noEndpointServicesMap),
 		noEndpointNodePorts: newNFTElementStorage("map", noEndpointNodePortsMap),
 		serviceNodePorts:    newNFTElementStorage("map", serviceNodePortsMap),
-		hairpinConnections:  newNFTElementStorage("set", hairpinConnectionsSet),
 	}
 
 	logger.V(2).Info("NFTables sync params", "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "maxSyncPeriod", proxyutil.FullSyncPeriod)
@@ -270,6 +277,52 @@ func NewProxier(ctx context.Context,
 	proxier.syncRunner = runner.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, proxyutil.FullSyncPeriod)
 
 	return proxier, nil
+}
+
+// Create a knftables.Interface and check if we can use the nftables proxy mode on this host.
+func getNFTablesInterface(ipFamily v1.IPFamily) (knftables.Interface, error) {
+	var nftablesFamily knftables.Family
+	if ipFamily == v1.IPv4Protocol {
+		nftablesFamily = knftables.IPv4Family
+	} else {
+		nftablesFamily = knftables.IPv6Family
+	}
+
+	// We require (or rather, knftables.New does) that the nft binary be version 1.0.1
+	// or later, because versions before that would always attempt to parse the entire
+	// nft ruleset at startup, even if you were only operating on a single table.
+	// That's bad, because in some cases, new versions of nft have added new rule
+	// types in ways that triggered bugs in older versions of nft, causing them to
+	// crash. Thus, if kube-proxy used nft < 1.0.1, it could potentially get locked
+	// out of its rules because of something some other component had done in a
+	// completely different table.
+	nft, err := knftables.New(nftablesFamily, kubeProxyTable)
+	if err != nil {
+		return nil, err
+	}
+
+	// Likewise, we want to ensure that the host filesystem has nft >= 1.0.1, so that
+	// it's not possible that *our* rules break *the system's* nft. (In particular, we
+	// know that if kube-proxy uses nft >= 1.0.3 and the system has nft <= 0.9.8, that
+	// the system nft will become completely unusable.) Unfortunately, we can't easily
+	// figure out the version of nft installed on the host filesystem, so instead, we
+	// check the kernel version, under the assumption that the distro will have an nft
+	// binary that supports the same features as its kernel does, and so kernel 5.13
+	// or later implies nft 1.0.1 or later. https://issues.k8s.io/122743
+	//
+	// However, we allow the user to bypass this check by setting
+	// `KUBE_PROXY_NFTABLES_SKIP_KERNEL_VERSION_CHECK` to anything non-empty.
+	if os.Getenv("KUBE_PROXY_NFTABLES_SKIP_KERNEL_VERSION_CHECK") == "" {
+		kernelVersion, err := utilkernel.GetVersion()
+		if err != nil {
+			return nil, fmt.Errorf("could not check kernel version: %w", err)
+		}
+		if kernelVersion.LessThan(version.MustParseGeneric(utilkernel.NFTablesKubeProxyKernelVersion)) {
+			return nil, fmt.Errorf("kube-proxy in nftables mode requires kernel %s or later", utilkernel.NFTablesKubeProxyKernelVersion)
+		}
+	}
+
+	return nft, nil
 }
 
 // internal struct for string service information
@@ -455,33 +508,34 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 	}
 
 	// Ensure all of our other "top-level" chains exist
-	for _, chain := range []string{servicesChain, clusterIPsCheckChain, masqueradingChain} {
+	for _, chain := range []string{servicesChain, clusterIPsCheckChain, masqueradingChain, markMasqChain} {
 		ensureChain(chain, tx, createdChains, false)
 	}
 
-	// add hairpin-connections set
-	tx.Add(&knftables.Set{
-		Name:    hairpinConnectionsSet,
-		Type:    ipvX_addr + " . " + ipvX_addr + " . inet_proto . inet_service",
-		Comment: ptr.To("service hairpin connections"),
+	// Add the rules in the mark-for-masquerade and masquerading chains
+	tx.Add(&knftables.Rule{
+		Chain: markMasqChain,
+		Rule: knftables.Concat(
+			"mark", "set", "mark", "or", proxier.masqueradeMark,
+		),
 	})
 
-	// Add the rules in the masquerading chain
 	tx.Add(&knftables.Rule{
 		Chain: masqueradingChain,
 		Rule: knftables.Concat(
-			"mark", "and", proxier.masqueradeMark, "!=", "0",
-			"mark", "set", "mark", "xor", proxier.masqueradeMark,
-			"masquerade fully-random",
+			"mark", "and", proxier.masqueradeMark, "==", "0",
+			"return",
 		),
 	})
 	tx.Add(&knftables.Rule{
 		Chain: masqueradingChain,
 		Rule: knftables.Concat(
-			"ct status dnat",
-			ipX, "saddr", ".", ipX, "daddr", ".", "meta l4proto", ".", "th dport", "@", hairpinConnectionsSet,
-			"masquerade fully-random",
+			"mark", "set", "mark", "xor", proxier.masqueradeMark,
 		),
+	})
+	tx.Add(&knftables.Rule{
+		Chain: masqueradingChain,
+		Rule:  "masquerade fully-random",
 	})
 
 	// add cluster-ips set.
@@ -625,33 +679,6 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 		Type:    "inet_proto . inet_service : verdict",
 		Comment: ptr.To("NodePort traffic"),
 	})
-
-	if proxier.masqueradeAll {
-		tx.Add(&knftables.Rule{
-			Chain: servicesChain,
-			Rule: knftables.Concat(
-				ipX, "daddr", "@", clusterIPsSet,
-				proxier.masqueradeRule,
-			),
-			Comment: ptr.To("masquerade all clusterIP traffic"),
-		})
-	} else if proxier.localDetector.IsImplemented() {
-		// This masquerades off-cluster traffic to a service VIP. The
-		// idea is that you can establish a static route for your
-		// Service range, routing to any node, and that node will
-		// bridge into the Service for you. Since that might bounce
-		// off-node, we masquerade here.
-		tx.Add(&knftables.Rule{
-			Chain: servicesChain,
-			Rule: knftables.Concat(
-				ipX, "daddr", "@", clusterIPsSet,
-				proxier.localDetector.IfNotLocalNFT(),
-				proxier.masqueradeRule,
-			),
-			Comment: ptr.To("masquerade clusterIP traffic from outside cluster"),
-		})
-	}
-
 	tx.Add(&knftables.Rule{
 		Chain: servicesChain,
 		Rule: knftables.Concat(
@@ -687,7 +714,29 @@ func (proxier *Proxier) setupNFTables(tx *knftables.Transaction) {
 	proxier.noEndpointServices.readOrReset(tx, proxier.nftables, proxier.logger)
 	proxier.noEndpointNodePorts.readOrReset(tx, proxier.nftables, proxier.logger)
 	proxier.serviceNodePorts.readOrReset(tx, proxier.nftables, proxier.logger)
-	proxier.hairpinConnections.readOrReset(tx, proxier.nftables, proxier.logger)
+}
+
+// CleanupLeftovers removes all nftables rules and chains created by the Proxier
+// It returns true if an error was encountered. Errors are logged.
+func CleanupLeftovers(ctx context.Context) bool {
+	logger := klog.FromContext(ctx)
+	var encounteredError bool
+
+	for _, family := range []knftables.Family{knftables.IPv4Family, knftables.IPv6Family} {
+		nft, err := knftables.New(family, kubeProxyTable)
+		if err != nil {
+			continue
+		}
+		tx := nft.NewTransaction()
+		tx.Delete(&knftables.Table{})
+		err = nft.Run(ctx, tx)
+		if err != nil && !knftables.IsNotFound(err) {
+			logger.Error(err, "Error cleaning up nftables rules")
+			encounteredError = true
+		}
+	}
+
+	return encounteredError
 }
 
 // Sync is called to synchronize the proxier state to nftables as soon as possible.
@@ -1073,6 +1122,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	doFullSync := proxier.needFullSync || (time.Since(proxier.lastFullSync) > proxyutil.FullSyncPeriod)
 
 	defer func() {
+		proxier.syncedOnce = true
 		metrics.SyncProxyRulesLatency.WithLabelValues(string(proxier.ipFamily)).Observe(metrics.SinceInSeconds(start))
 		if !doFullSync {
 			metrics.SyncPartialProxyRulesLatency.WithLabelValues(string(proxier.ipFamily)).Observe(metrics.SinceInSeconds(start))
@@ -1203,34 +1253,15 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 			!serviceUpdateResult.UpdatedServices.Has(svcName.NamespacedName) &&
 			!endpointUpdateResult.UpdatedServices.Has(svcName.NamespacedName)
 
-		// We only use separate endpoint chains when adding affinity rules
-		serviceUsesAffinity := svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP
-
-		// Note the endpoints that will be used
+		// Note the endpoint chains that will be used
 		for _, ep := range allLocallyReachableEndpoints {
-			epInfo, ok := ep.(*endpointInfo)
-			if !ok {
-				continue
-			}
-
-			// If using affinity, note the endpoint chain and affinity set
-			// names, and ensure that the chain exists.
-			if serviceUsesAffinity {
-				ensureChain(epInfo.chainName, tx, activeChains, skipServiceUpdate)
-				activeAffinitySets.Insert(epInfo.affinitySetName)
-			}
-
-			// Add local endpoints to the hairpin set.
-			if epInfo.IsLocal() {
-				proxier.hairpinConnections.ensureElem(tx, &knftables.Element{
-					Set: hairpinConnectionsSet,
-					Key: []string{
-						epInfo.IP(),
-						epInfo.IP(),
-						protocol,
-						strconv.Itoa(epInfo.Port()),
-					},
-				})
+			if epInfo, ok := ep.(*endpointInfo); ok {
+				ensureChain(epInfo.chainName, tx, activeChains, skipServiceUpdate ||
+					proxier.epChainSkipUpdate(existingChains, existingAffinitySets, svcInfo, epInfo))
+				// Note the affinity sets that will be used
+				if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
+					activeAffinitySets.Insert(epInfo.affinitySetName)
+				}
 			}
 		}
 
@@ -1483,6 +1514,33 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 			continue
 		}
 
+		// Set up internal traffic handling.
+		if hasInternalEndpoints {
+			if proxier.masqueradeAll {
+				tx.Add(&knftables.Rule{
+					Chain: internalTrafficChain,
+					Rule: knftables.Concat(
+						ipX, "daddr", svcInfo.ClusterIP(),
+						"jump", markMasqChain,
+					),
+				})
+			} else if proxier.localDetector.IsImplemented() {
+				// This masquerades off-cluster traffic to a service VIP. The
+				// idea is that you can establish a static route for your
+				// Service range, routing to any node, and that node will
+				// bridge into the Service for you. Since that might bounce
+				// off-node, we masquerade here.
+				tx.Add(&knftables.Rule{
+					Chain: internalTrafficChain,
+					Rule: knftables.Concat(
+						ipX, "daddr", svcInfo.ClusterIP(),
+						proxier.localDetector.IfNotLocalNFT(),
+						"jump", markMasqChain,
+					),
+				})
+			}
+		}
+
 		// Set up external traffic handling (if any "external" destinations are
 		// enabled). All captured traffic for all external destinations should
 		// jump to externalTrafficChain, which will handle some special cases and
@@ -1494,9 +1552,8 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 				tx.Add(&knftables.Rule{
 					Chain: externalTrafficChain,
 					Rule: knftables.Concat(
-						proxier.masqueradeRule,
+						"jump", markMasqChain,
 					),
-					Comment: ptr.To("masquerade"),
 				})
 			} else {
 				// If we are only using same-node endpoints, we can retain the
@@ -1524,7 +1581,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 					Chain: externalTrafficChain,
 					Rule: knftables.Concat(
 						"fib", "saddr", "type", "local",
-						proxier.masqueradeRule,
+						"jump", markMasqChain,
 					),
 					Comment: ptr.To("masquerade local traffic"),
 				})
@@ -1620,32 +1677,43 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 			}
 		}
 
-		// Write the endpoint rules and/or chains
-		if !serviceUsesAffinity {
-			if usesClusterPolicyChain {
-				proxier.writeServiceToEndpointDNATs(tx, svcInfo, clusterPolicyChain, clusterEndpoints)
-			}
-			if usesLocalPolicyChain {
-				proxier.writeServiceToEndpointDNATs(tx, svcInfo, localPolicyChain, localEndpoints)
-			}
-		} else {
-			if usesClusterPolicyChain {
-				proxier.writeServiceToEndpointJumps(tx, svcInfo, clusterPolicyChain, clusterEndpoints)
-			}
-			if usesLocalPolicyChain {
-				proxier.writeServiceToEndpointJumps(tx, svcInfo, localPolicyChain, localEndpoints)
+		// If Cluster policy is in use, create the chain and create rules jumping
+		// from clusterPolicyChain to the clusterEndpoints
+		if usesClusterPolicyChain {
+			proxier.writeServiceToEndpointRules(tx, svcInfo, clusterPolicyChain, clusterEndpoints)
+		}
+
+		// If Local policy is in use, create rules jumping from localPolicyChain
+		// to the localEndpoints
+		if usesLocalPolicyChain {
+			proxier.writeServiceToEndpointRules(tx, svcInfo, localPolicyChain, localEndpoints)
+		}
+
+		// Generate the per-endpoint chains
+		for _, ep := range allLocallyReachableEndpoints {
+			epInfo, ok := ep.(*endpointInfo)
+			if !ok {
+				proxier.logger.Error(nil, "Failed to cast endpointInfo", "endpointInfo", ep)
+				continue
 			}
 
-			// And generate the per-endpoint chains and affinity sets
-			for _, ep := range allLocallyReachableEndpoints {
-				epInfo, ok := ep.(*endpointInfo)
-				if !ok {
-					continue
-				}
+			if proxier.epChainSkipUpdate(existingChains, existingAffinitySets, svcInfo, epInfo) {
+				// If the EP chain is already updated, we can skip it.
+				continue
+			}
+			endpointChain := epInfo.chainName
 
-				endpointChain := epInfo.chainName
+			// Handle traffic that loops back to the originator with SNAT.
+			tx.Add(&knftables.Rule{
+				Chain: endpointChain,
+				Rule: knftables.Concat(
+					ipX, "saddr", epInfo.IP(),
+					"jump", markMasqChain,
+				),
+			})
 
-				// Handle session affinity
+			// Handle session affinity
+			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 				tx.Add(&knftables.Rule{
 					Chain: endpointChain,
 					Rule: knftables.Concat(
@@ -1653,16 +1721,16 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 						"{", ipX, "saddr", "}",
 					),
 				})
-
-				// DNAT to final destination.
-				tx.Add(&knftables.Rule{
-					Chain: endpointChain,
-					Rule: knftables.Concat(
-						"meta l4proto", protocol,
-						"dnat to", epInfo.String(),
-					),
-				})
 			}
+
+			// DNAT to final destination.
+			tx.Add(&knftables.Rule{
+				Chain: endpointChain,
+				Rule: knftables.Concat(
+					"meta l4proto", protocol,
+					"dnat to", epInfo.String(),
+				),
+			})
 		}
 	}
 
@@ -1700,7 +1768,6 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	proxier.noEndpointServices.cleanupLeftoverKeys(tx)
 	proxier.noEndpointNodePorts.cleanupLeftoverKeys(tx)
 	proxier.serviceNodePorts.cleanupLeftoverKeys(tx)
-	proxier.hairpinConnections.cleanupLeftoverKeys(tx)
 
 	// Sync rules.
 	proxier.logger.V(2).Info("Reloading service nftables data",
@@ -1759,58 +1826,61 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	return
 }
 
-func (proxier *Proxier) writeServiceToEndpointDNATs(tx *knftables.Transaction, svcInfo *servicePortInfo, svcChain string, endpoints []proxy.Endpoint) {
-	ipX := "ip"
-	if proxier.ipFamily == v1.IPv6Protocol {
-		ipX = "ip6"
+// epChainSkipUpdate returns true if the EP chain doesn't need to be updated.
+func (proxier *Proxier) epChainSkipUpdate(existingChains, existingAffinitySets sets.Set[string], svcInfo *servicePortInfo, epInfo *endpointInfo) bool {
+	if proxier.syncedOnce {
+		// We only skip updating EP chains during the first sync to speed up kube-proxy restart, otherwise return false.
+		return false
 	}
-
-	var elements []string
-	for i, ep := range endpoints {
-		epInfo, ok := ep.(*endpointInfo)
-		if !ok {
-			continue
-		}
-
-		elements = append(elements,
-			strconv.Itoa(i), ":", epInfo.IP(), ".", strconv.Itoa(epInfo.Port()),
-		)
-		if i != len(endpoints)-1 {
-			elements = append(elements, ",")
-		}
+	if existingChains == nil || existingAffinitySets == nil {
+		// listing existing objects failed, can't skip updating
+		return false
 	}
-	tx.Add(&knftables.Rule{
-		Chain: svcChain,
-		Rule: knftables.Concat(
-			"meta l4proto", strings.ToLower(string(svcInfo.Protocol())),
-			"dnat", ipX, "addr . port to",
-			"numgen random mod", len(endpoints), "map",
-			"{", elements, "}",
-		),
-	})
+	// EP chain can have up to 3 rules:
+	// - loopback masquerade rule
+	//   - includes the endpoint IP
+	// - affinity rule when session affinity is set to ClusterIP
+	//   - includes the affinity set name
+	// - DNAT rule
+	//   - includes the endpoint IP + port
+	// EP chain name includes the endpoint IP + port => loopback and DNAT rules are pre-defined by the chain name.
+	// When session affinity is set to ClusterIP, the affinity set is created for local endpoints.
+	// Therefore, we can check that sessions affinity hasn't changed by checking if the affinity set exists.
+	wantAffinitySet := svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP
+	return existingChains.Has(epInfo.chainName) && wantAffinitySet == existingAffinitySets.Has(epInfo.affinitySetName)
 }
 
-func (proxier *Proxier) writeServiceToEndpointJumps(tx *knftables.Transaction, svcInfo *servicePortInfo, svcChain string, endpoints []proxy.Endpoint) {
-	ipX := "ip"
-	if proxier.ipFamily == v1.IPv6Protocol {
-		ipX = "ip6"
+func (proxier *Proxier) writeServiceToEndpointRules(tx *knftables.Transaction, svcInfo *servicePortInfo, svcChain string, endpoints []proxy.Endpoint) {
+	// First write session affinity rules, if applicable.
+	if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
+		ipX := "ip"
+		if proxier.ipFamily == v1.IPv6Protocol {
+			ipX = "ip6"
+		}
+
+		for _, ep := range endpoints {
+			epInfo, ok := ep.(*endpointInfo)
+			if !ok {
+				continue
+			}
+
+			tx.Add(&knftables.Rule{
+				Chain: svcChain,
+				Rule: knftables.Concat(
+					ipX, "saddr", "@", epInfo.affinitySetName,
+					"goto", epInfo.chainName,
+				),
+			})
+		}
 	}
 
+	// Now write loadbalancing rule
 	var elements []string
-	// Write the affinity rules, construct the vmap elements
 	for i, ep := range endpoints {
 		epInfo, ok := ep.(*endpointInfo)
 		if !ok {
 			continue
 		}
-
-		tx.Add(&knftables.Rule{
-			Chain: svcChain,
-			Rule: knftables.Concat(
-				ipX, "saddr", "@", epInfo.affinitySetName,
-				"goto", epInfo.chainName,
-			),
-		})
 
 		elements = append(elements,
 			strconv.Itoa(i), ":", "goto", epInfo.chainName,
@@ -1819,7 +1889,6 @@ func (proxier *Proxier) writeServiceToEndpointJumps(tx *knftables.Transaction, s
 			elements = append(elements, ",")
 		}
 	}
-	// Now write the vmap, for the case where no affinity rule matched
 	tx.Add(&knftables.Rule{
 		Chain: svcChain,
 		Rule: knftables.Concat(

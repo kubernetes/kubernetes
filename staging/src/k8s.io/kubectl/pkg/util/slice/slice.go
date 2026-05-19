@@ -16,37 +16,40 @@ limitations under the License.
 
 package slice
 
-import "slices"
+import (
+	"sort"
+)
 
-// SortInts64 sorts []int64 in increasing order.
-//
-// Deprecated: Use slices.Sort instead.
-//
-//go:fix inline
-func SortInts64(a []int64) { slices.Sort(a) }
+// SortInts64 sorts []int64 in increasing order
+func SortInts64(a []int64) { sort.Slice(a, func(i, j int) bool { return a[i] < a[j] }) }
 
 // Contains checks if a given slice of type T contains the provided item.
 // If a modifier func is provided, it is called with the slice item before the comparation.
-//
-// Deprecated: Use slices.Contains or slices.ContainsFunc instead.
 func Contains[T comparable](slice []T, s T, modifier func(s T) T) bool {
-	if slices.Contains(slice, s) {
-		return true
-	}
-	if modifier != nil {
-		return slices.ContainsFunc(slice, func(item T) bool { return modifier(item) == s })
+	for _, item := range slice {
+		if item == s {
+			return true
+		}
+		if modifier != nil && modifier(item) == s {
+			return true
+		}
 	}
 	return false
 }
 
 // ContainsString checks if a given slice of strings contains the provided string.
 // If a modifier func is provided, it is called with the slice item before the comparation.
-//
-// Deprecated: Use slices.Contains or slices.ContainsFunc instead.
-//
-//go:fix inline
+// Deprecated: Use Contains[T] instead
 func ContainsString(slice []string, s string, modifier func(s string) string) bool {
-	return Contains(slice, s, modifier)
+	for _, item := range slice {
+		if item == s {
+			return true
+		}
+		if modifier != nil && modifier(item) == s {
+			return true
+		}
+	}
+	return false
 }
 
 // ToSet returns a single slice containing the unique values from one or more slices. The order of the items in the

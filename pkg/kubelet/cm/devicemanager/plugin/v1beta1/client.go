@@ -42,7 +42,6 @@ type Client interface {
 	Connect(context.Context) error
 	Run(context.Context)
 	Disconnect(klog.Logger) error
-	SocketPath() string
 }
 
 type client struct {
@@ -105,12 +104,12 @@ func (c *client) Disconnect(logger klog.Logger) error {
 	c.mutex.Lock()
 	if c.grpc != nil {
 		if err := c.grpc.Close(); err != nil {
-			logger.V(2).Info("Failed to close grpc connection", "resource", c.Resource(), "err", err)
+			logger.V(2).Info("Failed to close gRPC connection", "resource", c.Resource(), "err", err)
 		}
 		c.grpc = nil
 	}
 	c.mutex.Unlock()
-	c.handler.PluginDisconnected(logger, c.resource, c.socket)
+	c.handler.PluginDisconnected(logger, c.resource)
 
 	logger.V(2).Info("Device plugin disconnected", "resource", c.resource)
 	return nil

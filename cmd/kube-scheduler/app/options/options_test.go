@@ -633,8 +633,7 @@ profiles:
 							{
 								Name: "DynamicResources",
 								Args: &kubeschedulerconfig.DynamicResourcesArgs{
-									FilterTimeout:  &metav1.Duration{Duration: 10 * time.Second},
-									BindingTimeout: &metav1.Duration{Duration: 10 * time.Minute},
+									FilterTimeout: &metav1.Duration{Duration: 10 * time.Second},
 								},
 							},
 							{
@@ -750,8 +749,7 @@ profiles:
 							{
 								Name: "DynamicResources",
 								Args: &kubeschedulerconfig.DynamicResourcesArgs{
-									FilterTimeout:  &metav1.Duration{Duration: 10 * time.Second},
-									BindingTimeout: &metav1.Duration{Duration: 10 * time.Minute},
+									FilterTimeout: &metav1.Duration{Duration: 10 * time.Second},
 								},
 							},
 							{
@@ -897,8 +895,7 @@ profiles:
 							{
 								Name: "DynamicResources",
 								Args: &kubeschedulerconfig.DynamicResourcesArgs{
-									FilterTimeout:  &metav1.Duration{Duration: 10 * time.Second},
-									BindingTimeout: &metav1.Duration{Duration: 10 * time.Minute},
+									FilterTimeout: &metav1.Duration{Duration: 10 * time.Second},
 								},
 							},
 							{

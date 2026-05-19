@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -32,13 +31,13 @@ import (
 
 // endpointsStrategy implements behavior for Endpoints
 type endpointsStrategy struct {
-	rest.DeclarativeValidation
+	runtime.ObjectTyper
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Endpoint
 // objects via the REST API.
-var Strategy = endpointsStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
+var Strategy = endpointsStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped is true for endpoints.
 func (endpointsStrategy) NamespaceScoped() bool {
@@ -68,7 +67,7 @@ func (endpointsStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is true for endpoints.
-func (endpointsStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
+func (endpointsStrategy) AllowCreateOnUpdate() bool {
 	return true
 }
 
@@ -82,7 +81,7 @@ func (endpointsStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.
 	return endpointsWarnings(obj.(*api.Endpoints))
 }
 
-func (endpointsStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+func (endpointsStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 

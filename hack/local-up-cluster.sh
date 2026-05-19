@@ -32,11 +32,6 @@ if (( KUBE_VERBOSE >= 2 )); then
   set -x
 fi
 
-# Same defaults as in etcd.sh, repeated here to make them visible
-# to users of this script when using KUBE_VERBOSE >= 2.
-ETCD_HOST=${ETCD_HOST:-127.0.0.1}
-ETCD_PORT=${ETCD_PORT:-2379}
-
 ALLOW_PRIVILEGED=${ALLOW_PRIVILEGED:-""}
 RUNTIME_CONFIG=${RUNTIME_CONFIG:-""}
 KUBELET_AUTHORIZATION_WEBHOOK=${KUBELET_AUTHORIZATION_WEBHOOK:-""}
@@ -64,7 +59,7 @@ LIMITED_SWAP=${LIMITED_SWAP:-""}
 
 # required for cni installation
 CNI_CONFIG_DIR=${CNI_CONFIG_DIR:-/etc/cni/net.d}
-CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.9.1"}
+CNI_PLUGINS_VERSION=${CNI_PLUGINS_VERSION:-"v1.8.0"}
 # The arch of the CNI binary, if not set, will be fetched based on the value of `uname -m`
 CNI_TARGETARCH=${CNI_TARGETARCH:-""}
 CNI_PLUGINS_URL="https://github.com/containernetworking/plugins/releases/download"
@@ -100,7 +95,6 @@ KUBELET_PROVIDER_ID=${KUBELET_PROVIDER_ID:-"$(hostname)"}
 FEATURE_GATES=${FEATURE_GATES:-"AllAlpha=false"}
 EMULATED_VERSION=${EMULATED_VERSION:+kube=$EMULATED_VERSION}
 TOPOLOGY_MANAGER_POLICY=${TOPOLOGY_MANAGER_POLICY:-""}
-MEMORY_MANAGER_POLICY=${MEMORY_MANAGER_POLICY:-""}
 CPUMANAGER_POLICY=${CPUMANAGER_POLICY:-""}
 CPUMANAGER_RECONCILE_PERIOD=${CPUMANAGER_RECONCILE_PERIOD:-""}
 CPUMANAGER_POLICY_OPTIONS=${CPUMANAGER_POLICY_OPTIONS:-""}
@@ -187,15 +181,6 @@ function usage {
             echo "           CPUMANAGER_RECONCILE_PERIOD=\"5s\" \\"
             echo "           KUBELET_FLAGS=\"--kube-reserved=cpu=1,memory=2Gi,ephemeral-storage=1Gi --system-reserved=cpu=1,memory=2Gi,ephemeral-storage=1Gi\" \\"
             echo "           hack/local-up-cluster.sh (build a local copy of the source with full-pcpus-only CPU Management policy)"
-            echo "Example 5: PATH=\"\${PATH}:/usr/local/go/src/k8s.io/kubernetes/third_party/etcd\" \\"
-            echo "           FEATURE_GATES=CPUManagerPolicyOptions=true,MemoryManager=true,InPlacePodVerticalScalingExclusiveCPUs=true \\"
-            echo "           TOPOLOGY_MANAGER_POLICY=\"single-numa-node\" \\"
-            echo "           MEMORY_MANAGER_POLICY=\"Static\" \\"
-            echo "           CPUMANAGER_POLICY=\"static\" \\"
-            echo "           CPUMANAGER_POLICY_OPTIONS=full-pcpus-only=\"true\" \\"
-            echo "           CPUMANAGER_RECONCILE_PERIOD=\"5s\" \\"
-            echo "           KUBELET_FLAGS=\"--kube-reserved=cpu=1,memory=4Gi --system-reserved=cpu=1,memory=1Gi --reserved-memory 0:memory=3Gi;1:memory=2148Mi --resolv-conf=/run/systemd/resolve/resolv.conf\" \\"
-            echo "           hack/local-up-cluster.sh ( run with Topology, CPU, Memory Management policies alongside InPlacePodVerticalScaling, extra flags for etcd and coredns)"
             echo ""
             echo "-d         dry-run: prepare for running commands, then show their command lines instead of running them"
 }
@@ -338,21 +323,7 @@ REUSE_CERTS=${REUSE_CERTS:-false}
 
 # Ensure CERT_DIR is created for auto-generated crt/key and kubeconfig
 mkdir -p "${CERT_DIR}" &>/dev/null || sudo mkdir -p "${CERT_DIR}"
-
-# CONTROLPLANE_SUDO is used for control plane components. If the CERT_DIR is not writable,
-# "sudo -E" is used to gain the necessary write privileges.
-# Can be set to something else or explicitly to empty to override the default.
-CONTROLPLANE_SUDO=${CONTROLPLANE_SUDO-$(test -w "${CERT_DIR}" || echo "sudo -E")}
-
-# KUBELET_SUDO is used for starting the kubelet.
-# Can be set to something else or explicitly to empty to override the default.
-KUBELET_SUDO=${KUBELET_SUDO-sudo -E}
-
-# PROXY_SUDO is used for starting kube-proxy.
-# Can be set to something else or explicitly to empty to override the default.
-PROXY_SUDO=${PROXY_SUDO-sudo -E}
-
-# Note that "sudo" is still used in various other places and must work.
+CONTROLPLANE_SUDO=$(test -w "${CERT_DIR}" || echo "sudo -E")
 
 if (( KUBE_VERBOSE <= 4 )); then
   set +x
@@ -453,13 +424,6 @@ function detect_binary {
 cleanup()
 {
   echo "Cleaning up..."
-
-  # Capture CoreDNS logs before shutting down (useful for debugging DNS issues)
-  if [[ "${ENABLE_CLUSTER_DNS}" == true ]]; then
-    echo "Capturing CoreDNS logs..."
-    ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" logs -n kube-system -l k8s-app=kube-dns --all-containers > "${LOG_DIR}/coredns.log" 2>&1 || true
-  fi
-
   # delete running images
   # if [[ "${ENABLE_CLUSTER_DNS}" == true ]]; then
   # Still need to figure why this commands throw an error: Error from server: client: etcd cluster is unavailable or misconfigured
@@ -554,7 +518,7 @@ function warning_log {
 function start_etcd {
     echo "Starting etcd"
     export ETCD_LOGFILE=${LOG_DIR}/etcd.log
-    ETCD_DRY_RUN="${DRY_RUN:-}" kube::etcd::start
+    kube::etcd::start
 }
 
 function set_service_accounts {
@@ -877,6 +841,27 @@ function wait_coredns_available(){
     return
   fi
 
+  local interval_time=2
+  local coredns_wait_time=300
+
+  # kick the coredns pods to be recreated
+  ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" -n kube-system delete pods -l k8s-app=kube-dns
+  sleep 30
+
+  local coredns_pods_ready="${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' wait --for=condition=Ready --timeout=60s pods -l k8s-app=kube-dns -n kube-system"
+  kube::util::wait_for_success "$coredns_wait_time" "$interval_time" "$coredns_pods_ready"
+  if [ $? == "1" ]; then
+    echo "time out on waiting for coredns pods"
+    exit 1
+  fi
+
+  local coredns_available="${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' wait --for=condition=Available --timeout=60s deployments coredns -n kube-system"
+  kube::util::wait_for_success "$coredns_wait_time" "$interval_time" "$coredns_available"
+  if [ $? == "1" ]; then
+    echo "time out on waiting for coredns deployment"
+    exit 1
+  fi
+
   if [[ "${ENABLE_DAEMON}" = false ]]; then
     # bump log level
     echo "6" | sudo tee /proc/sys/kernel/printk
@@ -1031,11 +1016,6 @@ EOF
         echo "topologyManagerPolicy: \"${TOPOLOGY_MANAGER_POLICY}\""
       fi
 
-      # memorymanager policy
-      if [[ -n ${MEMORY_MANAGER_POLICY} ]]; then
-        echo "memoryManagerPolicy: \"${MEMORY_MANAGER_POLICY}\""
-      fi
-
       # cpumanager policy
       if [[ -n ${CPUMANAGER_POLICY} ]]; then
         echo "cpuManagerPolicy: \"${CPUMANAGER_POLICY}\""
@@ -1054,15 +1034,12 @@ EOF
     } >>"${TMP_DIR}"/kubelet.yaml
 
     # shellcheck disable=SC2024
-    # shellcheck disable=SC2086 # Word-splitting of KUBELET_SUDO is intentional.
-    run kubelet "${KUBELET_LOG}" ${KUBELET_SUDO} "${GO_OUT}/kubelet" "${all_kubelet_flags[@]}" \
+    run kubelet "${KUBELET_LOG}" sudo -E "${GO_OUT}/kubelet" "${all_kubelet_flags[@]}" \
       --config="${TMP_DIR}"/kubelet.yaml &
     KUBELET_PID=$!
 
     # Quick check that kubelet is running.
-    if [ -n "${DRY_RUN}" ]; then
-      :
-    elif ( [ -n "${KUBELET_PID}" ] && ps -p ${KUBELET_PID} > /dev/null ); then
+    if [ -n "${DRY_RUN}" ] || ( [ -n "${KUBELET_PID}" ] && ps -p ${KUBELET_PID} > /dev/null ); then
       echo "kubelet ( ${KUBELET_PID} ) is running."
     else
       cat "${KUBELET_LOG}" ; exit 1
@@ -1104,8 +1081,7 @@ EOF
     # Probably not necessary...
     #
     # shellcheck disable=SC2024
-    # shellcheck disable=SC2086 # Word-splitting of KUBELET_SUDO is intentional.
-    run kube-proxy "${PROXY_LOG}" ${PROXY_SUDO} "${GO_OUT}/kube-proxy" \
+    run kube-proxy "${PROXY_LOG}" sudo "${GO_OUT}/kube-proxy" \
       --v="${LOG_LEVEL}" \
       --config="${TMP_DIR}"/kube-proxy.yaml \
       --healthz-port="${PROXY_HEALTHZ_PORT}" \
@@ -1336,19 +1312,14 @@ function install_cni {
     rm -rf "${cni_plugin_tarball}" &&
     sudo find /opt/cni/bin -type f -not \( \
         -iname host-local \
-        -o -iname ptp \
+        -o -iname bridge \
         -o -iname portmap \
         -o -iname loopback \
         \) \
         -delete
 
-  # Configure CNI using ptp (point-to-point) plugin instead of bridge.
-  # ptp creates direct veth pairs between pods and host namespace, which
-  # avoids the need for br_netfilter and bridge-nf-call-iptables settings
-  # that are unreliable in docker-in-docker environments.
-  # This approach is proven to work reliably by KIND (Kubernetes IN Docker):
-  # https://github.com/kubernetes-sigs/kind/blob/main/images/kindnetd/cmd/kindnetd/cni.go#L83-L121
-  echo "Configuring cni (ptp mode)"
+  # containerd in kubekins supports CNI version 0.4.0
+  echo "Configuring cni"
   sudo mkdir -p "$CNI_CONFIG_DIR"
   cat << EOF | sudo tee "$CNI_CONFIG_DIR"/10-containerd-net.conflist
 {
@@ -1356,8 +1327,11 @@ function install_cni {
  "name": "containerd-net",
  "plugins": [
    {
-     "type": "ptp",
+     "type": "bridge",
+     "bridge": "cni0",
+     "isGateway": true,
      "ipMasq": true,
+     "promiscMode": true,
      "ipam": {
        "type": "host-local",
        "ranges": [
@@ -1413,26 +1387,6 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   # configure shared mounts to prevent failure in DIND scenarios
   mount --make-rshared /
 
-  # Configure kernel network parameters for container networking.
-  # These settings are required for ptp CNI and iptables-based kube-proxy
-  # to work correctly in docker-in-docker environments.
-  # See KIND's network configuration for reference.
-  echo "Configuring kernel network parameters for DIND..."
-
-  # Enable route_localnet - allows routing to localhost addresses after NAT.
-  # Required for proper DNS resolution in containers.
-  echo 1 > /proc/sys/net/ipv4/conf/all/route_localnet
-
-  # Set arp_ignore=0 - required for ptp CNI which uses /32 addresses.
-  # Ensures ARP replies are sent for all local addresses.
-  echo 0 > /proc/sys/net/ipv4/conf/all/arp_ignore
-
-  # Ensure IP forwarding is enabled for pod-to-pod traffic
-  echo 1 > /proc/sys/net/ipv4/ip_forward
-  echo 1 > /proc/sys/net/ipv6/conf/all/forwarding 2>/dev/null || true
-
-  echo "Kernel network parameters configured"
-
   # to use containerd as kubelet container runtime we need to install cni
   install_cni 
 
@@ -1475,6 +1429,7 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
 fi
 
 kube::util::test_openssl_installed
+kube::util::ensure-cfssl
 
 ### IF the user didn't supply an output/ for the build... Then we detect.
 if [ "${GO_OUT}" == "" ]; then
@@ -1482,18 +1437,8 @@ if [ "${GO_OUT}" == "" ]; then
 fi
 echo "Detected host and ready to start services.  Doing some housekeeping first..."
 echo "Using GO_OUT ${GO_OUT}"
-
-# kube::util::ensure-cfssl downloads cfssl when cfssl is not found in PATH.
-# Point it at the persistent cache dir and apppend it to PATH so cfssl is
-# downloaded only on the first run and reused afterwards.
-KUBERNETES_SERVER_CACHE_DIR=${KUBERNETES_SERVER_CACHE_DIR:-"${GO_OUT}"}
-CFSSL_PATH="${KUBERNETES_SERVER_CACHE_DIR}/cfssl"
-PATH="${PATH}:${CFSSL_PATH}"
-kube::util::ensure-cfssl "${CFSSL_PATH}"
-
 export KUBELET_CIDFILE=${TMP_DIR}/kubelet.cid
-if [[ "${ENABLE_DAEMON}" = false ]] && [[ -z "${DRY_RUN:-}" ]]; then
-  echo "Enabling cleanup on EXIT and INT..."
+if [[ "${ENABLE_DAEMON}" = false ]]; then
   trap cleanup EXIT
   trap cleanup INT
 fi
@@ -1522,7 +1467,7 @@ if [[ "${START_MODE}" != *"nokubelet"* ]]; then
   # Detect the OS name/arch and display appropriate error.
     case "$(uname -s)" in
       Darwin)
-        print_color "kubelet is not supported on macOS. Please use https://sigs.k8s.io/kind"
+        print_color "kubelet is not currently supported in darwin, kubelet aborted."
         KUBELET_LOG=""
         ;;
       Linux)
@@ -1542,7 +1487,7 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
     # Detect the OS name/arch and display appropriate error.
     case "$(uname -s)" in
       Darwin)
-        print_color "kube-proxy is not supported on macOS. Please use https://sigs.k8s.io/kind."
+        print_color "kubelet is not currently supported in darwin, kube-proxy aborted."
         ;;
       Linux)
         start_kubeproxy
@@ -1567,7 +1512,8 @@ if [[ -n "${DRY_RUN}" ]]; then
   # Ensure that "run" output has been flushed. This waits for anything which might have been started.
   # shellcheck disable=SC2086
   wait ${APISERVER_PID-} ${CTLRMGR_PID-} ${CLOUD_CTLRMGR_PID-} ${KUBELET_PID-} ${PROXY_PID-} ${SCHEDULER_PID-}
-  exit 0
+  echo "Local etcd is running. Run commands. Press Ctrl-C to shut it down."
+  sleep infinity
 elif [[ "${ENABLE_DAEMON}" = false ]]; then
   while true; do sleep 1; healthcheck; done
 fi

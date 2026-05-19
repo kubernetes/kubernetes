@@ -334,12 +334,13 @@ type ListOptions struct {
 
 // DeleteOptions provides the options that may be provided for storage delete operations.
 type DeleteOptions struct {
-	// ExpectTransformOrDecodeError, if enabled, will return an error if the object can be
-	// transformed and decoded.
+	// IgnoreStoreReadError, if enabled, will ignore store read error
+	// such as transformation or decode failure and go ahead with the
+	// deletion of the object.
 	// NOTE: for normal deletion flow it should always be false, it may be
 	// enabled by the caller only to facilitate unsafe deletion of corrupt
 	// object which otherwise can not be deleted using the normal flow
-	ExpectTransformOrDecodeError bool
+	IgnoreStoreReadError bool
 }
 
 func ValidateListOptions(keyPrefix string, versioner Versioner, opts ListOptions) (withRev int64, continueKey string, err error) {
