@@ -19,6 +19,7 @@ package json
 import (
 	"bytes"
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -51,6 +52,10 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 		in           runtime.Object
 		cannotStream bool
 		expect       string
+		// allow provides allowed alternate representations.
+		// For the json v1->v2 transition, this is used to tolerate changes
+		// in how malformed input in munged.
+		allow []string
 	}{
 		// Preserving the distinction between integers and floating-point numbers
 		{
@@ -114,6 +119,8 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 				},
 			},
 			expect: "{\"items\":[],\"key\":\"\\ufffd\"}\n",
+			// Go json/v2 emits U+FFFD as raw UTF-8 bytes rather than the \ufffd escape.
+			allow: []string{"{\"items\":[],\"key\":\"\ufffd\"}\n"},
 		},
 		{
 			name: "UnstructuredList items invalid UTF-8 ",
@@ -127,6 +134,8 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 				},
 			},
 			expect: "{\"items\":[{\"key\":\"\\ufffd\"}]}\n",
+			// Go json/v2 emits U+FFFD as raw UTF-8 bytes rather than the \ufffd escape.
+			allow: []string{"{\"items\":[{\"key\":\"\ufffd\"}]}\n"},
 		},
 		// Preserving the distinction between absent, present-but-null, and present-and-empty states for slices and maps
 		{
@@ -577,8 +586,8 @@ func testCollectionsEncoding(t *testing.T, s *Serializer, streamingEnabled bool)
 				t.Fatalf("unexpected error: %v", err)
 			}
 			t.Logf("encoded: %s", buf.String())
-			if diff := cmp.Diff(buf.String(), tc.expect); diff != "" {
-				t.Errorf("not matching:\n%s", diff)
+			if got := buf.String(); got != tc.expect && !slices.Contains(tc.allow, got) {
+				t.Errorf("not matching:\n%s", cmp.Diff(got, tc.expect))
 			}
 			expectStreaming := !tc.cannotStream && streamingEnabled
 			if expectStreaming && buf.writeCount <= 1 {
