@@ -27,7 +27,12 @@
                 "$ref": "#/components/schemas/io.k8s.api.storagemigration.v1beta1.StorageVersionMigrationSpec"
               }
             ],
-            "default": {},
+            "default": {
+              "resource": {
+                "group": "",
+                "resource": ""
+              }
+            },
             "description": "Specification of the migration."
           },
           "status": {
@@ -98,7 +103,10 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.GroupResource"
               }
             ],
-            "default": {},
+            "default": {
+              "group": "",
+              "resource": ""
+            },
             "description": "The resource that is being migrated. The migrator sends requests to the endpoint serving the resource. Immutable."
           }
         },

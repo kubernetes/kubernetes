@@ -72,7 +72,9 @@
                 "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReviewStatus"
               }
             ],
-            "default": {},
+            "default": {
+              "allowed": false
+            },
             "description": "status is filled in by the server and indicates whether the request is allowed or not"
           }
         },
@@ -253,7 +255,9 @@
                 "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReviewStatus"
               }
             ],
-            "default": {},
+            "default": {
+              "allowed": false
+            },
             "description": "status is filled in by the server and indicates whether the request is allowed or not"
           }
         },
@@ -326,7 +330,9 @@
                 "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectRulesReviewStatus"
               }
             ],
-            "default": {},
+            "default": {
+              "incomplete": false
+            },
             "description": "status is filled in by the server and indicates the set of actions a user can perform."
           }
         },
@@ -387,7 +393,9 @@
                 "$ref": "#/components/schemas/io.k8s.api.authorization.v1.SubjectAccessReviewStatus"
               }
             ],
-            "default": {},
+            "default": {
+              "allowed": false
+            },
             "description": "status is filled in by the server and indicates whether the request is allowed or not"
           }
         },

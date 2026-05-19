@@ -27,7 +27,10 @@
                 "$ref": "#/components/schemas/io.k8s.api.coordination.v1alpha2.LeaseCandidateSpec"
               }
             ],
-            "default": {},
+            "default": {
+              "binaryVersion": "",
+              "leaseName": ""
+            },
             "description": "spec contains the specification of the Lease. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
           }
         },

@@ -27,7 +27,9 @@
                 "$ref": "#/components/schemas/io.k8s.api.certificates.v1beta1.ClusterTrustBundleSpec"
               }
             ],
-            "default": {},
+            "default": {
+              "trustBundle": ""
+            },
             "description": "spec contains the signer (if any) and trust anchors."
           }
         },
@@ -127,7 +129,15 @@
                 "$ref": "#/components/schemas/io.k8s.api.certificates.v1beta1.PodCertificateRequestSpec"
               }
             ],
-            "default": {},
+            "default": {
+              "nodeName": "",
+              "nodeUID": "",
+              "podName": "",
+              "podUID": "",
+              "serviceAccountName": "",
+              "serviceAccountUID": "",
+              "signerName": ""
+            },
             "description": "spec contains the details about the certificate being requested."
           },
           "status": {

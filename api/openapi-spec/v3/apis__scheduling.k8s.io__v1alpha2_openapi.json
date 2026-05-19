@@ -46,7 +46,9 @@
                 "$ref": "#/components/schemas/io.k8s.api.scheduling.v1alpha2.PodGroupSpec"
               }
             ],
-            "default": {},
+            "default": {
+              "schedulingPolicy": {}
+            },
             "description": "Spec defines the desired state of the PodGroup."
           },
           "status": {

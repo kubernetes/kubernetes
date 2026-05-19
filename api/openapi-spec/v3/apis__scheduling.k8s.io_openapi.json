@@ -23,7 +23,10 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.GroupVersionForDiscovery"
               }
             ],
-            "default": {},
+            "default": {
+              "groupVersion": "",
+              "version": ""
+            },
             "description": "preferredVersion is the version preferred by the API server, which probably is the storage version."
           },
           "serverAddressByClientCIDRs": {

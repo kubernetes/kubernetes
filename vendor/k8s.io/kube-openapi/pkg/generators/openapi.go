@@ -100,7 +100,7 @@ func isOptional(m *types.Member) (bool, error) {
 
 	// If neither +optional nor +required is present in the comments,
 	// infer optional from the json tags.
-	return strings.Contains(reflect.StructTag(m.Tags).Get("json"), "omitempty"), nil
+	return hasOmitemptyTag(m), nil
 }
 
 func apiTypeFilterFunc(c *generator.Context, t *types.Type) bool {
@@ -220,6 +220,11 @@ func getReferableName(m *types.Member) string {
 	} else {
 		return m.Name
 	}
+}
+
+func hasOmitemptyTag(m *types.Member) bool {
+	jsonTag, _ := reflect.StructTag(m.Tags).Lookup("json")
+	return strings.HasSuffix(jsonTag, ",omitempty") || strings.Contains(jsonTag, ",omitempty,")
 }
 
 func shouldInlineMembers(m *types.Member) bool {
@@ -928,7 +933,7 @@ func mustEnforceDefault(t *types.Type, omitEmpty bool) (interface{}, error) {
 			return mustEnforceDefault(t.Members[0].Type, omitEmpty)
 		}
 
-		return map[string]interface{}{}, nil
+		return structZeroDefault(t)
 	case types.Builtin:
 		if !omitEmpty {
 			if zero, ok := openapi.OpenAPIZeroValue(t.String()); ok {
@@ -941,6 +946,60 @@ func mustEnforceDefault(t *types.Type, omitEmpty bool) (interface{}, error) {
 	default:
 		return nil, fmt.Errorf("not sure how to enforce default for %v", t.Kind)
 	}
+}
+
+// structZeroDefault builds a zero-value default for a struct type that includes
+// zero values for all required (non-optional) fields. This ensures the generated
+// default satisfies the schema's required constraints.
+func structZeroDefault(t *types.Type) (interface{}, error) {
+	for t.Kind == types.Pointer {
+		t = t.Elem
+	}
+	result := map[string]interface{}{}
+	for _, m := range t.Members {
+		if hasOpenAPITagValue(m.CommentLines, tagValueFalse) {
+			continue
+		}
+		if shouldInlineMembers(&m) {
+			inlined, err := structZeroDefault(m.Type)
+			if err != nil {
+				return nil, err
+			}
+			if inlinedMap, ok := inlined.(map[string]interface{}); ok {
+				for k, v := range inlinedMap {
+					result[k] = v
+				}
+			}
+			continue
+		}
+		name := getReferableName(&m)
+		if name == "" {
+			continue
+		}
+		// Skip unexported fields with no JSON tag, they are not
+		// serialized and do not appear in the OpenAPI schema.
+		jsonTags := getJsonTags(&m)
+		if len(jsonTags) == 0 && len(m.Name) > 0 && strings.ToLower(m.Name[:1]) == m.Name[:1] {
+			continue
+		}
+		optional, err := isOptional(&m)
+		if err != nil {
+			return nil, err
+		}
+		if optional {
+			continue
+		}
+		// Include zero value for this required field
+		memberOmitEmpty := hasOmitemptyTag(&m)
+		zero, err := mustEnforceDefault(m.Type, memberOmitEmpty)
+		if err != nil {
+			return nil, err
+		}
+		if zero != nil {
+			result[name] = zero
+		}
+	}
+	return result, nil
 }
 
 func (g openAPITypeWriter) generateDefault(comments []string, t *types.Type, omitEmpty bool, commentOwningType *types.Type) error {
@@ -1032,7 +1091,7 @@ func (g openAPITypeWriter) generateProperty(m *types.Member, parent *types.Type)
 		g.Do("},\n},\n", nil)
 		return nil
 	}
-	omitEmpty := strings.Contains(reflect.StructTag(m.Tags).Get("json"), "omitempty")
+	omitEmpty := hasOmitemptyTag(m)
 	if err := g.generateDefault(m.CommentLines, m.Type, omitEmpty, parent); err != nil {
 		return fmt.Errorf("failed to generate default in %v: %v: %v", parent, m.Name, err)
 	}

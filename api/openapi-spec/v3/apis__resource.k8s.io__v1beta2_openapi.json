@@ -952,7 +952,12 @@
                 "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.DeviceTaintRuleSpec"
               }
             ],
-            "default": {},
+            "default": {
+              "taint": {
+                "effect": "",
+                "key": ""
+              }
+            },
             "description": "Spec specifies the selector and one taint.\n\nChanging the spec automatically increments the metadata.generation number."
           },
           "status": {
@@ -1034,7 +1039,10 @@
                 "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.DeviceTaint"
               }
             ],
-            "default": {},
+            "default": {
+              "effect": "",
+              "key": ""
+            },
             "description": "The taint that gets applied to matching devices."
           }
         },
@@ -1553,7 +1561,14 @@
                 "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.ResourceSliceSpec"
               }
             ],
-            "default": {},
+            "default": {
+              "driver": "",
+              "pool": {
+                "generation": 0,
+                "name": "",
+                "resourceSliceCount": 0
+              }
+            },
             "description": "Contains the information published by the driver.\n\nChanging the spec automatically increments the metadata.generation number."
           }
         },
@@ -1651,7 +1666,11 @@
                 "$ref": "#/components/schemas/io.k8s.api.resource.v1beta2.ResourcePool"
               }
             ],
-            "default": {},
+            "default": {
+              "generation": 0,
+              "name": "",
+              "resourceSliceCount": 0
+            },
             "description": "Pool describes the pool that this ResourceSlice belongs to."
           },
           "sharedCounters": {

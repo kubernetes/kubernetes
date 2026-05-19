@@ -88,7 +88,14 @@
                 "$ref": "#/components/schemas/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionSpec"
               }
             ],
-            "default": {},
+            "default": {
+              "group": "",
+              "names": {
+                "kind": "",
+                "plural": ""
+              },
+              "scope": ""
+            },
             "description": "spec describes how the user wants the resources to appear"
           },
           "status": {
@@ -260,7 +267,10 @@
                 "$ref": "#/components/schemas/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionNames"
               }
             ],
-            "default": {},
+            "default": {
+              "kind": "",
+              "plural": ""
+            },
             "description": "names specify the resource and kind names for the custom resource."
           },
           "preserveUnknownFields": {
@@ -298,7 +308,10 @@
                 "$ref": "#/components/schemas/io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinitionNames"
               }
             ],
-            "default": {},
+            "default": {
+              "kind": "",
+              "plural": ""
+            },
             "description": "acceptedNames are the names that are actually being used to serve discovery. They may be different than the names in spec."
           },
           "conditions": {
