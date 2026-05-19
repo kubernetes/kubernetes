@@ -610,6 +610,30 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachabilityPort81})
 		})
 
+		// This test *does* apply to plugins that do not implement named ports
+		// (and the test specifically does not have the string "named port" in its
+		// title to ensure that doesn't get accidentally skipped by plugins that
+		// skip named port tests). It is a security hole if you fail this test,
+		// because you are allowing traffic that is supposed to be blocked.
+		f.It("should not allow all ports if it cannot limit to the requested port", feature.NetworkPolicy, func(ctx context.Context) {
+			protocols := []v1.Protocol{protocolTCP}
+			ports := []int32{80}
+			// One server (x/a) and one client (y/a) is sufficient
+			k8s = initializeResources(ctx, f, protocols, ports, "x/a", "y/a")
+			nsX, _, _ := getK8sNamespaces(k8s)
+
+			ginkgo.By("Creating a network policy for the server which allows traffic only on a (non-existent) named port.")
+			ingressRule := networkingv1.NetworkPolicyIngressRule{}
+			ingressRule.Ports = append(ingressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{StrVal: "no-such-port"}, Protocol: &protocolTCP})
+			policy := GenNetworkPolicyWithNameAndPodMatchLabel("allow-ingress-on-nonexistent-port", map[string]string{"pod": "a"}, SetSpecIngressRules(ingressRule))
+			CreatePolicy(ctx, k8s, policy, nsX)
+
+			ginkgo.By("Trying to connect to TCP port 80, which should be blocked by implicit isolation.")
+			reachability := NewReachability(k8s.AllPodStrings(), true)
+			reachability.ExpectAllIngress(NewPodString(nsX, "a"), false)
+			ValidateOrFail(k8s, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
+		})
+
 		f.It("should enforce updated policy", feature.NetworkPolicy, func(ctx context.Context) {
 			protocols := []v1.Protocol{protocolTCP}
 			ports := []int32{81}
