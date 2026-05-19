@@ -27,6 +27,26 @@ import (
 	registry "k8s.io/kubernetes/pkg/registry/core/secret"
 )
 
+func TestDeclarativeValidate(t *testing.T) {
+	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
+		APIGroup:   "",
+		APIVersion: "v1",
+	})
+	testCases := map[string]struct {
+		input        api.Secret
+		expectedErrs field.ErrorList
+	}{
+		"valid create": {
+			input: mkValidSecret(),
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
+		})
+	}
+}
+
 func TestDeclarativeValidateUpdate(t *testing.T) {
 	ctx := genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIGroup:   "",
@@ -37,7 +57,7 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 		update       api.Secret
 		expectedErrs field.ErrorList
 	}{
-		"no change": {
+		"valid update": {
 			old:    mkValidSecret(),
 			update: mkValidSecret(),
 		},
@@ -46,6 +66,20 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 			update: mkValidSecret(tweakType(api.SecretType("custom-type"))),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("type"), api.SecretType("custom-type"), "field is immutable").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		"type: set from unset": {
+			old:    mkValidSecret(tweakType("")),
+			update: mkValidSecret(tweakType(api.SecretTypeOpaque)),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("type"), api.SecretTypeOpaque, "field is immutable").WithOrigin("immutable").MarkAlpha(),
+			},
+		},
+		"type: unset from set": {
+			old:    mkValidSecret(),
+			update: mkValidSecret(tweakType("")),
+			expectedErrs: field.ErrorList{
+				field.Invalid(field.NewPath("type"), api.SecretType(""), "field is immutable").WithOrigin("immutable").MarkAlpha(),
 			},
 		},
 	}
@@ -75,8 +109,8 @@ func mkValidSecret(tweaks ...func(*api.Secret)) api.Secret {
 	return s
 }
 
-func tweakType(t api.SecretType) func(*api.Secret) {
+func tweakType(secretType api.SecretType) func(*api.Secret) {
 	return func(s *api.Secret) {
-		s.Type = t
+		s.Type = secretType
 	}
 }
