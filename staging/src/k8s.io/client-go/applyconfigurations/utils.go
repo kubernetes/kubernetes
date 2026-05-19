@@ -802,6 +802,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationscorev1.NodeDaemonEndpointsApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeFeatures"):
 		return &applyconfigurationscorev1.NodeFeaturesApplyConfiguration{}
+	case corev1.SchemeGroupVersion.WithKind("NodePreemptionPolicy"):
+		return &applyconfigurationscorev1.NodePreemptionPolicyApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeRuntimeHandler"):
 		return &applyconfigurationscorev1.NodeRuntimeHandlerApplyConfiguration{}
 	case corev1.SchemeGroupVersion.WithKind("NodeRuntimeHandlerFeatures"):

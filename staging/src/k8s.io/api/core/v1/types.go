@@ -6570,7 +6570,7 @@ type NodeSpec struct {
 
 	// PreemptionPolicy controls the node-level preemption behaviors.
 	// +optional
-	PreemptionPolicy *NodePreemptionPolicy `json:"preemptionPolicy,omitempty"`
+	PreemptionPolicy *NodePreemptionPolicy `json:"preemptionPolicy,omitempty" protobuf:"bytes,8,opt,name=preemptionPolicy"`
 }
 
 // NodePreemptionPolicy defines the node-level policies governing preemption on this node.
@@ -6580,7 +6580,7 @@ type NodePreemptionPolicy struct {
 	// If this list is non-empty, resize-induced preemption is disabled on this node.
 	// +listType=set
 	// +optional
-	DisablePodResizePreemption []string `json:"disablePodResizePreemption,omitempty"`
+	DisablePodResizePreemption []string `json:"disablePodResizePreemption,omitempty" protobuf:"bytes,1,rep,name=disablePodResizePreemption"`
 }
 
 // NodeConfigSource specifies a source of node configuration. Exactly one subfield (excluding metadata) must be non-nil.

@@ -6115,6 +6115,15 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: supplementalGroupsPolicy
       type:
         scalar: boolean
+- name: io.k8s.api.core.v1.NodePreemptionPolicy
+  map:
+    fields:
+    - name: disablePodResizePreemption
+      type:
+        list:
+          elementType:
+            scalar: string
+          elementRelationship: associative
 - name: io.k8s.api.core.v1.NodeRuntimeHandler
   map:
     fields:
@@ -6195,6 +6204,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: associative
+    - name: preemptionPolicy
+      type:
+        namedType: io.k8s.api.core.v1.NodePreemptionPolicy
     - name: providerID
       type:
         scalar: string

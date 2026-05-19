@@ -44,6 +44,9 @@ spec:
   podCIDR: podCIDRValue
   podCIDRs:
   - podCIDRsValue
+  preemptionPolicy:
+    disablePodResizePreemption:
+    - disablePodResizePreemptionValue
   providerID: providerIDValue
   taints:
   - effect: effectValue

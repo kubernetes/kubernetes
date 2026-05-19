@@ -2814,6 +2814,16 @@ message NodeList {
   repeated Node items = 2;
 }
 
+// NodePreemptionPolicy defines the node-level policies governing preemption on this node.
+message NodePreemptionPolicy {
+  // DisablePodResizePreemption lists the owners (e.g., autoscalers, operators, administrators)
+  // that have requested to disable scheduler and Kubelet preemption for in-place pod resize on this node.
+  // If this list is non-empty, resize-induced preemption is disabled on this node.
+  // +listType=set
+  // +optional
+  repeated string disablePodResizePreemption = 1;
+}
+
 // NodeProxyOptions is the query options to a Node's proxy call.
 message NodeProxyOptions {
   // Path is the URL path to use for the current proxy request to node.
@@ -2926,6 +2936,10 @@ message NodeSpec {
   // see: https://issues.k8s.io/61966
   // +optional
   optional string externalID = 2;
+
+  // PreemptionPolicy controls the node-level preemption behaviors.
+  // +optional
+  optional NodePreemptionPolicy preemptionPolicy = 8;
 }
 
 // NodeStatus is information about the current status of a node.

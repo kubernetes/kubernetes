@@ -67,7 +67,12 @@
         "kubeletConfigKey": "kubeletConfigKeyValue"
       }
     },
-    "externalID": "externalIDValue"
+    "externalID": "externalIDValue",
+    "preemptionPolicy": {
+      "disablePodResizePreemption": [
+        "disablePodResizePreemptionValue"
+      ]
+    }
   },
   "status": {
     "capacity": {

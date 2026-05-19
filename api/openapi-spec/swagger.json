@@ -9017,6 +9017,20 @@
         }
       ]
     },
+    "io.k8s.api.core.v1.NodePreemptionPolicy": {
+      "description": "NodePreemptionPolicy defines the node-level policies governing preemption on this node.",
+      "properties": {
+        "disablePodResizePreemption": {
+          "description": "DisablePodResizePreemption lists the owners (e.g., autoscalers, operators, administrators) that have requested to disable scheduler and Kubelet preemption for in-place pod resize on this node. If this list is non-empty, resize-induced preemption is disabled on this node.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "set"
+        }
+      },
+      "type": "object"
+    },
     "io.k8s.api.core.v1.NodeRuntimeHandler": {
       "description": "NodeRuntimeHandler is a set of runtime handler information.",
       "properties": {
@@ -9135,6 +9149,10 @@
           "type": "array",
           "x-kubernetes-list-type": "set",
           "x-kubernetes-patch-strategy": "merge"
+        },
+        "preemptionPolicy": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.NodePreemptionPolicy",
+          "description": "PreemptionPolicy controls the node-level preemption behaviors."
         },
         "providerID": {
           "description": "ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>",

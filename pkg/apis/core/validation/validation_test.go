@@ -22698,20 +22698,20 @@ func TestValidateSecret(t *testing.T) {
 		secret core.Secret
 		valid  bool
 	}{
-		"valid":                                     {validSecret(), true},
-		"empty name":                                {emptyName, false},
-		"invalid name":                              {invalidName, false},
-		"empty namespace":                           {emptyNs, false},
-		"invalid namespace":                         {invalidNs, false},
-		"over max size":                             {overMaxSize, false},
-		"invalid key":                               {invalidKey, false},
-		"valid service-account-token secret":        {validServiceAccountTokenSecret(), true},
-		"empty service-account-token annotation":    {emptyTokenAnnotation, false},
+		"valid":                                  {validSecret(), true},
+		"empty name":                             {emptyName, false},
+		"invalid name":                           {invalidName, false},
+		"empty namespace":                        {emptyNs, false},
+		"invalid namespace":                      {invalidNs, false},
+		"over max size":                          {overMaxSize, false},
+		"invalid key":                            {invalidKey, false},
+		"valid service-account-token secret":     {validServiceAccountTokenSecret(), true},
+		"empty service-account-token annotation": {emptyTokenAnnotation, false},
 		"missing service-account-token annotation":  {missingTokenAnnotation, false},
 		"missing service-account-token annotations": {missingTokenAnnotations, false},
-		"leading dot key":                           {leadingDotKey, true},
-		"dot key":                                   {dotKey, false},
-		"double dot key":                            {doubleDotKey, false},
+		"leading dot key": {leadingDotKey, true},
+		"dot key":         {dotKey, false},
+		"double dot key":  {doubleDotKey, false},
 	}
 
 	for name, tc := range tests {
