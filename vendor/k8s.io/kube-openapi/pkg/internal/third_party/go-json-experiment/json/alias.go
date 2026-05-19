@@ -608,15 +608,6 @@ func UnmarshalDecode(in *jsontext.Decoder, out any, opts ...Options) (err error)
 	return json.UnmarshalDecode(in, out, opts...)
 }
 
-// SkipFunc may be returned by [MarshalToFunc] and [UnmarshalFromFunc] functions.
-//
-// Any function that returns SkipFunc must not cause observable side effects
-// on the provided [jsontext.Encoder] or [jsontext.Decoder].
-// For example, it is permissible to call [jsontext.Decoder.PeekKind],
-// but not permissible to call [jsontext.Decoder.ReadToken] or
-// [jsontext.Encoder.WriteToken] since such methods mutate the state.
-var SkipFunc = json.SkipFunc
-
 // Marshalers is a list of functions that may override the marshal behavior
 // of specific types. Populate [WithMarshalers] to use it with
 // [Marshal], [MarshalWrite], or [MarshalEncode].
@@ -946,15 +937,6 @@ func OmitZeroStructFields(v bool) Options {
 // if it matches one of the declared fields in the Go struct.
 func MatchCaseInsensitiveNames(v bool) Options {
 	return json.MatchCaseInsensitiveNames(v)
-}
-
-// DiscardUnknownMembers specifies that marshaling should ignore any
-// JSON object members stored in Go struct fields dedicated to storing
-// unknown JSON object members.
-//
-// This only affects marshaling and is ignored when unmarshaling.
-func DiscardUnknownMembers(v bool) Options {
-	return json.DiscardUnknownMembers(v)
 }
 
 // RejectUnknownMembers specifies that unknown members should be rejected
