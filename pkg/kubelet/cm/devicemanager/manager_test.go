@@ -432,11 +432,9 @@ func TestUpdateCapacityAllocatable(t *testing.T) {
 
 	// Tests adding another resource.
 	resourceName2 := "resource2"
-	e2 := &endpointImpl{socket: socketName}
+	e2 := &endpointImpl{}
 	e2.client = plugin.NewPluginClient(resourceName2, socketName, testManager)
-	eInfo := endpointInfo{e: e2, opts: nil}
-	testManager.endpoints[resourceName2] = eInfo
-	testManager.endpointStore[resourceName2] = map[string]*endpointInfo{socketName: &eInfo}
+	testManager.endpoints[resourceName2] = endpointInfo{e: e2, opts: nil}
 	callback(logger, resourceName2, devs)
 	capacity, allocatable, removedResources = testManager.GetCapacity()
 	as.Len(capacity, 2)
@@ -810,7 +808,6 @@ type MockEndpoint struct {
 	getPreferredAllocationFunc func(available, mustInclude []string, size int) (*pluginapi.PreferredAllocationResponse, error)
 	allocateFunc               func(devs []string) (*pluginapi.AllocateResponse, error)
 	initChan                   chan []string
-	socket                     string
 }
 
 func (m *MockEndpoint) preStartContainer(_ context.Context, devs []string) (*pluginapi.PreStartContainerResponse, error) {
@@ -837,10 +834,6 @@ func (m *MockEndpoint) setStopTime(t time.Time) {}
 func (m *MockEndpoint) isStopped() bool { return false }
 
 func (m *MockEndpoint) stopGracePeriodExpired() bool { return false }
-
-func (m *MockEndpoint) socketPath() string {
-	return m.socket
-}
 
 func makePod(limits v1.ResourceList) *v1.Pod {
 	return &v1.Pod{
@@ -1106,9 +1099,9 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 		if testCase.expectedContainerOptsLen == nil {
 			as.Nil(runContainerOpts)
 		} else {
-			as.Len(runContainerOpts.Devices, testCase.expectedContainerOptsLen[0])
-			as.Len(runContainerOpts.Mounts, testCase.expectedContainerOptsLen[1])
-			as.Len(runContainerOpts.Envs, testCase.expectedContainerOptsLen[2])
+			as.Equal(len(runContainerOpts.Devices), testCase.expectedContainerOptsLen[0])
+			as.Equal(len(runContainerOpts.Mounts), testCase.expectedContainerOptsLen[1])
+			as.Equal(len(runContainerOpts.Envs), testCase.expectedContainerOptsLen[2])
 		}
 		as.Equal(testCase.expectedAllocatedResName1, testManager.allocatedDevices[res1.resourceName].Len())
 		as.Equal(testCase.expectedAllocatedResName2, testManager.allocatedDevices[res2.resourceName].Len())
@@ -1282,7 +1275,7 @@ func TestDevicesToAllocateConflictWithUpdateAllocatedDevices(t *testing.T) {
 
 	set, err := testManager.devicesToAllocate(tCtx, podToAllocate, containerToAllocate, resourceName, 1, sets.New[string]())
 	assert.NoError(t, err)
-	assert.Equal(t, sets.New[string](deviceID), set)
+	assert.Equal(t, set, sets.New[string](deviceID))
 }
 
 func TestGetDeviceRunContainerOptions(t *testing.T) {
@@ -1682,15 +1675,15 @@ func TestDevicePreStartContainer(t *testing.T) {
 
 	as.Contains(initializedDevs, "dev1")
 	as.Contains(initializedDevs, "dev2")
-	as.Len(initializedDevs, res1.devs.Devices().Len())
+	as.Equal(len(initializedDevs), res1.devs.Devices().Len())
 
 	expectedResps, err := allocateStubFunc()([]string{"dev1", "dev2"})
 	as.NoError(err)
 	as.Len(expectedResps.ContainerResponses, 1)
 	expectedResp := expectedResps.ContainerResponses[0]
-	as.Len(runContainerOpts.Devices, len(expectedResp.Devices))
-	as.Len(runContainerOpts.Mounts, len(expectedResp.Mounts))
-	as.Len(runContainerOpts.Envs, len(expectedResp.Envs))
+	as.Equal(len(runContainerOpts.Devices), len(expectedResp.Devices))
+	as.Equal(len(runContainerOpts.Mounts), len(expectedResp.Mounts))
+	as.Equal(len(runContainerOpts.Envs), len(expectedResp.Envs))
 
 	pod2 := makePod(v1.ResourceList{
 		v1.ResourceName(res1.resourceName): *resource.NewQuantity(int64(0), resource.DecimalSI)})
@@ -2167,12 +2160,9 @@ func TestEndpointSyncOnDisconnect(t *testing.T) {
 		resourceName: resourceName,
 		client:       plugin.NewPluginClient(resourceName, socketName, manager),
 		stopTime:     time.Now().Add(-endpointStopGracePeriod * 2), // make the grace period expired
-		socket:       socketName,
 	}
 
-	eInfo := endpointInfo{e: ep, opts: nil}
-	manager.endpoints[resourceName] = eInfo
-	manager.endpointStore[resourceName] = map[string]*endpointInfo{socketName: &eInfo}
+	manager.endpoints[resourceName] = endpointInfo{e: ep, opts: nil}
 	devs := []*pluginapi.Device{
 		{ID: "Device1", Health: pluginapi.Healthy},
 		{ID: "Device2", Health: pluginapi.Healthy},

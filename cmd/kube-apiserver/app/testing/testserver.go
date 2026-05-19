@@ -54,6 +54,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	clientgotransport "k8s.io/client-go/transport"
 	"k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	basecompatibility "k8s.io/component-base/compatibility"
@@ -63,11 +64,11 @@ import (
 	zpagesfeatures "k8s.io/component-base/zpages/features"
 	"k8s.io/klog/v2"
 	"k8s.io/kube-aggregator/pkg/apiserver"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	"k8s.io/kubernetes/test/e2e/invariants/metrics"
 	testutil "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/ktesting"
+
+	"k8s.io/kubernetes/cmd/kube-apiserver/app"
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
 
 func init() {
@@ -92,8 +93,6 @@ type TestServerInstanceOptions struct {
 	// SkipHealthzCheck returns without waiting for the server to become healthy.
 	// Useful for testing server configurations expected to prevent /healthz from completing.
 	SkipHealthzCheck bool
-	// DisableInvariantChecks skips the invariant checks at the end of the test.
-	DisableInvariantChecks bool
 	// Enable cert-auth for the kube-apiserver
 	EnableCertAuth bool
 	// Wrap the storage version interface of the created server's generic server.
@@ -157,11 +156,7 @@ func NewDefaultTestServerOptions() *TestServerInstanceOptions {
 func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, customFlags []string, storageConfig *storagebackend.Config) (result TestServer, err error) {
 	// Some callers may have initialize ktesting already.
 	tCtx, ok := t.(ktesting.TContext)
-	if ok {
-		// tCtx.Cancel below must not cancel whatever else might be using
-		// this existing TContext.
-		tCtx = tCtx.WithCancel()
-	} else {
+	if !ok {
 		tCtx = ktesting.Init(t)
 	}
 
@@ -357,12 +352,6 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	if err := fs.Parse(customFlags); err != nil {
 		return result, err
 	}
-
-	// disable endpoint reconciliation when using a loopback "external" address
-	// unless the user has explicitly overridden the reconciler or advertise address
-	if !fs.Changed("advertise-address") && !fs.Changed("endpoint-reconciler-type") {
-		s.EndpointReconcilerType = "none"
-	}
 	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
 		s.Flagz = flagz.NamedFlagSetsReader{FlagSets: namedFlagSets}
 	}
@@ -406,6 +395,12 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 
 	if instanceOptions.EnableCertAuth {
 		if featureGate.Enabled(genericfeatures.UnknownVersionInteroperabilityProxy) {
+			// TODO: set up a general clean up for testserver
+			if clientgotransport.DialerStopCh == wait.NeverStop {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+				t.Cleanup(cancel)
+				clientgotransport.DialerStopCh = ctx.Done()
+			}
 			s.PeerCAFile = filepath.Join(s.SecureServing.ServerCert.CertDirectory, s.SecureServing.ServerCert.PairName+".crt")
 		}
 	}
@@ -530,22 +525,8 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	result.ClientConfig.Burst = 10000
 	result.ServerOpts = s
 	result.TearDownFn = func() {
-		defer func() {
-			if err := etcdClient.Close(); err != nil {
-				tCtx.Errorf("Failed to close etcd client: %v", err)
-			}
-		}()
-		defer tearDown()
-		if instanceOptions.DisableInvariantChecks {
-			return
-		}
-		if tCtx.Err() != nil {
-			tCtx.Logf("Skipping metrics scrape because context is already canceled: %v", tCtx.Err())
-			return
-		}
-		if err := metrics.CheckMetricInvariants(tCtx, client, false); err != nil {
-			tCtx.Errorf("Invariant check failed (if the test intentionally breaks metrics/auth, consider setting DisableInvariantChecks: true in TestServerInstanceOptions): %v", err)
-		}
+		tearDown()
+		etcdClient.Close()
 	}
 	result.EtcdClient = etcdClient
 	result.EtcdStoragePrefix = storageConfig.Prefix

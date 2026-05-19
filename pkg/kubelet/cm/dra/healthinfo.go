@@ -41,14 +41,13 @@ type healthInfoCache struct {
 }
 
 // newHealthInfoCache creates a new cache, loading from a checkpoint if present.
-func newHealthInfoCache(logger klog.Logger, stateFile string) (*healthInfoCache, error) {
-	logger = logger.WithName("dra-healthinfo")
+func newHealthInfoCache(stateFile string) (*healthInfoCache, error) {
 	cache := &healthInfoCache{
 		HealthInfo: &state.DevicesHealthMap{},
 		stateFile:  stateFile,
 	}
 	if err := cache.loadFromCheckpoint(); err != nil {
-		logger.Error(err, "Failed to load health checkpoint, proceeding with empty cache")
+		klog.Background().Error(err, "Failed to load health checkpoint, proceeding with empty cache")
 	}
 	return cache, nil
 }
@@ -85,8 +84,7 @@ func (cache *healthInfoCache) withRLock(f func() error) error {
 
 // saveToCheckpointInternal does the actual saving without locking.
 // Assumes the caller holds the necessary lock.
-func (cache *healthInfoCache) saveToCheckpointInternal(logger klog.Logger) error {
-	logger = logger.WithName("dra-healthinfo")
+func (cache *healthInfoCache) saveToCheckpointInternal() error {
 	if cache.stateFile == "" {
 		return nil
 	}
@@ -102,7 +100,7 @@ func (cache *healthInfoCache) saveToCheckpointInternal(logger klog.Logger) error
 
 	defer func() {
 		if err := os.Remove(tempFile.Name()); err != nil && !os.IsNotExist(err) {
-			logger.Error(err, "Failed to remove temporary checkpoint file", "path", tempFile.Name())
+			klog.Background().Error(err, "Failed to remove temporary checkpoint file", "path", tempFile.Name())
 		}
 	}()
 
@@ -123,13 +121,8 @@ func (cache *healthInfoCache) saveToCheckpointInternal(logger klog.Logger) error
 }
 
 // getHealthInfo returns the current health info, adjusting for timeouts.
-func (cache *healthInfoCache) getHealthInfo(driverName, poolName, deviceName string) state.DeviceHealth {
-	res := state.DeviceHealth{
-		PoolName:   poolName,
-		DeviceName: deviceName,
-		Health:     state.DeviceHealthStatusUnknown,
-		Message:    "",
-	}
+func (cache *healthInfoCache) getHealthInfo(driverName, poolName, deviceName string) state.DeviceHealthStatus {
+	res := state.DeviceHealthStatusUnknown
 
 	_ = cache.withRLock(func() error {
 		now := time.Now()
@@ -144,11 +137,9 @@ func (cache *healthInfoCache) getHealthInfo(driverName, poolName, deviceName str
 
 				// Check if device health has timed out
 				if now.Sub(device.LastUpdated) > timeout {
-					// Keep default Unknown status, clear message for stale device
-					res.Health = state.DeviceHealthStatusUnknown
-					res.Message = ""
+					res = state.DeviceHealthStatusUnknown
 				} else {
-					res = device
+					res = device.Health
 				}
 			}
 		}
@@ -160,8 +151,7 @@ func (cache *healthInfoCache) getHealthInfo(driverName, poolName, deviceName str
 // updateHealthInfo reconciles the cache with a fresh list of device health states
 // from a plugin. It identifies which devices have changed state and handles devices
 // that are no longer being reported by the plugin.
-func (cache *healthInfoCache) updateHealthInfo(logger klog.Logger, driverName string, devices []state.DeviceHealth) ([]state.DeviceHealth, error) {
-	logger = logger.WithName("dra-healthinfo")
+func (cache *healthInfoCache) updateHealthInfo(driverName string, devices []state.DeviceHealth) ([]state.DeviceHealth, error) {
 	changedDevices := []state.DeviceHealth{}
 	err := cache.withLock(func() error {
 		now := time.Now()
@@ -183,8 +173,7 @@ func (cache *healthInfoCache) updateHealthInfo(logger klog.Logger, driverName st
 
 			existingDevice, ok := currentDriver.Devices[key]
 
-			// Consider health status, message, and timeout changes as updates
-			if !ok || existingDevice.Health != reportedDevice.Health || existingDevice.Message != reportedDevice.Message || existingDevice.HealthCheckTimeout != reportedDevice.HealthCheckTimeout {
+			if !ok || existingDevice.Health != reportedDevice.Health || existingDevice.HealthCheckTimeout != reportedDevice.HealthCheckTimeout {
 				changedDevices = append(changedDevices, reportedDevice)
 			}
 
@@ -205,7 +194,6 @@ func (cache *healthInfoCache) updateHealthInfo(logger klog.Logger, driverName st
 				// Mark as unknown if the device health has timed out
 				if existingDevice.Health != state.DeviceHealthStatusUnknown && now.Sub(existingDevice.LastUpdated) > timeout {
 					existingDevice.Health = state.DeviceHealthStatusUnknown
-					existingDevice.Message = ""
 					existingDevice.LastUpdated = now
 					currentDriver.Devices[key] = existingDevice
 
@@ -216,8 +204,8 @@ func (cache *healthInfoCache) updateHealthInfo(logger klog.Logger, driverName st
 
 		// Phase 3: Persist changes to the checkpoint file if any state changed.
 		if len(changedDevices) > 0 {
-			if err := cache.saveToCheckpointInternal(logger); err != nil {
-				logger.Error(err, "Failed to save health checkpoint after update. Kubelet restart may lose the device health information.")
+			if err := cache.saveToCheckpointInternal(); err != nil {
+				klog.Background().Error(err, "Failed to save health checkpoint after update. Kubelet restart may lose the device health information.")
 			}
 		}
 		return nil
@@ -230,9 +218,9 @@ func (cache *healthInfoCache) updateHealthInfo(logger klog.Logger, driverName st
 }
 
 // clearDriver clears all health data for a specific driver.
-func (cache *healthInfoCache) clearDriver(logger klog.Logger, driverName string) error {
+func (cache *healthInfoCache) clearDriver(driverName string) error {
 	return cache.withLock(func() error {
 		delete(*cache.HealthInfo, driverName)
-		return cache.saveToCheckpointInternal(logger)
+		return cache.saveToCheckpointInternal()
 	})
 }

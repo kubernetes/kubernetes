@@ -14,20 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package ktesting exists in different variants, each adding more
-// functionality on top of the previous one:
-//   - [k8s.io/klog/v2/ktesting]: contextual logging, caller determines
-//     all aspects
-//   - [k8s.io/kubernetes/test/utils/ktesting]: abstraction around
-//     Go testing and Ginkgo
-//   - [k8s.io/kubernetes/test/utils/client-go/ktesting]: tailored towards
-//     testing Kubernetes
+// Package ktesting is a wrapper around k8s.io/klog/v2/ktesting. In contrast
+// to the klog package, this one is opinionated and tailored towards testing
+// Kubernetes.
 //
-// Consumers can switch from a simpler variant to a more complex one simply
-// changing the import path. The more complex ones have additional package
-// dependencies.
-//
-// This variant is opinionated. Importing it:
+// Importing it
 // - adds the -v command line flag
 // - enables better dumping of complex datatypes
 // - sets the default verbosity to 5 (can be changed with [SetDefaultVerbosity])
@@ -36,5 +27,6 @@ limitations under the License.
 // which are too experimental for klog and/or are unrelated to logging.
 // The ktesting package itself takes care of managing a test context
 // with deadlines, timeouts, cancellation, and some common attributes
-// as first-class members of the API.
+// as first-class members of the API. Sub-packages have additional APIs
+// for propagating values via the context, implemented via [WithValue].
 package ktesting

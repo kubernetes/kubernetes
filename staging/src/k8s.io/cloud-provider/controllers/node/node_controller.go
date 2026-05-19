@@ -106,7 +106,6 @@ type CloudNodeController struct {
 
 	nodeStatusUpdateFrequency time.Duration
 	workerCount               int32
-	statusUpdateWorkerCount   int32
 
 	nodesLister corelisters.NodeLister
 	nodesSynced cache.InformerSynced
@@ -119,8 +118,7 @@ func NewCloudNodeController(
 	kubeClient clientset.Interface,
 	cloud cloudprovider.Interface,
 	nodeStatusUpdateFrequency time.Duration,
-	workerCount,
-	statusUpdateWorkerCount int32) (*CloudNodeController, error) {
+	workerCount int32) (*CloudNodeController, error) {
 
 	_, instancesSupported := cloud.Instances()
 	_, instancesV2Supported := cloud.InstancesV2()
@@ -134,7 +132,6 @@ func NewCloudNodeController(
 		cloud:                     cloud,
 		nodeStatusUpdateFrequency: nodeStatusUpdateFrequency,
 		workerCount:               workerCount,
-		statusUpdateWorkerCount:   statusUpdateWorkerCount,
 		nodesLister:               nodeInformer.Lister(),
 		nodesSynced:               nodeInformer.Informer().HasSynced,
 		workqueue: workqueue.NewTypedRateLimitingQueueWithConfig(
@@ -292,7 +289,7 @@ func (cnc *CloudNodeController) UpdateNodeStatus(ctx context.Context) error {
 		cnc.updateNodeAddress(ctx, node, instanceMetadata)
 	}
 
-	workqueue.ParallelizeUntil(ctx, int(cnc.statusUpdateWorkerCount), len(nodes), updateNodeFunc)
+	workqueue.ParallelizeUntil(ctx, int(cnc.workerCount), len(nodes), updateNodeFunc)
 	return nil
 }
 

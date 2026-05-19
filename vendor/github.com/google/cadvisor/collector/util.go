@@ -16,10 +16,11 @@ package collector
 
 import "github.com/google/cadvisor/container"
 
-func (ec *EndpointConfig) configure(containerHandler container.ContainerHandler) {
-	// If the exact URL was not specified, generate it based on the ip address of the container.
-	if ec.URL == "" {
+func (endpointConfig *EndpointConfig) configure(containerHandler container.ContainerHandler) {
+	//If the exact URL was not specified, generate it based on the ip address of the container.
+	endpoint := endpointConfig
+	if endpoint.URL == "" {
 		ipAddress := containerHandler.GetContainerIPAddress()
-		ec.URL = ec.URLConfig.Protocol + "://" + ipAddress + ":" + ec.URLConfig.Port.String() + ec.URLConfig.Path
+		endpointConfig.URL = endpoint.URLConfig.Protocol + "://" + ipAddress + ":" + endpoint.URLConfig.Port.String() + endpoint.URLConfig.Path
 	}
 }

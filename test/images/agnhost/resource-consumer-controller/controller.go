@@ -221,19 +221,19 @@ func (c *controller) handleBumpMetric(w http.ResponseWriter, query url.Values) {
 }
 
 func (c *controller) sendConsumeCPURequests(w http.ResponseWriter, requests, millicores, durationSec int) {
-	for range requests {
+	for i := 0; i < requests; i++ {
 		go c.sendOneConsumeCPURequest(w, millicores, durationSec)
 	}
 }
 
 func (c *controller) sendConsumeMemRequests(w http.ResponseWriter, requests, megabytes, durationSec int) {
-	for range requests {
+	for i := 0; i < requests; i++ {
 		go c.sendOneConsumeMemRequest(w, megabytes, durationSec)
 	}
 }
 
 func (c *controller) sendConsumeCustomMetric(w http.ResponseWriter, metric string, requests, delta, durationSec int) {
-	for range requests {
+	for i := 0; i < requests; i++ {
 		go c.sendOneConsumeCustomMetric(w, metric, delta, durationSec)
 	}
 }

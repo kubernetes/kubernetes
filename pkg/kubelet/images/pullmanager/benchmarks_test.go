@@ -88,9 +88,8 @@ func mustAttemptPullReadFunc(expectHit bool) benchmarkedCheckFunc {
 // We cannot do direct writes though because FSAccessor is not thread-safe and
 // would cause errors when the tests run in parallel.
 func BenchmarkPullManagerWriteImagePullIntent(b *testing.B) {
-	logger, _ := ktesting.NewTestContext(b)
 	benchmarkAllPullAccessorsWrite(b, func(b *testing.B, pullManager PullManager, imgRef string) {
-		if err := pullManager.RecordPullIntent(logger, "test.repo/org/"+imgRef); err != nil {
+		if err := pullManager.RecordPullIntent("test.repo/org/" + imgRef); err != nil {
 			b.Fatalf("failed to write a record: %v", err)
 		}
 	})
@@ -211,7 +210,6 @@ const (
 )
 
 func benchmarkPullAccessorCacheRead(b *testing.B, bc recordAccessorBenchmark, benchmarkedCheck benchmarkedCheckFunc) {
-	logger, _ := ktesting.NewTestContext(b)
 	b.Run(fmt.Sprintf("Type=%s/RecordsStored=%d/ConcurrencyPerCPU=%d", bc.namedInit.name, bc.recordsInCache, bc.concurrencyMultiplier), func(b *testing.B) {
 		genRecords, genRequests := generateRecordsAndRequests(bc.recordsInCache, bc.cacheHit)
 
@@ -220,7 +218,7 @@ func benchmarkPullAccessorCacheRead(b *testing.B, bc recordAccessorBenchmark, be
 		// tempdir cleanup to always trigger before the next benchmark is run
 		accessor := bc.namedInit.accessorInit(b)
 		for _, r := range genRecords {
-			if err := accessor.WriteImagePulledRecord(logger, r); err != nil {
+			if err := accessor.WriteImagePulledRecord(r); err != nil {
 				b.Fatalf("failed to prepare cache - write error: %v", err)
 			}
 		}
@@ -293,10 +291,9 @@ func generateRecordsAndRequests(recordsNum int, generateHits bool) ([]*kubeletco
 
 func setupFSRecordsAccessor(t testing.TB) PullRecordsAccessor {
 	t.Helper()
-	logger, _ := ktesting.NewTestContext(t)
 
 	tempDir := t.TempDir()
-	accessor, err := NewFSPullRecordsAccessor(logger, tempDir)
+	accessor, err := NewFSPullRecordsAccessor(tempDir)
 	if err != nil {
 		t.Fatalf("failed to setup filesystem pull records accessor: %v", err)
 	}
@@ -304,11 +301,10 @@ func setupFSRecordsAccessor(t testing.TB) PullRecordsAccessor {
 }
 
 func setupInMemRecordsAccessor(t testing.TB, cacheSize int, authoritative bool) PullRecordsAccessor {
-	logger, _ := ktesting.NewTestContext(t)
 	t.Helper()
 
 	fsAccessor := setupFSRecordsAccessor(t)
-	memcacheAccessor := NewCachedPullRecordsAccessor(logger, fsAccessor, int32(cacheSize), int32(cacheSize), int32(runtime.NumCPU()))
+	memcacheAccessor := NewCachedPullRecordsAccessor(fsAccessor, int32(cacheSize), int32(cacheSize), int32(runtime.NumCPU()))
 	gotMeteredAccessor, ok := memcacheAccessor.(*meteringRecordsAccessor)
 	if !ok {
 		t.Fatalf("the tested accessor must be a metered records accessor, got %T", memcacheAccessor)

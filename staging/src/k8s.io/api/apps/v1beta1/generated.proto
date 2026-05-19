@@ -67,7 +67,6 @@ message ControllerRevisionList {
 // DEPRECATED - This group version of Deployment is deprecated by apps/v1beta2/Deployment. See the release notes for
 // more information.
 // Deployment enables declarative updates for Pods and ReplicaSets.
-// +k8s:supportsSubresource="/status"
 message Deployment {
   // Standard object metadata.
   // +optional
@@ -319,9 +318,9 @@ message Scale {
 message ScaleSpec {
   // replicas is the number of observed instances of the scaled object.
   // +optional
-  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:optional
   // +default=0
-  // +k8s:alpha(since: "1.36")=+k8s:minimum=0
+  // +k8s:minimum=0
   optional int32 replicas = 1;
 }
 
@@ -353,7 +352,6 @@ message ScaleStatus {
 //
 // The StatefulSet guarantees that a given network identity will always
 // map to the same storage identity.
-// +k8s:supportsSubresource="/status"
 message StatefulSet {
   // +optional
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;

@@ -70,10 +70,9 @@ type respLogger struct {
 
 	captureErrorOutput bool
 
-	req         *http.Request
-	userAgent   string
-	contentType string
-	w           http.ResponseWriter
+	req       *http.Request
+	userAgent string
+	w         http.ResponseWriter
 
 	logStacktracePred StacktracePred
 }
@@ -168,7 +167,6 @@ func newLoggedWithStartTime(req *http.Request, w http.ResponseWriter, startTime 
 		startTime:         startTime,
 		req:               req,
 		userAgent:         req.UserAgent(),
-		contentType:       req.Header.Get("Content-Type"),
 		w:                 w,
 		logStacktracePred: DefaultStacktracePred,
 	}
@@ -273,7 +271,6 @@ func (rl *respLogger) Log() {
 		// This can cause apiserver to crash with unrecoverable fatal error.
 		// More info about concurrent read and write for maps: https://golang.org/doc/go1.6#runtime
 		"userAgent", rl.userAgent,
-		"contentType", rl.contentType,
 		"audit-ID", auditID,
 		"srcIP", rl.req.RemoteAddr,
 	}

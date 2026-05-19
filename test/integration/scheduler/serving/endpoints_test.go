@@ -29,21 +29,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	apiserverfeat "k8s.io/apiserver/pkg/features"
 	flagzv1alpha1 "k8s.io/apiserver/pkg/server/flagz/api/v1alpha1"
-	flagzv1beta1 "k8s.io/apiserver/pkg/server/flagz/api/v1beta1"
-	flagztesting "k8s.io/apiserver/pkg/server/flagz/testing"
-	statuszv1alpha1 "k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
-	statuszv1beta1 "k8s.io/apiserver/pkg/server/statusz/api/v1beta1"
-	statusztesting "k8s.io/apiserver/pkg/server/statusz/testing"
+	"k8s.io/apiserver/pkg/server/statusz/api/v1alpha1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/util/retry"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/zpages/features"
 	"k8s.io/klog/v2/ktesting"
-	kubeschedulerconfigv1 "k8s.io/kube-scheduler/config/v1"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	kubeschedulertesting "k8s.io/kubernetes/cmd/kube-scheduler/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -212,9 +206,8 @@ func TestEndpointHandlers(t *testing.T) {
 
 func TestSchedulerZPages(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.ComponentStatusz:           true,
-		features.ComponentFlagz:             true,
-		apiserverfeat.CBORServingAndStorage: true,
+		features.ComponentStatusz: true,
+		features.ComponentFlagz:   true,
 	})
 
 	server, configStr, _, err := startTestAPIServer(t)
@@ -237,7 +230,7 @@ func TestSchedulerZPages(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 	result, err := kubeschedulertesting.StartTestServer(
 		t, ctx,
-		[]string{"--kubeconfig", apiserverConfig.Name(), "--leader-elect=false", "--authorization-always-allow-paths=/statusz,/flagz,/configz"},
+		[]string{"--kubeconfig", apiserverConfig.Name(), "--leader-elect=false", "--authorization-always-allow-paths=/statusz,/flagz"},
 	)
 	if err != nil {
 		t.Fatalf("Failed to start kube-scheduler server: %v", err)
@@ -252,20 +245,10 @@ func TestSchedulerZPages(t *testing.T) {
 	}
 
 	statuszWantBodyStr := "kube-scheduler statusz\nWarning: This endpoint is not meant to be machine parseable"
-	statuszWantBodyStructuredAlpha := &statuszv1alpha1.Statusz{
+	statuszWantBodyJSON := &v1alpha1.Statusz{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Statusz",
 			APIVersion: "config.k8s.io/v1alpha1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "kube-scheduler",
-		},
-		Paths: []string{"/configz", "/flagz", "/healthz", "/livez", "/metrics", "/readyz"},
-	}
-	statuszWantBodyStructuredBeta := &statuszv1beta1.Statusz{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Statusz",
-			APIVersion: "config.k8s.io/v1beta1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "kube-scheduler",
@@ -274,7 +257,7 @@ func TestSchedulerZPages(t *testing.T) {
 	}
 
 	flagzWantBodyStr := "kube-scheduler flagz\nWarning: This endpoint is not meant to be machine parseable"
-	flagzWantBodyStructuredAlpha := &flagzv1alpha1.Flagz{
+	flagzWantBodyJSON := &flagzv1alpha1.Flagz{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Flagz",
 			APIVersion: "config.k8s.io/v1alpha1",
@@ -282,48 +265,32 @@ func TestSchedulerZPages(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "kube-scheduler",
 		},
-		Flags: map[string]string{
-			"leader-elect-resource-name": "kube-scheduler",
-		},
-	}
-	flagzWantBodyStructuredBeta := &flagzv1beta1.Flagz{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Flagz",
-			APIVersion: "config.k8s.io/v1beta1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "kube-scheduler",
-		},
-		Flags: map[string]string{
-			"leader-elect-resource-name": "kube-scheduler",
-		},
 	}
 
 	statuszTestCases := []struct {
-		name                  string
-		acceptHeader          string
-		wantStatus            int
-		wantBodyText          string
-		wantBodyStructured    interface{}
-		wantDeprecationHeader bool
+		name         string
+		acceptHeader string
+		wantStatus   int
+		wantBodySub  string            // for text/plain
+		wantJSON     *v1alpha1.Statusz // for application/json
 	}{
 		{
 			name:         "text plain response",
 			acceptHeader: "text/plain",
 			wantStatus:   http.StatusOK,
-			wantBodyText: statuszWantBodyStr,
+			wantBodySub:  statuszWantBodyStr,
 		},
 		{
-			name:               "structured json response",
-			acceptHeader:       "application/json;v=v1beta1;g=config.k8s.io;as=Statusz",
-			wantStatus:         http.StatusOK,
-			wantBodyStructured: statuszWantBodyStructuredBeta,
+			name:         "structured json response",
+			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io;as=Statusz",
+			wantStatus:   http.StatusOK,
+			wantJSON:     statuszWantBodyJSON,
 		},
 		{
 			name:         "no accept header (defaults to text)",
 			acceptHeader: "",
 			wantStatus:   http.StatusOK,
-			wantBodyText: statuszWantBodyStr,
+			wantBodySub:  statuszWantBodyStr,
 		},
 		{
 			name:         "invalid accept header",
@@ -337,74 +304,47 @@ func TestSchedulerZPages(t *testing.T) {
 		},
 		{
 			name:         "application/json with missing as",
-			acceptHeader: "application/json;v=v1beta1;g=config.k8s.io",
+			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io",
 			wantStatus:   http.StatusNotAcceptable,
 		},
 		{
 			name:         "wildcard accept header",
 			acceptHeader: "*/*",
 			wantStatus:   http.StatusOK,
-			wantBodyText: statuszWantBodyStr,
+			wantBodySub:  statuszWantBodyStr,
 		},
 		{
 			name:         "bad json header fall back wildcard",
 			acceptHeader: "application/json;v=foo;g=config.k8s.io;as=Statusz,*/*",
 			wantStatus:   http.StatusOK,
-			wantBodyText: statuszWantBodyStr,
-		},
-		{
-			name:               "structured yaml response",
-			acceptHeader:       "application/yaml;v=v1beta1;g=config.k8s.io;as=Statusz",
-			wantStatus:         http.StatusOK,
-			wantBodyStructured: statuszWantBodyStructuredBeta,
-		},
-		{
-			name:               "structured cbor response",
-			acceptHeader:       "application/cbor;v=v1beta1;g=config.k8s.io;as=Statusz",
-			wantStatus:         http.StatusOK,
-			wantBodyStructured: statuszWantBodyStructuredBeta,
-		},
-		{
-			name:                  "alpha specified before beta, should show warning",
-			acceptHeader:          "application/json;g=config.k8s.io;v=v1alpha1;as=Statusz,application/json;g=config.k8s.io;v=v1beta1;as=Statusz",
-			wantStatus:            http.StatusOK,
-			wantBodyStructured:    statuszWantBodyStructuredAlpha,
-			wantDeprecationHeader: true,
-		},
-		{
-			name:                  "beta specified before alpha, no warning",
-			acceptHeader:          "application/json;g=config.k8s.io;v=v1beta1;as=Statusz,application/json;g=config.k8s.io;v=v1alpha1;as=Statusz",
-			wantStatus:            http.StatusOK,
-			wantBodyStructured:    statuszWantBodyStructuredBeta,
-			wantDeprecationHeader: false,
+			wantBodySub:  statuszWantBodyStr,
 		},
 	}
 
 	flagzTestCases := []struct {
-		name                  string
-		acceptHeader          string
-		wantStatus            int
-		wantBodyText          string
-		wantBodyStructured    interface{}
-		wantDeprecationHeader bool
+		name         string
+		acceptHeader string
+		wantStatus   int
+		wantBodySub  string               // for text/plain
+		wantJSON     *flagzv1alpha1.Flagz // for structured json
 	}{
 		{
 			name:         "text plain response",
 			acceptHeader: "text/plain",
 			wantStatus:   http.StatusOK,
-			wantBodyText: flagzWantBodyStr,
+			wantBodySub:  flagzWantBodyStr,
 		},
 		{
-			name:               "structured json response",
-			acceptHeader:       "application/json;v=v1beta1;g=config.k8s.io;as=Flagz",
-			wantStatus:         http.StatusOK,
-			wantBodyStructured: flagzWantBodyStructuredBeta,
+			name:         "structured json response",
+			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io;as=Flagz",
+			wantStatus:   http.StatusOK,
+			wantJSON:     flagzWantBodyJSON,
 		},
 		{
 			name:         "no accept header (defaults to text)",
 			acceptHeader: "",
 			wantStatus:   http.StatusOK,
-			wantBodyText: flagzWantBodyStr,
+			wantBodySub:  flagzWantBodyStr,
 		},
 		{
 			name:         "invalid accept header",
@@ -418,58 +358,20 @@ func TestSchedulerZPages(t *testing.T) {
 		},
 		{
 			name:         "application/json with missing as",
-			acceptHeader: "application/json;v=v1beta1;g=config.k8s.io",
+			acceptHeader: "application/json;v=v1alpha1;g=config.k8s.io",
 			wantStatus:   http.StatusNotAcceptable,
 		},
 		{
 			name:         "wildcard accept header",
 			acceptHeader: "*/*",
 			wantStatus:   http.StatusOK,
-			wantBodyText: flagzWantBodyStr,
+			wantBodySub:  flagzWantBodyStr,
 		},
 		{
 			name:         "bad json header fall back wildcard",
 			acceptHeader: "application/json;v=foo;g=config.k8s.io;as=Flagz,*/*",
 			wantStatus:   http.StatusOK,
-			wantBodyText: flagzWantBodyStr,
-		},
-		{
-			name:               "structured cbor response",
-			acceptHeader:       "application/cbor;v=v1beta1;g=config.k8s.io;as=Flagz",
-			wantStatus:         http.StatusOK,
-			wantBodyStructured: flagzWantBodyStructuredBeta,
-		},
-		{
-			name:               "structured yaml response",
-			acceptHeader:       "application/yaml;v=v1beta1;g=config.k8s.io;as=Flagz",
-			wantStatus:         http.StatusOK,
-			wantBodyStructured: flagzWantBodyStructuredBeta,
-		},
-		{
-			name:                  "alpha specified before beta, should show warning",
-			acceptHeader:          "application/json;v=v1alpha1;g=config.k8s.io;as=Flagz,application/json;v=v1beta1;g=config.k8s.io;as=Flagz",
-			wantStatus:            http.StatusOK,
-			wantBodyStructured:    flagzWantBodyStructuredAlpha,
-			wantDeprecationHeader: true,
-		},
-		{
-			name:                  "beta specified before alpha, no warning",
-			acceptHeader:          "application/json;v=v1beta1;g=config.k8s.io;as=Flagz,application/json;v=v1alpha1;g=config.k8s.io;as=Flagz",
-			wantStatus:            http.StatusOK,
-			wantBodyStructured:    flagzWantBodyStructuredBeta,
-			wantDeprecationHeader: false,
-		},
-	}
-
-	configzTestCases := []struct {
-		name         string
-		acceptHeader string
-		wantStatus   int
-	}{
-		{
-			name:         "application/json response",
-			acceptHeader: "application/json",
-			wantStatus:   http.StatusOK,
+			wantBodySub:  flagzWantBodyStr,
 		},
 	}
 
@@ -500,14 +402,26 @@ func TestSchedulerZPages(t *testing.T) {
 			}
 
 			if tc.wantStatus == http.StatusOK {
-				if tc.wantBodyText != "" {
-					if !strings.Contains(string(body), tc.wantBodyText) {
-						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodyText, string(body))
+				if tc.wantBodySub != "" {
+					if !strings.Contains(string(body), tc.wantBodySub) {
+						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodySub, string(body))
 					}
 				}
-				if tc.wantBodyStructured != nil {
-					warnings := append([]string{}, r.Header.Values("Warning")...)
-					statusztesting.VerifyStructuredResponse(t, tc.acceptHeader, body, warnings, tc.wantBodyStructured, tc.wantDeprecationHeader)
+				if tc.wantJSON != nil {
+					var got v1alpha1.Statusz
+					if err := json.Unmarshal(body, &got); err != nil {
+						t.Fatalf("error unmarshalling JSON: %v", err)
+					}
+					// Only check static fields, since others are dynamic
+					if got.TypeMeta != tc.wantJSON.TypeMeta {
+						t.Errorf("TypeMeta mismatch: want %+v, got %+v", tc.wantJSON.TypeMeta, got.TypeMeta)
+					}
+					if got.ObjectMeta.Name != tc.wantJSON.ObjectMeta.Name {
+						t.Errorf("ObjectMeta.Name mismatch: want %q, got %q", tc.wantJSON.ObjectMeta.Name, got.ObjectMeta.Name)
+					}
+					if diff := cmp.Diff(tc.wantJSON.Paths, got.Paths); diff != "" {
+						t.Errorf("Paths mismatch (-want,+got):\n%s", diff)
+					}
 				}
 			}
 		})
@@ -540,68 +454,23 @@ func TestSchedulerZPages(t *testing.T) {
 			}
 
 			if tc.wantStatus == http.StatusOK {
-				if tc.wantBodyText != "" {
-					if !strings.Contains(string(body), tc.wantBodyText) {
-						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodyText, string(body))
+				if tc.wantBodySub != "" {
+					if !strings.Contains(string(body), tc.wantBodySub) {
+						t.Errorf("body missing expected substring: %q\nGot:\n%s", tc.wantBodySub, string(body))
 					}
 				}
-				if tc.wantBodyStructured != nil {
-					warnings := append([]string{}, r.Header.Values("Warning")...)
-					flagztesting.VerifyStructuredResponse(t, tc.acceptHeader, body, warnings, tc.wantBodyStructured, tc.wantDeprecationHeader)
-				}
-			}
-		})
-	}
-
-	for _, tc := range configzTestCases {
-		t.Run("configz_"+tc.name, func(t *testing.T) {
-			req, err := http.NewRequest(http.MethodGet, base+"/configz", nil)
-			if err != nil {
-				t.Fatalf("failed to request: %v", err)
-			}
-
-			req.Header.Set("Accept", tc.acceptHeader)
-			r, err := client.Do(req)
-			if err != nil {
-				t.Fatalf("failed to GET /configz: %v", err)
-			}
-
-			body, err := io.ReadAll(r.Body)
-			if err != nil {
-				t.Fatalf("failed to read response body: %v", err)
-			}
-
-			if err = r.Body.Close(); err != nil {
-				t.Fatalf("failed to close response body: %v", err)
-			}
-
-			if r.StatusCode != tc.wantStatus {
-				t.Fatalf("want status %d, got %d", tc.wantStatus, r.StatusCode)
-			}
-
-			if tc.wantStatus == http.StatusOK {
-				var configz map[string]unstructured.Unstructured
-				if err := json.Unmarshal(body, &configz); err != nil {
-					t.Fatalf("failed to unmarshal configz: %v", err)
-				}
-				cfg, ok := configz["componentconfig"]
-				if !ok {
-					t.Fatalf("configz missing 'componentconfig' key")
-				}
-				if cfg.GetAPIVersion() != "kubescheduler.config.k8s.io/v1" {
-					t.Errorf("unexpected APIVersion: %s", cfg.GetAPIVersion())
-				}
-				if cfg.GetKind() != "KubeSchedulerConfiguration" {
-					t.Errorf("unexpected Kind: %s", cfg.GetKind())
-				}
-
-				// confirm that they expose public config type
-				var schedulerConfig kubeschedulerconfigv1.KubeSchedulerConfiguration
-				err = json.Unmarshal(body, &struct {
-					ComponentConfig *kubeschedulerconfigv1.KubeSchedulerConfiguration `json:"componentconfig"`
-				}{ComponentConfig: &schedulerConfig})
-				if err != nil {
-					t.Errorf("failed to deserialize into public config type: %v", err)
+				if tc.wantJSON != nil {
+					var got flagzv1alpha1.Flagz
+					if err := json.Unmarshal(body, &got); err != nil {
+						t.Fatalf("error unmarshalling JSON: %v", err)
+					}
+					// Only check static fields, since others are dynamic
+					if got.TypeMeta != tc.wantJSON.TypeMeta {
+						t.Errorf("TypeMeta mismatch: want %+v, got %+v", tc.wantJSON.TypeMeta, got.TypeMeta)
+					}
+					if got.ObjectMeta.Name != tc.wantJSON.ObjectMeta.Name {
+						t.Errorf("ObjectMeta.Name mismatch: want %q, got %q", tc.wantJSON.ObjectMeta.Name, got.ObjectMeta.Name)
+					}
 				}
 			}
 		})

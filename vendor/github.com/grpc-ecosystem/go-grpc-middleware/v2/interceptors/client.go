@@ -7,7 +7,6 @@ package interceptors
 
 import (
 	"context"
-	"errors"
 	"io"
 	"time"
 
@@ -69,7 +68,7 @@ func (s *monitoredClientStream) RecvMsg(m any) error {
 			return nil
 		}
 		var postErr error
-		if !errors.Is(err, io.EOF) {
+		if err != io.EOF {
 			postErr = err
 		}
 		s.reporter.PostCall(postErr, time.Since(s.startTime))

@@ -17,7 +17,6 @@ limitations under the License.
 package ingress
 
 import (
-	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -81,7 +80,7 @@ func TestIngressStrategy(t *testing.T) {
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("Ingress must be namespace scoped")
 	}
-	if Strategy.AllowCreateOnUpdate(context.Background()) {
+	if Strategy.AllowCreateOnUpdate() {
 		t.Errorf("Ingress should not allow create on update")
 	}
 
@@ -112,7 +111,7 @@ func TestIngressStatusStrategy(t *testing.T) {
 	if !StatusStrategy.NamespaceScoped() {
 		t.Errorf("Ingress must be namespace scoped")
 	}
-	if StatusStrategy.AllowCreateOnUpdate(context.Background()) {
+	if StatusStrategy.AllowCreateOnUpdate() {
 		t.Errorf("Ingress should not allow create on update")
 	}
 	oldIngress := newIngress()

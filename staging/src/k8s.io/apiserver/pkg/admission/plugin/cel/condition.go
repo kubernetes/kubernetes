@@ -24,6 +24,7 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/cel/environment"
@@ -61,11 +62,22 @@ func NewCondition(compilationResults []CompilationResult) ConditionEvaluator {
 	}
 }
 
+func convertObjectToUnstructured(obj interface{}) (*unstructured.Unstructured, error) {
+	if obj == nil || reflect.ValueOf(obj).IsNil() {
+		return &unstructured.Unstructured{Object: nil}, nil
+	}
+	ret, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
+	if err != nil {
+		return nil, err
+	}
+	return &unstructured.Unstructured{Object: ret}, nil
+}
+
 func objectToResolveVal(r runtime.Object) (interface{}, error) {
 	if r == nil || reflect.ValueOf(r).IsNil() {
 		return nil, nil
 	}
-	v, err := admission.ConvertObjectToUnstructured(r)
+	v, err := convertObjectToUnstructured(r)
 	if err != nil {
 		return nil, err
 	}
@@ -78,10 +90,6 @@ func objectToResolveVal(r runtime.Object) (interface{}, error) {
 func (c *condition) ForInput(ctx context.Context, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs OptionalVariableBindings, namespace *v1.Namespace, runtimeCELCostBudget int64) ([]EvaluationResult, int64, error) {
 	// TODO: replace unstructured with ref.Val for CEL variables when native type support is available
 	evaluations := make([]EvaluationResult, len(c.compilationResults))
-	if len(c.compilationResults) == 0 {
-		return evaluations, runtimeCELCostBudget, nil
-	}
-
 	var err error
 
 	// if this activation supports composition, we will need the compositionCtx. It may be nil.

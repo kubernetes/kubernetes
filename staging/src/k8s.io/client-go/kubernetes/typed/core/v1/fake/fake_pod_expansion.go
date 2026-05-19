@@ -17,17 +17,16 @@ limitations under the License.
 package fake
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	fakerest "k8s.io/client-go/rest/fake"
@@ -64,26 +63,12 @@ func (c *fakePods) GetLogs(name string, opts *v1.PodLogOptions) *restclient.Requ
 	action.Subresource = "log"
 	action.Value = opts
 
-	defaultLogResponse := &runtime.Unknown{Raw: []byte("fake logs")}
-	obj, err := c.Fake.Invokes(action, defaultLogResponse)
-	logs := defaultLogResponse.Raw
-	if err == nil {
-		unknown, ok := obj.(*runtime.Unknown)
-		if !ok || unknown == nil {
-			err = fmt.Errorf("fake Pods.GetLogs expected reactor to return *runtime.Unknown, got %T", obj)
-		} else {
-			logs = unknown.Raw
-		}
-	}
-
+	_, _ = c.Fake.Invokes(action, &v1.Pod{})
 	fakeClient := &fakerest.RESTClient{
 		Client: fakerest.CreateHTTPClient(func(request *http.Request) (*http.Response, error) {
-			if err != nil {
-				return nil, err
-			}
 			resp := &http.Response{
 				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(bytes.NewReader(logs)),
+				Body:       io.NopCloser(strings.NewReader("fake logs")),
 			}
 			return resp, nil
 		}),

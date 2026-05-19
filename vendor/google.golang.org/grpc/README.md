@@ -32,7 +32,6 @@ import "google.golang.org/grpc"
 - [Low-level technical docs](Documentation) from this repository
 - [Performance benchmark][]
 - [Examples](examples)
-- [Contribution guidelines](CONTRIBUTING.md)
 
 ## FAQ
 

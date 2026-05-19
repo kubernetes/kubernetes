@@ -37,13 +37,13 @@ import (
 
 // deploymentStrategy implements behavior for Deployments.
 type deploymentStrategy struct {
-	rest.DeclarativeValidation
+	runtime.ObjectTyper
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Deployment
 // objects via the REST API.
-var Strategy = deploymentStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
+var Strategy = deploymentStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // Make sure we correctly implement the interface.
 var _ = rest.GarbageCollectionDeleteStrategy(Strategy)
@@ -102,7 +102,7 @@ func (deploymentStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for deployments.
-func (deploymentStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
+func (deploymentStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
@@ -145,7 +145,7 @@ func (deploymentStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime
 	return warnings
 }
 
-func (deploymentStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+func (deploymentStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 

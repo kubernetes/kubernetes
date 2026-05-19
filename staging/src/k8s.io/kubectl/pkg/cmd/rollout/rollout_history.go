@@ -18,7 +18,7 @@ package rollout
 
 import (
 	"fmt"
-	"slices"
+	"sort"
 
 	"github.com/spf13/cobra"
 
@@ -191,7 +191,7 @@ func (o *RolloutHistoryOptions) Run() error {
 				for k := range historyInfo {
 					sortedKeys = append(sortedKeys, k)
 				}
-				slices.Sort(sortedKeys)
+				sort.Slice(sortedKeys, func(i, j int) bool { return sortedKeys[i] < sortedKeys[j] })
 				for _, k := range sortedKeys {
 					printer.PrintObj(historyInfo[k], o.Out)
 				}

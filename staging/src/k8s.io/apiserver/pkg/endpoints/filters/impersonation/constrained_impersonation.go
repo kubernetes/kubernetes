@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -31,7 +30,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/filters"
-	"k8s.io/apiserver/pkg/endpoints/filters/impersonation/metrics"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/httplog"
@@ -43,26 +41,11 @@ import (
 // At a high level, constrained impersonation uses multiple authorization checks to allow for the granular
 // expression of impersonation access.  For example, a service account may be authorized to impersonate the
 // node that it is associated with but only when listing pods.  See the linked KEP for further details.
-func WithConstrainedImpersonation(handler http.Handler, a authorizer.UnconditionalAuthorizer, s runtime.NegotiatedSerializer) http.Handler {
-	metrics.RegisterMetrics()
-
-	ma := &metricsAuthorizer{
-		delegate:                a,
-		recordAuthorizationCall: metrics.RecordImpersonationAuthorizationCall,
-	}
-
-	recordAttempt := func(ctx context.Context, mode, decision string, duration time.Duration) {
-		metrics.RecordImpersonationAttempt(mode, decision, duration)
-		request.TrackImpersonationLatency(ctx, duration)
-	}
-
+func WithConstrainedImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.NegotiatedSerializer) http.Handler {
 	return &constrainedImpersonationHandler{
 		handler: handler,
-		tracker: newImpersonationModesTracker(ma),
+		tracker: newImpersonationModesTracker(a),
 		s:       s,
-
-		recordAttempt:     recordAttempt,
-		metricsAuthorizer: ma,
 	}
 }
 
@@ -70,10 +53,6 @@ type constrainedImpersonationHandler struct {
 	handler http.Handler
 	tracker *impersonationModesTracker
 	s       runtime.NegotiatedSerializer
-
-	// to allow unit tests to override metrics recording
-	recordAttempt     func(ctx context.Context, mode, decision string, duration time.Duration)
-	metricsAuthorizer *metricsAuthorizer
 }
 
 func (c *constrainedImpersonationHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -99,16 +78,12 @@ func (c *constrainedImpersonationHandler) ServeHTTP(w http.ResponseWriter, req *
 		return
 	}
 
-	start := time.Now()
 	impersonatedUser, err := c.tracker.getImpersonatedUser(ctx, wantedUser, attributes)
-	duration := time.Since(start)
 	if err != nil {
-		c.recordAttempt(ctx, "", "denied", duration)
 		klog.V(4).InfoS("Forbidden", "URI", req.RequestURI, "err", err)
 		responsewriters.RespondWithError(w, req, err, c.s)
 		return
 	}
-	c.recordAttempt(ctx, modeFromConstraint(impersonatedUser.constraint), "allowed", duration)
 
 	req = req.WithContext(request.WithUser(ctx, impersonatedUser.user))
 	httplog.LogOf(req, w).Addf("%v is impersonating %v", userString(requestor), userString(impersonatedUser.user))
@@ -188,7 +163,7 @@ type impersonationModesTracker struct {
 	idxCache *modeIndexCache
 }
 
-func newImpersonationModesTracker(a authorizer.UnconditionalAuthorizer) *impersonationModesTracker {
+func newImpersonationModesTracker(a authorizer.Authorizer) *impersonationModesTracker {
 	loggingAuthorizer := authorizer.AuthorizerFunc(func(ctx context.Context, attributes authorizer.Attributes) (authorizer.Decision, string, error) {
 		decision, reason, err := a.Authorize(ctx, attributes)
 		// build a detailed log of the authorization
@@ -273,52 +248,4 @@ func (t *impersonationModesTracker) getImpersonatedUser(ctx context.Context, wan
 
 	// this should not happen, but make sure we fail closed when no impersonation mode succeeded
 	return nil, errors.New("all impersonation modes failed")
-}
-
-var _ = authorizer.Authorizer(&metricsAuthorizer{})
-
-type metricsAuthorizer struct {
-	delegate                authorizer.UnconditionalAuthorizer
-	recordAuthorizationCall func(mode, decision string, duration time.Duration)
-}
-
-func (m *metricsAuthorizer) Authorize(ctx context.Context, attributes authorizer.Attributes) (authorizer.Decision, string, error) {
-	start := time.Now()
-	decision, reason, err := m.delegate.Authorize(ctx, attributes)
-	duration := time.Since(start)
-
-	m.recordAuthorizationCall(modeFromVerb(attributes.GetVerb()), decisionToLabel(decision), duration)
-
-	return decision, reason, err
-}
-
-func modeFromConstraint(constraint string) string {
-	if len(constraint) == 0 {
-		return "legacy"
-	}
-	return modeFromVerb(constraint)
-}
-
-func modeFromVerb(verb string) string {
-	switch {
-	case verb == "impersonate":
-		return "legacy"
-	case verb == "impersonate:associated-node" || strings.HasPrefix(verb, "impersonate-on:associated-node:"):
-		return "associated-node"
-	case verb == "impersonate:arbitrary-node" || strings.HasPrefix(verb, "impersonate-on:arbitrary-node:"):
-		return "arbitrary-node"
-	case verb == "impersonate:serviceaccount" || strings.HasPrefix(verb, "impersonate-on:serviceaccount:"):
-		return "serviceaccount"
-	case verb == "impersonate:user-info" || strings.HasPrefix(verb, "impersonate-on:user-info:"):
-		return "user-info"
-	default:
-		return "unknown"
-	}
-}
-
-func decisionToLabel(decision authorizer.Decision) string {
-	if decision == authorizer.DecisionAllow {
-		return "allowed"
-	}
-	return "denied"
 }

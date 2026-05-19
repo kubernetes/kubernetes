@@ -38,113 +38,64 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	// type Struct
-	scheme.AddValidationFunc(
-		(*Struct)(nil),
-		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-			switch op.Request.SubresourcePath() {
-			case "/":
-				return Validate_Struct(
-					ctx, op, nil, /* fldPath */
-					obj.(*Struct),
-					safe.Cast[*Struct](oldObj))
-			}
-			return field.ErrorList{
-				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
-			}
-		})
+	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_Struct(ctx, op, nil /* fldPath */, obj.(*Struct), safe.Cast[*Struct](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	return nil
 }
 
 // Validate_ResourcePoolNameStringType validates an instance of ResourcePoolNameStringType according
 // to declarative validation rules in the API schema.
-func Validate_ResourcePoolNameStringType(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *ResourcePoolNameStringType) (errs field.ErrorList) {
-
-	if e := validate.ResourcePoolName(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-		errs = append(errs, e...)
-	}
+func Validate_ResourcePoolNameStringType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ResourcePoolNameStringType) (errs field.ErrorList) {
+	errs = append(errs, validate.ResourcePoolName(ctx, op, fldPath, obj, oldObj)...)
 
 	return errs
 }
 
 // Validate_Struct validates an instance of Struct according
 // to declarative validation rules in the API schema.
-func Validate_Struct(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *Struct) (errs field.ErrorList) {
-
+func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.ResourcePoolNameField
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field Struct.ResourcePoolNameField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
-			if e := validate.ResourcePoolName(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.ResourcePoolName(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *Struct) *string {
-				return &oldObj.ResourcePoolNameField
-			})
-		errs = append(errs, fn(fldPath.Child("resourcePoolNameField"), &obj.ResourcePoolNameField, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("resourcePoolNameField"), &obj.ResourcePoolNameField, safe.Field(oldObj, func(oldObj *Struct) *string { return &oldObj.ResourcePoolNameField }), oldObj != nil)...)
 
-	{ // field Struct.ResourcePoolNamePtrField
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *string,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field Struct.ResourcePoolNamePtrField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
-			if e := validate.ResourcePoolName(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.ResourcePoolName(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *Struct) *string {
-				return oldObj.ResourcePoolNamePtrField
-			})
-		errs = append(errs, fn(fldPath.Child("resourcePoolNamePtrField"), obj.ResourcePoolNamePtrField, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("resourcePoolNamePtrField"), obj.ResourcePoolNamePtrField, safe.Field(oldObj, func(oldObj *Struct) *string { return oldObj.ResourcePoolNamePtrField }), oldObj != nil)...)
 
-	{ // field Struct.ResourcePoolNameTypedefField
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *ResourcePoolNameStringType,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field Struct.ResourcePoolNameTypedefField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *ResourcePoolNameStringType, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_ResourcePoolNameStringType(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *Struct) *ResourcePoolNameStringType {
-				return &oldObj.ResourcePoolNameTypedefField
-			})
-		errs = append(errs, fn(fldPath.Child("resourcePoolNameTypedefField"), &obj.ResourcePoolNameTypedefField, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("resourcePoolNameTypedefField"), &obj.ResourcePoolNameTypedefField, safe.Field(oldObj, func(oldObj *Struct) *ResourcePoolNameStringType { return &oldObj.ResourcePoolNameTypedefField }), oldObj != nil)...)
 
 	return errs
 }

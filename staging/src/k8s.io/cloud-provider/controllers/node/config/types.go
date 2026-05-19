@@ -21,8 +21,4 @@ type NodeControllerConfiguration struct {
 	// ConcurrentNodeSyncs is the number of workers
 	// concurrently synchronizing nodes
 	ConcurrentNodeSyncs int32
-	// ConcurrentNodeStatusUpdates is the number of workers
-	// concurrently updating node statuses.
-	// If unspecified or 0, ConcurrentNodeSyncs is used instead
-	ConcurrentNodeStatusUpdates int32
 }

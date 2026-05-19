@@ -62,13 +62,6 @@ func (g *Generic) toKubeOpenAPI(ret *spec.Schema) {
 	ret.Description = g.Description
 	ret.Title = g.Title
 	ret.Default = g.Default.Object
-	if g.ExternalDocs != nil {
-		ret.ExternalDocs = &spec.ExternalDocumentation{
-			Description: g.ExternalDocs.Description,
-			URL:         g.ExternalDocs.URL,
-		}
-	}
-	ret.Example = g.Example.Object
 }
 
 func (x *Extensions) toKubeOpenAPI(ret *spec.Schema) {

@@ -32,7 +32,7 @@ import (
 )
 
 // RecorderFactory builds an EventRecorder for a given scheduler name.
-type RecorderFactory func(string) events.EventRecorderLogger
+type RecorderFactory func(string) events.EventRecorder
 
 // newProfile builds a Profile for the given configuration.
 func newProfile(ctx context.Context, cfg config.KubeSchedulerProfile, r frameworkruntime.Registry, recorderFact RecorderFactory,
@@ -84,7 +84,7 @@ func (m Map) Close() error {
 
 // NewRecorderFactory returns a RecorderFactory for the broadcaster.
 func NewRecorderFactory(b events.EventBroadcaster) RecorderFactory {
-	return func(name string) events.EventRecorderLogger {
+	return func(name string) events.EventRecorder {
 		return b.NewRecorder(scheme.Scheme, name)
 	}
 }

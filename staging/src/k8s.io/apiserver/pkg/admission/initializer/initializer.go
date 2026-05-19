@@ -31,7 +31,7 @@ type pluginInitializer struct {
 	externalClient    kubernetes.Interface
 	dynamicClient     dynamic.Interface
 	externalInformers informers.SharedInformerFactory
-	authorizer        authorizer.UnconditionalAuthorizer
+	authorizer        authorizer.Authorizer
 	featureGates      featuregate.FeatureGate
 	effectiveVersion  compatibility.EffectiveVersion
 	stopCh            <-chan struct{}
@@ -45,7 +45,7 @@ func New(
 	extClientset kubernetes.Interface,
 	dynamicClient dynamic.Interface,
 	extInformers informers.SharedInformerFactory,
-	authz authorizer.UnconditionalAuthorizer,
+	authz authorizer.Authorizer,
 	featureGates featuregate.FeatureGate,
 	effectiveVersion compatibility.EffectiveVersion,
 	stopCh <-chan struct{},
@@ -91,8 +91,8 @@ func (i pluginInitializer) Initialize(plugin admission.Interface) {
 		wants.SetExternalKubeInformerFactory(i.externalInformers)
 	}
 
-	if wants, ok := plugin.(WantsUnconditionalAuthorizer); ok {
-		wants.SetUnconditionalAuthorizer(i.authorizer)
+	if wants, ok := plugin.(WantsAuthorizer); ok {
+		wants.SetAuthorizer(i.authorizer)
 	}
 	if wants, ok := plugin.(WantsRESTMapper); ok {
 		wants.SetRESTMapper(i.restMapper)

@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 
+	cmdkuberc "k8s.io/kubectl/pkg/cmd/kuberc"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -32,6 +33,11 @@ func NewCmdAlpha(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.C
 		Use:   "alpha",
 		Short: i18n.T("Commands for features in alpha"),
 		Long:  templates.LongDesc(i18n.T("These commands correspond to alpha features that are not enabled in Kubernetes clusters by default.")),
+	}
+
+	// Add alpha commands
+	if !cmdutil.KubeRC.IsDisabled() {
+		cmd.AddCommand(cmdkuberc.NewCmdKubeRC(streams))
 	}
 
 	// NewKubeletCommand() will hide the alpha command if it has no subcommands. Overriding

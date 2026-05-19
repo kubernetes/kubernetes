@@ -30,7 +30,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
+	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/utils/ptr"
 )
 
 type Cmd struct {
@@ -72,7 +73,7 @@ type Cmd struct {
 	cancel    func(string)
 	cmd       *exec.Cmd
 	wg        sync.WaitGroup
-	running   atomic.Bool
+	running   atomic.Pointer[bool]
 	result    error
 	gathering bool
 
@@ -89,9 +90,9 @@ func (c *Cmd) Start(tCtx ktesting.TContext) {
 	tCtx.Helper()
 	tCtx.Logf("running command %s: %s", c.Name, strings.Join(c.CommandLine, " "))
 	if c.KeepRunning {
-		tCtx = tCtx.WithoutCancel()
+		tCtx = ktesting.WithoutCancel(tCtx)
 	}
-	tCtx = tCtx.WithCancel()
+	tCtx = ktesting.WithCancel(tCtx)
 	c.cancel = tCtx.Cancel
 	c.cmd = exec.CommandContext(tCtx, c.CommandLine[0], c.CommandLine[1:]...)
 	c.gathering = false
@@ -120,7 +121,7 @@ func (c *Cmd) Start(tCtx ktesting.TContext) {
 	c.cmd.Stderr = writer
 
 	tCtx.ExpectNoError(c.cmd.Start(), "start %s command", c.Name)
-	c.running.Store(true)
+	c.running.Store(ptr.To(true))
 
 	if reader != nil {
 		scanner := bufio.NewScanner(reader)
@@ -156,9 +157,7 @@ func (c *Cmd) Start(tCtx ktesting.TContext) {
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
-		// tCtx.Logf("Starting to wait for termination of command %s", c.Name)
 		c.result = c.cmd.Wait()
-		tCtx.Logf("Command %s terminated, result: %v", c.Name, c.result)
 		now := time.Now()
 		if reader != nil {
 			// Has to be closed to stop output processing, otherwise the scanner
@@ -177,7 +176,7 @@ func (c *Cmd) Start(tCtx ktesting.TContext) {
 				}
 			}
 		}
-		c.running.Store(false)
+		c.running.Store(ptr.To(false))
 	}()
 }
 
@@ -191,15 +190,6 @@ func (c *Cmd) Stop(tCtx ktesting.TContext, reason string) string {
 		// Not started...
 		return ""
 	}
-	if c.LogFile != "" {
-		f, err := os.OpenFile(c.LogFile, os.O_WRONLY|os.O_APPEND, 0666)
-		if err == nil {
-			defer func() {
-				_ = f.Close()
-			}()
-			_, _ = fmt.Fprintf(f, "%s: killing: %s\n", time.Now(), reason)
-		}
-	}
 	c.cancel(reason)
 	return c.wait(tCtx, true)
 }
@@ -207,9 +197,6 @@ func (c *Cmd) Stop(tCtx ktesting.TContext, reason string) string {
 func (c *Cmd) wait(tCtx ktesting.TContext, killed bool) string {
 	tCtx.Helper()
 	c.wg.Wait()
-	if c.running.Load() {
-		tCtx.Fatalf("command %s should have stopped but didn't", c.Name)
-	}
 	if !killed {
 		tCtx.ExpectNoError(c.result, fmt.Sprintf("%s command failed, output:\n%s", c.Name, c.output.String()))
 	}
@@ -217,7 +204,7 @@ func (c *Cmd) wait(tCtx ktesting.TContext, killed bool) string {
 }
 
 func (c *Cmd) Running() bool {
-	return c.running.Load()
+	return ptr.Deref(c.running.Load(), false)
 }
 
 func (c *Cmd) Output(tCtx ktesting.TContext) string {

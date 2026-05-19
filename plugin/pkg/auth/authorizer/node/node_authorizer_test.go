@@ -34,8 +34,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -74,6 +76,20 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	nodeunregistered := &user.DefaultInfo{Name: "system:node:nodeunregistered", Groups: []string{"system:nodes"}}
 
+	selectorAuthzDisabled := func(t testing.TB) featuregate.FeatureGate {
+		f := utilfeature.DefaultFeatureGate.DeepCopy()
+		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, f, version.MustParse("1.33"))
+		featuregatetesting.SetFeatureGatesDuringTest(t, f, featuregatetesting.FeatureOverrides{
+			genericfeatures.AuthorizeWithSelectors: false,
+			features.AuthorizeNodeWithSelectors:    false,
+		})
+		return f
+	}
+
+	selectorAuthzEnabled := func(t testing.TB) featuregate.FeatureGate {
+		return utilfeature.DefaultFeatureGate
+	}
+
 	serviceAccountTokenForCredentialProvidersDisabled := func(t testing.TB) featuregate.FeatureGate {
 		f := utilfeature.DefaultFeatureGate.DeepCopy()
 		featuregatetesting.SetFeatureGatesDuringTest(t, f, featuregatetesting.FeatureOverrides{
@@ -92,7 +108,9 @@ func TestNodeAuthorizer(t *testing.T) {
 	podCertificateProjectionEnabled := func(t testing.TB) featuregate.FeatureGate {
 		f := utilfeature.DefaultFeatureGate.DeepCopy()
 		featuregatetesting.SetFeatureGatesDuringTest(t, f, featuregatetesting.FeatureOverrides{
-			features.PodCertificateRequest: true,
+			genericfeatures.AuthorizeWithSelectors: true,
+			features.AuthorizeNodeWithSelectors:    true,
+			features.PodCertificateRequest:         true,
 		})
 		return f
 	}
@@ -101,6 +119,14 @@ func TestNodeAuthorizer(t *testing.T) {
 		f := utilfeature.DefaultFeatureGate.DeepCopy()
 		featuregatetesting.SetFeatureGateDuringTest(t, f, features.PodCertificateRequest, false)
 		return f
+	}
+
+	featureVariants := []struct {
+		suffix   string
+		features func(t testing.TB) featuregate.FeatureGate
+	}{
+		{suffix: "selector_disabled", features: selectorAuthzDisabled},
+		{suffix: "selector_enabled", features: selectorAuthzEnabled},
 	}
 
 	tests := []struct {
@@ -131,14 +157,16 @@ func TestNodeAuthorizer(t *testing.T) {
 			expect: authorizer.DecisionAllow,
 		},
 		{
-			name:   "disallowed list many secrets",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "secrets", Name: "", Namespace: "ns0"},
-			expect: authorizer.DecisionNoOpinion,
+			name:         "disallowed list many secrets",
+			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "secrets", Name: "", Namespace: "ns0"},
+			expect:       authorizer.DecisionNoOpinion,
+			expectReason: "No Object name found,",
 		},
 		{
-			name:   "disallowed watch many secrets",
-			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "secrets", Name: "", Namespace: "ns0"},
-			expect: authorizer.DecisionNoOpinion,
+			name:         "disallowed watch many secrets",
+			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "secrets", Name: "", Namespace: "ns0"},
+			expect:       authorizer.DecisionNoOpinion,
+			expectReason: "No Object name found,",
 		},
 		{
 			name:         "disallowed list secrets from all namespaces with name",
@@ -524,10 +552,16 @@ func TestNodeAuthorizer(t *testing.T) {
 			expect: authorizer.DecisionAllow,
 		},
 		{
-			name:         "disallowed unfiltered list ResourceSlices",
+			name:     "allowed unfiltered list ResourceSlices - selector authz disabled",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "resourceslices", APIGroup: "resource.k8s.io"},
+			expect:   authorizer.DecisionAllow,
+			features: selectorAuthzDisabled,
+		},
+		{
+			name:         "disallowed unfiltered list ResourceSlices - selector authz enabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "resourceslices", APIGroup: "resource.k8s.io"},
 			expect:       authorizer.DecisionNoOpinion,
-			features:     nil,
+			features:     selectorAuthzEnabled,
 			expectReason: "can only list/watch/deletecollection resourceslices with nodeName field selector",
 		},
 		{
@@ -536,10 +570,16 @@ func TestNodeAuthorizer(t *testing.T) {
 			expect: authorizer.DecisionAllow,
 		},
 		{
-			name:         "disallowed unfiltered watch ResourceSlices",
+			name:     "allowed unfiltered watch ResourceSlices - selector authz disabled",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "resourceslices", APIGroup: "resource.k8s.io"},
+			expect:   authorizer.DecisionAllow,
+			features: selectorAuthzDisabled,
+		},
+		{
+			name:         "disallowed unfiltered watch ResourceSlices - selector authz enabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "resourceslices", APIGroup: "resource.k8s.io"},
 			expect:       authorizer.DecisionNoOpinion,
-			features:     nil,
+			features:     selectorAuthzEnabled,
 			expectReason: "can only list/watch/deletecollection resourceslices with nodeName field selector",
 		},
 		{
@@ -576,10 +616,16 @@ func TestNodeAuthorizer(t *testing.T) {
 			expect: authorizer.DecisionAllow,
 		},
 		{
-			name:         "get unrelated pod",
+			name:     "get unrelated pod - selector disabled",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "pods", APIGroup: "", Name: "pod0-node1", Namespace: "ns0"},
+			expect:   authorizer.DecisionAllow,
+			features: selectorAuthzDisabled,
+		},
+		{
+			name:         "get unrelated pod - selector enabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "pods", APIGroup: "", Name: "pod0-node1", Namespace: "ns0"},
-			expect:       authorizer.DecisionNoOpinion,
-			features:     nil,
+			expect:       authorizer.DecisionNoOpinion, // stricter with selector authz enabled
+			features:     selectorAuthzEnabled,
 			expectReason: "no relationship found between node 'node0' and this object",
 		},
 		// list pods
@@ -599,10 +645,16 @@ func TestNodeAuthorizer(t *testing.T) {
 			expect: authorizer.DecisionAllow,
 		},
 		{
-			name:         "list unrelated pods",
+			name:     "list unrelated pods - selector disabled",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "pods", APIGroup: ""},
+			expect:   authorizer.DecisionAllow,
+			features: selectorAuthzDisabled,
+		},
+		{
+			name:         "list unrelated pods - selector enabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "pods", APIGroup: ""},
-			expect:       authorizer.DecisionNoOpinion,
-			features:     nil,
+			expect:       authorizer.DecisionNoOpinion, // stricter with selector authz enabled
+			features:     selectorAuthzEnabled,
 			expectReason: "can only list/watch pods with spec.nodeName field selector",
 		},
 		// watch pods
@@ -622,10 +674,16 @@ func TestNodeAuthorizer(t *testing.T) {
 			expect: authorizer.DecisionAllow,
 		},
 		{
-			name:         "watch unrelated pods",
+			name:     "watch unrelated pods - selector disabled",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "pods", APIGroup: ""},
+			expect:   authorizer.DecisionAllow,
+			features: selectorAuthzDisabled,
+		},
+		{
+			name:         "watch unrelated pods - selector enabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "pods", APIGroup: ""},
-			expect:       authorizer.DecisionNoOpinion,
-			features:     nil,
+			expect:       authorizer.DecisionNoOpinion, // stricter with selector authz enabled
+			features:     selectorAuthzEnabled,
 			expectReason: "can only list/watch pods with spec.nodeName field selector",
 		},
 		// create, delete pods
@@ -705,10 +763,16 @@ func TestNodeAuthorizer(t *testing.T) {
 			expect: authorizer.DecisionAllow,
 		},
 		{
-			name:         "get unrelated node",
+			name:     "get unrelated node - selector disabled",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "nodes", APIGroup: "", Name: "node1"},
+			expect:   authorizer.DecisionAllow,
+			features: selectorAuthzDisabled,
+		},
+		{
+			name:         "get unrelated pod - selector enabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "nodes", APIGroup: "", Name: "node1"},
-			expect:       authorizer.DecisionNoOpinion,
-			features:     nil,
+			expect:       authorizer.DecisionNoOpinion, // stricter with selector authz enabled
+			features:     selectorAuthzEnabled,
 			expectReason: "node 'node0' cannot read 'node1', only its own Node object",
 		},
 		// list nodes
@@ -718,17 +782,29 @@ func TestNodeAuthorizer(t *testing.T) {
 			expect: authorizer.DecisionAllow,
 		},
 		{
-			name:         "list single unrelated node",
+			name:     "list single unrelated node - selector disabled",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "nodes", APIGroup: "", Name: "node1"},
+			expect:   authorizer.DecisionAllow,
+			features: selectorAuthzDisabled,
+		},
+		{
+			name:         "list single unrelated node - selector enabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "nodes", APIGroup: "", Name: "node1"},
-			expect:       authorizer.DecisionNoOpinion,
-			features:     nil,
+			expect:       authorizer.DecisionNoOpinion, // stricter with selector authz enabled
+			features:     selectorAuthzEnabled,
 			expectReason: "node 'node0' cannot read 'node1', only its own Node object",
 		},
 		{
-			name:         "list all nodes",
+			name:     "list all nodes - selector disabled",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "nodes", APIGroup: ""},
+			expect:   authorizer.DecisionAllow,
+			features: selectorAuthzDisabled,
+		},
+		{
+			name:         "list all nodes - selector enabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "nodes", APIGroup: ""},
-			expect:       authorizer.DecisionNoOpinion,
-			features:     nil,
+			expect:       authorizer.DecisionNoOpinion, // stricter with selector authz enabled
+			features:     selectorAuthzEnabled,
 			expectReason: "node 'node0' cannot read all nodes, only its own Node object",
 		},
 		// watch nodes
@@ -738,17 +814,29 @@ func TestNodeAuthorizer(t *testing.T) {
 			expect: authorizer.DecisionAllow,
 		},
 		{
-			name:         "watch single unrelated node",
+			name:     "watch single unrelated node - selector disabled",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "nodes", APIGroup: "", Name: "node1"},
+			expect:   authorizer.DecisionAllow,
+			features: selectorAuthzDisabled,
+		},
+		{
+			name:         "watch single unrelated node - selector enabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "nodes", APIGroup: "", Name: "node1"},
-			expect:       authorizer.DecisionNoOpinion,
-			features:     nil,
+			expect:       authorizer.DecisionNoOpinion, // stricter with selector authz enabled
+			features:     selectorAuthzEnabled,
 			expectReason: "node 'node0' cannot read 'node1', only its own Node object",
 		},
 		{
-			name:         "watch all nodes",
+			name:     "watch all nodes - selector disabled",
+			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "nodes", APIGroup: ""},
+			expect:   authorizer.DecisionAllow,
+			features: selectorAuthzDisabled,
+		},
+		{
+			name:         "watch all nodes - selector enabled",
 			attrs:        authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "nodes", APIGroup: ""},
-			expect:       authorizer.DecisionNoOpinion,
-			features:     nil,
+			expect:       authorizer.DecisionNoOpinion, // stricter with selector authz enabled
+			features:     selectorAuthzEnabled,
 			expectReason: "node 'node0' cannot read all nodes, only its own Node object",
 		},
 		// create nodes
@@ -803,16 +891,15 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	for _, tc := range tests {
 		if tc.features == nil {
-			t.Run(tc.name, func(t *testing.T) {
-				authz.features = utilfeature.DefaultFeatureGate
-				decision, reason, _ := authz.Authorize(context.Background(), tc.attrs)
-				if decision != tc.expect {
-					t.Errorf("expected %v, got %v (%s)", tc.expect, decision, reason)
-				}
-				if tc.expectReason != "" && reason != tc.expectReason {
-					t.Errorf("expected reason %q, got %q", tc.expectReason, reason)
-				}
-			})
+			for _, variant := range featureVariants {
+				t.Run(tc.name+"_"+variant.suffix, func(t *testing.T) {
+					authz.features = variant.features(t)
+					decision, reason, _ := authz.Authorize(context.Background(), tc.attrs)
+					if decision != tc.expect {
+						t.Errorf("expected %v, got %v (%s)", tc.expect, decision, reason)
+					}
+				})
+			}
 		} else {
 			t.Run(tc.name, func(t *testing.T) {
 				authz.features = tc.features(t)
@@ -1055,120 +1142,6 @@ func TestNodeAuthorizerAddEphemeralContainers(t *testing.T) {
 		if decision != tc.Decision {
 			t.Errorf("%d: expected %v, got %v", i, tc.Decision, decision)
 		}
-	}
-}
-
-// TestNodeAuthorizerUpdateExtendedResourceClaim checks that a node gains
-// authorization to read its pod's synthesized ResourceClaim once the scheduler
-// writes ExtendedResourceClaimStatus into the pod — even when the pod carries
-// no standard Spec.ResourceClaims entries.
-//
-// Background: the graph populator's updatePod has a fast-path that skips
-// AddPod when the pod's node assignment, UID, ephemeral containers, and
-// ResourceClaimStatuses are all unchanged. For pods that use the
-// DRAExtendedResource path (e.g. a plain nvidia.com/gpu request),
-// ResourceClaimStatuses is nil both before and after the scheduler writes
-// the synthesized claim name, and ExtendedResourceClaimStatus may change
-// under rare condition after a pod is bound to a node, so the fast-path
-// would fire prematurely and the claim→pod→node edge would never be added
-// to the authorization graph.
-func TestNodeAuthorizerUpdateExtendedResourceClaim(t *testing.T) {
-	g := NewGraph()
-	identifier := nodeidentifier.NewDefaultNodeIdentifier()
-	authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules())
-
-	node1 := &user.DefaultInfo{Name: "system:node:node1", Groups: []string{"system:nodes"}}
-
-	// The pod has been bound to node1, but the scheduler has written
-	// extended-claim-0, not extended-claim-1, to ExtendedResourceClaimStatus.
-	// There are no standard Spec.ResourceClaims, so ResourceClaimStatuses
-	// stays nil throughout.
-	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "pod1",
-			Namespace: "ns1",
-			UID:       "pod1uid",
-		},
-		Spec: corev1.PodSpec{
-			NodeName: "node1",
-		},
-		Status: corev1.PodStatus{
-			ExtendedResourceClaimStatus: &corev1.PodExtendedResourceClaimStatus{
-				ResourceClaimName: "extended-claim-0",
-				RequestMappings: []corev1.ContainerExtendedResourceRequest{
-					{
-						ContainerName: "container0",
-						ResourceName:  "example.com/gpu",
-						RequestName:   "request",
-					},
-				},
-			},
-		},
-	}
-
-	p := &graphPopulator{}
-	p.graph = g
-	p.addPod(pod)
-
-	// Before the scheduler swaps the synthesized claim name, extended-claim-1
-	// is not in the graph and node1 should have no opinion on it.
-	decision, _, err := authz.Authorize(context.Background(), authorizer.AttributesRecord{
-		User:            node1,
-		ResourceRequest: true,
-		Verb:            "get",
-		Resource:        "resourceclaims",
-		APIGroup:        "resource.k8s.io",
-		Namespace:       "ns1",
-		Name:            "extended-claim-1",
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if decision != authorizer.DecisionNoOpinion {
-		t.Errorf("before ExtendedResourceClaimStatus is updated to extended-claim-1: want NoOpinion, got %v", decision)
-	}
-
-	// The scheduler swaps the synthesized ResourceClaim from extended-claim-0
-	// to extended-claim-1. updatePod must recognize that ExtendedResourceClaimStatus
-	// changed and rebuild the graph edge rather than taking the fast-path early
-	// exit.
-	updatedPod := pod.DeepCopy()
-	updatedPod.Status.ExtendedResourceClaimStatus.ResourceClaimName = "extended-claim-1"
-	p.updatePod(pod, updatedPod)
-
-	// The node that hosts the pod should now be permitted to read the claim.
-	decision, _, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{
-		User:            node1,
-		ResourceRequest: true,
-		Verb:            "get",
-		Resource:        "resourceclaims",
-		APIGroup:        "resource.k8s.io",
-		Namespace:       "ns1",
-		Name:            "extended-claim-1",
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if decision != authorizer.DecisionAllow {
-		t.Errorf("after ExtendedResourceClaimStatus is updated to extended-claim-1: want Allow, got %v", decision)
-	}
-
-	// A node that does not host the pod must not gain access to the claim.
-	node2 := &user.DefaultInfo{Name: "system:node:node2", Groups: []string{"system:nodes"}}
-	decision, _, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{
-		User:            node2,
-		ResourceRequest: true,
-		Verb:            "get",
-		Resource:        "resourceclaims",
-		APIGroup:        "resource.k8s.io",
-		Namespace:       "ns1",
-		Name:            "extended-claim-1",
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if decision != authorizer.DecisionNoOpinion {
-		t.Errorf("node2 should not access a claim belonging to node1's pod: want NoOpinion, got %v", decision)
 	}
 }
 

@@ -24,7 +24,6 @@ import (
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -55,7 +54,7 @@ func (f *FakeRuntimeHelper) GetPodCgroupParent(pod *v1.Pod) string {
 	return ""
 }
 
-func (f *FakeRuntimeHelper) GetPodDNS(_ context.Context, pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
+func (f *FakeRuntimeHelper) GetPodDNS(pod *v1.Pod) (*runtimeapi.DNSConfig, error) {
 	return &runtimeapi.DNSConfig{
 		Servers:  f.DNSServers,
 		Searches: f.DNSSearches,
@@ -63,7 +62,7 @@ func (f *FakeRuntimeHelper) GetPodDNS(_ context.Context, pod *v1.Pod) (*runtimea
 }
 
 // This is not used by docker runtime.
-func (f *FakeRuntimeHelper) GeneratePodHostNameAndDomain(logger klog.Logger, _ *v1.Pod) (string, string, error) {
+func (f *FakeRuntimeHelper) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, error) {
 	return f.HostName, f.HostDomain, f.Err
 }
 
@@ -75,7 +74,7 @@ func (f *FakeRuntimeHelper) GetExtraSupplementalGroupsForPod(pod *v1.Pod) []int6
 	return nil
 }
 
-func (f *FakeRuntimeHelper) GetOrCreateUserNamespaceMappings(logger klog.Logger, pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error) {
+func (f *FakeRuntimeHelper) GetOrCreateUserNamespaceMappings(pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error) {
 	featureEnabled := utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport)
 	if pod == nil || pod.Spec.HostUsers == nil {
 		return nil, nil
@@ -118,11 +117,7 @@ func (f *FakeRuntimeHelper) UnprepareDynamicResources(ctx context.Context, pod *
 	return nil
 }
 
-func (f *FakeRuntimeHelper) RequestPodReinspect(_ kubetypes.UID) {
-	// Not implemented.
-}
-
-func (f *FakeRuntimeHelper) RequestPodRelist(_ kubetypes.UID) {
+func (f *FakeRuntimeHelper) SetPodWatchCondition(_ kubetypes.UID, _ string, _ func(*kubecontainer.PodStatus) bool) {
 	// Not implemented.
 }
 
@@ -131,9 +126,4 @@ func (f *FakeRuntimeHelper) PodCPUAndMemoryStats(_ context.Context, pod *v1.Pod,
 		return stats, nil
 	}
 	return nil, fmt.Errorf("stats for pod %q not found", pod.UID)
-}
-
-func (f *FakeRuntimeHelper) OnPodSandboxReady(_ context.Context, _ *v1.Pod) error {
-	// Not implemented
-	return nil
 }

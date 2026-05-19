@@ -60,7 +60,7 @@ func (r *EtcdManualResolver) SetEndpoints(endpoints []string) {
 }
 
 func (r EtcdManualResolver) updateState() {
-	if getCC(r) != nil {
+	if r.CC != nil {
 		eps := make([]resolver.Endpoint, len(r.endpoints))
 		for i, ep := range r.endpoints {
 			addr, serverName := endpoint.Interpret(ep)
@@ -74,14 +74,4 @@ func (r EtcdManualResolver) updateState() {
 		}
 		r.UpdateState(state)
 	}
-}
-
-func getCC(r EtcdManualResolver) (cc resolver.ClientConn) {
-	defer func() {
-		if rec := recover(); rec != nil {
-			cc = nil
-		}
-	}()
-
-	return r.CC()
 }

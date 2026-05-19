@@ -45,14 +45,6 @@ var (
 	astValidatorFactories = map[string]ASTValidatorFactory{
 		nestingLimitValidatorName: func(val *env.Validator) (ASTValidator, error) {
 			if limit, found := val.ConfigValue("limit"); found {
-				// In case of protos, config value is of type by google.protobuf.Value, which numeric values are always a double.
-				if val, isDouble := limit.(float64); isDouble {
-					if val != float64(int64(val)) {
-						return nil, fmt.Errorf("invalid validator: %s, limit value is not a whole number: %v", nestingLimitValidatorName, limit)
-					}
-					return ValidateComprehensionNestingLimit(int(val)), nil
-				}
-
 				if val, isInt := limit.(int); isInt {
 					return ValidateComprehensionNestingLimit(val), nil
 				}

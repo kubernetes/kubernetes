@@ -175,6 +175,9 @@ func testWorkloadDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.Volumes[0].VolumeSource.ScaleIO.StorageMode":                                           `"ThinProvisioned"`,
 		".Spec.Volumes[0].VolumeSource.Secret.DefaultMode":                                            `420`,
 	}
+	if !featuresEnabled {
+		delete(expectedDefaults, ".Spec.Volumes[0].VolumeSource.Image.PullPolicy")
+	}
 	t.Run("empty PodTemplateSpec", func(t *testing.T) {
 		rc := &v1.ReplicationController{Spec: v1.ReplicationControllerSpec{Template: &v1.PodTemplateSpec{}}}
 		template := rc.Spec.Template
@@ -361,6 +364,9 @@ func testPodDefaults(t *testing.T, featuresEnabled bool) {
 		".Spec.Volumes[0].VolumeSource.ScaleIO.FSType":                                                `"xfs"`,
 		".Spec.Volumes[0].VolumeSource.ScaleIO.StorageMode":                                           `"ThinProvisioned"`,
 		".Spec.Volumes[0].VolumeSource.Secret.DefaultMode":                                            `420`,
+	}
+	if !featuresEnabled {
+		delete(expectedDefaults, ".Spec.Volumes[0].VolumeSource.Image.PullPolicy")
 	}
 	defaults := detectDefaults(t, pod, reflect.ValueOf(pod))
 	if !reflect.DeepEqual(expectedDefaults, defaults) {

@@ -268,8 +268,7 @@ func (cs *clientStream) RecvMsg(m interface{}) error {
 	case msg = <-cs.s.recv:
 	}
 
-	switch msg.header.Type {
-	case messageTypeResponse:
+	if msg.header.Type == messageTypeResponse {
 		resp := &Response{}
 		err := proto.Unmarshal(msg.payload[:msg.header.Length], resp)
 		// return the payload buffer for reuse
@@ -290,7 +289,7 @@ func (cs *clientStream) RecvMsg(m interface{}) error {
 		cs.remoteClosed = true
 
 		return nil
-	case messageTypeData:
+	} else if msg.header.Type == messageTypeData {
 		if !cs.desc.StreamingServer {
 			cs.c.deleteStream(cs.s)
 			cs.remoteClosed = true
@@ -311,9 +310,9 @@ func (cs *clientStream) RecvMsg(m interface{}) error {
 			return err
 		}
 		return nil
-	default:
-		return fmt.Errorf("unexpected %q message received: %w", msg.header.Type, ErrProtocol)
 	}
+
+	return fmt.Errorf("unexpected %q message received: %w", msg.header.Type, ErrProtocol)
 }
 
 // Close closes the ttrpc connection and underlying connection

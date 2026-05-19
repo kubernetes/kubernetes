@@ -42,6 +42,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/capabilities"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	utiltest "k8s.io/kubernetes/test/utils"
 	podsecurityconfigloader "k8s.io/pod-security-admission/admission/api/load"
@@ -50,6 +51,11 @@ import (
 )
 
 func TestPodSecurity(t *testing.T) {
+	// Enable all feature gates needed to allow all fields to be exercised
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ProcMountType:         true,
+		features.UserNamespacesSupport: true,
+	})
 	// Start server
 	server := startPodSecurityServer(t)
 	opts := podsecuritytest.Options{
@@ -93,6 +99,12 @@ func TestPodSecurityGAOnly(t *testing.T) {
 }
 
 func TestPodSecurityWebhook(t *testing.T) {
+	// Enable all feature gates needed to allow all fields to be exercised
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.ProcMountType:         true,
+		features.UserNamespacesSupport: true,
+	})
+
 	// Start test API server.
 	capabilities.ResetForTest()
 	capabilities.Initialize(capabilities.Capabilities{AllowPrivileged: true})

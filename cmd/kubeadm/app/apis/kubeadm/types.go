@@ -193,7 +193,7 @@ type APIServer struct {
 // DNS defines the DNS addon that should be used in the cluster
 type DNS struct {
 	// ImageMeta allows to customize the image used for the DNS addon
-	ImageMeta `json:""`
+	ImageMeta `json:",inline"`
 
 	// Disabled specifies whether to disable this addon in the cluster
 	Disabled bool
@@ -292,7 +292,7 @@ type Etcd struct {
 type LocalEtcd struct {
 	// ImageMeta allows to customize the container image used for etcd. Passing a custom etcd image
 	// tells kubeadm upgrade that this image is user-managed and that its upgrade must be skipped.
-	ImageMeta `json:""`
+	ImageMeta `json:",inline"`
 
 	// DataDir is the directory etcd will place its data.
 	// Defaults to "/var/lib/etcd".
@@ -487,7 +487,7 @@ type HostPathMount struct {
 type Patches struct {
 	// Directory is a path to a directory that contains files named "target[suffix][+patchtype].extension".
 	// For example, "kube-apiserver0+merge.yaml" or just "etcd.json". "target" can be one of
-	// "kube-apiserver", "kube-controller-manager", "kube-scheduler", "etcd", "kubeletconfiguration", "corednsdeployment", "kubeproxydaemonset".
+	// "kube-apiserver", "kube-controller-manager", "kube-scheduler", "etcd", "kubeletconfiguration", "corednsdeployment".
 	// "patchtype" can be one of "strategic" "merge" or "json" and they match the patch formats supported by kubectl.
 	// The default "patchtype" is "strategic". "extension" must be either "json" or "yaml".
 	// "suffix" is an optional string that can be used to determine which patches are applied

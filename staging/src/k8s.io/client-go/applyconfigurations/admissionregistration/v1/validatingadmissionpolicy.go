@@ -32,12 +32,12 @@ import (
 //
 // ValidatingAdmissionPolicy describes the definition of an admission validation policy that accepts or rejects an object without changing it.
 type ValidatingAdmissionPolicyApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration `json:""`
-	// metadata is the standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
-	// spec defines the desired behavior of the ValidatingAdmissionPolicy.
+	// Specification of the desired behavior of the ValidatingAdmissionPolicy.
 	Spec *ValidatingAdmissionPolicySpecApplyConfiguration `json:"spec,omitempty"`
-	// status represents the current status of the ValidatingAdmissionPolicy, including warnings that are useful to determine if the policy
+	// The status of the ValidatingAdmissionPolicy, including warnings that are useful to determine if the policy
 	// behaves in the expected way.
 	// Populated by the system.
 	// Read-only.

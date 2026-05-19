@@ -163,7 +163,7 @@ func runServiceLatencies(ctx context.Context, f *framework.Framework, inParallel
 	durations := make(chan time.Duration, total)
 
 	blocker := make(chan struct{}, inParallel)
-	for range total {
+	for i := 0; i < total; i++ {
 		go func() {
 			defer ginkgo.GinkgoRecover()
 			blocker <- struct{}{}
@@ -177,7 +177,7 @@ func runServiceLatencies(ctx context.Context, f *framework.Framework, inParallel
 	}
 
 	errCount := 0
-	for range total {
+	for i := 0; i < total; i++ {
 		select {
 		case e := <-errs:
 			framework.Logf("Got error: %v", e)

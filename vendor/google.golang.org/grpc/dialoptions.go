@@ -213,7 +213,6 @@ func WithReadBufferSize(s int) DialOption {
 func WithInitialWindowSize(s int32) DialOption {
 	return newFuncDialOption(func(o *dialOptions) {
 		o.copts.InitialWindowSize = s
-		o.copts.StaticWindowSize = true
 	})
 }
 
@@ -223,26 +222,6 @@ func WithInitialWindowSize(s int32) DialOption {
 func WithInitialConnWindowSize(s int32) DialOption {
 	return newFuncDialOption(func(o *dialOptions) {
 		o.copts.InitialConnWindowSize = s
-		o.copts.StaticWindowSize = true
-	})
-}
-
-// WithStaticStreamWindowSize returns a DialOption which sets the initial
-// stream window size to the value provided and disables dynamic flow control.
-func WithStaticStreamWindowSize(s int32) DialOption {
-	return newFuncDialOption(func(o *dialOptions) {
-		o.copts.InitialWindowSize = s
-		o.copts.StaticWindowSize = true
-	})
-}
-
-// WithStaticConnWindowSize returns a DialOption which sets the initial
-// connection window size to the value provided and disables dynamic flow
-// control.
-func WithStaticConnWindowSize(s int32) DialOption {
-	return newFuncDialOption(func(o *dialOptions) {
-		o.copts.InitialConnWindowSize = s
-		o.copts.StaticWindowSize = true
 	})
 }
 
@@ -381,7 +360,7 @@ func WithReturnConnectionError() DialOption {
 //
 // Note that using this DialOption with per-RPC credentials (through
 // WithCredentialsBundle or WithPerRPCCredentials) which require transport
-// security is incompatible and will cause RPCs to fail.
+// security is incompatible and will cause grpc.Dial() to fail.
 //
 // Deprecated: use WithTransportCredentials and insecure.NewCredentials()
 // instead. Will be supported throughout 1.x.
@@ -608,8 +587,6 @@ func WithChainStreamInterceptor(interceptors ...StreamClientInterceptor) DialOpt
 
 // WithAuthority returns a DialOption that specifies the value to be used as the
 // :authority pseudo-header and as the server name in authentication handshake.
-// This overrides all other ways of setting authority on the channel, but can be
-// overridden per-call by using grpc.CallAuthority.
 func WithAuthority(a string) DialOption {
 	return newFuncDialOption(func(o *dialOptions) {
 		o.authority = a
@@ -705,11 +682,10 @@ func WithDisableHealthCheck() DialOption {
 func defaultDialOptions() dialOptions {
 	return dialOptions{
 		copts: transport.ConnectOptions{
-			ReadBufferSize:    defaultReadBufSize,
-			WriteBufferSize:   defaultWriteBufSize,
-			SharedWriteBuffer: true,
-			UserAgent:         grpcUA,
-			BufferPool:        mem.DefaultBufferPool(),
+			ReadBufferSize:  defaultReadBufSize,
+			WriteBufferSize: defaultWriteBufSize,
+			UserAgent:       grpcUA,
+			BufferPool:      mem.DefaultBufferPool(),
 		},
 		bs:                       internalbackoff.DefaultExponential,
 		idleTimeout:              30 * time.Minute,

@@ -1,4 +1,4 @@
-// Copyright The Prometheus Authors
+// Copyright 2021 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -40,13 +40,13 @@ type CgroupSummary struct {
 
 // parseCgroupSummary parses each line of the /proc/cgroup file
 // Line format is `subsys_name	hierarchy	num_cgroups	enabled`.
-func parseCgroupSummaryString(cgroupSummaryStr string) (*CgroupSummary, error) {
+func parseCgroupSummaryString(CgroupSummaryStr string) (*CgroupSummary, error) {
 	var err error
 
-	fields := strings.Fields(cgroupSummaryStr)
+	fields := strings.Fields(CgroupSummaryStr)
 	// require at least 4 fields
 	if len(fields) < 4 {
-		return nil, fmt.Errorf("%w: 4+ fields required, found %d fields in cgroup info string: %s", ErrFileParse, len(fields), cgroupSummaryStr)
+		return nil, fmt.Errorf("%w: 4+ fields required, found %d fields in cgroup info string: %s", ErrFileParse, len(fields), CgroupSummaryStr)
 	}
 
 	CgroupSummary := &CgroupSummary{

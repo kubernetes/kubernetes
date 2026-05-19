@@ -22,6 +22,7 @@ import (
 	"sync/atomic"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/proxy"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	endpointmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
@@ -36,8 +37,6 @@ import (
 	"k8s.io/klog/v2"
 	apiregistrationv1api "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	apiregistrationv1apihelper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
-	"k8s.io/kube-aggregator/pkg/controllers/status/remote"
-	"k8s.io/streaming/pkg/httpstream"
 )
 
 const (
@@ -167,7 +166,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	proxyRoundTripper = transport.NewAuthProxyRoundTripper(user.GetName(), userUID, user.GetGroups(), user.GetExtra(), proxyRoundTripper)
 
-	if !upgrade {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) && !upgrade {
 		tracingWrapper := tracing.WrapperFor(r.tracerProvider)
 		proxyRoundTripper = tracingWrapper(proxyRoundTripper)
 	}
@@ -220,7 +219,16 @@ func (r *proxyHandler) updateAPIService(apiService *apiregistrationv1api.APIServ
 
 	proxyClientCert, proxyClientKey := r.proxyCurrentCertKeyContent()
 
-	transportConfig := remote.BuildTransportConfig(r.proxyTransportDial, proxyClientCert, proxyClientKey, apiService)
+	transportConfig := &transport.Config{
+		TLS: transport.TLSConfig{
+			Insecure:   apiService.Spec.InsecureSkipTLSVerify,
+			ServerName: apiService.Spec.Service.Name + "." + apiService.Spec.Service.Namespace + ".svc",
+			CertData:   proxyClientCert,
+			KeyData:    proxyClientKey,
+			CAData:     apiService.Spec.CABundle,
+		},
+		DialHolder: r.proxyTransportDial,
+	}
 	transportConfig.Wrap(x509metrics.NewDeprecatedCertificateRoundTripperWrapperConstructor(
 		x509MissingSANCounter,
 		x509InsecureSHA1Counter,

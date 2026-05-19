@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
@@ -63,8 +62,8 @@ func (*enumExcludeTagValidator) GetValidations(_ Context, _ codetags.Tag) (Valid
 func (eetv *enumExcludeTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            eetv.TagName(),
-		StabilityLevel: TagStabilityLevelAlpha,
-		Scopes:         sets.List(eetv.ValidScopes()),
+		StabilityLevel: Alpha,
+		Scopes:         eetv.ValidScopes().UnsortedList(),
 		Description: `Indicates that an constant value is not part of an enum, even if the constant's type is tagged with k8s:enum.
 May be conditionally excluded via +k8s:ifEnabled(Option)=+k8s:enumExclude or +k8s:ifDisabled(Option)=+k8s:enumExclude.
 If multiple +k8s:ifEnabled/+k8s:ifDisabled tags are used, the value is excluded if any of the exclude conditions are met.`,
@@ -72,11 +71,11 @@ If multiple +k8s:ifEnabled/+k8s:ifDisabled tags are used, the value is excluded 
 }
 
 type enumTagValidator struct {
-	validator TagValidationExtractor
+	validator Validator
 }
 
 func (etv *enumTagValidator) Init(cfg Config) {
-	etv.validator = cfg.TagValidator
+	etv.validator = cfg.Validator
 }
 
 func (enumTagValidator) TagName() string {
@@ -186,8 +185,7 @@ func (etv *enumTagValidator) GetValidations(context Context, _ codetags.Tag) (Va
 		}))
 		exclusions = exclusionsVar
 	}
-	fn := Function(enumTagName, DefaultFlags, enumValidator, symbolsVarName, exclusions).
-		WithEmits(Emission{field.ErrorTypeNotSupported, "", ""})
+	fn := Function(enumTagName, DefaultFlags, enumValidator, symbolsVarName, exclusions)
 	result.AddFunction(fn)
 
 	return result, nil
@@ -196,8 +194,8 @@ func (etv *enumTagValidator) GetValidations(context Context, _ codetags.Tag) (Va
 func (etv *enumTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:            etv.TagName(),
-		StabilityLevel: TagStabilityLevelStable,
-		Scopes:         sets.List(etv.ValidScopes()),
+		StabilityLevel: Beta,
+		Scopes:         etv.ValidScopes().UnsortedList(),
 		Description:    "Indicates that a string type is an enum. All constant values of this type are considered values in the enum unless excluded using +k8s:enumExclude.",
 	}
 }

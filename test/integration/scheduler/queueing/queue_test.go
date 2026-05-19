@@ -19,7 +19,6 @@ package queueing
 import (
 	"context"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -334,7 +333,7 @@ func TestCustomResourceEnqueue(t *testing.T) {
 		t.Fatalf("Cannot find the profile for Pod %v", podInfo.Pod.Name)
 	}
 	// Schedule the Pod manually.
-	_, fitError := testCtx.Scheduler.SchedulePod(ctx, schedFramework, framework.NewCycleState(), podInfo)
+	_, fitError := testCtx.Scheduler.SchedulePod(ctx, schedFramework, framework.NewCycleState(), podInfo.Pod)
 	// The fitError is expected to be non-nil as it failed the fakeCRPlugin plugin.
 	if fitError == nil {
 		t.Fatalf("Expect Pod %v to fail at scheduling.", podInfo.Pod.Name)
@@ -619,15 +618,5 @@ func TestPopFromBackoffQWhenActiveQEmpty(t *testing.T) {
 	err = wait.PollUntilContextTimeout(ctx, 200*time.Millisecond, wait.ForeverTestTimeout, false, testutils.PodScheduled(cs, ns, pod.Name))
 	if err != nil {
 		t.Fatalf("Expected pod to be scheduled: %v", err)
-	}
-}
-
-// TestCoreResourceEnqueue verify Pods failed by in-tree default plugins can be
-// moved properly upon their registered events.
-func TestCoreResourceEnqueue(t *testing.T) {
-	for _, tt := range CoreResourceEnqueueTestCases {
-		t.Run(strings.Join(append(tt.EnablePlugins, tt.Name), "/"), func(t *testing.T) {
-			RunTestCoreResourceEnqueue(t, tt)
-		})
 	}
 }

@@ -1,4 +1,5 @@
 //go:build linux
+// +build linux
 
 /*
 Copyright 2016 The Kubernetes Authors.
@@ -26,11 +27,12 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/flowcontrol"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -71,7 +73,7 @@ func (s *sourceFile) doWatch(logger klog.Logger) error {
 			return err
 		}
 		// Emit an update with an empty PodList to allow FileSource to be marked as seen
-		s.updates <- sourceUpdate{Pods: []*v1.Pod{}}
+		s.updates <- kubetypes.PodUpdate{Pods: []*v1.Pod{}, Op: kubetypes.SET, Source: kubetypes.FileSource}
 		return &retryableError{"path does not exist, ignoring"}
 	}
 

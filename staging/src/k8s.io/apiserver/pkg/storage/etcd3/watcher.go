@@ -24,7 +24,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -43,7 +42,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/clock"
 )
 
 const (
@@ -51,37 +49,23 @@ const (
 	incomingBufSize         = 100
 	outgoingBufSize         = 100
 	processEventConcurrency = 10
-
-	watchChanLogWarningInterval  = 5 * time.Second
-	watchChanLogWarningThreshold = 100 * time.Millisecond
 )
 
 // defaultWatcherMaxLimit is used to facilitate construction tests
 var defaultWatcherMaxLimit int64 = maxLimit
 
 // fatalOnDecodeError is used during testing to panic the server if watcher encounters a decoding error
-var fatalOnDecodeError atomic.Bool
+var fatalOnDecodeError = false
 
 func init() {
 	// check to see if we are running in a test environment
-	b, _ := strconv.ParseBool(os.Getenv("KUBE_PANIC_WATCH_DECODE_ERROR"))
-	fatalOnDecodeError.Store(b)
-}
-
-// TestingTB is the subset of testing.TB required by TestOnlySetFatalOnDecodeError. Avoids importing
-// the testing package.
-type TestingTB interface {
-	Helper()
-	Cleanup(func())
+	TestOnlySetFatalOnDecodeError(true)
+	fatalOnDecodeError, _ = strconv.ParseBool(os.Getenv("KUBE_PANIC_WATCH_DECODE_ERROR"))
 }
 
 // TestOnlySetFatalOnDecodeError should only be used for cases where decode errors are expected and need to be tested. e.g. conversion webhooks.
-func TestOnlySetFatalOnDecodeError(tb TestingTB, b bool) {
-	tb.Helper()
-	old := fatalOnDecodeError.Swap(b)
-	tb.Cleanup(func() {
-		fatalOnDecodeError.Store(old)
-	})
+func TestOnlySetFatalOnDecodeError(b bool) {
+	fatalOnDecodeError = b
 }
 
 type watcher struct {
@@ -109,9 +93,6 @@ type watchChan struct {
 	incomingEventChan        chan *event
 	resultChan               chan watch.Event
 	getResourceSizeEstimator func() *resourceSizeEstimator
-
-	incomingEventLogger *blockLogger
-	resultLogger        *blockLogger
 }
 
 // Watch watches on a key and returns a watch.Interface that transfers relevant notifications.
@@ -162,10 +143,6 @@ func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, re
 		wc.internalPred = storage.Everything
 	}
 	wc.ctx, wc.cancel = context.WithCancel(ctx)
-
-	wc.incomingEventLogger = newBlockLogger(watchChanLogWarningInterval, watchChanLogWarningThreshold, "Fast watcher, slow processing. Probably caused by slow decoding, user not receiving fast, or other processing logic", wc.watcher.objectType, wc.watcher.groupResource, clock.RealClock{})
-	wc.resultLogger = newBlockLogger(watchChanLogWarningInterval, watchChanLogWarningThreshold, "Fast watcher, slow processing. Probably caused by slow dispatching events to watchers", wc.watcher.objectType, wc.watcher.groupResource, clock.RealClock{})
-
 	return wc
 }
 
@@ -696,8 +673,9 @@ func (wc *watchChan) sendError(err error) {
 // sendEvent synchronously puts an event into resultChan.
 // Returns true if it was successful.
 func (wc *watchChan) sendEvent(event *watch.Event) bool {
-	defer func(start time.Time) { wc.resultLogger.recordWait(time.Since(start)) }(time.Now())
-
+	if len(wc.resultChan) == cap(wc.resultChan) {
+		klog.V(3).InfoS("Fast watcher, slow processing. Probably caused by slow dispatching events to watchers", "outgoingEvents", outgoingBufSize, "objectType", wc.watcher.objectType, "groupResource", wc.watcher.groupResource)
+	}
 	// If user couldn't receive results fast enough, we also block incoming events from watcher.
 	// Because storing events in local will cause more memory usage.
 	// The worst case would be closing the fast watcher.
@@ -710,8 +688,9 @@ func (wc *watchChan) sendEvent(event *watch.Event) bool {
 }
 
 func (wc *watchChan) queueEvent(e *event) {
-	defer func(start time.Time) { wc.incomingEventLogger.recordWait(time.Since(start)) }(time.Now())
-
+	if len(wc.incomingEventChan) == incomingBufSize {
+		klog.V(3).InfoS("Fast watcher, slow processing. Probably caused by slow decoding, user not receiving fast, or other processing logic", "incomingEvents", incomingBufSize, "objectType", wc.watcher.objectType, "groupResource", wc.watcher.groupResource)
+	}
 	select {
 	case wc.incomingEventChan <- e:
 	case <-wc.ctx.Done():
@@ -779,7 +758,7 @@ func (w *watcher) transformIfCorruptObjectError(e *event, err error) error {
 func decodeObj(codec runtime.Codec, versioner storage.Versioner, data []byte, rev int64) (_ runtime.Object, err error) {
 	obj, err := runtime.Decode(codec, []byte(data))
 	if err != nil {
-		if fatalOnDecodeError.Load() {
+		if fatalOnDecodeError {
 			// we are running in a test environment and thus an
 			// error here is due to a coder mistake if the defer
 			// does not catch it

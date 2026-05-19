@@ -65,8 +65,8 @@ type backoffQueuer interface {
 	// It returns new pod info if updated, nil otherwise.
 	update(newPod *v1.Pod, oldPodInfo *framework.QueuedPodInfo) *framework.QueuedPodInfo
 	// delete deletes the pInfo from backoffQueue.
-	// It returns the removed pod object if found, nil otherwise.
-	delete(pInfo *framework.QueuedPodInfo) *framework.QueuedPodInfo
+	// It returns true if the pod was deleted.
+	delete(pInfo *framework.QueuedPodInfo) bool
 	// get returns the pInfo matching given pInfoLookup, if exists.
 	get(pInfoLookup *framework.QueuedPodInfo) (*framework.QueuedPodInfo, bool)
 	// has inform if pInfo exists in the queue.
@@ -301,7 +301,8 @@ func (bq *backoffQueue) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, 
 	if pInfo.UnschedulablePlugins.Len() == 0 && pInfo.PendingPlugins.Len() == 0 {
 		bq.podErrorBackoffQ.AddOrUpdate(pInfo)
 		// Ensure the pod is not in the podBackoffQ and report the error if it happens.
-		if deletedPod := bq.podBackoffQ.Delete(pInfo); deletedPod != nil {
+		err := bq.podBackoffQ.Delete(pInfo)
+		if err == nil {
 			logger.Error(nil, "BackoffQueue add() was called with a pod that was already in the podBackoffQ", "pod", klog.KObj(pInfo.Pod))
 			return
 		}
@@ -311,7 +312,8 @@ func (bq *backoffQueue) add(logger klog.Logger, pInfo *framework.QueuedPodInfo, 
 	}
 	bq.podBackoffQ.AddOrUpdate(pInfo)
 	// Ensure the pod is not in the podErrorBackoffQ and report the error if it happens.
-	if deletedPod := bq.podErrorBackoffQ.Delete(pInfo); deletedPod != nil {
+	err := bq.podErrorBackoffQ.Delete(pInfo)
+	if err == nil {
 		logger.Error(nil, "BackoffQueue add() was called with a pod that was already in the podErrorBackoffQ", "pod", klog.KObj(pInfo.Pod))
 		return
 	}
@@ -341,15 +343,15 @@ func (bq *backoffQueue) update(newPod *v1.Pod, oldPodInfo *framework.QueuedPodIn
 }
 
 // delete deletes the pInfo from backoffQueue.
-// It returns the removed pod object if found, nil otherwise.
-func (bq *backoffQueue) delete(pInfo *framework.QueuedPodInfo) *framework.QueuedPodInfo {
+// It returns true if the pod was deleted.
+func (bq *backoffQueue) delete(pInfo *framework.QueuedPodInfo) bool {
 	bq.lock.Lock()
 	defer bq.lock.Unlock()
 
-	if pInfo := bq.podBackoffQ.Delete(pInfo); pInfo != nil {
-		return pInfo
+	if bq.podBackoffQ.Delete(pInfo) == nil {
+		return true
 	}
-	return bq.podErrorBackoffQ.Delete(pInfo)
+	return bq.podErrorBackoffQ.Delete(pInfo) == nil
 }
 
 // popBackoff pops the pInfo from the podBackoffQ.

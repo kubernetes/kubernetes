@@ -1,4 +1,4 @@
-// Copyright The Prometheus Authors
+// Copyright 2019 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -139,6 +139,9 @@ func parseSockstatKVs(kvs []string) (map[string]int, error) {
 func parseSockstatProtocol(kvs map[string]int) NetSockstatProtocol {
 	var nsp NetSockstatProtocol
 	for k, v := range kvs {
+		// Capture the range variable to ensure we get unique pointers for
+		// each of the optional fields.
+		v := v
 		switch k {
 		case "inuse":
 			nsp.InUse = v

@@ -80,7 +80,7 @@ func NewConfig(opts options.CompletedOptions) (*Config, error) {
 	genericConfig, versionedInformers, storageFactory, err := controlplaneapiserver.BuildGenericConfig(
 		opts,
 		[]*runtime.Scheme{legacyscheme.Scheme, apiextensionsapiserver.Scheme, aggregatorscheme.Scheme},
-		controlplane.DefaultGenericAPIResourceConfigSource(),
+		controlplane.DefaultAPIResourceConfigSource(),
 		generatedopenapi.GetOpenAPIDefinitions,
 	)
 	if err != nil {

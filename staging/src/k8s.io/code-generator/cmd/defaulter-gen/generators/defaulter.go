@@ -28,7 +28,6 @@ import (
 	"strings"
 
 	"k8s.io/code-generator/cmd/defaulter-gen/args"
-	"k8s.io/code-generator/pkg/apidefinitions"
 	genutil "k8s.io/code-generator/pkg/util"
 	"k8s.io/gengo/v2"
 	"k8s.io/gengo/v2/generator"
@@ -63,6 +62,7 @@ var typeZeroValue = map[string]interface{}{
 
 // These are the comment tags that carry parameters for defaulter generation.
 const tagName = "k8s:defaulter-gen"
+const inputTagName = "k8s:defaulter-gen-input"
 const defaultTagName = "default"
 
 func extractDefaultTag(comments []string) ([]string, error) {
@@ -73,31 +73,20 @@ func extractDefaultTag(comments []string) ([]string, error) {
 	return tags[defaultTagName], nil
 }
 
-func extractTag(comments []string) ([]string, bool) {
+func extractTag(comments []string) ([]string, error) {
 	tags, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{tagName}, comments)
 	if err != nil {
-		klog.Fatalf("Error extracting %s tag: %v", tagName, err)
+		return nil, err
 	}
-
-	values, found := tags[tagName]
-	if !found || len(values) == 0 {
-		return nil, false
-	}
-
-	return values, true
+	return tags[tagName], nil
 }
 
-// defaulterMatchType returns the values to be defaulted for pkg, or false
-// if defaulter-gen should not run.
-func defaulterMatchType(pkg *types.Package, idOpts []apidefinitions.Option) ([]string, bool) {
-	info, err := apidefinitions.Identify(pkg, apidefinitions.Defaulter, idOpts...)
+func extractInputTag(comments []string) ([]string, error) {
+	tags, err := genutil.ExtractCommentTagsWithoutArguments("+", []string{inputTagName}, comments)
 	if err != nil {
-		klog.Fatal(err)
+		return nil, err
 	}
-	if !info.ShouldGenerate() {
-		return nil, false
-	}
-	return info.TypeFilters(), true
+	return tags[inputTagName], nil
 }
 
 func checkTag(comments []string, require ...string) (bool, error) {
@@ -255,12 +244,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 		klog.Fatalf("Failed loading boilerplate: %v", err)
 	}
 
-	var idOpts []apidefinitions.Option
-	if len(args.LintRules) > 0 {
-		idOpts = append(idOpts, apidefinitions.WithLintRules(args.LintRules...))
-	}
-
-	targetList := []generator.Target{}
+	targets := []generator.Target{}
 
 	// Accumulate pre-existing default functions.
 	// TODO: This is too ad-hoc.  We need a better way.
@@ -275,20 +259,26 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 	pkgToInput := map[string]string{}
 	for _, i := range context.Inputs {
 		klog.V(5).Infof("considering pkg %q", i)
+
 		pkg := context.Universe[i]
 
-		info, err := apidefinitions.Identify(pkg, apidefinitions.Defaulter, idOpts...)
+		// if the types are not in the same package where the defaulter functions to be generated
+		inputTags, err := extractInputTag(pkg.Comments)
 		if err != nil {
-			klog.Fatal(err)
+			panic(fmt.Sprintf("error extracting input tag: %v", err))
 		}
-		if !info.ShouldGenerate() {
-			continue
+		if len(inputTags) > 1 {
+			panic(fmt.Sprintf("there may only be one input tag, got %#v", inputTags))
 		}
+		if len(inputTags) == 1 {
+			inputPath := inputTags[0]
+			if strings.HasPrefix(inputPath, "./") || strings.HasPrefix(inputPath, "../") {
+				// this is a relative dir, which will not work under gomodules.
+				// join with the local package path, but warn
+				klog.Warningf("relative path %s=%s will not work under gomodule mode; use full package path (as used by 'import') instead", inputTagName, inputPath)
+				inputPath = path.Join(pkg.Path, inputTags[0])
+			}
 
-		// +k8s:defaulter-gen-input may direct the generator at types in
-		// a different package than the one where defaulters will be emitted.
-		inputPath := info.ExternalTypes()
-		if inputPath != pkg.Path {
 			klog.V(5).Infof("  input pkg %v", inputPath)
 			inputPkgs = append(inputPkgs, inputPath)
 			pkgToInput[i] = inputPath
@@ -340,10 +330,9 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 			getManualDefaultingFunctions(context, context.Universe[pp], existingDefaulters)
 		}
 
-		typesWith, found := defaulterMatchType(pkg, idOpts)
-		if !found {
-			klog.V(2).InfoS("  did not find required tag", "tag", tagName)
-			continue
+		typesWith, err := extractTag(pkg.Comments)
+		if err != nil {
+			klog.Fatalf("Error extracting %s tag: %v", tagName, err)
 		}
 		shouldCreateObjectDefaulterFn := func(t *types.Type) bool {
 			if defaults, ok := existingDefaulters[t]; ok && defaults.object != nil {
@@ -447,12 +436,9 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 
 		if len(newDefaulters) == 0 {
 			klog.V(5).Infof("no defaulters in package %s", pkg.Name)
-			if _, hasTag := extractTag(pkg.Comments); !hasTag {
-				continue
-			}
 		}
 
-		targetList = append(targetList,
+		targets = append(targets,
 			&generator.SimpleTarget{
 				PkgName:       path.Base(pkg.Path),
 				PkgPath:       pkg.Path,
@@ -470,7 +456,7 @@ func GetTargets(context *generator.Context, args *args.Args) []generator.Target 
 				},
 			})
 	}
-	return targetList
+	return targets
 }
 
 // callTreeForType contains fields necessary to build a tree for types.

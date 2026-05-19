@@ -248,11 +248,6 @@ type dynamicSlotActivation struct {
 	slotVals  []*slotVal
 }
 
-// Unwrap returns the underlying activation.
-func (sa *dynamicSlotActivation) Unwrap() cel.Activation {
-	return sa.Activation
-}
-
 // ResolveName implements the Activation interface method but handles variables prefixed with `@index`
 // as special variables which exist within the slot-based memory of the cel.@block() where each slot
 // refers to an expression which must be computed only once.
@@ -309,11 +304,6 @@ type constantSlotActivation struct {
 	cel.Activation
 	slots     traits.Lister
 	slotCount int
-}
-
-// Unwrap returns the underlying activation.
-func (sa *constantSlotActivation) Unwrap() cel.Activation {
-	return sa.Activation
 }
 
 // ResolveName implements Activation interface method and proxies @index prefixed lookups into the slot

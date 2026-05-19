@@ -5,7 +5,6 @@ package trace // import "go.opentelemetry.io/otel/sdk/trace"
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -14,13 +13,14 @@ import (
 	"go.opentelemetry.io/otel/internal/global"
 	"go.opentelemetry.io/otel/sdk/instrumentation"
 	"go.opentelemetry.io/otel/sdk/resource"
-	"go.opentelemetry.io/otel/sdk/trace/internal/observ"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/embedded"
 	"go.opentelemetry.io/otel/trace/noop"
 )
 
-const defaultTracerName = "go.opentelemetry.io/otel/sdk/tracer"
+const (
+	defaultTracerName = "go.opentelemetry.io/otel/sdk/tracer"
+)
 
 // tracerProviderConfig.
 type tracerProviderConfig struct {
@@ -45,7 +45,7 @@ type tracerProviderConfig struct {
 }
 
 // MarshalLog is the marshaling function used by the logging system to represent this Provider.
-func (cfg tracerProviderConfig) MarshalLog() any {
+func (cfg tracerProviderConfig) MarshalLog() interface{} {
 	return struct {
 		SpanProcessors  []SpanProcessor
 		SamplerType     string
@@ -159,13 +159,6 @@ func (p *TracerProvider) Tracer(name string, opts ...trace.TracerOption) trace.T
 				provider:             p,
 				instrumentationScope: is,
 			}
-
-			var err error
-			t.inst, err = observ.NewTracer()
-			if err != nil {
-				otel.Handle(err)
-			}
-
 			p.namedTracer[is] = t
 		}
 		return t, ok
@@ -263,7 +256,6 @@ func (p *TracerProvider) ForceFlush(ctx context.Context) error {
 		return nil
 	}
 
-	var err error
 	for _, sps := range spss {
 		select {
 		case <-ctx.Done():
@@ -271,9 +263,11 @@ func (p *TracerProvider) ForceFlush(ctx context.Context) error {
 		default:
 		}
 
-		err = errors.Join(err, sps.sp.ForceFlush(ctx))
+		if err := sps.sp.ForceFlush(ctx); err != nil {
+			return err
+		}
 	}
-	return err
+	return nil
 }
 
 // Shutdown shuts down TracerProvider. All registered span processors are shut down
@@ -303,7 +297,14 @@ func (p *TracerProvider) Shutdown(ctx context.Context) error {
 		sps.state.Do(func() {
 			err = sps.sp.Shutdown(ctx)
 		})
-		retErr = errors.Join(retErr, err)
+		if err != nil {
+			if retErr == nil {
+				retErr = err
+			} else {
+				// Poor man's list of errors
+				retErr = fmt.Errorf("%w; %w", retErr, err)
+			}
+		}
 	}
 	p.spanProcessors.Store(&spanProcessorStates{})
 	return retErr

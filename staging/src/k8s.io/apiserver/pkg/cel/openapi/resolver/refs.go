@@ -86,9 +86,7 @@ func populateRefs(schemaOf func(ref string) (*spec.Schema, bool), visited sets.S
 		}
 		if populated != result.AdditionalProperties.Schema {
 			changed = true
-			newProps := *result.AdditionalProperties
-			newProps.Schema = populated
-			result.AdditionalProperties = &newProps
+			result.AdditionalProperties.Schema = populated
 		}
 	}
 	// schema is a list, populate its items
@@ -99,9 +97,7 @@ func populateRefs(schemaOf func(ref string) (*spec.Schema, bool), visited sets.S
 		}
 		if populated != result.Items.Schema {
 			changed = true
-			newItems := *result.Items
-			newItems.Schema = populated
-			result.Items = &newItems
+			result.Items.Schema = populated
 		}
 	}
 	if changed {

@@ -56,18 +56,16 @@ var (
 	}
 )
 
-// SetInitDynamicDefaults checks and sets configuration values for the InitConfiguration object.
-func SetInitDynamicDefaults(cfg *kubeadmapi.InitConfiguration, skipCRIDetect, skipAPIEndpoint bool) error {
+// SetInitDynamicDefaults checks and sets configuration values for the InitConfiguration object
+func SetInitDynamicDefaults(cfg *kubeadmapi.InitConfiguration, skipCRIDetect bool) error {
 	if err := SetBootstrapTokensDynamicDefaults(&cfg.BootstrapTokens); err != nil {
 		return err
 	}
 	if err := SetNodeRegistrationDynamicDefaults(&cfg.NodeRegistration, true, skipCRIDetect); err != nil {
 		return err
 	}
-	if !skipAPIEndpoint {
-		if err := SetAPIEndpointDynamicDefaults(&cfg.LocalAPIEndpoint); err != nil {
-			return err
-		}
+	if err := SetAPIEndpointDynamicDefaults(&cfg.LocalAPIEndpoint); err != nil {
+		return err
 	}
 	return SetClusterDynamicDefaults(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, &cfg.NodeRegistration)
 }
@@ -247,7 +245,7 @@ func DefaultedInitConfiguration(versionedInitCfg *kubeadmapiv1.InitConfiguration
 	}
 
 	// Applies dynamic defaults to settings not provided with flags
-	if err := SetInitDynamicDefaults(internalcfg, opts.SkipCRIDetect, false); err != nil {
+	if err := SetInitDynamicDefaults(internalcfg, opts.SkipCRIDetect); err != nil {
 		return nil, err
 	}
 	// Validates cfg (flags/configs + defaults + dynamic defaults)
@@ -402,7 +400,7 @@ func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecat
 	}
 
 	// Applies dynamic defaults to settings not provided with flags
-	if err := SetInitDynamicDefaults(initcfg, skipCRIDetect, false); err != nil {
+	if err := SetInitDynamicDefaults(initcfg, skipCRIDetect); err != nil {
 		return nil, err
 	}
 

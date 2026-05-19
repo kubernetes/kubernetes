@@ -28,12 +28,12 @@ import (
 )
 
 const (
-	// ContainerTopologyScope specifies the TopologyManagerScope per container.
-	ContainerTopologyScope = "container"
-	// PodTopologyScope specifies the TopologyManagerScope per pod.
-	PodTopologyScope = "pod"
+	// containerTopologyScope specifies the TopologyManagerScope per container.
+	containerTopologyScope = "container"
+	// podTopologyScope specifies the TopologyManagerScope per pod.
+	podTopologyScope = "pod"
 	// noneTopologyScope specifies the TopologyManagerScope when topologyPolicyName is none.
-	NoneTopologyScope = "none"
+	noneTopologyScope = "none"
 )
 
 type podTopologyHints map[string]map[string]TopologyHint
@@ -151,20 +151,10 @@ func (s *scope) admitPolicyNone(pod *v1.Pod) lifecycle.PodAdmitResult {
 }
 
 // It would be better to implement this function in topologymanager instead of scope
-// but topologymanager does not track providers anymore
+// but topologymanager do not track providers anymore
 func (s *scope) allocateAlignedResources(pod *v1.Pod, container *v1.Container) error {
 	for _, provider := range s.hintProviders {
 		err := provider.Allocate(pod, container)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s *scope) allocatePodAlignedResources(pod *v1.Pod) error {
-	for _, provider := range s.hintProviders {
-		err := provider.AllocatePod(pod)
 		if err != nil {
 			return err
 		}

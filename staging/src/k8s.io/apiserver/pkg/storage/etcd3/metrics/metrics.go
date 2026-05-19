@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
-	storagemetrics "k8s.io/apiserver/pkg/storage/metrics"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -113,22 +112,13 @@ var (
 			Subsystem:      "apiserver",
 			Name:           "storage_events_received_total",
 			Help:           "Number of etcd events received split by kind.",
-			StabilityLevel: compbasemetrics.BETA,
+			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"group", "resource"},
 	)
 	etcdBookmarkCounts = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
-			Name:              "etcd_bookmark_counts",
-			Help:              "Number of etcd bookmarks (progress notify events) split by kind.",
-			StabilityLevel:    compbasemetrics.ALPHA,
-			DeprecatedVersion: "1.36.0",
-		},
-		[]string{"group", "resource"},
-	)
-	etcdBookmarkTotal = compbasemetrics.NewCounterVec(
-		&compbasemetrics.CounterOpts{
-			Name:           "etcd_bookmark_total",
+			Name:           "etcd_bookmark_counts",
 			Help:           "Number of etcd bookmarks (progress notify events) split by kind.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
@@ -142,6 +132,38 @@ var (
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{},
+	)
+	listStorageCount = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_storage_list_total",
+			Help:           "Number of LIST requests served from storage",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+	listStorageNumFetched = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_storage_list_fetched_objects_total",
+			Help:           "Number of objects read from storage in the course of serving a LIST request",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+	listStorageNumSelectorEvals = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_storage_list_evaluated_objects_total",
+			Help:           "Number of objects tested in the course of serving a LIST request from storage",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
+	)
+	listStorageNumReturned = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_storage_list_returned_objects_total",
+			Help:           "Number of objects returned for a LIST request from storage",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "resource"},
 	)
 	decodeErrorCounts = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
@@ -170,8 +192,11 @@ func Register() {
 		legacyregistry.CustomMustRegister(storageMonitor)
 		legacyregistry.MustRegister(etcdEventsReceivedCounts)
 		legacyregistry.MustRegister(etcdBookmarkCounts)
-		legacyregistry.MustRegister(etcdBookmarkTotal)
 		legacyregistry.MustRegister(etcdLeaseObjectCounts)
+		legacyregistry.MustRegister(listStorageCount)
+		legacyregistry.MustRegister(listStorageNumFetched)
+		legacyregistry.MustRegister(listStorageNumSelectorEvals)
+		legacyregistry.MustRegister(listStorageNumReturned)
 		legacyregistry.MustRegister(decodeErrorCounts)
 	})
 }
@@ -221,10 +246,9 @@ func RecordEtcdEvent(groupResource schema.GroupResource) {
 	etcdEventsReceivedCounts.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
 }
 
-// RecordEtcdBookmark updates the etcd_bookmark_total metric.
+// RecordEtcdBookmark updates the etcd_bookmark_counts metric.
 func RecordEtcdBookmark(groupResource schema.GroupResource) {
 	etcdBookmarkCounts.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
-	etcdBookmarkTotal.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
 }
 
 // RecordDecodeError sets the storage_decode_errors metrics.
@@ -262,9 +286,12 @@ func UpdateLeaseObjectCount(count int64) {
 	etcdLeaseObjectCounts.WithLabelValues().Observe(float64(count))
 }
 
-// RecordStorageListMetrics notes various metrics of the cost to serve a LIST request.
-func RecordStorageListMetrics(groupResource schema.GroupResource, index string, numFetched, numEvald, numReturned int) {
-	storagemetrics.RecordStorageListMetrics(groupResource, storagemetrics.StorageBackendEtcd, index, numFetched, numEvald, numReturned)
+// RecordListEtcd3Metrics notes various metrics of the cost to serve a LIST request
+func RecordStorageListMetrics(groupResource schema.GroupResource, numFetched, numEvald, numReturned int) {
+	listStorageCount.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
+	listStorageNumFetched.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numFetched))
+	listStorageNumSelectorEvals.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numEvald))
+	listStorageNumReturned.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numReturned))
 }
 
 type Monitor interface {
@@ -314,6 +341,7 @@ func (c *monitorCollector) CollectWithStability(ch chan<- compbasemetrics.Metric
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		metrics, err := m.Monitor(ctx)
 		cancel()
+		m.Close()
 		if err != nil {
 			klog.InfoS("Failed to get storage metrics", "storage_cluster_id", storageClusterID, "err", err)
 			continue

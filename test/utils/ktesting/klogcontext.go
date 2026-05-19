@@ -18,15 +18,59 @@ package ktesting
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
 var timeNow = time.Now // Can be stubbed out for testing.
 
-func klogHeader() string {
+// withKlogHeader creates a TB where the same "I<date> <time>]" prefix
+// gets added to all log output, just as in the klog test logger.
+// This is used internally when constructing a TContext for unit testing.
+func withKlogHeader(tb TB) TB {
+	return klogTB{
+		TB: tb,
+	}
+}
+
+type klogTB struct {
+	TB
+}
+
+func (k klogTB) Log(args ...any) {
+	k.Helper()
+	k.TB.Log(header() + strings.TrimSpace(fmt.Sprintln(args...)))
+}
+
+func (k klogTB) Logf(format string, args ...any) {
+	k.Helper()
+	k.TB.Log(header() + strings.TrimSpace(fmt.Sprintf(format, args...)))
+}
+
+func (k klogTB) Error(args ...any) {
+	k.Helper()
+	k.TB.Error(header() + strings.TrimSpace(fmt.Sprintln(args...)))
+}
+
+func (k klogTB) Errorf(format string, args ...any) {
+	k.Helper()
+	k.TB.Error(header() + strings.TrimSpace(fmt.Sprintf(format, args...)))
+}
+
+func (k klogTB) Fatal(args ...any) {
+	k.Helper()
+	k.TB.Fatal(header() + strings.TrimSpace(fmt.Sprintln(args...)))
+}
+
+func (k klogTB) Fatalf(format string, args ...any) {
+	k.Helper()
+	k.TB.Fatal(header() + strings.TrimSpace(fmt.Sprintf(format, args...)))
+}
+
+func header() string {
 	now := timeNow()
 	_, month, day := now.Date()
 	hour, minute, second := now.Clock()
-	return fmt.Sprintf("I%02d%02d %02d:%02d:%02d.%06d]",
+	return fmt.Sprintf("I%02d%02d %02d:%02d:%02d.%06d] ",
 		month, day, hour, minute, second, now.Nanosecond()/1000)
 }

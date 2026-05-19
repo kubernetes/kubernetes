@@ -55,11 +55,9 @@ func TestTerminationOrderingSidecarStopAfterMain(t *testing.T) {
 
 	var wg sync.WaitGroup
 	wg.Add(1)
-	var sidecarWaitDelay, mainWaitDelay int64
-	syncChannel := make(chan struct{})
-
+	var sidecarWaitDelay int64
+	var mainWaitDelay int64
 	go func() {
-		close(syncChannel) // notifies other goroutine that this goroutine scheduled.
 		sidecarWaitDelay = int64(to.waitForTurn("init", 30))
 		to.containerTerminated("init")
 		wg.Done()
@@ -67,7 +65,6 @@ func TestTerminationOrderingSidecarStopAfterMain(t *testing.T) {
 
 	wg.Add(1)
 	go func() {
-		<-syncChannel // make sure the other goroutine is scheduled.
 		mainWaitDelay = int64(to.waitForTurn("main", 0))
 		time.Sleep(1 * time.Second)
 		to.containerTerminated("main")

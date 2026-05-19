@@ -7,7 +7,12 @@
           "nodeSelectorTerms": {
             "description": "Required. A list of node selector terms. The terms are ORed.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorTerm"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorTerm"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -35,6 +40,7 @@
           "values": {
             "description": "An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. If the operator is Gt or Lt, the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch.",
             "items": {
+              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -53,7 +59,12 @@
           "matchExpressions": {
             "description": "A list of node selector requirements by node's labels.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorRequirement"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorRequirement"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -61,7 +72,12 @@
           "matchFields": {
             "description": "A list of node selector requirements by node's fields.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorRequirement"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.core.v1.NodeSelectorRequirement"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -76,7 +92,12 @@
           "conditions": {
             "description": "Conditions contains the latest observation of the device's state. If the device has been configured according to the class and claim config references, the `Ready` condition should be True.\n\nMust not contain more than 8 entries.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-map-keys": [
@@ -136,7 +157,7 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
               }
             ],
-            "description": "AllocationTimestamp stores the time when the resources were allocated. This field is not guaranteed to be set, in which case that time is unknown.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gate."
+            "description": "AllocationTimestamp stores the time when the resources were allocated. This field is not guaranteed to be set, in which case that time is unknown.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gate."
           },
           "devices": {
             "allOf": [
@@ -171,34 +192,46 @@
           },
           "attributes": {
             "additionalProperties": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceAttribute"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceAttribute"
+                }
+              ],
+              "default": {}
             },
             "description": "Attributes defines the set of attributes for this device. The name of each attribute must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
             "type": "object"
           },
           "bindingConditions": {
-            "description": "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
+            "description": "BindingConditions defines the conditions for proceeding with binding. All of these conditions must be set in the per-device status conditions with a value of True to proceed with binding the pod to the node while scheduling the pod.\n\nThe maximum number of binding conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
             "items": {
+              "default": "",
               "type": "string"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
           },
           "bindingFailureConditions": {
-            "description": "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
+            "description": "BindingFailureConditions defines the conditions for binding failure. They may be set in the per-device status conditions. If any is true, a binding failure occurred.\n\nThe maximum number of binding failure conditions is 4.\n\nThe conditions must be a valid condition type string.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
             "items": {
+              "default": "",
               "type": "string"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
           },
           "bindsToNode": {
-            "description": "BindsToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim. If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector to match the node where the allocation was made.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
+            "description": "BindsToNode indicates if the usage of an allocation involving this device has to be limited to exactly the node that was chosen when allocating the claim. If set to true, the scheduler will set the ResourceClaim.Status.Allocation.NodeSelector to match the node where the allocation was made.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
             "type": "boolean"
           },
           "capacity": {
             "additionalProperties": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceCapacity"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceCapacity"
+                }
+              ],
+              "default": {}
             },
             "description": "Capacity defines the set of capacities for this device. The name of each capacity must be unique in that set.\n\nThe maximum number of attributes and capacities combined is 32.",
             "type": "object"
@@ -206,17 +239,15 @@
           "consumesCounters": {
             "description": "ConsumesCounters defines a list of references to sharedCounters and the set of counters that the device will consume from those counter sets.\n\nThere can only be a single entry per counterSet.\n\nThe maximum number of device counter consumptions per device is 2.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceCounterConsumption"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceCounterConsumption"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
-          },
-          "nodeAllocatableResourceMappings": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.NodeAllocatableResourceMapping"
-            },
-            "description": "NodeAllocatableResourceMappings defines the mapping of node resources that are managed by the DRA driver exposing this device. This includes resources currently reported in v1.Node `status.allocatable` that are not extended resources (see https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#extended-resources). Examples include \"cpu\", \"memory\", \"ephemeral-storage\", and hugepages. In addition to standard requests made through the Pod `spec`, these resources can also be requested through claims and allocated by the DRA driver. For example, a CPU DRA driver might allocate exclusive CPUs or auxiliary node memory dependencies of an accelerator device. The keys of this map are the node-allocatable resource names (e.g., \"cpu\", \"memory\"). Extended resource names are not permitted as keys.",
-            "type": "object"
           },
           "nodeName": {
             "description": "NodeName identifies the node where the device is available.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set.",
@@ -231,9 +262,14 @@
             "description": "NodeSelector defines the nodes where the device is available.\n\nMust use exactly one term.\n\nMust only be set if Spec.PerDeviceNodeSelection is set to true. At most one of NodeName, NodeSelector and AllNodes can be set."
           },
           "taints": {
-            "description": "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 16. If taints are set for any device in a ResourceSlice, then the maximum number of allowed devices per ResourceSlice is 64 instead of 128.\n\nThis is a beta field and requires enabling the DRADeviceTaints feature gate.",
+            "description": "If specified, these are the driver-defined taints.\n\nThe maximum number of taints is 16. If taints are set for any device in a ResourceSlice, then the maximum number of allowed devices per ResourceSlice is 64 instead of 128.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceTaint"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceTaint"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -246,7 +282,7 @@
         "properties": {
           "expression": {
             "default": "",
-            "description": "Expression is a CEL expression which evaluates a single device. It must evaluate to true when the device under consideration satisfies the desired criteria, and false when it does not. Any other result is an error and causes allocation of devices to abort.\n\nThe expression's input is an object named \"device\", which carries the following properties:\n - driver (string): the name of the driver which defines this device.\n - attributes (map[string]object): the device's attributes, grouped by prefix\n   (e.g. device.attributes[\"dra.example.com\"] evaluates to an object with all\n   of the attributes which were prefixed by \"dra.example.com\").\n - capacity (map[string]object): the device's capacities, grouped by prefix.\n - allowMultipleAllocations (bool): the allowMultipleAllocations property of the device\n   (v1.34+ with the DRAConsumableCapacity feature enabled).\n\nExample: Consider a device with driver=\"dra.example.com\", which exposes two attributes named \"model\" and \"ext.example.com/family\" and which exposes one capacity named \"modules\". This input to this expression would have the following fields:\n\n    device.driver\n    device.attributes[\"dra.example.com\"].model\n    device.attributes[\"ext.example.com\"].family\n    device.capacity[\"dra.example.com\"].modules\n\nThe device.driver field can be used to check for a specific driver, either as a high-level precondition (i.e. you only want to consider devices from this driver) or as part of a multi-clause expression that is meant to consider devices from different drivers.\n\nThe value type of each attribute is defined by the device definition, and users who write these expressions must consult the documentation for their specific drivers. The value type of each capacity is Quantity.\n\nIf an unknown prefix is used as a lookup in either device.attributes or device.capacity, an empty map will be returned. Any reference to an unknown field will cause an evaluation error and allocation to abort.\n\nA robust expression should check for the existence of attributes before referencing them.\n\nCommon errors: - \"no such key\": Use optional chaining (.? followed by orValue())\n  or guarding the check with has() for optional fields.\n  See CEL Optional Types for details:\n  https://pkg.go.dev/github.com/google/cel-go@v0.17.4/cel#OptionalTypes\n\nFor more CEL expression syntax and examples, see: https://kubernetes.io/docs/reference/using-api/cel/\n\nFor ease of use, the cel.bind() function is enabled, and can be used to simplify expressions that access multiple attributes with the same domain. For example:\n\n    cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)\n\nWhen the DRAListTypeAttributes feature gate is enabled, the includes() helper is available and it can work for both scalar and list-type attributes. It was introduced to support smooth migration from scalar attributes to list-type attributes while keeping CEL expressions simple. For example:\n\n    device.attributes[\"dra.example.com\"].models.includes(\"some-model\")\n\nThe length of the expression must be smaller or equal to 10 Ki. The cost of evaluating it is also limited based on the estimated number of logical steps.",
+            "description": "Expression is a CEL expression which evaluates a single device. It must evaluate to true when the device under consideration satisfies the desired criteria, and false when it does not. Any other result is an error and causes allocation of devices to abort.\n\nThe expression's input is an object named \"device\", which carries the following properties:\n - driver (string): the name of the driver which defines this device.\n - attributes (map[string]object): the device's attributes, grouped by prefix\n   (e.g. device.attributes[\"dra.example.com\"] evaluates to an object with all\n   of the attributes which were prefixed by \"dra.example.com\".\n - capacity (map[string]object): the device's capacities, grouped by prefix.\n - allowMultipleAllocations (bool): the allowMultipleAllocations property of the device\n   (v1.34+ with the DRAConsumableCapacity feature enabled).\n\nExample: Consider a device with driver=\"dra.example.com\", which exposes two attributes named \"model\" and \"ext.example.com/family\" and which exposes one capacity named \"modules\". This input to this expression would have the following fields:\n\n    device.driver\n    device.attributes[\"dra.example.com\"].model\n    device.attributes[\"ext.example.com\"].family\n    device.capacity[\"dra.example.com\"].modules\n\nThe device.driver field can be used to check for a specific driver, either as a high-level precondition (i.e. you only want to consider devices from this driver) or as part of a multi-clause expression that is meant to consider devices from different drivers.\n\nThe value type of each attribute is defined by the device definition, and users who write these expressions must consult the documentation for their specific drivers. The value type of each capacity is Quantity.\n\nIf an unknown prefix is used as a lookup in either device.attributes or device.capacity, an empty map will be returned. Any reference to an unknown field will cause an evaluation error and allocation to abort.\n\nA robust expression should check for the existence of attributes before referencing them.\n\nFor ease of use, the cel.bind() function is enabled, and can be used to simplify expressions that access multiple attributes with the same domain. For example:\n\n    cel.bind(dra, device.attributes[\"dra.example.com\"], dra.someBool && dra.anotherBool)\n\nThe length of the expression must be smaller or equal to 10 Ki. The cost of evaluating it is also limited based on the estimated number of logical steps.",
             "type": "string"
           }
         },
@@ -353,7 +389,12 @@
         "properties": {
           "counters": {
             "additionalProperties": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.Counter"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.Counter"
+                }
+              ],
+              "default": {}
             },
             "description": "Counters defines the set of counters for this CounterSet The name of each counter must be unique in that set and must be a DNS label.\n\nThe maximum number of counters is 32.",
             "type": "object"
@@ -406,6 +447,7 @@
           "requests": {
             "description": "Requests lists the names of requests where the configuration applies. If empty, its applies to all requests.\n\nReferences to subrequests must include the name of the main request and may include the subrequest using the format <main request>[/<subrequest>]. If just the main request is given, the configuration applies to all subrequests.",
             "items": {
+              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -428,7 +470,12 @@
           "config": {
             "description": "This field is a combination of all the claim and class configuration parameters. Drivers can distinguish between those based on a flag.\n\nThis includes configuration parameters for drivers which have no allocated devices in the result because it is up to the drivers which configuration parameters they support. They can silently ignore unknown configuration parameters.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceAllocationConfiguration"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceAllocationConfiguration"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -436,7 +483,12 @@
           "results": {
             "description": "Results lists all allocated devices.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceRequestAllocationResult"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceRequestAllocationResult"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -451,51 +503,18 @@
             "description": "BoolValue is a true/false value.",
             "type": "boolean"
           },
-          "bools": {
-            "description": "BoolValues is a non-empty list of true/false values.",
-            "items": {
-              "type": "boolean"
-            },
-            "type": "array",
-            "x-kubernetes-list-type": "atomic"
-          },
           "int": {
             "description": "IntValue is a number.",
             "format": "int64",
             "type": "integer"
           },
-          "ints": {
-            "description": "IntValues is a non-empty list of numbers.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
-            "items": {
-              "format": "int64",
-              "type": "integer"
-            },
-            "type": "array",
-            "x-kubernetes-list-type": "atomic"
-          },
           "string": {
             "description": "StringValue is a string. Must not be longer than 64 characters.",
             "type": "string"
           },
-          "strings": {
-            "description": "StringValues is a non-empty list of strings. Each string must not be longer than 64 characters.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "x-kubernetes-list-type": "atomic"
-          },
           "version": {
             "description": "VersionValue is a semantic version according to semver.org spec 2.0.0. Must not be longer than 64 characters.",
             "type": "string"
-          },
-          "versions": {
-            "description": "VersionValues is a non-empty list of semantic versions according to semver.org spec 2.0.0. Each version string must not be longer than 64 characters.\n\nThis is an alpha field and requires enabling the DRAListTypeAttributes feature gate.",
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "x-kubernetes-list-type": "atomic"
           }
         },
         "type": "object"
@@ -531,7 +550,12 @@
           "config": {
             "description": "This field holds configuration for multiple potential drivers which could satisfy requests in this claim. It is ignored while allocating the claim.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceClaimConfiguration"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceClaimConfiguration"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -539,7 +563,12 @@
           "constraints": {
             "description": "These constraints must be satisfied by the set of devices that get allocated for the claim.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceConstraint"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceConstraint"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -547,7 +576,12 @@
           "requests": {
             "description": "Requests represent individual requests for distinct devices which must all be satisfied. If empty, nothing needs to be allocated.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceRequest"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceRequest"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -569,6 +603,7 @@
           "requests": {
             "description": "Requests lists the names of requests where the configuration applies. If empty, it applies to all requests.\n\nReferences to subrequests must include the name of the main request and may include the subrequest using the format <main request>[/<subrequest>]. If just the main request is given, the configuration applies to all subrequests.",
             "items": {
+              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -607,6 +642,9 @@
             "description": "Spec defines what can be allocated and how to configure it.\n\nThis is mutable. Consumers have to be prepared for classes changing at any time, either because they get updated or replaced. Claim allocations are done once based on whatever was set in classes at the time of allocation.\n\nChanging the spec automatically increments the metadata.generation number."
           }
         },
+        "required": [
+          "spec"
+        ],
         "type": "object",
         "x-kubernetes-group-version-kind": [
           {
@@ -640,7 +678,12 @@
           "items": {
             "description": "Items is the list of resource classes.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceClass"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceClass"
+                }
+              ],
+              "default": {}
             },
             "type": "array"
           },
@@ -676,19 +719,29 @@
           "config": {
             "description": "Config defines configuration parameters that apply to each device that is claimed via this class. Some classses may potentially be satisfied by multiple drivers, so each instance of a vendor configuration applies to exactly one driver.\n\nThey are passed to the driver, but are not considered while allocating the claim.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceClassConfiguration"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceClassConfiguration"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
           },
           "extendedResourceName": {
-            "description": "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is a beta field.",
+            "description": "ExtendedResourceName is the extended resource name for the devices of this class. The devices of this class can be used to satisfy a pod's extended resource requests. It has the same format as the name of a pod's extended resource. It should be unique among all the device classes in a cluster. If two device classes have the same name, then the class created later is picked to satisfy a pod's extended resource requests. If two classes are created at the same time, then the name of the class lexicographically sorted first is picked.\n\nThis is an alpha field.",
             "type": "string"
           },
           "selectors": {
             "description": "Each selector must be satisfied by a device which is claimed via this class.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceSelector"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceSelector"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -700,16 +753,17 @@
         "description": "DeviceConstraint must have exactly one field set besides Requests.",
         "properties": {
           "distinctAttribute": {
-            "description": "DistinctAttribute requires that all devices in question have this attribute and that its type and value are unique across those devices.\n\nWhen the DRAListTypeAttributes feature gate is enabled, comparison uses set semantics (i.e., element order and duplicates are ignored): list-valued attributes must be pairwise disjoint across devices. Scalar values are treated as singleton sets for backward compatibility.\n\nThis acts as the inverse of MatchAttribute.\n\nThis constraint is used to avoid allocating multiple requests to the same device by ensuring attribute-level differentiation.\n\nThis is useful for scenarios where resource requests must be fulfilled by separate physical devices. For example, a container requests two network interfaces that must be allocated from two different physical NICs.",
+            "description": "DistinctAttribute requires that all devices in question have this attribute and that its type and value are unique across those devices.\n\nThis acts as the inverse of MatchAttribute.\n\nThis constraint is used to avoid allocating multiple requests to the same device by ensuring attribute-level differentiation.\n\nThis is useful for scenarios where resource requests must be fulfilled by separate physical devices. For example, a container requests two network interfaces that must be allocated from two different physical NICs.",
             "type": "string"
           },
           "matchAttribute": {
-            "description": "MatchAttribute requires that all devices in question have this attribute and that its type and value are the same across those devices.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.\n\nWhen the DRAListTypeAttributes feature gate is enabled, comparison uses set semantics(i.e., element order and duplicates are ignored): list-valued attributes match when the intersection across all devices is non-empty. Scalar values are treated as singleton sets for backward compatibility.\n\nMust include the domain qualifier.",
+            "description": "MatchAttribute requires that all devices in question have this attribute and that its type and value are the same across those devices.\n\nFor example, if you specified \"dra.example.com/numa\" (a hypothetical example!), then only devices in the same NUMA node will be chosen. A device which does not have that attribute will not be chosen. All devices should use a value of the same type for this attribute because that is part of its specification, but if one device doesn't, then it also will not be chosen.\n\nMust include the domain qualifier.",
             "type": "string"
           },
           "requests": {
             "description": "Requests is a list of the one or more requests in this claim which must co-satisfy this constraint. If a request is fulfilled by multiple devices, then all of the devices must satisfy the constraint. If this is not specified, this constraint applies to all requests in this claim.\n\nReferences to subrequests must include the name of the main request and may include the subrequest using the format <main request>[/<subrequest>]. If just the main request is given, the constraint applies to all subrequests.",
             "items": {
+              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -728,7 +782,12 @@
           },
           "counters": {
             "additionalProperties": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.Counter"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.Counter"
+                }
+              ],
+              "default": {}
             },
             "description": "Counters defines the counters that will be consumed by the device.\n\nThe maximum number of counters is 32.",
             "type": "object"
@@ -772,7 +831,12 @@
           "firstAvailable": {
             "description": "FirstAvailable contains subrequests, of which exactly one will be satisfied by the scheduler to satisfy this request. It tries to satisfy them in the order in which they are listed here. So if there are two entries in the list, the scheduler will only check the second one if it determines that the first one cannot be used.\n\nThis field may only be set in the entries of DeviceClaim.Requests.\n\nDRA does not yet implement scoring, so the scheduler will select the first set of devices that satisfies all the requests in the claim. And if the requirements can be satisfied on more than one node, other scheduling features will determine which node is chosen. This means that the set of devices allocated to a claim might not be the optimal set available to the cluster. Scoring will be implemented later.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceSubRequest"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceSubRequest"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -785,15 +849,25 @@
           "selectors": {
             "description": "Selectors define criteria which must be satisfied by a specific device in order for that device to be considered for this request. All selectors must be satisfied for a device to be considered.\n\nThis field can only be set when deviceClassName is set and no subrequests are specified in the firstAvailable list.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceSelector"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceSelector"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
           },
           "tolerations": {
-            "description": "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis field can only be set when deviceClassName is set and no subrequests are specified in the firstAvailable list.\n\nThis is a beta field and requires enabling the DRADeviceTaints feature gate.",
+            "description": "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis field can only be set when deviceClassName is set and no subrequests are specified in the firstAvailable list.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceToleration"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceToleration"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -812,16 +886,18 @@
             "type": "boolean"
           },
           "bindingConditions": {
-            "description": "BindingConditions contains a copy of the BindingConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
+            "description": "BindingConditions contains a copy of the BindingConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
             "items": {
+              "default": "",
               "type": "string"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
           },
           "bindingFailureConditions": {
-            "description": "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is a beta field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
+            "description": "BindingFailureConditions contains a copy of the BindingFailureConditions from the corresponding ResourceSlice at the time of allocation.\n\nThis is an alpha field and requires enabling the DRADeviceBindingConditions and DRAResourceClaimDeviceStatus feature gates.",
             "items": {
+              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -859,9 +935,14 @@
             "type": "string"
           },
           "tolerations": {
-            "description": "A copy of all tolerations specified in the request at the time when the device got allocated.\n\nThe maximum number of tolerations is 16.\n\nThis is a beta field and requires enabling the DRADeviceTaints feature gate.",
+            "description": "A copy of all tolerations specified in the request at the time when the device got allocated.\n\nThe maximum number of tolerations is 16.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceToleration"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceToleration"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -922,15 +1003,25 @@
           "selectors": {
             "description": "Selectors define criteria which must be satisfied by a specific device in order for that device to be considered for this subrequest. All selectors must be satisfied for a device to be considered.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceSelector"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceSelector"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
           },
           "tolerations": {
-            "description": "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis is a beta field and requires enabling the DRADeviceTaints feature gate.",
+            "description": "If specified, the request's tolerations.\n\nTolerations for NoSchedule are required to allocate a device which has a taint with that effect. The same applies to NoExecute.\n\nIn addition, should any of the allocated devices get tainted with NoExecute after allocation and that effect is not tolerated, then all pods consuming the ResourceClaim get deleted to evict them. The scheduler will not let new pods reserve the claim while it has these tainted devices. Once all pods are evicted, the claim will get deallocated.\n\nThe maximum number of tolerations is 16.\n\nThis is an alpha field and requires enabling the DRADeviceTaints feature gate.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceToleration"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.DeviceToleration"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -961,7 +1052,7 @@
                 "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.Time"
               }
             ],
-            "description": "TimeAdded represents the time at which the taint was added or (only in a DeviceTaintRule) the effect was modified. Added automatically during create or update if not set.\n\nIn addition, in a DeviceTaintRule a value provided during an update gets replaced with the current time if the provided value is the same as the old one and the new effect is different. Changing the key and/or value while keeping the effect unchanged is possible and does not update the time stamp because the eviction which uses it is either already started (NoExecute) or not started yet (NoEffect, NoSchedule)."
+            "description": "TimeAdded represents the time at which the taint was added. Added automatically during create or update if not set."
           },
           "value": {
             "description": "The taint value corresponding to the taint key. Must be a label value.",
@@ -1006,38 +1097,21 @@
         "description": "NetworkDeviceData provides network-related details for the allocated device. This information may be filled by drivers or other components to configure or identify the device within a network context.",
         "properties": {
           "hardwareAddress": {
-            "description": "HardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.\n\nMust not be longer than 128 bytes.",
+            "description": "HardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.\n\nMust not be longer than 128 characters.",
             "type": "string"
           },
           "interfaceName": {
-            "description": "InterfaceName specifies the name of the network interface associated with the allocated device. This might be the name of a physical or virtual network interface being configured in the pod.\n\nMust not be longer than 256 bytes.",
+            "description": "InterfaceName specifies the name of the network interface associated with the allocated device. This might be the name of a physical or virtual network interface being configured in the pod.\n\nMust not be longer than 256 characters.",
             "type": "string"
           },
           "ips": {
             "description": "IPs lists the network addresses assigned to the device's network interface. This can include both IPv4 and IPv6 addresses. The IPs are in the CIDR notation, which includes both the address and the associated subnet mask. e.g.: \"192.0.2.5/24\" for IPv4 and \"2001:db8::5/64\" for IPv6.\n\nMust not contain more than 16 entries.",
             "items": {
+              "default": "",
               "type": "string"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
-          }
-        },
-        "type": "object"
-      },
-      "io.k8s.api.resource.v1beta1.NodeAllocatableResourceMapping": {
-        "description": "NodeAllocatableResourceMapping defines the translation between the DRA device/capacity units requested to the corresponding quantity of the node allocatable resource.",
-        "properties": {
-          "allocationMultiplier": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.api.resource.Quantity"
-              }
-            ],
-            "description": "AllocationMultiplier is used as a multiplier for the allocated device count or the allocated capacity in the claim. It defaults to 1 if not specified. How the field is used also depends on whether `capacityKey` is set. 1.  If `capacityKey` is NOT set: `allocationMultiplier` multiplies the device count allocated to the claim.\n\t   a. A DRA driver representing each CPU core as a device would have\n       {ResourceName: \"cpu\", allocationMultiplier: \"2\"} in its\n       `nodeAllocatableResourceMappings`. If 4 devices are allocated to the claim,\n\t\t  4 * 2 CPUs would be considered as allocated and subtracted from the node's capacity.\n    b. A GPU device that needs additional node memory per GPU allocation would\n       have {ResourceName: \"memory\", allocationMultiplier: \"2Gi\"}.  Each allocated\n\t\t  GPU device instance of this type will account for 2Gi of memory.\n\n2.  If `capacityKey` IS set: `allocationMultiplier` is multiplied by the amount of that capacity consumed.\n\t   The final node allocatable resource amount is `consumedCapacity[capacityKey]` * `allocationMultiplier`.\n    For example, if a Device's capacity \"dra.example.com/cores\" is consumed,\n    and each \"core\" provides 2 \"cpu\"s, the mapping would be:\n    {ResourceName: \"cpu\", capacityKey: \"dra.example.com/cores\", allocationMultiplier: \"2\"}.\n    If a claim consumes 8 \"dra.example.com/cores\", the CPU footprint is 8 * 2 = 16."
-          },
-          "capacityKey": {
-            "description": "CapacityKey references a capacity name defined as a key in the `spec.devices[*].capacity` map. When this field is set, the value associated with this key in the `status.allocation.devices.results[*].consumedCapacity` map (for a specific claim allocation) determines the base quantity for the node allocatable resource. If `allocationMultiplier` is also set, it is multiplied with the base quantity. For example, if `spec.devices[*].capacity` has an entry \"dra.example.com/memory\": \"128Gi\", and this field is set to \"dra.example.com/memory\", then for a claim allocation that consumes { \"dra.example.com/memory\": \"4Gi\" } the base quantity for the node allocatable resource mapping will be \"4Gi\", and `allocationMultiplier` should be omitted or set to \"1\".",
-            "type": "string"
           }
         },
         "type": "object"
@@ -1104,6 +1178,9 @@
             "description": "Status describes whether the claim is ready to use and what has been allocated."
           }
         },
+        "required": [
+          "spec"
+        ],
         "type": "object",
         "x-kubernetes-group-version-kind": [
           {
@@ -1153,7 +1230,12 @@
           "items": {
             "description": "Items is the list of resource claims.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.ResourceClaim"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.ResourceClaim"
+                }
+              ],
+              "default": {}
             },
             "type": "array"
           },
@@ -1212,7 +1294,12 @@
           "devices": {
             "description": "Devices contains the status of each device allocated for this claim, as reported by the driver. This can include driver-specific information. Entries are owned by their respective drivers.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.AllocatedDeviceStatus"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.AllocatedDeviceStatus"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-map-keys": [
@@ -1226,7 +1313,12 @@
           "reservedFor": {
             "description": "ReservedFor indicates which entities are currently allowed to use the claim. A Pod which references a ResourceClaim which is not reserved for that Pod will not be started. A claim that is in use or might be in use because it has been reserved must not get deallocated.\n\nIn a cluster with multiple scheduler instances, two pods might get scheduled concurrently by different schedulers. When they reference the same ResourceClaim which already has reached its maximum number of consumers, only one pod can be scheduled.\n\nBoth schedulers try to add their pod to the claim.status.reservedFor field, but only the update that reaches the API server first gets stored. The other one fails with an error and the scheduler which issued it knows that it must put the pod back into the queue, waiting for the ResourceClaim to become usable again.\n\nThere can be at most 256 such reservations. This may get increased in the future, but not reduced.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.ResourceClaimConsumerReference"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.ResourceClaimConsumerReference"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-map-keys": [
@@ -1269,6 +1361,9 @@
             "description": "Describes the ResourceClaim that is to be generated.\n\nThis field is immutable. A ResourceClaim will get created by the control plane for a Pod when needed and then not get updated anymore."
           }
         },
+        "required": [
+          "spec"
+        ],
         "type": "object",
         "x-kubernetes-group-version-kind": [
           {
@@ -1288,7 +1383,12 @@
           "items": {
             "description": "Items is the list of resource claim templates.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.ResourceClaimTemplate"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.ResourceClaimTemplate"
+                }
+              ],
+              "default": {}
             },
             "type": "array"
           },
@@ -1340,6 +1440,9 @@
             "description": "Spec for the ResourceClaim. The entire content is copied unchanged into the ResourceClaim that gets created from this template. The same fields as in a ResourceClaim are also valid here."
           }
         },
+        "required": [
+          "spec"
+        ],
         "type": "object"
       },
       "io.k8s.api.resource.v1beta1.ResourcePool": {
@@ -1422,7 +1525,12 @@
           "items": {
             "description": "Items is the list of resource ResourceSlices.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.ResourceSlice"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.ResourceSlice"
+                }
+              ],
+              "default": {}
             },
             "type": "array"
           },
@@ -1462,7 +1570,12 @@
           "devices": {
             "description": "Devices lists some or all of the devices in this pool.\n\nMust not have more than 128 entries. If any device uses taints or consumes counters the limit is 64.\n\nOnly one of Devices and SharedCounters can be set in a ResourceSlice.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.Device"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.Device"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -1500,7 +1613,12 @@
           "sharedCounters": {
             "description": "SharedCounters defines a list of counter sets, each of which has a name and a list of counters available.\n\nThe names of the counter sets must be unique in the ResourcePool.\n\nOnly one of Devices and SharedCounters can be set in a ResourceSlice.\n\nThe maximum number of counter sets is 8.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.CounterSet"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.api.resource.v1beta1.CounterSet"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -1529,6 +1647,7 @@
           "categories": {
             "description": "categories is a list of the grouped resources this resource belongs to (e.g. 'all')",
             "items": {
+              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -1556,6 +1675,7 @@
           "shortNames": {
             "description": "shortNames is a list of suggested short names of the resource.",
             "items": {
+              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -1573,6 +1693,7 @@
           "verbs": {
             "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",
             "items": {
+              "default": "",
               "type": "string"
             },
             "type": "array"
@@ -1610,7 +1731,12 @@
           "resources": {
             "description": "resources contains the name of the resources and if they are namespaced.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -1685,6 +1811,7 @@
           "dryRun": {
             "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
             "items": {
+              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -1728,7 +1855,307 @@
             "version": "v1"
           },
           {
+            "group": "admission.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "admission.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "admissionregistration.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "admissionregistration.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "admissionregistration.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "apiextensions.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "apiextensions.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "apiregistration.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "apiregistration.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "apps",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "apps",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "apps",
+            "kind": "DeleteOptions",
+            "version": "v1beta2"
+          },
+          {
+            "group": "authentication.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "authentication.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "authentication.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "authorization.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "authorization.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "autoscaling",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "autoscaling",
+            "kind": "DeleteOptions",
+            "version": "v2"
+          },
+          {
+            "group": "autoscaling",
+            "kind": "DeleteOptions",
+            "version": "v2beta1"
+          },
+          {
+            "group": "autoscaling",
+            "kind": "DeleteOptions",
+            "version": "v2beta2"
+          },
+          {
+            "group": "batch",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "batch",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "certificates.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "certificates.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "certificates.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "coordination.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "coordination.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha2"
+          },
+          {
+            "group": "coordination.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "discovery.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "discovery.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "events.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "events.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "extensions",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "flowcontrol.apiserver.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "flowcontrol.apiserver.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "flowcontrol.apiserver.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta2"
+          },
+          {
+            "group": "flowcontrol.apiserver.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta3"
+          },
+          {
+            "group": "imagepolicy.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "internal.apiserver.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "networking.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "networking.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "node.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "node.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "node.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "policy",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "policy",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "rbac.authorization.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "rbac.authorization.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "rbac.authorization.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
             "group": "resource.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "resource.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha3"
+          },
+          {
+            "group": "resource.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "resource.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta2"
+          },
+          {
+            "group": "scheduling.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "scheduling.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "scheduling.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "storage.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1"
+          },
+          {
+            "group": "storage.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "storage.k8s.io",
+            "kind": "DeleteOptions",
+            "version": "v1beta1"
+          },
+          {
+            "group": "storagemigration.k8s.io",
             "kind": "DeleteOptions",
             "version": "v1beta1"
           }
@@ -1757,14 +2184,6 @@
           "selfLink": {
             "description": "Deprecated: selfLink is a legacy read-only field that is no longer populated by the system.",
             "type": "string"
-          },
-          "shardInfo": {
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ShardInfo"
-              }
-            ],
-            "description": "shardInfo is set when the list is a filtered subset of the full collection, as selected by a shard selector on the request. It echoes back the selector so clients can verify which shard they received and merge sharded responses. Clients should not cache sharded list responses as a full representation of the collection.\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate."
           }
         },
         "type": "object"
@@ -1816,6 +2235,7 @@
         "properties": {
           "annotations": {
             "additionalProperties": {
+              "default": "",
               "type": "string"
             },
             "description": "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations",
@@ -1845,6 +2265,7 @@
           "finalizers": {
             "description": "Must be empty before the object is deleted from the registry. Each entry is an identifier for the responsible component that will remove the entry from the list. If the deletionTimestamp of the object is non-nil, entries in this list can only be removed. Finalizers may be processed and removed in any order.  Order is NOT enforced because it introduces significant risk of stuck finalizers. finalizers is a shared field, any actor with permission can reorder it. If the finalizer list is processed in order, then this can lead to a situation in which the component responsible for the first finalizer in the list is waiting for a signal (field value, external system, or other) produced by a component responsible for a finalizer later in the list, resulting in a deadlock. Without enforced ordering finalizers are free to order amongst themselves and are not vulnerable to ordering changes in the list.",
             "items": {
+              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -1862,6 +2283,7 @@
           },
           "labels": {
             "additionalProperties": {
+              "default": "",
               "type": "string"
             },
             "description": "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels",
@@ -1870,7 +2292,12 @@
           "managedFields": {
             "description": "ManagedFields maps workflow-id and version to the set of fields that are managed by that workflow. This is mostly for internal housekeeping, and users typically shouldn't need to set or understand this field. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". The set of fields is always in the version that the workflow used when modifying the object.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -1886,7 +2313,12 @@
           "ownerReferences": {
             "description": "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-map-keys": [
@@ -1970,20 +2402,6 @@
         },
         "type": "object"
       },
-      "io.k8s.apimachinery.pkg.apis.meta.v1.ShardInfo": {
-        "description": "ShardInfo describes the shard selector that was applied to produce a list response. Its presence on a list response indicates the list is a filtered subset.",
-        "properties": {
-          "selector": {
-            "default": "",
-            "description": "selector is the shard selector string from the request, echoed back so clients can verify which shard they received and merge responses from multiple shards.",
-            "type": "string"
-          }
-        },
-        "required": [
-          "selector"
-        ],
-        "type": "object"
-      },
       "io.k8s.apimachinery.pkg.apis.meta.v1.Status": {
         "description": "Status is a return value for calls that don't return other objects.",
         "properties": {
@@ -2063,7 +2481,12 @@
           "causes": {
             "description": "The Causes array includes more details associated with the StatusReason failure. Not all StatusReasons may provide detailed causes.",
             "items": {
-              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.StatusCause"
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.StatusCause"
+                }
+              ],
+              "default": {}
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -2125,14 +2548,314 @@
             "version": "v1"
           },
           {
+            "group": "admission.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "admission.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "admissionregistration.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "admissionregistration.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "admissionregistration.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "apiextensions.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "apiextensions.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "apiregistration.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "apiregistration.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "apps",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "apps",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "apps",
+            "kind": "WatchEvent",
+            "version": "v1beta2"
+          },
+          {
+            "group": "authentication.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "authentication.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "authentication.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "authorization.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "authorization.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "autoscaling",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "autoscaling",
+            "kind": "WatchEvent",
+            "version": "v2"
+          },
+          {
+            "group": "autoscaling",
+            "kind": "WatchEvent",
+            "version": "v2beta1"
+          },
+          {
+            "group": "autoscaling",
+            "kind": "WatchEvent",
+            "version": "v2beta2"
+          },
+          {
+            "group": "batch",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "batch",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "certificates.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "certificates.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "certificates.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "coordination.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "coordination.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha2"
+          },
+          {
+            "group": "coordination.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "discovery.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "discovery.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "events.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "events.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "extensions",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "flowcontrol.apiserver.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "flowcontrol.apiserver.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "flowcontrol.apiserver.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta2"
+          },
+          {
+            "group": "flowcontrol.apiserver.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta3"
+          },
+          {
+            "group": "imagepolicy.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "internal.apiserver.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "networking.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "networking.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "node.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "node.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "node.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "policy",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "policy",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "rbac.authorization.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "rbac.authorization.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "rbac.authorization.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
             "group": "resource.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "resource.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha3"
+          },
+          {
+            "group": "resource.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "resource.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta2"
+          },
+          {
+            "group": "scheduling.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "scheduling.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "scheduling.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "storage.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1"
+          },
+          {
+            "group": "storage.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1alpha1"
+          },
+          {
+            "group": "storage.k8s.io",
+            "kind": "WatchEvent",
+            "version": "v1beta1"
+          },
+          {
+            "group": "storagemigration.k8s.io",
             "kind": "WatchEvent",
             "version": "v1beta1"
           }
         ]
       },
       "io.k8s.apimachinery.pkg.runtime.RawExtension": {
-        "description": "RawExtension is used to hold extensions in external versions.\n\nTo use this, make a field which has RawExtension as its type in your external, versioned struct, and Object in your internal struct. You also need to register your various plugin types.\n\n// Internal package:\n\n\ttype MyAPIObject struct {\n\t\truntime.TypeMeta `json:\"\"`\n\t\tMyPlugin runtime.Object `json:\"myPlugin\"`\n\t}\n\n\ttype PluginA struct {\n\t\tAOption string `json:\"aOption\"`\n\t}\n\n// External package:\n\n\ttype MyAPIObject struct {\n\t\truntime.TypeMeta `json:\"\"`\n\t\tMyPlugin runtime.RawExtension `json:\"myPlugin\"`\n\t}\n\n\ttype PluginA struct {\n\t\tAOption string `json:\"aOption\"`\n\t}\n\n// On the wire, the JSON will look something like this:\n\n\t{\n\t\t\"kind\":\"MyAPIObject\",\n\t\t\"apiVersion\":\"v1\",\n\t\t\"myPlugin\": {\n\t\t\t\"kind\":\"PluginA\",\n\t\t\t\"aOption\":\"foo\",\n\t\t},\n\t}\n\nSo what happens? Decode first uses json or yaml to unmarshal the serialized data into your external MyAPIObject. That causes the raw JSON to be stored, but not unpacked. The next step is to copy (using pkg/conversion) into the internal struct. The runtime package's DefaultScheme has conversion functions installed which will unpack the JSON stored in RawExtension, turning it into the correct object type, and storing it in the Object. (TODO: In the case where the object is of an unknown type, a runtime.Unknown object will be created and stored.)",
+        "description": "RawExtension is used to hold extensions in external versions.\n\nTo use this, make a field which has RawExtension as its type in your external, versioned struct, and Object in your internal struct. You also need to register your various plugin types.\n\n// Internal package:\n\n\ttype MyAPIObject struct {\n\t\truntime.TypeMeta `json:\",inline\"`\n\t\tMyPlugin runtime.Object `json:\"myPlugin\"`\n\t}\n\n\ttype PluginA struct {\n\t\tAOption string `json:\"aOption\"`\n\t}\n\n// External package:\n\n\ttype MyAPIObject struct {\n\t\truntime.TypeMeta `json:\",inline\"`\n\t\tMyPlugin runtime.RawExtension `json:\"myPlugin\"`\n\t}\n\n\ttype PluginA struct {\n\t\tAOption string `json:\"aOption\"`\n\t}\n\n// On the wire, the JSON will look something like this:\n\n\t{\n\t\t\"kind\":\"MyAPIObject\",\n\t\t\"apiVersion\":\"v1\",\n\t\t\"myPlugin\": {\n\t\t\t\"kind\":\"PluginA\",\n\t\t\t\"aOption\":\"foo\",\n\t\t},\n\t}\n\nSo what happens? Decode first uses json or yaml to unmarshal the serialized data into your external MyAPIObject. That causes the raw JSON to be stored, but not unpacked. The next step is to copy (using pkg/conversion) into the internal struct. The runtime package's DefaultScheme has conversion functions installed which will unpack the JSON stored in RawExtension, turning it into the correct object type, and storing it in the Object. (TODO: In the case where the object is of an unknown type, a runtime.Unknown object will be created and stored.)",
         "type": "object"
       }
     },
@@ -2304,15 +3027,6 @@
             }
           },
           {
-            "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
-            "in": "query",
-            "name": "shardSelector",
-            "schema": {
-              "type": "string",
-              "uniqueItems": true
-            }
-          },
-          {
             "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
             "in": "query",
             "name": "timeoutSeconds",
@@ -2444,15 +3158,6 @@
             "name": "sendInitialEvents",
             "schema": {
               "type": "boolean",
-              "uniqueItems": true
-            }
-          },
-          {
-            "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
-            "in": "query",
-            "name": "shardSelector",
-            "schema": {
-              "type": "string",
               "uniqueItems": true
             }
           },
@@ -3221,15 +3926,6 @@
             }
           },
           {
-            "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
-            "in": "query",
-            "name": "shardSelector",
-            "schema": {
-              "type": "string",
-              "uniqueItems": true
-            }
-          },
-          {
             "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
             "in": "query",
             "name": "timeoutSeconds",
@@ -3361,15 +4057,6 @@
             "name": "sendInitialEvents",
             "schema": {
               "type": "boolean",
-              "uniqueItems": true
-            }
-          },
-          {
-            "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
-            "in": "query",
-            "name": "shardSelector",
-            "schema": {
-              "type": "string",
               "uniqueItems": true
             }
           },
@@ -4477,15 +5164,6 @@
             }
           },
           {
-            "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
-            "in": "query",
-            "name": "shardSelector",
-            "schema": {
-              "type": "string",
-              "uniqueItems": true
-            }
-          },
-          {
             "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
             "in": "query",
             "name": "timeoutSeconds",
@@ -4617,15 +5295,6 @@
             "name": "sendInitialEvents",
             "schema": {
               "type": "boolean",
-              "uniqueItems": true
-            }
-          },
-          {
-            "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
-            "in": "query",
-            "name": "shardSelector",
-            "schema": {
-              "type": "string",
               "uniqueItems": true
             }
           },
@@ -5442,15 +6111,6 @@
           }
         },
         {
-          "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
-          "in": "query",
-          "name": "shardSelector",
-          "schema": {
-            "type": "string",
-            "uniqueItems": true
-          }
-        },
-        {
           "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
           "in": "query",
           "name": "timeoutSeconds",
@@ -5612,15 +6272,6 @@
           }
         },
         {
-          "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
-          "in": "query",
-          "name": "shardSelector",
-          "schema": {
-            "type": "string",
-            "uniqueItems": true
-          }
-        },
-        {
           "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
           "in": "query",
           "name": "timeoutSeconds",
@@ -5750,15 +6401,6 @@
             "name": "sendInitialEvents",
             "schema": {
               "type": "boolean",
-              "uniqueItems": true
-            }
-          },
-          {
-            "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
-            "in": "query",
-            "name": "shardSelector",
-            "schema": {
-              "type": "string",
               "uniqueItems": true
             }
           },
@@ -5894,15 +6536,6 @@
             "name": "sendInitialEvents",
             "schema": {
               "type": "boolean",
-              "uniqueItems": true
-            }
-          },
-          {
-            "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
-            "in": "query",
-            "name": "shardSelector",
-            "schema": {
-              "type": "string",
               "uniqueItems": true
             }
           },
@@ -6699,15 +7332,6 @@
           }
         },
         {
-          "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
-          "in": "query",
-          "name": "shardSelector",
-          "schema": {
-            "type": "string",
-            "uniqueItems": true
-          }
-        },
-        {
           "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
           "in": "query",
           "name": "timeoutSeconds",
@@ -6879,15 +7503,6 @@
           }
         },
         {
-          "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
-          "in": "query",
-          "name": "shardSelector",
-          "schema": {
-            "type": "string",
-            "uniqueItems": true
-          }
-        },
-        {
           "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
           "in": "query",
           "name": "timeoutSeconds",
@@ -7055,15 +7670,6 @@
           "name": "sendInitialEvents",
           "schema": {
             "type": "boolean",
-            "uniqueItems": true
-          }
-        },
-        {
-          "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
-          "in": "query",
-          "name": "shardSelector",
-          "schema": {
-            "type": "string",
             "uniqueItems": true
           }
         },
@@ -7249,15 +7855,6 @@
           }
         },
         {
-          "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
-          "in": "query",
-          "name": "shardSelector",
-          "schema": {
-            "type": "string",
-            "uniqueItems": true
-          }
-        },
-        {
           "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
           "in": "query",
           "name": "timeoutSeconds",
@@ -7425,15 +8022,6 @@
           "name": "sendInitialEvents",
           "schema": {
             "type": "boolean",
-            "uniqueItems": true
-          }
-        },
-        {
-          "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
-          "in": "query",
-          "name": "shardSelector",
-          "schema": {
-            "type": "string",
             "uniqueItems": true
           }
         },
@@ -7619,15 +8207,6 @@
           }
         },
         {
-          "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
-          "in": "query",
-          "name": "shardSelector",
-          "schema": {
-            "type": "string",
-            "uniqueItems": true
-          }
-        },
-        {
           "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
           "in": "query",
           "name": "timeoutSeconds",
@@ -7785,15 +8364,6 @@
           "name": "sendInitialEvents",
           "schema": {
             "type": "boolean",
-            "uniqueItems": true
-          }
-        },
-        {
-          "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
-          "in": "query",
-          "name": "shardSelector",
-          "schema": {
-            "type": "string",
             "uniqueItems": true
           }
         },
@@ -7959,15 +8529,6 @@
           }
         },
         {
-          "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
-          "in": "query",
-          "name": "shardSelector",
-          "schema": {
-            "type": "string",
-            "uniqueItems": true
-          }
-        },
-        {
           "description": "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
           "in": "query",
           "name": "timeoutSeconds",
@@ -8125,15 +8686,6 @@
           "name": "sendInitialEvents",
           "schema": {
             "type": "boolean",
-            "uniqueItems": true
-          }
-        },
-        {
-          "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
-          "in": "query",
-          "name": "shardSelector",
-          "schema": {
-            "type": "string",
             "uniqueItems": true
           }
         },
@@ -8305,15 +8857,6 @@
           "name": "sendInitialEvents",
           "schema": {
             "type": "boolean",
-            "uniqueItems": true
-          }
-        },
-        {
-          "description": "shardSelector restricts the list of returned objects using a CEL-based shard selector expression. The format uses the shardRange() function combined with || (logical OR) to specify one or more hash ranges:\n\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000')\n  shardRange(object.metadata.uid, '0x0', '0x8000000000000000') || shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n\nField paths use CEL-style object-rooted syntax (e.g. \"object.metadata.uid\"), NOT the fieldSelector format (\"metadata.uid\"). Currently supported paths:\n  - object.metadata.uid\n  - object.metadata.namespace\n\nhexStart and hexEnd are single-quoted CEL string literals with a '0x' prefix, defining the inclusive lower and exclusive upper bounds over the 64-bit FNV-1a hash space. The full range is [0x0, 0x10000000000000000), where the exclusive upper bound equals 2^64.\n\nExamples:\n  2-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x8000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x8000000000000000', '0x10000000000000000')\n  4-shard split:\n    shard 0: shardRange(object.metadata.uid, '0x0000000000000000', '0x4000000000000000')\n    shard 1: shardRange(object.metadata.uid, '0x4000000000000000', '0x8000000000000000')\n    shard 2: shardRange(object.metadata.uid, '0x8000000000000000', '0xc000000000000000')\n    shard 3: shardRange(object.metadata.uid, '0xc000000000000000', '0x10000000000000000')\n\nThis is an alpha field and requires enabling the ShardedListAndWatch feature gate.",
-          "in": "query",
-          "name": "shardSelector",
-          "schema": {
-            "type": "string",
             "uniqueItems": true
           }
         },

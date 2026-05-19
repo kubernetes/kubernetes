@@ -18,9 +18,9 @@ package validators
 
 import (
 	"fmt"
+	"strconv"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
@@ -75,7 +75,7 @@ func (v neqTagValidator) GetValidations(context Context, tag codetags.Tag) (Vali
 		if tag.ValueType != codetags.ValueTypeBool {
 			return Validations{}, fmt.Errorf("type mismatch: field is a bool, but payload is of type %s", tag.ValueType)
 		}
-		disallowedValue, err = util.ParseBool(tag.Value)
+		disallowedValue, err = strconv.ParseBool(tag.Value)
 		if err != nil {
 			return Validations{}, fmt.Errorf("invalid bool value for payload: %w", err)
 		}
@@ -83,7 +83,7 @@ func (v neqTagValidator) GetValidations(context Context, tag codetags.Tag) (Vali
 		if tag.ValueType != codetags.ValueTypeInt {
 			return Validations{}, fmt.Errorf("type mismatch: field is an integer, but payload is of type %s", tag.ValueType)
 		}
-		disallowedValue, err = util.ParseInt(tag.Value)
+		disallowedValue, err = strconv.Atoi(tag.Value)
 		if err != nil {
 			return Validations{}, fmt.Errorf("invalid integer value for payload: %w", err)
 		}
@@ -91,16 +91,15 @@ func (v neqTagValidator) GetValidations(context Context, tag codetags.Tag) (Vali
 		return Validations{}, fmt.Errorf("unsupported type for 'neq' tag: %s", t.Name)
 	}
 
-	fn := Function(v.TagName(), DefaultFlags, neqValidator, disallowedValue).
-		WithEmits(Emission{field.ErrorTypeInvalid, "neq", ""})
+	fn := Function(v.TagName(), DefaultFlags, neqValidator, disallowedValue)
 	return Validations{Functions: []FunctionGen{fn}}, nil
 }
 
 func (v neqTagValidator) Docs() TagDoc {
 	return TagDoc{
 		Tag:              v.TagName(),
-		StabilityLevel:   TagStabilityLevelAlpha,
-		Scopes:           sets.List(v.ValidScopes()),
+		StabilityLevel:   Alpha,
+		Scopes:           v.ValidScopes().UnsortedList(),
 		Description:      "Verifies the field's value is not equal to a specific disallowed value. Supports string, integer, and boolean types.",
 		PayloadsRequired: true,
 		PayloadsType:     codetags.ValueTypeRaw,

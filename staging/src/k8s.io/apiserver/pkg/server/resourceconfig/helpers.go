@@ -221,37 +221,24 @@ func getRuntimeConfigValue(overrides cliflag.ConfigurationMap, apiKey string, de
 
 // ParseGroups takes in resourceConfig and returns parsed groups.
 func ParseGroups(resourceConfig cliflag.ConfigurationMap) ([]string, error) {
-	groupVersions, err := ParseGroupVersions(resourceConfig)
-	if err != nil {
-		return nil, err
-	}
 	groups := []string{}
-	for _, gv := range groupVersions {
-		groups = append(groups, gv.Group)
-	}
-	return groups, nil
-}
-
-// ParseGroupVersions takes in resourceConfig and returns parsed group versions.
-func ParseGroupVersions(resourceConfig cliflag.ConfigurationMap) ([]schema.GroupVersion, error) {
-	groupVersions := []schema.GroupVersion{}
 	for key := range resourceConfig {
 		if _, ok := groupVersionMatchers[key]; ok {
 			continue
 		}
 		tokens := strings.Split(key, "/")
 		if len(tokens) != 2 && len(tokens) != 3 {
-			return nil, fmt.Errorf("runtime-config invalid key %s", key)
+			return groups, fmt.Errorf("runtime-config invalid key %s", key)
 		}
 		groupVersionString := tokens[0] + "/" + tokens[1]
 		groupVersion, err := schema.ParseGroupVersion(groupVersionString)
 		if err != nil {
 			return nil, fmt.Errorf("runtime-config invalid key %s", key)
 		}
-		groupVersions = append(groupVersions, groupVersion)
+		groups = append(groups, groupVersion.Group)
 	}
 
-	return groupVersions, nil
+	return groups, nil
 }
 
 // EmulationForwardCompatibleResourceConfig creates a new ResourceConfig that besides all the enabled resources in resourceConfig,

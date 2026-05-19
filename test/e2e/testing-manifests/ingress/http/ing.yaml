@@ -1,0 +1,40 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: echomap
+spec:
+  # kubemci requires a default backend.
+  defaultBackend:
+    service:
+      name: echoheadersx
+      port:
+        number: 80
+  rules:
+  - host: foo.bar.com
+    http:
+      paths:
+      - path: /foo
+        pathType: "ImplementationSpecific"
+        backend:
+          service:
+            name: echoheadersx
+            port:
+              number: 80
+  - host: bar.baz.com
+    http:
+      paths:
+      - path: /bar
+        pathType: "ImplementationSpecific"
+        backend:
+          service:
+            name: echoheadersy
+            port:
+              number: 80
+      - path: /foo
+        pathType: "ImplementationSpecific"
+        backend:
+          service:
+            name: echoheadersx
+            port:
+              number: 80
+

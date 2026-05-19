@@ -62,17 +62,6 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"statefulset_namespace", "statefulset_name", "pod_management_policy"},
 	)
-
-	// StatefulSetRequeueSkips tracks the number of StatefulSet syncs skipped due to a stale watch cache.
-	StatefulSetRequeueSkips = metrics.NewCounterVec(
-		&metrics.CounterOpts{
-			Subsystem:      StatefulSetControllerSubsystem,
-			Name:           "stale_sync_skips_total",
-			Help:           "Total number of StatefulSet syncs skipped due to a stale watch cache.",
-			StabilityLevel: metrics.ALPHA,
-		},
-		[]string{"group", "resource"},
-	)
 )
 
 var registerMetrics sync.Once
@@ -81,6 +70,5 @@ func Register() {
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(MaxUnavailable)
 		legacyregistry.MustRegister(UnavailableReplicas)
-		legacyregistry.MustRegister(StatefulSetRequeueSkips)
 	})
 }

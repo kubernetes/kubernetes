@@ -223,7 +223,6 @@ func TestNewWithDelegate(t *testing.T) {
 		"/readyz/poststarthook/storage-object-count-tracker-hook",
 		"/readyz/poststarthook/wrapping-post-start-hook",
 		"/readyz/shutdown",
-		"/statusz",
 	}
 	checkExpectedPathsAtRoot(server.URL, expectedPaths, t)
 

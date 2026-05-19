@@ -52,7 +52,7 @@ var roleResources = map[schema.GroupResource]bool{
 }
 
 // RoleEscalationAuthorized checks if the user associated with the context is explicitly authorized to escalate the role resource associated with the context
-func RoleEscalationAuthorized(ctx context.Context, a authorizer.UnconditionalAuthorizer) bool {
+func RoleEscalationAuthorized(ctx context.Context, a authorizer.Authorizer) bool {
 	if a == nil {
 		return false
 	}
@@ -98,7 +98,7 @@ func RoleEscalationAuthorized(ctx context.Context, a authorizer.UnconditionalAut
 }
 
 // BindingAuthorized returns true if the user associated with the context is explicitly authorized to bind the specified roleRef
-func BindingAuthorized(ctx context.Context, roleRef rbac.RoleRef, bindingNamespace string, a authorizer.UnconditionalAuthorizer) bool {
+func BindingAuthorized(ctx context.Context, roleRef rbac.RoleRef, bindingNamespace string, a authorizer.Authorizer) bool {
 	if a == nil {
 		return false
 	}

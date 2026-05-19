@@ -27,14 +27,17 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/controller"
 	volumecache "k8s.io/kubernetes/pkg/controller/volume/selinuxwarning/cache"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/utils/ptr"
@@ -494,6 +497,8 @@ func TestSELinuxWarningController_Sync(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxChangePolicy, true)
+
 			var wg sync.WaitGroup
 			defer wg.Wait()
 			_, ctx := ktesting.NewTestContext(t)
@@ -778,12 +783,12 @@ func (f *fakeVolumeCache) GetPodsForCSIDriver(driverName string) []cache.ObjectN
 	return pods
 }
 
-func (f *fakeVolumeCache) GetConflicts(logger klog.Logger) []volumecache.Conflict {
-	result := make([]volumecache.Conflict, 0)
+func (f *fakeVolumeCache) SendConflicts(logger klog.Logger, ch chan<- volumecache.Conflict) {
 	for _, conflicts := range f.conflictsToSend {
-		result = append(result, conflicts...)
+		for _, conflict := range conflicts {
+			ch <- conflict
+		}
 	}
-	return result
 }
 
 func collectEvents(source <-chan string) []string {

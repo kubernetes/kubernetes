@@ -110,18 +110,18 @@ func TestServiceAllocPerformance(t *testing.T) {
 			results := make(chan error, nservices)
 			t.Log("Starting workers to create ClusterIP Service")
 			now := time.Now()
-			for w := range nworkers {
+			for w := 0; w < nworkers; w++ {
 				t.Logf("Starting worker %d", w)
 				go worker(client, w, jobs, results)
 			}
-			for i := range nservices {
+			for i := 0; i < nservices; i++ {
 				t.Logf("Sending job %d", i)
 				jobs <- i
 			}
 			t.Log("All jobs processed")
 			close(jobs)
 
-			for c := range nservices {
+			for c := 0; c < nservices; c++ {
 				t.Logf("Getting results %d", c)
 				err := <-results
 				if err != nil {

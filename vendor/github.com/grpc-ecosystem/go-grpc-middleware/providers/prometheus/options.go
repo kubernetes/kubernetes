@@ -46,13 +46,6 @@ func WithSubsystem(subsystem string) CounterOption {
 	}
 }
 
-// WithNamespace allows you to add a Namespace to Counter metrics.
-func WithNamespace(namespace string) CounterOption {
-	return func(o *prometheus.CounterOpts) {
-		o.Namespace = namespace
-	}
-}
-
 // A HistogramOption lets you add options to Histogram metrics using With*
 // funcs.
 type HistogramOption func(*prometheus.HistogramOpts)
@@ -75,7 +68,7 @@ func WithHistogramBuckets(buckets []float64) HistogramOption {
 // This function is helpful when specifying more than just the buckets, like using NativeHistograms.
 func WithHistogramOpts(opts *prometheus.HistogramOpts) HistogramOption {
 	// TODO: This isn't ideal either if new fields are added to prometheus.HistogramOpts.
-	// Maybe we can change the interface to accept arbitrary HistogramOpts and
+	// Maybe we can change the interface to accept abitrary HistogramOpts and
 	// only make sure to overwrite the necessary fields (name, labels).
 	return func(o *prometheus.HistogramOpts) {
 		o.Buckets = opts.Buckets
@@ -102,13 +95,6 @@ func WithHistogramSubsystem(subsystem string) HistogramOption {
 	}
 }
 
-// WithHistogramNamespace allows you to add a Namespace to histograms metrics.
-func WithHistogramNamespace(namespace string) HistogramOption {
-	return func(o *prometheus.HistogramOpts) {
-		o.Namespace = namespace
-	}
-}
-
 func typeFromMethodInfo(mInfo *grpc.MethodInfo) grpcType {
 	if !mInfo.IsClientStream && !mInfo.IsServerStream {
 		return Unary
@@ -127,7 +113,6 @@ type Option func(*config)
 
 type config struct {
 	exemplarFn exemplarFromCtxFn
-	labelsFn   labelsFromCtxFn
 }
 
 func (c *config) apply(opts []Option) {
@@ -140,13 +125,5 @@ func (c *config) apply(opts []Option) {
 func WithExemplarFromContext(exemplarFn exemplarFromCtxFn) Option {
 	return func(o *config) {
 		o.exemplarFn = exemplarFn
-	}
-}
-
-// WithLabelsFromContext sets function that will be used to extract labels from context for metrics.
-// This should be used in conjunction with WithContextLabels to define which labels to extract.
-func WithLabelsFromContext(labelsFn labelsFromCtxFn) Option {
-	return func(o *config) {
-		o.labelsFn = labelsFn
 	}
 }

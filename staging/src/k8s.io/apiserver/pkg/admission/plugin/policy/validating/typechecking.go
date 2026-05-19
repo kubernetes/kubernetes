@@ -177,17 +177,20 @@ func (c *TypeChecker) CreateContext(policy *v1.ValidatingAdmissionPolicy) *TypeC
 
 func (c *TypeChecker) compiler(ctx *TypeCheckingContext, typeOverwrite typeOverwrite) (*plugincel.CompositedCompiler, error) {
 	envSet, err := buildEnvSet(
-		/* hasParams */ !ctx.paramGVK.Empty(),
+		/* hasParams */ ctx.paramDeclType != nil,
 		/* hasAuthorizer */ true,
 		typeOverwrite)
 	if err != nil {
 		return nil, err
 	}
-	compiler, err := plugincel.NewCompositedCompilerForTypeChecking(envSet)
+	env, err := plugincel.NewCompositionEnv(plugincel.VariablesTypeName, envSet)
 	if err != nil {
 		return nil, err
 	}
-	compiler.Compiler = &typeCheckingCompiler{typeOverwrite: typeOverwrite, compiler: compiler}
+	compiler := &plugincel.CompositedCompiler{
+		Compiler:       &typeCheckingCompiler{typeOverwrite: typeOverwrite, compositionEnv: env},
+		CompositionEnv: env,
+	}
 	return compiler, nil
 }
 
@@ -205,7 +208,7 @@ func (c *TypeChecker) CheckExpression(ctx *TypeCheckingContext, expression strin
 			continue
 		}
 		options := plugincel.OptionalVariableDeclarations{
-			HasParams:     !ctx.paramGVK.Empty(),
+			HasParams:     ctx.paramDeclType != nil,
 			HasAuthorizer: true,
 		}
 		compiler.CompileAndStoreVariables(convertv1beta1Variables(ctx.variables), options, environment.StoredExpressions)
@@ -244,11 +247,7 @@ func (c *TypeChecker) declType(gvk schema.GroupVersionKind) (*apiservercel.DeclT
 	if err != nil {
 		return nil, err
 	}
-	declType := common.SchemaDeclType(&openapi.Schema{Schema: s}, true)
-	if declType == nil {
-		return nil, nil
-	}
-	return declType.MaybeAssignTypeName(generateUniqueTypeName(gvk.Kind)), nil
+	return common.SchemaDeclType(&openapi.Schema{Schema: s}, true).MaybeAssignTypeName(generateUniqueTypeName(gvk.Kind)), nil
 }
 
 func (c *TypeChecker) paramsGVK(policy *v1.ValidatingAdmissionPolicy) schema.GroupVersionKind {
@@ -408,16 +407,12 @@ func buildEnvSet(hasParams bool, hasAuthorizer bool, types typeOverwrite) (*envi
 	varOpts = append(varOpts, createVariableOpts(requestType, plugincel.RequestVarName)...)
 
 	// object and oldObject, same type, type(s) resolved from constraints
-	if types.object != nil {
-		declTypes = append(declTypes, types.object)
-	}
+	declTypes = append(declTypes, types.object)
 	varOpts = append(varOpts, createVariableOpts(types.object, plugincel.ObjectVarName, plugincel.OldObjectVarName)...)
 
 	// params, defined by ParamKind
-	if hasParams {
-		if types.params != nil {
-			declTypes = append(declTypes, types.params)
-		}
+	if hasParams && types.params != nil {
+		declTypes = append(declTypes, types.params)
 		varOpts = append(varOpts, createVariableOpts(types.params, plugincel.ParamsVarName)...)
 	}
 
@@ -454,8 +449,8 @@ func createVariableOpts(declType *apiservercel.DeclType, variables ...string) []
 }
 
 type typeCheckingCompiler struct {
-	compiler      *plugincel.CompositedCompiler
-	typeOverwrite typeOverwrite
+	compositionEnv *plugincel.CompositionEnv
+	typeOverwrite  typeOverwrite
 }
 
 // CompileCELExpression compiles the given expression.
@@ -474,7 +469,7 @@ func (c *typeCheckingCompiler) CompileCELExpression(expressionAccessor plugincel
 			ExpressionAccessor: expressionAccessor,
 		}
 	}
-	env, err := c.compiler.Env(mode)
+	env, err := c.compositionEnv.Env(mode)
 	if err != nil {
 		return resultError(fmt.Sprintf("fail to build env: %v", err), apiservercel.ErrorTypeInternal)
 	}

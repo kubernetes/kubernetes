@@ -24,8 +24,7 @@ import (
 )
 
 const (
-	ErrorReasonUnexpected         = "UnexpectedAdmissionError"
-	ErrorReasonEmptyPodSharedPool = "EmptyPodSharedPoolError"
+	ErrorReasonUnexpected = "UnexpectedAdmissionError"
 )
 
 type Error interface {
@@ -43,26 +42,6 @@ func (e *unexpectedAdmissionError) Error() string {
 
 func (e *unexpectedAdmissionError) Type() string {
 	return ErrorReasonUnexpected
-}
-
-// EmptyPodSharedPoolError represents an error due to a pod spec being invalid
-// when the Topology manager's scope is set to pod, because the pod spec
-// produces an empty pod shared pool and there are containers that require it.
-type EmptyPodSharedPoolError struct {
-	message string
-}
-
-// NewEmptyPodSharedPoolError returns a new EmptyPodSharedPoolError.
-func NewEmptyPodSharedPoolError(err error) *EmptyPodSharedPoolError {
-	return &EmptyPodSharedPoolError{message: err.Error()}
-}
-
-func (e *EmptyPodSharedPoolError) Error() string {
-	return e.message
-}
-
-func (e *EmptyPodSharedPoolError) Type() string {
-	return ErrorReasonEmptyPodSharedPool
 }
 
 func GetPodAdmitResult(err error) lifecycle.PodAdmitResult {

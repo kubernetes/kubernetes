@@ -9,20 +9,19 @@ import (
 	"sync"
 	"time"
 
-	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
-	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal/counter"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal/observ"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal/otlpconfig"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc/internal/retry"
+	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
 )
 
 type client struct {
@@ -46,9 +45,6 @@ type client struct {
 	conn    *grpc.ClientConn
 	tscMu   sync.RWMutex
 	tsc     coltracepb.TraceServiceClient
-
-	instID int64
-	inst   *observ.Instrumentation
 }
 
 // Compile time check *client implements otlptrace.Client.
@@ -62,7 +58,7 @@ func NewClient(opts ...Option) otlptrace.Client {
 func newClient(opts ...Option) *client {
 	cfg := otlpconfig.NewGRPCConfig(asGRPCOptions(opts)...)
 
-	ctx, cancel := context.WithCancel(context.Background()) //nolint:gosec  // cancel called in client shutdown.
+	ctx, cancel := context.WithCancel(context.Background())
 
 	c := &client{
 		endpoint:      cfg.Traces.Endpoint,
@@ -72,7 +68,6 @@ func newClient(opts ...Option) *client {
 		stopCtx:       ctx,
 		stopFunc:      cancel,
 		conn:          cfg.GRPCConn,
-		instID:        counter.NextExporterID(),
 	}
 
 	if len(cfg.Traces.Headers) > 0 {
@@ -97,24 +92,13 @@ func (c *client) Start(context.Context) error {
 		c.conn = conn
 	}
 
-	// Initialize the instrumentation if not already done.
-	//
-	// Initialize here instead of NewClient to allow any errors to be passed
-	// back to the caller and so that any setup of the environment variables to
-	// enable instrumentation can be set via code.
-	var err error
-	if c.inst == nil {
-		target := c.conn.CanonicalTarget()
-		c.inst, err = observ.NewInstrumentation(c.instID, target)
-	}
-
 	// The otlptrace.Client interface states this method is called just once,
 	// so no need to check if already started.
 	c.tscMu.Lock()
 	c.tsc = coltracepb.NewTraceServiceClient(c.conn)
 	c.tscMu.Unlock()
 
-	return err
+	return nil
 }
 
 var errAlreadyStopped = errors.New("the client is already stopped")
@@ -190,7 +174,7 @@ var errShutdown = errors.New("the client is shutdown")
 //
 // Retryable errors from the server will be handled according to any
 // RetryConfig the client was created with.
-func (c *client) UploadTraces(ctx context.Context, protoSpans []*tracepb.ResourceSpans) (uploadErr error) {
+func (c *client) UploadTraces(ctx context.Context, protoSpans []*tracepb.ResourceSpans) error {
 	// Hold a read lock to ensure a shut down initiated after this starts does
 	// not abandon the export. This read lock acquire has less priority than a
 	// write lock acquire (i.e. Stop), meaning if the client is shutting down
@@ -205,12 +189,6 @@ func (c *client) UploadTraces(ctx context.Context, protoSpans []*tracepb.Resourc
 	ctx, cancel := c.exportContext(ctx)
 	defer cancel()
 
-	var code codes.Code
-	if c.inst != nil {
-		op := c.inst.ExportSpans(ctx, len(protoSpans))
-		defer func() { op.End(uploadErr, code) }()
-	}
-
 	return c.requestFunc(ctx, func(iCtx context.Context) error {
 		resp, err := c.tsc.Export(iCtx, &coltracepb.ExportTraceServiceRequest{
 			ResourceSpans: protoSpans,
@@ -219,17 +197,16 @@ func (c *client) UploadTraces(ctx context.Context, protoSpans []*tracepb.Resourc
 			msg := resp.PartialSuccess.GetErrorMessage()
 			n := resp.PartialSuccess.GetRejectedSpans()
 			if n != 0 || msg != "" {
-				e := internal.TracePartialSuccessError(n, msg)
-				uploadErr = errors.Join(uploadErr, e)
+				err := internal.TracePartialSuccessError(n, msg)
+				otel.Handle(err)
 			}
 		}
 		// nil is converted to OK.
-		code = status.Code(err)
-		if code == codes.OK {
+		if status.Code(err) == codes.OK {
 			// Success.
-			return uploadErr
+			return nil
 		}
-		return errors.Join(uploadErr, err)
+		return err
 	})
 }
 
@@ -246,9 +223,9 @@ func (c *client) exportContext(parent context.Context) (context.Context, context
 	)
 
 	if c.exportTimeout > 0 {
-		ctx, cancel = context.WithTimeoutCause(parent, c.exportTimeout, errors.New("exporter export timeout"))
+		ctx, cancel = context.WithTimeout(parent, c.exportTimeout)
 	} else {
-		ctx, cancel = context.WithCancel(parent) //nolint:gosec  // cancel called by caller when export is complete.
+		ctx, cancel = context.WithCancel(parent)
 	}
 
 	if c.metadata.Len() > 0 {
@@ -312,7 +289,7 @@ func throttleDelay(s *status.Status) (bool, time.Duration) {
 }
 
 // MarshalLog is the marshaling function used by the logging system to represent this Client.
-func (c *client) MarshalLog() any {
+func (c *client) MarshalLog() interface{} {
 	return struct {
 		Type     string
 		Endpoint string

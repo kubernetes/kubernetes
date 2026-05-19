@@ -1,4 +1,5 @@
 //go:build cgo && linux
+// +build cgo,linux
 
 /*
 Copyright 2016 The Kubernetes Authors.
@@ -452,7 +453,7 @@ func injectLog(file string, timestamp time.Time, log string, num int) error {
 		return err
 	}
 	defer f.Close()
-	for range num {
+	for i := 0; i < num; i++ {
 		_, err := f.WriteString(fmt.Sprintf("%s kernel: [0.000000] %s\n", timestamp.Format(time.Stamp), log))
 		if err != nil {
 			return err

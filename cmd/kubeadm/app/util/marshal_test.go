@@ -18,7 +18,6 @@ package util
 
 import (
 	"bytes"
-	_ "embed"
 	"reflect"
 	"sort"
 	"testing"
@@ -31,25 +30,33 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
-var (
-	//go:embed testdata/foo.yaml
-	fooYAML []byte
-	//go:embed testdata/bar.yaml
-	barYAML []byte
-	//go:embed testdata/baz.yaml
-	bazYAML []byte
-	//go:embed testdata/nokind.yaml
-	nokindYAML []byte
-	//go:embed testdata/noapiversion.yaml
-	noapiversionYAML []byte
-)
-
 var files = map[string][]byte{
-	"foo":          fooYAML,
-	"bar":          barYAML,
-	"baz":          bazYAML,
-	"nokind":       nokindYAML,
-	"noapiversion": noapiversionYAML,
+	"foo": []byte(`
+kind: Foo
+apiVersion: foo.k8s.io/v1
+fooField: foo
+`),
+	"bar": []byte(`
+apiVersion: bar.k8s.io/v2
+barField: bar
+kind: Bar
+`),
+	"baz": []byte(`
+apiVersion: baz.k8s.io/v1
+kind: Baz
+baz:
+	foo: bar
+`),
+	"nokind": []byte(`
+apiVersion: baz.k8s.io/v1
+foo: foo
+bar: bar
+`),
+	"noapiversion": []byte(`
+kind: Bar
+foo: foo
+bar: bar
+`),
 }
 
 func TestMarshalUnmarshalYaml(t *testing.T) {

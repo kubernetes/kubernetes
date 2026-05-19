@@ -29,7 +29,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	schedulingapiv1alpha2 "k8s.io/api/scheduling/v1alpha2"
+	schedulingapiv1alpha1 "k8s.io/api/scheduling/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -74,27 +74,18 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/integration/framework"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
 // ShutdownFunc represents the function handle to be called, typically in a defer handler, to shutdown a running module
 type ShutdownFunc func()
 
-// StartScheduler is a wrapper around StartSchedulerWithDone for backward compatibility.
+// StartScheduler configures and starts a scheduler given a handle to the clientSet interface
+// and event broadcaster. It returns the running scheduler and podInformer. Background goroutines
+// will keep running until the context is canceled.
 func StartScheduler(tCtx ktesting.TContext, cfg *kubeschedulerconfig.KubeSchedulerConfiguration, outOfTreePluginRegistry frameworkruntime.Registry) (*scheduler.Scheduler, informers.SharedInformerFactory) {
-	sched, informerFactory, _ := StartSchedulerWithDone(tCtx, cfg, outOfTreePluginRegistry)
-	return sched, informerFactory
-}
-
-// StartSchedulerWithDone configures and starts a scheduler. Background goroutines
-// will keep running until the context is canceled. It returns the running scheduler,
-// the informer factory, and a channel that is closed when the scheduler goroutine
-// actually exits. Callers can use this channel to ensure the scheduler has fully
-// stopped before performing operations that might race with it (e.g., resetting
-// global metrics).
-func StartSchedulerWithDone(tCtx ktesting.TContext, cfg *kubeschedulerconfig.KubeSchedulerConfiguration, outOfTreePluginRegistry frameworkruntime.Registry) (*scheduler.Scheduler, informers.SharedInformerFactory, <-chan struct{}) {
 	clientSet := tCtx.Client()
 	informerFactory := scheduler.NewInformerFactory(clientSet, 0)
 	evtBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
@@ -130,28 +121,25 @@ func StartSchedulerWithDone(tCtx ktesting.TContext, cfg *kubeschedulerconfig.Kub
 	err = sched.WaitForHandlersSync(tCtx)
 	tCtx.ExpectNoError(err, "waiting for handlers to sync")
 	logger.V(3).Info("Handlers synced")
-	done := make(chan struct{})
-	go func() {
-		sched.Run(tCtx)
-		close(done)
-	}()
+	go sched.Run(tCtx)
 
-	return sched, informerFactory, done
+	return sched, informerFactory
 }
 
-// CreateResourceClaimController creates a ResourceClaim controller and returns a blocking run function.
-// The caller is responsible for the management of the goroutine where that method is invoked.
-func CreateResourceClaimController(ctx context.Context, tb ktesting.TB, clientSet clientset.Interface, informerFactory informers.SharedInformerFactory, features resourceclaim.Features) func() {
+func CreateResourceClaimController(ctx context.Context, tb ktesting.TB, clientSet clientset.Interface, informerFactory informers.SharedInformerFactory) func() {
 	podInformer := informerFactory.Core().V1().Pods()
-	podGroupInformer := informerFactory.Scheduling().V1alpha2().PodGroups()
 	claimInformer := informerFactory.Resource().V1().ResourceClaims()
 	claimTemplateInformer := informerFactory.Resource().V1().ResourceClaimTemplates()
-	claimController, err := resourceclaim.NewController(klog.FromContext(ctx), features, clientSet, podInformer, podGroupInformer, claimInformer, claimTemplateInformer)
+	features := resourceclaim.Features{
+		AdminAccess:     true,
+		PrioritizedList: true,
+	}
+	claimController, err := resourceclaim.NewController(klog.FromContext(ctx), features, clientSet, podInformer, claimInformer, claimTemplateInformer)
 	if err != nil {
 		tb.Fatalf("Error creating claim controller: %v", err)
 	}
 	return func() {
-		claimController.Run(ctx, 5 /* workers */)
+		go claimController.Run(ctx, 5 /* workers */)
 	}
 }
 
@@ -535,7 +523,7 @@ func InitTestAPIServer(t *testing.T, nsPrefix string, admission admission.Interf
 			}
 			if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 				options.APIEnablement.RuntimeConfig = cliflag.ConfigurationMap{
-					schedulingapiv1alpha2.SchemeGroupVersion.String(): "true",
+					schedulingapiv1alpha1.SchemeGroupVersion.String(): "true",
 				}
 			}
 		},
@@ -787,7 +775,7 @@ func CreateNode(cs clientset.Interface, node *v1.Node) (*v1.Node, error) {
 
 func createNodes(cs clientset.Interface, prefix string, wrapper *st.NodeWrapper, numNodes int) ([]*v1.Node, error) {
 	nodes := make([]*v1.Node, numNodes)
-	for i := range numNodes {
+	for i := 0; i < numNodes; i++ {
 		nodeName := fmt.Sprintf("%v-%d", prefix, i)
 		node, err := CreateNode(cs, wrapper.Name(nodeName).Label("kubernetes.io/hostname", nodeName).Obj())
 		if err != nil {

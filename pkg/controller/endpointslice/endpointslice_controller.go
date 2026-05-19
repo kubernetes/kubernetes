@@ -162,18 +162,21 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 
 	c.endpointUpdatesBatchPeriod = endpointUpdatesBatchPeriod
 
-	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(_ interface{}) {
-			c.addNode()
-		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			c.updateNode(oldObj, newObj)
-		},
-		DeleteFunc: func(_ interface{}) {
-			c.deleteNode()
-		},
-	})
-	c.topologyCache = topologycache.NewTopologyCache()
+	if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
+		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc: func(_ interface{}) {
+				c.addNode()
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				c.updateNode(oldObj, newObj)
+			},
+			DeleteFunc: func(_ interface{}) {
+				c.deleteNode()
+			},
+		})
+
+		c.topologyCache = topologycache.NewTopologyCache()
+	}
 
 	c.reconciler = endpointslicerec.NewReconciler(
 		c.client,
@@ -183,7 +186,7 @@ func NewController(ctx context.Context, podInformer coreinformers.PodInformer,
 		c.topologyCache,
 		c.eventRecorder,
 		ControllerName,
-		endpointslicerec.WithPreferSameTrafficDistributionEnabled(utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution)),
+		endpointslicerec.WithTrafficDistributionEnabled(utilfeature.DefaultFeatureGate.Enabled(features.ServiceTrafficDistribution), utilfeature.DefaultFeatureGate.Enabled(features.PreferSameTrafficDistribution)),
 	)
 
 	return c

@@ -70,7 +70,6 @@ makeIPTablesUtilChains: true
 maxOpenFiles: 1000000
 maxPods: 110
 memoryManagerPolicy: None
-memoryReservationPolicy: None
 memorySwap: {}
 memoryThrottlingFactor: 0.9
 mergeDefaultEvictionSettings: false

@@ -208,10 +208,6 @@ func (m *managerImpl) Start(ctx context.Context, diskInfoProvider DiskInfoProvid
 	// start the eviction manager monitoring
 	go func() {
 		for {
-			if err := ctx.Err(); err != nil {
-				logger.Info("Eviction manager: monitoring loop exiting", "err", err)
-				return
-			}
 			evictedPods, err := m.synchronize(ctx, diskInfoProvider, podFunc)
 			if evictedPods != nil && err == nil {
 				logger.Info("Eviction manager: pods evicted, waiting for pod to be cleaned up", "pods", klog.KObjSlice(evictedPods))
@@ -220,12 +216,7 @@ func (m *managerImpl) Start(ctx context.Context, diskInfoProvider DiskInfoProvid
 				if err != nil {
 					logger.Error(err, "Eviction manager: failed to synchronize")
 				}
-				select {
-				case <-ctx.Done():
-					logger.Info("Eviction manager: monitoring loop exiting", "err", ctx.Err())
-					return
-				case <-time.After(monitoringInterval):
-				}
+				time.Sleep(monitoringInterval)
 			}
 		}
 	}()
@@ -597,15 +588,6 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(logger klog.Logger,
 			thresholdsMap[container.Name] = ephemeralLimit
 		}
 	}
-	for _, container := range pod.Spec.InitContainers {
-		if !podutil.IsRestartableInitContainer(&container) {
-			continue
-		}
-		ephemeralLimit := container.Resources.Limits.StorageEphemeral()
-		if ephemeralLimit != nil && ephemeralLimit.Value() != 0 {
-			thresholdsMap[container.Name] = ephemeralLimit
-		}
-	}
 
 	for _, containerStat := range podStats.Containers {
 		containerUsed := diskUsage(containerStat.Logs)
@@ -635,8 +617,7 @@ func (m *managerImpl) evictPod(logger klog.Logger, pod *v1.Pod, gracePeriodOverr
 		return false
 	}
 	// record that we are evicting the pod
-	//nolint:forbidigo // Legacy usage
-	m.recorder.AnnotatedEventf(pod, annotations, v1.EventTypeWarning, Reason, "%s", evictMsg)
+	m.recorder.AnnotatedEventf(pod, annotations, v1.EventTypeWarning, Reason, evictMsg)
 	// this is a blocking call and should only return when the pod and its containers are killed.
 	logger.V(3).Info("Evicting pod", "pod", klog.KObj(pod), "podUID", pod.UID, "message", evictMsg)
 	err := m.killPodFunc(pod, true, &gracePeriodOverride, func(status *v1.PodStatus) {

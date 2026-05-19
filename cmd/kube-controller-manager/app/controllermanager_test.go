@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/server/healthz"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	cpnames "k8s.io/cloud-provider/names"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
@@ -63,7 +64,6 @@ func TestControllerNamesDeclaration(t *testing.T) {
 		names.GarbageCollectorController,
 		names.DaemonSetController,
 		names.JobController,
-		names.PodGroupProtectionController,
 		names.DeploymentController,
 		names.ReplicaSetController,
 		names.HorizontalPodAutoscalerController,
@@ -80,6 +80,9 @@ func TestControllerNamesDeclaration(t *testing.T) {
 		names.NodeIpamController,
 		names.NodeLifecycleController,
 		names.TaintEvictionController,
+		cpnames.ServiceLBController,
+		cpnames.NodeRouteController,
+		cpnames.CloudNodeLifecycleController,
 		names.PersistentVolumeBinderController,
 		names.PersistentVolumeAttachDetachController,
 		names.PersistentVolumeExpanderController,
@@ -94,7 +97,6 @@ func TestControllerNamesDeclaration(t *testing.T) {
 		names.StorageVersionGarbageCollectorController,
 		names.ResourceClaimController,
 		names.DeviceTaintEvictionController,
-		names.ResourcePoolStatusRequestController,
 		names.LegacyServiceAccountTokenCleanerController,
 		names.ValidatingAdmissionPolicyStatusController,
 		names.ServiceCIDRController,
@@ -230,6 +232,31 @@ func TestTaintEvictionControllerGating(t *testing.T) {
 				t.Errorf("TaintEvictionController healthCheck check failed: expected=%v, got=%v", expectHealthCheck, hasHealthCheck)
 			}
 		})
+	}
+}
+
+func TestNoCloudProviderControllerStarted(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	controllerCtx := ControllerContext{}
+	controllerCtx.ComponentConfig.Generic.Controllers = []string{"*"}
+	cpControllerDescriptors := make(map[string]*ControllerDescriptor)
+	for controllerName, controller := range NewControllerDescriptors() {
+		if !controller.IsCloudProviderController() {
+			continue
+		}
+
+		controller.constructor = func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
+			return newControllerLoop(func(ctx context.Context) {
+				t.Error("Controller should not be started:", controllerName)
+			}, controllerName), nil
+		}
+
+		cpControllerDescriptors[controllerName] = controller
+	}
+
+	var healthChecks mockHealthCheckAdder
+	if err := runControllers(ctx, controllerCtx, cpControllerDescriptors, &healthChecks); err != nil {
+		t.Error("Failed to start controllers:", err)
 	}
 }
 

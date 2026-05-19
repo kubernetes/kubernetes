@@ -22,21 +22,21 @@ var (
 )
 
 var gbk = internal.Encoding{
-	Encoding: &internal.SimpleEncoding{
-		Decoder: gbkDecoder{gb18030: false},
-		Encoder: gbkEncoder{gb18030: false},
+	&internal.SimpleEncoding{
+		gbkDecoder{gb18030: false},
+		gbkEncoder{gb18030: false},
 	},
-	Name: "GBK",
-	MIB:  identifier.GBK,
+	"GBK",
+	identifier.GBK,
 }
 
 var gbk18030 = internal.Encoding{
-	Encoding: &internal.SimpleEncoding{
-		Decoder: gbkDecoder{gb18030: true},
-		Encoder: gbkEncoder{gb18030: true},
+	&internal.SimpleEncoding{
+		gbkDecoder{gb18030: true},
+		gbkEncoder{gb18030: true},
 	},
-	Name: "GB18030",
-	MIB:  identifier.GB18030,
+	"GB18030",
+	identifier.GB18030,
 }
 
 type gbkDecoder struct {

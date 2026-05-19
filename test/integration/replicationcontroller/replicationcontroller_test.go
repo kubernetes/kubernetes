@@ -30,15 +30,18 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/replication"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
@@ -500,6 +503,7 @@ func TestSpecReplicasChange(t *testing.T) {
 }
 
 func TestLogarithmicScaleDown(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LogarithmicScaleDown, true)
 	tCtx, closeFn, rm, informers, c := rmSetup(t)
 	defer closeFn()
 	ns := framework.CreateNamespaceOrDie(c, "test-spec-replicas-change", t)
@@ -610,7 +614,7 @@ func TestOverlappingRCs(t *testing.T) {
 	defer stopControllers()
 
 	// Create 2 RCs with identical selectors
-	for i := range 2 {
+	for i := 0; i < 2; i++ {
 		// One RC has 1 replica, and another has 2 replicas
 		rc := newRC(fmt.Sprintf("rc-%d", i+1), ns.Name, i+1)
 		rcs, _ := createRCsPods(t, c, []*v1.ReplicationController{rc}, []*v1.Pod{})
@@ -625,7 +629,7 @@ func TestOverlappingRCs(t *testing.T) {
 	}
 
 	// Expect both RCs have .status.replicas = .spec.replicas
-	for i := range 2 {
+	for i := 0; i < 2; i++ {
 		newRC, err := c.CoreV1().ReplicationControllers(ns.Name).Get(tCtx, fmt.Sprintf("rc-%d", i+1), metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("failed to obtain rc rc-%d: %v", i+1, err)
@@ -826,7 +830,7 @@ func TestExtraPodsAdoptionAndDeletion(t *testing.T) {
 	rc := newRC("rc", ns.Name, 2)
 	// Create 3 pods, RC should adopt only 2 of them
 	podList := []*v1.Pod{}
-	for i := range 3 {
+	for i := 0; i < 3; i++ {
 		pod := newMatchingPod(fmt.Sprintf("pod-%d", i+1), ns.Name)
 		pod.Labels = labelMap()
 		podList = append(podList, pod)

@@ -66,9 +66,8 @@ const (
 // +k8s:prerelease-lifecycle-gen:introduced=1.2
 
 // Job represents the configuration of a single job.
-// +k8s:supportsSubresource="/status"
 type Job struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -90,7 +89,7 @@ type Job struct {
 
 // JobList is a collection of jobs.
 type JobList struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -534,6 +533,9 @@ type JobStatus struct {
 
 	// The number of pods which are terminating (in phase Pending or Running
 	// and have a deletionTimestamp).
+	//
+	// This field is beta-level. The job controller populates the field when
+	// the feature gate JobPodReplacementPolicy is enabled (enabled by default).
 	// +optional
 	Terminating *int32 `json:"terminating,omitempty" protobuf:"varint,11,opt,name=terminating"`
 
@@ -624,8 +626,10 @@ const (
 	// JobReasponDeadlineExceeded means job duration is past ActiveDeadline
 	JobReasonDeadlineExceeded string = "DeadlineExceeded"
 	// JobReasonMaxFailedIndexesExceeded indicates that an indexed of a job failed
+	// This const is used in beta-level feature: https://kep.k8s.io/3850.
 	JobReasonMaxFailedIndexesExceeded string = "MaxFailedIndexesExceeded"
 	// JobReasonFailedIndexes means Job has failed indexes.
+	// This const is used in beta-level feature: https://kep.k8s.io/3850.
 	JobReasonFailedIndexes string = "FailedIndexes"
 	// JobReasonSuccessPolicy reason indicates a SuccessCriteriaMet condition is added due to
 	// a Job met successPolicy.
@@ -673,9 +677,8 @@ type JobTemplateSpec struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.21
 
 // CronJob represents the configuration of a single cron job.
-// +k8s:supportsSubresource="/status"
 type CronJob struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -683,7 +686,7 @@ type CronJob struct {
 
 	// Specification of the desired behavior of a cron job, including the schedule.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +required
+	// +optional
 	Spec CronJobSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// Current status of a cron job.
@@ -697,7 +700,7 @@ type CronJob struct {
 
 // CronJobList is a collection of cron jobs.
 type CronJobList struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -712,8 +715,6 @@ type CronJobList struct {
 type CronJobSpec struct {
 
 	// The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
-	// +required
-	// +k8s:alpha(since: "1.36")=+k8s:required
 	Schedule string `json:"schedule" protobuf:"bytes,1,opt,name=schedule"`
 
 	// The time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones.

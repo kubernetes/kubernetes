@@ -1,4 +1,5 @@
 //go:build linux
+// +build linux
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -24,8 +25,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	libcontainercgroups "github.com/opencontainers/cgroups"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -82,16 +81,6 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups(logger klog.Logger
 	cgroupConfig := &CgroupConfig{
 		Name:               cm.cgroupRoot,
 		ResourceParameters: cm.getCgroupConfig(nodeAllocatable, false),
-	}
-
-	// Stale memory.min from a previously enabled MemoryQoS state can persist
-	// across kubelet restarts. Reset to 0 so rollback takes effect.
-	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.MemoryQoS) && libcontainercgroups.IsCgroup2UnifiedMode() {
-		rp := cgroupConfig.ResourceParameters
-		if rp.Unified == nil {
-			rp.Unified = make(map[string]string)
-		}
-		rp.Unified[Cgroup2MemoryMin] = "0"
 	}
 
 	// Using ObjectReference for events as the node maybe not cached; refer to #42701 for detail.
@@ -256,8 +245,6 @@ func getCgroupConfigInternal(rl v1.ResourceList, compressibleResourcesOnly bool)
 // Note that not all resources that are available on the node are included in the returned list of resources.
 // Returns a ResourceList.
 func (cm *containerManagerImpl) GetNodeAllocatableAbsolute() v1.ResourceList {
-	cm.RLock()
-	defer cm.RUnlock()
 	return cm.getNodeAllocatableAbsoluteImpl(cm.capacity)
 }
 
@@ -289,8 +276,6 @@ func (cm *containerManagerImpl) getNodeAllocatableInternalAbsolute() v1.Resource
 
 // GetNodeAllocatableReservation returns amount of compute or storage resource that have to be reserved on this node from scheduling.
 func (cm *containerManagerImpl) GetNodeAllocatableReservation() v1.ResourceList {
-	cm.RLock()
-	defer cm.RUnlock()
 	evictionReservation := hardEvictionReservation(cm.HardEvictionThresholds, cm.capacity)
 	result := make(v1.ResourceList)
 	for k := range cm.capacity {
@@ -314,8 +299,6 @@ func (cm *containerManagerImpl) GetNodeAllocatableReservation() v1.ResourceList 
 // validateNodeAllocatable ensures that the user specified Node Allocatable Configuration doesn't reserve more than the node capacity.
 // Returns error if the configuration is invalid, nil otherwise.
 func (cm *containerManagerImpl) validateNodeAllocatable() error {
-	cm.RLock()
-	defer cm.RUnlock()
 	var errors []string
 	nar := cm.GetNodeAllocatableReservation()
 	for k, v := range nar {

@@ -1,4 +1,5 @@
 //go:build !windows
+// +build !windows
 
 /*
 Copyright 2022 The Kubernetes Authors.
@@ -140,7 +141,7 @@ func MakeUserNsManager(logger klog.Logger, kl userNsPodsManager, idsPerPod *int6
 		// cast it.
 		userNsLength = uint32(*idsPerPod)
 	}
-	kubeletMappingID, kubeletMappingLen, err := kl.GetKubeletMappings(logger, userNsLength)
+	kubeletMappingID, kubeletMappingLen, err := kl.GetKubeletMappings(userNsLength)
 	if err != nil {
 		return nil, fmt.Errorf("kubelet mappings: %w", err)
 	}
@@ -393,7 +394,8 @@ func (m *UsernsManager) createUserNs(logger klog.Logger, pod *v1.Pod) (userNs us
 }
 
 // GetOrCreateUserNamespaceMappings returns the configuration for the sandbox user namespace
-func (m *UsernsManager) GetOrCreateUserNamespaceMappings(logger klog.Logger, pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error) {
+func (m *UsernsManager) GetOrCreateUserNamespaceMappings(ctx context.Context, pod *v1.Pod, runtimeHandler string) (*runtimeapi.UserNamespace, error) {
+	logger := klog.FromContext(ctx)
 	featureEnabled := utilfeature.DefaultFeatureGate.Enabled(features.UserNamespacesSupport)
 
 	// TODO: If the default value for hostUsers ever changes, change the default value of

@@ -81,7 +81,7 @@ func setRawTerminal(fd uintptr) (*State, error) {
 	return makeRaw(fd)
 }
 
-func setRawTerminalOutput(uintptr) (*State, error) {
+func setRawTerminalOutput(fd uintptr) (*State, error) {
 	return nil, nil
 }
 

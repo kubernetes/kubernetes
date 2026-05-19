@@ -20,6 +20,7 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -63,7 +64,7 @@ func TestUnschedulableNodes(t *testing.T) {
 	goodCondition := v1.NodeCondition{
 		Type:              v1.NodeReady,
 		Status:            v1.ConditionTrue,
-		Reason:            "schedulable condition",
+		Reason:            fmt.Sprintf("schedulable condition"),
 		LastHeartbeatTime: metav1.Time{Time: time.Now()},
 	}
 	// Create a new schedulable node, since we're first going to apply

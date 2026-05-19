@@ -209,7 +209,7 @@ func TestWebhookLoadBalance(t *testing.T) {
 
 			// Submit 10 parallel requests
 			wg := &sync.WaitGroup{}
-			for range 10 {
+			for i := 0; i < 10; i++ {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
@@ -221,7 +221,7 @@ func TestWebhookLoadBalance(t *testing.T) {
 			}
 			wg.Wait()
 
-			actual := trackingListener.connections.Load()
+			actual := atomic.LoadInt64(&trackingListener.connections)
 			if tc.http2 && actual != tc.expected {
 				t.Errorf("expected %d connections, got %d", tc.expected, actual)
 			}
@@ -232,7 +232,7 @@ func TestWebhookLoadBalance(t *testing.T) {
 
 			// Submit 10 more parallel requests
 			wg = &sync.WaitGroup{}
-			for range 10 {
+			for i := 0; i < 10; i++ {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
@@ -244,7 +244,7 @@ func TestWebhookLoadBalance(t *testing.T) {
 			}
 			wg.Wait()
 
-			if actual := trackingListener.connections.Load(); actual > 0 {
+			if actual := atomic.LoadInt64(&trackingListener.connections); actual > 0 {
 				t.Errorf("expected no additional connections (reusing kept-alive connections), got %d", actual)
 			}
 		})
@@ -338,18 +338,18 @@ var loadBalanceMarkerFixture = &corev1.Pod{
 }
 
 type connectionTrackingListener struct {
-	connections atomic.Int64
+	connections int64
 	delegate    net.Listener
 }
 
 func (c *connectionTrackingListener) Reset() {
-	c.connections.Store(0)
+	atomic.StoreInt64(&c.connections, 0)
 }
 
 func (c *connectionTrackingListener) Accept() (net.Conn, error) {
 	conn, err := c.delegate.Accept()
 	if err == nil {
-		c.connections.Add(1)
+		atomic.AddInt64(&c.connections, 1)
 	}
 	return conn, err
 }

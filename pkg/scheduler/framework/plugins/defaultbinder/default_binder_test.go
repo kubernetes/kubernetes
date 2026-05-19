@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -94,7 +95,7 @@ func TestDefaultBinder(t *testing.T) {
 					t.Fatal(err)
 				}
 				if asyncAPICallsEnabled {
-					cache := internalcache.New(ctx, apiDispatcher, false)
+					cache := internalcache.New(ctx, time.Duration(0), apiDispatcher)
 					fh.SetAPICacher(apicache.New(nil, cache))
 				}
 

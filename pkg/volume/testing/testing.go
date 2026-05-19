@@ -21,7 +21,6 @@ import (
 	"os"
 	"path/filepath"
 	goruntime "runtime"
-	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -200,10 +199,6 @@ type FakeVolumePlugin struct {
 	// Add callbacks as needed
 	WaitForAttachHook func(spec *volume.Spec, devicePath string, pod *v1.Pod, spectimeout time.Duration) (string, error)
 	UnmountDeviceHook func(globalMountPath string) error
-	SetUpHook         func(plugin volume.VolumePlugin, mounterArgs volume.MounterArgs) error
-
-	// Inject error to NewUnmounterError
-	NewUnmounterError error
 
 	Mounters             []*FakeVolume
 	Unmounters           []*FakeVolume
@@ -231,14 +226,12 @@ func (plugin *FakeVolumePlugin) getFakeVolume(list *[]*FakeVolume) *FakeVolume {
 			defer volume.Unlock()
 			volume.WaitForAttachHook = plugin.WaitForAttachHook
 			volume.UnmountDeviceHook = plugin.UnmountDeviceHook
-			volume.SetUpHook = plugin.SetUpHook
 			return volume
 		}
 	}
 	volume := &FakeVolume{
 		WaitForAttachHook: plugin.WaitForAttachHook,
 		UnmountDeviceHook: plugin.UnmountDeviceHook,
-		SetUpHook:         plugin.SetUpHook,
 	}
 	volume.VolumesAttached = make(map[string]sets.Set[string])
 	volume.DeviceMountState = make(map[string]string)
@@ -328,9 +321,6 @@ func (plugin *FakeVolumePlugin) GetMounters() (Mounters []*FakeVolume) {
 func (plugin *FakeVolumePlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
 	plugin.Lock()
 	defer plugin.Unlock()
-	if plugin.NewUnmounterError != nil {
-		return nil, plugin.NewUnmounterError
-	}
 	fakeVolume := plugin.getFakeVolume(&plugin.Unmounters)
 	fakeVolume.Lock()
 	defer fakeVolume.Unlock()
@@ -699,7 +689,6 @@ type FakeVolume struct {
 	// Add callbacks as needed
 	WaitForAttachHook func(spec *volume.Spec, devicePath string, pod *v1.Pod, spectimeout time.Duration) (string, error)
 	UnmountDeviceHook func(globalMountPath string) error
-	SetUpHook         func(plugin volume.VolumePlugin, mounterArgs volume.MounterArgs) error
 
 	SetUpCallCount              int
 	TearDownCallCount           int
@@ -749,9 +738,6 @@ func (fv *FakeVolume) SetUp(mounterArgs volume.MounterArgs) error {
 	defer fv.Unlock()
 	err := fv.setupInternal(mounterArgs)
 	fv.SetUpCallCount++
-	if fv.SetUpHook != nil {
-		return fv.SetUpHook(fv.Plugin, mounterArgs)
-	}
 	return err
 }
 
@@ -1749,5 +1735,10 @@ func MetricsEqualIgnoreTimestamp(a *volume.Metrics, b *volume.Metrics) bool {
 }
 
 func ContainsAccessMode(modes []v1.PersistentVolumeAccessMode, mode v1.PersistentVolumeAccessMode) bool {
-	return slices.Contains(modes, mode)
+	for _, m := range modes {
+		if m == mode {
+			return true
+		}
+	}
+	return false
 }

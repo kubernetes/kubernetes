@@ -34,7 +34,7 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-func Test_isSchedulableAfterAssignedPodChange(t *testing.T) {
+func Test_isSchedulableAfterPodChange(t *testing.T) {
 	tests := []struct {
 		name           string
 		pod            *v1.Pod
@@ -43,120 +43,90 @@ func Test_isSchedulableAfterAssignedPodChange(t *testing.T) {
 	}{
 		{
 			name:         "add a pod which matches the pod affinity",
-			pod:          st.MakePod().UID("p").Name("p").PodAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
-			newPod:       st.MakePod().UID("other").Node("fake-node").Label("service", "securityscan").Obj(),
+			pod:          st.MakePod().Name("p").PodAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
+			newPod:       st.MakePod().Node("fake-node").Label("service", "securityscan").Obj(),
 			expectedHint: fwk.Queue,
 		},
 		{
 			name:         "add an un-scheduled pod",
-			pod:          st.MakePod().UID("p").Name("p").PodAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
-			newPod:       st.MakePod().UID("other").Label("service", "securityscan").Obj(),
+			pod:          st.MakePod().Name("p").PodAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
+			newPod:       st.MakePod().Label("service", "securityscan").Obj(),
 			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name:         "add a pod which doesn't match the pod affinity",
-			pod:          st.MakePod().UID("p").Name("p").PodAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
-			newPod:       st.MakePod().UID("other").Node("fake-node").Label("aaa", "a").Obj(),
+			pod:          st.MakePod().Name("p").PodAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
+			newPod:       st.MakePod().Node("fake-node").Label("aaa", "a").Obj(),
 			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name:         "update a pod from non-match to match pod affinity",
-			pod:          st.MakePod().UID("p").Name("p").PodAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
-			newPod:       st.MakePod().UID("other").Node("fake-node").Label("service", "securityscan").Obj(),
-			oldPod:       st.MakePod().UID("other").Node("fake-node").Label("aaa", "a").Obj(),
+			pod:          st.MakePod().Name("p").PodAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
+			newPod:       st.MakePod().Node("fake-node").Label("service", "securityscan").Obj(),
+			oldPod:       st.MakePod().Node("fake-node").Label("aaa", "a").Obj(),
 			expectedHint: fwk.Queue,
 		},
 		{
 			name:         "the updating pod matches target pod's affinity both before and after label changes",
-			pod:          st.MakePod().UID("p").Name("p").PodAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
-			newPod:       st.MakePod().UID("other").Node("fake-node").Label("service", "securityscan").Obj(),
-			oldPod:       st.MakePod().UID("other").Node("fake-node").Label("service", "value2").Obj(),
+			pod:          st.MakePod().Name("p").PodAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
+			newPod:       st.MakePod().Node("fake-node").Label("service", "securityscan").Obj(),
+			oldPod:       st.MakePod().Node("fake-node").Label("service", "value2").Obj(),
 			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name:         "update an un-scheduled pod",
-			pod:          st.MakePod().UID("p").Name("p").PodAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
-			newPod:       st.MakePod().UID("other").Label("service", "securityscan").Obj(),
-			oldPod:       st.MakePod().UID("other").Label("aaa", "a").Obj(),
+			pod:          st.MakePod().Name("p").PodAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
+			newPod:       st.MakePod().Label("service", "securityscan").Obj(),
+			oldPod:       st.MakePod().Label("service", "securityscan").Obj(),
 			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name:         "update a pod from match to non-match the pod affinity",
-			pod:          st.MakePod().UID("p").Name("p").PodAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
-			newPod:       st.MakePod().UID("other").Node("fake-node").Label("aaa", "a").Obj(),
-			oldPod:       st.MakePod().UID("other").Node("fake-node").Label("service", "securityscan").Obj(),
+			pod:          st.MakePod().Name("p").PodAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAffinityWithRequiredReq).Obj(),
+			newPod:       st.MakePod().Node("fake-node").Label("aaa", "a").Obj(),
+			oldPod:       st.MakePod().Node("fake-node").Label("service", "securityscan").Obj(),
 			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name: "update a pod from match to non-match pod's affinity - multiple terms case",
-			pod: st.MakePod().UID("p").Name("p").PodAffinityExists("aaa", "hostname", st.PodAffinityWithRequiredReq).
+			pod: st.MakePod().Name("p").PodAffinityExists("aaa", "hostname", st.PodAffinityWithRequiredReq).
 				PodAffinityExists("bbb", "hostname", st.PodAffinityWithRequiredReq).Obj(),
-			newPod:       st.MakePod().UID("other").Node("fake-node").Label("service", "securityscan").Obj(),
-			oldPod:       st.MakePod().UID("other").Node("fake-node").Label("aaa", "a").Obj(),
+			newPod:       st.MakePod().Node("fake-node").Label("service", "securityscan").Obj(),
+			oldPod:       st.MakePod().Node("fake-node").Label("aaa", "a").Obj(),
 			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name: "update a pod from non-match to match pod's affinity - multiple terms case",
-			pod: st.MakePod().UID("p").Name("p").PodAffinityExists("aaa", "hostname", st.PodAffinityWithRequiredReq).
+			pod: st.MakePod().Name("p").PodAffinityExists("aaa", "hostname", st.PodAffinityWithRequiredReq).
 				PodAffinityExists("bbb", "hostname", st.PodAffinityWithRequiredReq).Obj(),
-			newPod:       st.MakePod().UID("other").Node("fake-node").Label("aaa", "").Label("bbb", "").Obj(),
-			oldPod:       st.MakePod().UID("other").Node("fake-node").Label("aaa", "a").Obj(),
+			newPod:       st.MakePod().Node("fake-node").Label("aaa", "").Label("bbb", "").Obj(),
+			oldPod:       st.MakePod().Node("fake-node").Label("aaa", "a").Obj(),
 			expectedHint: fwk.Queue,
 		},
 		{
 			name:         "modify pod label to change it from satisfying pod anti-affinity to not satisfying anti-affinity",
-			pod:          st.MakePod().UID("p").Name("p").PodAntiAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Obj(),
-			newPod:       st.MakePod().UID("other").Node("fake-node").Label("service", "aaaa").Obj(),
-			oldPod:       st.MakePod().UID("other").Node("fake-node").Label("service", "securityscan").Obj(),
+			pod:          st.MakePod().Name("p").PodAntiAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Obj(),
+			newPod:       st.MakePod().Node("fake-node").Label("service", "aaaa").Obj(),
+			oldPod:       st.MakePod().Node("fake-node").Label("service", "securityscan").Obj(),
 			expectedHint: fwk.Queue,
 		},
 		{
 			name:         "modify pod label to change it from not satisfying pod anti-affinity to satisfying anti-affinity",
-			pod:          st.MakePod().UID("p").Name("p").PodAntiAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Obj(),
-			newPod:       st.MakePod().UID("other").Node("fake-node").Label("service", "securityscan").Obj(),
-			oldPod:       st.MakePod().UID("other").Node("fake-node").Label("service", "bbb").Obj(),
+			pod:          st.MakePod().Name("p").PodAntiAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Obj(),
+			newPod:       st.MakePod().Node("fake-node").Label("service", "securityscan").Obj(),
+			oldPod:       st.MakePod().Node("fake-node").Label("service", "bbb").Obj(),
 			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name:         "delete a pod which doesn't match pod's anti-affinity",
-			pod:          st.MakePod().UID("p").Name("p").PodAntiAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Obj(),
-			oldPod:       st.MakePod().UID("other").Node("fake-node").Label("aaa", "a").Obj(),
+			pod:          st.MakePod().Name("p").PodAntiAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Obj(),
+			oldPod:       st.MakePod().Node("fake-node").Label("aaa", "a").Obj(),
 			expectedHint: fwk.QueueSkip,
 		},
 		{
 			name:         "delete a pod which matches pod's anti-affinity",
-			pod:          st.MakePod().UID("p").Name("p").PodAntiAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Obj(),
-			oldPod:       st.MakePod().UID("other").Node("fake-node").Label("service", "securityscan").Obj(),
-			expectedHint: fwk.Queue,
-		},
-		{
-			name:         "delete a pod with anti-affinity that matches pending pod",
-			pod:          st.MakePod().Name("p").Label("service", "securityscan").Obj(),
-			oldPod:       st.MakePod().Node("fake-node").PodAntiAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Obj(),
-			expectedHint: fwk.Queue,
-		},
-		{
-			name:         "delete a pod with anti-affinity that doesn't match pending pod",
-			pod:          st.MakePod().Name("p").Label("service", "foo").Obj(),
-			oldPod:       st.MakePod().Node("fake-node").PodAntiAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Obj(),
-			expectedHint: fwk.QueueSkip,
-		},
-		{
-			name:         "delete a pod which doesn't match pending pod's anti-affinity and has anti-affinity that doesn't match pending pod",
-			pod:          st.MakePod().Name("p").PodAntiAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Label("service", "foo").Obj(),
-			oldPod:       st.MakePod().Node("fake-node").PodAntiAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Label("service", "foo").Obj(),
-			expectedHint: fwk.QueueSkip,
-		},
-		{
-			name:         "delete a nominated pod which doesn't match pod's anti-affinity",
 			pod:          st.MakePod().Name("p").PodAntiAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Obj(),
-			oldPod:       st.MakePod().NominatedNodeName("fake-node").Label("aaa", "a").Obj(),
-			expectedHint: fwk.QueueSkip,
-		},
-		{
-			name:         "delete a nominated pod which matches pod's anti-affinity",
-			pod:          st.MakePod().Name("p").PodAntiAffinityIn("service", "region", []string{"securityscan", "value2"}, st.PodAntiAffinityWithRequiredReq).Obj(),
-			oldPod:       st.MakePod().NominatedNodeName("fake-node").Label("service", "securityscan").Obj(),
+			oldPod:       st.MakePod().Node("fake-node").Label("service", "securityscan").Obj(),
 			expectedHint: fwk.Queue,
 		},
 	}
@@ -169,33 +139,14 @@ func Test_isSchedulableAfterAssignedPodChange(t *testing.T) {
 			snapshot := cache.NewSnapshot(nil, nil)
 			pl := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, snapshot, namespaces)
 			p := pl.(*InterPodAffinity)
-			actualHint, err := p.isSchedulableAfterAssignedPodChange(logger, tc.pod, tc.oldPod, tc.newPod)
+			actualHint, err := p.isSchedulableAfterPodChange(logger, tc.pod, tc.oldPod, tc.newPod)
 			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
+				t.Errorf("unexpected error: %v", err)
 			}
 			if diff := cmp.Diff(tc.expectedHint, actualHint); diff != "" {
-				t.Errorf("unexpected QueueingHint (-want, +got):\n%s", diff)
+				t.Errorf("expected QueuingHint doesn't match (-want,+got): \n %s", diff)
 			}
 		})
-	}
-}
-
-func Test_isSchedulableAfterTargetPodUpdateLabel(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	pod := st.MakePod().UID("p").Name("p").Label("foo", "baz").Obj()
-
-	snapshot := cache.NewSnapshot(nil, nil)
-	pl := plugintesting.SetupPluginWithInformers(ctx, t, schedruntime.FactoryAdapter(feature.Features{}, New), &config.InterPodAffinityArgs{}, snapshot, namespaces)
-	p := pl.(*InterPodAffinity)
-	actualHint, err := p.isSchedulableAfterTargetPodUpdateLabel(logger, pod, pod.DeepCopy(), pod.DeepCopy())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if diff := cmp.Diff(fwk.Queue, actualHint); diff != "" {
-		t.Errorf("unexpected QueueingHint (-want, +got):\n%s", diff)
 	}
 }
 

@@ -1,4 +1,5 @@
 //go:build linux
+// +build linux
 
 /*
 Copyright 2020 The Kubernetes Authors.
@@ -20,7 +21,6 @@ limitations under the License.
 package nodeshutdown
 
 import (
-	"context"
 	"fmt"
 	"path/filepath"
 	"sync"
@@ -63,7 +63,7 @@ type managerImpl struct {
 	nodeRef  *v1.ObjectReference
 
 	getPods        eviction.ActivePodsFunc
-	syncNodeStatus func(context.Context)
+	syncNodeStatus func()
 
 	dbusCon     dbusInhibiter
 	inhibitLock systemd.InhibitLock
@@ -144,30 +144,20 @@ func (m *managerImpl) setMetrics() {
 }
 
 // Start starts the node shutdown manager and will start watching the node for shutdown events.
-func (m *managerImpl) Start(ctx context.Context) error {
-	stop, err := m.start(ctx)
+func (m *managerImpl) Start() error {
+	stop, err := m.start()
 	if err != nil {
 		return err
 	}
 	go func() {
 		for {
 			if stop != nil {
-				select {
-				case <-stop:
-				case <-ctx.Done():
-					return
-				}
+				<-stop
 			}
 
-			t := time.NewTimer(dbusReconnectPeriod)
-			select {
-			case <-t.C:
-			case <-ctx.Done():
-				t.Stop()
-				return
-			}
+			time.Sleep(dbusReconnectPeriod)
 			m.logger.V(1).Info("Restarting watch for node shutdown events")
-			stop, err = m.start(ctx)
+			stop, err = m.start()
 			if err != nil {
 				m.logger.Error(err, "Unable to watch the node for shutdown events")
 			}
@@ -178,7 +168,7 @@ func (m *managerImpl) Start(ctx context.Context) error {
 	return nil
 }
 
-func (m *managerImpl) start(ctx context.Context) (chan struct{}, error) {
+func (m *managerImpl) start() (chan struct{}, error) {
 	systemBus, err := systemDbus()
 	if err != nil {
 		return nil, err
@@ -258,9 +248,6 @@ func (m *managerImpl) start(ctx context.Context) (chan struct{}, error) {
 		// 3. When shutdown(false) event is received, this indicates a previous shutdown was cancelled. In this case, acquire the inhibit lock again.
 		for {
 			select {
-			case <-ctx.Done():
-				close(stop)
-				return
 			case isShuttingDown, ok := <-events:
 				if !ok {
 					m.logger.Error(err, "Ended to watching the node for shutdown events")
@@ -288,12 +275,9 @@ func (m *managerImpl) start(ctx context.Context) (chan struct{}, error) {
 
 				if isShuttingDown {
 					// Update node status and ready condition
-					nodeStatusCtx := klog.NewContext(ctx, m.logger)
-					go m.syncNodeStatus(nodeStatusCtx)
+					go m.syncNodeStatus()
 
-					if err := m.processShutdownEvent(ctx); err != nil {
-						m.logger.Error(err, "Shutdown manager failed to process shutdown event")
-					}
+					m.processShutdownEvent()
 				} else {
 					_ = m.acquireInhibitLock()
 				}
@@ -326,7 +310,7 @@ func (m *managerImpl) ShutdownStatus() error {
 	return nil
 }
 
-func (m *managerImpl) processShutdownEvent(ctx context.Context) error {
+func (m *managerImpl) processShutdownEvent() error {
 	m.logger.V(1).Info("Shutdown manager processing shutdown event")
 	activePods := m.getPods()
 
@@ -359,5 +343,5 @@ func (m *managerImpl) processShutdownEvent(ctx context.Context) error {
 		}()
 	}
 
-	return m.podManager.killPods(ctx, activePods)
+	return m.podManager.killPods(activePods)
 }

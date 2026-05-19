@@ -304,7 +304,7 @@ func contactOthers(state *State) {
 
 	// Do this repeatedly, in case there's some propagation delay with getting
 	// newly started pods into the endpoints list.
-	for range 15 {
+	for i := 0; i < 15; i++ {
 		eps := getWebserverEndpoints(client)
 		for ep := range eps {
 			state.Logf("Attempting to contact %s", ep)

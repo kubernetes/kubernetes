@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -43,7 +43,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
-func NewDispatcher(a authorizer.UnconditionalAuthorizer, m *matching.Matcher, tcm patch.TypeConverterManager) generic.Dispatcher[PolicyHook] {
+func NewDispatcher(a authorizer.Authorizer, m *matching.Matcher, tcm patch.TypeConverterManager) generic.Dispatcher[PolicyHook] {
 	res := &dispatcher{
 		matcher:              m,
 		authz:                a,
@@ -60,7 +60,7 @@ func NewDispatcher(a authorizer.UnconditionalAuthorizer, m *matching.Matcher, tc
 
 type dispatcher struct {
 	matcher              *matching.Matcher
-	authz                authorizer.UnconditionalAuthorizer
+	authz                authorizer.Authorizer
 	typeConverterManager patch.TypeConverterManager
 	generic.Dispatcher[PolicyHook]
 }
@@ -137,8 +137,8 @@ func (d *dispatcher) dispatchInvocations(
 	// Should loop through invocations, handling possible error and invoking
 	// evaluator to apply patch, also should handle re-invocations
 	for _, invocation := range invocations {
-		if invocation.Evaluator.CompositedCompiler != nil {
-			ctx = invocation.Evaluator.CompositedCompiler.CreateContext(ctx)
+		if invocation.Evaluator.CompositionEnv != nil {
+			ctx = invocation.Evaluator.CompositionEnv.CreateContext(ctx)
 		}
 		if len(invocation.Evaluator.Mutators) != len(invocation.Policy.Spec.Mutations) {
 			// This would be a bug. The compiler should always return exactly as
@@ -177,12 +177,12 @@ func (d *dispatcher) dispatchInvocations(
 			continue
 		}
 
-		objectBeforeMutations := versionedAttr.VersionedObject.Object()
+		objectBeforeMutations := versionedAttr.VersionedObject
 		// Mutations for a single invocation of a MutatingAdmissionPolicy are evaluated
 		// in order.
 		for mutationIndex := range invocation.Policy.Spec.Mutations {
 			lastVersionedAttr = versionedAttr
-			if versionedAttr.VersionedObject.Object() == nil { // Do not call patchers if there is no object to patch.
+			if versionedAttr.VersionedObject == nil { // Do not call patchers if there is no object to patch.
 				continue
 			}
 
@@ -205,20 +205,20 @@ func (d *dispatcher) dispatchInvocations(
 				celmetrics.Metrics.ObserveAdmission(ctx, elapsed, invocation.Policy.Name, invocation.Binding.Name, celmetrics.MutationNoError)
 			}
 		}
-		if !apiequality.Semantic.DeepEqual(objectBeforeMutations, versionedAttr.VersionedObject.Object()) {
+		if !apiequality.Semantic.DeepEqual(objectBeforeMutations, versionedAttr.VersionedObject) {
 			// The mutation has changed the object. Prepare to reinvoke all previous mutations that are eligible for re-invocation.
 			policyReinvokeCtx.RequireReinvokingPreviouslyInvokedPlugins()
 			reinvokeCtx.SetShouldReinvoke()
 		}
-		if invocation.Policy.Spec.ReinvocationPolicy == admissionregistrationv1.IfNeededReinvocationPolicy {
+		if invocation.Policy.Spec.ReinvocationPolicy == v1beta1.IfNeededReinvocationPolicy {
 			policyReinvokeCtx.AddReinvocablePolicyToPreviouslyInvoked(invocationKey)
 		}
 	}
 
-	if lastVersionedAttr != nil && lastVersionedAttr.VersionedObject.Object() != nil && lastVersionedAttr.Dirty {
+	if lastVersionedAttr != nil && lastVersionedAttr.VersionedObject != nil && lastVersionedAttr.Dirty {
 		policyReinvokeCtx.RequireReinvokingPreviouslyInvokedPlugins()
 		reinvokeCtx.SetShouldReinvoke()
-		if err := o.GetObjectConvertor().Convert(lastVersionedAttr.VersionedObject.Object(), lastVersionedAttr.Attributes.GetObject(), nil); err != nil {
+		if err := o.GetObjectConvertor().Convert(lastVersionedAttr.VersionedObject, lastVersionedAttr.Attributes.GetObject(), nil); err != nil {
 			return nil, k8serrors.NewInternalError(fmt.Errorf("failed to convert object: %w", err))
 		}
 	}
@@ -261,7 +261,7 @@ func (d *dispatcher) dispatchOne(
 		return err
 	}
 
-	switch versionedAttributes.VersionedObject.Object().(type) {
+	switch versionedAttributes.VersionedObject.(type) {
 	case *unstructured.Unstructured:
 		// No conversion needed before defaulting for the patch object if the admitted object is unstructured.
 	default:
@@ -272,7 +272,9 @@ func (d *dispatcher) dispatchOne(
 		}
 	}
 	o.GetObjectDefaulter().Default(newVersionedObject)
-	versionedAttributes.UpdateObject(newVersionedObject)
+
+	versionedAttributes.Dirty = true
+	versionedAttributes.VersionedObject = newVersionedObject
 	return nil
 }
 

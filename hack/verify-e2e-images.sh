@@ -24,10 +24,6 @@ cd "${KUBE_ROOT}"
 source hack/lib/init.sh
 ret=0
 
-# We need deterministic sort order and want to avoid this extra log output:
-#   i18n.go:119] Couldn't find the LC_ALL, LC_MESSAGES or LANG environment variables, defaulting to en_US
-export LC_ALL=C
-
 # NOTE: Please do NOT add any to this list!!
 #
 # We are aiming to consolidate on: registry.k8s.io/e2e-test-images/agnhost
@@ -43,10 +39,7 @@ e2e_test="$(kube::util::find-binary e2e.test)"
 # validate "e2e.test --list-images":
 # - no unexpected output (whether it's on stderr or stdout)
 # - zero exit code (indirectly ensures that tests are set up properly)
-#
-# For now (https://github.com/google/cadvisor/issues/3707, https://github.com/google/cadvisor/pull/3778)
-# we have to ignore additional output caused by cadvisor.
-output=$("${e2e_test}" --list-images 2>&1 | grep -v 'factory.go.*Registered Plugin' ) || ret=$?
+output=$("${e2e_test}" --list-images 2>&1) || ret=$?
 if [[ $ret -ne 0 ]]; then
   >&2 echo "FAIL: '${e2e_test} --list-images' failed:"
   >&2 echo "${output}"
@@ -61,7 +54,7 @@ if [[ -n "${unexpected_output}" ]]; then
 fi
 
 # extract image names without the version
-kube::util::read-array IMAGES < <(echo "${output}" | sed -E 's/^([[:alnum:]/.-]+):[^:]+$/\1/' | sort -u)
+kube::util::read-array IMAGES < <(echo "${output}" | sed -E 's/^([[:alnum:]/.-]+):[^:]+$/\1/' | LC_ALL=C sort -u)
 
 # diff versus known permitted images
 >&2 echo "Diffing e2e image list ..."

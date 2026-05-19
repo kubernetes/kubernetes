@@ -19,6 +19,7 @@ package rolebinding
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -30,13 +31,13 @@ import (
 
 // strategy implements behavior for RoleBindings
 type strategy struct {
-	rest.DeclarativeValidation
+	runtime.ObjectTyper
 	names.NameGenerator
 }
 
 // strategy is the default logic that applies when creating and updating
 // RoleBinding objects.
-var Strategy = strategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
+var Strategy = strategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // Strategy should implement rest.RESTCreateStrategy
 var _ rest.RESTCreateStrategy = Strategy
@@ -50,7 +51,7 @@ func (strategy) NamespaceScoped() bool {
 }
 
 // AllowCreateOnUpdate is true for RoleBindings.
-func (strategy) AllowCreateOnUpdate(ctx context.Context) bool {
+func (strategy) AllowCreateOnUpdate() bool {
 	return true
 }
 
@@ -71,7 +72,8 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 // Validate validates a new RoleBinding. Validation must check for a correct signature.
 func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	roleBinding := obj.(*rbac.RoleBinding)
-	return validation.ValidateRoleBinding(roleBinding)
+	allErrs := validation.ValidateRoleBinding(roleBinding)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, roleBinding, nil, allErrs, operation.Create)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -88,15 +90,9 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 	newRoleBinding := obj.(*rbac.RoleBinding)
 	oldRoleBinding := old.(*rbac.RoleBinding)
 
-	return validation.ValidateRoleBindingUpdate(newRoleBinding, oldRoleBinding)
-}
+	allErrs := validation.ValidateRoleBindingUpdate(newRoleBinding, oldRoleBinding)
 
-func (strategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
-	// Match declarative validation short-circuit errors with handwritten child field errors.
-	// This is required because RoleBinding.RoleRef is immutable.
-	return rest.DeclarativeValidationConfig{
-		ShortCircuitMismatch: true,
-	}
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newRoleBinding, oldRoleBinding, allErrs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -109,6 +105,6 @@ func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) [
 // populates it with the latest version. Else, it checks that the
 // version specified by the user matches the version of latest etcd
 // object.
-func (strategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+func (strategy) AllowUnconditionalUpdate() bool {
 	return true
 }

@@ -21,7 +21,6 @@ import (
 
 	"k8s.io/kube-openapi/pkg/internal"
 	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
-	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/jsontext"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -61,7 +60,7 @@ func (o *OpenAPI) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&p)
 }
 
-func (o *OpenAPI) MarshalJSONTo(enc *jsontext.Encoder) error {
+func (o *OpenAPI) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
 	type OpenAPIOmitZero struct {
 		Version             string                 `json:"openapi"`
 		Info                *spec.Info             `json:"info"`
@@ -72,5 +71,5 @@ func (o *OpenAPI) MarshalJSONTo(enc *jsontext.Encoder) error {
 		ExternalDocs        *ExternalDocumentation `json:"externalDocs,omitzero"`
 	}
 	x := (*OpenAPIOmitZero)(o)
-	return jsonv2.MarshalEncode(enc, x)
+	return opts.MarshalNext(enc, x)
 }

@@ -217,7 +217,7 @@ func testDynamicClientWatch(t *testing.T, client clientset.Interface, dynamicCli
 	}
 
 	rv1 := ""
-	for i := range 10 {
+	for i := 0; i < 10; i++ {
 		event := mkEvent(i)
 		got, err := client.CoreV1().Events("default").Create(context.TODO(), event, metav1.CreateOptions{})
 		if err != nil {

@@ -34,12 +34,12 @@ import (
 
 // daemonSetStrategy implements verification logic for daemon sets.
 type daemonSetStrategy struct {
-	rest.DeclarativeValidation
+	runtime.ObjectTyper
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating DaemonSet objects.
-var Strategy = daemonSetStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
+var Strategy = daemonSetStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // Make sure we correctly implement the interface.
 var _ = rest.GarbageCollectionDeleteStrategy(Strategy)
@@ -132,7 +132,7 @@ func (daemonSetStrategy) Canonicalize(obj runtime.Object) {
 
 // AllowCreateOnUpdate is false for daemon set; this means a POST is
 // needed to create one
-func (daemonSetStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
+func (daemonSetStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
@@ -159,7 +159,7 @@ func (daemonSetStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.
 }
 
 // AllowUnconditionalUpdate is the default update policy for daemon set objects.
-func (daemonSetStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+func (daemonSetStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 

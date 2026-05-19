@@ -1,4 +1,5 @@
 //go:build x86
+// +build x86
 
 // Copyright 2021 Google Inc. All Rights Reserved.
 //

@@ -53,7 +53,7 @@ func (f *FallbackExecutor) Stream(options StreamOptions) error {
 func (f *FallbackExecutor) StreamWithContext(ctx context.Context, options StreamOptions) error {
 	err := f.primary.StreamWithContext(ctx, options)
 	if err != nil && f.shouldFallback(err) {
-		klog.FromContext(ctx).V(4).Info("RemoteCommand fallback", "err", err)
+		klog.V(4).Infof("RemoteCommand fallback: %v", err)
 		return f.secondary.StreamWithContext(ctx, options)
 	}
 	return err

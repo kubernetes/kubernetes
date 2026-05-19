@@ -22,7 +22,6 @@ import (
 	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
 	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
-	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/jsontext"
 )
 
 // Paths holds the relative paths to the individual endpoints.
@@ -71,7 +70,7 @@ func (p *Paths) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (p *Paths) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+func (p *Paths) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
 	tok, err := dec.ReadToken()
 	if err != nil {
 		return err
@@ -95,7 +94,7 @@ func (p *Paths) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 			switch k := tok.String(); {
 			case internal.IsExtensionKey(k):
 				ext = nil
-				if err := jsonv2.UnmarshalDecode(dec, &ext); err != nil {
+				if err := opts.UnmarshalNext(dec, &ext); err != nil {
 					return err
 				}
 
@@ -105,7 +104,7 @@ func (p *Paths) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
 				p.Extensions[k] = ext
 			case len(k) > 0 && k[0] == '/':
 				pi = PathItem{}
-				if err := jsonv2.UnmarshalDecode(dec, &pi); err != nil {
+				if err := opts.UnmarshalNext(dec, &pi); err != nil {
 					return err
 				}
 
@@ -149,7 +148,7 @@ func (p Paths) MarshalJSON() ([]byte, error) {
 	return concated, nil
 }
 
-func (p Paths) MarshalJSONTo(enc *jsontext.Encoder) error {
+func (p Paths) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
 	m := make(map[string]any, len(p.Extensions)+len(p.Paths))
 	for k, v := range p.Extensions {
 		if internal.IsExtensionKey(k) {
@@ -161,5 +160,5 @@ func (p Paths) MarshalJSONTo(enc *jsontext.Encoder) error {
 			m[k] = v
 		}
 	}
-	return jsonv2.MarshalEncode(enc, m)
+	return opts.MarshalNext(enc, m)
 }

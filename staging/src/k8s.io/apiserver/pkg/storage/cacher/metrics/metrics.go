@@ -20,9 +20,6 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/features"
-	storagemetrics "k8s.io/apiserver/pkg/storage/metrics"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	compbasemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -115,7 +112,7 @@ var (
 			Namespace:      namespace,
 			Subsystem:      subsystem,
 			Name:           "resource_version",
-			Help:           "Current resource version of watch cache broken by resource type. This is truncated to the 15 least significant digits.",
+			Help:           "Current resource version of watch cache broken by resource type.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"group", "resource"},
@@ -162,29 +159,6 @@ var (
 		[]string{"group", "resource"},
 	)
 
-	WatchCacheInitializationErrors = compbasemetrics.NewCounterVec(
-		&compbasemetrics.CounterOpts{
-			Namespace:      namespace,
-			Subsystem:      subsystem,
-			Name:           "initialization_errors_total",
-			Help:           "Counter of watch cache initialization errors broken by resource type.",
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{"group", "resource"},
-	)
-
-	WatchCacheInitializationDuration = compbasemetrics.NewHistogramVec(
-		&compbasemetrics.HistogramOpts{
-			Namespace:      namespace,
-			Subsystem:      subsystem,
-			Name:           "initialization_duration_seconds",
-			Help:           "Histogram of watch cache initialization duration in seconds, broken by resource type.",
-			StabilityLevel: compbasemetrics.ALPHA,
-			Buckets:        []float64{0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60, 180, 600},
-		},
-		[]string{"group", "resource"},
-	)
-
 	WatchCacheReadWait = compbasemetrics.NewHistogramVec(
 		&compbasemetrics.HistogramOpts{
 			Namespace:      namespace,
@@ -211,26 +185,6 @@ var (
 			Help:           "Counter for status of consistency checks between etcd and watch cache",
 			StabilityLevel: compbasemetrics.ALPHA,
 		}, []string{"group", "resource", "status"})
-
-	WatchShardsTotal = compbasemetrics.NewGaugeVec(
-		&compbasemetrics.GaugeOpts{
-			Namespace:      namespace,
-			Name:           "watch_shards_total",
-			Help:           "Number of active sharded watch connections broken by resource type.",
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{"group", "resource"},
-	)
-
-	WatchFilteredEventsTotal = compbasemetrics.NewCounterVec(
-		&compbasemetrics.CounterOpts{
-			Namespace:      namespace,
-			Name:           "watch_filtered_events_total",
-			Help:           "Counter of events filtered out by shard selector during watch dispatch, broken by resource type.",
-			StabilityLevel: compbasemetrics.ALPHA,
-		},
-		[]string{"group", "resource"},
-	)
 )
 
 var registerMetrics sync.Once
@@ -251,15 +205,9 @@ func Register() {
 		legacyregistry.MustRegister(watchCacheCapacityDecreaseTotal)
 		legacyregistry.MustRegister(WatchCacheCapacity)
 		legacyregistry.MustRegister(WatchCacheInitializations)
-		legacyregistry.MustRegister(WatchCacheInitializationErrors)
-		legacyregistry.MustRegister(WatchCacheInitializationDuration)
 		legacyregistry.MustRegister(WatchCacheReadWait)
 		legacyregistry.MustRegister(ConsistentReadTotal)
 		legacyregistry.MustRegister(StorageConsistencyCheckTotal)
-		if utilfeature.DefaultFeatureGate.Enabled(features.ShardedListAndWatch) {
-			legacyregistry.MustRegister(WatchShardsTotal)
-			legacyregistry.MustRegister(WatchFilteredEventsTotal)
-		}
 	})
 }
 
@@ -268,32 +216,14 @@ func RecordListCacheMetrics(groupResource schema.GroupResource, indexName string
 	listCacheCount.WithLabelValues(groupResource.Group, groupResource.Resource, indexName).Inc()
 	listCacheNumFetched.WithLabelValues(groupResource.Group, groupResource.Resource, indexName).Add(float64(numFetched))
 	listCacheNumReturned.WithLabelValues(groupResource.Group, groupResource.Resource).Add(float64(numReturned))
-	storagemetrics.RecordStorageListMetrics(groupResource, storagemetrics.StorageBackendWatchCache, indexName, numFetched, 0, numReturned)
 }
 
 // RecordResourceVersion sets the current resource version for a given resource type.
-// The resource version is truncated to the 15 least significant digits to prevent
-// the metric from growing indefinitely and losing precision when it exceeds 2^53-1.
 func RecordResourceVersion(groupResource schema.GroupResource, resourceVersion uint64) {
-	watchCacheResourceVersion.WithLabelValues(groupResource.Group, groupResource.Resource).Set(float64(resourceVersion % 1000000000000000))
+	watchCacheResourceVersion.WithLabelValues(groupResource.Group, groupResource.Resource).Set(float64(resourceVersion))
 }
 
-// RecordShardedWatchStarted increments the active sharded watch gauge for the given resource.
-func RecordShardedWatchStarted(groupResource schema.GroupResource) {
-	WatchShardsTotal.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
-}
-
-// RecordShardedWatchStopped decrements the active sharded watch gauge for the given resource.
-func RecordShardedWatchStopped(groupResource schema.GroupResource) {
-	WatchShardsTotal.WithLabelValues(groupResource.Group, groupResource.Resource).Dec()
-}
-
-// RecordWatchFilteredEvent increments the counter for events filtered by shard selector.
-func RecordWatchFilteredEvent(groupResource schema.GroupResource) {
-	WatchFilteredEventsTotal.WithLabelValues(groupResource.Group, groupResource.Resource).Inc()
-}
-
-// RecordsWatchCacheCapacityChange records watchCache capacity resize(increase or decrease) operations.
+// RecordsWatchCacheCapacityChange record watchCache capacity resize(increase or decrease) operations.
 func RecordsWatchCacheCapacityChange(groupResource schema.GroupResource, old, new int) {
 	WatchCacheCapacity.WithLabelValues(groupResource.Group, groupResource.Resource).Set(float64(new))
 	if old < new {

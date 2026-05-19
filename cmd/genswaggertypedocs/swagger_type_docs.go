@@ -24,7 +24,6 @@ import (
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 
 	flag "github.com/spf13/pflag"
-
 	"k8s.io/klog/v2"
 )
 
@@ -53,11 +52,7 @@ func main() {
 		funcOut = file
 	}
 
-	docsForTypes, err := kruntime.ParseDocumentationFrom(*typeSrc)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	docsForTypes := kruntime.ParseDocumentationFrom(*typeSrc)
 
 	if *verify {
 		rc, err := kruntime.VerifySwaggerDocsExist(docsForTypes, funcOut)

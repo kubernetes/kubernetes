@@ -126,7 +126,7 @@ func main() {
 			klog.Warningf("Failed to delete namespace %s: %v", ns, err)
 		} else {
 			// wait until the namespace disappears
-			for range int(namespaceDeleteTimeout / time.Second) {
+			for i := 0; i < int(namespaceDeleteTimeout/time.Second); i++ {
 				if _, err := client.CoreV1().Namespaces().Get(context.TODO(), ns, metav1.GetOptions{}); err != nil {
 					if apierrors.IsNotFound(err) {
 						return
@@ -297,7 +297,7 @@ func main() {
 		// of in-flight requests to avoid overloading the service.
 		inFlight := make(chan struct{}, *maxPar)
 		start := time.Now()
-		for q := range queries {
+		for q := 0; q < queries; q++ {
 			go func(i int, query int) {
 				inFlight <- struct{}{}
 				t := time.Now()
@@ -319,7 +319,7 @@ func main() {
 		}
 		responses := make(map[string]int, *podsPerNode*len(nodes.Items))
 		missing := 0
-		for range queries {
+		for q := 0; q < queries; q++ {
 			r := <-responseChan
 			klog.V(4).Infof("Got response from %s", r)
 			responses[r]++

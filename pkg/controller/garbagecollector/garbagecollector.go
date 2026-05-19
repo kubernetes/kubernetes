@@ -359,8 +359,8 @@ func (gc *GarbageCollector) attemptToDeleteWorker(ctx context.Context, item inte
 			// 2. The reference is to an invalid group/version. We don't currently
 			//    have a way to distinguish this from a valid type we will recognize
 			//    after the next discovery sync.
-			// For now, log the error and retry.
-			logger.V(5).Info("error syncing item", "item", n.identity, "err", err)
+			// For now, record the error and retry.
+			logger.V(5).Error(err, "error syncing item", "item", n.identity)
 		} else {
 			utilruntime.HandleError(fmt.Errorf("error syncing item %s: %v", n, err))
 		}
@@ -625,12 +625,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node)
 		// FinalizerDeletingDependents from the item, resulting in the final
 		// deletion of the item.
 		policy := metav1.DeletePropagationForeground
-		err := gc.deleteObject(item.identity, latest.ResourceVersion, latest.OwnerReferences, &policy)
-		if errors.IsNotFound(err) {
-			gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
-			return enqueuedVirtualDeleteEventErr
-		}
-		return err
+		return gc.deleteObject(item.identity, latest.ResourceVersion, latest.OwnerReferences, &policy)
 	default:
 		// item doesn't have any solid owner, so it needs to be garbage
 		// collected. Also, none of item's owners is waiting for the deletion of
@@ -651,12 +646,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node)
 			"item", item.identity,
 			"propagationPolicy", policy,
 		)
-		err := gc.deleteObject(item.identity, latest.ResourceVersion, latest.OwnerReferences, &policy)
-		if errors.IsNotFound(err) {
-			gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
-			return enqueuedVirtualDeleteEventErr
-		}
-		return err
+		return gc.deleteObject(item.identity, latest.ResourceVersion, latest.OwnerReferences, &policy)
 	}
 }
 

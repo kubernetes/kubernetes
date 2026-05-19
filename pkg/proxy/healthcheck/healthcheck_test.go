@@ -31,13 +31,15 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/sets"
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	basemetrics "k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	testingclock "k8s.io/utils/clock/testing"
-	"k8s.io/utils/dump"
 	"k8s.io/utils/ptr"
 )
 
@@ -57,7 +59,7 @@ func (fake *fakeListener) hasPort(addr string) bool {
 	return fake.openPorts.Has(addr)
 }
 
-func (fake *fakeListener) Listen(_ context.Context, network string, addrs ...string) (net.Listener, error) {
+func (fake *fakeListener) Listen(_ context.Context, addrs ...string) (net.Listener, error) {
 	fake.openPorts.Insert(addrs...)
 	return &fakeNetListener{
 		parent: fake,
@@ -149,7 +151,7 @@ func TestServer(t *testing.T) {
 	nodePortAddresses := proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{})
 	proxyChecker := &fakeProxyHealthChecker{true}
 
-	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodePortAddresses, proxyChecker, v1.IPv4Protocol)
+	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodePortAddresses, proxyChecker)
 	hcs := hcsi.(*server)
 	if len(hcs.services) != 0 {
 		t.Errorf("expected 0 services, got %d", len(hcs.services))
@@ -469,25 +471,14 @@ type serverTest struct {
 	tracking503 int
 }
 
-type testNodeManager struct {
-	node *v1.Node
-}
-
-func (t *testNodeManager) Node() *v1.Node {
-	return t.node
-}
-
-func (t *testNodeManager) update(node *v1.Node) {
-	t.node = node
-}
-
 func TestHealthzServer(t *testing.T) {
 	metrics.RegisterMetrics("")
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := testingclock.NewFakeClock(time.Now())
+	client := clientsetfake.NewClientset(makeNode())
 
-	nodeManager := &testNodeManager{node: makeNode()}
+	nodeManager, _ := proxy.NewNodeManager(context.TODO(), client, time.Second, testNodeName, false)
 	hs := newProxyHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second, nodeManager)
 	server := hs.httpFactory.New(healthzHandler{hs: hs})
 
@@ -504,7 +495,7 @@ func TestHealthzServer(t *testing.T) {
 	testProxyHealthUpdater(hs, hsTest, fakeClock, ptr.To(true), t)
 
 	// Should return 200 "OK" if we've synced a node, tainted in any other way
-	nodeManager.update(makeNode(tweakTainted("other")))
+	nodeManager.OnNodeChange(makeNode(tweakTainted("other")))
 	expectedPayload = ProxyHealth{
 		CurrentTime:  fakeClock.Now(),
 		LastUpdated:  fakeClock.Now(),
@@ -518,7 +509,7 @@ func TestHealthzServer(t *testing.T) {
 	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should return 503 "ServiceUnavailable" if we've synced a ToBeDeletedTaint node
-	nodeManager.update(makeNode(tweakTainted(ToBeDeletedTaint)))
+	nodeManager.OnNodeChange(makeNode(tweakTainted(ToBeDeletedTaint)))
 	expectedPayload = ProxyHealth{
 		CurrentTime:  fakeClock.Now(),
 		LastUpdated:  fakeClock.Now(),
@@ -532,7 +523,7 @@ func TestHealthzServer(t *testing.T) {
 	testHTTPHandler(hsTest, http.StatusServiceUnavailable, expectedPayload, t)
 
 	// Should return 200 "OK" if we've synced a node, tainted in any other way
-	nodeManager.update(makeNode(tweakTainted("other")))
+	nodeManager.OnNodeChange(makeNode(tweakTainted("other")))
 	expectedPayload = ProxyHealth{
 		CurrentTime:  fakeClock.Now(),
 		LastUpdated:  fakeClock.Now(),
@@ -546,7 +537,7 @@ func TestHealthzServer(t *testing.T) {
 	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should return 503 "ServiceUnavailable" if we've synced a deleted node
-	nodeManager.update(makeNode(tweakDeleted()))
+	nodeManager.OnNodeChange(makeNode(tweakDeleted()))
 	expectedPayload = ProxyHealth{
 		CurrentTime:  fakeClock.Now(),
 		LastUpdated:  fakeClock.Now(),
@@ -565,8 +556,9 @@ func TestLivezServer(t *testing.T) {
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := testingclock.NewFakeClock(time.Now())
+	client := clientsetfake.NewClientset(makeNode())
 
-	nodeManager := &testNodeManager{node: makeNode()}
+	nodeManager, _ := proxy.NewNodeManager(context.TODO(), client, time.Second, testNodeName, false)
 	hs := newProxyHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second, nodeManager)
 	server := hs.httpFactory.New(livezHandler{hs: hs})
 
@@ -583,7 +575,7 @@ func TestLivezServer(t *testing.T) {
 	testProxyHealthUpdater(hs, hsTest, fakeClock, nil, t)
 
 	// Should return 200 "OK" irrespective of node syncs
-	nodeManager.update(makeNode(tweakTainted("other")))
+	nodeManager.OnNodeChange(makeNode(tweakTainted("other")))
 	expectedPayload = ProxyHealth{
 		CurrentTime: fakeClock.Now(),
 		LastUpdated: fakeClock.Now(),
@@ -596,7 +588,7 @@ func TestLivezServer(t *testing.T) {
 	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should return 200 "OK" irrespective of node syncs
-	nodeManager.update(makeNode(tweakTainted(ToBeDeletedTaint)))
+	nodeManager.OnNodeChange(makeNode(tweakTainted(ToBeDeletedTaint)))
 	expectedPayload = ProxyHealth{
 		CurrentTime: fakeClock.Now(),
 		LastUpdated: fakeClock.Now(),
@@ -609,7 +601,7 @@ func TestLivezServer(t *testing.T) {
 	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should return 200 "OK" irrespective of node syncs
-	nodeManager.update(makeNode(tweakTainted("other")))
+	nodeManager.OnNodeChange(makeNode(tweakTainted("other")))
 	expectedPayload = ProxyHealth{
 		CurrentTime: fakeClock.Now(),
 		LastUpdated: fakeClock.Now(),
@@ -622,7 +614,7 @@ func TestLivezServer(t *testing.T) {
 	testHTTPHandler(hsTest, http.StatusOK, expectedPayload, t)
 
 	// Should return 200 "OK" irrespective of node syncs
-	nodeManager.update(makeNode(tweakDeleted()))
+	nodeManager.OnNodeChange(makeNode(tweakDeleted()))
 	expectedPayload = ProxyHealth{
 		CurrentTime: fakeClock.Now(),
 		LastUpdated: fakeClock.Now(),
@@ -972,7 +964,7 @@ func TestServerWithSelectiveListeningAddress(t *testing.T) {
 	// machine nor testing ipv6 || ipv4. using loop back guarantees the test will work on any machine
 	nodePortAddresses := proxyutil.NewNodePortAddresses(v1.IPv4Protocol, []string{"127.0.0.0/8"})
 
-	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodePortAddresses, proxyChecker, v1.IPv4Protocol)
+	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory, nodePortAddresses, proxyChecker)
 	hcs := hcsi.(*server)
 	if len(hcs.services) != 0 {
 		t.Errorf("expected 0 services, got %d", len(hcs.services))

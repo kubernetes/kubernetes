@@ -28,9 +28,7 @@ func ForwardResponseStream(ctx context.Context, mux *ServeMux, marshaler Marshal
 	}
 	handleForwardResponseServerMetadata(w, mux, md)
 
-	if !mux.disableChunkedEncoding {
-		w.Header().Set("Transfer-Encoding", "chunked")
-	}
+	w.Header().Set("Transfer-Encoding", "chunked")
 	if err := handleForwardResponseOptions(ctx, w, nil, opts); err != nil {
 		HTTPError(ctx, mux, marshaler, w, req, err)
 		return

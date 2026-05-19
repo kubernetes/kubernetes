@@ -70,25 +70,14 @@ func ToFileDescriptorProto(file protoreflect.FileDescriptor) *descriptorpb.FileD
 	if syntax := file.Syntax(); syntax != protoreflect.Proto2 && syntax.IsValid() {
 		p.Syntax = proto.String(file.Syntax().String())
 	}
-	desc := file
-	if fileImportDesc, ok := file.(protoreflect.FileImport); ok {
-		desc = fileImportDesc.FileDescriptor
-	}
 	if file.Syntax() == protoreflect.Editions {
+		desc := file
+		if fileImportDesc, ok := file.(protoreflect.FileImport); ok {
+			desc = fileImportDesc.FileDescriptor
+		}
+
 		if editionsInterface, ok := desc.(interface{ Edition() int32 }); ok {
 			p.Edition = descriptorpb.Edition(editionsInterface.Edition()).Enum()
-		}
-	}
-	type hasOptionImports interface {
-		OptionImports() protoreflect.FileImports
-	}
-	if opts, ok := desc.(hasOptionImports); ok {
-		if optionImports := opts.OptionImports(); optionImports.Len() > 0 {
-			optionDeps := make([]string, optionImports.Len())
-			for i := range optionImports.Len() {
-				optionDeps[i] = optionImports.Get(i).Path()
-			}
-			p.OptionDependency = optionDeps
 		}
 	}
 	return p
@@ -133,14 +122,6 @@ func ToDescriptorProto(message protoreflect.MessageDescriptor) *descriptorpb.Des
 	}
 	for i, names := 0, message.ReservedNames(); i < names.Len(); i++ {
 		p.ReservedName = append(p.ReservedName, string(names.Get(i)))
-	}
-	type hasVisibility interface {
-		Visibility() int32
-	}
-	if vis, ok := message.(hasVisibility); ok {
-		if visibility := vis.Visibility(); visibility > 0 {
-			p.Visibility = descriptorpb.SymbolVisibility(visibility).Enum()
-		}
 	}
 	return p
 }
@@ -234,14 +215,6 @@ func ToEnumDescriptorProto(enum protoreflect.EnumDescriptor) *descriptorpb.EnumD
 	}
 	for i, names := 0, enum.ReservedNames(); i < names.Len(); i++ {
 		p.ReservedName = append(p.ReservedName, string(names.Get(i)))
-	}
-	type hasVisibility interface {
-		Visibility() int32
-	}
-	if vis, ok := enum.(hasVisibility); ok {
-		if visibility := vis.Visibility(); visibility > 0 {
-			p.Visibility = descriptorpb.SymbolVisibility(visibility).Enum()
-		}
 	}
 	return p
 }

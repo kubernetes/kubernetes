@@ -59,7 +59,7 @@ func RecordAuthorizationDecision(authorizerType, authorizerName, decision string
 	authorizationDecisionsTotal.WithLabelValues(authorizerType, authorizerName, decision).Inc()
 }
 
-func InstrumentedAuthorizer(authorizerType string, authorizerName string, delegate authorizer.UnconditionalAuthorizer) authorizer.UnconditionalAuthorizer {
+func InstrumentedAuthorizer(authorizerType string, authorizerName string, delegate authorizer.Authorizer) authorizer.Authorizer {
 	RegisterMetrics()
 	return &instrumentedAuthorizer{
 		authorizerType: string(authorizerType),
@@ -68,12 +68,10 @@ func InstrumentedAuthorizer(authorizerType string, authorizerName string, delega
 	}
 }
 
-var _ = authorizer.Authorizer(&instrumentedAuthorizer{})
-
 type instrumentedAuthorizer struct {
 	authorizerType string
 	authorizerName string
-	delegate       authorizer.UnconditionalAuthorizer
+	delegate       authorizer.Authorizer
 }
 
 func (a *instrumentedAuthorizer) Authorize(ctx context.Context, attributes authorizer.Attributes) (authorizer.Decision, string, error) {

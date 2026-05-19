@@ -53,7 +53,7 @@ func (f *fakeCelFilter) ForInput(ctx context.Context, versionedAttr *admission.V
 	if costBudget <= 0 { // this filter will cost 1, so cost = 0 means fail.
 		return nil, -1, &apiservercel.Error{
 			Type:   apiservercel.ErrorTypeInvalid,
-			Detail: "validation failed due to running out of cost budget, no further validation rules will be run",
+			Detail: fmt.Sprintf("validation failed due to running out of cost budget, no further validation rules will be run"),
 			Cause:  apiservercel.ErrOutOfBudget,
 		}
 	}
@@ -74,7 +74,7 @@ type fakeCELMatcher struct {
 	matches bool
 }
 
-func (f *fakeCELMatcher) Match(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, authz authorizer.UnconditionalAuthorizer) matchconditions.MatchResult {
+func (f *fakeCELMatcher) Match(ctx context.Context, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, authz authorizer.Authorizer) matchconditions.MatchResult {
 	return matchconditions.MatchResult{Matches: f.matches, FailedConditionName: "placeholder", Error: f.error}
 }
 

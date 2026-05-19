@@ -378,18 +378,13 @@ func TestCreatePodsWithGenerateName(t *testing.T) {
 			defer testServer.Close()
 			clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}, ContentType: runtime.ContentTypeJSON}})
 
-			callbackCalled := false
 			podControl := RealPodControl{
 				KubeClient: clientset,
 				Recorder:   &record.FakeRecorder{},
-				OnWrite: func(*v1.Pod, *metav1.OwnerReference) {
-					callbackCalled = true
-				},
 			}
 
 			err := test.podCreationFunc(podControl)
 			require.NoError(t, err, "unexpected error: %v", err)
-			assert.True(t, callbackCalled, "OnWrite callback was not called")
 
 			fakeHandler.ValidateRequest(t, "/api/v1/namespaces/default/pods", "POST", nil)
 			var actualPod = &v1.Pod{}
@@ -399,32 +394,6 @@ func TestCreatePodsWithGenerateName(t *testing.T) {
 				"Body: %s", fakeHandler.RequestBody)
 		})
 	}
-}
-
-func TestPatchPodCallbacks(t *testing.T) {
-	fakeClient := fake.NewSimpleClientset(
-		&v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-pod",
-			},
-		},
-	)
-	wroteCallbackCalled := false
-	podControl := RealPodControl{
-		KubeClient: fakeClient,
-		Recorder:   &record.FakeRecorder{},
-		OnWrite: func(pod *v1.Pod, ownerRef *metav1.OwnerReference) {
-			wroteCallbackCalled = true
-		},
-	}
-
-	err := podControl.PatchPod(context.TODO(), "", "non-existing-pod", []byte("{}"))
-	assert.False(t, wroteCallbackCalled, "OnWrite callback was called when not expected")
-	assert.True(t, apierrors.IsNotFound(err), "Expected not found error")
-
-	err = podControl.PatchPod(context.TODO(), "", "test-pod", []byte("{}"))
-	assert.True(t, wroteCallbackCalled, "OnWrite callback was not called")
-	assert.NoError(t, err, "Expected no error")
 }
 
 func TestDeletePodsAllowsMissing(t *testing.T) {
@@ -831,8 +800,9 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 		ready10Hours                        = pod("ready-10-hours", "", v1.PodRunning, true, 0, 0, then8Hours, then1Month, nil)
 	)
 	equalityTests := []struct {
-		p1 *v1.Pod
-		p2 *v1.Pod
+		p1                          *v1.Pod
+		p2                          *v1.Pod
+		disableLogarithmicScaleDown bool
 	}{
 		{p1: unscheduledPod},
 		{p1: scheduledPendingPod},
@@ -848,6 +818,7 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 	}
 	for i, test := range equalityTests {
 		t.Run(fmt.Sprintf("Equality tests %d", i), func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.LogarithmicScaleDown, !test.disableLogarithmicScaleDown)
 			if test.p2 == nil {
 				test.p2 = test.p1
 			}
@@ -867,8 +838,9 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 		rank int
 	}
 	inequalityTests := []struct {
-		lesser, greater        podWithRank
-		disablePodDeletioncost bool
+		lesser, greater             podWithRank
+		disablePodDeletioncost      bool
+		disableLogarithmicScaleDown bool
 	}{
 		{lesser: podWithRank{unscheduledPod, 1}, greater: podWithRank{scheduledPendingPod, 2}},
 		{lesser: podWithRank{unscheduledPod, 2}, greater: podWithRank{scheduledPendingPod, 1}},
@@ -892,7 +864,8 @@ func TestSortingActivePodsWithRanks(t *testing.T) {
 	for i, test := range inequalityTests {
 		t.Run(fmt.Sprintf("Inequality tests %d", i), func(t *testing.T) {
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-				features.PodDeletionCost: !test.disablePodDeletioncost,
+				features.PodDeletionCost:      !test.disablePodDeletioncost,
+				features.LogarithmicScaleDown: !test.disableLogarithmicScaleDown,
 			})
 
 			podsWithRanks := ActivePodsWithRanks{

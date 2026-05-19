@@ -1,4 +1,5 @@
 //go:build linux
+// +build linux
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -193,7 +194,7 @@ func isFilesystemOfType(mountpoint string, backingDev string, typeMagic int64) b
 	var buf syscall.Statfs_t
 	err := syscall.Statfs(mountpoint, &buf)
 	if err != nil {
-		klog.Warningf("Unable to statfs %s: %v", mountpoint, err)
+		klog.Warningf("Warning: Unable to statfs %s: %v", mountpoint, err)
 		return false
 	}
 	if int64(buf.Type) != typeMagic {

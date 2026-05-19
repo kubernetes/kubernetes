@@ -18,6 +18,7 @@ package qos
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -42,6 +43,10 @@ func GetPodQOS(pod *v1.Pod) v1.PodQOSClass {
 	return ComputePodQOS(pod)
 }
 
+// zeroQuantity represents a resource.Quantity with value "0", used as a baseline
+// for resource comparisons.
+var zeroQuantity = resource.MustParse("0")
+
 // processResourceList adds non-zero quantities for supported QoS compute resources
 // quantities from newList to list.
 func processResourceList(list, newList v1.ResourceList) {
@@ -49,7 +54,7 @@ func processResourceList(list, newList v1.ResourceList) {
 		if !isSupportedQoSComputeResource(name) {
 			continue
 		}
-		if quantity.Sign() == 1 {
+		if quantity.Cmp(zeroQuantity) == 1 {
 			delta := quantity.DeepCopy()
 			if _, exists := list[name]; !exists {
 				list[name] = delta
@@ -70,7 +75,7 @@ func getQOSResources(list v1.ResourceList) sets.Set[string] {
 		if !isSupportedQoSComputeResource(name) {
 			continue
 		}
-		if quantity.Sign() == 1 {
+		if quantity.Cmp(zeroQuantity) == 1 {
 			qosResources.Insert(string(name))
 		}
 	}
@@ -115,7 +120,7 @@ func ComputePodQOS(pod *v1.Pod) v1.PodQOSClass {
 				if !isSupportedQoSComputeResource(name) {
 					continue
 				}
-				if quantity.Sign() == 1 {
+				if quantity.Cmp(zeroQuantity) == 1 {
 					delta := quantity.DeepCopy()
 					if _, exists := requests[name]; !exists {
 						requests[name] = delta
@@ -131,7 +136,7 @@ func ComputePodQOS(pod *v1.Pod) v1.PodQOSClass {
 				if !isSupportedQoSComputeResource(name) {
 					continue
 				}
-				if quantity.Sign() == 1 {
+				if quantity.Cmp(zeroQuantity) == 1 {
 					qosLimitsFound.Insert(string(name))
 					delta := quantity.DeepCopy()
 					if _, exists := limits[name]; !exists {

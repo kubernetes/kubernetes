@@ -58,10 +58,6 @@ func (w *removingWalker) doList(t *schema.List) (errs ValidationErrors) {
 	defer w.allocator.Free(l)
 	// If list is null or empty just return
 	if l == nil || l.Length() == 0 {
-		// For extraction, we just return the value as is (which is nil or empty). For extraction the difference matters.
-		if w.shouldExtract {
-			w.out = w.value.Unstructured()
-		}
 		return nil
 	}
 
@@ -75,7 +71,6 @@ func (w *removingWalker) doList(t *schema.List) (errs ValidationErrors) {
 	}
 
 	var newItems []interface{}
-	hadMatches := false
 	iter := l.RangeUsing(w.allocator)
 	defer w.allocator.Free(iter)
 	for iter.Next() {
@@ -85,40 +80,24 @@ func (w *removingWalker) doList(t *schema.List) (errs ValidationErrors) {
 		path, _ := fieldpath.MakePath(pe)
 		// save items on the path when we shouldExtract
 		// but ignore them when we are removing (i.e. !w.shouldExtract)
-		isExactPathMatch := w.toRemove.Has(path)
-		isPrefixMatch := !w.toRemove.WithPrefix(pe).Empty()
-		if w.shouldExtract {
-			if isPrefixMatch {
-				item = removeItemsWithSchema(item, w.toRemove.WithPrefix(pe), w.schema, t.ElementType, w.shouldExtract)
-			}
-			if isExactPathMatch || isPrefixMatch {
-				newItems = append(newItems, item.Unstructured())
-			}
-		} else {
-			if isExactPathMatch {
+		if w.toRemove.Has(path) {
+			if w.shouldExtract {
+				newItems = append(newItems, removeItemsWithSchema(item, w.toRemove, w.schema, t.ElementType, w.shouldExtract).Unstructured())
+			} else {
 				continue
 			}
-			if isPrefixMatch {
-				// Removing nested items within this list item and preserve if it becomes empty
-				hadMatches = true
-				wasMap := item.IsMap()
-				wasList := item.IsList()
-				item = removeItemsWithSchema(item, w.toRemove.WithPrefix(pe), w.schema, t.ElementType, w.shouldExtract)
-				// If item returned null but we're removing items within the structure(not the item itself),
-				// preserve the empty container structure
-				if item.IsNull() && !w.shouldExtract {
-					if wasMap {
-						item = value.NewValueInterface(map[string]interface{}{})
-					} else if wasList {
-						item = value.NewValueInterface([]interface{}{})
-					}
-				}
-			}
-			newItems = append(newItems, item.Unstructured())
 		}
+		if subset := w.toRemove.WithPrefix(pe); !subset.Empty() {
+			item = removeItemsWithSchema(item, subset, w.schema, t.ElementType, w.shouldExtract)
+		} else {
+			// don't save items not on the path when we shouldExtract.
+			if w.shouldExtract {
+				continue
+			}
+		}
+		newItems = append(newItems, item.Unstructured())
 	}
-	// Preserve empty lists (non-nil) instead of converting to null when items were matched and removed
-	if len(newItems) > 0 || (hadMatches && !w.shouldExtract) {
+	if len(newItems) > 0 {
 		w.out = newItems
 	}
 	return nil
@@ -134,10 +113,6 @@ func (w *removingWalker) doMap(t *schema.Map) ValidationErrors {
 	}
 	// If map is null or empty just return
 	if m == nil || m.Empty() {
-		// For extraction, we just return the value as is (which is nil or empty). For extraction the difference matters.
-		if w.shouldExtract {
-			w.out = w.value.Unstructured()
-		}
 		return nil
 	}
 
@@ -156,7 +131,6 @@ func (w *removingWalker) doMap(t *schema.Map) ValidationErrors {
 	}
 
 	newMap := map[string]interface{}{}
-	hadMatches := false
 	m.Iterate(func(k string, val value.Value) bool {
 		pe := fieldpath.PathElement{FieldName: &k}
 		path, _ := fieldpath.MakePath(pe)
@@ -174,19 +148,7 @@ func (w *removingWalker) doMap(t *schema.Map) ValidationErrors {
 			return true
 		}
 		if subset := w.toRemove.WithPrefix(pe); !subset.Empty() {
-			hadMatches = true
-			wasMap := val.IsMap()
-			wasList := val.IsList()
 			val = removeItemsWithSchema(val, subset, w.schema, fieldType, w.shouldExtract)
-			// If val returned null but we're removing items within the structure (not the field itself),
-			// preserve the empty container structure
-			if val.IsNull() && !w.shouldExtract {
-				if wasMap {
-					val = value.NewValueInterface(map[string]interface{}{})
-				} else if wasList {
-					val = value.NewValueInterface([]interface{}{})
-				}
-			}
 		} else {
 			// don't save values not on the path when we shouldExtract.
 			if w.shouldExtract {
@@ -196,8 +158,7 @@ func (w *removingWalker) doMap(t *schema.Map) ValidationErrors {
 		newMap[k] = val.Unstructured()
 		return true
 	})
-	// Preserve empty maps (non-nil) instead of converting to null when items were matched and removed
-	if len(newMap) > 0 || (hadMatches && !w.shouldExtract) {
+	if len(newMap) > 0 {
 		w.out = newMap
 	}
 	return nil

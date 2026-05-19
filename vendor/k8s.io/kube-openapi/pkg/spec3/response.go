@@ -24,7 +24,6 @@ import (
 	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
 	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
-	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/jsontext"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -52,11 +51,11 @@ func (r *Responses) MarshalJSON() ([]byte, error) {
 	return swag.ConcatJSON(b1, b2), nil
 }
 
-func (r Responses) MarshalJSONTo(enc *jsontext.Encoder) error {
+func (r Responses) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
 	type ArbitraryKeys map[string]interface{}
 	var x struct {
-		ArbitraryKeys ArbitraryKeys `json:",inline"`
-		Default       *Response     `json:"default,omitzero"`
+		ArbitraryKeys
+		Default *Response `json:"default,omitzero"`
 	}
 	x.ArbitraryKeys = make(map[string]any, len(r.Extensions)+len(r.StatusCodeResponses))
 	for k, v := range r.Extensions {
@@ -68,7 +67,7 @@ func (r Responses) MarshalJSONTo(enc *jsontext.Encoder) error {
 		x.ArbitraryKeys[strconv.Itoa(k)] = v
 	}
 	x.Default = r.Default
-	return jsonv2.MarshalEncode(enc, x)
+	return opts.MarshalNext(enc, x)
 }
 
 func (r *Responses) UnmarshalJSON(data []byte) error {
@@ -137,7 +136,7 @@ func (r *ResponsesProps) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (r *Responses) UnmarshalJSONFrom(dec *jsontext.Decoder) (err error) {
+func (r *Responses) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) (err error) {
 	tok, err := dec.ReadToken()
 	if err != nil {
 		return err
@@ -158,7 +157,7 @@ func (r *Responses) UnmarshalJSONFrom(dec *jsontext.Decoder) (err error) {
 			switch k := tok.String(); {
 			case internal.IsExtensionKey(k):
 				var ext any
-				if err := jsonv2.UnmarshalDecode(dec, &ext); err != nil {
+				if err := opts.UnmarshalNext(dec, &ext); err != nil {
 					return err
 				}
 
@@ -168,14 +167,14 @@ func (r *Responses) UnmarshalJSONFrom(dec *jsontext.Decoder) (err error) {
 				r.Extensions[k] = ext
 			case k == "default":
 				resp := Response{}
-				if err := jsonv2.UnmarshalDecode(dec, &resp); err != nil {
+				if err := opts.UnmarshalNext(dec, &resp); err != nil {
 					return err
 				}
 				r.ResponsesProps.Default = &resp
 			default:
 				if nk, err := strconv.Atoi(k); err == nil {
 					resp := Response{}
-					if err := jsonv2.UnmarshalDecode(dec, &resp); err != nil {
+					if err := opts.UnmarshalNext(dec, &resp); err != nil {
 						return err
 					}
 
@@ -220,16 +219,16 @@ func (r *Response) MarshalJSON() ([]byte, error) {
 	return swag.ConcatJSON(b1, b2, b3), nil
 }
 
-func (r Response) MarshalJSONTo(enc *jsontext.Encoder) error {
+func (r Response) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
 	var x struct {
-		Ref           string          `json:"$ref,omitempty"`
-		Extensions    spec.Extensions `json:",inline"`
+		Ref string `json:"$ref,omitempty"`
+		spec.Extensions
 		ResponseProps `json:",inline"`
 	}
 	x.Ref = r.Refable.Ref.String()
 	x.Extensions = internal.SanitizeExtensions(r.Extensions)
 	x.ResponseProps = r.ResponseProps
-	return jsonv2.MarshalEncode(enc, x)
+	return opts.MarshalNext(enc, x)
 }
 
 func (r *Response) UnmarshalJSON(data []byte) error {
@@ -248,12 +247,12 @@ func (r *Response) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (r *Response) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+func (r *Response) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
 	var x struct {
-		Extensions spec.Extensions `json:",inline"`
+		spec.Extensions
 		ResponseProps
 	}
-	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
+	if err := opts.UnmarshalNext(dec, &x); err != nil {
 		return err
 	}
 	if err := internal.JSONRefFromMap(&r.Ref.Ref, x.Extensions); err != nil {
@@ -303,16 +302,16 @@ func (r *Link) MarshalJSON() ([]byte, error) {
 	return swag.ConcatJSON(b1, b2, b3), nil
 }
 
-func (r *Link) MarshalJSONTo(enc *jsontext.Encoder) error {
+func (r *Link) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
 	var x struct {
-		Ref        string          `json:"$ref,omitempty"`
-		Extensions spec.Extensions `json:",inline"`
-		LinkProps  `json:",inline"`
+		Ref string `json:"$ref,omitempty"`
+		spec.Extensions
+		LinkProps `json:",inline"`
 	}
 	x.Ref = r.Refable.Ref.String()
 	x.Extensions = internal.SanitizeExtensions(r.Extensions)
 	x.LinkProps = r.LinkProps
-	return jsonv2.MarshalEncode(enc, x)
+	return opts.MarshalNext(enc, x)
 }
 
 func (r *Link) UnmarshalJSON(data []byte) error {
@@ -332,12 +331,12 @@ func (r *Link) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (l *Link) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
+func (l *Link) UnmarshalNextJSON(opts jsonv2.UnmarshalOptions, dec *jsonv2.Decoder) error {
 	var x struct {
-		Extensions spec.Extensions `json:",inline"`
+		spec.Extensions
 		LinkProps
 	}
-	if err := jsonv2.UnmarshalDecode(dec, &x); err != nil {
+	if err := opts.UnmarshalNext(dec, &x); err != nil {
 		return err
 	}
 	if err := internal.JSONRefFromMap(&l.Ref.Ref, x.Extensions); err != nil {

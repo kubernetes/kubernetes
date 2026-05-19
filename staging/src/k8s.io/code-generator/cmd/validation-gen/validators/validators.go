@@ -30,12 +30,17 @@ import (
 // findable by validation-gen, a TagValidator must be registered - see
 // RegisterTagValidator.
 //
-// TagValidators should not depend on other TagValidators having been run
-// already because users might specify tags in the any order.
+// TagValidators are always evaluated before TypeValidators and
+// FieldValidators. In general, TagValidators should not depend on other
+// TagValidators having been run already because users might specify tags in
+// the any order. The one exception to this rule is that some TagValidators may
+// be designated as "late" validators (see LateTagValidator), which means they
+// will be run after all non-late TagValidators.
 //
-// No other guarantees are made about the order of execution of TagValidators.
-// Instead of relying on tag ordering, TagValidators can
-// accumulate information internally and use a DeferredGen to finish the work.
+// No other guarantees are made about the order of execution of TagValidators
+// or LateTagValidators. Instead of relying on tag ordering, TagValidators can
+// accumulate information internally and use a TypeValidator and/or
+// FieldValidator to finish the work.
 type TagValidator interface {
 	// Init initializes the implementation.  This will be called exactly once.
 	Init(cfg Config)
@@ -54,13 +59,82 @@ type TagValidator interface {
 	Docs() TagDoc
 }
 
+// LateTagValidator is an optional extension to TagValidator. Any TagValidator
+// which implements this interface will be evaluated after all TagValidators
+// which do not.
+type LateTagValidator interface {
+	LateTagValidator()
+}
+
+// TypeValidator describes a validator which runs on every type definition.
+// To be findable by validation-gen, a TypeValidator must be registered - see
+// RegisterTypeValidator.
+//
+// TypeValidators are always processed after TagValidators, and after the type
+// has been fully processed (including all child fields and their types). This
+// means that they can "finish" work with data that was collected by
+// TagValidators.
+//
+// TypeValidators MUST NOT depend on other TypeValidators having been run
+// already.
+type TypeValidator interface {
+	// Init initializes the implementation.  This will be called exactly once.
+	Init(cfg Config)
+
+	// Name returns a unique name for this validator.  This is used for sorting
+	// and logging.
+	Name() string
+
+	// GetValidations returns any validations imposed by this validator for the
+	// given context.
+	//
+	// The way gengo handles type definitions varies between structs and other
+	// types.  For struct definitions (e.g. `type Foo struct {}`), the realType
+	// is the struct itself (the Kind field will be `types.Struct`) and the
+	// parentType will be nil.  For other types (e.g. `type Bar string`), the
+	// realType will be the underlying type and the parentType will be the
+	// newly defined type (the Kind field will be `types.Alias`).
+	GetValidations(context Context) (Validations, error)
+}
+
+// FieldValidator describes a validator which runs on every field definition.
+// To be findable by validation-gen, a FieldValidator must be registered - see
+// RegisterFieldValidator.
+//
+// FieldValidators are always processed after TagValidators and TypeValidators,
+// and after the field has been fully processed (including all child fields).
+// This means that they can "finish" work with data that was collected by
+// TagValidators.
+//
+// FieldValidators MUST NOT depend on other FieldValidators having been run
+// already.
+type FieldValidator interface {
+	// Init initializes the implementation.  This will be called exactly once.
+	Init(cfg Config)
+
+	// Name returns a unique name for this validator.  This is used for sorting
+	// and logging.
+	Name() string
+
+	// GetValidations returns any validations imposed by this validator for the
+	// given context.
+	//
+	// The way gengo handles type definitions varies between structs and other
+	// types.  For struct definitions (e.g. `type Foo struct {}`), the realType
+	// is the struct itself (the Kind field will be `types.Struct`) and the
+	// parentType will be nil.  For other types (e.g. `type Bar string`), the
+	// realType will be the underlying type and the parentType will be the
+	// newly defined type (the Kind field will be `types.Alias`).
+	GetValidations(context Context) (Validations, error)
+}
+
 // Config carries optional configuration information for use by validators.
 type Config struct {
 	// GengoContext provides gengo's generator Context.  This allows validators
 	// to look up all sorts of other information.
 	GengoContext *generator.Context
 
-	// TagValidator provides a way to compose validations.
+	// Validator provides a way to compose validations.
 	//
 	// For example, it is possible to define a validation such as
 	// "+myValidator=+format=IP" by using the registry to extract the
@@ -69,7 +143,7 @@ type Config struct {
 	//
 	// This field MUST NOT be used during init, since other validators may not
 	// be initialized yet.
-	TagValidator TagValidationExtractor
+	Validator Validator
 }
 
 // Scope describes where a validation (or potential validation) is located.
@@ -153,18 +227,9 @@ type Context struct {
 	// specified). When Scope is ScopeType, this is nil.
 	ParentPath *field.Path
 
-	// ParentType provides the type of the parent of the object being validated.
-	// When Scope is ScopeField, this is the containing struct type. When Scope
-	// indicates a list-value, map-key, or map-value, this is the list or map type.
-	// When the scope is ScopeType, this is nil.
-	ParentType *types.Type
-
 	// Constants provides access to all constants of the type being
 	// validated.  Only set when Scope is ScopeType.
 	Constants []*Constant
-
-	// StabilityLevel indicates the stability on the corresponding validation.
-	StabilityLevel ValidationStabilityLevel
 }
 
 // Constant represents a constant value.
@@ -182,78 +247,46 @@ type ListSelectorTerm struct {
 	Value any
 }
 
-// TagStabilityLevel indicates the stability of a validation tag.
-type TagStabilityLevel string
+// StabilityLevel indicates the stability of a validation tag.
+type StabilityLevel string
 
 const (
-	// TagStabilityLevelAlpha indicates that a tag's semantics may change in the future.
-	TagStabilityLevelAlpha TagStabilityLevel = "Alpha"
-	// TagStabilityLevelBeta indicates that a tag's semantics will remain unchanged for the
+	// Alpha indicates that a tag's semantics may change in the future.
+	Alpha StabilityLevel = "Alpha"
+	// Beta indicates that a tag's semantics will remain unchanged for the
 	// foreseeable future. This is used for soaking tags before qualifying to stable.
-	TagStabilityLevelBeta TagStabilityLevel = "Beta"
-	// TagStabilityLevelStable indicates that a tag's semantics will remain unchanged for the
+	Beta StabilityLevel = "Beta"
+	// Stable indicates that a tag's semantics will remain unchanged for the
 	// foreseeable future.
-	TagStabilityLevelStable TagStabilityLevel = "Stable"
+	Stable StabilityLevel = "Stable"
 )
-
-var stabilityOrder = map[TagStabilityLevel]int{
-	TagStabilityLevelAlpha:  0,
-	TagStabilityLevelBeta:   1,
-	TagStabilityLevelStable: 2,
-}
-
-// Validation stability level denotes the stability of a validation.
-type ValidationStabilityLevel string
-
-const (
-	// Alpha denotes the declarative validations should be run with the handwritten validation. But the handwritten validations are the authoritative.
-	ValidationStabilityLevelAlpha ValidationStabilityLevel = "Alpha"
-	// Beta denotes the declarative validations should be run with the handwritten validation. Declarative validations are authoritative.
-	ValidationStabilityLevelBeta ValidationStabilityLevel = "Beta"
-)
-
-// Compare returns an integer comparing two stability levels, or an error if either
-// stability level is unknown.
-func (s TagStabilityLevel) Compare(other TagStabilityLevel) (int, error) {
-	sOrder, okS := stabilityOrder[s]
-	if !okS {
-		return 0, fmt.Errorf("unknown stability level %q", s)
-	}
-	otherOrder, okOther := stabilityOrder[other]
-	if !okOther {
-		return 0, fmt.Errorf("unknown stability level %q", other)
-	}
-	return sOrder - otherOrder, nil
-}
 
 // TagDoc describes a comment-tag and its usage.
 type TagDoc struct {
 	// Tag is the tag name, without the leading '+'.
 	Tag string
 	// StabilityLevel is the stability level of the tag.
-	StabilityLevel TagStabilityLevel
+	StabilityLevel StabilityLevel
 	// Args lists any arguments this tag might take.
-	Args []TagArgDoc `json:",omitempty"`
+	Args []TagArgDoc
 	// Usage is how the tag is used, including arguments.
 	Usage string
 	// Description is a short description of this tag's purpose.
 	Description string
 	// Docs is a human-oriented string explaining this tag.
 	Docs string
-	// Warning is an optional warning about this tag.
-	Warning string `json:",omitempty"`
 	// Scopes lists the place or places this tag may be used.
 	Scopes []Scope
 	// Payloads lists zero or more varieties of value for this tag. If this tag
 	// never has a payload, this list should be empty, but if the payload is
 	// optional, this list should include an entry for "<none>".
-	Payloads []TagPayloadDoc `json:",omitempty"`
+	Payloads []TagPayloadDoc
 	// PayloadsType is the type of the payloads.
-	PayloadsType codetags.ValueType `json:",omitempty"`
+	PayloadsType codetags.ValueType
 	// PayloadsRequired is true if a payload is required.
-	PayloadsRequired bool `json:",omitempty"`
+	PayloadsRequired bool
 	// AcceptsUnknownArgs is true if unknown args are accepted
-	AcceptsUnknownArgs bool `json:",omitempty"`
+	AcceptsUnknownArgs bool
 }
 
 func (td TagDoc) Arg(name string) (TagArgDoc, bool) {
@@ -337,24 +370,14 @@ type Validations struct {
 	// validated is opaque, and that any validations defined on it should not
 	// be emitted.
 	OpaqueValType bool
-
-	// Deferred holds a list of callbacks which will be executed after all other
-	// validation generation is complete. This allows validators to defer
-	// decision making until they have more information (e.g. about other
-	// validators). Deferred callbacks may return further deferred validations,
-	// which will be processed iteratively until exhaustion.
-	Deferred []DeferredGen
 }
 
 func (v *Validations) Empty() bool {
-	return !v.HasEmitable() &&
-		!v.OpaqueType &&
-		!v.OpaqueKeyType &&
-		!v.OpaqueValType
+	return v.Len() == 0
 }
 
-func (v *Validations) HasEmitable() bool {
-	return len(v.Functions) > 0 || len(v.Variables) > 0 || len(v.Comments) > 0 || len(v.Deferred) > 0
+func (v *Validations) Len() int {
+	return len(v.Functions) + len(v.Variables) + len(v.Comments)
 }
 
 func (v *Validations) AddFunction(fn FunctionGen) {
@@ -365,10 +388,6 @@ func (v *Validations) AddVariable(vr VariableGen) {
 	v.Variables = append(v.Variables, vr)
 }
 
-func (v *Validations) AddDeferred(d DeferredGen) {
-	v.Deferred = append(v.Deferred, d)
-}
-
 func (v *Validations) AddComment(comment string) {
 	v.Comments = append(v.Comments, comment)
 }
@@ -377,62 +396,9 @@ func (v *Validations) Add(o Validations) {
 	v.Functions = append(v.Functions, o.Functions...)
 	v.Variables = append(v.Variables, o.Variables...)
 	v.Comments = append(v.Comments, o.Comments...)
-	v.Deferred = append(v.Deferred, o.Deferred...)
 	v.OpaqueType = v.OpaqueType || o.OpaqueType
 	v.OpaqueKeyType = v.OpaqueKeyType || o.OpaqueKeyType
 	v.OpaqueValType = v.OpaqueValType || o.OpaqueValType
-}
-
-// Clone returns a copy of v with new slices for its slice fields.
-func (v Validations) Clone() Validations {
-	res := v
-	if v.Functions != nil {
-		res.Functions = make([]FunctionGen, len(v.Functions))
-		copy(res.Functions, v.Functions)
-	}
-	if v.Variables != nil {
-		res.Variables = make([]VariableGen, len(v.Variables))
-		copy(res.Variables, v.Variables)
-	}
-	if v.Comments != nil {
-		res.Comments = make([]string, len(v.Comments))
-		copy(res.Comments, v.Comments)
-	}
-	if v.Deferred != nil {
-		res.Deferred = make([]DeferredGen, len(v.Deferred))
-		copy(res.Deferred, v.Deferred)
-	}
-	return res
-}
-
-// WrapFunctions applies the given wrap function to all functions in this Validations object
-// and recursively to all Deferred validations, passing the appropriate scope.
-// Useful for applying common transformations (e.g., conditionals, stability levels)
-// to all validations, including deferred ones.
-func WrapFunctions(v Validations, wrapFn func(FunctionGen, DeferredScope) FunctionGen) Validations {
-	return wrapFunctionsWithScope(v, wrapFn, ThisContext)
-}
-
-func wrapFunctionsWithScope(v Validations, wrapFn func(FunctionGen, DeferredScope) FunctionGen, scope DeferredScope) Validations {
-	result := v.Clone()
-	result.Functions = nil
-	result.Deferred = nil
-
-	for _, fn := range v.Functions {
-		result.AddFunction(wrapFn(fn, scope))
-	}
-
-	for _, d := range v.Deferred {
-		result.AddDeferred(Deferred(d.Scope, func() (Validations, error) {
-			inner, err := d.Callback()
-			if err != nil {
-				return Validations{}, err
-			}
-			return wrapFunctionsWithScope(inner, wrapFn, d.Scope), nil
-		}))
-	}
-
-	return result
 }
 
 // FunctionFlags define optional properties of a validator.  Most validators
@@ -492,44 +458,6 @@ func Function(tagName string, flags FunctionFlags, function types.Name, extraArg
 	}
 }
 
-// DeferredScope indicates how long a validation should be deferred.
-type DeferredScope string
-
-const (
-	// ThisContext defers validation until the end of the current context (e.g. field or type).
-	ThisContext DeferredScope = "ThisContext"
-	// ParentContext defers validation until the end of the parent context (e.g. to accumulate data across fields in a struct).
-	ParentContext DeferredScope = "ParentContext"
-)
-
-// Deferred creates a DeferredGen for a given callback.
-func Deferred(scope DeferredScope, callback func() (Validations, error)) DeferredGen {
-	return DeferredGen{
-		Scope:    scope,
-		Callback: callback,
-	}
-}
-
-// DeferredGen describes a validation generation task that is deferred until
-// later.
-type DeferredGen struct {
-	Scope    DeferredScope
-	Callback func() (Validations, error)
-}
-
-// Emission describes the field.Error a runtime validator produces on failure.
-// Must match what the runtime function emits via .WithOrigin(...).
-type Emission struct {
-	Type   field.ErrorType
-	Origin string
-	// PathFragment, when non-empty, is the static field-path component the
-	// runtime validator appends to fldPath before emitting the error (e.g.
-	// "[*]" for Unique, which reports field.Duplicate(fldPath.Index(i), ...)
-	// at the offending element). Used by tools that walk the FunctionGen
-	// tree to reconstruct the path the runtime will emit at.
-	PathFragment string
-}
-
 // FunctionGen describes a function call that should be generated.
 type FunctionGen struct {
 	// TagName is the tag which triggered this function.
@@ -569,18 +497,6 @@ type FunctionGen struct {
 	// Comments holds optional comments that should be added to the generated
 	// code (without the leading "//").
 	Comments []string
-
-	// StabilityLevel indicates the stability level of the corresponding validation.
-	StabilityLevel ValidationStabilityLevel
-
-	// StabilityLevelSelfManaged indicates that the function already has stability levels
-	// embedded or handled, and should not be wrapped by levelTagValidator.
-	StabilityLevelSelfManaged bool
-
-	// Emits, when non-nil, declares the field.Error the runtime validator
-	// produces on failure. Set via WithEmits; nil for wrappers and
-	// non-emitting validators.
-	Emits *Emission
 }
 
 // WithTypeArgs returns a derived FunctionGen with type arguments.
@@ -606,19 +522,6 @@ func (fg FunctionGen) WithComment(comment string) FunctionGen {
 	return fg.WithComments(comment)
 }
 
-// WithStabilityLevel returns a new FunctionGen with the given stability level.
-func (fg FunctionGen) WithStabilityLevel(level ValidationStabilityLevel) FunctionGen {
-	fg.StabilityLevel = level
-	return fg
-}
-
-// WithEmits returns a new FunctionGen that declares the field.Error the
-// runtime validator produces on failure.
-func (fg FunctionGen) WithEmits(emits Emission) FunctionGen {
-	fg.Emits = &emits
-	return fg
-}
-
 // Variable creates a VariableGen for a given variable name and init value.
 func Variable(variable PrivateVar, initializer any) VariableGen {
 	return VariableGen{
@@ -642,24 +545,6 @@ type VariableGen struct {
 type WrapperFunction struct {
 	Function FunctionGen
 	ObjType  *types.Type
-	// PathFragment, when non-empty, is the static field-path component the
-	// wrapping FunctionGen adds to fldPath before invoking Function (e.g.
-	// "[*]" for slice/map value iteration, ".<name>" for subfield). Used
-	// by tools that walk the FunctionGen tree to reconstruct field paths.
-	PathFragment string
-}
-
-// MultiWrapperFunction describes a function literal which has the fingerprint
-// of a regular validation function (op, fldPath, obj, oldObj) and calls
-// multiple other validation functions with the same signature.
-type MultiWrapperFunction struct {
-	Functions []FunctionGen
-	ObjType   *types.Type
-	// PathFragment, when non-empty, is the static field-path component the
-	// wrapping FunctionGen adds to fldPath before invoking the inner Functions
-	// (e.g. ".<jsonName>" for the discriminated-mode validator). Used by tools
-	// that walk the FunctionGen tree to reconstruct field paths.
-	PathFragment string
 }
 
 // Literal is a literal value that, when used as an argument to a validator,

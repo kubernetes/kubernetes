@@ -79,7 +79,7 @@ func TestDualStackEndpoints(t *testing.T) {
 				{
 					Type:              v1.NodeReady,
 					Status:            v1.ConditionTrue,
-					Reason:            "schedulable condition",
+					Reason:            fmt.Sprintf("schedulable condition"),
 					LastHeartbeatTime: metav1.Time{Time: time.Now()},
 				},
 			},

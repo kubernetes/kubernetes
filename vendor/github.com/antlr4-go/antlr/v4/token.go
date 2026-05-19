@@ -104,25 +104,6 @@ func (b *BaseToken) GetSource() *TokenSourceCharStreamPair {
 	return b.source
 }
 
-func (b *BaseToken) GetText() string {
-	if b.text != "" {
-		return b.text
-	}
-	input := b.GetInputStream()
-	if input == nil {
-		return ""
-	}
-	n := input.Size()
-	if b.GetStart() < n && b.GetStop() < n {
-		return input.GetTextFromInterval(NewInterval(b.GetStart(), b.GetStop()))
-	}
-	return "<EOF>"
-}
-
-func (b *BaseToken) SetText(text string) {
-	b.text = text
-}
-
 func (b *BaseToken) GetTokenIndex() int {
 	return b.tokenIndex
 }
@@ -137,28 +118,6 @@ func (b *BaseToken) GetTokenSource() TokenSource {
 
 func (b *BaseToken) GetInputStream() CharStream {
 	return b.source.charStream
-}
-
-func (b *BaseToken) String() string {
-	txt := b.GetText()
-	if txt != "" {
-		txt = strings.Replace(txt, "\n", "\\n", -1)
-		txt = strings.Replace(txt, "\r", "\\r", -1)
-		txt = strings.Replace(txt, "\t", "\\t", -1)
-	} else {
-		txt = "<no text>"
-	}
-
-	var ch string
-	if b.GetChannel() > 0 {
-		ch = ",channel=" + strconv.Itoa(b.GetChannel())
-	} else {
-		ch = ""
-	}
-
-	return "[@" + strconv.Itoa(b.GetTokenIndex()) + "," + strconv.Itoa(b.GetStart()) + ":" + strconv.Itoa(b.GetStop()) + "='" +
-		txt + "',<" + strconv.Itoa(b.GetTokenType()) + ">" +
-		ch + "," + strconv.Itoa(b.GetLine()) + ":" + strconv.Itoa(b.GetColumn()) + "]"
 }
 
 type CommonToken struct {
@@ -210,4 +169,45 @@ func (c *CommonToken) clone() *CommonToken {
 	t.column = c.GetColumn()
 	t.text = c.GetText()
 	return t
+}
+
+func (c *CommonToken) GetText() string {
+	if c.text != "" {
+		return c.text
+	}
+	input := c.GetInputStream()
+	if input == nil {
+		return ""
+	}
+	n := input.Size()
+	if c.start < n && c.stop < n {
+		return input.GetTextFromInterval(NewInterval(c.start, c.stop))
+	}
+	return "<EOF>"
+}
+
+func (c *CommonToken) SetText(text string) {
+	c.text = text
+}
+
+func (c *CommonToken) String() string {
+	txt := c.GetText()
+	if txt != "" {
+		txt = strings.Replace(txt, "\n", "\\n", -1)
+		txt = strings.Replace(txt, "\r", "\\r", -1)
+		txt = strings.Replace(txt, "\t", "\\t", -1)
+	} else {
+		txt = "<no text>"
+	}
+
+	var ch string
+	if c.channel > 0 {
+		ch = ",channel=" + strconv.Itoa(c.channel)
+	} else {
+		ch = ""
+	}
+
+	return "[@" + strconv.Itoa(c.tokenIndex) + "," + strconv.Itoa(c.start) + ":" + strconv.Itoa(c.stop) + "='" +
+		txt + "',<" + strconv.Itoa(c.tokenType) + ">" +
+		ch + "," + strconv.Itoa(c.line) + ":" + strconv.Itoa(c.column) + "]"
 }

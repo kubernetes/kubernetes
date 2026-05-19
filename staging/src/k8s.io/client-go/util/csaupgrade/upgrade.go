@@ -17,6 +17,7 @@ limitations under the License.
 package csaupgrade
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -322,13 +323,12 @@ func filter[T any](
 // Included from fieldmanager.internal to avoid dependency cycle
 // FieldsToSet creates a set paths from an input trie of fields
 func decodeManagedFieldsEntrySet(f metav1.ManagedFieldsEntry) (s fieldpath.Set, err error) {
-	err = s.FromJSON(f.FieldsV1.GetRawReader())
+	err = s.FromJSON(bytes.NewReader(f.FieldsV1.Raw))
 	return s, err
 }
 
 // SetToFields creates a trie of fields from an input set of paths
 func encodeManagedFieldsEntrySet(f *metav1.ManagedFieldsEntry, s fieldpath.Set) (err error) {
-	raw, err := s.ToJSON()
-	f.FieldsV1.SetRawBytes(raw)
+	f.FieldsV1.Raw, err = s.ToJSON()
 	return err
 }

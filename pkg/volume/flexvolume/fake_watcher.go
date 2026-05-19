@@ -17,8 +17,6 @@ limitations under the License.
 package flexvolume
 
 import (
-	"context"
-
 	"github.com/fsnotify/fsnotify"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
@@ -42,7 +40,7 @@ func (w *fakeWatcher) Init(eventHandler utilfs.FSEventHandler, _ utilfs.FSErrorH
 	return nil
 }
 
-func (w *fakeWatcher) Run(_ context.Context) { /* no-op */ }
+func (w *fakeWatcher) Run() { /* no-op */ }
 
 func (w *fakeWatcher) AddWatch(path string) error {
 	w.watches = append(w.watches, path)

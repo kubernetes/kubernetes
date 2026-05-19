@@ -1,4 +1,5 @@
 //go:build !windows && !linux
+// +build !windows,!linux
 
 /*
 Copyright 2024 The Kubernetes Authors.
@@ -26,12 +27,12 @@ import (
 	"runtime"
 
 	"k8s.io/kubernetes/pkg/proxy"
-	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
+	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 )
 
 // platformApplyDefaults is called after parsing command-line flags and/or reading the
 // config file, to apply platform-specific default values to config.
-func (o *Options) platformApplyDefaults(config *kubeproxyconfig.KubeProxyConfiguration) {
+func (o *Options) platformApplyDefaults(config *proxyconfigapi.KubeProxyConfiguration) {
 }
 
 var unsupportedError = fmt.Errorf(runtime.GOOS + "/" + runtime.GOARCH + "is unsupported")
@@ -50,11 +51,11 @@ func (s *ProxyServer) platformCheckSupported(ctx context.Context) (ipv4Supported
 }
 
 // createProxier creates the proxy.Provider
-func (s *ProxyServer) createProxier(ctx context.Context, config *kubeproxyconfig.KubeProxyConfiguration, dualStackMode, initOnly bool) (proxy.Provider, error) {
+func (s *ProxyServer) createProxier(ctx context.Context, config *proxyconfigapi.KubeProxyConfiguration, dualStackMode, initOnly bool) (proxy.Provider, error) {
 	return nil, unsupportedError
 }
 
 // platformCleanup removes stale kube-proxy rules that can be safely removed.
-func platformCleanup(ctx context.Context, mode kubeproxyconfig.ProxyMode, cleanupAndExit bool) error {
+func platformCleanup(ctx context.Context, mode proxyconfigapi.ProxyMode, cleanupAndExit bool) error {
 	return unsupportedError
 }

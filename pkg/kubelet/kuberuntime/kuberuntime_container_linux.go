@@ -1,4 +1,5 @@
 //go:build linux
+// +build linux
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -42,7 +43,6 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	kubeapiqos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
-	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -79,7 +79,7 @@ func (m *kubeGenericRuntimeManager) applyPlatformSpecificContainerConfig(ctx con
 
 // generateLinuxContainerConfig generates linux container config for kubelet runtime v1.
 func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(ctx context.Context, container *v1.Container, pod *v1.Pod, uid *int64, username string, nsTarget *kubecontainer.ContainerID, enforceMemoryQoS bool) (*runtimeapi.LinuxContainerConfig, error) {
-	sc, err := m.determineEffectiveSecurityContext(ctx, pod, container, uid, username)
+	sc, err := m.determineEffectiveSecurityContext(pod, container, uid, username)
 	if err != nil {
 		return nil, err
 	}
@@ -155,17 +155,8 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerResources(ctx context.
 		unified := map[string]string{}
 		memoryRequest := container.Resources.Requests.Memory().Value()
 		memoryLimit := container.Resources.Limits.Memory().Value()
-		if memoryRequest != 0 && m.memoryReservationPolicy == kubeletconfiginternal.TieredReservationMemoryReservationPolicy {
-			// Guaranteed pods get memory.min (hard protection).
-			// Burstable pods get memory.low (soft protection).
-			if kubeapiqos.GetPodQOS(pod) == v1.PodQOSGuaranteed {
-				unified[cm.Cgroup2MemoryMin] = strconv.FormatInt(memoryRequest, 10)
-			} else {
-				unified[cm.Cgroup2MemoryLow] = strconv.FormatInt(memoryRequest, 10)
-			}
-		} else {
-			unified[cm.Cgroup2MemoryMin] = "0"
-			unified[cm.Cgroup2MemoryLow] = "0"
+		if memoryRequest != 0 {
+			unified[cm.Cgroup2MemoryMin] = strconv.FormatInt(memoryRequest, 10)
 		}
 
 		// Guaranteed pods by their QoS definition requires that memory request equals memory limit and cpu request must equal cpu limit.
@@ -396,13 +387,13 @@ func toKubeContainerResources(statusResources *runtimeapi.ContainerResources) *k
 	if runtimeStatusResources != nil {
 		var cpuLimit, memLimit, cpuRequest *resource.Quantity
 		if runtimeStatusResources.CpuPeriod > 0 {
-			milliCPU := cm.QuotaToMilliCPU(runtimeStatusResources.CpuQuota, runtimeStatusResources.CpuPeriod)
+			milliCPU := quotaToMilliCPU(runtimeStatusResources.CpuQuota, runtimeStatusResources.CpuPeriod)
 			if milliCPU > 0 {
 				cpuLimit = resource.NewMilliQuantity(milliCPU, resource.DecimalSI)
 			}
 		}
 		if runtimeStatusResources.CpuShares > 0 {
-			milliCPU := cm.SharesToMilliCPU(runtimeStatusResources.CpuShares)
+			milliCPU := sharesToMilliCPU(runtimeStatusResources.CpuShares)
 			if milliCPU > 0 {
 				cpuRequest = resource.NewMilliQuantity(milliCPU, resource.DecimalSI)
 			}

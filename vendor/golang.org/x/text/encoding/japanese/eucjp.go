@@ -17,9 +17,9 @@ import (
 var EUCJP encoding.Encoding = &eucJP
 
 var eucJP = internal.Encoding{
-	Encoding: &internal.SimpleEncoding{Decoder: eucJPDecoder{}, Encoder: eucJPEncoder{}},
-	Name:     "EUC-JP",
-	MIB:      identifier.EUCPkdFmtJapanese,
+	&internal.SimpleEncoding{eucJPDecoder{}, eucJPEncoder{}},
+	"EUC-JP",
+	identifier.EUCPkdFmtJapanese,
 }
 
 type eucJPDecoder struct{ transform.NopResetter }

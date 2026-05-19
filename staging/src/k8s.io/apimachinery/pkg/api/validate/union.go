@@ -77,7 +77,7 @@ func Union[T any](_ context.Context, op operation.Operation, fldPath *field.Path
 		},
 	}
 
-	return unionValidate(op, fldPath, obj, oldObj, union, options, isSetFns...).WithOrigin("union")
+	return unionValidate(op, fldPath, obj, oldObj, union, options, isSetFns...)
 }
 
 // DiscriminatedUnion verifies specified union member matches the discriminator.
@@ -144,7 +144,7 @@ func DiscriminatedUnion[T any, D ~string](_ context.Context, op operation.Operat
 	if op.Type == operation.Update && hasOldValue && !changed {
 		return nil
 	}
-	return errs.WithOrigin("union")
+	return errs
 }
 
 // UnionMember represents a member of a union.

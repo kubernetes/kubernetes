@@ -1,8 +1,4 @@
-{{define "variable"}}{{.Name}} is a {{.Type}}{{if .Description}}
-
-{{range split .Description}}      {{.}}
-{{end}}
-{{- end -}}
+{{define "variable"}}{{.Name}} is a {{.Type}}
 {{- end -}}
 
 {{define "macro" -}}

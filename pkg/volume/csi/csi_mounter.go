@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	api "k8s.io/api/core/v1"
@@ -315,7 +314,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 
 	if csiRPCError != nil {
 		// If operation finished with error then we can remove the mount directory.
-		if volumetypes.IsOperationFinishedError(csiRPCError) && !mounterArgs.ReconstructedVolume {
+		if volumetypes.IsOperationFinishedError(csiRPCError) {
 			if removeMountDirErr := removeMountDir(c.plugin, dir); removeMountDirErr != nil {
 				klog.Error(log("mounter.SetupAt failed to remove mount dir after a NodePublish() error [%s]: %v", dir, removeMountDirErr))
 			}
@@ -454,7 +453,7 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 	// to the spec.
 	//
 	// Kubelet should only be responsible for removal of json data files it
-	// creates and their parent directories.
+	// creates and parent directories.
 	//
 	// However, some CSI plugins maybe buggy and don't adhere to the standard,
 	// so we still need to remove the target_path here if it's unmounted and
@@ -561,7 +560,12 @@ func (c *csiMountMgr) supportsVolumeLifecycleMode() error {
 
 // containsVolumeMode checks whether the given volume mode is listed.
 func containsVolumeMode(modes []storage.VolumeLifecycleMode, mode storage.VolumeLifecycleMode) bool {
-	return slices.Contains(modes, mode)
+	for _, m := range modes {
+		if m == mode {
+			return true
+		}
+	}
+	return false
 }
 
 // isDirMounted returns the !notMounted result from IsLikelyNotMountPoint check

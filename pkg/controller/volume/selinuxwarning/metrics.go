@@ -59,7 +59,13 @@ func (c *collector) DescribeWithStability(ch chan<- *metrics.Desc) {
 }
 
 func (c *collector) CollectWithStability(ch chan<- metrics.Metric) {
-	for _, conflict := range c.cache.GetConflicts(c.logger) {
+	conflictCh := make(chan cache.Conflict)
+	go func() {
+		c.cache.SendConflicts(c.logger, conflictCh)
+		close(conflictCh)
+	}()
+
+	for conflict := range conflictCh {
 		ch <- metrics.NewLazyConstMetric(seLinuxConflictDesc,
 			metrics.GaugeValue,
 			1.0,

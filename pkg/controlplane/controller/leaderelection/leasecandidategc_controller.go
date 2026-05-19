@@ -18,6 +18,7 @@ package leaderelection
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -60,13 +61,13 @@ func NewLeaseCandidateGC(clientset kubernetes.Interface, gcCheckPeriod time.Dura
 
 // Run starts one worker.
 func (c *LeaseCandidateGCController) Run(ctx context.Context) {
-	defer utilruntime.HandleCrashWithContext(ctx)
+	defer utilruntime.HandleCrash()
 	defer klog.Infof("Shutting down apiserver leasecandidate garbage collector")
 
 	klog.Infof("Starting apiserver leasecandidate garbage collector")
 
-	if !cache.WaitForNamedCacheSyncWithContext(ctx, c.leaseCandidatesSynced) {
-		utilruntime.HandleErrorWithContext(ctx, nil, "Timed out waiting for caches to sync")
+	if !cache.WaitForCacheSync(ctx.Done(), c.leaseCandidatesSynced) {
+		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
 		return
 	}
 

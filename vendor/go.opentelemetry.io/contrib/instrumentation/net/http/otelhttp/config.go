@@ -8,8 +8,9 @@ import (
 	"net/http"
 	"net/http/httptrace"
 
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
@@ -26,6 +27,7 @@ type config struct {
 	Meter             metric.Meter
 	Propagators       propagation.TextMapPropagator
 	SpanStartOptions  []trace.SpanStartOption
+	PublicEndpoint    bool
 	PublicEndpointFn  func(*http.Request) bool
 	ReadEvent         bool
 	WriteEvent        bool
@@ -66,7 +68,7 @@ func newConfig(opts ...Option) *config {
 
 	c.Meter = c.MeterProvider.Meter(
 		ScopeName,
-		metric.WithInstrumentationVersion(Version),
+		metric.WithInstrumentationVersion(Version()),
 	)
 
 	return c
@@ -92,10 +94,20 @@ func WithMeterProvider(provider metric.MeterProvider) Option {
 	})
 }
 
+// WithPublicEndpoint configures the Handler to link the span with an incoming
+// span context. If this option is not provided, then the association is a child
+// association instead of a link.
+func WithPublicEndpoint() Option {
+	return optionFunc(func(c *config) {
+		c.PublicEndpoint = true
+	})
+}
+
 // WithPublicEndpointFn runs with every request, and allows conditionally
 // configuring the Handler to link the span with an incoming span context. If
 // this option is not provided or returns false, then the association is a
 // child association instead of a link.
+// Note: WithPublicEndpoint takes precedence over WithPublicEndpointFn.
 func WithPublicEndpointFn(fn func(*http.Request) bool) Option {
 	return optionFunc(func(c *config) {
 		c.PublicEndpointFn = fn
@@ -132,13 +144,11 @@ func WithFilter(f Filter) Option {
 	})
 }
 
-// Event represents message event types for [WithMessageEvents].
-type Event int
+type event int
 
 // Different types of events that can be recorded, see WithMessageEvents.
 const (
-	unspecifiedEvents Event = iota
-	ReadEvents
+	ReadEvents event = iota
 	WriteEvents
 )
 
@@ -151,7 +161,7 @@ const (
 //     using the ReadBytesKey
 //   - WriteEvents: Record the number of bytes written after every http.ResponeWriter.Write
 //     using the WriteBytesKey
-func WithMessageEvents(events ...Event) Option {
+func WithMessageEvents(events ...event) Option {
 	return optionFunc(func(c *config) {
 		for _, e := range events {
 			switch e {
@@ -194,9 +204,6 @@ func WithServerName(server string) Option {
 
 // WithMetricAttributesFn returns an Option to set a function that maps an HTTP request to a slice of attribute.KeyValue.
 // These attributes will be included in metrics for every request.
-//
-// Deprecated: WithMetricAttributesFn is deprecated and will be removed in a
-// future release. Use [Labeler] instead.
 func WithMetricAttributesFn(metricAttributesFn func(r *http.Request) []attribute.KeyValue) Option {
 	return optionFunc(func(c *config) {
 		c.MetricAttributesFn = metricAttributesFn

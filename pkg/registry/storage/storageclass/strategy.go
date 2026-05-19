@@ -18,7 +18,7 @@ package storageclass
 
 import (
 	"context"
-
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apiserver/pkg/registry/rest"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -32,13 +32,13 @@ import (
 
 // storageClassStrategy implements behavior for StorageClass objects
 type storageClassStrategy struct {
-	rest.DeclarativeValidation
+	runtime.ObjectTyper
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating
 // StorageClass objects via the REST API.
-var Strategy = storageClassStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
+var Strategy = storageClassStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 func (storageClassStrategy) NamespaceScoped() bool {
 	return false
@@ -50,7 +50,8 @@ func (storageClassStrategy) PrepareForCreate(ctx context.Context, obj runtime.Ob
 
 func (storageClassStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	storageClass := obj.(*storage.StorageClass)
-	return validation.ValidateStorageClass(storageClass)
+	allErrs := validation.ValidateStorageClass(storageClass)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, nil, allErrs, operation.Create)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -62,7 +63,7 @@ func (storageClassStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Ob
 func (storageClassStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (storageClassStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
+func (storageClassStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
@@ -73,7 +74,7 @@ func (storageClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runti
 func (storageClassStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	allErrs := validation.ValidateStorageClass(obj.(*storage.StorageClass))
 	allErrs = append(allErrs, validation.ValidateStorageClassUpdate(obj.(*storage.StorageClass), old.(*storage.StorageClass))...)
-	return allErrs
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, allErrs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -81,6 +82,6 @@ func (storageClassStrategy) WarningsOnUpdate(ctx context.Context, obj, old runti
 	return storageutil.GetWarningsForStorageClass(obj.(*storage.StorageClass))
 }
 
-func (storageClassStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+func (storageClassStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }

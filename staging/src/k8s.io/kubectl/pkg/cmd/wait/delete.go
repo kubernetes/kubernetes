@@ -24,7 +24,6 @@ import (
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
@@ -91,7 +90,7 @@ func IsDeleted(ctx context.Context, info *resource.Info, o *WaitOptions) (runtim
 
 	// this function is used to refresh the cache to prevent timeout waits on resources that have disappeared
 	preconditionFunc := func(store cache.Store) (bool, error) {
-		obj, exists, err := store.Get(&metav1.ObjectMeta{Namespace: info.Namespace, Name: info.Name})
+		_, exists, err := store.Get(&metav1.ObjectMeta{Namespace: info.Namespace, Name: info.Name})
 		if err != nil {
 			return true, err
 		}
@@ -99,15 +98,7 @@ func IsDeleted(ctx context.Context, info *resource.Info, o *WaitOptions) (runtim
 			// since we're looking for it to disappear we just return here if it no longer exists
 			return true, nil
 		}
-		acc, err := meta.Accessor(obj)
-		if err != nil {
-			return true, err
-		}
-		if uid, ok := o.UIDMap[resourceLocation]; ok {
-			if acc.GetUID() != uid {
-				return true, nil
-			}
-		}
+
 		return false, nil
 	}
 

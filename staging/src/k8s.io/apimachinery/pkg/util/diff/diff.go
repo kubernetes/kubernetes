@@ -1,3 +1,6 @@
+//go:build !usegocmp
+// +build !usegocmp
+
 /*
 Copyright 2025 The Kubernetes Authors.
 
@@ -22,7 +25,7 @@ import (
 
 	"github.com/pmezard/go-difflib/difflib"
 
-	"k8s.io/utils/dump"
+	"k8s.io/apimachinery/pkg/util/dump"
 )
 
 // Diff returns a string representation of the difference between two objects.

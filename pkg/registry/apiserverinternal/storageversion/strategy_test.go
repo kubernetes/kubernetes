@@ -17,7 +17,6 @@ limitations under the License.
 package storageversion
 
 import (
-	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +29,7 @@ func TestStorageVersionStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Error("StorageVersion strategy must be cluster scoped")
 	}
-	if Strategy.AllowCreateOnUpdate(context.Background()) {
+	if Strategy.AllowCreateOnUpdate() {
 		t.Errorf("StorageVersion should not allow create on update")
 	}
 

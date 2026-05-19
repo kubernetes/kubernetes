@@ -180,8 +180,9 @@ func BenchmarkListFromWatchCache(b *testing.B) {
 	wg := sync.WaitGroup{}
 
 	errCh := make(chan error, namespaces)
-	for index := range namespaces {
+	for i := 0; i < namespaces; i++ {
 		wg.Add(1)
+		index := i
 		go func() {
 			defer wg.Done()
 
@@ -194,7 +195,7 @@ func BenchmarkListFromWatchCache(b *testing.B) {
 				return
 			}
 
-			for j := range secretsPerNamespace {
+			for j := 0; j < secretsPerNamespace; j++ {
 				secret := &v1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: fmt.Sprintf("secret-%d", j),

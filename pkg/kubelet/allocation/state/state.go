@@ -20,7 +20,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog/v2"
 )
 
 // PodResourceInfo stores resource requirements for containers within a pod.
@@ -59,7 +58,7 @@ type Reader interface {
 
 type writer interface {
 	SetContainerResources(podUID types.UID, containerName string, resources v1.ResourceRequirements) error
-	SetPodResourceInfo(logger klog.Logger, podUID types.UID, resourceInfo PodResourceInfo) error
+	SetPodResourceInfo(podUID types.UID, resourceInfo PodResourceInfo) error
 	SetPodLevelResources(podUID types.UID, alloc *v1.ResourceRequirements) error
 	RemovePod(podUID types.UID) error
 	// RemoveOrphanedPods removes the stored state for any pods not included in the set of remaining pods.

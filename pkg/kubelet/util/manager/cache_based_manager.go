@@ -17,7 +17,6 @@ limitations under the License.
 package manager
 
 import (
-	"context"
 	"fmt"
 	"strconv"
 	"sync"
@@ -130,11 +129,9 @@ func (s *objectStore) DeleteReference(namespace, name string, _ types.UID) {
 
 // GetObjectTTLFromNodeFunc returns a function that returns TTL value
 // from a given Node object.
-func GetObjectTTLFromNodeFunc(getNode func(context.Context) (*v1.Node, error)) GetObjectTTLFunc {
+func GetObjectTTLFromNodeFunc(getNode func() (*v1.Node, error)) GetObjectTTLFunc {
 	return func() (time.Duration, bool) {
-		// TODO: Pass context from upper level instead of using context.Background().
-		// This requires changing the GetObjectTTLFunc signature to accept a context parameter.
-		node, err := getNode(context.Background())
+		node, err := getNode()
 		if err != nil {
 			return time.Duration(0), false
 		}

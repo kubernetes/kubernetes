@@ -53,10 +53,6 @@ type Buffer interface {
 	Free()
 	// Len returns the Buffer's size.
 	Len() int
-	// Slice returns a new Buffer that is a view into this buffer's data
-	// from [start:end). The buffer is not modified. Panics if the buffer
-	// has been freed or if start/end are out of bounds.
-	Slice(start, end int) Buffer
 
 	split(n int) (left, right Buffer)
 	read(buf []byte) (int, Buffer)
@@ -66,6 +62,7 @@ var (
 	bufferPoolingThreshold = 1 << 10
 
 	bufferObjectPool = sync.Pool{New: func() any { return new(buffer) }}
+	refObjectPool    = sync.Pool{New: func() any { return new(atomic.Int32) }}
 )
 
 // IsBelowBufferPoolingThreshold returns true if the given size is less than or
@@ -76,19 +73,9 @@ func IsBelowBufferPoolingThreshold(size int) bool {
 }
 
 type buffer struct {
-	refs atomic.Int32
-	data []byte
-
-	// rootBuf is the buffer responsible for returning origData to the pool
-	// once the reference count drops to 0.
-	//
-	// When a buffer is split, the new buffer inherits the rootBuf of the
-	// original and increments the root's reference count. For the
-	// initial buffer (the root), this field points to itself.
-	rootBuf *buffer
-
-	// The following fields are only set for root buffers.
 	origData *[]byte
+	data     []byte
+	refs     *atomic.Int32
 	pool     BufferPool
 }
 
@@ -116,8 +103,8 @@ func NewBuffer(data *[]byte, pool BufferPool) Buffer {
 	b.origData = data
 	b.data = *data
 	b.pool = pool
-	b.rootBuf = b
-	b.refs.Store(1)
+	b.refs = refObjectPool.Get().(*atomic.Int32)
+	b.refs.Add(1)
 	return b
 }
 
@@ -140,85 +127,59 @@ func Copy(data []byte, pool BufferPool) Buffer {
 }
 
 func (b *buffer) ReadOnlyData() []byte {
-	if b.rootBuf == nil {
+	if b.refs == nil {
 		panic("Cannot read freed buffer")
 	}
 	return b.data
 }
 
 func (b *buffer) Ref() {
-	if b.refs.Add(1) <= 1 {
+	if b.refs == nil {
 		panic("Cannot ref freed buffer")
 	}
+	b.refs.Add(1)
 }
 
 func (b *buffer) Free() {
-	refs := b.refs.Add(-1)
-	if refs < 0 {
+	if b.refs == nil {
 		panic("Cannot free freed buffer")
 	}
-	if refs > 0 {
-		return
-	}
 
-	b.data = nil
-	if b.rootBuf == b {
-		// This buffer is the owner of the data slice and its ref count reached
-		// 0, free the slice.
+	refs := b.refs.Add(-1)
+	switch {
+	case refs > 0:
+		return
+	case refs == 0:
 		if b.pool != nil {
 			b.pool.Put(b.origData)
-			b.pool = nil
 		}
-		b.origData = nil
-	} else {
-		// This buffer doesn't own the data slice, decrement a ref on the root
-		// buffer.
-		b.rootBuf.Free()
-	}
 
-	b.rootBuf = nil
-	bufferObjectPool.Put(b)
+		refObjectPool.Put(b.refs)
+		b.origData = nil
+		b.data = nil
+		b.refs = nil
+		b.pool = nil
+		bufferObjectPool.Put(b)
+	default:
+		panic("Cannot free freed buffer")
+	}
 }
 
 func (b *buffer) Len() int {
 	return len(b.ReadOnlyData())
 }
 
-func (b *buffer) Slice(start, end int) Buffer {
-	if b.rootBuf == nil {
-		panic("Cannot slice freed buffer")
-	}
-
-	data := b.data[start:end] // access the data to check slice bounds
-
-	if len(data) == 0 {
-		return emptyBuffer{}
-	}
-	if len(data) == len(b.data) {
-		b.Ref()
-		return b
-	}
-	// We are creating a new reference (view) to a portion of the root buffer's
-	// data. Therefore, we must increment the reference count of the root buffer
-	// to ensure the underlying data is not freed while this view is still in
-	// use.
-	b.rootBuf.Ref()
-	s := newBuffer()
-	s.data = data
-	s.rootBuf = b.rootBuf
-	s.refs.Store(1)
-	return s
-}
-
 func (b *buffer) split(n int) (Buffer, Buffer) {
-	if b.rootBuf == nil || b.rootBuf.refs.Add(1) <= 1 {
+	if b.refs == nil {
 		panic("Cannot split freed buffer")
 	}
 
+	b.refs.Add(1)
 	split := newBuffer()
+	split.origData = b.origData
 	split.data = b.data[n:]
-	split.rootBuf = b.rootBuf
-	split.refs.Store(1)
+	split.refs = b.refs
+	split.pool = b.pool
 
 	b.data = b.data[:n]
 
@@ -226,7 +187,7 @@ func (b *buffer) split(n int) (Buffer, Buffer) {
 }
 
 func (b *buffer) read(buf []byte) (int, Buffer) {
-	if b.rootBuf == nil {
+	if b.refs == nil {
 		panic("Cannot read freed buffer")
 	}
 
@@ -270,13 +231,6 @@ func (e emptyBuffer) Len() int {
 	return 0
 }
 
-func (e emptyBuffer) Slice(start, end int) Buffer {
-	if start != 0 || end != 0 {
-		panic(fmt.Sprintf("slice bounds out of range [%d:%d] with length 0", start, end))
-	}
-	return e
-}
-
 func (e emptyBuffer) split(int) (left, right Buffer) {
 	return e, e
 }
@@ -300,9 +254,6 @@ func (s SliceBuffer) Free() {}
 
 // Len is a noop implementation of Len.
 func (s SliceBuffer) Len() int { return len(s) }
-
-// Slice returns a new SliceBuffer that is a view into the receiver from [start:end).
-func (s SliceBuffer) Slice(start, end int) Buffer { return s[start:end] }
 
 func (s SliceBuffer) split(n int) (left, right Buffer) {
 	return s[:n], s[n:]

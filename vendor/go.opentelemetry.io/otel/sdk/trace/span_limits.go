@@ -3,7 +3,7 @@
 
 package trace // import "go.opentelemetry.io/otel/sdk/trace"
 
-import "go.opentelemetry.io/otel/sdk/trace/internal/env"
+import "go.opentelemetry.io/otel/sdk/internal/env"
 
 const (
 	// DefaultAttributeValueLengthLimit is the default maximum allowed

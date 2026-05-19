@@ -107,7 +107,7 @@ var _ = common.SIGDescribe("Service CIDRs", func() {
 		// gets allocated, we also need to ensure the ClusterIP belongs to the new Service range
 		// so we need to explicitly set it. Try several times before giving up.
 		var nodePortService *v1.Service
-		for range 5 {
+		for i := 0; i < 5; i++ {
 			nodePortService, err = jig.CreateTCPService(ctx, func(svc *v1.Service) {
 				svc.Spec.ClusterIP = serviceIP.String()
 				svc.Spec.Type = v1.ServiceTypeNodePort

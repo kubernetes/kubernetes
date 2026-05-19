@@ -1526,7 +1526,7 @@ func TestValidateClusterTrustBundleUpdate(t *testing.T) {
 		},
 		wantErrors: field.ErrorList{
 			field.Invalid(field.NewPath("metadata", "name"), "k8s.io:foo:bar", "ClusterTrustBundle for signerName k8s.io/bar must be named with prefix k8s.io:bar:"),
-			field.Invalid(field.NewPath("spec", "signerName"), "k8s.io/bar", "field is immutable").WithOrigin("immutable").MarkAlpha().MarkCoveredByDeclarative(),
+			field.Invalid(field.NewPath("spec", "signerName"), "k8s.io/bar", "field is immutable"),
 		},
 	}, {
 		description: "adding certificate allowed",
@@ -1610,9 +1610,9 @@ func TestValidateClusterTrustBundleUpdate(t *testing.T) {
 
 func TestValidatePodCertificateRequestCreate(t *testing.T) {
 	podUID1 := "pod-uid-1"
-	_, _, ed25519PubPKIX1, ed25519Proof1, ed25519CSR1 := mustMakeEd25519KeyAndProof(t, []byte(podUID1), []string{})
-	_, _, ed25519PubPKIX2, ed25519Proof2, _ := mustMakeEd25519KeyAndProof(t, []byte("other-value"), []string{})
-	_, _, _, ed25519Proof3, _ := mustMakeEd25519KeyAndProof(t, []byte(podUID1), []string{})
+	_, _, ed25519PubPKIX1, ed25519Proof1 := mustMakeEd25519KeyAndProof(t, []byte(podUID1))
+	_, _, ed25519PubPKIX2, ed25519Proof2 := mustMakeEd25519KeyAndProof(t, []byte("other-value"))
+	_, _, _, ed25519Proof3 := mustMakeEd25519KeyAndProof(t, []byte(podUID1))
 	_, _, ecdsaP224PubPKIX1, ecdsaP224Proof1 := mustMakeECDSAKeyAndProof(t, elliptic.P224(), []byte(podUID1))
 	_, _, ecdsaP256PubPKIX1, ecdsaP256Proof1 := mustMakeECDSAKeyAndProof(t, elliptic.P256(), []byte(podUID1))
 	_, _, ecdsaP384PubPKIX1, ecdsaP384Proof1 := mustMakeECDSAKeyAndProof(t, elliptic.P384(), []byte(podUID1))
@@ -1624,7 +1624,7 @@ func TestValidatePodCertificateRequestCreate(t *testing.T) {
 	_, _, rsaWrongProofPKIX, rsaWrongProof := mustMakeRSAKeyAndProof(t, 3072, []byte("other-value"))
 
 	podUIDEmpty := ""
-	_, _, pubPKIXEmpty, proofEmpty, _ := mustMakeEd25519KeyAndProof(t, []byte(podUIDEmpty), []string{})
+	_, _, pubPKIXEmpty, proofEmpty := mustMakeEd25519KeyAndProof(t, []byte(podUIDEmpty))
 
 	testCases := []struct {
 		description string
@@ -1652,52 +1652,6 @@ func TestValidatePodCertificateRequestCreate(t *testing.T) {
 				},
 			},
 			wantErrors: nil,
-		},
-		{
-			description: "valid Ed25519 PCR (using PKCS#10)",
-			pcr: &capi.PodCertificateRequest{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "foo",
-					Name:      "bar",
-				},
-				Spec: capi.PodCertificateRequestSpec{
-					SignerName:           "foo.com/abc",
-					PodName:              "pod-1",
-					PodUID:               types.UID(podUID1),
-					ServiceAccountName:   "sa-1",
-					ServiceAccountUID:    "sa-uid-1",
-					NodeName:             "node-1",
-					NodeUID:              "node-uid-1",
-					MaxExpirationSeconds: ptr.To[int32](86400),
-					StubPKCS10Request:    ed25519CSR1,
-				},
-			},
-			wantErrors: nil,
-		},
-		{
-			description: "invalid Ed25519 PCR (both StubPKCS10Request and PKIXPublicKey set)",
-			pcr: &capi.PodCertificateRequest{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "foo",
-					Name:      "bar",
-				},
-				Spec: capi.PodCertificateRequestSpec{
-					SignerName:           "foo.com/abc",
-					PodName:              "pod-1",
-					PodUID:               types.UID(podUID1),
-					ServiceAccountName:   "sa-1",
-					ServiceAccountUID:    "sa-uid-1",
-					NodeName:             "node-1",
-					NodeUID:              "node-uid-1",
-					MaxExpirationSeconds: ptr.To[int32](86400),
-					PKIXPublicKey:        ed25519PubPKIX1,
-					ProofOfPossession:    ed25519Proof1,
-					StubPKCS10Request:    ed25519CSR1,
-				},
-			},
-			wantErrors: field.ErrorList{
-				field.Invalid(field.NewPath("spec"), field.OmitValueType{}, "exactly one of (stubPKCS10Request) or (pkixPublicKey, proofOfPossession) must be set"),
-			},
 		},
 		{
 			description: "invalid Ed25519 proof of possession (correct key signed wrong message)",
@@ -2233,7 +2187,7 @@ func TestValidatePodCertificateRequestCreate(t *testing.T) {
 					NodeUID:              "node-uid-1",
 					MaxExpirationSeconds: ptr.To[int32](86400),
 					PKIXPublicKey:        make([]byte, capi.MaxPKIXPublicKeySize+1),
-					ProofOfPossession:    []byte("abc"),
+					ProofOfPossession:    []byte{},
 				},
 			},
 			wantErrors: field.ErrorList{
@@ -2256,7 +2210,7 @@ func TestValidatePodCertificateRequestCreate(t *testing.T) {
 					NodeName:             "node-1",
 					NodeUID:              "node-uid-1",
 					MaxExpirationSeconds: ptr.To[int32](86400),
-					PKIXPublicKey:        ed25519PubPKIX1,
+					PKIXPublicKey:        []byte{},
 					ProofOfPossession:    make([]byte, capi.MaxProofOfPossessionSize+1),
 				},
 			},
@@ -2354,7 +2308,7 @@ func TestValidatePodCertificateRequestCreate(t *testing.T) {
 
 func TestValidatePodCertificateRequestUpdate(t *testing.T) {
 	podUID1 := "pod-uid-1"
-	_, _, pubPKIX1, proof1, _ := mustMakeEd25519KeyAndProof(t, []byte(podUID1), []string{})
+	_, _, pubPKIX1, proof1 := mustMakeEd25519KeyAndProof(t, []byte(podUID1))
 
 	testCases := []struct {
 		description    string
@@ -2442,7 +2396,7 @@ func TestValidatePodCertificateRequestStatusUpdate(t *testing.T) {
 	intermediateCACertDER, intermediateCAPrivKey := mustMakeIntermediateCA(t, caCertDER, caPrivKey)
 
 	podUID1 := "pod-uid-1"
-	_, pub1, pubPKIX1, proof1, _ := mustMakeEd25519KeyAndProof(t, []byte(podUID1), []string{})
+	_, pub1, pubPKIX1, proof1 := mustMakeEd25519KeyAndProof(t, []byte(podUID1))
 
 	pod1Cert1 := mustSignCertForPublicKey(t, 24*time.Hour, pub1, caCertDER, caPrivKey, false, "", "")
 	pod1Cert2 := mustSignCertForPublicKey(t, 18*time.Hour, pub1, caCertDER, caPrivKey, false, "", "")
@@ -4484,7 +4438,7 @@ func mustParseTime(t *testing.T, stamp string) time.Time {
 	return got
 }
 
-func mustMakeEd25519KeyAndProof(t *testing.T, toBeSigned []byte, pkcs10DNSSANS []string) (ed25519.PrivateKey, ed25519.PublicKey, []byte, []byte, []byte) {
+func mustMakeEd25519KeyAndProof(t *testing.T, toBeSigned []byte) (ed25519.PrivateKey, ed25519.PublicKey, []byte, []byte) {
 	pub, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatalf("Error while generating ed25519 key: %v", err)
@@ -4494,13 +4448,7 @@ func mustMakeEd25519KeyAndProof(t *testing.T, toBeSigned []byte, pkcs10DNSSANS [
 		t.Fatalf("Error while marshaling PKIX public key: %v", err)
 	}
 	sig := ed25519.Sign(priv, toBeSigned)
-
-	pkcs10DER, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{DNSNames: pkcs10DNSSANS}, priv)
-	if err != nil {
-		t.Fatalf("Error while creating PKCS#10 certificate signing request: %v", err)
-	}
-
-	return priv, pub, pubPKIX, sig, pkcs10DER
+	return priv, pub, pubPKIX, sig
 }
 
 func mustMakeECDSAKeyAndProof(t *testing.T, curve elliptic.Curve, toBeSigned []byte) (*ecdsa.PrivateKey, *ecdsa.PublicKey, []byte, []byte) {

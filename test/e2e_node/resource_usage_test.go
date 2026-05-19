@@ -1,4 +1,5 @@
 //go:build linux
+// +build linux
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -83,7 +84,8 @@ var _ = SIGDescribe("Resource-usage", framework.WithSerial(), framework.WithSlow
 			},
 		}
 
-		for _, itArg := range rTests {
+		for _, testArg := range rTests {
+			itArg := testArg
 			desc := fmt.Sprintf("resource tracking for %d pods per node", itArg.podsNr)
 			ginkgo.It(desc, func(ctx context.Context) {
 				testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
@@ -113,14 +115,15 @@ var _ = SIGDescribe("Resource-usage", framework.WithSerial(), framework.WithSlow
 		}
 
 		for _, testArg := range rTests {
-			desc := fmt.Sprintf("resource tracking for %d pods per node [Benchmark]", testArg.podsNr)
+			itArg := testArg
+			desc := fmt.Sprintf("resource tracking for %d pods per node [Benchmark]", itArg.podsNr)
 			ginkgo.It(desc, func(ctx context.Context) {
-				testInfo := getTestNodeInfo(f, testArg.getTestName(), desc)
+				testInfo := getTestNodeInfo(f, itArg.getTestName(), desc)
 
-				runResourceUsageTest(ctx, f, rc, testArg)
+				runResourceUsageTest(ctx, f, rc, itArg)
 
 				// Log and verify resource usage
-				logAndVerifyResource(ctx, f, rc, testArg.cpuLimits, testArg.memLimits, testInfo, false)
+				logAndVerifyResource(ctx, f, rc, itArg.cpuLimits, itArg.memLimits, testInfo, false)
 			})
 		}
 	})

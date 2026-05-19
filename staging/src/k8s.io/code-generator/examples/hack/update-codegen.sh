@@ -28,12 +28,10 @@ THIS_PKG="k8s.io/code-generator/examples"
 
 kube::codegen::gen_helpers \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
-    --lint-rules known-tags-only,require-explicit-disablement \
     "${SCRIPT_ROOT}"
 
 kube::codegen::gen_register \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
-    --lint-rules known-tags-only,require-explicit-disablement \
     "${SCRIPT_ROOT}"
 
 if [[ -n "${API_KNOWN_VIOLATIONS_DIR:-}" ]]; then
@@ -57,7 +55,6 @@ kube::codegen::gen_client \
     --output-dir "${SCRIPT_ROOT}/apiserver" \
     --output-pkg "${THIS_PKG}/apiserver" \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
-    --lint-rules known-tags-only,require-explicit-disablement \
     "${SCRIPT_ROOT}/apiserver/apis"
 
 kube::codegen::gen_client \
@@ -66,7 +63,6 @@ kube::codegen::gen_client \
     --output-dir "${SCRIPT_ROOT}/crd" \
     --output-pkg "${THIS_PKG}/crd" \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
-    --lint-rules known-tags-only,require-explicit-disablement \
     "${SCRIPT_ROOT}/crd/apis"
 
 kube::codegen::gen_client \
@@ -76,7 +72,6 @@ kube::codegen::gen_client \
     --output-pkg "${THIS_PKG}/single" \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
     --one-input-api "api" \
-    --lint-rules known-tags-only,require-explicit-disablement \
     "${SCRIPT_ROOT}/single"
 
 kube::codegen::gen_client \
@@ -85,7 +80,6 @@ kube::codegen::gen_client \
     --output-dir "${SCRIPT_ROOT}/MixedCase" \
     --output-pkg "${THIS_PKG}/MixedCase" \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
-    --lint-rules known-tags-only,require-explicit-disablement \
     "${SCRIPT_ROOT}/MixedCase/apis"
 
 kube::codegen::gen_client \
@@ -94,5 +88,4 @@ kube::codegen::gen_client \
     --output-dir "${SCRIPT_ROOT}/HyphenGroup" \
     --output-pkg "${THIS_PKG}/HyphenGroup" \
     --boilerplate "${SCRIPT_ROOT}/hack/boilerplate.go.txt" \
-    --lint-rules known-tags-only,require-explicit-disablement \
     "${SCRIPT_ROOT}/HyphenGroup/apis"

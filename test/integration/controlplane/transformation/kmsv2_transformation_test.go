@@ -1,4 +1,5 @@
 //go:build !windows
+// +build !windows
 
 /*
 Copyright 2022 The Kubernetes Authors.
@@ -741,7 +742,7 @@ resources:
 
 	const podCount = 1_000
 
-	for i := range podCount {
+	for i := 0; i < podCount; i++ {
 		if _, err := client.CoreV1().Pods(testNamespace).Create(ctx, &corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("dek-reuse-%04d", i+1), // making creation order match returned list order / nonce counter
@@ -1147,7 +1148,7 @@ resources:
 
 	secrets := make([]*api.Secret, dataLen)
 
-	for i := range dataLen {
+	for i := 0; i < dataLen; i++ {
 		secrets[i] = &api.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("test-secret-%d", i),
@@ -1166,7 +1167,7 @@ resources:
 			b.Fatal(err)
 		}
 
-		for i := range dataLen {
+		for i := 0; i < dataLen; i++ {
 			out, err := secretStorage.Create(ctx, secrets[i], noValidation, &metav1.CreateOptions{})
 			if err != nil {
 				b.Fatal(err)
@@ -1294,7 +1295,7 @@ resources:
 
 	secrets := make([]*corev1.Secret, dataLen)
 
-	for i := range dataLen {
+	for i := 0; i < dataLen; i++ {
 		secrets[i] = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("test-secret-%d", i),
@@ -1313,7 +1314,7 @@ resources:
 			b.Fatal(err)
 		}
 
-		for i := range dataLen {
+		for i := 0; i < dataLen; i++ {
 			out, err := secretStorage.Create(ctx, secrets[i], metav1.CreateOptions{})
 			if err != nil {
 				b.Fatal(err)
@@ -1470,7 +1471,7 @@ resources:
 							APIVersion: "v1",
 							Time:       &dekSourceAESGCMKeyTime,
 							FieldsType: "FieldsV1",
-							FieldsV1:   metav1.NewFieldsV1(`{"f:data":{".":{},"f:api_key":{}},"f:type":{}}`),
+							FieldsV1:   &metav1.FieldsV1{Raw: []byte(`{"f:data":{".":{},"f:api_key":{}},"f:type":{}}`)},
 						},
 					},
 				},
@@ -1492,7 +1493,7 @@ resources:
 							APIVersion: "v1",
 							Time:       &dekSourceHKDFSHA256XNonceAESGCMSeedTime,
 							FieldsType: "FieldsV1",
-							FieldsV1:   metav1.NewFieldsV1(`{"f:data":{".":{},"f:api_key":{}},"f:type":{}}`),
+							FieldsV1:   &metav1.FieldsV1{Raw: []byte(`{"f:data":{".":{},"f:api_key":{}},"f:type":{}}`)},
 						},
 					},
 				},

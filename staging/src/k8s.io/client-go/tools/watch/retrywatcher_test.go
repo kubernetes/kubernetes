@@ -32,12 +32,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
-	"k8s.io/utils/dump"
 )
 
 func init() {
@@ -186,29 +186,6 @@ func TestRetryWatcher(t *testing.T) {
 						if firstRun {
 							firstRun = false
 							return nil, fmt.Errorf("test error")
-						}
-
-						return watch.NewProxyWatcher(arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
-							makeTestEvent(2),
-						}))), nil
-					}
-				}(),
-			},
-			watchCount: 2,
-			expected: []watch.Event{
-				makeTestEvent(2),
-			},
-		},
-		{
-			name:      "recovers from 410 Gone error on watch establishment",
-			initialRV: "1",
-			watchClient: &cache.ListWatch{
-				WatchFunc: func() func(options metav1.ListOptions) (watch.Interface, error) {
-					firstRun := true
-					return func(options metav1.ListOptions) (watch.Interface, error) {
-						if firstRun {
-							firstRun = false
-							return nil, apierrors.NewResourceExpired("")
 						}
 
 						return watch.NewProxyWatcher(arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
@@ -571,6 +548,7 @@ func TestRetryWatcher(t *testing.T) {
 	}
 
 	for _, tc := range tt {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			t.Parallel()

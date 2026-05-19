@@ -1,4 +1,4 @@
-//go:build !windows && !solaris
+//+build !windows,!solaris
 
 package dbus
 
@@ -11,29 +11,10 @@ import (
 	"syscall"
 )
 
-// msghead represents the part of the message header
-// that has a constant size (byte order + 15 bytes).
-type msghead struct {
-	Type      Type
-	Flags     Flags
-	Proto     byte
-	BodyLen   uint32
-	Serial    uint32
-	HeaderLen uint32
-}
-
 type oobReader struct {
 	conn *net.UnixConn
 	oob  []byte
 	buf  [4096]byte
-
-	// The following fields are used to reduce memory allocs.
-	headers  []header
-	csheader []byte
-	b        *bytes.Buffer
-	r        *bytes.Reader
-	dec      *decoder
-	msghead
 }
 
 func (o *oobReader) Read(b []byte) (n int, err error) {
@@ -52,14 +33,6 @@ type unixTransport struct {
 	*net.UnixConn
 	rdr        *oobReader
 	hasUnixFDs bool
-}
-
-func newUnixTransportFromConn(conn *net.UnixConn) transport {
-	t := new(unixTransport)
-	t.UnixConn = conn
-	t.hasUnixFDs = true
-
-	return t
 }
 
 func newUnixTransport(keys string) (transport, error) {
@@ -97,36 +70,28 @@ func (t *unixTransport) EnableUnixFDs() {
 }
 
 func (t *unixTransport) ReadMessage() (*Message, error) {
+	var (
+		blen, hlen uint32
+		csheader   [16]byte
+		headers    []header
+		order      binary.ByteOrder
+		unixfds    uint32
+	)
 	// To be sure that all bytes of out-of-band data are read, we use a special
 	// reader that uses ReadUnix on the underlying connection instead of Read
 	// and gathers the out-of-band data in a buffer.
 	if t.rdr == nil {
-		t.rdr = &oobReader{
-			conn: t.UnixConn,
-			// This buffer is used to decode the part of the header that has a constant size.
-			csheader: make([]byte, 16),
-			b:        &bytes.Buffer{},
-			// The reader helps to read from the buffer several times.
-			r:   &bytes.Reader{},
-			dec: &decoder{},
-		}
+		t.rdr = &oobReader{conn: t.UnixConn}
 	} else {
-		t.rdr.oob = t.rdr.oob[:0]
-		t.rdr.headers = t.rdr.headers[:0]
+		t.rdr.oob = nil
 	}
-	var (
-		r   = t.rdr.r
-		b   = t.rdr.b
-		dec = t.rdr.dec
-	)
 
-	_, err := io.ReadFull(t.rdr, t.rdr.csheader)
-	if err != nil {
+	// read the first 16 bytes (the part of the header that has a constant size),
+	// from which we can figure out the length of the rest of the message
+	if _, err := io.ReadFull(t.rdr, csheader[:]); err != nil {
 		return nil, err
 	}
-
-	var order binary.ByteOrder
-	switch t.rdr.csheader[0] {
+	switch csheader[0] {
 	case 'l':
 		order = binary.LittleEndian
 	case 'B':
@@ -134,62 +99,38 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 	default:
 		return nil, InvalidMessageError("invalid byte order")
 	}
-
-	r.Reset(t.rdr.csheader[1:])
-	if err := binary.Read(r, order, &t.rdr.msghead); err != nil {
-		return nil, err
-	}
-
-	msg := &Message{
-		Type:   t.rdr.Type,
-		Flags:  t.rdr.Flags,
-		serial: t.rdr.Serial,
-	}
-	// Length of header fields (without alignment).
-	hlen := t.rdr.HeaderLen
+	// csheader[4:8] -> length of message body, csheader[12:16] -> length of
+	// header fields (without alignment)
+	binary.Read(bytes.NewBuffer(csheader[4:8]), order, &blen)
+	binary.Read(bytes.NewBuffer(csheader[12:]), order, &hlen)
 	if hlen%8 != 0 {
 		hlen += 8 - (hlen % 8)
 	}
-	if hlen+t.rdr.BodyLen+16 > 1<<27 {
-		return nil, InvalidMessageError("message is too long")
-	}
 
-	// Decode headers and look for unix fds.
-	b.Reset()
-	if _, err = b.Write(t.rdr.csheader[12:]); err != nil {
+	// decode headers and look for unix fds
+	headerdata := make([]byte, hlen+4)
+	copy(headerdata, csheader[12:])
+	if _, err := io.ReadFull(t.rdr, headerdata[4:]); err != nil {
 		return nil, err
 	}
-	if _, err = io.CopyN(b, t.rdr, int64(hlen)); err != nil {
-		return nil, err
-	}
-	dec.Reset(b, order, nil)
+	dec := newDecoder(bytes.NewBuffer(headerdata), order, make([]int, 0))
 	dec.pos = 12
 	vs, err := dec.Decode(Signature{"a(yv)"})
 	if err != nil {
 		return nil, err
 	}
-	if err = Store(vs, &t.rdr.headers); err != nil {
-		return nil, err
-	}
-	var unixfds uint32
-	for _, v := range t.rdr.headers {
+	Store(vs, &headers)
+	for _, v := range headers {
 		if v.Field == byte(FieldUnixFDs) {
-			unixfds, _ = v.value.(uint32)
+			unixfds, _ = v.Variant.value.(uint32)
 		}
 	}
-
-	msg.Headers = make(map[HeaderField]Variant)
-	for _, v := range t.rdr.headers {
-		msg.Headers[HeaderField(v.Field)] = v.Variant
-	}
-
-	dec.align(8)
-	body := make([]byte, t.rdr.BodyLen)
-	if _, err = io.ReadFull(t.rdr, body); err != nil {
+	all := make([]byte, 16+hlen+blen)
+	copy(all, csheader[:])
+	copy(all[16:], headerdata[4:])
+	if _, err := io.ReadFull(t.rdr, all[16+hlen:]); err != nil {
 		return nil, err
 	}
-	r.Reset(body)
-
 	if unixfds != 0 {
 		if !t.hasUnixFDs {
 			return nil, errors.New("dbus: got unix fds on unsupported transport")
@@ -206,8 +147,8 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 		if err != nil {
 			return nil, err
 		}
-		dec.Reset(r, order, fds)
-		if err = decodeMessageBody(msg, dec); err != nil {
+		msg, err := DecodeMessageWithFDs(bytes.NewBuffer(all), fds)
+		if err != nil {
 			return nil, err
 		}
 		// substitute the values in the message body (which are indices for the
@@ -232,27 +173,7 @@ func (t *unixTransport) ReadMessage() (*Message, error) {
 		}
 		return msg, nil
 	}
-
-	dec.Reset(r, order, nil)
-	if err = decodeMessageBody(msg, dec); err != nil {
-		return nil, err
-	}
-	return msg, nil
-}
-
-func decodeMessageBody(msg *Message, dec *decoder) error {
-	if err := msg.validateHeader(); err != nil {
-		return err
-	}
-
-	sig, _ := msg.Headers[FieldSignature].value.(Signature)
-	if sig.str == "" {
-		return nil
-	}
-
-	var err error
-	msg.Body, err = dec.Decode(sig)
-	return err
+	return DecodeMessage(bytes.NewBuffer(all))
 }
 
 func (t *unixTransport) SendMessage(msg *Message) error {
@@ -271,7 +192,7 @@ func (t *unixTransport) SendMessage(msg *Message) error {
 			return err
 		}
 		oob := syscall.UnixRights(fds...)
-		n, oobn, err := t.WriteMsgUnix(buf.Bytes(), oob, nil)
+		n, oobn, err := t.UnixConn.WriteMsgUnix(buf.Bytes(), oob, nil)
 		if err != nil {
 			return err
 		}

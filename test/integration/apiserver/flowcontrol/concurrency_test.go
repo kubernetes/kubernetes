@@ -314,7 +314,7 @@ func createPriorityLevelAndBindingFlowSchemaForUser(c clientset.Interface, usern
 }
 
 func streamRequests(parallel int, request func(), wg *sync.WaitGroup, stopCh <-chan struct{}) {
-	for range parallel {
+	for i := 0; i < parallel; i++ {
 		go func() {
 			defer wg.Done()
 			for {

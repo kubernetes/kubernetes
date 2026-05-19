@@ -22,7 +22,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -53,8 +52,6 @@ var CmdFakeRegistryServer = &cobra.Command{
 }
 
 func main(cmd *cobra.Command, args []string) {
-	log.Printf("Registry server starting with registry directory: %s", registryDir)
-
 	registryMux := NewRegistryServerMux(private)
 
 	addr := fmt.Sprintf(":%d", port)
@@ -89,23 +86,9 @@ func auth(h http.Handler) http.Handler {
 	})
 }
 
-// digestToPath converts a digest to a nested directory path following the Docker
-// registry storage layout. For example, "sha256:abc123..." becomes
-// "<baseDir>/sha256/ab/abc123.../data". This avoids filesystem issues with colons
-// in filenames on Windows and matches the standard Docker registry layout.
-func digestToPath(baseDir, digest string) string {
-	parts := strings.SplitN(digest, ":", 2)
-	if len(parts) != 2 || len(parts[1]) < 2 {
-		return filepath.Join(baseDir, digest)
-	}
-	algo := parts[0] // e.g., "sha256"
-	hash := parts[1] // e.g., "abc123..."
-	return filepath.Join(baseDir, algo, hash[:2], hash, "data")
-}
-
 // handleBlobs serves blob requests
 func handleBlobs(w http.ResponseWriter, r *http.Request, imageName, identifier string) {
-	filePath := digestToPath(filepath.Join(registryDir, imageName, "blobs"), identifier)
+	filePath := fmt.Sprintf("%s/%s/blobs/%s", registryDir, imageName, identifier)
 	w.Header().Set("Content-Type", "application/octet-stream")
 	log.Printf("Serving blob: %s", filePath)
 	http.ServeFile(w, r, filePath)
@@ -115,16 +98,12 @@ func handleBlobs(w http.ResponseWriter, r *http.Request, imageName, identifier s
 // based on the manifest's mediaType field. If the identifier is a tag, it
 // reads the digest from the tag file and issues a redirect.
 func handleManifests(w http.ResponseWriter, r *http.Request, imageName, identifier string) {
-	manifestsDir := filepath.Join(registryDir, imageName, "manifests")
+	filePath := fmt.Sprintf("%s/%s/manifests/%s", registryDir, imageName, identifier)
 
 	// if the identifier is not a digest, assume it's a tag and perform a redirect.
 	if !strings.HasPrefix(identifier, "sha256:") {
-		// Tags are stored as flat files (not nested)
-		tagFilePath := filepath.Join(manifestsDir, identifier)
-		log.Printf("Looking for tag file: %s", tagFilePath)
-		digest, err := os.ReadFile(tagFilePath)
+		digest, err := os.ReadFile(filePath)
 		if err != nil {
-			log.Printf("Tag file not found: %s, error: %v", tagFilePath, err)
 			http.NotFound(w, r)
 			return
 		}
@@ -134,11 +113,8 @@ func handleManifests(w http.ResponseWriter, r *http.Request, imageName, identifi
 		return
 	}
 
-	filePath := digestToPath(manifestsDir, identifier)
-	log.Printf("Serving manifest: %s", filePath)
 	manifestContent, err := os.ReadFile(filePath)
 	if err != nil {
-		log.Printf("Manifest file not found: %s, error: %v", filePath, err)
 		http.NotFound(w, r)
 		return
 	}

@@ -18,95 +18,87 @@ package config
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"testing"
 
-	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestConfigurationChannels(t *testing.T) {
-	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("TestConfigurationChannels completed")
+	ctx := ktesting.Init(t)
+	ctx = ktesting.WithCancel(ctx)
+	defer ctx.Cancel("TestConfigurationChannels completed")
 
 	mux := newMux(nil)
-	channelOne := mux.ChannelWithContext(tCtx, "one")
-	if channelOne != mux.ChannelWithContext(tCtx, "one") {
+	channelOne := mux.ChannelWithContext(ctx, "one")
+	if channelOne != mux.ChannelWithContext(ctx, "one") {
 		t.Error("Didn't get the same muxuration channel back with the same name")
 	}
-	channelTwo := mux.ChannelWithContext(tCtx, "two")
+	channelTwo := mux.ChannelWithContext(ctx, "two")
 	if channelOne == channelTwo {
 		t.Error("Got back the same muxuration channel for different names")
 	}
 }
 
+type MergeMock struct {
+	source string
+	update interface{}
+	t      *testing.T
+}
+
+func (m MergeMock) Merge(ctx context.Context, source string, update interface{}) error {
+	if m.source != source {
+		m.t.Errorf("Expected %s, Got %s", m.source, source)
+	}
+	if !reflect.DeepEqual(m.update, update) {
+		m.t.Errorf("Expected %s, Got %s", m.update, update)
+	}
+	return nil
+}
+
 func TestMergeInvoked(t *testing.T) {
-	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("TestMergeInvoked completed")
+	ctx := ktesting.Init(t)
+	ctx = ktesting.WithCancel(ctx)
+	defer ctx.Cancel("TestMergeInvoked completed")
 
-	const expectedSource = "one"
-	done := make(chan interface{})
-	var merger mergeFunc = func(ctx context.Context, source string, update sourceUpdate) error {
-		if expectedSource != source {
-			t.Errorf("Expected %s, Got %s", expectedSource, source)
-		}
-		expectedUpdate := fakeUpdate(expectedSource)
-		if !reflect.DeepEqual(expectedUpdate, update) {
-			t.Errorf("Expected %v, Got %v", expectedUpdate, update)
-		}
-		close(done)
-		return nil
-	}
-
+	merger := MergeMock{"one", "test", t}
 	mux := newMux(&merger)
-
-	mux.ChannelWithContext(tCtx, expectedSource) <- fakeUpdate(expectedSource)
-
-	// Wait for Merge call.
-	select {
-	case <-done:
-		// Test complete.
-	case <-tCtx.Done():
-		t.Fatal("Test context canceled before completion")
-	}
+	mux.ChannelWithContext(ctx, "one") <- "test"
 }
 
 // mergeFunc implements the Merger interface
-type mergeFunc func(ctx context.Context, source string, update sourceUpdate) error
+type mergeFunc func(ctx context.Context, source string, update interface{}) error
 
-func (f mergeFunc) Merge(ctx context.Context, source string, update sourceUpdate) error {
+func (f mergeFunc) Merge(ctx context.Context, source string, update interface{}) error {
 	return f(ctx, source, update)
 }
 
 func TestSimultaneousMerge(t *testing.T) {
-	tCtx := ktesting.Init(t)
-	defer tCtx.Cancel("TestSimultaneousMerge completed")
+	ctx := ktesting.Init(t)
+	ctx = ktesting.WithCancel(ctx)
+	defer ctx.Cancel("TestSimultaneousMerge completed")
 
 	ch := make(chan bool, 2)
-	mux := newMux(mergeFunc(func(ctx context.Context, source string, update sourceUpdate) error {
-		if nsSource := update.Pods[0].Namespace; nsSource != source {
-			t.Errorf("Expected %s, Got %s", source, nsSource)
+	mux := newMux(mergeFunc(func(ctx context.Context, source string, update interface{}) error {
+		switch source {
+		case "one":
+			if update.(string) != "test" {
+				t.Errorf("Expected %s, Got %s", "test", update)
+			}
+		case "two":
+			if update.(string) != "test2" {
+				t.Errorf("Expected %s, Got %s", "test2", update)
+			}
+		default:
+			t.Errorf("Unexpected source, Got %s", update)
 		}
 		ch <- true
 		return nil
 	}))
-	source := mux.ChannelWithContext(tCtx, "one")
-	source2 := mux.ChannelWithContext(tCtx, "two")
-	source <- fakeUpdate("one")
-	source2 <- fakeUpdate("two")
+	source := mux.ChannelWithContext(ctx, "one")
+	source2 := mux.ChannelWithContext(ctx, "two")
+	source <- "test"
+	source2 <- "test2"
 	<-ch
 	<-ch
-}
-
-func fakeUpdate(source string) sourceUpdate {
-	return sourceUpdate{[]*v1.Pod{{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-pod", source),
-			Namespace: source,
-			UID:       types.UID(fmt.Sprintf("%s-pod-uid", source)),
-		},
-	}}}
 }

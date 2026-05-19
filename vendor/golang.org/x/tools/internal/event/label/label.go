@@ -7,6 +7,7 @@ package label
 import (
 	"fmt"
 	"io"
+	"reflect"
 	"slices"
 	"unsafe"
 )
@@ -19,8 +20,12 @@ type Key interface {
 	Name() string
 	// Description returns a string that can be used to describe the value.
 	Description() string
-	// Append appends the formatted value of the label to the supplied buffer.
-	Append(buf []byte, l Label) []byte
+
+	// Format is used in formatting to append the value of the label to the
+	// supplied buffer.
+	// The formatter may use the supplied buf as a scratch area to avoid
+	// allocations.
+	Format(w io.Writer, buf []byte, l Label)
 }
 
 // Label holds a key and value pair.
@@ -98,10 +103,11 @@ type stringptr unsafe.Pointer
 // This method is for implementing new key types, label creation should
 // normally be done with the Of method of the key.
 func OfString(k Key, v string) Label {
+	hdr := (*reflect.StringHeader)(unsafe.Pointer(&v))
 	return Label{
 		key:     k,
-		packed:  uint64(len(v)),
-		untyped: stringptr(unsafe.StringData(v)),
+		packed:  uint64(hdr.Len),
+		untyped: stringptr(hdr.Data),
 	}
 }
 
@@ -110,7 +116,11 @@ func OfString(k Key, v string) Label {
 // This method is for implementing new key types, for type safety normal
 // access should be done with the From method of the key.
 func (t Label) UnpackString() string {
-	return unsafe.String((*byte)(t.untyped.(stringptr)), int(t.packed))
+	var v string
+	hdr := (*reflect.StringHeader)(unsafe.Pointer(&v))
+	hdr.Data = uintptr(t.untyped.(stringptr))
+	hdr.Len = int(t.packed)
+	return v
 }
 
 // Valid returns true if the Label is a valid one (it has a key).
@@ -127,7 +137,8 @@ func (t Label) Format(f fmt.State, r rune) {
 	}
 	io.WriteString(f, t.Key().Name())
 	io.WriteString(f, "=")
-	f.Write(t.Key().Append(nil, t)) // ignore error
+	var buf [128]byte
+	t.Key().Format(f, buf[:0], t)
 }
 
 func (l *list) Valid(index int) bool {

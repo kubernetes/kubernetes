@@ -39,6 +39,9 @@ import (
 	"github.com/opencontainers/selinux/go-selinux"
 	grpcstatus "google.golang.org/grpc/status"
 
+	"github.com/armon/circbuf"
+	"k8s.io/klog/v2"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
@@ -47,7 +50,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	remote "k8s.io/cri-client/pkg"
-	"k8s.io/klog/v2"
 	kubelettypes "k8s.io/kubelet/pkg/types"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
@@ -60,7 +62,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/util/tail"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/utils/buffer"
 )
 
 var (
@@ -98,7 +99,7 @@ func (m *kubeGenericRuntimeManager) recordContainerEvent(ctx context.Context, po
 	if containerID != "" {
 		eventMessage = strings.Replace(eventMessage, containerID, container.Name, -1)
 	}
-	m.recorder.WithLogger(logger).Event(ref, eventType, reason, eventMessage)
+	m.recorder.Event(ref, eventType, reason, eventMessage)
 }
 
 // startSpec wraps the spec required to start a container, either a regular/init container
@@ -436,12 +437,7 @@ func (m *kubeGenericRuntimeManager) updatePodSandboxResources(ctx context.Contex
 	_, err := m.runtimeService.UpdatePodSandboxResources(ctx, podResourcesRequest)
 	if err != nil {
 		stat, _ := grpcstatus.FromError(err)
-		// Containerd 2.2 returns an error with code 'Unknown' and message 'not implemented yet' instead of
-		// an error with code 'Unimplemented'.
-		// This is being fixed in https://github.com/containerd/containerd/pull/13023, so this hardcoded
-		// string check can be removed once containerd 2.2 is no longer supported.
-		const unimplementedMsg = "not implemented"
-		if stat.Code() == codes.Unimplemented || (stat.Code() == codes.Unknown && strings.Contains(stat.Message(), unimplementedMsg)) {
+		if stat.Code() == codes.Unimplemented {
 			logger.V(3).Info("updatePodSandboxResources failed: unimplemented; this call is best-effort: proceeding with resize", "sandboxID", sandboxID)
 			return nil
 		}
@@ -538,6 +534,27 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 	return volumeMounts
 }
 
+// getKubeletContainers lists containers managed by kubelet.
+// The boolean parameter specifies whether returns all containers including
+// those already exited and dead containers (used for garbage collection).
+func (m *kubeGenericRuntimeManager) getKubeletContainers(ctx context.Context, allContainers bool) ([]*runtimeapi.Container, error) {
+	logger := klog.FromContext(ctx)
+	filter := &runtimeapi.ContainerFilter{}
+	if !allContainers {
+		filter.State = &runtimeapi.ContainerStateValue{
+			State: runtimeapi.ContainerState_CONTAINER_RUNNING,
+		}
+	}
+
+	containers, err := m.runtimeService.ListContainers(ctx, filter)
+	if err != nil {
+		logger.Error(err, "ListContainers failed")
+		return nil, err
+	}
+
+	return containers, nil
+}
+
 // makeUID returns a randomly generated string.
 func makeUID() string {
 	return fmt.Sprintf("%08x", rand.Uint32())
@@ -572,11 +589,11 @@ func getTerminationMessage(status *runtimeapi.ContainerStatus, terminationMessag
 // by path. It reads up to max log lines.
 func (m *kubeGenericRuntimeManager) readLastStringFromContainerLogs(ctx context.Context, path string) string {
 	value := int64(kubecontainer.MaxContainerTerminationMessageLogLines)
-	buf, _ := buffer.NewTypedRingFixed[byte](kubecontainer.MaxContainerTerminationMessageLogLength)
+	buf, _ := circbuf.NewBuffer(kubecontainer.MaxContainerTerminationMessageLogLength)
 	if err := m.ReadLogs(ctx, path, "", &v1.PodLogOptions{TailLines: &value}, buf, buf); err != nil {
 		return fmt.Sprintf("Error on reading termination message from logs: %v", err)
 	}
-	return string(buf.Slice())
+	return buf.String()
 }
 
 func (m *kubeGenericRuntimeManager) convertToKubeContainerStatus(ctx context.Context, podUID kubetypes.UID, status *runtimeapi.ContainerStatus) (cStatus *kubecontainer.Status) {
@@ -602,58 +619,23 @@ func (m *kubeGenericRuntimeManager) convertToKubeContainerStatus(ctx context.Con
 	return cStatus
 }
 
-type listOptions struct {
-	// podUID of the pod to filter to.
-	// Optional.
-	podUID kubetypes.UID
-	// onlyRunningReady filters the results to only ready sandboxes or running containers.
-	// Optional.
-	onlyRunningReady bool
-}
-
-func (o *listOptions) containerFilter() *runtimeapi.ContainerFilter {
-	filter := &runtimeapi.ContainerFilter{}
-	if o.podUID != "" {
-		filter.LabelSelector = map[string]string{kubelettypes.KubernetesPodUIDLabel: string(o.podUID)}
-	}
-	if o.onlyRunningReady {
-		filter.State = &runtimeapi.ContainerStateValue{
-			State: runtimeapi.ContainerState_CONTAINER_RUNNING,
-		}
-	}
-	return filter
-}
-
-func (o *listOptions) sandboxFilter() *runtimeapi.PodSandboxFilter {
-	filter := &runtimeapi.PodSandboxFilter{}
-	if o.podUID != "" {
-		filter.LabelSelector = map[string]string{kubelettypes.KubernetesPodUIDLabel: string(o.podUID)}
-	}
-	if o.onlyRunningReady {
-		filter.State = &runtimeapi.PodSandboxStateValue{
-			State: runtimeapi.PodSandboxState_SANDBOX_READY,
-		}
-	}
-	return filter
-}
-
-func (m *kubeGenericRuntimeManager) getContainers(ctx context.Context, opts listOptions) ([]*runtimeapi.Container, error) {
-	return m.runtimeService.ListContainers(ctx, opts.containerFilter())
-}
-
-func (m *kubeGenericRuntimeManager) getSandboxes(ctx context.Context, opts listOptions) ([]*runtimeapi.PodSandbox, error) {
-	return m.runtimeService.ListPodSandbox(ctx, opts.sandboxFilter())
-}
-
 // getPodContainerStatuses gets all containers' statuses for the pod.
-func (m *kubeGenericRuntimeManager) getPodContainerStatuses(ctx context.Context, pod *kubecontainer.Pod, activePodSandboxID string) ([]*kubecontainer.Status, []*kubecontainer.Status, error) {
+func (m *kubeGenericRuntimeManager) getPodContainerStatuses(ctx context.Context, uid kubetypes.UID, name, namespace, activePodSandboxID string) ([]*kubecontainer.Status, []*kubecontainer.Status, error) {
 	logger := klog.FromContext(ctx)
+	// Select all containers of the given pod.
+	containers, err := m.runtimeService.ListContainers(ctx, &runtimeapi.ContainerFilter{
+		LabelSelector: map[string]string{kubelettypes.KubernetesPodUIDLabel: string(uid)},
+	})
+	if err != nil {
+		logger.Error(err, "ListContainers error")
+		return nil, nil, err
+	}
 
 	statuses := []*kubecontainer.Status{}
 	activeContainerStatuses := []*kubecontainer.Status{}
 	// TODO: optimization: set maximum number of containers per container name to examine.
-	for _, c := range pod.Containers {
-		resp, err := m.runtimeService.ContainerStatus(ctx, c.ID.ID, false)
+	for _, c := range containers {
+		resp, err := m.runtimeService.ContainerStatus(ctx, c.Id, false)
 		// Between List (ListContainers) and check (ContainerStatus) another thread might remove a container, and that is normal.
 		// The previous call (ListContainers) never fails due to a pod container not existing.
 		// Therefore, this method should not either, but instead act as if the previous call failed,
@@ -663,16 +645,16 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(ctx context.Context,
 		}
 		if err != nil {
 			// Merely log this here; GetPodStatus will actually report the error out.
-			logger.V(4).Info("ContainerStatus return error", "containerID", c.ID.ID, "err", err)
+			logger.V(4).Info("ContainerStatus return error", "containerID", c.Id, "err", err)
 			return nil, nil, err
 		}
 		status := resp.GetStatus()
 		if status == nil {
 			return nil, nil, remote.ErrContainerStatusNil
 		}
-		cStatus := m.convertToKubeContainerStatus(ctx, pod.ID, status)
+		cStatus := m.convertToKubeContainerStatus(ctx, uid, status)
 		statuses = append(statuses, cStatus)
-		if c.PodSandboxID == activePodSandboxID {
+		if c.PodSandboxId == activePodSandboxID {
 			activeContainerStatuses = append(activeContainerStatuses, cStatus)
 		}
 	}
@@ -785,7 +767,7 @@ func (m *kubeGenericRuntimeManager) executePreStopHook(ctx context.Context, pod 
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		defer utilruntime.HandleCrashWithContext(ctx)
+		defer utilruntime.HandleCrash()
 		if _, err := m.runner.Run(ctx, containerID, pod, containerSpec, containerSpec.Lifecycle.PreStop); err != nil {
 			logger.Error(err, "PreStop hook failed", "pod", klog.KObj(pod), "podUID", pod.UID,
 				"containerName", containerSpec.Name, "containerID", containerID.String())
@@ -941,7 +923,7 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(ctx context.Con
 	}
 	for _, container := range runningPod.Containers {
 		go func(container *kubecontainer.Container) {
-			defer utilruntime.HandleCrashWithContext(ctx)
+			defer utilruntime.HandleCrash()
 			defer wg.Done()
 
 			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, container.Name)
@@ -993,7 +975,7 @@ func (m *kubeGenericRuntimeManager) pruneInitContainersBeforeStart(ctx context.C
 			}
 			// prune all other init containers that match this container name
 			logger.V(4).Info("Removing init container", "containerName", status.Name, "containerID", status.ID.ID, "count", count)
-			if err := m.removeContainer(ctx, status.ID.ID, false); err != nil {
+			if err := m.removeContainer(ctx, status.ID.ID); err != nil {
 				utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %v; Skipping pod %q", status.Name, err, format.Pod(pod)))
 				continue
 			}
@@ -1019,7 +1001,7 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(ctx context.Context, pod
 			count++
 			// Purge all init containers that match this container name
 			logger.V(4).Info("Removing init container", "containerName", status.Name, "containerID", status.ID.ID, "count", count)
-			if err := m.removeContainer(ctx, status.ID.ID, false); err != nil {
+			if err := m.removeContainer(ctx, status.ID.ID); err != nil {
 				utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %v; Skipping pod %q", status.Name, err, format.Pod(pod)))
 				continue
 			}
@@ -1027,9 +1009,9 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(ctx context.Context, pod
 	}
 }
 
-// HasAnyRegularContainerCreated returns true if any regular container has been
+// hasAnyRegularContainerCreated returns true if any regular container has been
 // created, which indicates all init containers have been initialized.
-func HasAnyRegularContainerCreated(pod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
+func hasAnyRegularContainerCreated(pod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
 	for _, container := range pod.Spec.Containers {
 		status := podStatus.FindContainerStatusByName(container.Name)
 		if status == nil {
@@ -1139,10 +1121,6 @@ func (m *kubeGenericRuntimeManager) computeInitContainerActions(ctx context.Cont
 
 		case kubecontainer.ContainerStateRunning:
 			if !podutil.IsRestartableInitContainer(container) {
-				if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingInitContainers) {
-					// computePodResizeAction updates 'changes' if resize policy requires restarting this container
-					_ = m.computePodResizeAction(ctx, pod, i, true, status, changes)
-				}
 				break
 			} else { // If container is restartable
 				if container.StartupProbe != nil {
@@ -1370,14 +1348,13 @@ func (m *kubeGenericRuntimeManager) RunInContainer(ctx context.Context, id kubec
 	return append(stdout, stderr...), err
 }
 
-// removeContainer removes the container and optionally the container logs.
+// removeContainer removes the container and the container logs.
 // Notice that we remove the container logs first, so that container will not be removed if
 // container logs are failed to be removed, and kubelet will retry this later. This guarantees
-// that container logs to be removed with the container if specified.
+// that container logs to be removed with the container.
 // Notice that we assume that the container should only be removed in non-running state, and
 // it will not write container logs anymore in that state.
-// If the logs are kept, they will be preserved until the pod is removed and kubelet GC is triggered.
-func (m *kubeGenericRuntimeManager) removeContainer(ctx context.Context, containerID string, keepLogs bool) error {
+func (m *kubeGenericRuntimeManager) removeContainer(ctx context.Context, containerID string) error {
 	logger := klog.FromContext(ctx)
 	logger.V(4).Info("Removing container", "containerID", containerID)
 	// Call internal container post-stop lifecycle hook.
@@ -1387,10 +1364,8 @@ func (m *kubeGenericRuntimeManager) removeContainer(ctx context.Context, contain
 
 	// Remove the container log.
 	// TODO: Separate log and container lifecycle management.
-	if !keepLogs {
-		if err := m.removeContainerLog(ctx, containerID); err != nil {
-			return err
-		}
+	if err := m.removeContainerLog(ctx, containerID); err != nil {
+		return err
 	}
 	// Remove the container.
 	return m.runtimeService.RemoveContainer(ctx, containerID)
@@ -1426,7 +1401,7 @@ func (m *kubeGenericRuntimeManager) removeContainerLog(ctx context.Context, cont
 
 // DeleteContainer removes a container.
 func (m *kubeGenericRuntimeManager) DeleteContainer(ctx context.Context, containerID kubecontainer.ContainerID) error {
-	return m.removeContainer(ctx, containerID.ID, false)
+	return m.removeContainer(ctx, containerID.ID)
 }
 
 // setTerminationGracePeriod determines the grace period to use when killing a container

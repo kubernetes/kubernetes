@@ -38,137 +38,76 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	// type Struct
-	scheme.AddValidationFunc(
-		(*Struct)(nil),
-		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-			switch op.Request.SubresourcePath() {
-			case "/":
-				return Validate_Struct(
-					ctx, op, nil, /* fldPath */
-					obj.(*Struct),
-					safe.Cast[*Struct](oldObj))
-			}
-			return field.ErrorList{
-				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
-			}
-		})
+	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+		switch op.Request.SubresourcePath() {
+		case "/":
+			return Validate_Struct(ctx, op, nil /* fldPath */, obj.(*Struct), safe.Cast[*Struct](oldObj))
+		}
+		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
+	})
 	return nil
 }
 
 // Validate_Struct validates an instance of Struct according
 // to declarative validation rules in the API schema.
-func Validate_Struct(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *Struct) (errs field.ErrorList) {
-
+func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
 	// field Struct.TypeMeta has no validation
 
-	{ // field Struct.IntField
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *int,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field Struct.IntField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *int, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
-			if e := validate.NEQ(ctx, op, fldPath, obj, oldObj, 0); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.NEQ(ctx, op, fldPath, obj, oldObj, 0)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *Struct) *int {
-				return &oldObj.IntField
-			})
-		errs = append(errs, fn(fldPath.Child("intField"), &obj.IntField, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("intField"), &obj.IntField, safe.Field(oldObj, func(oldObj *Struct) *int { return &oldObj.IntField }), oldObj != nil)...)
 
-	{ // field Struct.IntPtrField
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *int,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field Struct.IntPtrField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *int, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
-			if e := validate.NEQ(ctx, op, fldPath, obj, oldObj, -1); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.NEQ(ctx, op, fldPath, obj, oldObj, -1)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *Struct) *int {
-				return oldObj.IntPtrField
-			})
-		errs = append(errs, fn(fldPath.Child("intPtrField"), obj.IntPtrField, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("intPtrField"), obj.IntPtrField, safe.Field(oldObj, func(oldObj *Struct) *int { return oldObj.IntPtrField }), oldObj != nil)...)
 
-	{ // field Struct.IntTypedefField
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *IntType,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field Struct.IntTypedefField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *IntType, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call field-attached validations
-			if e := validate.NEQ(ctx, op, fldPath, obj, oldObj, 42); len(e) != 0 {
-				errs = append(errs, e...)
-			}
+			errs = append(errs, validate.NEQ(ctx, op, fldPath, obj, oldObj, 42)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *Struct) *IntType {
-				return &oldObj.IntTypedefField
-			})
-		errs = append(errs, fn(fldPath.Child("intTypedefField"), &obj.IntTypedefField, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("intTypedefField"), &obj.IntTypedefField, safe.Field(oldObj, func(oldObj *Struct) *IntType { return &oldObj.IntTypedefField }), oldObj != nil)...)
 
-	{ // field Struct.ValidatedTypedefField
-		fn := func(
-			fldPath *field.Path,
-			obj, oldObj *ValidatedIntType,
-			oldValueCorrelated bool) (errs field.ErrorList) {
+	// field Struct.ValidatedTypedefField
+	errs = append(errs,
+		func(fldPath *field.Path, obj, oldObj *ValidatedIntType, oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update {
-				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
-					return nil
-				}
+			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
+				return nil
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_ValidatedIntType(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}
-		oldVal := safe.Field(oldObj,
-			func(oldObj *Struct) *ValidatedIntType {
-				return &oldObj.ValidatedTypedefField
-			})
-		errs = append(errs, fn(fldPath.Child("validatedTypedefField"), &obj.ValidatedTypedefField, oldVal, oldObj != nil)...)
-	}
+		}(fldPath.Child("validatedTypedefField"), &obj.ValidatedTypedefField, safe.Field(oldObj, func(oldObj *Struct) *ValidatedIntType { return &oldObj.ValidatedTypedefField }), oldObj != nil)...)
 
 	return errs
 }
 
 // Validate_ValidatedIntType validates an instance of ValidatedIntType according
 // to declarative validation rules in the API schema.
-func Validate_ValidatedIntType(
-	ctx context.Context, op operation.Operation, fldPath *field.Path,
-	obj, oldObj *ValidatedIntType) (errs field.ErrorList) {
-
-	if e := validate.NEQ(ctx, op, fldPath, obj, oldObj, 100); len(e) != 0 {
-		errs = append(errs, e...)
-	}
+func Validate_ValidatedIntType(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ValidatedIntType) (errs field.ErrorList) {
+	errs = append(errs, validate.NEQ(ctx, op, fldPath, obj, oldObj, 100)...)
 
 	return errs
 }

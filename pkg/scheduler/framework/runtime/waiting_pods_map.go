@@ -75,7 +75,6 @@ type waitingPod struct {
 	pendingPlugins map[string]*time.Timer
 	s              chan *fwk.Status
 	mu             sync.RWMutex
-	done           bool
 }
 
 var _ fwk.WaitingPod = &waitingPod{}
@@ -96,7 +95,8 @@ func newWaitingPod(pod *v1.Pod, pluginsMaxWaitTime map[string]time.Duration) *wa
 	// lock here so that time.AfterFunc can only execute after newWaitingPod finishes.
 	wp.mu.Lock()
 	defer wp.mu.Unlock()
-	for plugin, waitTime := range pluginsMaxWaitTime {
+	for k, v := range pluginsMaxWaitTime {
+		plugin, waitTime := k, v
 		wp.pendingPlugins[plugin] = time.AfterFunc(waitTime, func() {
 			msg := fmt.Sprintf("rejected due to timeout after waiting %v at plugin %v",
 				waitTime, plugin)
@@ -141,26 +141,15 @@ func (w *waitingPod) Allow(pluginName string) {
 	}
 
 	// The select clause works as a non-blocking send.
-	// If there is no place in the buffer, it's a no-op (default case).
+	// If there is no receiver, it's a no-op (default case).
 	select {
 	case w.s <- fwk.NewStatus(fwk.Success, ""):
 	default:
 	}
-	w.done = true
 }
 
 // Reject declares the waiting pod unschedulable.
-func (w *waitingPod) Reject(pluginName, msg string) bool {
-	return w.stopWithStatus(fwk.Unschedulable, pluginName, msg)
-}
-
-// Preempt declares the waiting pod is preempted. Compared to reject it does not mark the pod as unschedulable,
-// allowing it to be rescheduled.
-func (w *waitingPod) Preempt(pluginName, msg string) bool {
-	return w.stopWithStatus(fwk.Error, pluginName, msg)
-}
-
-func (w *waitingPod) stopWithStatus(status fwk.Code, pluginName, msg string) bool {
+func (w *waitingPod) Reject(pluginName, msg string) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	for _, timer := range w.pendingPlugins {
@@ -168,14 +157,9 @@ func (w *waitingPod) stopWithStatus(status fwk.Code, pluginName, msg string) boo
 	}
 
 	// The select clause works as a non-blocking send.
-	// If there is no place in the buffer, it's a no-op (default case).
+	// If there is no receiver, it's a no-op (default case).
 	select {
-	case w.s <- fwk.NewStatus(status, msg).WithPlugin(pluginName):
+	case w.s <- fwk.NewStatus(fwk.Unschedulable, msg).WithPlugin(pluginName):
 	default:
 	}
-	if w.done {
-		return false
-	}
-	w.done = true
-	return true
 }

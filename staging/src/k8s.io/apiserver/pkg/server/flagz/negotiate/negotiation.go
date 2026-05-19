@@ -20,21 +20,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// FlagzEndpointRestrictions implements content negotiation restrictions for the flagz endpoint.
+// FlagzEndpointRestrictions implements content negotiation restrictions for the z-pages.
 // It is used to validate and restrict which GroupVersionKinds are allowed for structured responses.
-type FlagzEndpointRestrictions struct {
-	RecognizedStructuredKinds map[schema.GroupVersionKind]bool
-}
+type FlagzEndpointRestrictions struct{}
 
-// AllowsMediaTypeTransform checks if the provided GVK is supported for structured flagz responses.
-func (f FlagzEndpointRestrictions) AllowsMediaTypeTransform(mimeType string, mimeSubType string, gvk *schema.GroupVersionKind) bool {
+// AllowsMediaTypeTransform checks if the provided GVK is supported for structured z-page responses.
+func (FlagzEndpointRestrictions) AllowsMediaTypeTransform(mimeType string, mimeSubType string, gvk *schema.GroupVersionKind) bool {
 	if mimeType == "text" && mimeSubType == "plain" {
 		return gvk == nil
 	}
-	if gvk != nil {
-		return f.RecognizedStructuredKinds[*gvk]
-	}
-	return false
+	return isStructured(gvk)
 }
 
 func (FlagzEndpointRestrictions) AllowsServerVersion(string) bool {
@@ -42,5 +37,17 @@ func (FlagzEndpointRestrictions) AllowsServerVersion(string) bool {
 }
 
 func (FlagzEndpointRestrictions) AllowsStreamSchema(s string) bool {
+	return false
+}
+
+func isStructured(gvk *schema.GroupVersionKind) bool {
+	if gvk != nil {
+		if gvk.Group == "config.k8s.io" && gvk.Version == "v1alpha1" {
+			if gvk.Kind == "Flagz" {
+				return true
+			}
+		}
+	}
+
 	return false
 }

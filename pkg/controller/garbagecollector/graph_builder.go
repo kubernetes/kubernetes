@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"slices"
 	"sync"
 	"time"
 
@@ -224,7 +223,7 @@ func (gb *GraphBuilder) controllerFor(logger klog.Logger, resource schema.GroupV
 
 	shared, err := gb.sharedInformers.ForResource(resource)
 	if err != nil {
-		logger.V(4).Info("unable to use a shared informer", "resource", resource, "kind", kind, "err", err)
+		logger.V(4).Error(err, "unable to use a shared informer", "resource", resource, "kind", kind)
 		return nil, nil, err
 	}
 	logger.V(4).Info("using a shared informer", "resource", resource, "kind", kind)
@@ -622,7 +621,12 @@ func hasOrphanFinalizer(accessor metav1.Object) bool {
 
 func hasFinalizer(accessor metav1.Object, matchingFinalizer string) bool {
 	finalizers := accessor.GetFinalizers()
-	return slices.Contains(finalizers, matchingFinalizer)
+	for _, finalizer := range finalizers {
+		if finalizer == matchingFinalizer {
+			return true
+		}
+	}
+	return false
 }
 
 // this function takes newAccessor directly because the caller already
@@ -780,7 +784,7 @@ func (gb *GraphBuilder) processGraphChanges(logger klog.Logger) bool {
 			// waiting for the deletion of their dependents.
 			gb.addUnblockedOwnersToDeleteQueue(logger, removed, changed)
 			// update the node itself
-			existingNode.setOwners(accessor.GetOwnerReferences())
+			existingNode.owners = accessor.GetOwnerReferences()
 			// Add the node to its new owners' dependent lists.
 			gb.addDependentToOwners(logger, existingNode, added)
 			// remove the node from the dependent list of node that are no longer in

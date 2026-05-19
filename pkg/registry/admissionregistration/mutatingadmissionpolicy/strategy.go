@@ -23,10 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/apiserver/pkg/features"
-	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration/validation"
@@ -35,19 +32,19 @@ import (
 
 // mutatingAdmissionPolicyStrategy implements verification logic for MutatingAdmissionPolicy.
 type mutatingAdmissionPolicyStrategy struct {
-	rest.DeclarativeValidation
+	runtime.ObjectTyper
 	names.NameGenerator
-	authorizer       authorizer.UnconditionalAuthorizer
+	authorizer       authorizer.Authorizer
 	resourceResolver resolver.ResourceResolver
 }
 
 // NewStrategy is the default logic that applies when creating and updating MutatingAdmissionPolicy objects.
-func NewStrategy(authorizer authorizer.UnconditionalAuthorizer, resourceResolver resolver.ResourceResolver) *mutatingAdmissionPolicyStrategy {
+func NewStrategy(authorizer authorizer.Authorizer, resourceResolver resolver.ResourceResolver) *mutatingAdmissionPolicyStrategy {
 	return &mutatingAdmissionPolicyStrategy{
-		DeclarativeValidation: rest.DeclarativeValidation{Scheme: legacyscheme.Scheme},
-		NameGenerator:         names.SimpleNameGenerator,
-		authorizer:            authorizer,
-		resourceResolver:      resourceResolver,
+		ObjectTyper:      legacyscheme.Scheme,
+		NameGenerator:    names.SimpleNameGenerator,
+		authorizer:       authorizer,
+		resourceResolver: resourceResolver,
 	}
 }
 
@@ -77,11 +74,7 @@ func (v *mutatingAdmissionPolicyStrategy) PrepareForUpdate(ctx context.Context, 
 
 // Validate validates a new MutatingAdmissionPolicy.
 func (v *mutatingAdmissionPolicyStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
-	ic := obj.(*admissionregistration.MutatingAdmissionPolicy)
-	errs := validation.ValidateMutatingAdmissionPolicy(ic)
-	if utilfeature.DefaultFeatureGate.Enabled(features.ManifestBasedAdmissionControlConfig) {
-		errs = append(errs, validation.ValidateStaticSuffix(ic.Name, field.NewPath("metadata", "name"))...)
-	}
+	errs := validation.ValidateMutatingAdmissionPolicy(obj.(*admissionregistration.MutatingAdmissionPolicy))
 	if len(errs) == 0 {
 		// if the object is well-formed, also authorize the paramKind
 		if err := v.authorizeCreate(ctx, obj); err != nil {
@@ -93,10 +86,6 @@ func (v *mutatingAdmissionPolicyStrategy) Validate(ctx context.Context, obj runt
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (v *mutatingAdmissionPolicyStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	ic := obj.(*admissionregistration.MutatingAdmissionPolicy)
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ManifestBasedAdmissionControlConfig) {
-		return validation.WarningsForStaticSuffix(ic.Name)
-	}
 	return nil
 }
 
@@ -105,15 +94,13 @@ func (v *mutatingAdmissionPolicyStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for MutatingAdmissionPolicy; this means you may not create one with a PUT request.
-func (v *mutatingAdmissionPolicyStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
+func (v *mutatingAdmissionPolicyStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
 // ValidateUpdate is the default update validation for an end user.
 func (v *mutatingAdmissionPolicyStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	newIC := obj.(*admissionregistration.MutatingAdmissionPolicy)
-	oldIC := old.(*admissionregistration.MutatingAdmissionPolicy)
-	errs := validation.ValidateMutatingAdmissionPolicyUpdate(newIC, oldIC)
+	errs := validation.ValidateMutatingAdmissionPolicyUpdate(obj.(*admissionregistration.MutatingAdmissionPolicy), old.(*admissionregistration.MutatingAdmissionPolicy))
 	if len(errs) == 0 {
 		// if the object is well-formed, also authorize the paramKind
 		if err := v.authorizeUpdate(ctx, obj, old); err != nil {
@@ -125,12 +112,11 @@ func (v *mutatingAdmissionPolicyStrategy) ValidateUpdate(ctx context.Context, ob
 
 // WarningsOnUpdate returns warnings for the given update.
 func (v *mutatingAdmissionPolicyStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	newIC := obj.(*admissionregistration.MutatingAdmissionPolicy)
-	return validation.WarningsForStaticSuffix(newIC.Name)
+	return nil
 }
 
 // AllowUnconditionalUpdate is the default update policy for MutatingAdmissionPolicy objects. Status update should
 // only be allowed if version match.
-func (v *mutatingAdmissionPolicyStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+func (v *mutatingAdmissionPolicyStrategy) AllowUnconditionalUpdate() bool {
 	return false
 }

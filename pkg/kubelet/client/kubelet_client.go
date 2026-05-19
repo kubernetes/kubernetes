@@ -68,7 +68,6 @@ type ConnectionInfo struct {
 	Port                           string
 	Transport                      http.RoundTripper
 	InsecureSkipTLSVerifyTransport http.RoundTripper
-	NodeFeatures                   []string
 }
 
 // ConnectionInfoGetter provides ConnectionInfo for the kubelet running on a named node
@@ -210,6 +209,5 @@ func (k *NodeConnectionInfoGetter) GetConnectionInfo(ctx context.Context, nodeNa
 		Port:                           strconv.Itoa(port),
 		Transport:                      k.transport,
 		InsecureSkipTLSVerifyTransport: k.insecureSkipTLSVerifyTransport,
-		NodeFeatures:                   node.Status.DeclaredFeatures,
 	}, nil
 }

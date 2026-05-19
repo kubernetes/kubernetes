@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/metadata"
@@ -118,15 +117,8 @@ func (f *metadataSharedInformerFactory) ForResource(gvr schema.GroupVersionResou
 	return informer
 }
 
-// Start is a legacy wrapper that initializes all requested informers.
-//
-//logcheck:context // StartWithContext should be used instead of Start in code which supports contextual logging.
+// Start initializes all requested informers.
 func (f *metadataSharedInformerFactory) Start(stopCh <-chan struct{}) {
-	f.StartWithContext(wait.ContextForChannel(stopCh))
-}
-
-// StartWithContext initializes all requested informers.
-func (f *metadataSharedInformerFactory) StartWithContext(ctx context.Context) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -143,7 +135,7 @@ func (f *metadataSharedInformerFactory) StartWithContext(ctx context.Context) {
 			informer := informer.Informer()
 			go func() {
 				defer f.wg.Done()
-				informer.RunWithContext(ctx)
+				informer.Run(stopCh)
 			}()
 			f.startedInformers[informerType] = true
 		}

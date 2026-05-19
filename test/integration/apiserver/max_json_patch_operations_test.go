@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -56,7 +57,7 @@ func TestMaxJSONPatchOperations(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = c.Patch(types.JSONPatchType).AbsPath("/api/v1/namespaces/default/secrets/test").
+	err = c.Patch(types.JSONPatchType).AbsPath(fmt.Sprintf("/api/v1/namespaces/default/secrets/test")).
 		Body(hugePatch).Do(tCtx).Error()
 	if err == nil {
 		t.Fatalf("unexpected no error")

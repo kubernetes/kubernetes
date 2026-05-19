@@ -12,12 +12,12 @@ new images, test the changes made, promote the newly built staging images.
 ## Prerequisites
 
 In order to build the docker test images, a Linux node is required. The node will require `make`,
-`docker`, and ``docker buildx``, which will be used to build multiarch
+`docker (version 19.03.0 or newer)`, and ``docker buildx``, which will be used to build multiarch
 images, as well as Windows images. In order to properly build multi-arch and Windows images, some
 initialization is required (in CI this is done in [cloudbuild.yaml](cloudbuild.yaml)):
 
 ```shell
-docker run --privileged --rm tonistiigi/binfmt --install all
+docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 docker buildx create --name img-builder --use
 docker buildx inspect --bootstrap
 ```
@@ -37,7 +37,7 @@ last known stable version.
 
 Most tests used in E2E testing suite use the `agnhost` image. It contains several subcommands with
 different [functionalities](agnhost/README.md) used to validate different Kubernetes behaviors. If
-a new functionality needs testing, add it as an `agnhost` subcommand first, before
+a new functionality needs testing, consider adding an `agnhost` subcommand for it first, before
 creating an entirely separate test image.
 
 The general process of making updates to the images is as follows:
@@ -52,19 +52,8 @@ After going through these steps your image will be used in the e2e tests. There 
 
 ### Creating and promoting new images
 
-Please reach out to SIG Testing to see if we can meet your needs with the agnhost image first,
-including adding new functionality to that image.
-
-Consolidating images has many benefits including:
-- Reduced patching toil (dependencies, base images, go, ...)
-- Less dependency on pulling images at runtime and therefore faster test results
-- Simplified airgap testing (fewer images to mirror / airgap)
-
-We are working to reduce the number of existing images.
-
-If you still truly need to add an entirely different image, confirm with SIG Testing.
-You will need to have it automatically built by the Image Builder, to do this
-you will have to define the postsubmit prow job for it. This can easily
+If you intend to add an entirely different image and have it automatically built by the Image Builder
+and used in E2E tests, you will also have to define the postsubmit prow job for it. This can easily
 be done by running [this script](https://github.com/kubernetes/test-infra/blob/master/config/jobs/image-pushing/k8s-staging-e2e-test-images.sh)
 in `kubernetes/test-infra`.
 

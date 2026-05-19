@@ -229,6 +229,7 @@ func (s *Structural) XListMapKeys() []string {
 func (s *Structural) AllOf() []common.Schema {
 	var res []common.Schema
 	for _, subSchema := range s.Structural.ValueValidation.AllOf {
+		subSchema := subSchema
 		res = append(res, nestedValueValidationToStructural(&subSchema))
 	}
 	return res
@@ -237,6 +238,7 @@ func (s *Structural) AllOf() []common.Schema {
 func (s *Structural) AnyOf() []common.Schema {
 	var res []common.Schema
 	for _, subSchema := range s.Structural.ValueValidation.AnyOf {
+		subSchema := subSchema
 		res = append(res, nestedValueValidationToStructural(&subSchema))
 	}
 	return res
@@ -245,6 +247,7 @@ func (s *Structural) AnyOf() []common.Schema {
 func (s *Structural) OneOf() []common.Schema {
 	var res []common.Schema
 	for _, subSchema := range s.Structural.ValueValidation.OneOf {
+		subSchema := subSchema
 		res = append(res, nestedValueValidationToStructural(&subSchema))
 	}
 	return res

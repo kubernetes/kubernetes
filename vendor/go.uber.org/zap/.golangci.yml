@@ -25,7 +25,7 @@ linters-settings:
   govet:
     # These govet checks are disabled by default, but they're useful.
     enable:
-      - nilness
+      - niliness
       - reflectvaluecompare
       - sortslice
       - unusedwrite

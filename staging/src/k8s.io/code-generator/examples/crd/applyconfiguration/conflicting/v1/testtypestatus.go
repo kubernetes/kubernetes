@@ -26,7 +26,7 @@ import (
 // with apply.
 type TestTypeStatusApplyConfiguration struct {
 	Blah                  *string `json:"blah,omitempty"`
-	v1alpha2.PolicyStatus `json:""`
+	v1alpha2.PolicyStatus `json:",inline"`
 }
 
 // TestTypeStatusApplyConfiguration constructs a declarative configuration of the TestTypeStatus type for use with

@@ -182,6 +182,7 @@ func (lib *stdLibrary) CompileOptions() []EnvOption {
 			if err = lib.subset.Validate(); err != nil {
 				return nil, err
 			}
+			e.variables = append(e.variables, stdlib.Types()...)
 			for _, fn := range funcs {
 				existing, found := e.functions[fn.Name()]
 				if found {

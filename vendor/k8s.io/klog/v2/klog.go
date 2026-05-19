@@ -58,30 +58,15 @@
 //
 //		-logtostderr=true
 //			Logs are written to standard error instead of to files.
-//	             By default, all logs are written regardless of severity
-//	             (legacy behavior). To filter logs by severity when
-//	             -logtostderr=true, set -legacy_stderr_threshold_behavior=false
-//	             and use -stderrthreshold.
-//              With -legacy_stderr_threshold_behavior=true,
-//              -stderrthreshold has no effect.
-//
-//	             The following flags always have no effect:
-//	             -alsologtostderr, -alsologtostderrthreshold, and -log_dir.
-//	             Output redirection at runtime with SetOutput is also ignored.
+//	             This shortcuts most of the usual output routing:
+//	             -alsologtostderr, -stderrthreshold and -log_dir have no
+//	             effect and output redirection at runtime with SetOutput is
+//	             ignored.
 //		-alsologtostderr=false
 //			Logs are written to standard error as well as to files.
-//		-alsologtostderrthreshold=INFO
-//			Log events at or above this severity are logged to standard
-//			error when -alsologtostderr=true (no effect when -logtostderr=true).
-//			Default is INFO to maintain backward compatibility.
 //		-stderrthreshold=ERROR
 //			Log events at or above this severity are logged to standard
-//			error as well as to files. When -logtostderr=true, this flag
-//			has no effect unless -legacy_stderr_threshold_behavior=false.
-//		-legacy_stderr_threshold_behavior=true
-//			If true, -stderrthreshold is ignored when -logtostderr=true
-//			(legacy behavior). If false, -stderrthreshold is honored even
-//			when -logtostderr=true, allowing severity-based filtering.
+//			error as well as to files.
 //		-log_dir=""
 //			Log files will be written to this directory instead of the
 //			default temporary directory.
@@ -171,7 +156,7 @@ func (s *severityValue) Set(value string) error {
 		}
 		threshold = severity.Severity(v)
 	}
-	s.set(threshold)
+	logging.stderrThreshold.set(threshold)
 	return nil
 }
 
@@ -424,15 +409,6 @@ var commandLine flag.FlagSet
 
 // init sets up the defaults and creates command line flags.
 func init() {
-	// Initialize severity thresholds
-	logging.stderrThreshold = severityValue{
-		Severity: severity.ErrorLog, // Default stderrThreshold is ERROR.
-	}
-	logging.alsologtostderrthreshold = severityValue{
-		Severity: severity.InfoLog, // Default alsologtostderrthreshold is INFO (to maintain backward compatibility).
-	}
-	logging.setVState(0, nil, false)
-
 	commandLine.StringVar(&logging.logDir, "log_dir", "", "If non-empty, write log files in this directory (no effect when -logtostderr=true)")
 	commandLine.StringVar(&logging.logFile, "log_file", "", "If non-empty, use this log file (no effect when -logtostderr=true)")
 	commandLine.Uint64Var(&logging.logFileMaxSizeMB, "log_file_max_size", 1800,
@@ -440,14 +416,16 @@ func init() {
 			"If the value is 0, the maximum file size is unlimited.")
 	commandLine.BoolVar(&logging.toStderr, "logtostderr", true, "log to standard error instead of files")
 	commandLine.BoolVar(&logging.alsoToStderr, "alsologtostderr", false, "log to standard error as well as files (no effect when -logtostderr=true)")
-	commandLine.BoolVar(&logging.legacyStderrThresholdBehavior, "legacy_stderr_threshold_behavior", true, "If true, stderrthreshold is ignored when logtostderr=true (legacy behavior). If false, stderrthreshold is honored even when logtostderr=true")
+	logging.setVState(0, nil, false)
 	commandLine.Var(&logging.verbosity, "v", "number for the log level verbosity")
 	commandLine.BoolVar(&logging.addDirHeader, "add_dir_header", false, "If true, adds the file directory to the header of the log messages")
 	commandLine.BoolVar(&logging.skipHeaders, "skip_headers", false, "If true, avoid header prefixes in the log messages")
 	commandLine.BoolVar(&logging.oneOutput, "one_output", false, "If true, only write logs to their native severity level (vs also writing to each lower severity level; no effect when -logtostderr=true)")
 	commandLine.BoolVar(&logging.skipLogHeaders, "skip_log_headers", false, "If true, avoid headers when opening log files (no effect when -logtostderr=true)")
-	commandLine.Var(&logging.stderrThreshold, "stderrthreshold", "logs at or above this threshold go to stderr when writing to files and stderr (no effect when -logtostderr=true or -alsologtostderr=true unless -legacy_stderr_threshold_behavior=false)")
-	commandLine.Var(&logging.alsologtostderrthreshold, "alsologtostderrthreshold", "logs at or above this threshold go to stderr when -alsologtostderr=true (no effect when -logtostderr=true)")
+	logging.stderrThreshold = severityValue{
+		Severity: severity.ErrorLog, // Default stderrThreshold is ERROR.
+	}
+	commandLine.Var(&logging.stderrThreshold, "stderrthreshold", "logs at or above this threshold go to stderr when writing to files and stderr (no effect when -logtostderr=true or -alsologtostderr=true)")
 	commandLine.Var(&logging.vmodule, "vmodule", "comma-separated list of pattern=N settings for file-filtered logging")
 	commandLine.Var(&logging.traceLocation, "log_backtrace_at", "when logging hits line file:N, emit a stack trace")
 
@@ -492,13 +470,11 @@ type settings struct {
 	// Boolean flags. Not handled atomically because the flag.Value interface
 	// does not let us avoid the =true, and that shorthand is necessary for
 	// compatibility. TODO: does this matter enough to fix? Seems unlikely.
-	toStderr                      bool // The -logtostderr flag.
-	alsoToStderr                  bool // The -alsologtostderr flag.
-	legacyStderrThresholdBehavior bool // The -legacy_stderr_threshold_behavior flag.
+	toStderr     bool // The -logtostderr flag.
+	alsoToStderr bool // The -alsologtostderr flag.
 
 	// Level flag. Handled atomically.
-	stderrThreshold          severityValue // The -stderrthreshold flag.
-	alsologtostderrthreshold severityValue // The -alsologtostderrthreshold flag.
+	stderrThreshold severityValue // The -stderrthreshold flag.
 
 	// Access to all of the following fields must be protected via a mutex.
 
@@ -833,21 +809,16 @@ func (l *loggingT) infoS(logger *logWriter, filter LogFilter, depth int, msg str
 // printS is called from infoS and errorS if logger is not specified.
 // set log severity by s
 func (l *loggingT) printS(err error, s severity.Severity, depth int, msg string, keysAndValues ...interface{}) {
+	// Only create a new buffer if we don't have one cached.
+	b := buffer.GetBuffer()
 	// The message is always quoted, even if it contains line breaks.
 	// If developers want multi-line output, they should use a small, fixed
 	// message and put the multi-line output into a value.
-	qMsg := make([]byte, 0, 1024)
-	qMsg = strconv.AppendQuote(qMsg, msg)
-
-	// Only create a new buffer if we don't have one cached.
-	b := buffer.GetBuffer()
-	b.Write(qMsg)
-
-	var errKV []interface{}
+	b.WriteString(strconv.Quote(msg))
 	if err != nil {
-		errKV = []interface{}{"err", err}
+		serialize.KVListFormat(&b.Buffer, "err", err)
 	}
-	serialize.FormatKVs(&b.Buffer, errKV, keysAndValues)
+	serialize.KVListFormat(&b.Buffer, keysAndValues...)
 	l.printDepth(s, nil, nil, depth+1, &b.Buffer)
 	// Make the buffer available for reuse.
 	buffer.PutBuffer(b)
@@ -914,25 +885,9 @@ func (l *loggingT) output(s severity.Severity, logger *logWriter, buf *buffer.Bu
 			}
 		}
 	} else if l.toStderr {
-		// When logging to stderr only, check if we should filter by severity.
-		// This is controlled by the legacy_stderr_threshold_behavior flag.
-		if l.legacyStderrThresholdBehavior {
-			// Legacy behavior: always write to stderr, ignore stderrthreshold
-			os.Stderr.Write(data)
-		} else {
-			// New behavior: honor stderrthreshold even when logtostderr=true
-			if s >= l.stderrThreshold.get() {
-				os.Stderr.Write(data)
-			}
-		}
+		os.Stderr.Write(data)
 	} else {
-		// Write to stderr if any of these conditions are met:
-		// - alsoToStderr is set (legacy behavior)
-		// - alsologtostderr is set and severity meets alsologtostderrthreshold
-		// - alsologtostderr is not set and severity meets stderrThreshold
-		if alsoToStderr ||
-			(l.alsoToStderr && s >= l.alsologtostderrthreshold.get()) ||
-			(!l.alsoToStderr && s >= l.stderrThreshold.get()) {
+		if alsoToStderr || l.alsoToStderr || s >= l.stderrThreshold.get() {
 			os.Stderr.Write(data)
 		}
 

@@ -44,8 +44,14 @@ const (
 	maxAttachedVolumeMetadataSize = 256 * (1 << 10) // 256 kB
 	maxVolumeErrorMessageSize     = 1024
 
-	csiNodeIDMaxLength = 256
+	csiNodeIDMaxLength       = 192
+	csiNodeIDLongerMaxLength = 256
 )
+
+// CSINodeValidationOptions contains the validation options for validating CSINode
+type CSINodeValidationOptions struct {
+	AllowLongNodeID bool
+}
 
 // ValidateStorageClass validates a StorageClass.
 func ValidateStorageClass(storageClass *storage.StorageClass) field.ErrorList {
@@ -62,13 +68,19 @@ func ValidateStorageClass(storageClass *storage.StorageClass) field.ErrorList {
 // ValidateStorageClassUpdate tests if an update to StorageClass is valid.
 func ValidateStorageClassUpdate(storageClass, oldStorageClass *storage.StorageClass) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&storageClass.ObjectMeta, &oldStorageClass.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(storageClass.Parameters, oldStorageClass.Parameters, field.NewPath("parameters")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
+	if !reflect.DeepEqual(oldStorageClass.Parameters, storageClass.Parameters) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("parameters"), "updates to parameters are forbidden."))
+	}
 
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(storageClass.Provisioner, oldStorageClass.Provisioner, field.NewPath("provisioner")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
+	if storageClass.Provisioner != oldStorageClass.Provisioner {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("provisioner"), "updates to provisioner are forbidden."))
+	}
 
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(storageClass.ReclaimPolicy, oldStorageClass.ReclaimPolicy, field.NewPath("reclaimPolicy")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
+	if *storageClass.ReclaimPolicy != *oldStorageClass.ReclaimPolicy {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("reclaimPolicy"), "updates to reclaimPolicy are forbidden."))
+	}
 
-	allErrs = append(allErrs, apivalidation.ValidateImmutableField(storageClass.VolumeBindingMode, oldStorageClass.VolumeBindingMode, field.NewPath("volumeBindingMode")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
+	allErrs = append(allErrs, apivalidation.ValidateImmutableField(storageClass.VolumeBindingMode, oldStorageClass.VolumeBindingMode, field.NewPath("volumeBindingMode"))...)
 	return allErrs
 }
 
@@ -117,9 +129,6 @@ var supportedReclaimPolicy = sets.NewString(string(api.PersistentVolumeReclaimDe
 // provisioning for storage classes with impossible reclaim policies, e.g. EBS is not Recyclable
 func validateReclaimPolicy(reclaimPolicy *api.PersistentVolumeReclaimPolicy, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if reclaimPolicy == nil {
-		return allErrs
-	}
 	if len(string(*reclaimPolicy)) > 0 {
 		if !supportedReclaimPolicy.Has(string(*reclaimPolicy)) {
 			allErrs = append(allErrs, field.NotSupported(fldPath, reclaimPolicy, supportedReclaimPolicy.List()))
@@ -133,6 +142,14 @@ func ValidateVolumeAttachment(volumeAttachment *storage.VolumeAttachment) field.
 	allErrs := apivalidation.ValidateObjectMeta(&volumeAttachment.ObjectMeta, false, apivalidation.ValidateClassName, field.NewPath("metadata"))
 	allErrs = append(allErrs, validateVolumeAttachmentSpec(&volumeAttachment.Spec, field.NewPath("spec"))...)
 	allErrs = append(allErrs, validateVolumeAttachmentStatus(&volumeAttachment.Status, field.NewPath("status"))...)
+	return allErrs
+}
+
+// ValidateVolumeAttachmentV1 validates a v1/VolumeAttachment. It contains only extra checks missing in
+// ValidateVolumeAttachment.
+func ValidateVolumeAttachmentV1(volumeAttachment *storage.VolumeAttachment) field.ErrorList {
+	allErrs := apivalidation.ValidateCSIDriverName(volumeAttachment.Spec.Attacher, field.NewPath("spec.attacher"))
+
 	if volumeAttachment.Spec.Source.PersistentVolumeName != nil {
 		pvName := *volumeAttachment.Spec.Source.PersistentVolumeName
 		for _, msg := range apivalidation.ValidatePersistentVolumeName(pvName, false) {
@@ -146,9 +163,19 @@ func ValidateVolumeAttachment(volumeAttachment *storage.VolumeAttachment) field.
 // has valid data.
 func validateVolumeAttachmentSpec(
 	spec *storage.VolumeAttachmentSpec, fldPath *field.Path) field.ErrorList {
-	allErrs := apivalidation.ValidateCSIDriverName(spec.Attacher, fldPath.Child("attacher"), apivalidation.RequiredCovered, apivalidation.FormatCovered, apivalidation.SizeCovered)
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, validateAttacher(spec.Attacher, fldPath.Child("attacher"))...)
 	allErrs = append(allErrs, validateVolumeAttachmentSource(&spec.Source, fldPath.Child("source"))...)
 	allErrs = append(allErrs, validateNodeName(spec.NodeName, fldPath.Child("nodeName"))...)
+	return allErrs
+}
+
+// validateAttacher tests if attacher is a valid qualified name.
+func validateAttacher(attacher string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(attacher) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, attacher))
+	}
 	return allErrs
 }
 
@@ -210,7 +237,7 @@ func validateVolumeError(e *storage.VolumeError, fldPath *field.Path) field.Erro
 		return allErrs
 	}
 	if len(e.Message) > maxVolumeErrorMessageSize {
-		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), "" /*unused*/, maxVolumeErrorMessageSize))
+		allErrs = append(allErrs, field.TooLong(fldPath.Child("message"), "" /*unused*/, maxAttachedVolumeMetadataSize))
 	}
 
 	if e.ErrorCode != nil {
@@ -225,7 +252,12 @@ func validateVolumeError(e *storage.VolumeError, fldPath *field.Path) field.Erro
 // ValidateVolumeAttachmentUpdate validates a VolumeAttachment.
 func ValidateVolumeAttachmentUpdate(new, old *storage.VolumeAttachment) field.ErrorList {
 	allErrs := ValidateVolumeAttachment(new)
-	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(new.Spec, old.Spec, field.NewPath("spec")).WithOrigin("immutable").MarkCoveredByDeclarative()...)
+
+	// Spec is read-only
+	// If this ever relaxes in the future, make sure to increment the Generation number in PrepareForUpdate
+	if !apiequality.Semantic.DeepEqual(old.Spec, new.Spec) {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec"), new.Spec, "field is immutable"))
+	}
 	return allErrs
 }
 
@@ -271,15 +303,15 @@ func validateAllowedTopologies(topologies []api.TopologySelectorTerm, fldPath *f
 }
 
 // ValidateCSINode validates a CSINode.
-func ValidateCSINode(csiNode *storage.CSINode) field.ErrorList {
+func ValidateCSINode(csiNode *storage.CSINode, validationOpts CSINodeValidationOptions) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&csiNode.ObjectMeta, false, apivalidation.ValidateNodeName, field.NewPath("metadata"))
-	allErrs = append(allErrs, validateCSINodeSpec(&csiNode.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, validateCSINodeSpec(&csiNode.Spec, field.NewPath("spec"), validationOpts)...)
 	return allErrs
 }
 
 // ValidateCSINodeUpdate validates a CSINode.
-func ValidateCSINodeUpdate(new, old *storage.CSINode) field.ErrorList {
-	allErrs := ValidateCSINode(new)
+func ValidateCSINodeUpdate(new, old *storage.CSINode, validationOpts CSINodeValidationOptions) field.ErrorList {
+	allErrs := ValidateCSINode(new, validationOpts)
 
 	// Validate modifying fields inside an existing CSINodeDriver entry
 	for _, oldDriver := range old.Spec.Drivers {
@@ -307,35 +339,39 @@ func ValidateCSINodeUpdate(new, old *storage.CSINode) field.ErrorList {
 }
 
 // ValidateCSINodeSpec tests that the specified CSINodeSpec has valid data.
-func validateCSINodeSpec(spec *storage.CSINodeSpec, fldPath *field.Path) field.ErrorList {
+func validateCSINodeSpec(
+	spec *storage.CSINodeSpec, fldPath *field.Path, validationOpts CSINodeValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, validateCSINodeDrivers(spec.Drivers, fldPath.Child("drivers"))...)
+	allErrs = append(allErrs, validateCSINodeDrivers(spec.Drivers, fldPath.Child("drivers"), validationOpts)...)
 	return allErrs
 }
 
 // ValidateCSINodeDrivers tests that the specified CSINodeDrivers have valid data.
-func validateCSINodeDrivers(drivers []storage.CSINodeDriver, fldPath *field.Path) field.ErrorList {
+func validateCSINodeDrivers(drivers []storage.CSINodeDriver, fldPath *field.Path, validationOpts CSINodeValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	driverNamesInSpecs := sets.New[string]()
 	for i, driver := range drivers {
 		idxPath := fldPath.Index(i)
-		allErrs = append(allErrs, validateCSINodeDriver(driver, driverNamesInSpecs, idxPath)...)
+		allErrs = append(allErrs, validateCSINodeDriver(driver, driverNamesInSpecs, idxPath, validationOpts)...)
 	}
 
 	return allErrs
 }
 
 // validateCSINodeDriverNodeID tests if Name in CSINodeDriver is a valid node id.
-func validateCSINodeDriverNodeID(nodeID string, fldPath *field.Path) field.ErrorList {
+func validateCSINodeDriverNodeID(nodeID string, fldPath *field.Path, validationOpts CSINodeValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	// nodeID is always required
 	if len(nodeID) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, nodeID))
 	}
-
-	if len(nodeID) > csiNodeIDMaxLength {
-		allErrs = append(allErrs, field.Invalid(fldPath, nodeID, fmt.Sprintf("must be %d characters or less", csiNodeIDMaxLength)))
+	maxLength := csiNodeIDMaxLength
+	if validationOpts.AllowLongNodeID {
+		maxLength = csiNodeIDLongerMaxLength
+	}
+	if len(nodeID) > maxLength {
+		allErrs = append(allErrs, field.Invalid(fldPath, nodeID, fmt.Sprintf("must be %d characters or less", maxLength)))
 	}
 	return allErrs
 }
@@ -353,11 +389,12 @@ func validateCSINodeDriverAllocatable(a *storage.VolumeNodeResources, fldPath *f
 }
 
 // validateCSINodeDriver tests if CSINodeDriver has valid entries
-func validateCSINodeDriver(driver storage.CSINodeDriver, driverNamesInSpecs sets.Set[string], fldPath *field.Path) field.ErrorList {
+func validateCSINodeDriver(driver storage.CSINodeDriver, driverNamesInSpecs sets.Set[string], fldPath *field.Path,
+	validationOpts CSINodeValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, apivalidation.ValidateCSIDriverName(driver.Name, fldPath.Child("name"))...)
-	allErrs = append(allErrs, validateCSINodeDriverNodeID(driver.NodeID, fldPath.Child("nodeID"))...)
+	allErrs = append(allErrs, validateCSINodeDriverNodeID(driver.NodeID, fldPath.Child("nodeID"), validationOpts)...)
 	allErrs = append(allErrs, validateCSINodeDriverAllocatable(driver.Allocatable, fldPath.Child("allocatable"))...)
 
 	// check for duplicate entries for the same driver in specs
@@ -420,7 +457,6 @@ func validateCSIDriverSpec(
 	allErrs = append(allErrs, validateSELinuxMount(spec.SELinuxMount, fldPath.Child("seLinuxMount"))...)
 	allErrs = append(allErrs, validateNodeAllocatableUpdatePeriodSeconds(spec.NodeAllocatableUpdatePeriodSeconds, fldPath.Child("nodeAllocatableUpdatePeriodSeconds"))...)
 	allErrs = append(allErrs, validateServiceAccountTokenInSecrets(spec.ServiceAccountTokenInSecrets, spec.TokenRequests, fldPath.Child("serviceAccountTokenInSecrets"))...)
-	allErrs = append(allErrs, validatePreventPodSchedulingIfMissing(spec.PreventPodSchedulingIfMissing, fldPath.Child("preventPodSchedulingIfMissing"))...)
 	return allErrs
 }
 
@@ -542,16 +578,6 @@ func validateServiceAccountTokenInSecrets(serviceAccountTokenInSecrets *bool, to
 	allErrs := field.ErrorList{}
 	if serviceAccountTokenInSecrets != nil && len(tokenRequests) == 0 {
 		allErrs = append(allErrs, field.Invalid(fldPath, serviceAccountTokenInSecrets, "serviceAccountTokenInSecrets is set but no tokenRequests are specified"))
-	}
-
-	return allErrs
-}
-
-// validatePreventPodSchedulingIfMissing validates that preventPodSchedulingIfMissing is not set when the VolumeLimitScaling feature gate is disabled.
-func validatePreventPodSchedulingIfMissing(preventPodSchedulingIfMissing *bool, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if preventPodSchedulingIfMissing == nil && utilfeature.DefaultFeatureGate.Enabled(features.VolumeLimitScaling) {
-		allErrs = append(allErrs, field.Required(fldPath, ""))
 	}
 
 	return allErrs

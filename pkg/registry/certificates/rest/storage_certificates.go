@@ -39,7 +39,7 @@ import (
 )
 
 type RESTStorageProvider struct {
-	Authorizer authorizer.UnconditionalAuthorizer
+	Authorizer authorizer.Authorizer
 }
 
 func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, error) {

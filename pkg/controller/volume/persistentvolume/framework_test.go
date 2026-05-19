@@ -809,6 +809,7 @@ func runSyncTests(t *testing.T, ctx context.Context, tests []controllerTest, sto
 	}
 
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			doit(t, test)
 		})
@@ -943,6 +944,7 @@ func runMultisyncTests(t *testing.T, ctx context.Context, tests []controllerTest
 	}
 
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			run(t, test)

@@ -1,4 +1,5 @@
 //go:build linux
+// +build linux
 
 /*
 Copyright 2020 The Kubernetes Authors.
@@ -19,7 +20,6 @@ limitations under the License.
 package nodeshutdown
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -46,7 +46,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
-	testutilsktesting "k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/clock"
 	testingclock "k8s.io/utils/clock/testing"
 )
@@ -304,7 +303,7 @@ func TestManager(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.desc, func(t *testing.T) {
-			logger, tCtx := ktesting.NewTestContext(t)
+			logger, _ := ktesting.NewTestContext(t)
 
 			activePodsFunc := func() []*v1.Pod {
 				return tc.activePods
@@ -345,14 +344,14 @@ func TestManager(t *testing.T) {
 				NodeRef:                         nodeRef,
 				GetPodsFunc:                     activePodsFunc,
 				KillPodFunc:                     killPodsFunc,
-				SyncNodeStatusFunc:              func(context context.Context) {},
+				SyncNodeStatusFunc:              func() {},
 				ShutdownGracePeriodRequested:    tc.shutdownGracePeriodRequested,
 				ShutdownGracePeriodCriticalPods: tc.shutdownGracePeriodCriticalPods,
 				Clock:                           testingclock.NewFakeClock(time.Now()),
 				StateDirectory:                  os.TempDir(),
 			})
 
-			err := manager.Start(tCtx)
+			err := manager.Start()
 			lock.Unlock()
 
 			if tc.expectedError != nil {
@@ -450,7 +449,7 @@ func TestFeatureEnabled(t *testing.T) {
 				NodeRef:                         nodeRef,
 				GetPodsFunc:                     activePodsFunc,
 				KillPodFunc:                     killPodsFunc,
-				SyncNodeStatusFunc:              func(context.Context) {},
+				SyncNodeStatusFunc:              func() {},
 				ShutdownGracePeriodRequested:    tc.shutdownGracePeriodRequested,
 				ShutdownGracePeriodCriticalPods: 0,
 				StateDirectory:                  os.TempDir(),
@@ -461,10 +460,7 @@ func TestFeatureEnabled(t *testing.T) {
 }
 
 func TestRestart(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(tCtx)
-	defer cancel()
-
+	logger, _ := ktesting.NewTestContext(t)
 	systemDbusTmp := systemDbus
 	defer func() {
 		systemDbus = systemDbusTmp
@@ -480,7 +476,7 @@ func TestRestart(t *testing.T) {
 	killPodsFunc := func(pod *v1.Pod, isEvicted bool, gracePeriodOverride *int64, fn func(*v1.PodStatus)) error {
 		return nil
 	}
-	syncNodeStatus := func(context.Context) {}
+	syncNodeStatus := func() {}
 
 	var shutdownChan chan bool
 	var shutdownChanMut sync.Mutex
@@ -515,7 +511,7 @@ func TestRestart(t *testing.T) {
 		StateDirectory:                  os.TempDir(),
 	})
 
-	err := manager.Start(ctx)
+	err := manager.Start()
 	lock.Unlock()
 
 	if err != nil {
@@ -535,75 +531,11 @@ func TestRestart(t *testing.T) {
 	}
 }
 
-func TestStartDoesNotReconnectAfterContextCancel(t *testing.T) {
-	logger, tCtx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(tCtx)
-	defer cancel()
-
-	systemDbusTmp := systemDbus
-	defer func() {
-		systemDbus = systemDbusTmp
-	}()
-
-	shutdownGracePeriodRequested := 30 * time.Second
-	shutdownGracePeriodCriticalPods := 10 * time.Second
-	systemInhibitDelay := 40 * time.Second
-	overrideSystemInhibitDelay := 40 * time.Second
-
-	shutdownChans := make(chan chan bool, 2)
-
-	lock.Lock()
-	systemDbus = func() (dbusInhibiter, error) {
-		ch := make(chan bool)
-		shutdownChans <- ch
-		return &fakeDbus{
-			currentInhibitDelay:        systemInhibitDelay,
-			shutdownChan:               ch,
-			overrideSystemInhibitDelay: overrideSystemInhibitDelay,
-		}, nil
-	}
-
-	manager := NewManager(&Config{
-		Logger:                          logger,
-		VolumeManager:                   volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false),
-		Recorder:                        &record.FakeRecorder{},
-		NodeRef:                         &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""},
-		GetPodsFunc:                     func() []*v1.Pod { return nil },
-		KillPodFunc:                     func(*v1.Pod, bool, *int64, func(*v1.PodStatus)) error { return nil },
-		SyncNodeStatusFunc:              func(context.Context) {},
-		ShutdownGracePeriodRequested:    shutdownGracePeriodRequested,
-		ShutdownGracePeriodCriticalPods: shutdownGracePeriodCriticalPods,
-		StateDirectory:                  os.TempDir(),
-	})
-
-	err := manager.Start(ctx)
-	lock.Unlock()
-	require.NoError(t, err)
-
-	var shutdownChan chan bool
-	select {
-	case shutdownChan = <-shutdownChans:
-	case <-time.After(dbusReconnectPeriod):
-		t.Fatal("timed out waiting for initial dbus watch")
-	}
-
-	cancel()
-	close(shutdownChan)
-
-	select {
-	case <-shutdownChans:
-		t.Fatal("shutdown manager reconnected after context cancellation")
-	case <-time.After(dbusReconnectPeriod * 5):
-	}
-}
-
 func Test_managerImpl_processShutdownEvent(t *testing.T) {
-	tCtx := testutilsktesting.Init(t)
-
 	var (
 		fakeRecorder      = &record.FakeRecorder{}
 		fakeVolumeManager = volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false)
-		syncNodeStatus    = func(context.Context) {}
+		syncNodeStatus    = func() {}
 		nodeRef           = &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 		fakeclock         = testingclock.NewFakeClock(time.Now())
 	)
@@ -615,7 +547,7 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 		shutdownGracePeriodByPodPriority []kubeletconfig.ShutdownGracePeriodByPodPriority
 		getPods                          eviction.ActivePodsFunc
 		killPodFunc                      eviction.KillPodFunc
-		syncNodeStatus                   func(context.Context)
+		syncNodeStatus                   func()
 		dbusCon                          dbusInhibiter
 		inhibitLock                      systemd.InhibitLock
 		nodeShuttingDownNow              bool
@@ -664,7 +596,6 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Use a buffered logger because this test asserts log output.
 			logger := ktesting.NewLogger(t,
 				ktesting.NewConfig(
 					ktesting.BufferLogs(true),
@@ -688,11 +619,8 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 					clock:                            tt.fields.clock,
 				},
 			}
-			err := m.processShutdownEvent(tCtx)
-			if tt.wantErr {
-				require.Error(t, err, "managerImpl.processShutdownEvent() should return an error")
-			} else {
-				require.NoError(t, err, "managerImpl.processShutdownEvent() should not return an error")
+			if err := m.processShutdownEvent(); (err != nil) != tt.wantErr {
+				t.Errorf("managerImpl.processShutdownEvent() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
 			underlier, ok := logger.GetSink().(ktesting.Underlier)
@@ -711,11 +639,9 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 }
 
 func Test_processShutdownEvent_VolumeUnmountTimeout(t *testing.T) {
-	tCtx := testutilsktesting.Init(t)
-
 	var (
 		fakeRecorder               = &record.FakeRecorder{}
-		syncNodeStatus             = func(context.Context) {}
+		syncNodeStatus             = func() {}
 		nodeRef                    = &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 		fakeclock                  = testingclock.NewFakeClock(time.Now())
 		shutdownGracePeriodSeconds = 2
@@ -727,7 +653,6 @@ func Test_processShutdownEvent_VolumeUnmountTimeout(t *testing.T) {
 		// for volume unmount operations that take longer than the allowed grace period.
 		fmt.Errorf("unmount timeout"), false,
 	)
-	// Use a buffered logger because this test asserts log output.
 	logger := ktesting.NewLogger(t, ktesting.NewConfig(ktesting.BufferLogs(true)))
 	m := &managerImpl{
 		logger:   logger,
@@ -757,7 +682,7 @@ func Test_processShutdownEvent_VolumeUnmountTimeout(t *testing.T) {
 	}
 
 	start := fakeclock.Now()
-	err := m.processShutdownEvent(tCtx)
+	err := m.processShutdownEvent()
 	end := fakeclock.Now()
 
 	require.NoError(t, err, "managerImpl.processShutdownEvent() should not return an error")

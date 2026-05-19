@@ -53,9 +53,6 @@ func TestCSIImageConfigs(t *testing.T) {
 		// For AnyVolumeDataSource feature tests.
 		"volume-data-source-validator",
 		"hello-populator",
-
-		// For SnapshotMetadata feature tests.
-		"csi-snapshot-metadata",
 	}
 	actualImages := sets.NewString()
 	for _, config := range configs {

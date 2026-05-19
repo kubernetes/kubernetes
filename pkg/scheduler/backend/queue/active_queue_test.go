@@ -30,10 +30,12 @@ import (
 func TestClose(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
 	rr := metrics.NewMetricsAsyncRecorder(10, time.Second, ctx.Done())
-	aq := newActiveQueue(heap.NewWithRecorder(podInfoKeyFunc, heap.LessFunc[*framework.QueuedPodInfo](convertLessFn(newDefaultQueueSort())), metrics.NewActivePodsRecorder()), rr, nil)
+	aq := newActiveQueue(heap.NewWithRecorder(podInfoKeyFunc, heap.LessFunc[*framework.QueuedPodInfo](convertLessFn(newDefaultQueueSort())), metrics.NewActivePodsRecorder()), true, rr, nil)
 
-	aq.add(logger, &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: st.MakePod().Namespace("foo").Name("p1").UID("p1").Obj()}}, framework.EventUnscheduledPodAdd.Label())
-	aq.add(logger, &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: st.MakePod().Namespace("bar").Name("p2").UID("p2").Obj()}}, framework.EventUnscheduledPodAdd.Label())
+	aq.underLock(func(unlockedActiveQ unlockedActiveQueuer) {
+		unlockedActiveQ.add(logger, &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: st.MakePod().Namespace("foo").Name("p1").UID("p1").Obj()}}, framework.EventUnscheduledPodAdd.Label())
+		unlockedActiveQ.add(logger, &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: st.MakePod().Namespace("bar").Name("p2").UID("p2").Obj()}}, framework.EventUnscheduledPodAdd.Label())
+	})
 
 	_, err := aq.pop(logger)
 	if err != nil {

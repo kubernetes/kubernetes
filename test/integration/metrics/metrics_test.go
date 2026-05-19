@@ -36,7 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	"k8s.io/apiserver/pkg/features"
-	"k8s.io/apiserver/pkg/storage/cacher/consistency"
+	"k8s.io/apiserver/pkg/storage/cacher"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -683,10 +683,10 @@ func TestWatchCacheConsistencyCheckMetrics(t *testing.T) {
 }
 
 func overrideConsistencyCheckerTimings(period time.Duration) func() {
-	tmpPeriod := consistency.CheckPeriod
-	consistency.CheckPeriod = period
+	tmpPeriod := cacher.ConsistencyCheckPeriod
+	cacher.ConsistencyCheckPeriod = period
 	return func() {
-		consistency.CheckPeriod = tmpPeriod
+		cacher.ConsistencyCheckPeriod = tmpPeriod
 	}
 }
 

@@ -50,12 +50,13 @@ func TestPodSecurityContextAccessor(t *testing.T) {
 		{FSGroupChangePolicy: &onRootMismatchPolicy},
 	}
 
-	for i, expected := range testcases {
+	for i, tc := range testcases {
+		expected := tc
 		if expected == nil {
 			expected = &api.PodSecurityContext{}
 		}
 
-		a := NewPodSecurityContextAccessor(expected)
+		a := NewPodSecurityContextAccessor(tc)
 
 		if v := a.FSGroup(); !reflect.DeepEqual(expected.FSGroup, v) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected.FSGroup, v)
@@ -334,12 +335,13 @@ func TestContainerSecurityContextAccessor(t *testing.T) {
 		{AllowPrivilegeEscalation: &allowPrivilegeEscalation},
 	}
 
-	for i, expected := range testcases {
+	for i, tc := range testcases {
+		expected := tc
 		if expected == nil {
 			expected = &api.SecurityContext{}
 		}
 
-		a := NewContainerSecurityContextAccessor(expected)
+		a := NewContainerSecurityContextAccessor(tc)
 
 		if v := a.Capabilities(); !reflect.DeepEqual(expected.Capabilities, v) {
 			t.Errorf("%d: expected %#v, got %#v", i, expected.Capabilities, v)

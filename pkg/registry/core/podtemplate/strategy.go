@@ -22,7 +22,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/pod"
@@ -32,13 +31,13 @@ import (
 
 // podTemplateStrategy implements behavior for PodTemplates
 type podTemplateStrategy struct {
-	rest.DeclarativeValidation
+	runtime.ObjectTyper
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating PodTemplate
 // objects via the REST API.
-var Strategy = podTemplateStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
+var Strategy = podTemplateStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped is true for pod templates.
 func (podTemplateStrategy) NamespaceScoped() bool {
@@ -70,7 +69,7 @@ func (podTemplateStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for pod templates.
-func (podTemplateStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
+func (podTemplateStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
@@ -110,6 +109,6 @@ func (podTemplateStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtim
 	return warnings
 }
 
-func (podTemplateStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+func (podTemplateStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }

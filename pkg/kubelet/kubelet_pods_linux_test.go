@@ -1,4 +1,5 @@
 //go:build linux
+// +build linux
 
 /*
 Copyright 2018 The Kubernetes Authors.
@@ -25,7 +26,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/utils/ptr"
@@ -38,11 +38,9 @@ import (
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestMakeMounts(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
 	bTrue := true
 	propagationHostToContainer := v1.MountPropagationHostToContainer
 	propagationBidirectional := v1.MountPropagationBidirectional
@@ -453,10 +451,6 @@ func TestMakeMounts(t *testing.T) {
 		for _, featureEnabled := range tc.imageVolumeFeatureEnabled {
 			name := fmt.Sprintf("features.ImageVolume is %v, %s", featureEnabled, name)
 			t.Run(name, func(t *testing.T) {
-				if !featureEnabled {
-					// Set emulation version to v1.35 (last version before GA) to allow disabling the feature gate
-					featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
-				}
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ImageVolume, featureEnabled)
 				fhu := hostutil.NewFakeHostUtil(nil)
 				fsp := &subpath.FakeSubpath{}
@@ -466,7 +460,7 @@ func TestMakeMounts(t *testing.T) {
 					},
 				}
 
-				mounts, _, err := makeMounts(logger, &pod, "/pod", &tc.container, "fakepodname", "", []string{""}, tc.podVolumes, fhu, fsp, nil, tc.supportsRRO, tc.imageVolumes)
+				mounts, _, err := makeMounts(&pod, "/pod", &tc.container, "fakepodname", "", []string{""}, tc.podVolumes, fhu, fsp, nil, tc.supportsRRO, tc.imageVolumes)
 
 				// validate only the error if we expect an error
 				if tc.expectErr {
@@ -488,7 +482,6 @@ func TestMakeMounts(t *testing.T) {
 }
 
 func TestMakeMountsEtcHostsFile(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:   "test-ns",
@@ -566,7 +559,7 @@ func TestMakeMountsEtcHostsFile(t *testing.T) {
 				tt.containerFn(container)
 			}
 
-			mounts, _, err := makeMounts(logger, pod, t.TempDir(), container, "fakepodname", "fakedomain", tt.podIPs, tt.podVolumes, fhu, fsp, nil, false, nil)
+			mounts, _, err := makeMounts(pod, t.TempDir(), container, "fakepodname", "fakedomain", tt.podIPs, tt.podVolumes, fhu, fsp, nil, false, nil)
 
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -587,7 +580,6 @@ func TestMakeMountsEtcHostsFile(t *testing.T) {
 }
 
 func TestMakeBlockVolumes(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -703,7 +695,7 @@ func TestMakeBlockVolumes(t *testing.T) {
 				},
 			}
 			blkutil := volumetest.NewBlockVolumePathHandler()
-			blkVolumes, err := kubelet.makeBlockVolumes(logger, &pod, &tc.container, tc.podVolumes, blkutil)
+			blkVolumes, err := kubelet.makeBlockVolumes(&pod, &tc.container, tc.podVolumes, blkutil)
 			// validate only the error if we expect an error
 			if tc.expectErr {
 				if err == nil || err.Error() != tc.expectedErrMsg {

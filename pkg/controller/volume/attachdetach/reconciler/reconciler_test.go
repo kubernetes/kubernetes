@@ -57,16 +57,12 @@ var registerMetrics sync.Once
 // Calls Run()
 // Verifies there are no calls to attach or detach.
 func Test_Run_Positive_DoNothing(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 
-	fakeKubeClient := controllervolumetesting.CreateTestClient(logger)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -82,6 +78,9 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
 
 	// Act
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	go reconciler.Run(ctx)
 
 	// Assert
@@ -96,15 +95,11 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 // Calls Run()
 // Verifies there is one attach call and no detach calls.
 func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
-	fakeKubeClient := controllervolumetesting.CreateTestClient(logger)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -136,6 +131,9 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 	}
 
 	// Act
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	go reconciler.Run(ctx)
 
 	// Assert
@@ -151,15 +149,11 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 // Deletes the node/volume/pod tuple from desiredStateOfWorld cache.
 // Verifies there is one detach call and no (new) attach calls.
 func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
-	fakeKubeClient := controllervolumetesting.CreateTestClient(logger)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -191,6 +185,9 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 	}
 
 	// Act
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	go reconciler.Run(ctx)
 
 	// Assert
@@ -227,10 +224,6 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 // Deletes the node/volume/pod tuple from desiredStateOfWorld cache without first marking the node/volume as unmounted.
 // Verifies there is one detach call and no (new) attach calls.
 func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(metrics.ForceDetachMetricCounter)
 	})
@@ -250,7 +243,7 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
-	fakeKubeClient := controllervolumetesting.CreateTestClient(logger)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -283,6 +276,9 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 	}
 
 	// Act
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	go reconciler.Run(ctx)
 
 	// Assert
@@ -324,15 +320,11 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 // Deletes the node/volume/pod tuple from desiredStateOfWorld cache.
 // Verifies there are NO detach call and no (new) attach calls.
 func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdateStatusFail(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
-	fakeKubeClient := controllervolumetesting.CreateTestClient(logger)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -364,6 +356,9 @@ func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdate
 	}
 
 	// Act
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	go reconciler.Run(ctx)
 
 	// Assert
@@ -403,15 +398,11 @@ func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdate
 // Deletes the second node/volume/pod tuple from desiredStateOfWorld cache without first marking the node/volume as unmounted.
 // Verifies there are two detach calls and no (new) attach calls.
 func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteMany(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
-	fakeKubeClient := controllervolumetesting.CreateTestClient(logger)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -445,6 +436,9 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteMany(t *testing.
 	}
 
 	// Act
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	go reconciler.Run(ctx)
 
 	// Assert
@@ -499,15 +493,11 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteMany(t *testing.
 // Deletes the node/volume/pod tuple from desiredStateOfWorld which succeeded in attaching
 // Verifies there are two attach call and one detach call.
 func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
-	fakeKubeClient := controllervolumetesting.CreateTestClient(logger)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -541,6 +531,9 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 	}
 
 	// Act
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	go reconciler.Run(ctx)
 
 	// Assert
@@ -593,15 +586,11 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 // Secondly, delete this pod.
 // Lastly, create a pod scheduled to a normal node which will trigger attach volume to the node. The attach should return successfully.
 func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
-	fakeKubeClient := controllervolumetesting.CreateTestClient(logger)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -625,6 +614,9 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 	dsw.AddNode(nodeName2)
 
 	// Act
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	go reconciler.Run(ctx)
 
 	// Add the pod in which the volume is attached to the uncertain node
@@ -656,15 +648,11 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 }
 
 func Test_Run_UpdateNodeStatusFailBeforeOneVolumeDetachNodeWithReadWriteOnce(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
-	fakeKubeClient := controllervolumetesting.CreateTestClient(logger)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -675,6 +663,9 @@ func Test_Run_UpdateNodeStatusFailBeforeOneVolumeDetachNodeWithReadWriteOnce(t *
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	rc := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
 	reconciliationLoopFunc := rc.(*reconciler).reconciliationLoopFunc(ctx)
@@ -720,15 +711,11 @@ func Test_Run_UpdateNodeStatusFailBeforeOneVolumeDetachNodeWithReadWriteOnce(t *
 }
 
 func Test_Run_OneVolumeDetachFailNodeWithReadWriteOnce(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
-	fakeKubeClient := controllervolumetesting.CreateTestClient(logger)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -753,6 +740,9 @@ func Test_Run_OneVolumeDetachFailNodeWithReadWriteOnce(t *testing.T) {
 	dsw.AddNode(nodeName2)
 
 	// Act
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	go reconciler.Run(ctx)
 
 	// Add the pod in which the volume is attached to the FailDetachNode
@@ -802,15 +792,11 @@ func Test_Run_OneVolumeDetachFailNodeWithReadWriteOnce(t *testing.T) {
 // Secondly, delete the this pod.
 // Lastly, create a pod scheduled to a normal node which will trigger attach volume to the node. The attach should return successfully.
 func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
-	fakeKubeClient := controllervolumetesting.CreateTestClient(logger)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -834,6 +820,9 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 	dsw.AddNode(nodeName2)
 
 	// Act
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	go reconciler.Run(ctx)
 
 	// Add the pod in which the volume is attached to the timeout node
@@ -874,10 +863,6 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 // Deletes the pod from desiredStateOfWorld cache without first marking the node/volume as unmounted.
 // Verifies there is one detach call and no (new) attach calls.
 func Test_Run_OneVolumeDetachOnOutOfServiceTaintedNode(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(metrics.ForceDetachMetricCounter)
 	})
@@ -897,7 +882,7 @@ func Test_Run_OneVolumeDetachOnOutOfServiceTaintedNode(t *testing.T) {
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
-	fakeKubeClient := controllervolumetesting.CreateTestClient(logger)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -938,6 +923,9 @@ func Test_Run_OneVolumeDetachOnOutOfServiceTaintedNode(t *testing.T) {
 	}
 
 	// Act
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	go reconciler.Run(ctx)
 
 	// Assert
@@ -976,15 +964,11 @@ func Test_Run_OneVolumeDetachOnOutOfServiceTaintedNode(t *testing.T) {
 // Deletes the pod from desiredStateOfWorld cache without first marking the node/volume as unmounted.
 // Verifies there is no detach call and no (new) attach calls.
 func Test_Run_OneVolumeDetachOnNoOutOfServiceTaintedNode(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
-	fakeKubeClient := controllervolumetesting.CreateTestClient(logger)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -1022,6 +1006,9 @@ func Test_Run_OneVolumeDetachOnNoOutOfServiceTaintedNode(t *testing.T) {
 	}
 
 	// Act
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	go reconciler.Run(ctx)
 
 	// Assert
@@ -1054,15 +1041,11 @@ func Test_Run_OneVolumeDetachOnNoOutOfServiceTaintedNode(t *testing.T) {
 // Marks the node as unhealthy.
 // Verifies that the volume is detached after maxWaitForUnmountDuration.
 func Test_Run_OneVolumeDetachOnUnhealthyNode(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	// Arrange
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
-	fakeKubeClient := controllervolumetesting.CreateTestClient(logger)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -1108,6 +1091,9 @@ func Test_Run_OneVolumeDetachOnUnhealthyNode(t *testing.T) {
 	}
 
 	// Act
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	go reconciler.Run(ctx)
 
 	// Assert
@@ -1157,10 +1143,6 @@ func Test_Run_OneVolumeDetachOnUnhealthyNode(t *testing.T) {
 // Verifies that there is still just one attach call.
 // Verifies there is now one detach call.
 func Test_Run_OneVolumeDetachOnUnhealthyNodeWithForceDetachOnUnmountDisabled(t *testing.T) {
-	logger, ctx := ktesting.NewTestContext(t)
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(metrics.ForceDetachMetricCounter)
 	})
@@ -1179,7 +1161,7 @@ func Test_Run_OneVolumeDetachOnUnhealthyNodeWithForceDetachOnUnmountDisabled(t *
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
-	fakeKubeClient := controllervolumetesting.CreateTestClient(logger)
+	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	fakeRecorder := &record.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -1228,6 +1210,9 @@ func Test_Run_OneVolumeDetachOnUnhealthyNodeWithForceDetachOnUnmountDisabled(t *
 	}
 
 	// Act
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	go reconciler.Run(ctx)
 
 	// Assert
@@ -1291,7 +1276,7 @@ func Test_Run_OneVolumeDetachOnUnhealthyNodeWithForceDetachOnUnmountDisabled(t *
 	testForceDetachMetric(t, int(initialForceDetachCountTimeout), metrics.ForceDetachReasonTimeout)
 }
 
-func Test_ReportWaitingOnDetach(t *testing.T) {
+func Test_ReportMultiAttachError(t *testing.T) {
 	type nodeWithPods struct {
 		name     k8stypes.NodeName
 		podNames []string
@@ -1306,7 +1291,7 @@ func Test_ReportWaitingOnDetach(t *testing.T) {
 			[]nodeWithPods{
 				{"node1", []string{"ns1/pod1"}},
 			},
-			[]string{"Warning FailedAttachVolume Waiting for detach for volume \"volume-name\" Volume is already exclusively attached to one node, waiting on detach before it can be attached to another node"},
+			[]string{"Warning FailedAttachVolume Multi-Attach error for volume \"volume-name\" Volume is already exclusively attached to one node and can't be attached to another"},
 		},
 		{
 			"pods in the same namespace use the volume",
@@ -1314,7 +1299,7 @@ func Test_ReportWaitingOnDetach(t *testing.T) {
 				{"node1", []string{"ns1/pod1"}},
 				{"node2", []string{"ns1/pod2"}},
 			},
-			[]string{"Warning FailedAttachVolume Waiting for detach for volume \"volume-name\" Volume is already used by pod(s) pod2"},
+			[]string{"Warning FailedAttachVolume Multi-Attach error for volume \"volume-name\" Volume is already used by pod(s) pod2"},
 		},
 		{
 			"pods in another namespace use the volume",
@@ -1322,7 +1307,7 @@ func Test_ReportWaitingOnDetach(t *testing.T) {
 				{"node1", []string{"ns1/pod1"}},
 				{"node2", []string{"ns2/pod2"}},
 			},
-			[]string{"Warning FailedAttachVolume Waiting for detach for volume \"volume-name\" Volume is already used by 1 pod(s) in different namespaces"},
+			[]string{"Warning FailedAttachVolume Multi-Attach error for volume \"volume-name\" Volume is already used by 1 pod(s) in different namespaces"},
 		},
 		{
 			"pods both in the same and another namespace use the volume",
@@ -1331,18 +1316,17 @@ func Test_ReportWaitingOnDetach(t *testing.T) {
 				{"node2", []string{"ns2/pod2"}},
 				{"node3", []string{"ns1/pod3"}},
 			},
-			[]string{"Warning FailedAttachVolume Waiting for detach for volume \"volume-name\" Volume is already used by pod(s) pod3 and 1 pod(s) in different namespaces"},
+			[]string{"Warning FailedAttachVolume Multi-Attach error for volume \"volume-name\" Volume is already used by pod(s) pod3 and 1 pod(s) in different namespaces"},
 		},
 	}
 
 	for _, test := range tests {
-		logger, _ := ktesting.NewTestContext(t)
 		// Arrange
 		t.Logf("Test %q starting", test.name)
 		volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 		dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 		asw := cache.NewActualStateOfWorld(volumePluginMgr)
-		fakeKubeClient := controllervolumetesting.CreateTestClient(logger)
+		fakeKubeClient := controllervolumetesting.CreateTestClient()
 		fakeRecorder := record.NewFakeRecorder(100)
 		fakeHandler := volumetesting.NewBlockVolumePathHandler()
 		ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
@@ -1375,6 +1359,7 @@ func Test_ReportWaitingOnDetach(t *testing.T) {
 			}
 		}
 		// Act
+		logger, _ := ktesting.NewTestContext(t)
 		volumes := dsw.GetVolumesToAttach()
 		for _, vol := range volumes {
 			if vol.NodeName == "node1" {

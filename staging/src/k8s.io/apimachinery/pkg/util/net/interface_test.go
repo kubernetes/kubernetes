@@ -23,7 +23,6 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/klog/v2/ktesting"
 	netutils "k8s.io/utils/net"
 )
 
@@ -243,7 +242,6 @@ func TestParseIP(t *testing.T) {
 }
 
 func TestIsInterfaceUp(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
 		tcase    string
 		intf     *net.Interface
@@ -254,7 +252,7 @@ func TestIsInterfaceUp(t *testing.T) {
 		{"no interface", nil, false},
 	}
 	for _, tc := range testCases {
-		it := isInterfaceUp(logger, tc.intf)
+		it := isInterfaceUp(tc.intf)
 		if it != tc.expected {
 			t.Errorf("case[%v]: expected %v, got %v .", tc.tcase, tc.expected, it)
 		}
@@ -271,7 +269,6 @@ func (a addrStruct) String() string {
 }
 
 func TestFinalIP(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
 		tcase    string
 		addr     []net.Addr
@@ -292,7 +289,7 @@ func TestFinalIP(t *testing.T) {
 		{"no addresses", []net.Addr{}, familyIPv4, nil},
 	}
 	for _, tc := range testCases {
-		ip, err := getMatchingGlobalIP(logger, tc.addr, tc.family)
+		ip, err := getMatchingGlobalIP(tc.addr, tc.family)
 		if !ip.Equal(tc.expected) {
 			t.Errorf("case[%v]: expected %v, got %v .err : %v", tc.tcase, tc.expected, ip, err)
 		}
@@ -552,7 +549,6 @@ func (_ networkInterfaceWithInvalidAddr) Interfaces() ([]net.Interface, error) {
 }
 
 func TestGetIPFromInterface(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
 		tcase      string
 		nwname     string
@@ -571,7 +567,7 @@ func TestGetIPFromInterface(t *testing.T) {
 		{"bad addr", "eth3", familyIPv4, networkInterfaceWithInvalidAddr{}, nil, "invalid CIDR"},
 	}
 	for _, tc := range testCases {
-		ip, err := getIPFromInterface(logger, tc.nwname, tc.family, tc.nw)
+		ip, err := getIPFromInterface(tc.nwname, tc.family, tc.nw)
 		if err != nil {
 			if !strings.Contains(err.Error(), tc.errStrFrag) {
 				t.Errorf("case[%s]: Error string %q does not contain %q", tc.tcase, err, tc.errStrFrag)
@@ -585,7 +581,6 @@ func TestGetIPFromInterface(t *testing.T) {
 }
 
 func TestGetIPFromLoopbackInterface(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
 		tcase      string
 		family     AddressFamily
@@ -599,7 +594,7 @@ func TestGetIPFromLoopbackInterface(t *testing.T) {
 		{"no global ipv6", familyIPv6, loopbackNetworkInterface{}, nil, ""},
 	}
 	for _, tc := range testCases {
-		ip, err := getIPFromLoopbackInterface(logger, tc.family, tc.nw)
+		ip, err := getIPFromLoopbackInterface(tc.family, tc.nw)
 		if err != nil {
 			if !strings.Contains(err.Error(), tc.errStrFrag) {
 				t.Errorf("case[%s]: Error string %q does not contain %q", tc.tcase, err, tc.errStrFrag)
@@ -613,7 +608,6 @@ func TestGetIPFromLoopbackInterface(t *testing.T) {
 }
 
 func TestChooseHostInterfaceFromRoute(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
 		tcase    string
 		routes   []Route
@@ -642,7 +636,7 @@ func TestChooseHostInterfaceFromRoute(t *testing.T) {
 		{"fail get IP", routeV4, networkInterfaceFailGetAddrs{}, preferIPv4, nil},
 	}
 	for _, tc := range testCases {
-		ip, err := chooseHostInterfaceFromRoute(logger, tc.routes, tc.nw, tc.order)
+		ip, err := chooseHostInterfaceFromRoute(tc.routes, tc.nw, tc.order)
 		if !ip.Equal(tc.expected) {
 			t.Errorf("case[%v]: expected %v, got %+v .err : %v", tc.tcase, tc.expected, ip, err)
 		}
@@ -669,7 +663,6 @@ func TestMemberOf(t *testing.T) {
 }
 
 func TestGetIPFromHostInterfaces(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
 	testCases := []struct {
 		tcase      string
 		nw         networkInterfacer
@@ -695,7 +688,7 @@ func TestGetIPFromHostInterfaces(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		ip, err := chooseIPFromHostInterfaces(logger, tc.nw, tc.order)
+		ip, err := chooseIPFromHostInterfaces(tc.nw, tc.order)
 		if !ip.Equal(tc.expected) {
 			t.Errorf("case[%s]: expected %+v, got %+v with err : %v", tc.tcase, tc.expected, ip, err)
 		}

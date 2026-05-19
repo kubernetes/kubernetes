@@ -26,7 +26,6 @@ import (
 
 	"go.uber.org/goleak"
 
-	extensionfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -155,10 +154,10 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.StorageVersionMigrator:                                  true,
 		featuregate.Feature(clientgofeaturegate.InformerResourceVersion): true,
-		extensionfeatures.CRDObservedGenerationTracking:                  true,
 	})
 	// decode errors are expected when using conversation webhooks
-	etcd3watcher.TestOnlySetFatalOnDecodeError(t, false)
+	etcd3watcher.TestOnlySetFatalOnDecodeError(false)
+	t.Cleanup(func() { etcd3watcher.TestOnlySetFatalOnDecodeError(true) })
 	framework.GoleakCheck(t, // block test clean up and let any lingering watches complete before making decode errors fatal again
 		goleak.IgnoreTopFunction("k8s.io/kubernetes/vendor/gopkg.in/natefinch/lumberjack%2ev2.(*Logger).millRun"),
 		goleak.IgnoreTopFunction("gopkg.in/natefinch/lumberjack%2ev2.(*Logger).millRun"),
@@ -263,7 +262,7 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create SVM resource: %v", err)
 	}
-	if ok := svmTest.isCRDMigrated(ctx, t, svm.Name, crd.Name, "triggercr"); !ok {
+	if ok := svmTest.isCRDMigrated(ctx, t, svm.Name, "triggercr"); !ok {
 		t.Fatalf("CRD not migrated")
 	}
 
@@ -304,7 +303,6 @@ func TestStorageVersionMigrationDuringChaos(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.StorageVersionMigrator:                                  true,
 		featuregate.Feature(clientgofeaturegate.InformerResourceVersion): true,
-		extensionfeatures.CRDObservedGenerationTracking:                  true,
 	})
 
 	ctx := ktesting.Init(t)
@@ -330,6 +328,7 @@ func TestStorageVersionMigrationDuringChaos(t *testing.T) {
 	const migrations = 10 // more than the total workers of SVM
 	wg.Add(migrations)
 	for i := range migrations {
+		i := i
 		go func() {
 			defer wg.Done()
 
@@ -345,7 +344,7 @@ func TestStorageVersionMigrationDuringChaos(t *testing.T) {
 				return
 			}
 			triggerCRName := "chaos-trigger-" + strconv.Itoa(i)
-			if ok := svmTest.isCRDMigrated(ctx, t, svm.Name, crd.Name, triggerCRName); !ok {
+			if ok := svmTest.isCRDMigrated(ctx, t, svm.Name, triggerCRName); !ok {
 				t.Errorf("CRD not migrated")
 				return
 			}

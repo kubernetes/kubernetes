@@ -19,10 +19,9 @@ package cel
 import (
 	"context"
 	"fmt"
+	"github.com/google/cel-go/interpreter"
 	"math"
 	"time"
-
-	"github.com/google/cel-go/interpreter"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	v1 "k8s.io/api/core/v1"
@@ -34,16 +33,14 @@ import (
 // newActivation creates an activation for CEL admission plugins from the given request, admission chain and
 // variable binding information.
 func newActivation(compositionCtx CompositionContext, versionedAttr *admission.VersionedAttributes, request *admissionv1.AdmissionRequest, inputs OptionalVariableBindings, namespace *v1.Namespace) (*evaluationActivation, error) {
-	celOldObjVal, err := versionedAttr.VersionedOldObject.CELValue()
+	oldObjectVal, err := objectToResolveVal(versionedAttr.VersionedOldObject)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare oldObject variable for evaluation: %w", err)
 	}
-
-	celObjVal, err := versionedAttr.VersionedObject.CELValue()
+	objectVal, err := objectToResolveVal(versionedAttr.VersionedObject)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare object variable for evaluation: %w", err)
 	}
-
 	var paramsVal, authorizerVal, requestResourceAuthorizerVal any
 	if inputs.VersionedParams != nil {
 		paramsVal, err = objectToResolveVal(inputs.VersionedParams)
@@ -57,7 +54,7 @@ func newActivation(compositionCtx CompositionContext, versionedAttr *admission.V
 		requestResourceAuthorizerVal = library.NewResourceAuthorizerVal(versionedAttr.GetUserInfo(), inputs.Authorizer, versionedAttr)
 	}
 
-	requestVal, err := admission.ConvertObjectToUnstructured(request)
+	requestVal, err := convertObjectToUnstructured(request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prepare request variable for evaluation: %w", err)
 	}
@@ -66,8 +63,8 @@ func newActivation(compositionCtx CompositionContext, versionedAttr *admission.V
 		return nil, fmt.Errorf("failed to prepare namespace variable for evaluation: %w", err)
 	}
 	va := &evaluationActivation{
-		object:                    celObjVal,
-		oldObject:                 celOldObjVal,
+		object:                    objectVal,
+		oldObject:                 oldObjectVal,
 		params:                    paramsVal,
 		request:                   requestVal.Object,
 		namespace:                 namespaceVal,

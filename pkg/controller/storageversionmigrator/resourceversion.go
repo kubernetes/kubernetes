@@ -61,10 +61,7 @@ type ResourceVersionController struct {
 	svmSynced       cache.InformerSynced
 	queue           workqueue.TypedRateLimitingInterface[string]
 	kubeClient      clientset.Interface
-	mapper          meta.ResettableRESTMapper
-
-	lastResetLock sync.Mutex
-	lastReset     time.Time
+	mapper          meta.RESTMapper
 }
 
 func NewResourceVersionController(
@@ -73,7 +70,7 @@ func NewResourceVersionController(
 	discoveryClient discovery.DiscoveryInterface,
 	metadataClient metadata.Interface,
 	svmInformer svminformers.StorageVersionMigrationInformer,
-	mapper meta.ResettableRESTMapper,
+	mapper meta.RESTMapper,
 ) *ResourceVersionController {
 	logger := klog.FromContext(ctx)
 
@@ -192,11 +189,6 @@ func (rv *ResourceVersionController) sync(ctx context.Context, key string) error
 	}
 	// working with copy to avoid race condition between this and migration controller
 	toBeProcessedSVM := svm.DeepCopy()
-
-	if !meta.IsStatusConditionTrue(toBeProcessedSVM.Status.Conditions, string(svmv1beta1.MigrationRunning)) {
-		logger.V(4).Info("Migration is not running yet, skipping", "svm", name)
-		return nil
-	}
 	gr := toBeProcessedSVM.Spec.Resource
 
 	if meta.IsStatusConditionTrue(toBeProcessedSVM.Status.Conditions, string(svmv1beta1.MigrationSucceeded)) ||
@@ -218,7 +210,6 @@ func (rv *ResourceVersionController) sync(ctx context.Context, key string) error
 		// our GC cache could be missing a recently created custom resource, so give it some time to catch up
 		// we resync discovery every 30 seconds so twice that should be sufficient
 		if toBeProcessedSVM.CreationTimestamp.Add(time.Minute).After(time.Now()) {
-			rv.resetMapperIfStale()
 			return fmt.Errorf("resource does not exist in our rest mapper, requeuing to attempt again")
 		}
 		return rv.failMigration(ctx, toBeProcessedSVM, "resource does not exist in discovery")
@@ -365,13 +356,4 @@ func (rv *ResourceVersionController) failMigration(ctx context.Context, svm *svm
 		return err
 	}
 	return nil
-}
-
-func (rv *ResourceVersionController) resetMapperIfStale() {
-	rv.lastResetLock.Lock()
-	defer rv.lastResetLock.Unlock()
-	if time.Since(rv.lastReset) > 10*time.Second {
-		rv.mapper.Reset()
-		rv.lastReset = time.Now()
-	}
 }

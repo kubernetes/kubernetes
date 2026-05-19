@@ -36,19 +36,16 @@ import (
 	authorizationmetrics "k8s.io/apiserver/pkg/authorization/metrics"
 	"k8s.io/apiserver/pkg/authorization/union"
 	"k8s.io/apiserver/pkg/server/options/authorizationconfig/metrics"
-	"k8s.io/apiserver/pkg/util/filesystem"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
 	webhookmetrics "k8s.io/apiserver/plugin/pkg/authorizer/webhook/metrics"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
+	"k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/node"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 )
-
-var _ = authorizer.Authorizer(&reloadableAuthorizerResolver{})
-var _ = authorizer.RuleResolver(&reloadableAuthorizerResolver{})
 
 type reloadableAuthorizerResolver struct {
 	// initialConfig holds the ReloadFile used to initiate background reloading,
@@ -74,7 +71,7 @@ type reloadableAuthorizerResolver struct {
 }
 
 type authorizerResolver struct {
-	authorizer   authorizer.UnconditionalAuthorizer
+	authorizer   authorizer.Authorizer
 	ruleResolver authorizer.RuleResolver
 }
 
@@ -87,13 +84,13 @@ func (r *reloadableAuthorizerResolver) RulesFor(ctx context.Context, user user.I
 }
 
 // newForConfig constructs
-func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.AuthorizationConfiguration) (authorizer.UnconditionalAuthorizer, authorizer.RuleResolver, error) {
+func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.AuthorizationConfiguration) (authorizer.Authorizer, authorizer.RuleResolver, error) {
 	if len(authzConfig.Authorizers) == 0 {
 		return nil, nil, fmt.Errorf("at least one authorization mode must be passed")
 	}
 
 	var (
-		authorizers   []authorizer.UnconditionalAuthorizer
+		authorizers   []authorizer.Authorizer
 		ruleResolvers []authorizer.RuleResolver
 	)
 

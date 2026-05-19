@@ -1,4 +1,5 @@
 //go:build tools
+// +build tools
 
 /*
 Copyright 2019 The Kubernetes Authors.

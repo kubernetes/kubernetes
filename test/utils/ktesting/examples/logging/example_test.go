@@ -1,4 +1,5 @@
 //go:build example
+// +build example
 
 /*
 Copyright 2023 The Kubernetes Authors.
@@ -59,11 +60,11 @@ func TestInfo(t *testing.T) {
 
 func TestWithStep(t *testing.T) {
 	tCtx := ktesting.Init(t)
-	bake(tCtx.WithStep("bake cake"))
+	bake(ktesting.WithStep(tCtx, "bake cake"))
 }
 
 func bake(tCtx ktesting.TContext) {
-	heatOven(tCtx.WithStep("set heat for baking"))
+	heatOven(ktesting.WithStep(tCtx, "set heat for baking"))
 }
 
 func heatOven(tCtx ktesting.TContext) {

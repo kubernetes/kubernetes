@@ -26,8 +26,6 @@ import (
 type Interface interface {
 	// DeviceClasses returns a DeviceClassInformer.
 	DeviceClasses() DeviceClassInformer
-	// DeviceTaintRules returns a DeviceTaintRuleInformer.
-	DeviceTaintRules() DeviceTaintRuleInformer
 	// ResourceClaims returns a ResourceClaimInformer.
 	ResourceClaims() ResourceClaimInformer
 	// ResourceClaimTemplates returns a ResourceClaimTemplateInformer.
@@ -50,11 +48,6 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 // DeviceClasses returns a DeviceClassInformer.
 func (v *version) DeviceClasses() DeviceClassInformer {
 	return &deviceClassInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
-}
-
-// DeviceTaintRules returns a DeviceTaintRuleInformer.
-func (v *version) DeviceTaintRules() DeviceTaintRuleInformer {
-	return &deviceTaintRuleInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }
 
 // ResourceClaims returns a ResourceClaimInformer.

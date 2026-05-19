@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -70,11 +69,6 @@ func newSVMController(ctx context.Context, controllerContext ControllerContext, 
 
 	informer := controllerContext.InformerFactory.Storagemigration().V1beta1().StorageVersionMigrations()
 
-	crdClientset, err := apiextensionsclientset.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-
 	dynamicClient, err := dynamic.NewForConfig(config)
 	if err != nil {
 		return nil, err
@@ -107,12 +101,6 @@ func newSVMController(ctx context.Context, controllerContext ControllerContext, 
 			metaClient,
 			informer,
 			controllerContext.RESTMapper,
-		).Run,
-		svm.NewCustomResourceController(
-			ctx,
-			client,
-			informer,
-			crdClientset.ApiextensionsV1().CustomResourceDefinitions(),
 		).Run,
 	), controllerName), nil
 }

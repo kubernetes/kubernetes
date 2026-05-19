@@ -1,4 +1,5 @@
 //go:build !windows
+// +build !windows
 
 /*
 Copyright 2022 The Kubernetes Authors.
@@ -24,7 +25,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
@@ -35,7 +35,6 @@ import (
 
 func TestMakeUserNsManagerDisabled(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
 
 	testUserNsPodsManager := &testUserNsPodsManager{}
@@ -45,7 +44,6 @@ func TestMakeUserNsManagerDisabled(t *testing.T) {
 
 func TestReleaseDisabled(t *testing.T) {
 	logger, _ := ktesting.NewTestContext(t)
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
 
 	testUserNsPodsManager := &testUserNsPodsManager{}
@@ -56,7 +54,6 @@ func TestReleaseDisabled(t *testing.T) {
 }
 
 func TestGetOrCreateUserNamespaceMappingsDisabled(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
 
 	trueVal := true
@@ -101,12 +98,12 @@ func TestGetOrCreateUserNamespaceMappingsDisabled(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			logger, _ := ktesting.NewTestContext(t)
+			logger, ctx := ktesting.NewTestContext(t)
 			testUserNsPodsManager := &testUserNsPodsManager{}
 			m, err := MakeUserNsManager(logger, testUserNsPodsManager, nil)
 			require.NoError(t, err)
 
-			userns, err := m.GetOrCreateUserNamespaceMappings(logger, test.pod, "")
+			userns, err := m.GetOrCreateUserNamespaceMappings(ctx, test.pod, "")
 			assert.Nil(t, userns)
 			if test.success {
 				assert.NoError(t, err)
@@ -119,7 +116,6 @@ func TestGetOrCreateUserNamespaceMappingsDisabled(t *testing.T) {
 
 func TestCleanupOrphanedPodUsernsAllocationsDisabled(t *testing.T) {
 	logger, ctx := ktesting.NewTestContext(t)
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
 
 	testUserNsPodsManager := &testUserNsPodsManager{}

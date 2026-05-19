@@ -304,7 +304,8 @@ func (h hasher) hash(t types.Type) uint32 {
 	case *types.Named:
 		hash := h.hashTypeName(t.Obj())
 		targs := t.TypeArgs()
-		for targ := range targs.Types() {
+		for i := 0; i < targs.Len(); i++ {
+			targ := targs.At(i)
 			hash += 2 * h.hash(targ)
 		}
 		return hash

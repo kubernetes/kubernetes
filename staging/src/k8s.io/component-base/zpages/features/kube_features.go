@@ -29,7 +29,6 @@ const (
 	// owner: @richabanker
 	// kep: https://kep.k8s.io/4827
 	// alpha: v1.32
-	// beta: v1.36
 	//
 	// Enables /statusz endpoint for a component making it accessible to
 	// users with the system:monitoring cluster role.
@@ -40,11 +39,9 @@ func featureGates() map[featuregate.Feature]featuregate.VersionedSpecs {
 	return map[featuregate.Feature]featuregate.VersionedSpecs{
 		ComponentFlagz: {
 			{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
-			{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 		},
 		ComponentStatusz: {
 			{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
-			{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 		},
 	}
 }

@@ -93,7 +93,6 @@ func TestMetricsModified(t *testing.T) {
 }
 
 func TestPeerAggregatedDiscoveryMetrics(t *testing.T) {
-	legacyregistry.Reset()
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.UnknownVersionInteroperabilityProxy, true)
 	manager := discoveryendpoint.NewResourceManager("apis")
 	localGroup := newAPIGroup("local.example.com", "v1", "local-resource")
@@ -108,9 +107,9 @@ func TestPeerAggregatedDiscoveryMetrics(t *testing.T) {
 	peerAggregatedDiscoveryManager := discoveryendpoint.NewPeerAggregatedDiscoveryHandler("test-server", manager, peerProvider, "apis")
 	wrapped := discoveryendpoint.WrapAggregatedDiscoveryToHandler(manager, manager, peerAggregatedDiscoveryManager)
 
-	_ = legacyregistry.Register(discoveryendpoint.PeerAggregatedCacheHitsCounter)
-	_ = legacyregistry.Register(discoveryendpoint.PeerAggregatedCacheMissesCounter)
-	_ = legacyregistry.Register(discoveryendpoint.NoPeerDiscoveryRequestCounter)
+	legacyregistry.MustRegister(discoveryendpoint.PeerAggregatedCacheHitsCounter)
+	legacyregistry.MustRegister(discoveryendpoint.PeerAggregatedCacheMissesCounter)
+	legacyregistry.MustRegister(discoveryendpoint.NoPeerDiscoveryRequestCounter)
 
 	// Make 3 peer-aggregated requests.
 	fetchPath(wrapped, "application/json", "/apis", "")

@@ -53,7 +53,7 @@ func TestProbeExpandableVolumePlugins(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TestProbeExpandableVolumePlugins failed: %s", err)
 	}
-	checkPlugins(t, plugins, []string{})
+	checkPlugins(t, plugins, []string{"kubernetes.io/portworx-volume"})
 }
 
 func TestProbeControllerVolumePlugins(t *testing.T) {
@@ -62,7 +62,7 @@ func TestProbeControllerVolumePlugins(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ProbeControllerVolumePlugins failed: %s", err)
 	}
-	checkPlugins(t, plugins, []string{"kubernetes.io/host-path", "kubernetes.io/nfs"})
+	checkPlugins(t, plugins, []string{"kubernetes.io/host-path", "kubernetes.io/nfs", "kubernetes.io/portworx-volume"})
 }
 
 func getConfig() persistentvolumeconfig.VolumeConfiguration {

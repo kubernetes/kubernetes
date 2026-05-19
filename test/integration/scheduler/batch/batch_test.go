@@ -40,7 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	testutil "k8s.io/kubernetes/test/integration/util"
-	"k8s.io/kubernetes/test/utils/client-go/ktesting"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 type podDef struct {
@@ -496,7 +496,7 @@ type batchGetter interface {
 }
 
 func runScenario(t *testing.T, tt *scenario, batch bool) ([]*v1.Pod, []bool) {
-	tCtx := ktesting.Init(t)
+	_, tCtx := ktesting.NewTestContext(t)
 
 	cfg, err := newDefaultComponentConfig()
 	if err != nil {
@@ -597,12 +597,9 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 		tCtx.Fatalf("start apiserver: %v", err)
 	}
 	// Cleanup will be in reverse order: first the clients by canceling the
-	// child context, then the server.
+	// child context (happens automatically), then the server.
 	tCtx.Cleanup(server.TearDownFn)
-	tCtx = tCtx.WithCancel()
-	tCtx.Cleanup(func() {
-		tCtx.Cancel("test is done")
-	})
+	tCtx = ktesting.WithCancel(tCtx)
 
 	// TODO: client connection configuration, such as QPS or Burst is configurable in theory, this could be derived from the `config`, need to
 	// support this when there is any testcase that depends on such configuration.
@@ -619,7 +616,7 @@ func mustSetupCluster(tCtx ktesting.TContext, config *config.KubeSchedulerConfig
 		}
 	}
 
-	tCtx = tCtx.WithRESTConfig(cfg)
+	tCtx = ktesting.WithRESTConfig(tCtx, cfg)
 
 	// Not all config options will be effective but only those mostly related with scheduler performance will
 	// be applied to start a scheduler, most of them are defined in `scheduler.schedulerOptions`.

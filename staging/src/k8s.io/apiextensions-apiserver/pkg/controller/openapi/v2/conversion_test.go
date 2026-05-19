@@ -632,6 +632,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaByType(t *testing.T) {
 			},
 			expected: new(spec.Schema).
 				WithExternalDocs(testStr, testStr2),
+			expectDiff: true,
 		},
 		{
 			name: "example",
@@ -640,6 +641,7 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaByType(t *testing.T) {
 			},
 			expected: new(spec.Schema).
 				WithExample(testStr),
+			expectDiff: true,
 		},
 		{
 			name: "preserve-unknown-fields in arrays",

@@ -24,7 +24,7 @@ package v1
 // Selects a key from a ConfigMap.
 type ConfigMapKeySelectorApplyConfiguration struct {
 	// The ConfigMap to select from.
-	LocalObjectReferenceApplyConfiguration `json:""`
+	LocalObjectReferenceApplyConfiguration `json:",inline"`
 	// The key to select.
 	Key *string `json:"key,omitempty"`
 	// Specify whether the ConfigMap or its key must be defined

@@ -19,7 +19,7 @@ package topologymanager
 import (
 	"context"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -28,7 +28,6 @@ import (
 type fakeManager struct {
 	hint   *TopologyHint
 	policy Policy
-	scope  string
 }
 
 // NewFakeManager returns an instance of FakeManager
@@ -37,13 +36,6 @@ func NewFakeManager() Manager {
 	logger := klog.TODO()
 	logger.Info("NewFakeManager")
 	return &fakeManager{}
-}
-
-// NewFakeManagerWithScope returns an instance of fake topology manager with specified scope
-func NewFakeManagerWithScope(scope string) Manager {
-	return &fakeManager{
-		scope: scope,
-	}
 }
 
 // NewFakeManagerWithHint returns an instance of fake topology manager with specified topology hints
@@ -82,10 +74,6 @@ func (m *fakeManager) GetAffinity(podUID string, containerName string) TopologyH
 
 func (m *fakeManager) GetPolicy() Policy {
 	return m.policy
-}
-
-func (m *fakeManager) Name() string {
-	return m.scope
 }
 
 func (m *fakeManager) AddHintProvider(logger klog.Logger, h HintProvider) {

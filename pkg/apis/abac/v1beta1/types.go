@@ -26,7 +26,7 @@ import (
 
 // Policy contains a single ABAC policy rule
 type Policy struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 
 	// Spec describes the policy rule
 	Spec PolicySpec `json:"spec"`

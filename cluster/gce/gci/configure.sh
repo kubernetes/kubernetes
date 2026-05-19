@@ -24,18 +24,18 @@ set -o nounset
 set -o pipefail
 
 ### Hardcoded constants
-DEFAULT_CNI_VERSION='v1.9.1'
+DEFAULT_CNI_VERSION='v1.8.0'
 # CNI HASH for amd64 sha512
-DEFAULT_CNI_HASH='3ea8a76852b7ddc62c087a34cccca2cb29822ca24214928cd172b28bf9d1486000ba3eb71a156445af31ff6a92c1dc3e01e702546c6ee016ef13fae06ccfb8fc'
+DEFAULT_CNI_HASH='a2696f937b3433eee4a0de44a0994190166b108f2b29adf9f7005fa4fbfff56e78cbe8a2fe2607d99d4bcc0d4a8183e0c27fa748c2f8fb08ae40b62f198fd45b'
 DEFAULT_NPD_VERSION='v1.34.0'
 DEFAULT_NPD_HASH_AMD64='3c55ff6ffadd77dbc3df3774d13164587103ca87c8b6914f5c71c87d8f498b78621e0c96538bb3c69f8f1b4194a6da553aa56b1b52001a7d9a67776ac24e80bd'
 DEFAULT_NPD_HASH_ARM64='ca1d34e64b80f6b2bdf86cfde95154122d6e14c707a748ea6fc414a55f391b1bb572a96b6b2c285996af0232917fa87e14e037125aa03a62247383af3e48c095'
-DEFAULT_CRICTL_VERSION='v1.36.0'
-DEFAULT_CRICTL_AMD64_SHA512='43ac5425d264547bc9d9c9e31c74624d9c2a63bf7de4e77fe79517e0c927ea77ee3951a2f662920bc771599a0dc4f2859b6225c3621c7cafff952e63c83d686d'
-DEFAULT_CRICTL_ARM64_SHA512='485aa86f327c23cb0508e814e568bda793d291865c5cec3337ae5467a51898e9ab21a6bd38b73a6b219058bb34c9b4e7128e57360a2552b74a552e7ea1936f32'
+DEFAULT_CRICTL_VERSION='v1.34.0'
+DEFAULT_CRICTL_AMD64_SHA512='6b5669fe6c0dbcb8d0e0910529a4559e22154ef7f524fa15f3e13dfced6bea2c90a531d99786ac8b24fb4cc9ead1ef294387b52a230ba6fdf83278ab9dbd6133'
+DEFAULT_CRICTL_ARM64_SHA512='b2daa7f6b559cd32da6d3bcb82b356561c0bc2ffcf7dc5084547fbae6cb8570a96cf01c9bfaa6d868cf92d1c1fbbced2a32bf7e0328f62c420c180a86314278d'
 DEFAULT_MOUNTER_TAR_SHA='7956fd42523de6b3107ddc3ce0e75233d2fcb78436ff07a1389b6eaac91fb2b1b72a08f7a219eaf96ba1ca4da8d45271002e0d60e0644e796c665f99bb356516'
-AUTH_PROVIDER_GCP_HASH_LINUX_AMD64="${AUTH_PROVIDER_GCP_HASH_LINUX_AMD64:-a3d00131ddd427db2f99a3c355bf416f9872dbdf445992ae56fc51c28ff5e50f0d225f3cd76eab2e89cb9a179f30af00d8a04fc209e43be70cf00525a7daeeae}"
-AUTH_PROVIDER_GCP_HASH_LINUX_ARM64="${AUTH_PROVIDER_GCP_HASH_LINUX_ARM64:-d0466ae554fef91165260b7ae3ef5c8bce3607015ec31461c3413de6a1257b7f305bd0ce30cddc112f6707420d5012600918f249e808d0c8ff262692a76ad30d}"
+AUTH_PROVIDER_GCP_HASH_LINUX_AMD64="${AUTH_PROVIDER_GCP_HASH_LINUX_AMD64:-156058e5b3994cba91c23831774033e0d505d6d8b80f43541ef6af91b320fd9dfaabe42ec8a8887b51d87104c2b57e1eb895649d681575ffc80dd9aee8e563db}"
+AUTH_PROVIDER_GCP_HASH_LINUX_ARM64="${AUTH_PROVIDER_GCP_HASH_LINUX_ARM64:-1aa3b0bea10a9755231989ffc150cbfa770f1d96932db7535473f7bfeb1108bafdae80202ae738d59495982512e716ff7366d5f414d0e76dd50519f98611f9ab}"
 ###
 
 # Standard curl flags.
@@ -510,94 +510,70 @@ function load-docker-images {
   fi
 }
 
-# Create containerd systemd service (needed when skipping apt install)
-function ensure-containerd-systemd-service {
-  local -r svc="/etc/systemd/system/containerd.service"
-  [[ -f "${svc}" ]] && return 0
-  cat > "${svc}" <<'EOF'
-[Unit]
-Description=containerd container runtime
-Documentation=https://containerd.io
-After=network.target local-fs.target
-[Service]
-ExecStartPre=-/sbin/modprobe overlay
-ExecStart=/usr/bin/containerd
-Type=notify
-Delegate=yes
-KillMode=process
-Restart=always
-RestartSec=5
-LimitNPROC=infinity
-LimitCORE=infinity
-LimitNOFILE=infinity
-TasksMax=infinity
-OOMScoreAdjust=-999
-[Install]
-WantedBy=multi-user.target
-EOF
-  systemctl daemon-reload && systemctl enable containerd
-}
-
-# Download and install containerd binary from GitHub
-function install-containerd-binary {
-  local -r version="$1" temp_dir="$(mktemp -d)"
-  local -r url="https://github.com/containerd/containerd/releases/download/${version}/containerd-${version#v}-${HOST_PLATFORM}-${HOST_ARCH}.tar.gz"
-  if download-robust "containerd ${version}" "${temp_dir}" "${url}"; then
-    tar --overwrite -xzf "${temp_dir}"/containerd-*.tar.gz -C /usr/
-    rm -rf "${temp_dir}"; return 0
-  fi
-  rm -rf "${temp_dir}"; return 1
-}
-
-# Download and install runc binary from GitHub
-function install-runc-binary {
-  local -r version="$1" temp_dir="$(mktemp -d)"
-  local -r url="https://github.com/opencontainers/runc/releases/download/${version}/runc.${HOST_ARCH}"
-  if download-robust "runc ${version}" "${temp_dir}" "${url}"; then
-    cp "${temp_dir}/runc.${HOST_ARCH}" /usr/sbin/runc && chmod 755 /usr/sbin/runc
-    rm -rf "${temp_dir}"; return 0
-  fi
-  rm -rf "${temp_dir}"; return 1
-}
-
-# Install containerd on Ubuntu. When both UBUNTU_INSTALL_CONTAINERD_VERSION and
-# UBUNTU_INSTALL_RUNC_VERSION are set, skips apt and downloads binaries directly.
+# If we are on ubuntu we can try to install containerd
 function install-containerd-ubuntu {
+  # bailout if we are not on ubuntu
   if [[ -z "$(command -v lsb_release)" || $(lsb_release -si) != "Ubuntu" ]]; then
-    echo "Unable to automatically install containerd in non-ubuntu image. Bailing out..."; exit 2
+    echo "Unable to automatically install containerd in non-ubuntu image. Bailing out..."
+    exit 2
   fi
 
-  local -r custom_containerd="${UBUNTU_INSTALL_CONTAINERD_VERSION:-}"
-  local -r custom_runc="${UBUNTU_INSTALL_RUNC_VERSION:-}"
+  # Install dependencies, some of these are already installed in the image but
+  # that's fine since they won't re-install and we can reuse the code below
+  # for another image someday.
+  apt-get update
+  apt-get install -y --no-install-recommends \
+    apt-transport-https \
+    ca-certificates \
+    socat \
+    curl \
+    gnupg2 \
+    nfs-common \
+    software-properties-common \
+    lsb-release
 
-  # Both versions specified: skip apt, install binaries directly
-  if [[ -n "${custom_containerd}" && -n "${custom_runc}" ]]; then
-    echo "Installing containerd ${custom_containerd} and runc ${custom_runc} (skipping apt)"
-    ensure-containerd-systemd-service
-    install-containerd-binary "${custom_containerd}" || { echo "ERROR: containerd download failed"; exit 1; }
-    install-runc-binary "${custom_runc}" || { echo "ERROR: runc download failed"; exit 1; }
-    systemctl start containerd
-    return
-  fi
+  release=$(lsb_release -cs)
 
-  # Install from Docker apt repo, optionally override binaries
-  local -r release="$(lsb_release -cs)"
-  local -r keyring="/etc/apt/keyrings/docker.gpg"
-  mkdir -p "$(dirname "${keyring}")"
+  # Add the Docker apt-repository (as we install containerd from there)
   # shellcheck disable=SC2086
-  curl ${CURL_FLAGS} -fsSL "https://download.docker.com/${HOST_PLATFORM}/$(. /etc/os-release; echo "$ID")/gpg" \
-    | gpg --batch --dearmor -o "${keyring}"
-  chmod a+r "${keyring}"
-  echo "deb [arch=${HOST_ARCH} signed-by=${keyring}] https://download.docker.com/${HOST_PLATFORM}/$(. /etc/os-release; echo "$ID") ${release} stable" \
-    > /etc/apt/sources.list.d/docker.list
+  curl ${CURL_FLAGS} \
+    --location \
+    "https://download.docker.com/${HOST_PLATFORM}/$(. /etc/os-release; echo "$ID")/gpg" \
+  | apt-key add -
+  add-apt-repository \
+    "deb [arch=${HOST_ARCH}] https://download.docker.com/${HOST_PLATFORM}/$(. /etc/os-release; echo "$ID") \
+    $release stable"
 
-  apt-get update && apt-get install -y --no-install-recommends containerd.io
+  # Install containerd from Docker repo
+  apt-get update && \
+    apt-get install -y --no-install-recommends containerd
   rm -rf /var/lib/apt/lists/*
 
+  # Override to latest versions of containerd and runc
   systemctl stop containerd
-  [[ -n "${custom_containerd}" ]] && install-containerd-binary "${custom_containerd}"
-  [[ -n "${custom_runc}" ]] && install-runc-binary "${custom_runc}"
-  systemctl start containerd
+  if [[ -n "${UBUNTU_INSTALL_CONTAINERD_VERSION:-}" ]]; then
+    local temp_dir
+    temp_dir=$(mktemp -d)
+    
+    # Download containerd
+    if download-robust "containerd ${UBUNTU_INSTALL_CONTAINERD_VERSION}" "${temp_dir}" \
+       "https://github.com/containerd/containerd/releases/download/${UBUNTU_INSTALL_CONTAINERD_VERSION}/containerd-${UBUNTU_INSTALL_CONTAINERD_VERSION:1}-${HOST_PLATFORM}-${HOST_ARCH}.tar.gz"; then
+      tar --overwrite -xzv -C /usr/ -f "${temp_dir}"/containerd-*.tar.gz
+    fi
+    rm -rf "${temp_dir}"
+  fi
+  if [[ -n "${UBUNTU_INSTALL_RUNC_VERSION:-}" ]]; then
+    local temp_dir
+    temp_dir=$(mktemp -d)
+    
+    # Download and install runc
+    if download-robust "runc ${UBUNTU_INSTALL_RUNC_VERSION}" "${temp_dir}" \
+       "https://github.com/opencontainers/runc/releases/download/${UBUNTU_INSTALL_RUNC_VERSION}/runc.${HOST_ARCH}"; then
+      cp "${temp_dir}/runc.${HOST_ARCH}" /usr/sbin/runc && chmod 755 /usr/sbin/runc
+    fi
+    rm -rf "${temp_dir}"
+  fi
+  sudo systemctl start containerd
 }
 
 # If we are on cos we can try to install containerd
@@ -645,7 +621,7 @@ function install-containerd-cos {
 
 function install-auth-provider-gcp {
   local -r filename="auth-provider-gcp"
-  local -r auth_provider_storage_full_path="${AUTH_PROVIDER_GCP_STORAGE_PATH}/${AUTH_PROVIDER_GCP_VERSION}/auth-provider-gcp/${HOST_PLATFORM}/${HOST_ARCH}/${filename}"
+  local -r auth_provider_storage_full_path="${AUTH_PROVIDER_GCP_STORAGE_PATH}/${AUTH_PROVIDER_GCP_VERSION}/${HOST_PLATFORM}_${HOST_ARCH}/${filename}"
   echo "Downloading auth-provider-gcp ${auth_provider_storage_full_path}" .
 
   case "${HOST_ARCH}" in

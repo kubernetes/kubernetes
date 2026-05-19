@@ -28,6 +28,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -48,12 +49,12 @@ import (
 
 // rcStrategy implements verification logic for Replication Controllers.
 type rcStrategy struct {
-	rest.DeclarativeValidation
+	runtime.ObjectTyper
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating Replication Controller objects.
-var Strategy = rcStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
+var Strategy = rcStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // DefaultGarbageCollectionPolicy returns OrphanDependents for v1 for backwards compatibility,
 // and DeleteDependents for all other versions.
@@ -126,7 +127,8 @@ func (rcStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorL
 	opts := pod.GetValidationOptionsFromPodTemplate(controller.Spec.Template, nil)
 
 	// Run imperative validation
-	return corevalidation.ValidateReplicationController(controller, opts)
+	allErrs := corevalidation.ValidateReplicationController(controller, opts)
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, controller, nil, allErrs, operation.Create)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -146,7 +148,7 @@ func (rcStrategy) Canonicalize(obj runtime.Object) {
 
 // AllowCreateOnUpdate is false for replication controllers; this means a POST is
 // needed to create one.
-func (rcStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
+func (rcStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
@@ -175,7 +177,7 @@ func (rcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 		}
 	}
 
-	return errs
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newRc, oldRc, errs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -189,7 +191,7 @@ func (rcStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object)
 	return warnings
 }
 
-func (rcStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+func (rcStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 

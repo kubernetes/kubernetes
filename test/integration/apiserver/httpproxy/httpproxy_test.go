@@ -41,7 +41,6 @@ import (
 )
 
 func TestEgressToWebhookWithProxy(t *testing.T) {
-	t.Skip("this test does not pass for the reason we think it passes")
 	// Go's http.ProxyFromEnvironment bypasses the proxy
 	// for localhost/127.0.0.1. To test this, we must make the HTTP client
 	// resolve a non-local hostname to 127.0.0.1.

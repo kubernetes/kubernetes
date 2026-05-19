@@ -2978,8 +2978,8 @@ users:
 			return &config.Preference{
 				CredentialPluginPolicy: config.CredentialPluginPolicy("Allowlist"),
 				CredentialPluginAllowlist: []config.AllowlistEntry{
-					{Command: "bar"},
-					{Command: "baz"},
+					{Name: "bar"},
+					{Name: "baz"},
 				},
 			}, nil
 		}
@@ -2992,8 +2992,8 @@ users:
 		require.NotNil(t, cfg, "rest config")
 		require.NotNil(t, cfg.ExecProvider, "exec config")
 		require.Equal(t, clientcmdapi.PolicyType("Allowlist"), cfg.ExecProvider.PluginPolicy.PolicyType)
-		require.Equal(t, "bar", cfg.ExecProvider.PluginPolicy.Allowlist[0].Command)
-		require.Equal(t, "baz", cfg.ExecProvider.PluginPolicy.Allowlist[1].Command)
+		require.Equal(t, "bar", cfg.ExecProvider.PluginPolicy.Allowlist[0].Name)
+		require.Equal(t, "baz", cfg.ExecProvider.PluginPolicy.Allowlist[1].Name)
 	})
 
 	type pluginPolicyTest struct {
@@ -3028,7 +3028,7 @@ kind: Preference
 apiVersion: kubectl.config.k8s.io/v1beta1
 credentialPluginPolicy: "foo"
 credentialPluginAllowlist:
-- command: "bar"
+- name: "bar"
 `,
 		},
 		{
@@ -3057,8 +3057,8 @@ credentialPluginAllowlist: []
 kind: Preference
 apiVersion: kubectl.config.k8s.io/v1beta1
 credentialPluginAllowlist:
-- command: "bar"
-- command: "baz"
+- name: "bar"
+- name: "baz"
 `,
 		},
 		{
@@ -3069,8 +3069,8 @@ kind: Preference
 apiVersion: kubectl.config.k8s.io/v1beta1
 credentialPluginPolicy: "AllowAll"
 credentialPluginAllowlist: []clientcmdapi.AllowlistEntry{
-- command: "bar"
-- command: "baz"
+- name: "bar"
+- name: "baz"
 `,
 		},
 		{
@@ -3081,8 +3081,8 @@ kind: Preference
 apiVersion: kubectl.config.k8s.io/v1beta1
 credentialPluginPolicy: "DenyAll"
 credentialPluginAllowlist:
-- command: "bar"
-- command: "baz"
+- name: "bar"
+- name: "baz"
 `,
 		},
 		{
@@ -3103,8 +3103,8 @@ kind: Preference
 apiVersion: kubectl.config.k8s.io/v1beta1
 credentialPluginPolicy: "Allowlist"
 credentialPluginAllowlist:
-- command: "foo"
-- command: ""
+- name: "foo"
+- name: ""
 `,
 		},
 		{
@@ -3114,39 +3114,7 @@ credentialPluginAllowlist:
 kind: Preference
 credentialPluginPolicy: "Allowlist"
 credentialPluginAllowlist:
-- command: "foo"
-`,
-		},
-		{
-			name:      "allowlist-policy-name-converts-to-command",
-			shouldErr: false,
-			kuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
-kind: Preference
-credentialPluginPolicy: "Allowlist"
-credentialPluginAllowlist:
 - name: "foo"
-`,
-		},
-		{
-			name:      "allowlist-policy-with-both-name-and-command-having-different-values",
-			shouldErr: true,
-			kuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
-kind: Preference
-credentialPluginPolicy: "Allowlist"
-credentialPluginAllowlist:
-- name: "foo"
-  command: "bar"
-`,
-		},
-		{
-			name:      "allowlist-policy-with-both-name-and-command-having-the-same-value",
-			shouldErr: false,
-			kuberc: `apiVersion: kubectl.config.k8s.io/v1beta1
-kind: Preference
-credentialPluginPolicy: "Allowlist"
-credentialPluginAllowlist:
-- name: "foo"
-  command: "foo"
 `,
 		},
 		{

@@ -146,9 +146,9 @@ var _ = SIGDescribe("GarbageCollect", framework.WithSerial(), framework.WithNode
 //	once pods are killed, all containers are eventually cleaned up
 func containerGCTest(f *framework.Framework, test testRun) {
 	var runtime internalapi.RuntimeService
-	ginkgo.BeforeEach(func(ctx context.Context) {
+	ginkgo.BeforeEach(func() {
 		var err error
-		runtime, _, err = getCRIClient(ctx)
+		runtime, _, err = getCRIClient()
 		framework.ExpectNoError(err)
 	})
 	for _, pod := range test.testPods {

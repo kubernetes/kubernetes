@@ -2,14 +2,17 @@ package dbus
 
 import (
 	"context"
+	"errors"
 )
+
+var errSignature = errors.New("dbus: mismatched signature")
 
 // Call represents a pending or completed method call.
 type Call struct {
 	Destination string
 	Path        ObjectPath
 	Method      string
-	Args        []any
+	Args        []interface{}
 
 	// Strobes when the call is complete.
 	Done chan *Call
@@ -19,7 +22,7 @@ type Call struct {
 	Err error
 
 	// Holds the response once the call is done.
-	Body []any
+	Body []interface{}
 
 	// ResponseSequence stores the sequence number of the DBus message containing
 	// the call response (or error). This can be compared to the sequence number
@@ -52,7 +55,7 @@ func (c *Call) ContextCancel() {
 // Store stores the body of the reply into the provided pointers. It returns
 // an error if the signatures of the body and retvalues don't match, or if
 // the error status is not nil.
-func (c *Call) Store(retvalues ...any) error {
+func (c *Call) Store(retvalues ...interface{}) error {
 	if c.Err != nil {
 		return c.Err
 	}

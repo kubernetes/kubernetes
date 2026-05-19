@@ -32,10 +32,10 @@ import (
 // +k8s:prerelease-lifecycle-gen:replacement=certificates.k8s.io,v1,CertificateSigningRequest
 
 // Describes a certificate signing request
-// +k8s:supportsSubresource="/status"
-// +k8s:supportsSubresource="/approval"
+// +k8s:supportsSubresource=/status
+// +k8s:supportsSubresource=/approval
 type CertificateSigningRequest struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -177,12 +177,12 @@ type CertificateSigningRequestStatus struct {
 	// +listType=map
 	// +listMapKey=type
 	// +optional
-	// +k8s:alpha(since: "1.36")=+k8s:listType=map
-	// +k8s:alpha(since: "1.36")=+k8s:listMapKey=type
-	// +k8s:alpha(since: "1.36")=+k8s:customUnique
-	// +k8s:alpha(since: "1.36")=+k8s:optional
-	// +k8s:alpha(since: "1.36")=+k8s:item(type: "Approved")=+k8s:zeroOrOneOfMember
-	// +k8s:alpha(since: "1.36")=+k8s:item(type: "Denied")=+k8s:zeroOrOneOfMember
+	// +k8s:listType=map
+	// +k8s:listMapKey=type
+	// +k8s:customUnique
+	// +k8s:optional
+	// +k8s:item(type: "Approved")=+k8s:zeroOrOneOfMember
+	// +k8s:item(type: "Denied")=+k8s:zeroOrOneOfMember
 	Conditions []CertificateSigningRequestCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`
 
 	// If request was approved, the controller will place the issued certificate here.
@@ -230,7 +230,7 @@ type CertificateSigningRequestCondition struct {
 // +k8s:prerelease-lifecycle-gen:replacement=certificates.k8s.io,v1,CertificateSigningRequestList
 
 type CertificateSigningRequestList struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -273,7 +273,6 @@ const (
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:prerelease-lifecycle-gen:introduced=1.33
-// +k8s:prerelease-lifecycle-gen:deprecated=1.37
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClusterTrustBundle is a cluster-scoped container for X.509 trust anchors
@@ -292,7 +291,7 @@ const (
 // anchors for that signer. Admission control is used to enforce that only users
 // with permissions on the signer can create or modify the corresponding bundle.
 type ClusterTrustBundle struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 
 	// metadata contains the object metadata.
 	// +optional
@@ -324,8 +323,6 @@ type ClusterTrustBundleSpec struct {
 	// using a `spec.signerName=NAME` field selector.
 	//
 	// +optional
-	// +k8s:alpha(since:"1.37")=+k8s:optional
-	// +k8s:alpha(since:"1.37")=+k8s:immutable
 	SignerName string `json:"signerName,omitempty" protobuf:"bytes,1,opt,name=signerName"`
 
 	// trustBundle contains the individual X.509 trust anchors for this
@@ -343,12 +340,11 @@ type ClusterTrustBundleSpec struct {
 }
 
 // +k8s:prerelease-lifecycle-gen:introduced=1.33
-// +k8s:prerelease-lifecycle-gen:deprecated=1.37
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ClusterTrustBundleList is a collection of ClusterTrustBundle objects
 type ClusterTrustBundleList struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 
 	// metadata contains the list metadata.
 	//
@@ -367,9 +363,8 @@ type ClusterTrustBundleList struct {
 // signer.
 //
 // Kubelets use this API to implement podCertificate projected volumes
-// +k8s:supportsSubresource="/status"
 type PodCertificateRequest struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 
 	// metadata contains the object metadata.
 	//
@@ -377,7 +372,6 @@ type PodCertificateRequest struct {
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// spec contains the details about the certificate being requested.
-	// +required
 	Spec PodCertificateRequestSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
 
 	// status contains the issued certificate, and a standard set of conditions.
@@ -444,7 +438,8 @@ type PodCertificateRequestSpec struct {
 	// +default=86400
 	MaxExpirationSeconds *int32 `json:"maxExpirationSeconds,omitempty" protobuf:"varint,8,opt,name=maxExpirationSeconds"`
 
-	// The PKIX-serialized public key the signer will issue the certificate to.
+	// pkixPublicKey is the PKIX-serialized public key the signer will issue the
+	// certificate to.
 	//
 	// The key must be one of RSA3072, RSA4096, ECDSAP256, ECDSAP384, ECDSAP521,
 	// or ED25519. Note that this list may be expanded in the future.
@@ -456,16 +451,11 @@ type PodCertificateRequestSpec struct {
 	// "UnsupportedKeyType". It may also suggest a key type that it does support
 	// in the message field.
 	//
-	// Deprecated: This field is replaced by StubPKCS10Request. If
-	// StubPKCS10Request is set, this field must be empty.  Signer
-	// implementations should extract the public key from the StubPKCS10Request
-	// field.
-	//
-	// +optional
+	// +required
 	PKIXPublicKey []byte `json:"pkixPublicKey" protobuf:"bytes,9,opt,name=pkixPublicKey"`
 
-	// A proof that the requesting kubelet holds the private key corresponding
-	// to pkixPublicKey.
+	// proofOfPossession proves that the requesting kubelet holds the private
+	// key corresponding to pkixPublicKey.
 	//
 	// It is contructed by signing the ASCII bytes of the pod's UID using
 	// `pkixPublicKey`.
@@ -482,34 +472,11 @@ type PodCertificateRequestSpec struct {
 	// golang library function crypto/ecdsa.SignASN1)
 	//
 	// If the key is an ED25519 key, the the signature is as described by the
-	// [ED25519 Specification](https://ed25519.cr.yp.to/) (as implemented by the
-	// golang library crypto/ed25519.Sign).
+	// [ED25519 Specification](https://ed25519.cr.yp.to/) (as implemented by
+	// the golang library crypto/ed25519.Sign).
 	//
-	// Deprecated: This field is replaced by StubPKCS10Request. If
-	// StubPKCS10Request is set, this field must be empty.
-	//
-	// +optional
+	// +required
 	ProofOfPossession []byte `json:"proofOfPossession" protobuf:"bytes,10,opt,name=proofOfPossession"`
-
-	// A PKCS#10 certificate signing request (DER-serialized) generated by
-	// Kubelet using the subject private key.
-	//
-	// Most signer implementations will ignore the contents of the CSR except to
-	// extract the subject public key. The API server automatically verifies the
-	// CSR signature during admission, so the signer does not need to repeat the
-	// verification.  CSRs generated by kubelet are completely empty.
-	//
-	// The subject public key must be one of RSA3072, RSA4096, ECDSAP256,
-	// ECDSAP384, ECDSAP521, or ED25519. Note that this list may be expanded in
-	// the future.
-	//
-	// Signer implementations do not need to support all key types supported by
-	// kube-apiserver and kubelet.  If a signer does not support the key type
-	// used for a given PodCertificateRequest, it must deny the request by
-	// setting a status.conditions entry with a type of "Denied" and a reason of
-	// "UnsupportedKeyType". It may also suggest a key type that it does support
-	// in the message field.
-	StubPKCS10Request []byte `json:"stubPKCS10Request" protobuf:"bytes,12,opt,name=stubPKCS10Request"`
 
 	// unverifiedUserAnnotations allow pod authors to pass additional information to
 	// the signer implementation.  Kubernetes does not restrict or validate this
@@ -624,7 +591,7 @@ const (
 
 // PodCertificateRequestList is a collection of PodCertificateRequest objects
 type PodCertificateRequestList struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 
 	// metadata contains the list metadata.
 	//

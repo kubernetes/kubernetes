@@ -28,7 +28,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -157,12 +156,8 @@ func TestControllerSync(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
 			client, controller := newController(t, []string{defaultIPv4CIDR, defaultIPv6CIDR}, tc.cidrs...)
-			err := controller.sync(ctx)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
+			controller.sync()
 			expectAction(t, client.Actions(), tc.actions)
 		})
 	}
@@ -335,13 +330,11 @@ func TestControllerSyncConversions(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, ctx := ktesting.NewTestContext(t)
-
 			// Initialize controller and client with the existing ServiceCIDR
 			client, controller := newController(t, tc.controllerCIDRs, tc.existingCIDR)
 
 			// Call the syncStatus method directly
-			err := controller.sync(ctx)
+			err := controller.sync()
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

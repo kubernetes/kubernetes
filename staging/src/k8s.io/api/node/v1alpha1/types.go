@@ -33,7 +33,7 @@ import (
 // pod.  For more details, see
 // https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class
 type RuntimeClass struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -41,7 +41,6 @@ type RuntimeClass struct {
 
 	// spec represents specification of the RuntimeClass
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-	// +required
 	Spec RuntimeClassSpec `json:"spec" protobuf:"bytes,2,name=spec"`
 }
 
@@ -60,10 +59,6 @@ type RuntimeClassSpec struct {
 	// in a pod.
 	// The runtimeHandler must be lowercase, conform to the DNS Label (RFC 1123)
 	// requirements, and is immutable.
-	// +required
-	// +k8s:alpha(since: "1.36")=+k8s:format="k8s-short-name"
-	// +k8s:alpha(since: "1.36")=+k8s:immutable
-	// +k8s:alpha(since: "1.36")=+k8s:required
 	RuntimeHandler string `json:"runtimeHandler" protobuf:"bytes,1,opt,name=runtimeHandler"`
 
 	// overhead represents the resource overhead associated with running a pod for a
@@ -111,7 +106,7 @@ type Scheduling struct {
 
 // RuntimeClassList is a list of RuntimeClass objects.
 type RuntimeClassList struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata

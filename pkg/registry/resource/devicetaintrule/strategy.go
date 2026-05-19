@@ -18,13 +18,11 @@ package devicetaintrule
 
 import (
 	"context"
-	"time"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/resource"
@@ -34,12 +32,12 @@ import (
 
 // deviceTaintRuleStrategy implements behavior for DeviceTaintRule objects
 type deviceTaintRuleStrategy struct {
-	rest.DeclarativeValidation
+	runtime.ObjectTyper
 	names.NameGenerator
 }
 
 var (
-	Strategy       = &deviceTaintRuleStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
+	Strategy       = &deviceTaintRuleStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 	StatusStrategy = &deviceTaintRuleStatusStrategy{deviceTaintRuleStrategy: Strategy}
 )
 
@@ -53,9 +51,6 @@ func (deviceTaintRuleStrategy) NamespaceScoped() bool {
 func (*deviceTaintRuleStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
 		"resource.k8s.io/v1alpha3": fieldpath.NewSet(
-			fieldpath.MakePathOrDie("status"),
-		),
-		"resource.k8s.io/v1beta2": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
 	}
@@ -82,7 +77,7 @@ func (*deviceTaintRuleStrategy) WarningsOnCreate(ctx context.Context, obj runtim
 func (*deviceTaintRuleStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (*deviceTaintRuleStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
+func (*deviceTaintRuleStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
@@ -90,23 +85,6 @@ func (*deviceTaintRuleStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 	rule := obj.(*resource.DeviceTaintRule)
 	oldRule := old.(*resource.DeviceTaintRule)
 	rule.Status = oldRule.Status
-
-	// Automatically bump the TimeAdded when the effect changes and the
-	// client hasn't already changed it. This makes the TimeAdded track
-	// "when was this *effect* added" instead of "when was this
-	// *DeviceTaintRule* added". This is relevant for computing the
-	// toleration duration of affected claims.
-	//
-	// The downside is that clients cannot keep the old time even if that
-	// is what they want - this seems extremely unlikely compared to "I
-	// want TimeAdded to work automatically".
-	if rule.Spec.Taint.Effect != oldRule.Spec.Taint.Effect &&
-		rule.Spec.Taint.TimeAdded.Equal(oldRule.Spec.Taint.TimeAdded) {
-		// Encoding only has seconds as resolution, so don't even
-		// generate something which does not survive encode/decode (can cause
-		// random unit test failures).
-		rule.Spec.Taint.TimeAdded = &metav1.Time{Time: time.Now().Truncate(time.Second)}
-	}
 
 	// Any changes to the spec increment the generation number.
 	if !apiequality.Semantic.DeepEqual(oldRule.Spec, rule.Spec) {
@@ -122,7 +100,7 @@ func (*deviceTaintRuleStrategy) WarningsOnUpdate(ctx context.Context, obj, old r
 	return nil
 }
 
-func (*deviceTaintRuleStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+func (*deviceTaintRuleStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
@@ -135,10 +113,6 @@ type deviceTaintRuleStatusStrategy struct {
 func (*deviceTaintRuleStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
 		"resource.k8s.io/v1alpha3": fieldpath.NewSet(
-			fieldpath.MakePathOrDie("metadata"),
-			fieldpath.MakePathOrDie("spec"),
-		),
-		"resource.k8s.io/v1beta2": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("metadata"),
 			fieldpath.MakePathOrDie("spec"),
 		),

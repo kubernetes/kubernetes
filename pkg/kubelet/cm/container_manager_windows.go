@@ -1,4 +1,5 @@
 //go:build windows
+// +build windows
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -375,15 +376,9 @@ func (cm *containerManagerImpl) PodMightNeedToUnprepareResources(UID types.UID) 
 }
 
 func (cm *containerManagerImpl) PodHasExclusiveCPUs(pod *v1.Pod) bool {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
-	return podHasExclusiveCPUs(logger, cm.cpuManager, pod)
+	return podHasExclusiveCPUs(cm.cpuManager, pod)
 }
 
 func (cm *containerManagerImpl) ContainerHasExclusiveCPUs(pod *v1.Pod, container *v1.Container) bool {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
-	return containerHasExclusiveCPUs(logger, cm.cpuManager, pod, container)
+	return containerHasExclusiveCPUs(cm.cpuManager, pod, container)
 }

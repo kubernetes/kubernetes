@@ -122,7 +122,7 @@ func (c *Config) AddVariableDecls(vars ...*decls.VariableDecl) *Config {
 	return c.AddVariables(convVars...)
 }
 
-// AddVariables adds one or more variables to the config.
+// AddVariables adds one or more vairables to the config.
 func (c *Config) AddVariables(vars ...*Variable) *Config {
 	c.Variables = append(c.Variables, vars...)
 	return c

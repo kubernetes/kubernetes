@@ -314,6 +314,7 @@ func (c *AssumeCache) delete(obj interface{}) {
 // An update has both as non-nil.
 func (c *AssumeCache) pushEvent(oldObj, newObj interface{}) {
 	for _, handler := range c.eventHandlers {
+		handler := handler
 		if oldObj == nil {
 			c.eventQueue.WriteOne(func() {
 				handler.OnAdd(newObj, false)
@@ -462,13 +463,8 @@ func (c *AssumeCache) Assume(obj interface{}) error {
 	c.pushEvent(objInfo.latestObj, obj)
 
 	// Only update the cached object
-	oldObj := objInfo.latestObj
 	objInfo.latestObj = obj
-	if loggerV := c.logger.V(6); loggerV.Enabled() {
-		loggerV.Info("Assumed object", "description", c.description, "cacheKey", name, "version", newVersion, "oldObj", klog.Format(oldObj), "newObj", klog.Format(obj))
-	} else {
-		c.logger.V(5).Info("Assumed object", "description", c.description, "cacheKey", name, "version", newVersion)
-	}
+	c.logger.V(4).Info("Assumed object", "description", c.description, "cacheKey", name, "version", newVersion)
 	return nil
 }
 
@@ -487,7 +483,7 @@ func (c *AssumeCache) Restore(objName string) {
 			c.pushEvent(objInfo.latestObj, objInfo.apiObj)
 			objInfo.latestObj = objInfo.apiObj
 		}
-		c.logger.V(5).Info("Restored object", "description", c.description, "cacheKey", objName)
+		c.logger.V(4).Info("Restored object", "description", c.description, "cacheKey", objName)
 	}
 }
 
@@ -512,11 +508,7 @@ func (c *AssumeCache) AddEventHandler(handler cache.ResourceEventHandler) cache.
 
 	if c.handlerRegistration == nil {
 		// No informer, so immediately synced.
-		s := syncedHandlerRegistration{
-			synced: make(chan struct{}),
-		}
-		close(s.synced)
-		return s
+		return syncedHandlerRegistration{}
 	}
 
 	return c.handlerRegistration
@@ -565,14 +557,6 @@ func (c *AssumeCache) emitEvents() {
 
 // syncedHandlerRegistration is an implementation of ResourceEventHandlerRegistration
 // which always returns true.
-type syncedHandlerRegistration struct {
-	synced chan struct{}
-}
+type syncedHandlerRegistration struct{}
 
 func (syncedHandlerRegistration) HasSynced() bool { return true }
-
-func (s syncedHandlerRegistration) HasSyncedChecker() cache.DoneChecker { return s }
-
-func (s syncedHandlerRegistration) Name() string { return "AssumeCache" }
-
-func (s syncedHandlerRegistration) Done() <-chan struct{} { return s.synced }

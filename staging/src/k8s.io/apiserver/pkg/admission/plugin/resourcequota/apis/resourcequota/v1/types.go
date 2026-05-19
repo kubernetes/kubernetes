@@ -25,7 +25,7 @@ import (
 
 // Configuration provides configuration for the ResourceQuota admission controller.
 type Configuration struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 
 	// LimitedResources whose consumption is limited by default.
 	// +optional

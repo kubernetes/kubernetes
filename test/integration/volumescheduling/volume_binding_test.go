@@ -522,7 +522,7 @@ func testVolumeBindingWithAffinity(t *testing.T, anti bool, numNodes, numPods, n
 	pvcs := []*v1.PersistentVolumeClaim{}
 
 	// Create PVs for the first node
-	for i := range numPVsFirstNode {
+	for i := 0; i < numPVsFirstNode; i++ {
 		pv := makePV(fmt.Sprintf("pv-node1-%v", i), classWait, "", "", node1)
 		if pv, err := config.client.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
@@ -538,7 +538,7 @@ func testVolumeBindingWithAffinity(t *testing.T, anti bool, numNodes, numPods, n
 	}
 
 	// Create pods
-	for i := range numPods {
+	for i := 0; i < numPods; i++ {
 		// Create one pvc per pod
 		pvc := makePVC(fmt.Sprintf("pvc-%v", i), config.ns, &classWait, "")
 		if pvc, err := config.client.CoreV1().PersistentVolumeClaims(config.ns).Create(context.TODO(), pvc, metav1.CreateOptions{}); err != nil {
@@ -662,7 +662,7 @@ func TestPVAffinityConflict(t *testing.T) {
 		markNodeAffinity,
 		markNodeSelector,
 	}
-	for i := range nodeMarkers {
+	for i := 0; i < len(nodeMarkers); i++ {
 		podName := "local-pod-" + strconv.Itoa(i+1)
 		pod := makePod(podName, config.ns, []string{"local-pvc"})
 		nodeMarkers[i].(func(*v1.Pod, string))(pod, "node-2")
@@ -1057,7 +1057,7 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod t
 
 	// Create shared objects
 	// Create nodes
-	for i := range numberOfNodes {
+	for i := 0; i < numberOfNodes; i++ {
 		testNode := makeNode(i + 1)
 		if _, err := clientset.CoreV1().Nodes().Create(context.TODO(), testNode, metav1.CreateOptions{}); err != nil {
 			t.Fatalf("Failed to create Node %q: %v", testNode.Name, err)
@@ -1276,7 +1276,7 @@ func makeNode(index int) *v1.Node {
 				{
 					Type:              v1.NodeReady,
 					Status:            v1.ConditionTrue,
-					Reason:            "schedulable condition",
+					Reason:            fmt.Sprintf("schedulable condition"),
 					LastHeartbeatTime: metav1.Time{Time: time.Now()},
 				},
 			},

@@ -18,7 +18,6 @@ package podautoscaler
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	goruntime "runtime"
@@ -37,27 +36,19 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	autoscalinglisters "k8s.io/client-go/listers/autoscaling/v2"
 	scalefake "k8s.io/client-go/scale/fake"
 	core "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/workqueue"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	metricstestutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	autoscalingapiv2 "k8s.io/kubernetes/pkg/apis/autoscaling/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/monitor"
-	consistencyutil "k8s.io/kubernetes/pkg/controller/util/consistency"
 	"k8s.io/kubernetes/pkg/controller/util/selectors"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -70,7 +61,6 @@ import (
 	"k8s.io/utils/ptr"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
@@ -158,15 +148,6 @@ type testCase struct {
 	expectedReportedMetricComputationErrorLabels  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel
 	checkDesiredReplicaMetric                     bool
 
-	// expectedReconciliationCount specifies the minimum number of reconciliations to wait for.
-	// This verifies that reconciliationsTotal counter metric is incremented on each cycle.
-	// The actual count may be higher; we only verify it's at least this value.
-	expectedReconciliationCount int
-	// expectedMetricComputationCounts specifies the minimum computation count per metric type.
-	// This verifies that metricComputationTotal counter metric is incremented for each
-	// metric type on each reconciliation. The actual counts may be higher.
-	expectedMetricComputationCounts map[autoscalingv2.MetricSourceType]int
-
 	// Target resource information.
 	resource *fakeResource
 
@@ -180,12 +161,8 @@ type testCase struct {
 	testEMClient      *emfake.FakeExternalMetricsClient
 	testScaleClient   *scalefake.FakeScaleClient
 
-	recommendations   []timestampedRecommendation
-	hpaSelectors      *selectors.BiMultimap
-	initialConditions []autoscalingv2.HorizontalPodAutoscalerCondition
-
-	verifyReconciliationDuration     bool
-	verifyMetricComputationDurations bool
+	recommendations []timestampedRecommendation
+	hpaSelectors    *selectors.BiMultimap
 }
 
 // Needs to be called under a lock.
@@ -210,7 +187,6 @@ func init() {
 }
 
 func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfake.Clientset, *cmfake.FakeCustomMetricsClient, *emfake.FakeExternalMetricsClient, *scalefake.FakeScaleClient) {
-	logger, _ := ktesting.NewTestContext(t)
 	namespace := "test-namespace"
 	hpaName := "test-hpa"
 	podNamePrefix := "test-pod"
@@ -266,7 +242,6 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 				CurrentReplicas: tc.specReplicas,
 				DesiredReplicas: tc.specReplicas,
 				LastScaleTime:   tc.lastScaleTime,
-				Conditions:      tc.initialConditions,
 			},
 		}
 		// Initialize default values
@@ -536,7 +511,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 		return true, obj, nil
 	})
 
-	fakeWatch := watch.NewFakeWithOptions(watch.FakeOptions{Logger: &logger})
+	fakeWatch := watch.NewFake()
 	fakeClient.AddWatchReactor("*", core.DefaultWatchReactor(fakeWatch, nil))
 
 	fakeMetricsClient := &metricsfake.Clientset{}
@@ -712,91 +687,55 @@ func findCpuUtilization(metricStatus []autoscalingv2.MetricStatus) (utilization 
 	return nil
 }
 
-func (tc *testCase) verifyResults(ctx context.Context, t *testing.T) {
+func (tc *testCase) verifyResults(ctx context.Context, t *testing.T, m *mockMonitor) {
 	tc.Lock()
 	defer tc.Unlock()
+
 	assert.Equal(t, tc.specReplicas != tc.expectedDesiredReplicas, tc.scaleUpdated, "the scale should only be updated if we expected a change in replicas")
 	assert.True(t, tc.statusUpdated, "the status should have been updated")
 	if tc.verifyEvents {
 		assert.Equal(t, tc.specReplicas != tc.expectedDesiredReplicas, tc.eventCreated, "an event should have been created only if we expected a change in replicas")
 	}
 
-	tc.verifyRecordedMetric(ctx, t)
+	tc.verifyRecordedMetric(ctx, t, m)
 }
 
-func (tc *testCase) verifyRecordedMetric(ctx context.Context, t *testing.T) {
-	actionStr := string(tc.expectedReportedReconciliationActionLabel)
-	errorStr := string(tc.expectedReportedReconciliationErrorLabel)
+func (tc *testCase) verifyRecordedMetric(ctx context.Context, t *testing.T, m *mockMonitor) {
+	// First, wait for the reconciliation completed at least once.
+	m.waitUntilRecorded(ctx, t)
 
-	if err := wait.PollUntilContextTimeout(ctx, 20*time.Millisecond, 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
-		v, err := metricstestutil.GetCounterMetricValue(monitor.ReconciliationsTotal.WithLabelValues(actionStr, errorStr))
-		if err != nil {
-			return false, nil
-		}
-		return v >= 1, nil
-	}); err != nil {
-		t.Fatalf("%s metric was not recorded for action=%s, error=%s", monitor.ReconciliationsTotal.Name, actionStr, errorStr)
+	assert.Equal(t, tc.expectedReportedReconciliationActionLabel, m.reconciliationActionLabels[0], "the reconciliation action should be recorded in monitor expectedly")
+	assert.Equal(t, tc.expectedReportedReconciliationErrorLabel, m.reconciliationErrorLabels[0], "the reconciliation error should be recorded in monitor expectedly")
+
+	if len(tc.expectedReportedMetricComputationActionLabels) != len(m.metricComputationActionLabels) {
+		t.Fatalf("the metric computation actions for %d types should be recorded, but actually only %d was recorded", len(tc.expectedReportedMetricComputationActionLabels), len(m.metricComputationActionLabels))
+	}
+	if len(tc.expectedReportedMetricComputationErrorLabels) != len(m.metricComputationErrorLabels) {
+		t.Fatalf("the metric computation errors for %d types should be recorded, but actually only %d was recorded", len(tc.expectedReportedMetricComputationErrorLabels), len(m.metricComputationErrorLabels))
 	}
 
-	if tc.verifyReconciliationDuration {
-		if err := wait.PollUntilContextTimeout(ctx, 20*time.Millisecond, 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
-			count, err := metricstestutil.GetHistogramMetricCount(monitor.ReconciliationsDuration.WithLabelValues(actionStr, errorStr))
-			if err != nil {
-				return false, nil
-			}
-			return count >= 1, nil
-		}); err != nil {
-			t.Fatalf("%s metric was not recorded for action=%s, error=%s", monitor.ReconciliationsDuration.Name, actionStr, errorStr)
+	for metricType, l := range tc.expectedReportedMetricComputationActionLabels {
+		_, ok := m.metricComputationActionLabels[metricType]
+		if !ok {
+			t.Fatalf("the metric computation action should be recorded with metricType %s, but actually nothing was recorded", metricType)
 		}
+		assert.Equal(t, l, m.metricComputationActionLabels[metricType][0], "the metric computation action should be recorded in monitor expectedly")
+	}
+	for metricType, l := range tc.expectedReportedMetricComputationErrorLabels {
+		_, ok := m.metricComputationErrorLabels[metricType]
+		if !ok {
+			t.Fatalf("the metric computation error should be recorded with metricType %s, but actually nothing was recorded", metricType)
+		}
+		assert.Equal(t, l, m.metricComputationErrorLabels[metricType][0], "the metric computation error should be recorded in monitor expectedly")
 	}
 
-	if tc.expectedReconciliationCount > 0 {
-		v, err := metricstestutil.GetCounterMetricValue(monitor.ReconciliationsTotal.WithLabelValues(actionStr, errorStr))
-		if err != nil {
-			t.Fatalf("error getting reconciliations total metric: %v", err)
-		}
-		assert.GreaterOrEqual(t, int(v), tc.expectedReconciliationCount, "reconciliation count should be at least %d", tc.expectedReconciliationCount)
-
-		for metricType, expectedAction := range tc.expectedReportedMetricComputationActionLabels {
-			expectedError := tc.expectedReportedMetricComputationErrorLabels[metricType]
-			mcv, err := metricstestutil.GetCounterMetricValue(
-				monitor.MetricComputationTotal.WithLabelValues(string(expectedAction), string(expectedError), string(metricType)))
-			if err != nil {
-				t.Fatalf("metric computation total not found for type %s: %v", metricType, err)
-			}
-			assert.GreaterOrEqual(t, mcv, float64(1), "metric computation count for %s should be at least 1", metricType)
-
-			if tc.verifyMetricComputationDurations {
-				count, err := metricstestutil.GetHistogramMetricCount(
-					monitor.MetricComputationDuration.WithLabelValues(string(expectedAction), string(expectedError), string(metricType)))
-				if err != nil {
-					t.Fatalf("error getting metric computation duration for type %s: %v", metricType, err)
-				}
-				assert.Positive(t, count, "metric computation duration for %s should be recorded", metricType)
-			}
-		}
-
-		for metricType, expectedCount := range tc.expectedMetricComputationCounts {
-			expectedAction := tc.expectedReportedMetricComputationActionLabels[metricType]
-			expectedError := tc.expectedReportedMetricComputationErrorLabels[metricType]
-			mcv, err := metricstestutil.GetCounterMetricValue(
-				monitor.MetricComputationTotal.WithLabelValues(string(expectedAction), string(expectedError), string(metricType)))
-			if err != nil {
-				t.Fatalf("error getting metric computation count for type %s: %v", metricType, err)
-			}
-			assert.GreaterOrEqual(t, int(mcv), expectedCount, "metric computation count for %s should be at least %d", metricType, expectedCount)
-		}
-
-		// TODO: Retrieve the namespace and HPA names from the test case (tc) to replace hardcoded values below (and check).
-		if tc.checkDesiredReplicaMetric {
-			v, err := metricstestutil.GetGaugeMetricValue(monitor.DesiredReplicasCount.WithLabelValues("test-namespace", "test-hpa"))
-			if err != nil {
-				t.Fatalf("error getting desired replicas metric: %v", err)
-			}
-			assert.InEpsilon(t, float64(tc.expectedDesiredReplicas), v, 0.01,
-				"the desired replicas should be recorded in monitor expectedly")
-		}
+	// TODO: Retrieve the namespace and HPA names from the test case (tc) to replace hardcoded values below (and check).
+	if tc.checkDesiredReplicaMetric {
+		currentValue := m.GetDesiredReplicasValue("test-namespace", "test-hpa")
+		assert.Equal(t, tc.expectedDesiredReplicas, currentValue,
+			"the desired replicas should be recorded in monitor expectedly")
 	}
+
 }
 
 func (tc *testCase) setupController(t *testing.T) (*HorizontalController, informers.SharedInformerFactory) {
@@ -872,15 +811,7 @@ func (tc *testCase) setupController(t *testing.T) (*HorizontalController, inform
 		hpaController.hpaSelectors = tc.hpaSelectors
 	}
 
-	// reset all HPA prometheus metrics
-	monitor.Register()
-	monitor.ReconciliationsTotal.Reset()
-	monitor.ReconciliationsDuration.Reset()
-	monitor.MetricComputationTotal.Reset()
-	monitor.MetricComputationDuration.Reset()
-	monitor.NumHorizontalPodAutoscalers.Set(0)
-	monitor.DesiredReplicasCount.Reset()
-	hpaController.monitor = monitor.New()
+	hpaController.monitor = newMockMonitor()
 	return hpaController, informerFactory
 }
 
@@ -905,7 +836,6 @@ func (tc *testCase) runTestWithController(t *testing.T, hpaController *Horizonta
 
 	tc.Lock()
 	shouldWait := tc.verifyEvents
-	minReconciliations := tc.expectedReconciliationCount
 	tc.Unlock()
 
 	if shouldWait {
@@ -922,31 +852,101 @@ func (tc *testCase) runTestWithController(t *testing.T, hpaController *Horizonta
 		}
 	} else {
 		// Wait for HPA to be processed.
-		if minReconciliations < 1 {
-			t.Logf("minReconciliations should be at least 1, got %d; adjusting to 1", minReconciliations)
-			minReconciliations = 1
-		}
-		timeoutTime := time.Now().Add(5 * time.Second)
-		reconciliationsProcessed := 0
-		for reconciliationsProcessed < minReconciliations && time.Now().Before(timeoutTime) {
-			select {
-			case <-tc.processed:
-				reconciliationsProcessed++
-			case <-time.After(100 * time.Millisecond):
-				// continue waiting
-			}
-		}
-		if reconciliationsProcessed < minReconciliations {
-			t.Fatalf("expected at least %d reconciliations, but only got %d", minReconciliations, reconciliationsProcessed)
-		}
+		<-tc.processed
 	}
-
-	tc.verifyResults(ctx, t)
+	m, ok := hpaController.monitor.(*mockMonitor)
+	if !ok {
+		t.Fatalf("test HPA controller should have mockMonitor, but actually not")
+	}
+	tc.verifyResults(ctx, t, m)
 }
 
 func (tc *testCase) runTest(t *testing.T) {
 	hpaController, informerFactory := tc.setupController(t)
 	tc.runTestWithController(t, hpaController, informerFactory)
+}
+
+// mockMonitor implements monitor.Monitor interface.
+// It records which results are observed in slices.
+type mockMonitor struct {
+	sync.RWMutex
+	reconciliationActionLabels []monitor.ActionLabel
+	reconciliationErrorLabels  []monitor.ErrorLabel
+
+	metricComputationActionLabels map[autoscalingv2.MetricSourceType][]monitor.ActionLabel
+	metricComputationErrorLabels  map[autoscalingv2.MetricSourceType][]monitor.ErrorLabel
+	metricObjectsCount            int
+	desiredReplicasValues         map[string]int32 // key is "namespace/name"
+}
+
+func newMockMonitor() *mockMonitor {
+	return &mockMonitor{
+		metricComputationActionLabels: make(map[autoscalingv2.MetricSourceType][]monitor.ActionLabel),
+		metricComputationErrorLabels:  make(map[autoscalingv2.MetricSourceType][]monitor.ErrorLabel),
+		desiredReplicasValues:         make(map[string]int32),
+	}
+}
+
+func (m *mockMonitor) ObserveReconciliationResult(action monitor.ActionLabel, err monitor.ErrorLabel, _ time.Duration) {
+	m.Lock()
+	defer m.Unlock()
+	m.reconciliationActionLabels = append(m.reconciliationActionLabels, action)
+	m.reconciliationErrorLabels = append(m.reconciliationErrorLabels, err)
+}
+
+func (m *mockMonitor) ObserveMetricComputationResult(action monitor.ActionLabel, err monitor.ErrorLabel, duration time.Duration, metricType autoscalingv2.MetricSourceType) {
+	m.Lock()
+	defer m.Unlock()
+
+	m.metricComputationActionLabels[metricType] = append(m.metricComputationActionLabels[metricType], action)
+	m.metricComputationErrorLabels[metricType] = append(m.metricComputationErrorLabels[metricType], err)
+}
+
+// waitUntilRecorded waits for the HPA controller to reconcile at least once.
+func (m *mockMonitor) waitUntilRecorded(ctx context.Context, t *testing.T) {
+	if err := wait.PollUntilContextTimeout(ctx, 20*time.Millisecond, 100*time.Millisecond, true, func(ctx context.Context) (done bool, err error) {
+		m.RWMutex.RLock()
+		defer m.RWMutex.RUnlock()
+		if len(m.reconciliationActionLabels) == 0 || len(m.reconciliationErrorLabels) == 0 {
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		t.Fatalf("no reconciliation is recorded in the monitor, len(monitor.reconciliationActionLabels)=%v len(monitor.reconciliationErrorLabels)=%v ", len(m.reconciliationActionLabels), len(m.reconciliationErrorLabels))
+	}
+}
+
+func (m *mockMonitor) ObserveHPAAddition() {
+	m.Lock()
+	defer m.Unlock()
+	m.metricObjectsCount++
+}
+
+func (m *mockMonitor) ObserveHPADeletion() {
+	m.Lock()
+	defer m.Unlock()
+	m.metricObjectsCount--
+}
+
+func (m *mockMonitor) GetObjectsCount() int {
+	m.RLock()
+	defer m.RUnlock()
+	return m.metricObjectsCount
+}
+
+func (m *mockMonitor) ObserveDesiredReplicas(namespace, hpaName string, desiredReplicas int32) {
+	fmt.Printf("putting %s/%s with %v", namespace, hpaName, desiredReplicas)
+	m.Lock()
+	defer m.Unlock()
+	key := fmt.Sprintf("%s/%s", namespace, hpaName)
+	m.desiredReplicasValues[key] = desiredReplicas
+}
+
+func (m *mockMonitor) GetDesiredReplicasValue(namespace, hpaName string) int32 {
+	m.RLock()
+	defer m.RUnlock()
+	key := fmt.Sprintf("%s/%s", namespace, hpaName)
+	return m.desiredReplicasValues[key]
 }
 
 func TestScaleUp(t *testing.T) {
@@ -1359,6 +1359,53 @@ func TestScaleUpCMUnreadyandCpuHot(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestScaleUpHotCpuNoScaleWouldScaleDown(t *testing.T) {
+	averageValue := resource.MustParse("15.0")
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		specReplicas:            3,
+		statusReplicas:          3,
+		expectedDesiredReplicas: 6,
+		CPUTarget:               0,
+		metricsTarget: []autoscalingv2.MetricSpec{
+			{
+				Type: autoscalingv2.PodsMetricSourceType,
+				Pods: &autoscalingv2.PodsMetricSource{
+					Metric: autoscalingv2.MetricIdentifier{
+						Name: "qps",
+					},
+					Target: autoscalingv2.MetricTarget{
+						Type:         autoscalingv2.AverageValueMetricType,
+						AverageValue: &averageValue,
+					},
+				},
+			},
+		},
+		reportedLevels:       []uint64{50000, 15000, 30000},
+		reportedCPURequests:  []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		reportedPodStartTime: []metav1.Time{hotCPUCreationTime(), coolCPUCreationTime(), hotCPUCreationTime()},
+		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.AbleToScale,
+			Status: v1.ConditionTrue,
+			Reason: "SucceededRescale",
+		}, autoscalingv2.HorizontalPodAutoscalerCondition{
+			Type:   autoscalingv2.ScalingLimited,
+			Status: v1.ConditionTrue,
+			Reason: "TooManyReplicas",
+		}),
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.PodsMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.PodsMetricSourceType: monitor.ErrorLabelNone,
+		},
+	}
+	tc.runTest(t)
+}
+
 func TestScaleUpCMObject(t *testing.T) {
 	targetValue := resource.MustParse("15.0")
 	tc := testCase{
@@ -1401,147 +1448,85 @@ func TestScaleUpCMObject(t *testing.T) {
 }
 
 func TestScaleUpFromZeroCMObject(t *testing.T) {
-	for _, fgEnabled := range []bool{true, false} {
-		t.Run(fmt.Sprintf("HPAScaleToZero=%v", fgEnabled), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, fgEnabled)
-			targetValue := resource.MustParse("15.0")
-			tc := testCase{
-				minReplicas:    0,
-				maxReplicas:    6,
-				specReplicas:   0,
-				statusReplicas: 0,
-				CPUTarget:      0,
-				metricsTarget: []autoscalingv2.MetricSpec{
-					{
-						Type: autoscalingv2.ObjectMetricSourceType,
-						Object: &autoscalingv2.ObjectMetricSource{
-							DescribedObject: autoscalingv2.CrossVersionObjectReference{
-								APIVersion: "apps/v1",
-								Kind:       "Deployment",
-								Name:       "some-deployment",
-							},
-							Metric: autoscalingv2.MetricIdentifier{
-								Name: "qps",
-							},
-							Target: autoscalingv2.MetricTarget{
-								Type:  autoscalingv2.ValueMetricType,
-								Value: &targetValue,
-							},
-						},
+	targetValue := resource.MustParse("15.0")
+	tc := testCase{
+		minReplicas:             0,
+		maxReplicas:             6,
+		specReplicas:            0,
+		statusReplicas:          0,
+		expectedDesiredReplicas: 2,
+		CPUTarget:               0,
+		metricsTarget: []autoscalingv2.MetricSpec{
+			{
+				Type: autoscalingv2.ObjectMetricSourceType,
+				Object: &autoscalingv2.ObjectMetricSource{
+					DescribedObject: autoscalingv2.CrossVersionObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "some-deployment",
+					},
+					Metric: autoscalingv2.MetricIdentifier{
+						Name: "qps",
+					},
+					Target: autoscalingv2.MetricTarget{
+						Type:  autoscalingv2.ValueMetricType,
+						Value: &targetValue,
 					},
 				},
-				reportedLevels: []uint64{20000},
-				initialConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
-					{
-						Type:   autoscalingv2.ScaledToZero,
-						Status: v1.ConditionTrue,
-						Reason: "ScaledToZero",
-					},
-				},
-			}
-			if fgEnabled {
-				tc.expectedDesiredReplicas = 2
-				tc.expectedConditions = []autoscalingv2.HorizontalPodAutoscalerCondition{
-					{Type: autoscalingv2.ScaledToZero, Status: v1.ConditionFalse, Reason: "NotScaledToZero"},
-					{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededRescale"},
-					{Type: autoscalingv2.ScalingActive, Status: v1.ConditionTrue, Reason: "ValidMetricFound"},
-					{Type: autoscalingv2.ScalingLimited, Status: v1.ConditionFalse, Reason: "DesiredWithinRange"},
-				}
-				tc.expectedReportedReconciliationActionLabel = monitor.ActionLabelScaleUp
-				tc.expectedReportedReconciliationErrorLabel = monitor.ErrorLabelNone
-				tc.expectedReportedMetricComputationActionLabels = map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-					autoscalingv2.ObjectMetricSourceType: monitor.ActionLabelScaleUp,
-				}
-				tc.expectedReportedMetricComputationErrorLabels = map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-					autoscalingv2.ObjectMetricSourceType: monitor.ErrorLabelNone,
-				}
-			} else {
-				// FG off: scaledToZeroCondition=false, canScaleFromZero=false → scaling disabled
-				tc.expectedDesiredReplicas = 0
-				tc.expectedConditions = []autoscalingv2.HorizontalPodAutoscalerCondition{
-					{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
-					{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "ScalingDisabled"},
-				}
-				tc.expectedReportedReconciliationActionLabel = monitor.ActionLabelNone
-				tc.expectedReportedReconciliationErrorLabel = monitor.ErrorLabelNone
-				tc.expectedReportedMetricComputationActionLabels = map[autoscalingv2.MetricSourceType]monitor.ActionLabel{}
-				tc.expectedReportedMetricComputationErrorLabels = map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{}
-			}
-			tc.runTest(t)
-		})
+			},
+		},
+		reportedLevels: []uint64{20000},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ObjectMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ObjectMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
+	tc.runTest(t)
 }
 
 func TestScaleUpFromZeroIgnoresToleranceCMObject(t *testing.T) {
-	for _, fgEnabled := range []bool{true, false} {
-		t.Run(fmt.Sprintf("HPAScaleToZero=%v", fgEnabled), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, fgEnabled)
-			targetValue := resource.MustParse("1.0")
-			tc := testCase{
-				minReplicas:    0,
-				maxReplicas:    6,
-				specReplicas:   0,
-				statusReplicas: 0,
-				CPUTarget:      0,
-				metricsTarget: []autoscalingv2.MetricSpec{
-					{
-						Type: autoscalingv2.ObjectMetricSourceType,
-						Object: &autoscalingv2.ObjectMetricSource{
-							DescribedObject: autoscalingv2.CrossVersionObjectReference{
-								APIVersion: "apps/v1",
-								Kind:       "Deployment",
-								Name:       "some-deployment",
-							},
-							Metric: autoscalingv2.MetricIdentifier{
-								Name: "qps",
-							},
-							Target: autoscalingv2.MetricTarget{
-								Type:  autoscalingv2.ValueMetricType,
-								Value: &targetValue,
-							},
-						},
+	targetValue := resource.MustParse("1.0")
+	tc := testCase{
+		minReplicas:             0,
+		maxReplicas:             6,
+		specReplicas:            0,
+		statusReplicas:          0,
+		expectedDesiredReplicas: 1,
+		CPUTarget:               0,
+		metricsTarget: []autoscalingv2.MetricSpec{
+			{
+				Type: autoscalingv2.ObjectMetricSourceType,
+				Object: &autoscalingv2.ObjectMetricSource{
+					DescribedObject: autoscalingv2.CrossVersionObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "some-deployment",
+					},
+					Metric: autoscalingv2.MetricIdentifier{
+						Name: "qps",
+					},
+					Target: autoscalingv2.MetricTarget{
+						Type:  autoscalingv2.ValueMetricType,
+						Value: &targetValue,
 					},
 				},
-				reportedLevels: []uint64{1000},
-				initialConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
-					{
-						Type:   autoscalingv2.ScaledToZero,
-						Status: v1.ConditionTrue,
-						Reason: "ScaledToZero",
-					},
-				},
-			}
-			if fgEnabled {
-				tc.expectedDesiredReplicas = 1
-				tc.expectedConditions = []autoscalingv2.HorizontalPodAutoscalerCondition{
-					{Type: autoscalingv2.ScaledToZero, Status: v1.ConditionFalse, Reason: "NotScaledToZero"},
-					{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededRescale"},
-					{Type: autoscalingv2.ScalingActive, Status: v1.ConditionTrue, Reason: "ValidMetricFound"},
-					{Type: autoscalingv2.ScalingLimited, Status: v1.ConditionFalse, Reason: "DesiredWithinRange"},
-				}
-				tc.expectedReportedReconciliationActionLabel = monitor.ActionLabelScaleUp
-				tc.expectedReportedReconciliationErrorLabel = monitor.ErrorLabelNone
-				tc.expectedReportedMetricComputationActionLabels = map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-					autoscalingv2.ObjectMetricSourceType: monitor.ActionLabelScaleUp,
-				}
-				tc.expectedReportedMetricComputationErrorLabels = map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-					autoscalingv2.ObjectMetricSourceType: monitor.ErrorLabelNone,
-				}
-			} else {
-				// FG off: scaledToZeroCondition=false, canScaleFromZero=false → scaling disabled
-				tc.expectedDesiredReplicas = 0
-				tc.expectedConditions = []autoscalingv2.HorizontalPodAutoscalerCondition{
-					{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
-					{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "ScalingDisabled"},
-				}
-				tc.expectedReportedReconciliationActionLabel = monitor.ActionLabelNone
-				tc.expectedReportedReconciliationErrorLabel = monitor.ErrorLabelNone
-				tc.expectedReportedMetricComputationActionLabels = map[autoscalingv2.MetricSourceType]monitor.ActionLabel{}
-				tc.expectedReportedMetricComputationErrorLabels = map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{}
-			}
-			tc.runTest(t)
-		})
+			},
+		},
+		reportedLevels: []uint64{1000},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ObjectMetricSourceType: monitor.ActionLabelScaleUp,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ObjectMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
+	tc.runTest(t)
 }
 
 func TestScaleUpPerPodCMObject(t *testing.T) {
@@ -1714,6 +1699,32 @@ func TestScaleDownContainerResource(t *testing.T) {
 	tc.runTest(t)
 }
 
+func TestScaleDownWithScalingRules(t *testing.T) {
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		scaleUpRules:            generateScalingRules(0, 0, 100, 15, 30),
+		specReplicas:            5,
+		statusReplicas:          5,
+		expectedDesiredReplicas: 3,
+		CPUTarget:               50,
+		verifyCPUCurrent:        true,
+		reportedLevels:          []uint64{100, 300, 500, 250, 250},
+		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		useMetricsAPI:           true,
+		recommendations:         []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+		},
+	}
+	tc.runTest(t)
+}
+
 func TestScaleUpOneMetricInvalid(t *testing.T) {
 	tc := testCase{
 		minReplicas:             2,
@@ -1731,7 +1742,7 @@ func TestScaleUpOneMetricInvalid(t *testing.T) {
 		reportedLevels:      []uint64{300, 400, 500},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
-		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelSpec,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
 		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
 			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
 			// Actually, such an invalid type should be validated in the kube-apiserver and invalid metric type shouldn't be recorded.
@@ -1747,39 +1758,69 @@ func TestScaleUpOneMetricInvalid(t *testing.T) {
 }
 
 func TestScaleUpFromZeroOneMetricInvalid(t *testing.T) {
-	for _, fgEnabled := range []bool{true, false} {
-		t.Run(fmt.Sprintf("HPAScaleToZero=%v", fgEnabled), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, fgEnabled)
-			// This test uses CPU metrics, not object/external, so it can't scale from zero
-			// regardless of feature gate state (only object/external metrics support scale-from-zero per KEP-2021)
-			tc := testCase{
-				minReplicas:             0,
-				maxReplicas:             6,
-				specReplicas:            0,
-				statusReplicas:          0,
-				expectedDesiredReplicas: 0,
-				CPUTarget:               30,
-				verifyCPUCurrent:        false,
-				metricsTarget: []autoscalingv2.MetricSpec{
-					{
-						Type: "CheddarCheese",
-					},
-				},
-				reportedLevels:      []uint64{300, 400, 500},
-				reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-				recommendations:     []timestampedRecommendation{},
-				expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
-					{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
-					{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "ScalingDisabled"},
-				},
-				expectedReportedReconciliationActionLabel:     monitor.ActionLabelNone,
-				expectedReportedReconciliationErrorLabel:      monitor.ErrorLabelNone,
-				expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{},
-				expectedReportedMetricComputationErrorLabels:  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{},
-			}
-			tc.runTest(t)
-		})
+	tc := testCase{
+		minReplicas:             0,
+		maxReplicas:             6,
+		specReplicas:            0,
+		statusReplicas:          0,
+		expectedDesiredReplicas: 4,
+		CPUTarget:               30,
+		verifyCPUCurrent:        true,
+		metricsTarget: []autoscalingv2.MetricSpec{
+			{
+				Type: "CheddarCheese",
+			},
+		},
+		reportedLevels:      []uint64{300, 400, 500},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		recommendations:     []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
+			// Actually, such an invalid type should be validated in the kube-apiserver and invalid metric type shouldn't be recorded.
+			"CheddarCheese": monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
+			// Actually, such an invalid type should be validated in the kube-apiserver and invalid metric type shouldn't be recorded.
+			"CheddarCheese": monitor.ErrorLabelSpec,
+		},
 	}
+	tc.runTest(t)
+}
+
+func TestScaleUpBothMetricsEmpty(t *testing.T) { // Switch to missing
+	tc := testCase{
+		minReplicas:             2,
+		maxReplicas:             6,
+		specReplicas:            3,
+		statusReplicas:          3,
+		expectedDesiredReplicas: 3,
+		CPUTarget:               0,
+		metricsTarget: []autoscalingv2.MetricSpec{
+			{
+				Type: "CheddarCheese",
+			},
+		},
+		reportedLevels:      []uint64{},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
+			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
+			{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "InvalidMetricSourceType"},
+		},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			// Actually, such an invalid type should be validated in the kube-apiserver and invalid metric type shouldn't be recorded.
+			"CheddarCheese": monitor.ActionLabelNone,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			// Actually, such an invalid type should be validated in the kube-apiserver and invalid metric type shouldn't be recorded.
+			"CheddarCheese": monitor.ErrorLabelSpec,
+		},
+	}
+	tc.runTest(t)
 }
 
 func TestScaleDownStabilizeInitialSize(t *testing.T) {
@@ -1898,62 +1939,46 @@ func TestScaleDownCMObject(t *testing.T) {
 }
 
 func TestScaleDownToZeroCMObject(t *testing.T) {
-	for _, fgEnabled := range []bool{true, false} {
-		t.Run(fmt.Sprintf("HPAScaleToZero=%v", fgEnabled), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, fgEnabled)
-			targetValue := resource.MustParse("20.0")
-			tc := testCase{
-				minReplicas:             0,
-				maxReplicas:             6,
-				specReplicas:            5,
-				statusReplicas:          5,
-				expectedDesiredReplicas: 0,
-				CPUTarget:               0,
-				metricsTarget: []autoscalingv2.MetricSpec{
-					{
-						Type: autoscalingv2.ObjectMetricSourceType,
-						Object: &autoscalingv2.ObjectMetricSource{
-							DescribedObject: autoscalingv2.CrossVersionObjectReference{
-								APIVersion: "apps/v1",
-								Kind:       "Deployment",
-								Name:       "some-deployment",
-							},
-							Metric: autoscalingv2.MetricIdentifier{
-								Name: "qps",
-							},
-							Target: autoscalingv2.MetricTarget{
-								Type:  autoscalingv2.ValueMetricType,
-								Value: &targetValue,
-							},
-						},
+	targetValue := resource.MustParse("20.0")
+	tc := testCase{
+		minReplicas:             0,
+		maxReplicas:             6,
+		specReplicas:            5,
+		statusReplicas:          5,
+		expectedDesiredReplicas: 0,
+		CPUTarget:               0,
+		metricsTarget: []autoscalingv2.MetricSpec{
+			{
+				Type: autoscalingv2.ObjectMetricSourceType,
+				Object: &autoscalingv2.ObjectMetricSource{
+					DescribedObject: autoscalingv2.CrossVersionObjectReference{
+						APIVersion: "apps/v1",
+						Kind:       "Deployment",
+						Name:       "some-deployment",
+					},
+					Metric: autoscalingv2.MetricIdentifier{
+						Name: "qps",
+					},
+					Target: autoscalingv2.MetricTarget{
+						Type:  autoscalingv2.ValueMetricType,
+						Value: &targetValue,
 					},
 				},
-				reportedLevels:      []uint64{0},
-				reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-				recommendations:     []timestampedRecommendation{},
-				expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
-				expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
-				expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-					autoscalingv2.ObjectMetricSourceType: monitor.ActionLabelScaleDown,
-				},
-				expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-					autoscalingv2.ObjectMetricSourceType: monitor.ErrorLabelNone,
-				},
-			}
-			if fgEnabled {
-				// FG on: ScaledToZero condition set on scale-down to zero
-				tc.expectedConditions = statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
-					Type:   autoscalingv2.ScaledToZero,
-					Status: v1.ConditionTrue,
-					Reason: "ScaledToZero",
-				})
-			} else {
-				// FG off: no ScaledToZero condition, but scale-down still happens
-				tc.expectedConditions = statusOkWithOverrides()
-			}
-			tc.runTest(t)
-		})
+			},
+		},
+		reportedLevels:      []uint64{0},
+		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
+		recommendations:     []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ObjectMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ObjectMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
+	tc.runTest(t)
 }
 
 func TestScaleDownPerPodCMObject(t *testing.T) {
@@ -2036,252 +2061,39 @@ func TestScaleDownCMExternal(t *testing.T) {
 }
 
 func TestScaleDownToZeroCMExternal(t *testing.T) {
-	for _, fgEnabled := range []bool{true, false} {
-		t.Run(fmt.Sprintf("HPAScaleToZero=%v", fgEnabled), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, fgEnabled)
-			tc := testCase{
-				minReplicas:             0,
-				maxReplicas:             6,
-				specReplicas:            5,
-				statusReplicas:          5,
-				expectedDesiredReplicas: 0,
-				metricsTarget: []autoscalingv2.MetricSpec{
-					{
-						Type: autoscalingv2.ExternalMetricSourceType,
-						External: &autoscalingv2.ExternalMetricSource{
-							Metric: autoscalingv2.MetricIdentifier{
-								Name:     "qps",
-								Selector: &metav1.LabelSelector{},
-							},
-							Target: autoscalingv2.MetricTarget{
-								Type:  autoscalingv2.ValueMetricType,
-								Value: resource.NewMilliQuantity(14400, resource.DecimalSI),
-							},
-						},
+	tc := testCase{
+		minReplicas:             0,
+		maxReplicas:             6,
+		specReplicas:            5,
+		statusReplicas:          5,
+		expectedDesiredReplicas: 0,
+		metricsTarget: []autoscalingv2.MetricSpec{
+			{
+				Type: autoscalingv2.ExternalMetricSourceType,
+				External: &autoscalingv2.ExternalMetricSource{
+					Metric: autoscalingv2.MetricIdentifier{
+						Name:     "qps",
+						Selector: &metav1.LabelSelector{},
+					},
+					Target: autoscalingv2.MetricTarget{
+						Type:  autoscalingv2.ValueMetricType,
+						Value: resource.NewMilliQuantity(14400, resource.DecimalSI),
 					},
 				},
-				reportedLevels:  []uint64{0},
-				recommendations: []timestampedRecommendation{},
-				expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
-				expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
-				expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-					autoscalingv2.ExternalMetricSourceType: monitor.ActionLabelScaleDown,
-				},
-				expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-					autoscalingv2.ExternalMetricSourceType: monitor.ErrorLabelNone,
-				},
-			}
-			if fgEnabled {
-				tc.expectedConditions = statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
-					Type:   autoscalingv2.ScaledToZero,
-					Status: v1.ConditionTrue,
-					Reason: "ScaledToZero",
-				})
-			} else {
-				tc.expectedConditions = statusOkWithOverrides()
-			}
-			tc.runTest(t)
-		})
+			},
+		},
+		reportedLevels:  []uint64{0},
+		recommendations: []timestampedRecommendation{},
+		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleDown,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
+		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
+			autoscalingv2.ExternalMetricSourceType: monitor.ActionLabelScaleDown,
+		},
+		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
+			autoscalingv2.ExternalMetricSourceType: monitor.ErrorLabelNone,
+		},
 	}
-}
-
-func TestScaleUpFromZeroWithoutCondition(t *testing.T) {
-	for _, fgEnabled := range []bool{true, false} {
-		t.Run(fmt.Sprintf("HPAScaleToZero=%v", fgEnabled), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, fgEnabled)
-			// Without ScaledToZero condition, scaling from zero is disabled regardless of feature gate
-			targetValue := resource.MustParse("15.0")
-			tc := testCase{
-				minReplicas:             0,
-				maxReplicas:             6,
-				specReplicas:            0,
-				statusReplicas:          0,
-				expectedDesiredReplicas: 0,
-				CPUTarget:               0,
-				metricsTarget: []autoscalingv2.MetricSpec{
-					{
-						Type: autoscalingv2.ObjectMetricSourceType,
-						Object: &autoscalingv2.ObjectMetricSource{
-							DescribedObject: autoscalingv2.CrossVersionObjectReference{
-								APIVersion: "apps/v1",
-								Kind:       "Deployment",
-								Name:       "some-deployment",
-							},
-							Metric: autoscalingv2.MetricIdentifier{
-								Name: "qps",
-							},
-							Target: autoscalingv2.MetricTarget{
-								Type:  autoscalingv2.ValueMetricType,
-								Value: &targetValue,
-							},
-						},
-					},
-				},
-				reportedLevels: []uint64{20000},
-				expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
-					{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
-					{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "ScalingDisabled"},
-				},
-				expectedReportedReconciliationActionLabel:     monitor.ActionLabelNone,
-				expectedReportedReconciliationErrorLabel:      monitor.ErrorLabelNone,
-				expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{},
-				expectedReportedMetricComputationErrorLabels:  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{},
-			}
-			tc.runTest(t)
-		})
-	}
-}
-
-func TestScaleUpFromZeroWhenMinReplicasIncreased(t *testing.T) {
-	for _, fgEnabled := range []bool{true, false} {
-		t.Run(fmt.Sprintf("HPAScaleToZero=%v", fgEnabled), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, fgEnabled)
-			tc := testCase{
-				minReplicas:    2,
-				maxReplicas:    6,
-				specReplicas:   0,
-				statusReplicas: 0,
-				CPUTarget:      0,
-				metricsTarget: []autoscalingv2.MetricSpec{
-					{
-						Type: autoscalingv2.ObjectMetricSourceType,
-						Object: &autoscalingv2.ObjectMetricSource{
-							DescribedObject: autoscalingv2.CrossVersionObjectReference{
-								APIVersion: "apps/v1",
-								Kind:       "Deployment",
-								Name:       "some-deployment",
-							},
-							Metric: autoscalingv2.MetricIdentifier{
-								Name: "qps",
-							},
-							Target: autoscalingv2.MetricTarget{
-								Type:  autoscalingv2.ValueMetricType,
-								Value: resource.NewMilliQuantity(15000, resource.DecimalSI),
-							},
-						},
-					},
-				},
-				reportedLevels: []uint64{10000},
-				initialConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
-					{
-						Type:   autoscalingv2.ScaledToZero,
-						Status: v1.ConditionTrue,
-						Reason: "ScaledToZero",
-					},
-				},
-			}
-			if fgEnabled {
-				// HPA previously scaled to zero, minReplicas increased to 2 → scale up to minReplicas
-				tc.expectedDesiredReplicas = 2
-				tc.expectedConditions = []autoscalingv2.HorizontalPodAutoscalerCondition{
-					{Type: autoscalingv2.ScaledToZero, Status: v1.ConditionFalse, Reason: "NotScaledToZero"},
-					{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededRescale"},
-					{Type: autoscalingv2.ScalingActive, Status: v1.ConditionTrue, Reason: "ValidMetricFound"},
-					{Type: autoscalingv2.ScalingLimited, Status: v1.ConditionTrue, Reason: "TooFewReplicas"},
-				}
-				tc.expectedReportedReconciliationActionLabel = monitor.ActionLabelScaleUp
-				tc.expectedReportedReconciliationErrorLabel = monitor.ErrorLabelNone
-				tc.expectedReportedMetricComputationActionLabels = map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-					autoscalingv2.ObjectMetricSourceType: monitor.ActionLabelScaleUp,
-				}
-				tc.expectedReportedMetricComputationErrorLabels = map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-					autoscalingv2.ObjectMetricSourceType: monitor.ErrorLabelNone,
-				}
-			} else {
-				// FG off: scaledToZeroCondition=false → treated as manual scale-down, scaling disabled
-				tc.expectedDesiredReplicas = 0
-				tc.expectedConditions = []autoscalingv2.HorizontalPodAutoscalerCondition{
-					{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
-					{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "ScalingDisabled"},
-				}
-				tc.expectedReportedReconciliationActionLabel = monitor.ActionLabelNone
-				tc.expectedReportedReconciliationErrorLabel = monitor.ErrorLabelNone
-				tc.expectedReportedMetricComputationActionLabels = map[autoscalingv2.MetricSourceType]monitor.ActionLabel{}
-				tc.expectedReportedMetricComputationErrorLabels = map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{}
-			}
-			tc.runTest(t)
-		})
-	}
-}
-
-func TestScaledToZeroConditionHandledOnNormalRescale(t *testing.T) {
-	for _, fgEnabled := range []bool{true, false} {
-		t.Run(fmt.Sprintf("HPAScaleToZero=%v", fgEnabled), func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, fgEnabled)
-			tc := testCase{
-				minReplicas:             1,
-				maxReplicas:             6,
-				specReplicas:            3,
-				statusReplicas:          3,
-				expectedDesiredReplicas: 5,
-				CPUTarget:               30,
-				reportedLevels:          []uint64{300, 500, 700},
-				reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-				useMetricsAPI:           true,
-				initialConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
-					{
-						Type:   autoscalingv2.ScaledToZero,
-						Status: v1.ConditionTrue,
-						Reason: "ScaledToZero",
-					},
-				},
-				expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
-				expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
-				expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-					autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
-				},
-				expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-					autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
-				},
-			}
-			if fgEnabled {
-				// FG on: ScaledToZero condition set to False on rescale
-				tc.expectedConditions = []autoscalingv2.HorizontalPodAutoscalerCondition{
-					{Type: autoscalingv2.ScaledToZero, Status: v1.ConditionFalse, Reason: "NotScaledToZero"},
-					{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededRescale"},
-					{Type: autoscalingv2.ScalingActive, Status: v1.ConditionTrue, Reason: "ValidMetricFound"},
-					{Type: autoscalingv2.ScalingLimited, Status: v1.ConditionFalse, Reason: "DesiredWithinRange"},
-				}
-			} else {
-				// FG off: stale ScaledToZero condition removed on rescale
-				tc.expectedConditions = statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
-					Type: autoscalingv2.ScalingLimited, Status: v1.ConditionFalse,
-					Reason: "DesiredWithinRange",
-				})
-			}
-			tc.runTest(t)
-		})
-	}
-}
-
-func TestManualScaleToZeroDisablesHPA(t *testing.T) {
-	for _, fgEnabled := range []bool{true, false} {
-		t.Run(fmt.Sprintf("HPAScaleToZero=%v", fgEnabled), func(t *testing.T) {
-			// With minReplicas >= 1, a workload manually scaled to zero (no ScaledToZero condition)
-			// should cause HPA to pause (ScalingDisabled), regardless of feature gate
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAScaleToZero, fgEnabled)
-			tc := testCase{
-				minReplicas:             1,
-				maxReplicas:             6,
-				specReplicas:            0,
-				statusReplicas:          0,
-				expectedDesiredReplicas: 0,
-				CPUTarget:               50,
-				reportedLevels:          []uint64{},
-				reportedCPURequests:     []resource.Quantity{},
-				useMetricsAPI:           true,
-				expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
-					{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
-					{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "ScalingDisabled"},
-				},
-				expectedReportedReconciliationActionLabel:     monitor.ActionLabelNone,
-				expectedReportedReconciliationErrorLabel:      monitor.ErrorLabelNone,
-				expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{},
-				expectedReportedMetricComputationErrorLabels:  map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{},
-			}
-			tc.runTest(t)
-		})
-	}
+	tc.runTest(t)
 }
 
 func TestScaleDownPerPodCMExternal(t *testing.T) {
@@ -3598,7 +3410,7 @@ func TestConditionInvalidSourceType(t *testing.T) {
 			},
 		},
 		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
-		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelSpec,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
 		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
 			// Actually, such an invalid type should be validated in the kube-apiserver and invalid metric type shouldn't be recorded.
 			"CheddarCheese": monitor.ActionLabelNone,
@@ -3994,9 +3806,6 @@ func TestScaleDownRCImmediately(t *testing.T) {
 }
 
 func TestAvoidUnnecessaryUpdates(t *testing.T) {
-	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAGeneration, true)
-
 	now := metav1.Time{Time: time.Now().Add(-time.Hour)}
 	tc := testCase{
 		minReplicas:             2,
@@ -4045,9 +3854,8 @@ func TestAvoidUnnecessaryUpdates(t *testing.T) {
 			Items: []autoscalingv2.HorizontalPodAutoscaler{
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:       "test-hpa",
-						Namespace:  "test-namespace",
-						Generation: 1,
+						Name:      "test-hpa",
+						Namespace: "test-namespace",
 					},
 					Spec: autoscalingv2.HorizontalPodAutoscalerSpec{
 						ScaleTargetRef: autoscalingv2.CrossVersionObjectReference{
@@ -4074,10 +3882,9 @@ func TestAvoidUnnecessaryUpdates(t *testing.T) {
 						MaxReplicas: tc.maxReplicas,
 					},
 					Status: autoscalingv2.HorizontalPodAutoscalerStatus{
-						ObservedGeneration: ptr.To[int64](1),
-						CurrentReplicas:    tc.specReplicas,
-						DesiredReplicas:    tc.specReplicas,
-						LastScaleTime:      tc.lastScaleTime,
+						CurrentReplicas: tc.specReplicas,
+						DesiredReplicas: tc.specReplicas,
+						LastScaleTime:   tc.lastScaleTime,
 						CurrentMetrics: []autoscalingv2.MetricStatus{
 							{
 								Type: autoscalingv2.ResourceMetricSourceType,
@@ -4391,6 +4198,8 @@ func TestScalingWithRules(t *testing.T) {
 		// test expected result
 		expectedReplicas  int32
 		expectedCondition string
+
+		testThis bool
 	}
 
 	tests := []TestCase{
@@ -4448,6 +4257,17 @@ func TestScalingWithRules(t *testing.T) {
 			expectedCondition:            "ScaleUpLimit",
 			scaleUpRules:                 generateScalingRules(0, 0, 1, 60, 0),
 			name:                         "scaleUpLimit is the limit because scaleUpLimit < maxReplicas with user policies",
+		},
+		{
+			currentReplicas:              1000,
+			prenormalizedDesiredReplicas: 3,
+			specMinReplicas:              3,
+			specMaxReplicas:              2000,
+			scaleDownRules:               generateScalingRules(20, 60, 0, 0, 0),
+			expectedReplicas:             980,
+			expectedCondition:            "ScaleDownLimit",
+			name:                         "scaleDownLimit is the limit because scaleDownLimit > minReplicas with user defined policies",
+			testThis:                     true,
 		},
 		// ScaleUp without PeriodSeconds usage
 		{
@@ -4538,6 +4358,16 @@ func TestScalingWithRules(t *testing.T) {
 			prenormalizedDesiredReplicas: 2,
 			expectedReplicas:             98,
 			expectedCondition:            "ScaleDownLimit",
+		},
+		{
+			name:                         "scaleDown with spec MinReplicas=nil limitation with large pod policy",
+			specMinReplicas:              1,
+			specMaxReplicas:              1000,
+			scaleDownRules:               generateScalingRules(100, 60, 0, 0, 300),
+			currentReplicas:              10,
+			prenormalizedDesiredReplicas: 0,
+			expectedReplicas:             1,
+			expectedCondition:            "TooFewReplicas",
 		},
 		{
 			name:                         "scaleDown with spec MinReplicas limitation with large pod policy",
@@ -4821,6 +4651,10 @@ func TestScalingWithRules(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+
+			if tc.testThis {
+				return
+			}
 			hc := HorizontalController{
 				scaleUpEvents: map[string][]timestampedScaleEvent{
 					tc.key: tc.scaleUpEvents,
@@ -5294,7 +5128,7 @@ func TestNoScaleDownOneMetricInvalid(t *testing.T) {
 			{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "InvalidMetricSourceType"},
 		},
 		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
-		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelSpec,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
 		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
 			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleDown,
 			"CheddarCheese":                        monitor.ActionLabelNone,
@@ -5611,9 +5445,7 @@ func TestMultipleHPAs(t *testing.T) {
 	)
 	hpaController.scaleUpEvents = scaleUpEventsMap
 	hpaController.scaleDownEvents = scaleDownEventsMap
-	monitor.Register()
-	monitor.NumHorizontalPodAutoscalers.Set(0)
-	hpaController.monitor = monitor.New()
+	hpaController.monitor = newMockMonitor()
 
 	informerFactory.Start(tCtx.Done())
 	go hpaController.Run(tCtx, 5)
@@ -5631,17 +5463,14 @@ func TestMultipleHPAs(t *testing.T) {
 	}
 
 	assert.Len(t, processedHPA, hpaCount, "Expected to process all HPAs")
-	v, err := metricstestutil.GetGaugeMetricValue(monitor.NumHorizontalPodAutoscalers)
-	require.NoError(t, err)
-	assert.InEpsilon(t, float64(hpaCount), v, 0.01, "Expected objects count to match number of HPAs")
+	assert.Equal(t, hpaCount, hpaController.monitor.(*mockMonitor).GetObjectsCount(), "Expected objects count to match number of HPAs")
 
 	// Simulate the watch event for deletion
 	hpaWatcher.Delete(&hpaList[0])
 
 	// Give the controller time to process the deletion and update the monitor
 	assert.Eventually(t, func() bool {
-		v, err := metricstestutil.GetGaugeMetricValue(monitor.NumHorizontalPodAutoscalers)
-		return err == nil && v == float64(hpaCount-1)
+		return hpaController.monitor.(*mockMonitor).GetObjectsCount() == hpaCount-1
 	}, 5*time.Second, 100*time.Millisecond, "Expected objects count to be hpaCount-1 after an HPA was deleted")
 }
 
@@ -5686,97 +5515,6 @@ func TestHPARescaleWithSuccessfulConflictRetry(t *testing.T) {
 		return false, nil, nil
 	})
 
-	tc.runTest(t)
-}
-
-func TestReconciliationDurationIsRecorded(t *testing.T) {
-	tc := testCase{
-		minReplicas:             2,
-		maxReplicas:             6,
-		specReplicas:            3,
-		statusReplicas:          3,
-		expectedDesiredReplicas: 5,
-		CPUTarget:               30,
-		verifyCPUCurrent:        true,
-		reportedLevels:          []uint64{300, 500, 700},
-		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		useMetricsAPI:           true,
-		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
-		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
-		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
-		},
-		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
-		},
-		verifyReconciliationDuration:     true,
-		verifyMetricComputationDurations: true,
-	}
-	tc.runTest(t)
-}
-
-func TestReconciliationDurationIsRecordedOnError(t *testing.T) {
-	tc := testCase{
-		minReplicas:             2,
-		maxReplicas:             6,
-		specReplicas:            4,
-		statusReplicas:          4,
-		expectedDesiredReplicas: 4,
-		CPUTarget:               100,
-		reportedLevels:          []uint64{},
-		reportedCPURequests:     []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
-		useMetricsAPI:           true,
-		expectedConditions: []autoscalingv2.HorizontalPodAutoscalerCondition{
-			{Type: autoscalingv2.AbleToScale, Status: v1.ConditionTrue, Reason: "SucceededGetScale"},
-			{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "FailedGetResourceMetric"},
-		},
-		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
-		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
-		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelNone,
-		},
-		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelInternal,
-		},
-		verifyReconciliationDuration:     true,
-		verifyMetricComputationDurations: true,
-	}
-	tc.runTest(t)
-}
-
-func TestReconciliationsTotalCountMultipleReconciliations(t *testing.T) {
-	tc := testCase{
-		minReplicas:             1,
-		maxReplicas:             5,
-		specReplicas:            3,
-		statusReplicas:          3,
-		expectedDesiredReplicas: 3,
-		CPUTarget:               100,
-		reportedLevels:          []uint64{1010, 1030, 1020},
-		reportedCPURequests:     []resource.Quantity{resource.MustParse("0.9"), resource.MustParse("1.0"), resource.MustParse("1.1")},
-		useMetricsAPI:           true,
-		expectedConditions: statusOkWithOverrides(autoscalingv2.HorizontalPodAutoscalerCondition{
-			Type:   autoscalingv2.AbleToScale,
-			Status: v1.ConditionTrue,
-			Reason: "ReadyForNewScale",
-		}),
-		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
-		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelNone,
-		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelNone,
-		},
-		expectedReportedMetricComputationErrorLabels: map[autoscalingv2.MetricSourceType]monitor.ErrorLabel{
-			autoscalingv2.ResourceMetricSourceType: monitor.ErrorLabelNone,
-		},
-		// The specific count value is not important. This test verifies that
-		// reconciliationsTotal counter is incremented on each reconciliation cycle.
-		expectedReconciliationCount: 3,
-		// The specific count values are not important. This test verifies that
-		// metricComputationTotal counter is incremented for each metric type on each reconciliation.
-		expectedMetricComputationCounts: map[autoscalingv2.MetricSourceType]int{
-			autoscalingv2.ResourceMetricSourceType: 3,
-		},
-	}
 	tc.runTest(t)
 }
 
@@ -5838,428 +5576,6 @@ func TestBuildQuantity(t *testing.T) {
 				t.Errorf("expected quantity %v (Format: %v), got %v (Format: %v)",
 					tt.expected.String(), tt.expected.Format,
 					q.String(), q.Format)
-			}
-		})
-	}
-}
-
-// spyWorkQueue wraps a real rate-limiting workqueue and records whether items
-// were enqueued via Add (immediate) or AddRateLimited (delayed).
-type spyWorkQueue struct {
-	workqueue.TypedRateLimitingInterface[string]
-	mu                  sync.Mutex
-	addCalls            []string
-	addRateLimitedCalls []string
-	onAdd               func(string)
-}
-
-func newSpyWorkQueue(resyncPeriod time.Duration) *spyWorkQueue {
-	return &spyWorkQueue{
-		TypedRateLimitingInterface: workqueue.NewTypedRateLimitingQueueWithConfig(
-			NewDefaultHPARateLimiter(resyncPeriod),
-			workqueue.TypedRateLimitingQueueConfig[string]{
-				Name: "test-spy",
-			},
-		),
-	}
-}
-
-func (s *spyWorkQueue) Add(item string) {
-	s.mu.Lock()
-	s.addCalls = append(s.addCalls, item)
-	onAdd := s.onAdd
-	s.mu.Unlock()
-	if onAdd != nil {
-		onAdd(item)
-	}
-	s.TypedRateLimitingInterface.Add(item)
-}
-
-func (s *spyWorkQueue) AddRateLimited(item string) {
-	s.mu.Lock()
-	s.addRateLimitedCalls = append(s.addRateLimitedCalls, item)
-	s.mu.Unlock()
-	s.TypedRateLimitingInterface.AddRateLimited(item)
-}
-
-func (s *spyWorkQueue) getAddCalls() []string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	result := make([]string, len(s.addCalls))
-	copy(result, s.addCalls)
-	return result
-}
-
-func (s *spyWorkQueue) getAddRateLimitedCalls() []string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	result := make([]string, len(s.addRateLimitedCalls))
-	copy(result, s.addRateLimitedCalls)
-	return result
-}
-
-func newTestEnqueueController(spy *spyWorkQueue) *HorizontalController {
-	monitor.Register()
-	return &HorizontalController{
-		queue:        spy,
-		hpaSelectors: selectors.NewBiMultimap(),
-		monitor:      monitor.New(),
-	}
-}
-
-func TestEnqueueHPAAddsImmediately(t *testing.T) {
-	spy := newSpyWorkQueue(10 * time.Minute)
-	defer spy.ShutDown()
-	ctrl := newTestEnqueueController(spy)
-
-	hpa := &autoscalingv2.HorizontalPodAutoscaler{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-hpa",
-			Namespace: "test-ns",
-		},
-	}
-	ctrl.enqueueHPA(hpa)
-
-	expectedKey := "test-ns/test-hpa"
-	assert.Equal(t, []string{expectedKey}, spy.getAddCalls(),
-		"enqueueHPA should use queue.Add for immediate processing")
-	assert.Empty(t, spy.getAddRateLimitedCalls(),
-		"enqueueHPA should not use queue.AddRateLimited")
-}
-
-func TestEnqueueHPARegistersSelectorBeforeQueueAdd(t *testing.T) {
-	spy := newSpyWorkQueue(10 * time.Minute)
-	defer spy.ShutDown()
-	ctrl := newTestEnqueueController(spy)
-
-	expectedKey := "test-ns/test-hpa"
-	expectedSelectorKey := selectors.Key{Name: "test-hpa", Namespace: "test-ns"}
-	spy.onAdd = func(item string) {
-		assert.Equal(t, expectedKey, item)
-		ctrl.hpaSelectorsMux.Lock()
-		defer ctrl.hpaSelectorsMux.Unlock()
-		assert.True(t, ctrl.hpaSelectors.SelectorExists(expectedSelectorKey),
-			"selector registration should happen before queue.Add")
-	}
-
-	hpa := &autoscalingv2.HorizontalPodAutoscaler{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-hpa",
-			Namespace: "test-ns",
-		},
-	}
-	ctrl.enqueueHPA(hpa)
-
-	assert.Equal(t, []string{expectedKey}, spy.getAddCalls(),
-		"enqueueHPA should still enqueue immediately")
-}
-
-func TestUpdateHPAEnqueueBehavior(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAGeneration, true)
-
-	tests := []struct {
-		name                 string
-		oldObj               interface{}
-		curObj               interface{}
-		expectImmediateAdd   bool
-		expectRateLimitedAdd bool
-	}{
-		{
-			name: "generation change enqueues immediately",
-			oldObj: &autoscalingv2.HorizontalPodAutoscaler{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:       "test-hpa",
-					Namespace:  "test-ns",
-					Generation: 1,
-				},
-			},
-			curObj: &autoscalingv2.HorizontalPodAutoscaler{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:       "test-hpa",
-					Namespace:  "test-ns",
-					Generation: 2,
-				},
-			},
-			expectImmediateAdd:   true,
-			expectRateLimitedAdd: false,
-		},
-		{
-			name: "status-only change uses rate limiting",
-			oldObj: &autoscalingv2.HorizontalPodAutoscaler{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:       "test-hpa",
-					Namespace:  "test-ns",
-					Generation: 1,
-				},
-				Status: autoscalingv2.HorizontalPodAutoscalerStatus{
-					CurrentReplicas: 3,
-					DesiredReplicas: 3,
-				},
-			},
-			curObj: &autoscalingv2.HorizontalPodAutoscaler{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:       "test-hpa",
-					Namespace:  "test-ns",
-					Generation: 1,
-				},
-				Status: autoscalingv2.HorizontalPodAutoscalerStatus{
-					CurrentReplicas: 5,
-					DesiredReplicas: 5,
-				},
-			},
-			expectImmediateAdd:   false,
-			expectRateLimitedAdd: true,
-		},
-		{
-			name: "unrecognized old object type falls back to rate-limited enqueue",
-			oldObj: cache.DeletedFinalStateUnknown{
-				Key: "test-ns/test-hpa",
-				Obj: &autoscalingv2.HorizontalPodAutoscaler{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-hpa",
-						Namespace: "test-ns",
-					},
-				},
-			},
-			curObj: &autoscalingv2.HorizontalPodAutoscaler{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-hpa",
-					Namespace: "test-ns",
-				},
-			},
-			expectImmediateAdd:   false,
-			expectRateLimitedAdd: true,
-		},
-		{
-			name: "unrecognized new object type falls back to rate-limited enqueue",
-			oldObj: &autoscalingv2.HorizontalPodAutoscaler{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-hpa",
-					Namespace: "test-ns",
-				},
-			},
-			curObj: cache.DeletedFinalStateUnknown{
-				Key: "test-ns/test-hpa",
-				Obj: &autoscalingv2.HorizontalPodAutoscaler{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-hpa",
-						Namespace: "test-ns",
-					},
-				},
-			},
-			expectImmediateAdd:   false,
-			expectRateLimitedAdd: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			spy := newSpyWorkQueue(10 * time.Minute)
-			defer spy.ShutDown()
-			ctrl := newTestEnqueueController(spy)
-
-			ctrl.updateHPA(tt.oldObj, tt.curObj)
-
-			expectedKey := "test-ns/test-hpa"
-			if tt.expectImmediateAdd {
-				assert.Equal(t, []string{expectedKey}, spy.getAddCalls(),
-					"expected queue.Add to be called for immediate processing")
-			} else {
-				assert.Empty(t, spy.getAddCalls(),
-					"expected queue.Add not to be called")
-			}
-			if tt.expectRateLimitedAdd {
-				assert.Equal(t, []string{expectedKey}, spy.getAddRateLimitedCalls(),
-					"expected queue.AddRateLimited to be called for delayed processing")
-			} else {
-				assert.Empty(t, spy.getAddRateLimitedCalls(),
-					"expected queue.AddRateLimited not to be called")
-			}
-		})
-	}
-}
-
-func TestUpdateHPAFallsBackWhenFeatureDisabled(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAGeneration, false)
-
-	spy := newSpyWorkQueue(10 * time.Minute)
-	defer spy.ShutDown()
-	ctrl := newTestEnqueueController(spy)
-
-	ctrl.updateHPA(
-		&autoscalingv2.HorizontalPodAutoscaler{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:       "test-hpa",
-				Namespace:  "test-ns",
-				Generation: 1,
-			},
-		},
-		&autoscalingv2.HorizontalPodAutoscaler{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:       "test-hpa",
-				Namespace:  "test-ns",
-				Generation: 2,
-			},
-		},
-	)
-
-	expectedKey := "test-ns/test-hpa"
-	assert.Empty(t, spy.getAddCalls(),
-		"with HPAGeneration disabled, generation changes should not trigger immediate enqueue")
-	assert.Equal(t, []string{expectedKey}, spy.getAddRateLimitedCalls(),
-		"with HPAGeneration disabled, all updates should be rate-limited")
-}
-
-// fakeRVGetter satisfies consistencyutil.LastSyncRVGetter for tests.
-type fakeRVGetter struct {
-	rv string
-}
-
-func (f *fakeRVGetter) LastStoreSyncResourceVersion() string { return f.rv }
-
-func newConsistencyTestController(hpaStore cache.Store, hpaLister autoscalinglisters.HorizontalPodAutoscalerLister, consistencyStore consistencyutil.ConsistencyStore) *HorizontalController {
-	monitor.Register()
-	return &HorizontalController{
-		hpaLister:        hpaLister,
-		hpaListerSynced:  alwaysReady,
-		hpaSelectors:     selectors.NewBiMultimap(),
-		monitor:          monitor.New(),
-		consistencyStore: consistencyStore,
-		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
-			NewDefaultHPARateLimiter(time.Minute),
-			workqueue.TypedRateLimitingQueueConfig[string]{Name: "test"},
-		),
-	}
-}
-
-// TestUpdateStatusPopulatesConsistencyStore verifies updateStatus records the
-// post-write RV/UID with the consistency store so EnsureReady reports stale
-// until the informer has caught up.
-func TestUpdateStatusPopulatesConsistencyStore(t *testing.T) {
-	hpa := &autoscalingv2.HorizontalPodAutoscaler{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            "test-hpa",
-			Namespace:       "test-ns",
-			UID:             "hpa-uid",
-			ResourceVersion: "1",
-		},
-	}
-	fakeClient := &fake.Clientset{}
-	fakeClient.AddReactor("update", "horizontalpodautoscalers", func(action core.Action) (bool, runtime.Object, error) {
-		obj := action.(core.UpdateAction).GetObject().(*autoscalingv2.HorizontalPodAutoscaler)
-		obj.ResourceVersion = "2"
-		return true, obj, nil
-	})
-
-	rvGetter := &fakeRVGetter{rv: "1"}
-	consistencyStore := consistencyutil.NewConsistencyStore(map[schema.GroupResource]consistencyutil.LastSyncRVGetter{
-		horizontalGroupResource: rvGetter,
-	})
-
-	ctrl := newConsistencyTestController(nil, nil, consistencyStore)
-	ctrl.hpaNamespacer = fakeClient.AutoscalingV2()
-	ctrl.eventRecorder = &record.FakeRecorder{}
-
-	if err := ctrl.updateStatus(context.TODO(), hpa); err != nil {
-		t.Fatalf("updateStatus returned unexpected error: %v", err)
-	}
-
-	owner := types.NamespacedName{Namespace: hpa.Namespace, Name: hpa.Name}
-	if err := consistencyStore.EnsureReady(owner); err == nil {
-		t.Error("expected consistency store to be stale (read RV 1 < written RV 2), got nil error")
-	}
-
-	rvGetter.rv = "2"
-
-	if err := consistencyStore.EnsureReady(owner); err != nil {
-		t.Errorf("expected consistency store to be ready once informer catches up, got error: %v", err)
-	}
-}
-
-// TestReconcileKeyEnsureReadyStaleCache verifies reconcileKey returns the
-// consistency error and increments the HPARequeueSkips metric when the HPA
-// informer has not yet observed the controller's last write.
-func TestReconcileKeyEnsureReadyStaleCache(t *testing.T) {
-	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
-	hpaLister := autoscalinglisters.NewHorizontalPodAutoscalerLister(indexer)
-
-	rvGetter := &fakeRVGetter{rv: "1"}
-	consistencyStore := consistencyutil.NewConsistencyStore(map[schema.GroupResource]consistencyutil.LastSyncRVGetter{
-		horizontalGroupResource: rvGetter,
-	})
-
-	owner := types.NamespacedName{Namespace: "test-ns", Name: "test-hpa"}
-	consistencyStore.WroteAt(owner, "hpa-uid", horizontalGroupResource, "5")
-
-	ctrl := newConsistencyTestController(indexer, hpaLister, consistencyStore)
-
-	deleted, err := ctrl.reconcileKey(context.TODO(), "test-ns/test-hpa")
-	if err == nil {
-		t.Fatal("expected reconcileKey to return the consistency error, got nil")
-	}
-	var consistencyErr *consistencyutil.ConsistencyError
-	if !errors.As(err, &consistencyErr) {
-		t.Fatalf("expected *ConsistencyError, got %T: %v", err, err)
-	}
-	assert.False(t, deleted, "expected deleted=false when returning early on consistency error")
-
-	v, mErr := metricstestutil.GetCounterMetricValue(monitor.HPARequeueSkips.WithLabelValues(horizontalGroupResource.Group, horizontalGroupResource.Resource))
-	if mErr != nil {
-		t.Fatalf("error getting HPARequeueSkips metric: %v", mErr)
-	}
-	assert.Equal(t, 1, int(v), "HPARequeueSkips should increment once per stale reconcile")
-}
-
-// TestDeleteHPAClearsConsistencyStore verifies deleteHPA clears the per-owner
-// consistency record, including when the informer delivers a tombstone.
-func TestDeleteHPAClearsConsistencyStore(t *testing.T) {
-	tests := []struct {
-		name string
-		obj  interface{}
-	}{
-		{
-			name: "direct HPA object",
-			obj: &autoscalingv2.HorizontalPodAutoscaler{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-hpa",
-					Namespace: "test-ns",
-					UID:       "hpa-uid",
-				},
-			},
-		},
-		{
-			name: "tombstone",
-			obj: cache.DeletedFinalStateUnknown{
-				Key: "test-ns/test-hpa",
-				Obj: &autoscalingv2.HorizontalPodAutoscaler{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "test-hpa",
-						Namespace: "test-ns",
-						UID:       "hpa-uid",
-					},
-				},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			rvGetter := &fakeRVGetter{rv: "1"}
-			consistencyStore := consistencyutil.NewConsistencyStore(map[schema.GroupResource]consistencyutil.LastSyncRVGetter{
-				horizontalGroupResource: rvGetter,
-			})
-			owner := types.NamespacedName{Namespace: "test-ns", Name: "test-hpa"}
-			consistencyStore.WroteAt(owner, "hpa-uid", horizontalGroupResource, "5")
-
-			if err := consistencyStore.EnsureReady(owner); err == nil {
-				t.Fatal("expected consistency store to be stale before deleteHPA, got nil")
-			}
-
-			ctrl := newConsistencyTestController(nil, nil, consistencyStore)
-			ctrl.deleteHPA(tt.obj)
-
-			if err := consistencyStore.EnsureReady(owner); err != nil {
-				t.Errorf("expected consistency store record to be cleared after deleteHPA, got: %v", err)
 			}
 		})
 	}

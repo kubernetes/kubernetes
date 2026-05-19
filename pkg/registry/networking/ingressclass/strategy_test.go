@@ -17,7 +17,6 @@ limitations under the License.
 package ingressclass
 
 import (
-	"context"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +29,7 @@ func TestIngressClassStrategy(t *testing.T) {
 	if Strategy.NamespaceScoped() {
 		t.Errorf("IngressClass must not be namespace scoped")
 	}
-	if Strategy.AllowCreateOnUpdate(context.Background()) {
+	if Strategy.AllowCreateOnUpdate() {
 		t.Errorf("IngressClass should not allow create on update")
 	}
 

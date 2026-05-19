@@ -90,14 +90,6 @@ connect_registry(){
     fi
 }
 
-# create_hosts_toml creates the hosts.toml file used to configure the local registry for the kind cluster.
-create_hosts_toml() {
-    mkdir -p "test/e2e/testing-manifests/auth/encrypt/certs.d/localhost:5000"
-    cat <<EOF > "test/e2e/testing-manifests/auth/encrypt/certs.d/localhost:5000/hosts.toml"
-[host."http://kind-registry:5000"]
-EOF
-}
-
 # create_cluster_and_run_test creates a kind cluster using kubetest2 and runs e2e tests.
 create_cluster_and_run_test() {
     CLUSTER_CREATE_ATTEMPTED=true
@@ -120,8 +112,6 @@ create_cluster_and_run_test() {
 }
 
 cleanup() {
-    rm -rf test/e2e/testing-manifests/auth/encrypt/certs.d
-
     # CLUSTER_CREATE_ATTEMPTED is true once we run kubetest2 kind --up
     if [ "${CLUSTER_CREATE_ATTEMPTED:-}" = true ]; then
         if [ "${SKIP_COLLECT_LOGS:-}" != "true" ]; then
@@ -172,7 +162,6 @@ main(){
     done;
 
     create_registry
-    create_hosts_toml
     build_and_push_mock_plugin
     connect_registry &
     create_cluster_and_run_test

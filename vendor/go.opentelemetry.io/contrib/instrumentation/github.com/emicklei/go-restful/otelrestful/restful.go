@@ -1,19 +1,30 @@
 // Copyright The OpenTelemetry Authors
-// SPDX-License-Identifier: Apache-2.0
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 package otelrestful // import "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful"
 
 import (
 	"github.com/emicklei/go-restful/v3"
+
+	"go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful/internal/semconvutil"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
-
-	"go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful/internal/semconv"
 )
 
-// ScopeName is the instrumentation scope name.
-const ScopeName = "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful"
+const tracerName = "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful"
 
 // OTelFilter returns a restful.FilterFunction which will trace an incoming request.
 //
@@ -29,14 +40,12 @@ func OTelFilter(service string, opts ...Option) restful.FilterFunction {
 		cfg.TracerProvider = otel.GetTracerProvider()
 	}
 	tracer := cfg.TracerProvider.Tracer(
-		ScopeName,
-		oteltrace.WithInstrumentationVersion(Version),
+		tracerName,
+		oteltrace.WithInstrumentationVersion(Version()),
 	)
 	if cfg.Propagators == nil {
 		cfg.Propagators = otel.GetTextMapPropagator()
 	}
-	semconvServer := semconv.NewHTTPServer(nil)
-
 	return func(req *restful.Request, resp *restful.Response, chain *restful.FilterChain) {
 		r := req.Request
 		ctx := cfg.Propagators.Extract(r.Context(), propagation.HeaderCarrier(r.Header))
@@ -44,11 +53,11 @@ func OTelFilter(service string, opts ...Option) restful.FilterFunction {
 		spanName := route
 
 		opts := []oteltrace.SpanStartOption{
-			oteltrace.WithAttributes(semconvServer.RequestTraceAttrs(service, r, semconv.RequestTraceAttrsOpts{})...),
+			oteltrace.WithAttributes(semconvutil.HTTPServerRequest(service, r)...),
 			oteltrace.WithSpanKind(oteltrace.SpanKindServer),
 		}
 		if route != "" {
-			rAttr := semconvServer.Route(route)
+			rAttr := semconv.HTTPRoute(route)
 			opts = append(opts, oteltrace.WithAttributes(rAttr))
 		}
 
@@ -69,9 +78,9 @@ func OTelFilter(service string, opts ...Option) restful.FilterFunction {
 		chain.ProcessFilter(req, resp)
 
 		status := resp.StatusCode()
-		span.SetStatus(semconvServer.Status(status))
-		span.SetAttributes(semconvServer.ResponseTraceAttrs(semconv.ResponseTelemetry{
-			StatusCode: status,
-		})...)
+		span.SetStatus(semconvutil.HTTPServerStatus(status))
+		if status > 0 {
+			span.SetAttributes(semconv.HTTPStatusCode(status))
+		}
 	}
 }

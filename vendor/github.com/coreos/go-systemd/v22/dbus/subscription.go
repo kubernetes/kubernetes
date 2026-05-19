@@ -15,7 +15,6 @@
 package dbus
 
 import (
-	"context"
 	"errors"
 	"log"
 	"time"
@@ -71,7 +70,7 @@ func (c *Conn) dispatch() {
 			switch signal.Name {
 			case "org.freedesktop.systemd1.Manager.JobRemoved":
 				unitName := signal.Body[2].(string)
-				_ = c.sysobj.Call("org.freedesktop.systemd1.Manager.GetUnit", 0, unitName).Store(&unitPath)
+				c.sysobj.Call("org.freedesktop.systemd1.Manager.GetUnit", 0, unitName).Store(&unitPath)
 			case "org.freedesktop.systemd1.Manager.UnitNew":
 				unitPath = signal.Body[1].(dbus.ObjectPath)
 			case "org.freedesktop.DBus.Properties.PropertiesChanged":
@@ -95,26 +94,16 @@ func (c *Conn) dispatch() {
 	}()
 }
 
-// Deprecated: use SubscribeUnitsContext instead.
-func (c *Conn) SubscribeUnits(interval time.Duration) (<-chan map[string]*UnitStatus, <-chan error) {
-	return c.SubscribeUnitsContext(context.Background(), interval)
-}
-
-// SubscribeUnitsContext returns two unbuffered channels which will receive all changed units every
+// SubscribeUnits returns two unbuffered channels which will receive all changed units every
 // interval.  Deleted units are sent as nil.
-func (c *Conn) SubscribeUnitsContext(ctx context.Context, interval time.Duration) (<-chan map[string]*UnitStatus, <-chan error) {
-	return c.SubscribeUnitsCustomContext(ctx, interval, 0, func(u1, u2 *UnitStatus) bool { return *u1 != *u2 }, nil)
+func (c *Conn) SubscribeUnits(interval time.Duration) (<-chan map[string]*UnitStatus, <-chan error) {
+	return c.SubscribeUnitsCustom(interval, 0, func(u1, u2 *UnitStatus) bool { return *u1 != *u2 }, nil)
 }
 
-// Deprecated: use SubscribeUnitsCustomContext instead.
-func (c *Conn) SubscribeUnitsCustom(interval time.Duration, buffer int, isChanged func(*UnitStatus, *UnitStatus) bool, filterUnit func(string) bool) (<-chan map[string]*UnitStatus, <-chan error) {
-	return c.SubscribeUnitsCustomContext(context.Background(), interval, buffer, isChanged, filterUnit)
-}
-
-// SubscribeUnitsCustomContext is like [Conn.SubscribeUnitsContext] but lets you specify the buffer
+// SubscribeUnitsCustom is like SubscribeUnits but lets you specify the buffer
 // size of the channels, the comparison function for detecting changes and a filter
 // function for cutting down on the noise that your channel receives.
-func (c *Conn) SubscribeUnitsCustomContext(ctx context.Context, interval time.Duration, buffer int, isChanged func(*UnitStatus, *UnitStatus) bool, filterUnit func(string) bool) (<-chan map[string]*UnitStatus, <-chan error) {
+func (c *Conn) SubscribeUnitsCustom(interval time.Duration, buffer int, isChanged func(*UnitStatus, *UnitStatus) bool, filterUnit func(string) bool) (<-chan map[string]*UnitStatus, <-chan error) {
 	old := make(map[string]*UnitStatus)
 	statusChan := make(chan map[string]*UnitStatus, buffer)
 	errChan := make(chan error, buffer)
@@ -123,7 +112,7 @@ func (c *Conn) SubscribeUnitsCustomContext(ctx context.Context, interval time.Du
 		for {
 			timerChan := time.After(interval)
 
-			units, err := c.ListUnitsContext(ctx)
+			units, err := c.ListUnits()
 			if err == nil {
 				cur := make(map[string]*UnitStatus)
 				for i := range units {
@@ -156,14 +145,7 @@ func (c *Conn) SubscribeUnitsCustomContext(ctx context.Context, interval time.Du
 				errChan <- err
 			}
 
-			select {
-			case <-timerChan:
-				continue
-			case <-ctx.Done():
-				close(statusChan)
-				close(errChan)
-				return
-			}
+			<-timerChan
 		}
 	}()
 
@@ -280,7 +262,7 @@ func (c *Conn) shouldIgnore(path dbus.ObjectPath) bool {
 	return ok && t >= time.Now().UnixNano()
 }
 
-func (c *Conn) updateIgnore(path dbus.ObjectPath, info map[string]any) {
+func (c *Conn) updateIgnore(path dbus.ObjectPath, info map[string]interface{}) {
 	loadState, ok := info["LoadState"].(string)
 	if !ok {
 		return

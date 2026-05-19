@@ -113,9 +113,6 @@ func sizeMap(mapv reflect.Value, mapi *mapInfo, f *coderFieldInfo, opts marshalO
 }
 
 func consumeMap(b []byte, mapv reflect.Value, wtyp protowire.Type, mapi *mapInfo, f *coderFieldInfo, opts unmarshalOptions) (out unmarshalOutput, err error) {
-	if opts.depth--; opts.depth < 0 {
-		return out, errRecursionDepth
-	}
 	if wtyp != protowire.BytesType {
 		return out, errUnknown
 	}
@@ -173,9 +170,6 @@ func consumeMap(b []byte, mapv reflect.Value, wtyp protowire.Type, mapi *mapInfo
 }
 
 func consumeMapOfMessage(b []byte, mapv reflect.Value, wtyp protowire.Type, mapi *mapInfo, f *coderFieldInfo, opts unmarshalOptions) (out unmarshalOutput, err error) {
-	if opts.depth--; opts.depth < 0 {
-		return out, errRecursionDepth
-	}
 	if wtyp != protowire.BytesType {
 		return out, errUnknown
 	}

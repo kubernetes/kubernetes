@@ -1,4 +1,5 @@
 //go:build !linux && !windows
+// +build !linux,!windows
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -24,7 +25,6 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
-	"k8s.io/klog/v2"
 )
 
 type cadvisorUnsupported struct {
@@ -33,7 +33,7 @@ type cadvisorUnsupported struct {
 var _ Interface = new(cadvisorUnsupported)
 
 // New creates a new cAdvisor Interface for unsupported systems.
-func New(_ klog.Logger, imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupsRoots []string, usingLegacyStats, localStorageCapacityIsolation bool) (Interface, error) {
+func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupsRoots []string, usingLegacyStats, localStorageCapacityIsolation bool) (Interface, error) {
 	return &cadvisorUnsupported{}, nil
 }
 
@@ -73,8 +73,4 @@ func (cu *cadvisorUnsupported) ContainerFsInfo(context.Context) (cadvisorapiv2.F
 
 func (cu *cadvisorUnsupported) GetDirFsInfo(path string) (cadvisorapiv2.FsInfo, error) {
 	return cadvisorapiv2.FsInfo{}, nil
-}
-
-func IsPsiEnabled(_ klog.Logger) bool {
-	return false
 }

@@ -18,6 +18,8 @@ package sysctl
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // TestConvertSysctlVariableToDotsSeparator tests whether the sysctl variable
@@ -39,8 +41,6 @@ func TestConvertSysctlVariableToDotsSeparator(t *testing.T) {
 
 	for _, test := range valid {
 		convertSysctlVal := NormalizeName(test.in)
-		if test.out != convertSysctlVal {
-			t.Errorf("The sysctl variable was not converted correctly. got: %s, want: %s", convertSysctlVal, test.out)
-		}
+		assert.Equalf(t, test.out, convertSysctlVal, "The sysctl variable was not converted correctly. got: %s, want: %s", convertSysctlVal, test.out)
 	}
 }

@@ -20,34 +20,23 @@ limitations under the License.
 // object, and the program should call InstallHandler once. e.g.,
 //
 //	func main() {
-//		if err := setupConfigz(); err != nil {
-//			klog.Fatalf("Failed to setup configz: %v", err)
-//		}
-//		http.ListenAndServe(":8080", http.DefaultServeMux)
-//	}
-//
-//	func setupConfigz() error {
 //		boatConfig := getBoatConfig()
 //		planeConfig := getPlaneConfig()
 //
 //		bcz, err := configz.New("boat")
 //		if err != nil {
-//			return fmt.Errorf("unable to register boat config: %w", err)
+//			panic(err)
 //		}
-//		if err := bcz.Set(boatConfig); err != nil {
-//			return fmt.Errorf("unable to set boat config: %w", err)
-//		}
+//		bcz.Set(boatConfig)
 //
 //		pcz, err := configz.New("plane")
 //		if err != nil {
-//			return fmt.Errorf("unable to register plane config: %w", err)
+//			panic(err)
 //		}
-//		if err := pcz.Set(planeConfig); err != nil {
-//			return fmt.Errorf("unable to set plane config: %w", err)
-//		}
+//		pcz.Set(planeConfig)
 //
 //		configz.InstallHandler(http.DefaultServeMux)
-//		return nil
+//		http.ListenAndServe(":8080", http.DefaultServeMux)
 //	}
 package configz
 
@@ -56,8 +45,6 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
-
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const DefaultConfigzPath = "/configz"
@@ -70,7 +57,7 @@ var (
 // Config is a handle to a ComponentConfig object. Don't create these directly;
 // use New() instead.
 type Config struct {
-	val runtime.Object
+	val interface{}
 }
 
 // InstallHandler adds an HTTP handler on the given mux for the "/configz"
@@ -105,24 +92,10 @@ func Delete(name string) {
 }
 
 // Set sets the ComponentConfig for this Config.
-func (v *Config) Set(val runtime.Object) error {
+func (v *Config) Set(val interface{}) {
 	configsGuard.Lock()
 	defer configsGuard.Unlock()
-	if val == nil {
-		return fmt.Errorf("val may not be nil")
-	}
-	gvk := val.GetObjectKind().GroupVersionKind()
-	if len(gvk.Kind) == 0 {
-		return fmt.Errorf("val must specify a kind")
-	}
-	if gvk.GroupVersion().Empty() {
-		return fmt.Errorf("val must specify a group/version")
-	}
-	if gvk.Version == runtime.APIVersionInternal {
-		return fmt.Errorf("val must specify an external version")
-	}
 	v.val = val
-	return nil
 }
 
 // MarshalJSON marshals the ComponentConfig as JSON data.

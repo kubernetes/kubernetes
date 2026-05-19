@@ -1,4 +1,5 @@
 //go:build linux
+// +build linux
 
 /*
 Copyright 2016 The Kubernetes Authors.
@@ -78,7 +79,7 @@ func validateOOMScoreAdjSettingIsInRange(pid int, expectedMinOOMScoreAdj, expect
 }
 
 func dumpRunningContainer(ctx context.Context) error {
-	runtime, _, err := getCRIClient(ctx)
+	runtime, _, err := getCRIClient()
 	if err != nil {
 		return err
 	}

@@ -41,9 +41,6 @@ type ResourceHealthApplyConfiguration struct {
 	//
 	// In future we may want to introduce the PermanentlyUnhealthy Status.
 	Health *corev1.ResourceHealthStatus `json:"health,omitempty"`
-	// Message provides human-readable context for Health (e.g. "ECC error count exceeded threshold").
-	// This field is populated by the kubelet when ResourceHealthStatusMessage is enabled if the DRA plugin returns a message, and is null otherwise.
-	Message *string `json:"message,omitempty"`
 }
 
 // ResourceHealthApplyConfiguration constructs a declarative configuration of the ResourceHealth type for use with
@@ -65,13 +62,5 @@ func (b *ResourceHealthApplyConfiguration) WithResourceID(value corev1.ResourceI
 // If called multiple times, the Health field is set to the value of the last call.
 func (b *ResourceHealthApplyConfiguration) WithHealth(value corev1.ResourceHealthStatus) *ResourceHealthApplyConfiguration {
 	b.Health = &value
-	return b
-}
-
-// WithMessage sets the Message field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Message field is set to the value of the last call.
-func (b *ResourceHealthApplyConfiguration) WithMessage(value string) *ResourceHealthApplyConfiguration {
-	b.Message = &value
 	return b
 }

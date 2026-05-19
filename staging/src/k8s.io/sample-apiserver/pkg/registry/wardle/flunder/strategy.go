@@ -84,11 +84,11 @@ func (flunderStrategy) Validate(ctx context.Context, obj runtime.Object) field.E
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (flunderStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
 
-func (flunderStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
+func (flunderStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-func (flunderStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+func (flunderStrategy) AllowUnconditionalUpdate() bool {
 	return false
 }
 

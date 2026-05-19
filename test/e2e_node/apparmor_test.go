@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
@@ -41,7 +42,6 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/third_party/forked/libcontainer/apparmor"
 	admissionapi "k8s.io/pod-security-admission/api"
-	"k8s.io/utils/dump"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"

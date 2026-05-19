@@ -1,4 +1,5 @@
 //go:build linux
+// +build linux
 
 /*
 Copyright 2015 The Kubernetes Authors.
@@ -381,7 +382,7 @@ func deletePodsSync(ctx context.Context, f *framework.Framework, pods []*v1.Pod)
 // newTestPods creates a list of pods (specification) for test.
 func newTestPods(numPods int, volume bool, imageName, podType string) []*v1.Pod {
 	var pods []*v1.Pod
-	for range numPods {
+	for i := 0; i < numPods; i++ {
 		podName := "test-" + string(uuid.NewUUID())
 		labels := map[string]string{
 			"type": podType,

@@ -33,7 +33,6 @@ option go_package = "k8s.io/api/extensions/v1beta1";
 // DEPRECATED - This group version of DaemonSet is deprecated by apps/v1beta2/DaemonSet. See the release notes for
 // more information.
 // DaemonSet represents the configuration of a daemon set.
-// +k8s:supportsSubresource="/status"
 message DaemonSet {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -203,7 +202,6 @@ message DaemonSetUpdateStrategy {
 // DEPRECATED - This group version of Deployment is deprecated by apps/v1beta2/Deployment. See the release notes for
 // more information.
 // Deployment enables declarative updates for Pods and ReplicaSets.
-// +k8s:supportsSubresource="/status"
 message Deployment {
   // Standard object metadata.
   // +optional
@@ -430,8 +428,6 @@ message HTTPIngressRuleValue {
 message IPBlock {
   // CIDR is a string representing the IP Block
   // Valid examples are "192.168.1.0/24" or "2001:db8::/64"
-  // +required
-  // +k8s:alpha(since: "1.36")=+k8s:required
   optional string cidr = 1;
 
   // Except is a slice of CIDRs that should not be included within an IP Block
@@ -447,7 +443,6 @@ message IPBlock {
 // externally-reachable urls, load balance traffic, terminate SSL, offer name
 // based virtual hosting etc.
 // DEPRECATED - This group version of Ingress is deprecated by networking.k8s.io/v1beta1 Ingress. See the release notes for more information.
-// +k8s:supportsSubresource="/status"
 message Ingress {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -691,7 +686,6 @@ message NetworkPolicyEgressRule {
   // allows traffic only if the traffic matches at least one item in the to list.
   // +optional
   // +listType=atomic
-  // +k8s:alpha(since: "1.36")=+k8s:optional
   repeated NetworkPolicyPeer to = 2;
 }
 
@@ -714,7 +708,6 @@ message NetworkPolicyIngressRule {
   // traffic matches at least one item in the from list.
   // +optional
   // +listType=atomic
-  // +k8s:alpha(since: "1.36")=+k8s:optional
   repeated NetworkPolicyPeer from = 2;
 }
 
@@ -753,7 +746,6 @@ message NetworkPolicyPeer {
   // IPBlock defines policy on a particular IPBlock. If this field is set then
   // neither of the other fields can be.
   // +optional
-  // +k8s:alpha(since: "1.36")=+k8s:optional
   optional IPBlock ipBlock = 3;
 }
 
@@ -797,7 +789,6 @@ message NetworkPolicySpec {
   // (and serves solely to ensure that the pods it selects are isolated by default).
   // +optional
   // +listType=atomic
-  // +k8s:alpha(since: "1.36")=+k8s:optional
   repeated NetworkPolicyIngressRule ingress = 2;
 
   // List of egress rules to be applied to the selected pods. Outgoing traffic is
@@ -809,7 +800,6 @@ message NetworkPolicySpec {
   // This field is beta-level in 1.8
   // +optional
   // +listType=atomic
-  // +k8s:alpha(since: "1.36")=+k8s:optional
   repeated NetworkPolicyEgressRule egress = 3;
 
   // List of rule types that the NetworkPolicy relates to.
@@ -830,7 +820,6 @@ message NetworkPolicySpec {
 // DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1beta2/ReplicaSet. See the release notes for
 // more information.
 // ReplicaSet ensures that a specified number of pod replicas are running at any given time.
-// +k8s:supportsSubresource="/status"
 message ReplicaSet {
   // If the Labels of a ReplicaSet are empty, they are defaulted to
   // be the same as the Pod(s) that the ReplicaSet manages.
@@ -1050,9 +1039,9 @@ message Scale {
 message ScaleSpec {
   // desired number of instances for the scaled object.
   // +optional
-  // +k8s:alpha(since: "1.36")=+k8s:optional
+  // +k8s:optional
   // +default=0
-  // +k8s:alpha(since: "1.36")=+k8s:minimum=0
+  // +k8s:minimum=0
   optional int32 replicas = 1;
 }
 

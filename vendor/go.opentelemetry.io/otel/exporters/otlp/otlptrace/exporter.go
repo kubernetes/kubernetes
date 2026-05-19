@@ -94,7 +94,7 @@ func NewUnstarted(client Client) *Exporter {
 }
 
 // MarshalLog is the marshaling function used by the logging system to represent this Exporter.
-func (e *Exporter) MarshalLog() any {
+func (e *Exporter) MarshalLog() interface{} {
 	return struct {
 		Type   string
 		Client Client

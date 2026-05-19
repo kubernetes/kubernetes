@@ -1,4 +1,4 @@
-// Copyright The Prometheus Authors
+// Copyright 2019 The Prometheus Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -388,21 +388,20 @@ func parseFscacheinfo(r io.Reader) (*Fscacheinfo, error) {
 				}
 			}
 		case "CacheOp:":
-			switch strings.Split(fields[1], "=")[0] {
-			case "alo":
+			if strings.Split(fields[1], "=")[0] == "alo" {
 				err := setFSCacheFields(fields[1:], &m.CacheopAllocationsinProgress, &m.CacheopLookupObjectInProgress,
 					&m.CacheopLookupCompleteInPorgress, &m.CacheopGrabObjectInProgress)
 				if err != nil {
 					return &m, err
 				}
-			case "inv":
+			} else if strings.Split(fields[1], "=")[0] == "inv" {
 				err := setFSCacheFields(fields[1:], &m.CacheopInvalidations, &m.CacheopUpdateObjectInProgress,
 					&m.CacheopDropObjectInProgress, &m.CacheopPutObjectInProgress, &m.CacheopAttributeChangeInProgress,
 					&m.CacheopSyncCacheInProgress)
 				if err != nil {
 					return &m, err
 				}
-			default:
+			} else {
 				err := setFSCacheFields(fields[1:], &m.CacheopReadOrAllocPageInProgress, &m.CacheopReadOrAllocPagesInProgress,
 					&m.CacheopAllocatePageInProgress, &m.CacheopAllocatePagesInProgress, &m.CacheopWritePagesInProgress,
 					&m.CacheopUncachePagesInProgress, &m.CacheopDissociatePagesInProgress)

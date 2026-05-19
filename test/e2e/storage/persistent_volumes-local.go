@@ -181,7 +181,10 @@ var _ = utils.SIGDescribe("PersistentVolumes-local", func() {
 		}
 	})
 
-	for testVolType := range setupLocalVolumeMap {
+	for tempTestVolType := range setupLocalVolumeMap {
+
+		// New variable required for ginkgo test closures
+		testVolType := tempTestVolType
 		args := []interface{}{fmt.Sprintf("[Volume type: %s]", testVolType)}
 		if testVolType == GCELocalSSDVolumeType {
 			args = append(args, framework.WithSerial())
@@ -290,7 +293,8 @@ var _ = utils.SIGDescribe("PersistentVolumes-local", func() {
 					e2epod.DeletePodOrFail(ctx, config.client, config.ns, pod2.Name)
 				})
 
-				f.It("should set different fsGroup for second pod if first pod is deleted", func(ctx context.Context) {
+				f.It("should set different fsGroup for second pod if first pod is deleted", f.WithFlaky(), func(ctx context.Context) {
+					// TODO: Disabled temporarily, remove [Flaky] tag after #73168 is fixed.
 					fsGroup1, fsGroup2 := int64(1234), int64(4321)
 					ginkgo.By("Create first pod and check fsGroup is set")
 					pod1 := createPodWithFsGroupTest(ctx, config, testVol, fsGroup1, fsGroup1)
@@ -572,9 +576,9 @@ var _ = utils.SIGDescribe("PersistentVolumes-local", func() {
 					return
 				}
 
-				for range numConcurrentPods {
+				for i := 0; i < numConcurrentPods; i++ {
 					pvcs := []*v1.PersistentVolumeClaim{}
-					for range volsPerPod {
+					for j := 0; j < volsPerPod; j++ {
 						pvc := e2epv.MakePersistentVolumeClaim(makeLocalPVCConfig(config, volType), config.ns)
 						pvc, err := e2epv.CreatePVC(ctx, config.client, config.ns, pvc)
 						framework.ExpectNoError(err)
@@ -772,7 +776,7 @@ func podNodeName(ctx context.Context, config *localTestConfig, pod *v1.Pod) (str
 // setupLocalVolumes sets up directories to use for local PV
 func setupLocalVolumes(ctx context.Context, config *localTestConfig, localVolumeType localVolumeType, node *v1.Node, count int) []*localTestVolume {
 	vols := []*localTestVolume{}
-	for range count {
+	for i := 0; i < count; i++ {
 		ltrType, ok := setupLocalVolumeMap[localVolumeType]
 		if !ok {
 			framework.Failf("Invalid localVolumeType: %v", localVolumeType)
@@ -1077,7 +1081,7 @@ func newLocalClaimWithName(config *localTestConfig, name string) *v1.PersistentV
 func createStatefulSet(ctx context.Context, config *localTestConfig, ssReplicas int32, volumeCount int, anti, parallel bool) *appsv1.StatefulSet {
 	mounts := []v1.VolumeMount{}
 	claims := []v1.PersistentVolumeClaim{}
-	for i := range volumeCount {
+	for i := 0; i < volumeCount; i++ {
 		name := fmt.Sprintf("vol%v", i+1)
 		pvc := newLocalClaimWithName(config, name)
 		mounts = append(mounts, v1.VolumeMount{Name: name, MountPath: "/" + name})

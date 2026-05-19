@@ -104,12 +104,12 @@ type FormatOptions struct {
 
 // TextOptions contains options for logging format "text".
 type TextOptions struct {
-	OutputRoutingOptions `json:""`
+	OutputRoutingOptions `json:",inline"`
 }
 
 // JSONOptions contains options for logging format "json".
 type JSONOptions struct {
-	OutputRoutingOptions `json:""`
+	OutputRoutingOptions `json:",inline"`
 }
 
 // OutputRoutingOptions contains options that are supported by both "text" and "json".

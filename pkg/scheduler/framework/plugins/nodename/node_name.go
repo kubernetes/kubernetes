@@ -27,7 +27,9 @@ import (
 )
 
 // NodeName is a plugin that checks if a pod spec node name matches the current node.
-type NodeName struct{}
+type NodeName struct {
+	enableSchedulingQueueHint bool
+}
 
 var _ fwk.FilterPlugin = &NodeName{}
 var _ fwk.EnqueueExtensions = &NodeName{}
@@ -44,10 +46,20 @@ const (
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *NodeName) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
+	// A note about UpdateNodeTaint/UpdateNodeLabel event:
+	// Ideally, it's supposed to register only Add because any Node update event will never change the result from this plugin.
+	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
+	// See: https://github.com/kubernetes/kubernetes/issues/109437
+	nodeActionType := fwk.Add | fwk.UpdateNodeTaint | fwk.UpdateNodeLabel
+	if pl.enableSchedulingQueueHint {
+		// preCheck is not used when QHint is enabled, and hence Update event isn't necessary.
+		nodeActionType = fwk.Add
+	}
+
 	return []fwk.ClusterEventWithHint{
 		// We don't need the QueueingHintFn here because the scheduling of Pods will be always retried with backoff when this Event happens.
 		// (the same as Queue)
-		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add}},
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}},
 	}, nil
 }
 
@@ -78,6 +90,8 @@ func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo) bool {
 }
 
 // New initializes a new plugin and returns it.
-func New(_ context.Context, _ runtime.Object, _ fwk.Handle, _ feature.Features) (fwk.Plugin, error) {
-	return &NodeName{}, nil
+func New(_ context.Context, _ runtime.Object, _ fwk.Handle, fts feature.Features) (fwk.Plugin, error) {
+	return &NodeName{
+		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,
+	}, nil
 }

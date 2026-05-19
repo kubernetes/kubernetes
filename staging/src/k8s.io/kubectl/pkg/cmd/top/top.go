@@ -49,8 +49,6 @@ var (
 		Vertical Pod Autoscaler (VPA). Because of this, the values may not match those
 		from standard OS tools like 'top', as the metrics are designed to provide a
 		stable signal for autoscalers rather than for pinpoint accuracy.
-        
-		FAQ for Metrics Server: https://github.com/kubernetes-sigs/metrics-server/blob/master/FAQ.md
 
 		When to use this command:
 
@@ -70,11 +68,10 @@ var (
 
 func NewCmdTop(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:        "top",
-		Short:      i18n.T("Display resource (CPU/memory) usage"),
-		Long:       topLong,
-		Run:        cmdutil.DefaultSubCommandRun(streams.ErrOut),
-		SuggestFor: []string{"stats"},
+		Use:   "top",
+		Short: i18n.T("Display resource (CPU/memory) usage"),
+		Long:  topLong,
+		Run:   cmdutil.DefaultSubCommandRun(streams.ErrOut),
 	}
 
 	// create subcommands

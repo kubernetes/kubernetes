@@ -1,66 +1,50 @@
-version: "2"
+linters-settings:
+  govet:
+    check-shadowing: true
+  gocyclo:
+    min-complexity: 30
+  maligned:
+    suggest-new: true
+  dupl:
+    threshold: 100
+  goconst:
+    min-len: 2
+    min-occurrences: 4
+  paralleltest:
+    ignore-missing: true
 linters:
-  default: all
+  enable-all: true
   disable:
-    - depguard
-    - funlen
+    - maligned
+    - lll
+    - gochecknoglobals
     - godox
-    - exhaustruct
-    - nlreturn
-    - nonamedreturns
-    - noinlineerr
-    - paralleltest
-    - recvcheck
-    - testpackage
-    - tparallel
-    - varnamelen
+    - gocognit
     - whitespace
-    - wrapcheck
     - wsl
-    - wsl_v5
-  settings:
-    dupl:
-      threshold: 200
-    goconst:
-      min-len: 2
-      min-occurrences: 3
-    cyclop:
-      max-complexity: 20
-    gocyclo:
-      min-complexity: 20
-    exhaustive:
-      default-signifies-exhaustive: true
-      default-case-required: true
-    lll:
-      line-length: 180
-  exclusions:
-    generated: lax
-    presets:
-      - comments
-      - common-false-positives
-      - legacy
-      - std-error-handling
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
-formatters:
-  enable:
-    - gofmt
-    - goimports
+    - funlen
+    - gochecknoglobals
+    - gochecknoinits
+    - scopelint
+    - wrapcheck
+    - exhaustivestruct
+    - exhaustive
+    - nlreturn
+    - testpackage
+    - gci
     - gofumpt
-  exclusions:
-    generated: lax
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
-issues:
-  # Maximum issues count per one linter.
-  # Set to 0 to disable.
-  # Default: 50
-  max-issues-per-linter: 0
-  # Maximum count of issues with the same text.
-  # Set to 0 to disable.
-  # Default: 3
-  max-same-issues: 0
+    - goerr113
+    - gomnd
+    - tparallel
+    - nestif
+    - godot
+    - errorlint
+    - varcheck
+    - interfacer
+    - deadcode
+    - golint
+    - ifshort
+    - structcheck
+    - nosnakecase
+    - varnamelen
+    - exhaustruct

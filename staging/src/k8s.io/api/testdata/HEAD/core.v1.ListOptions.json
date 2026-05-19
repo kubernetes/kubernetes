@@ -10,6 +10,5 @@
   "timeoutSeconds": 5,
   "limit": 7,
   "continue": "continueValue",
-  "sendInitialEvents": true,
-  "shardSelector": "shardSelectorValue"
+  "sendInitialEvents": true
 }

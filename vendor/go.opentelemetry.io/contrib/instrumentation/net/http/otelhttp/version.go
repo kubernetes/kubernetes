@@ -4,4 +4,7 @@
 package otelhttp // import "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
 // Version is the current release version of the otelhttp instrumentation.
-const Version = "0.68.0"
+func Version() string {
+	return "0.61.0"
+	// This string is updated by the pre_release.sh script during release
+}

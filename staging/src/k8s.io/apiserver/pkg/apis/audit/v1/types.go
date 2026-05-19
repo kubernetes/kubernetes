@@ -70,7 +70,7 @@ const (
 
 // Event captures all the information that can be included in an API audit log.
 type Event struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 
 	// AuditLevel at which event was generated
 	Level Level `json:"level" protobuf:"bytes,1,opt,name=level,casttype=Level"`
@@ -156,7 +156,7 @@ type AuthenticationMetadata struct {
 
 // EventList is a list of audit Events.
 type EventList struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -168,7 +168,7 @@ type EventList struct {
 // Policy defines the configuration of audit logging, and the rules for how different request
 // categories are logged.
 type Policy struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 	// ObjectMeta is included for interoperability with API infrastructure.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -200,7 +200,7 @@ type Policy struct {
 
 // PolicyList is a list of audit Policies.
 type PolicyList struct {
-	metav1.TypeMeta `json:""`
+	metav1.TypeMeta `json:",inline"`
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -278,7 +278,6 @@ type PolicyRule struct {
 type GroupResources struct {
 	// Group is the name of the API group that contains the resources.
 	// The empty string represents the core API group.
-	// `*` matches all groups
 	// +optional
 	Group string `json:"group,omitempty" protobuf:"bytes,1,opt,name=group"`
 	// Resources is a list of resources this rule applies to.

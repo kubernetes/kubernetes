@@ -45,7 +45,7 @@ func (n Null) ConvertToNative(typeDesc reflect.Type) (any, error) {
 	switch typeDesc.Kind() {
 	case reflect.Int32:
 		switch typeDesc {
-		case JSONNullType:
+		case jsonNullType:
 			return structpb.NullValue_NULL_VALUE, nil
 		case nullReflectType:
 			return n, nil
@@ -55,18 +55,18 @@ func (n Null) ConvertToNative(typeDesc reflect.Type) (any, error) {
 		case anyValueType:
 			// Convert to a JSON-null before packing to an Any field since the enum value for JSON
 			// null cannot be packed directly.
-			pb, err := n.ConvertToNative(JSONValueType)
+			pb, err := n.ConvertToNative(jsonValueType)
 			if err != nil {
 				return nil, err
 			}
 			return anypb.New(pb.(proto.Message))
-		case JSONValueType:
+		case jsonValueType:
 			return structpb.NewNullValue(), nil
 		case boolWrapperType, byteWrapperType, doubleWrapperType, floatWrapperType,
 			int32WrapperType, int64WrapperType, stringWrapperType, uint32WrapperType,
 			uint64WrapperType, durationValueType, timestampValueType, protoIfaceType:
 			return nil, nil
-		case JSONListType, JSONStructType:
+		case jsonListValueType, jsonStructType:
 			// skip handling
 		default:
 			if typeDesc.Implements(protoIfaceType) {

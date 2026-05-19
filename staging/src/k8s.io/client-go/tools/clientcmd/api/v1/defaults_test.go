@@ -72,6 +72,7 @@ func TestSetDefaults_Config(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			gotOut := test.in.DeepCopy()
 			SetDefaults_ExecConfig(gotOut)

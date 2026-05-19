@@ -133,13 +133,15 @@ func Test_dropDisabledFieldsOnCreate(t *testing.T) {
 func Test_dropDisabledFieldsOnUpdate(t *testing.T) {
 	testcases := []struct {
 		name              string
+		hintsGateEnabled  bool
 		preferSameEnabled bool
 		oldEPS            *discovery.EndpointSlice
 		newEPS            *discovery.EndpointSlice
 		expectedEPS       *discovery.EndpointSlice
 	}{
 		{
-			name: "PreferSameTrafficDistribution disabled, can still set zone hints",
+			name:             "hints gate enabled, set on new EPS",
+			hintsGateEnabled: true,
 			oldEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
 					{
@@ -180,7 +182,92 @@ func Test_dropDisabledFieldsOnUpdate(t *testing.T) {
 			},
 		},
 		{
+			name:             "hints gate disabled, set on new EPS",
+			hintsGateEnabled: false,
+			oldEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: nil,
+					},
+					{
+						Hints: nil,
+					},
+				},
+			},
+			newEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+						},
+					},
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-b"}},
+						},
+					},
+				},
+			},
+			expectedEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: nil,
+					},
+					{
+						Hints: nil,
+					},
+				},
+			},
+		},
+		{
+			name:             "hints gate disabled, set on new and old EPS",
+			hintsGateEnabled: false,
+			oldEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a-old"}},
+						},
+					},
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-b-old"}},
+						},
+					},
+				},
+			},
+			newEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+						},
+					},
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-b"}},
+						},
+					},
+				},
+			},
+			expectedEPS: &discovery.EndpointSlice{
+				Endpoints: []discovery.Endpoint{
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-a"}},
+						},
+					},
+					{
+						Hints: &discovery.EndpointHints{
+							ForZones: []discovery.ForZone{{Name: "zone-b"}},
+						},
+					},
+				},
+			},
+		},
+		{
 			name:              "PreferSameTrafficDistribution gate enabled, set on new EPS",
+			hintsGateEnabled:  true,
 			preferSameEnabled: true,
 			oldEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
@@ -227,6 +314,7 @@ func Test_dropDisabledFieldsOnUpdate(t *testing.T) {
 		},
 		{
 			name:              "PreferSameTrafficDistribution gate disabled, set on new EPS",
+			hintsGateEnabled:  true,
 			preferSameEnabled: false,
 			oldEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
@@ -271,6 +359,7 @@ func Test_dropDisabledFieldsOnUpdate(t *testing.T) {
 		},
 		{
 			name:              "PreferSameTrafficDiscovery gate disabled, set on new and old EPS",
+			hintsGateEnabled:  true,
 			preferSameEnabled: false,
 			oldEPS: &discovery.EndpointSlice{
 				Endpoints: []discovery.Endpoint{
@@ -325,7 +414,10 @@ func Test_dropDisabledFieldsOnUpdate(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			if !testcase.preferSameEnabled {
+			if !testcase.hintsGateEnabled {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.32"))
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TopologyAwareHints, testcase.hintsGateEnabled)
+			} else if !testcase.preferSameEnabled {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreferSameTrafficDistribution, testcase.preferSameEnabled)
 			}

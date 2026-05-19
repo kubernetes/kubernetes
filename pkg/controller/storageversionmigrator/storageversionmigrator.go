@@ -224,7 +224,7 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		return err
 	}
 	if !exists {
-		logger.V(4).Info("resource does not exist in our rest mapper", "gvr", gvr.String())
+		logger.V(4).Error(err, "resource does not exist in our rest mapper", "gvr", gvr.String())
 		if toBeProcessedSVM.CreationTimestamp.Add(time.Minute).After(time.Now()) {
 			return fmt.Errorf("resource does not exist in rest mapper, requeuing to attempt again: %w", err)
 		}
@@ -241,7 +241,7 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		return errMonitor
 	}
 	if !hasSynced {
-		logger.V(4).Info("resource does not exist in GC", "gvr", gvr.String())
+		logger.V(4).Error(errMonitor, "resource does not exist in GC", "gvr", gvr.String())
 
 		// our mapper could be missing a recently created custom resource, so give it some time to catch up
 		// we resync discovery every 30 seconds so twice that should be sufficient
@@ -262,7 +262,18 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 		return fmt.Errorf("GC cache is not up to date, requeuing to attempt again. gcListResourceVersion: %s, listResourceVersion: %s", gcListResourceVersion, listResourceVersion)
 	}
 
-	err, failedMigration := svmc.runMigration(ctx, *gvr, resourceMonitor, toBeProcessedSVM, listResourceVersion)
+	toBeProcessedSVM, err = svmc.kubeClient.StoragemigrationV1beta1().
+		StorageVersionMigrations().
+		UpdateStatus(
+			ctx,
+			setStatusConditions(toBeProcessedSVM, svmv1beta1.MigrationRunning, migrationRunningStatusReason, ""),
+			metav1.UpdateOptions{},
+		)
+	if err != nil {
+		return err
+	}
+
+	err, failedMigration := svmc.runMigration(ctx, logger, *gvr, resourceMonitor, toBeProcessedSVM, listResourceVersion)
 	if err != nil {
 		return err
 	}
@@ -285,12 +296,11 @@ func (svmc *SVMController) sync(ctx context.Context, key string) error {
 	return nil
 }
 
-func (svmc *SVMController) runMigration(ctx context.Context, gvr schema.GroupVersionResource, resourceMonitor *garbagecollector.Monitor, toBeProcessedSVM *svmv1beta1.StorageVersionMigration, listResourceVersion string) (err error, failed bool) {
+func (svmc *SVMController) runMigration(ctx context.Context, logger klog.Logger, gvr schema.GroupVersionResource, resourceMonitor *garbagecollector.Monitor, toBeProcessedSVM *svmv1beta1.StorageVersionMigration, listResourceVersion string) (err error, failed bool) {
 	gvk, err := svmc.restMapper.KindFor(gvr)
 	if err != nil {
 		return svmc.failMigration(ctx, toBeProcessedSVM, err), true
 	}
-	logger := klog.FromContext(ctx)
 	for _, obj := range resourceMonitor.Store.List() {
 		accessor, err := meta.Accessor(obj)
 		if err != nil {
@@ -298,7 +308,7 @@ func (svmc *SVMController) runMigration(ctx context.Context, gvr schema.GroupVer
 		}
 		rvCmp, err := resourceversion.CompareResourceVersion(accessor.GetResourceVersion(), listResourceVersion)
 		if err != nil {
-			logger.Error(err, "Unable to compare the resource version of the resource", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "accessorRV", accessor.GetResourceVersion(), "listResourceVersion", listResourceVersion, "error", err.Error())
+			logger.V(4).Error(err, "Unable to compare the resource version of the resource", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "accessorRV", accessor.GetResourceVersion(), "listResourceVersion", listResourceVersion, "error", err.Error())
 			return svmc.failMigration(ctx, toBeProcessedSVM, err), true
 		}
 		if rvCmp == 1 {
@@ -308,6 +318,13 @@ func (svmc *SVMController) runMigration(ctx context.Context, gvr schema.GroupVer
 
 		typeMeta := typeMetaUIDRV{}
 		typeMeta.APIVersion, typeMeta.Kind = gvk.ToAPIVersionAndKind()
+		// set UID so that when a resource gets deleted, we get an "uid mismatch"
+		// conflict error instead of trying to create it.
+		typeMeta.UID = accessor.GetUID()
+		// set RV so that when a resources gets updated or deleted+recreated, we get an "object has been modified"
+		// conflict error.  we do not actually need to do anything special for the updated case because if RV
+		// was not set, it would just result in no-op request.  but for the deleted+recreated case, if RV is
+		// not set but UID is set, we would get an immutable field validation error.  hence we must set both.
 		typeMeta.ResourceVersion = accessor.GetResourceVersion()
 		data, err := json.Marshal(typeMeta)
 		if err != nil {
@@ -318,18 +335,18 @@ func (svmc *SVMController) runMigration(ctx context.Context, gvr schema.GroupVer
 			Namespace(accessor.GetNamespace()).
 			Patch(ctx,
 				accessor.GetName(),
-				types.MergePatchType,
+				types.ApplyPatchType,
 				data,
 				metav1.PatchOptions{
 					FieldManager: svmc.controllerName,
 				},
 			)
 
-		// in case of conflict or not found error, we can stop processing migration for that resource because it has either been
+		// in case of conflict, we can stop processing migration for that resource because it has either been
 		// - updated, meaning that migration has already been performed
 		// - deleted, meaning that migration is not needed
 		// - deleted and recreated, meaning that migration has already been performed
-		if apierrors.IsConflict(errPatch) || apierrors.IsNotFound(errPatch) {
+		if apierrors.IsConflict(errPatch) {
 			logger.V(6).Info("Resource ignored due to conflict", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "err", errPatch)
 			continue
 		}
@@ -341,7 +358,7 @@ func (svmc *SVMController) runMigration(ctx context.Context, gvr schema.GroupVer
 		}
 
 		if errPatch != nil {
-			logger.Error(errPatch, "Failed to migrate the resource", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "reason", apierrors.ReasonForError(errPatch))
+			logger.V(4).Error(errPatch, "Failed to migrate the resource", "namespace", accessor.GetNamespace(), "name", accessor.GetName(), "gvr", gvr.String(), "reason", apierrors.ReasonForError(errPatch))
 			errStatus := svmc.failMigration(ctx, toBeProcessedSVM, errPatch)
 			return errStatus, true
 		}
@@ -375,10 +392,11 @@ func (svmc *SVMController) failMigration(ctx context.Context, toBeProcessedSVM *
 }
 
 type typeMetaUIDRV struct {
-	metav1.TypeMeta `json:""`
-	objectRV        `json:"metadata,omitempty"`
+	metav1.TypeMeta    `json:",inline"`
+	objectMetaUIDandRV `json:"metadata,omitempty"`
 }
 
-type objectRV struct {
-	ResourceVersion string `json:"resourceVersion,omitempty"`
+type objectMetaUIDandRV struct {
+	UID             types.UID `json:"uid,omitempty"`
+	ResourceVersion string    `json:"resourceVersion,omitempty"`
 }

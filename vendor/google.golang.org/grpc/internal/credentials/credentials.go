@@ -20,6 +20,20 @@ import (
 	"context"
 )
 
+// requestInfoKey is a struct to be used as the key to store RequestInfo in a
+// context.
+type requestInfoKey struct{}
+
+// NewRequestInfoContext creates a context with ri.
+func NewRequestInfoContext(ctx context.Context, ri any) context.Context {
+	return context.WithValue(ctx, requestInfoKey{}, ri)
+}
+
+// RequestInfoFromContext extracts the RequestInfo from ctx.
+func RequestInfoFromContext(ctx context.Context) any {
+	return ctx.Value(requestInfoKey{})
+}
+
 // clientHandshakeInfoKey is a struct used as the key to store
 // ClientHandshakeInfo in a context.
 type clientHandshakeInfoKey struct{}

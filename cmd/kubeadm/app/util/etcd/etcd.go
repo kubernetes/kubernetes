@@ -408,7 +408,7 @@ func (c *Client) RemoveMember(id uint64) ([]Member, error) {
 				respMembers = resp.Members
 				return true, nil
 			}
-			if errors.Is(err, rpctypes.ErrMemberNotFound) {
+			if errors.Is(rpctypes.ErrMemberNotFound, err) {
 				klog.V(5).Infof("Member was already removed, because member %s was not found", strconv.FormatUint(id, 16))
 				listResp, err = cli.MemberList(ctx)
 				if err == nil {
@@ -584,8 +584,6 @@ func (c *Client) getMemberStatus(memberID uint64) (isLearner bool, started bool,
 func (c *Client) MemberPromote(learnerID uint64) error {
 	var (
 		lastError     error
-		isLearner     bool
-		isStarted     bool
 		learnerIDUint = strconv.FormatUint(learnerID, 16)
 	)
 
@@ -593,8 +591,7 @@ func (c *Client) MemberPromote(learnerID uint64) error {
 
 	err := wait.PollUntilContextTimeout(context.Background(), constants.EtcdAPICallRetryInterval, kubeadmapi.GetActiveTimeouts().EtcdAPICall.Duration,
 		true, func(_ context.Context) (bool, error) {
-			var err error
-			isLearner, isStarted, err = c.getMemberStatus(learnerID)
+			isLearner, started, err := c.getMemberStatus(learnerID)
 			if err != nil {
 				lastError = errors.WithMessagef(err, "failed to get member %s status", learnerIDUint)
 				return false, nil
@@ -603,7 +600,7 @@ func (c *Client) MemberPromote(learnerID uint64) error {
 				klog.V(1).Infof("[etcd] Member %s was already promoted.", learnerIDUint)
 				return true, nil
 			}
-			if !isStarted {
+			if !started {
 				klog.V(1).Infof("[etcd] Member %s is not started yet. Waiting for it to be started.", learnerIDUint)
 				lastError = errors.Errorf("the etcd member %s is not started", learnerIDUint)
 				return false, nil
@@ -612,10 +609,6 @@ func (c *Client) MemberPromote(learnerID uint64) error {
 		})
 	if err != nil {
 		return lastError
-	}
-
-	if !isLearner {
-		return nil
 	}
 
 	klog.V(1).Infof("[etcd] Promoting a learner as a voting member: %s", learnerIDUint)
@@ -749,7 +742,7 @@ func (c *Client) getClusterStatus() (map[string]*etcdMemberStatus, bool, error) 
 
 // WaitForClusterAvailable returns true if the etcd cluster is healthy after retry attempts, otherwise returns an error.
 func (c *Client) WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error) {
-	for i := range retries {
+	for i := 0; i < retries; i++ {
 		if i > 0 {
 			klog.V(1).Infof("[etcd] Waiting %v until next retry\n", retryInterval)
 			time.Sleep(retryInterval)

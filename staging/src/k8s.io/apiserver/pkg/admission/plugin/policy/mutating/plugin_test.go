@@ -22,7 +22,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	v1 "k8s.io/api/admissionregistration/v1"
+	"k8s.io/api/admissionregistration/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,15 +42,15 @@ import (
 
 func setupTest(
 	t *testing.T,
-	compiler func(*v1.MutatingAdmissionPolicy) mutating.PolicyEvaluator,
-) *generic.PolicyTestContext[*v1.MutatingAdmissionPolicy, *v1.MutatingAdmissionPolicyBinding, mutating.PolicyEvaluator] {
+	compiler func(*mutating.Policy) mutating.PolicyEvaluator,
+) *generic.PolicyTestContext[*mutating.Policy, *mutating.PolicyBinding, mutating.PolicyEvaluator] {
 
-	testContext, testCancel, err := generic.NewPolicyTestContext[*v1.MutatingAdmissionPolicy, *v1.MutatingAdmissionPolicyBinding, mutating.PolicyEvaluator](
+	testContext, testCancel, err := generic.NewPolicyTestContext[*mutating.Policy, *mutating.PolicyBinding, mutating.PolicyEvaluator](
 		t,
 		mutating.NewMutatingAdmissionPolicyAccessor,
 		mutating.NewMutatingAdmissionPolicyBindingAccessor,
 		compiler,
-		func(a authorizer.UnconditionalAuthorizer, m *matching.Matcher, i kubernetes.Interface) generic.Dispatcher[mutating.PolicyHook] {
+		func(a authorizer.Authorizer, m *matching.Matcher, i kubernetes.Interface) generic.Dispatcher[mutating.PolicyHook] {
 			// Use embedded schemas rather than discovery schemas
 			return mutating.NewDispatcher(a, m, patch.NewTypeConverterManager(nil, openapitest.NewEmbeddedFileClient()))
 		},
@@ -81,33 +81,33 @@ func TestBasicPatch(t *testing.T) {
 	expectedAnnotations := map[string]string{"foo": "bar"}
 
 	// Treat all policies as setting foo annotation to bar
-	testContext := setupTest(t, func(p *v1.MutatingAdmissionPolicy) mutating.PolicyEvaluator {
+	testContext := setupTest(t, func(p *mutating.Policy) mutating.PolicyEvaluator {
 		return mutating.PolicyEvaluator{Mutators: []patch.Patcher{annotationPatcher{expectedAnnotations}}}
 	})
 
 	// Set up a policy and binding that match, no params
 	require.NoError(t, testContext.UpdateAndWait(
-		&v1.MutatingAdmissionPolicy{
+		&mutating.Policy{
 			ObjectMeta: metav1.ObjectMeta{Name: "policy"},
-			Spec: v1.MutatingAdmissionPolicySpec{
-				MatchConstraints: &v1.MatchResources{
-					MatchPolicy:       ptr.To(v1.Equivalent),
+			Spec: v1beta1.MutatingAdmissionPolicySpec{
+				MatchConstraints: &v1beta1.MatchResources{
+					MatchPolicy:       ptr.To(v1beta1.Equivalent),
 					NamespaceSelector: &metav1.LabelSelector{},
 					ObjectSelector:    &metav1.LabelSelector{},
 				},
-				Mutations: []v1.Mutation{
+				Mutations: []v1beta1.Mutation{
 					{
-						ApplyConfiguration: &v1.ApplyConfiguration{
+						ApplyConfiguration: &v1beta1.ApplyConfiguration{
 							Expression: "ignored, but required",
 						},
-						PatchType: v1.PatchTypeApplyConfiguration,
+						PatchType: v1beta1.PatchTypeApplyConfiguration,
 					},
 				},
 			},
 		},
-		&v1.MutatingAdmissionPolicyBinding{
+		&mutating.PolicyBinding{
 			ObjectMeta: metav1.ObjectMeta{Name: "binding"},
-			Spec: v1.MutatingAdmissionPolicyBindingSpec{
+			Spec: v1beta1.MutatingAdmissionPolicyBindingSpec{
 				PolicyName: "policy",
 			},
 		},
@@ -136,7 +136,7 @@ func TestJSONPatch(t *testing.T) {
 		},
 	}
 
-	testContext := setupTest(t, func(p *v1.MutatingAdmissionPolicy) mutating.PolicyEvaluator {
+	testContext := setupTest(t, func(p *mutating.Policy) mutating.PolicyEvaluator {
 		return mutating.PolicyEvaluator{
 			Mutators: []patch.Patcher{smdPatcher{patch: patchObj}},
 		}
@@ -144,27 +144,27 @@ func TestJSONPatch(t *testing.T) {
 
 	// Set up a policy and binding that match, no params
 	require.NoError(t, testContext.UpdateAndWait(
-		&v1.MutatingAdmissionPolicy{
+		&mutating.Policy{
 			ObjectMeta: metav1.ObjectMeta{Name: "policy"},
-			Spec: v1.MutatingAdmissionPolicySpec{
-				MatchConstraints: &v1.MatchResources{
-					MatchPolicy:       ptr.To(v1.Equivalent),
+			Spec: v1beta1.MutatingAdmissionPolicySpec{
+				MatchConstraints: &v1beta1.MatchResources{
+					MatchPolicy:       ptr.To(v1beta1.Equivalent),
 					NamespaceSelector: &metav1.LabelSelector{},
 					ObjectSelector:    &metav1.LabelSelector{},
 				},
-				Mutations: []v1.Mutation{
+				Mutations: []v1beta1.Mutation{
 					{
-						JSONPatch: &v1.JSONPatch{
+						JSONPatch: &v1beta1.JSONPatch{
 							Expression: "ignored, but required",
 						},
-						PatchType: v1.PatchTypeApplyConfiguration,
+						PatchType: v1beta1.PatchTypeApplyConfiguration,
 					},
 				},
 			},
 		},
-		&v1.MutatingAdmissionPolicyBinding{
+		&mutating.PolicyBinding{
 			ObjectMeta: metav1.ObjectMeta{Name: "binding"},
-			Spec: v1.MutatingAdmissionPolicyBindingSpec{
+			Spec: v1beta1.MutatingAdmissionPolicyBindingSpec{
 				PolicyName: "policy",
 			},
 		},
@@ -198,7 +198,7 @@ func TestSSAPatch(t *testing.T) {
 		},
 	}
 
-	testContext := setupTest(t, func(p *v1.MutatingAdmissionPolicy) mutating.PolicyEvaluator {
+	testContext := setupTest(t, func(p *mutating.Policy) mutating.PolicyEvaluator {
 		return mutating.PolicyEvaluator{
 			Mutators: []patch.Patcher{smdPatcher{patch: patchObj}},
 		}
@@ -206,27 +206,27 @@ func TestSSAPatch(t *testing.T) {
 
 	// Set up a policy and binding that match, no params
 	require.NoError(t, testContext.UpdateAndWait(
-		&v1.MutatingAdmissionPolicy{
+		&mutating.Policy{
 			ObjectMeta: metav1.ObjectMeta{Name: "policy"},
-			Spec: v1.MutatingAdmissionPolicySpec{
-				MatchConstraints: &v1.MatchResources{
-					MatchPolicy:       ptr.To(v1.Equivalent),
+			Spec: v1beta1.MutatingAdmissionPolicySpec{
+				MatchConstraints: &v1beta1.MatchResources{
+					MatchPolicy:       ptr.To(v1beta1.Equivalent),
 					NamespaceSelector: &metav1.LabelSelector{},
 					ObjectSelector:    &metav1.LabelSelector{},
 				},
-				Mutations: []v1.Mutation{
+				Mutations: []v1beta1.Mutation{
 					{
-						ApplyConfiguration: &v1.ApplyConfiguration{
+						ApplyConfiguration: &v1beta1.ApplyConfiguration{
 							Expression: "ignored, but required",
 						},
-						PatchType: v1.PatchTypeApplyConfiguration,
+						PatchType: v1beta1.PatchTypeApplyConfiguration,
 					},
 				},
 			},
 		},
-		&v1.MutatingAdmissionPolicyBinding{
+		&mutating.PolicyBinding{
 			ObjectMeta: metav1.ObjectMeta{Name: "binding"},
-			Spec: v1.MutatingAdmissionPolicyBindingSpec{
+			Spec: v1beta1.MutatingAdmissionPolicyBindingSpec{
 				PolicyName: "policy",
 			},
 		},
@@ -265,7 +265,7 @@ func TestSSAMapList(t *testing.T) {
 		},
 	}
 
-	testContext := setupTest(t, func(p *v1.MutatingAdmissionPolicy) mutating.PolicyEvaluator {
+	testContext := setupTest(t, func(p *mutating.Policy) mutating.PolicyEvaluator {
 		return mutating.PolicyEvaluator{
 			Mutators: []patch.Patcher{smdPatcher{patch: patchObj}},
 		}
@@ -273,27 +273,27 @@ func TestSSAMapList(t *testing.T) {
 
 	// Set up a policy and binding that match, no params
 	require.NoError(t, testContext.UpdateAndWait(
-		&v1.MutatingAdmissionPolicy{
+		&mutating.Policy{
 			ObjectMeta: metav1.ObjectMeta{Name: "policy"},
-			Spec: v1.MutatingAdmissionPolicySpec{
-				MatchConstraints: &v1.MatchResources{
-					MatchPolicy:       ptr.To(v1.Equivalent),
+			Spec: v1beta1.MutatingAdmissionPolicySpec{
+				MatchConstraints: &v1beta1.MatchResources{
+					MatchPolicy:       ptr.To(v1beta1.Equivalent),
 					NamespaceSelector: &metav1.LabelSelector{},
 					ObjectSelector:    &metav1.LabelSelector{},
 				},
-				Mutations: []v1.Mutation{
+				Mutations: []v1beta1.Mutation{
 					{
-						ApplyConfiguration: &v1.ApplyConfiguration{
+						ApplyConfiguration: &v1beta1.ApplyConfiguration{
 							Expression: "ignored, but required",
 						},
-						PatchType: v1.PatchTypeApplyConfiguration,
+						PatchType: v1beta1.PatchTypeApplyConfiguration,
 					},
 				},
 			},
 		},
-		&v1.MutatingAdmissionPolicyBinding{
+		&mutating.PolicyBinding{
 			ObjectMeta: metav1.ObjectMeta{Name: "binding"},
-			Spec: v1.MutatingAdmissionPolicyBindingSpec{
+			Spec: v1beta1.MutatingAdmissionPolicyBindingSpec{
 				PolicyName: "policy",
 			},
 		},
@@ -337,7 +337,7 @@ type annotationPatcher struct {
 }
 
 func (ap annotationPatcher) Patch(ctx context.Context, request patch.Request, runtimeCELCostBudget int64) (runtime.Object, error) {
-	obj := request.VersionedAttributes.VersionedObject.Object().DeepCopyObject()
+	obj := request.VersionedAttributes.VersionedObject.DeepCopyObject()
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return nil, err
@@ -351,5 +351,5 @@ type smdPatcher struct {
 }
 
 func (sp smdPatcher) Patch(ctx context.Context, request patch.Request, runtimeCELCostBudget int64) (runtime.Object, error) {
-	return patch.ApplyStructuredMergeDiff(request.TypeConverter, request.VersionedAttributes.VersionedObject.Object(), sp.patch)
+	return patch.ApplyStructuredMergeDiff(request.TypeConverter, request.VersionedAttributes.VersionedObject, sp.patch)
 }

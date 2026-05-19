@@ -43,7 +43,6 @@ func NewServerCallMeta(fullMethod string, streamInfo *grpc.StreamServerInfo, req
 	c.Service, c.Method = splitFullMethodName(fullMethod)
 	return c
 }
-
 func (c CallMeta) FullMethod() string {
 	return fmt.Sprintf("/%s/%s", c.Service, c.Method)
 }

@@ -18,6 +18,7 @@ package validators
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -42,12 +43,12 @@ type keyValuePair struct {
 }
 
 type itemTagValidator struct {
-	validator  TagValidationExtractor
+	validator  Validator
 	listByPath map[string]*listMetadata
 }
 
 func (itv *itemTagValidator) Init(cfg Config) {
-	itv.validator = cfg.TagValidator
+	itv.validator = cfg.Validator
 }
 
 func (itemTagValidator) TagName() string {
@@ -59,6 +60,10 @@ var itemTagValidScopes = sets.New(ScopeType, ScopeField, ScopeListVal, ScopeMapK
 func (itemTagValidator) ValidScopes() sets.Set[Scope] {
 	return itemTagValidScopes
 }
+
+// LateTagValidator indicates that this validator has to run AFTER the listType
+// and listMapKey tags.
+func (itemTagValidator) LateTagValidator() {}
 
 var (
 	validateSliceItem = types.Name{Package: libValidationPkg, Name: "SliceItem"}
@@ -82,6 +87,23 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 		return Validations{}, fmt.Errorf("requires a validation tag as its value payload")
 	}
 
+	// For fields, list metadata can fall back to the type.
+	// For types, list metadata must be defined on the type itself.
+	listMeta, ok := itv.listByPath[context.Path.String()]
+	if !ok {
+		if context.Scope == ScopeField {
+			typePath := context.Type.String()
+			listMeta, ok = itv.listByPath[typePath]
+		}
+	}
+
+	// Fields inherit list metadata from typedefs, but not vice-versa.
+	// If we find no listMetadata then something is wrong.
+	// The item tag requires map semantics, which can come from either listType=map or unique=map
+	if !ok || listMeta.semantic != semanticMap || len(listMeta.keyMembers) == 0 {
+		return Validations{}, fmt.Errorf("found items with no list metadata - item tags require listType=map or unique=map with listMapKey")
+	}
+
 	// Parse key-value pairs from named args.
 	criteria, err := criteriaFromArgs(tag.Args)
 	if err != nil {
@@ -90,106 +112,11 @@ func (itv *itemTagValidator) GetValidations(context Context, tag codetags.Tag) (
 	if len(criteria) == 0 {
 		return Validations{}, fmt.Errorf("no selection criteria was specified")
 	}
-
-	// Extract validations from the stored tag
-	itemKey := selectorString(criteria)
-	itemPath := context.Path.Key(itemKey)
-	itemSelector := generateSelector(criteria)
-	subContext := Context{
-		Scope:          ScopeListVal,
-		Type:           elemT,
-		Path:           itemPath,
-		ListSelector:   itemSelector,
-		ParentPath:     context.Path,
-		ParentType:     context.Type,
-		StabilityLevel: context.StabilityLevel,
+	if narg, nkey := len(criteria), len(listMeta.keyNames); narg != nkey {
+		return Validations{}, fmt.Errorf("number of arguments (%d) does not match number of listMapKey fields (%d)", narg, nkey)
 	}
 
-	validations, err := itv.validator.ExtractTagValidations(subContext, *tag.ValueTag)
-	if err != nil {
-		return Validations{}, err
-	}
-
-	result := validations.Clone()
-	result.Functions = nil
-	result.Deferred = nil
-
-	// 1. Handle immediate functions. We need to defer them because listMetadata is not ready yet.
-	if len(validations.Functions) > 0 {
-		result.AddDeferred(Deferred(ThisContext, func() (Validations, error) {
-			matchArg, equivArg, err := itv.prepareArgs(context, criteria, elemT)
-			if err != nil {
-				return Validations{}, err
-			}
-			deferredResult := Validations{}
-			for _, vfn := range validations.Functions {
-				f := Function(itemTagName, vfn.Flags, validateSliceItem, matchArg, equivArg, WrapperFunction{Function: vfn, ObjType: elemT})
-				f.Cohort = itemKey
-				vfn = f
-				deferredResult.AddFunction(vfn)
-			}
-			return deferredResult, nil
-		}))
-	}
-
-	// 2. Handle deferred validations from child tag.
-	for _, d := range validations.Deferred {
-		scope := d.Scope
-		if scope == ParentContext {
-			// A child tag (e.g. +k8s:union) returning a ParentContext validation intends
-			// to evaluate the entire collection (the list) after its items are processed.
-			// Because item tags are evaluated in the context of the list field, the "parent"
-			// of a list element is conceptually the list itself, which maps to ThisContext
-			// (the field phase).
-			// If we left this as ParentContext, the framework would mistakenly defer it to
-			// the struct containing the list. By mapping to ThisContext, we ensure the
-			// deferred validation correctly runs at the end of the list field's phase, naturally
-			// accumulating and running after all immediate item validations for this criteria.
-			scope = ThisContext
-		}
-		result.AddDeferred(Deferred(scope, func() (Validations, error) {
-			inner, err := d.Callback()
-			if err != nil {
-				return Validations{}, err
-			}
-
-			matchArg, equivArg, err := itv.prepareArgs(context, criteria, elemT)
-			if err != nil {
-				return Validations{}, err
-			}
-
-			return wrapFunctionsWithScope(inner, func(fn FunctionGen, s DeferredScope) FunctionGen {
-				if s == ParentContext {
-					// We reach here if the original deferred scope was ParentContext.
-					// Because the parent of a list element is the list itself, the generated
-					// function `fn` (e.g. a union validation) already expects the full list
-					// as its argument. If we didn't skip wrapping, validateSliceItem would
-					// mistakenly attempt to pass individual list elements to it.
-					return fn
-				}
-				f := Function(itemTagName, fn.Flags, validateSliceItem, matchArg, equivArg, WrapperFunction{Function: fn, ObjType: elemT})
-				f.Cohort = itemKey
-				return f
-			}, d.Scope), nil
-		}))
-	}
-
-	return result, nil
-}
-
-func (itv *itemTagValidator) prepareArgs(context Context, criteria []keyValuePair, elemT *types.Type) (matchArg any, equivArg any, err error) {
-	listMeta, ok := itv.listByPath[context.Path.String()]
-	if !ok && context.Scope == ScopeField {
-		listMeta, ok = itv.listByPath[context.Type.String()]
-	}
-	if !ok || listMeta.semantic != semanticMap || len(listMeta.keyMembers) == 0 {
-		return nil, nil, fmt.Errorf("found items with no list metadata - item tags require listType=map or unique=map with listMapKey")
-	}
-
-	if len(criteria) != len(listMeta.keyNames) {
-		return nil, nil, fmt.Errorf("number of arguments (%d) does not match number of listMapKey fields (%d)", len(criteria), len(listMeta.keyNames))
-	}
-
+	// Validate that all listMapKeys are provided and types match
 	foundKeys := make(map[string]bool)
 	sortedCriteria := make([]keyValuePair, 0, len(listMeta.keyNames))
 	for _, keyName := range listMeta.keyNames {
@@ -197,9 +124,11 @@ func (itv *itemTagValidator) prepareArgs(context Context, criteria []keyValuePai
 			if pair.key == keyName {
 				member := util.GetMemberByJSON(elemT, pair.key)
 				if member == nil {
-					return nil, nil, fmt.Errorf("no field with JSON name %q", pair.key)
+					return Validations{}, fmt.Errorf("no field with JSON name %q", pair.key)
 				}
-				// We don't need to validate type match here, as it's done during generateComparisonRHS
+				if err := validateTypeMatch(member.Type, pair.value); err != nil {
+					return Validations{}, fmt.Errorf("key %q: %w", pair.key, err)
+				}
 				foundKeys[keyName] = true
 				sortedCriteria = append(sortedCriteria, pair)
 				break
@@ -213,19 +142,59 @@ func (itv *itemTagValidator) prepareArgs(context Context, criteria []keyValuePai
 				missing = append(missing, k)
 			}
 		}
-		return nil, nil, fmt.Errorf("missing required listMapKey fields: %v", missing)
+		return Validations{}, fmt.Errorf("missing required listMapKey fields: %v", missing)
 	}
-	matchArg, err = createMatchFn(elemT, sortedCriteria)
+	criteria = sortedCriteria
+
+	result := Validations{}
+
+	// Extract validations from the stored tag
+	itemKey := selectorString(criteria)
+	itemPath := context.Path.Key(itemKey)
+	itemSelector := generateSelector(criteria)
+	subContext := Context{
+		Scope:        ScopeListVal,
+		Type:         elemT,
+		Path:         itemPath,
+		ListSelector: itemSelector,
+		ParentPath:   context.Path,
+	}
+
+	validations, err := itv.validator.ExtractValidations(subContext, *tag.ValueTag)
 	if err != nil {
-		return nil, nil, err
+		return Validations{}, err
 	}
+
+	result.Variables = append(result.Variables, validations.Variables...)
+
+	// matchArg is the function that is used to select the item in new and
+	// old lists.
+	matchArg, err := createMatchFn(elemT, criteria)
+	if err != nil {
+		return Validations{}, err
+	}
+
+	// equivArg is the function that is used to compare the correlated
+	// elements in the old and new lists, for ratcheting.
+	var equivArg any
+
+	// directComparable is used to determine whether we can use the direct
+	// comparison operator "==" or need to use the semantic DeepEqual when
+	// looking up and comparing correlated list elements for validation ratcheting.
 	directComparable := util.IsDirectComparable(util.NonPointer(util.NativeType(elemT)))
 	if directComparable {
 		equivArg = Identifier(validateDirectEqual)
 	} else {
 		equivArg = Identifier(validateSemanticDeepEqual)
 	}
-	return matchArg, equivArg, nil
+
+	for _, vfn := range validations.Functions {
+		f := Function(itemTagName, vfn.Flags, validateSliceItem, matchArg, equivArg, WrapperFunction{vfn, elemT})
+		f.Cohort = itemKey
+		result.AddFunction(f)
+	}
+
+	return result, nil
 }
 
 func criteriaFromArgs(args []codetags.Arg) ([]keyValuePair, error) {
@@ -261,13 +230,13 @@ func parseTypedValue(value string, argType codetags.ArgType) (any, codetags.Valu
 	case codetags.ArgTypeString:
 		return value, codetags.ValueTypeString, nil
 	case codetags.ArgTypeInt:
-		intVal, err := util.ParseInt(value)
+		intVal, err := strconv.Atoi(value)
 		if err != nil {
 			return nil, "", fmt.Errorf("invalid integer: %w", err)
 		}
 		return intVal, codetags.ValueTypeInt, nil
 	case codetags.ArgTypeBool:
-		boolVal, err := util.ParseBool(value)
+		boolVal, err := strconv.ParseBool(value)
 		if err != nil {
 			return nil, "", fmt.Errorf("invalid boolean: %w", err)
 		}
@@ -280,8 +249,8 @@ func parseTypedValue(value string, argType codetags.ArgType) (any, codetags.Valu
 func (itv itemTagValidator) Docs() TagDoc {
 	doc := TagDoc{
 		Tag:            itv.TagName(),
-		StabilityLevel: TagStabilityLevelStable,
-		Scopes:         sets.List(itv.ValidScopes()),
+		StabilityLevel: Alpha,
+		Scopes:         itv.ValidScopes().UnsortedList(),
 		Description: "Declares a validation for an item of a slice declared as a +k8s:listType=map. " +
 			"The item to match is declared by providing field-value pair arguments. All key fields must be specified.",
 		Usage: "+k8s:item(stringKey: \"value\", intKey: 42, boolKey: true)=<validation-tag>",
@@ -297,6 +266,29 @@ func (itv itemTagValidator) Docs() TagDoc {
 		PayloadsRequired: true,
 	}
 	return doc
+}
+
+// validateTypeMatch ensures the provided value matches the field's type
+func validateTypeMatch(fieldType *types.Type, value any) error {
+	nativeType := util.NonPointer(util.NativeType(fieldType))
+
+	switch {
+	case nativeType == types.String:
+		if _, ok := value.(string); !ok {
+			return fmt.Errorf("expected string value")
+		}
+	case nativeType == types.Bool:
+		if _, ok := value.(bool); !ok {
+			return fmt.Errorf("expected bool value")
+		}
+	case types.IsInteger(nativeType):
+		if _, ok := value.(int); !ok {
+			return fmt.Errorf("expected integer value")
+		}
+	default:
+		return fmt.Errorf("unsupported field type: %s", nativeType.String())
+	}
+	return nil
 }
 
 func buildMatchConditions(elemT *types.Type, criteria []keyValuePair, itemRef string) (string, error) {

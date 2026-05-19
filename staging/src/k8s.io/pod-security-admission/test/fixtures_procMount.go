@@ -18,6 +18,7 @@ package test
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
 )
@@ -37,6 +38,7 @@ func init() {
 				}),
 			}
 		},
+		failRequiresFeatures: []featuregate.Feature{"ProcMountType"},
 		generateFail: func(p *corev1.Pod) []*corev1.Pod {
 			p = ensureSecurityContext(p)
 			return []*corev1.Pod{
@@ -87,7 +89,8 @@ func init() {
 
 			return retval
 		},
-		failRequiresError: true, // the only combination that can fail the 1.35 baseline check also fails validation
+		failRequiresFeatures: []featuregate.Feature{"ProcMountType"},
+		failRequiresError:    true, // the only combination that can fail the 1.35 baseline check also fails validation
 		generateFail: func(p *corev1.Pod) []*corev1.Pod {
 			p = ensureSecurityContext(p)
 			return []*corev1.Pod{
@@ -126,6 +129,7 @@ func init() {
 				}),
 			}
 		},
+		failRequiresFeatures: []featuregate.Feature{"ProcMountType"},
 		generateFail: func(p *corev1.Pod) []*corev1.Pod {
 			p = ensureSecurityContext(p)
 			return []*corev1.Pod{

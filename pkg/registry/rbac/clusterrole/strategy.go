@@ -19,6 +19,7 @@ package clusterrole
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -31,13 +32,13 @@ import (
 
 // strategy implements behavior for ClusterRoles
 type strategy struct {
-	rest.DeclarativeValidation
+	runtime.ObjectTyper
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating
 // ClusterRole objects.
-var Strategy = strategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
+var Strategy = strategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // Strategy should implement rest.RESTCreateStrategy
 var _ rest.RESTCreateStrategy = Strategy
@@ -51,7 +52,7 @@ func (strategy) NamespaceScoped() bool {
 }
 
 // AllowCreateOnUpdate is true for ClusterRoles.
-func (strategy) AllowCreateOnUpdate(ctx context.Context) bool {
+func (strategy) AllowCreateOnUpdate() bool {
 	return true
 }
 
@@ -75,7 +76,9 @@ func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorLis
 	opts := validation.ClusterRoleValidationOptions{
 		AllowInvalidLabelValueInSelector: false,
 	}
-	return validation.ValidateClusterRole(clusterRole, opts)
+	allErrs := validation.ValidateClusterRole(clusterRole, opts)
+
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, clusterRole, nil, allErrs, operation.Create)
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -93,7 +96,9 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 	opts := validation.ClusterRoleValidationOptions{
 		AllowInvalidLabelValueInSelector: hasInvalidLabelValueInLabelSelector(oldObj),
 	}
-	return validation.ValidateClusterRoleUpdate(newObj, oldObj, opts)
+	errs := validation.ValidateClusterRoleUpdate(newObj, oldObj, opts)
+
+	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, newObj, oldObj, errs, operation.Update)
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -106,7 +111,7 @@ func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) [
 // populates it with the latest version. Else, it checks that the
 // version specified by the user matches the version of latest etcd
 // object.
-func (strategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+func (strategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 

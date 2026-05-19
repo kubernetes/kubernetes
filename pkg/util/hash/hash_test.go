@@ -21,7 +21,7 @@ import (
 	"hash/adler32"
 	"testing"
 
-	"k8s.io/utils/dump"
+	"k8s.io/apimachinery/pkg/util/dump"
 )
 
 type A struct {

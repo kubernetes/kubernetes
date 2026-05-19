@@ -19,24 +19,29 @@ package synctrack
 import (
 	"strings"
 	"sync"
+	"time"
 
 	"testing"
 )
 
-func testSingleFileFuncs() (upstreamHasSynced func(), start func(), finished func(), hasSynced func() bool, synced <-chan struct{}) {
-	tracker := NewSingleFileTracker("")
-	return tracker.UpstreamHasSynced, tracker.Start, tracker.Finished, tracker.HasSynced, tracker.Done()
+func testSingleFileFuncs(upstreamHasSynced func() bool) (start func(), finished func(), hasSynced func() bool) {
+	tracker := SingleFileTracker{
+		UpstreamHasSynced: upstreamHasSynced,
+	}
+	return tracker.Start, tracker.Finished, tracker.HasSynced
 }
 
-func testAsyncFuncs() (upstreamHasSynced func(), start func(), finished func(), hasSynced func() bool, synced <-chan struct{}) {
-	tracker := NewAsyncTracker[string]("")
-	return tracker.UpstreamHasSynced, func() { tracker.Start("key") }, func() { tracker.Finished("key") }, tracker.HasSynced, tracker.Done()
+func testAsyncFuncs(upstreamHasSynced func() bool) (start func(), finished func(), hasSynced func() bool) {
+	tracker := AsyncTracker[string]{
+		UpstreamHasSynced: upstreamHasSynced,
+	}
+	return func() { tracker.Start("key") }, func() { tracker.Finished("key") }, tracker.HasSynced
 }
 
 func TestBasicLogic(t *testing.T) {
 	table := []struct {
 		name      string
-		construct func() (func(), func(), func(), func() bool, <-chan struct{})
+		construct func(func() bool) (func(), func(), func() bool)
 	}{
 		{"SingleFile", testSingleFileFuncs},
 		{"Async", testAsyncFuncs},
@@ -45,87 +50,27 @@ func TestBasicLogic(t *testing.T) {
 	for _, entry := range table {
 		t.Run(entry.name, func(t *testing.T) {
 			table := []struct {
-				synced             bool
-				syncedBeforeFinish bool
-
+				synced       bool
 				start        bool
 				finish       bool
 				expectSynced bool
 			}{
-				{false, false, true, true, false},
-				{true, false, true, false, false},
-				{true, true, true, false, false},
-				{false, false, true, false, false},
-				{true, false, true, true, true},
-				{true, true, true, true, true},
+				{false, true, true, false},
+				{true, true, false, false},
+				{false, true, false, false},
+				{true, true, true, true},
 			}
 			for _, tt := range table {
-				upstreamHasSynced, start, finished, hasSynced, synced := entry.construct()
-				syncedDone := func() bool {
-					select {
-					case <-synced:
-						return true
-					default:
-						return false
-					}
-				}
-
-				if hasSynced() {
-					t.Errorf("for %#v got HasSynced() true before start (wanted false)", tt)
-				}
-				if syncedDone() {
-					t.Errorf("for %#v got Done() true before start (wanted false)", tt)
-				}
-
+				Start, Finished, HasSynced := entry.construct(func() bool { return tt.synced })
 				if tt.start {
-					start()
-				}
-
-				if hasSynced() {
-					t.Errorf("for %#v got HasSynced() true after start (wanted false)", tt)
-				}
-				if syncedDone() {
-					t.Errorf("for %#v got Done() true after start (wanted false)", tt)
-				}
-
-				// "upstream has synced" may occur before or after finished, but not before start.
-				if tt.synced && tt.syncedBeforeFinish {
-					upstreamHasSynced()
-					if hasSynced() {
-						t.Errorf("for %#v got HasSynced() true after upstreamHasSynced and before finish (wanted false)", tt)
-					}
-					if syncedDone() {
-						t.Errorf("for %#v got Done() true after upstreamHasSynced and before finish (wanted false)", tt)
-					}
+					Start()
 				}
 				if tt.finish {
-					finished()
+					Finished()
 				}
-				if tt.synced && !tt.syncedBeforeFinish {
-					if hasSynced() {
-						t.Errorf("for %#v got HasSynced() true after finish and before upstreamHasSynced (wanted false)", tt)
-					}
-					if syncedDone() {
-						t.Errorf("for %#v got Done() true after finish and before upstreamHasSynced (wanted false)", tt)
-					}
-					upstreamHasSynced()
-				}
-				if e, a := tt.expectSynced, hasSynced(); e != a {
-					t.Errorf("for %#v got HasSynced() %v (wanted %v)", tt, a, e)
-				}
-				if e, a := tt.expectSynced, syncedDone(); e != a {
-					t.Errorf("for %#v got Done() %v (wanted %v)", tt, a, e)
-				}
-
-				select {
-				case <-synced:
-					if !tt.expectSynced {
-						t.Errorf("for %#v got done (wanted not done)", tt)
-					}
-				default:
-					if tt.expectSynced {
-						t.Errorf("for %#v got done (wanted not done)", tt)
-					}
+				got := HasSynced()
+				if e, a := tt.expectSynced, got; e != a {
+					t.Errorf("for %#v got %v (wanted %v)", tt, a, e)
 				}
 			}
 		})
@@ -133,7 +78,7 @@ func TestBasicLogic(t *testing.T) {
 }
 
 func TestAsyncLocking(t *testing.T) {
-	aft := NewAsyncTracker[int]("")
+	aft := AsyncTracker[int]{UpstreamHasSynced: func() bool { return true }}
 
 	var wg sync.WaitGroup
 	for _, i := range []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10} {
@@ -147,7 +92,6 @@ func TestAsyncLocking(t *testing.T) {
 		}(i)
 	}
 	wg.Wait()
-	aft.UpstreamHasSynced()
 	if !aft.HasSynced() {
 		t.Errorf("async tracker must have made a threading error?")
 	}
@@ -155,7 +99,7 @@ func TestAsyncLocking(t *testing.T) {
 }
 
 func TestSingleFileCounting(t *testing.T) {
-	sft := NewSingleFileTracker("")
+	sft := SingleFileTracker{UpstreamHasSynced: func() bool { return true }}
 
 	for i := 0; i < 100; i++ {
 		sft.Start()
@@ -171,8 +115,6 @@ func TestSingleFileCounting(t *testing.T) {
 	}
 
 	sft.Finished()
-	sft.UpstreamHasSynced()
-
 	if !sft.HasSynced() {
 		t.Fatal("Unexpectedly not synced?")
 	}
@@ -206,39 +148,92 @@ func TestSingleFileCounting(t *testing.T) {
 
 func TestSingleFile(t *testing.T) {
 	table := []struct {
-		synced            bool
-		syncedBeforeStops bool
-
+		synced       bool
 		starts       int
 		stops        int
 		expectSynced bool
 	}{
-		{false, false, 1, 1, false},
-		{true, false, 1, 0, false},
-		{true, true, 1, 0, false},
-		{false, false, 1, 0, false},
-		{true, false, 1, 1, true},
-		{true, true, 1, 1, true},
+		{false, 1, 1, false},
+		{true, 1, 0, false},
+		{false, 1, 0, false},
+		{true, 1, 1, true},
 	}
 	for _, tt := range table {
-		sft := NewSingleFileTracker("")
+		sft := SingleFileTracker{UpstreamHasSynced: func() bool { return tt.synced }}
 		for i := 0; i < tt.starts; i++ {
 			sft.Start()
 		}
-		// "upstream has synced" may occur before or after finished, but not before start.
-		if tt.synced && tt.syncedBeforeStops {
-			sft.UpstreamHasSynced()
-		}
 		for i := 0; i < tt.stops; i++ {
 			sft.Finished()
-		}
-		if tt.synced && !tt.syncedBeforeStops {
-			sft.UpstreamHasSynced()
 		}
 		got := sft.HasSynced()
 		if e, a := tt.expectSynced, got; e != a {
 			t.Errorf("for %#v got %v (wanted %v)", tt, a, e)
 		}
+	}
+
+}
+
+func TestNoStaleValue(t *testing.T) {
+	table := []struct {
+		name      string
+		construct func(func() bool) (func(), func(), func() bool)
+	}{
+		{"SingleFile", testSingleFileFuncs},
+		{"Async", testAsyncFuncs},
+	}
+
+	for _, entry := range table {
+		t.Run(entry.name, func(t *testing.T) {
+			var lock sync.Mutex
+			upstreamHasSynced := func() bool {
+				lock.Lock()
+				defer lock.Unlock()
+				return true
+			}
+
+			Start, Finished, HasSynced := entry.construct(upstreamHasSynced)
+
+			// Ordinarily the corresponding lock would be held and you wouldn't be
+			// able to call this function at this point.
+			if !HasSynced() {
+				t.Fatal("Unexpectedly not synced??")
+			}
+
+			Start()
+			if HasSynced() {
+				t.Fatal("Unexpectedly synced??")
+			}
+			Finished()
+			if !HasSynced() {
+				t.Fatal("Unexpectedly not synced??")
+			}
+
+			// Now we will prove that if the lock is held, you can't get a false
+			// HasSynced return.
+			lock.Lock()
+
+			// This goroutine calls HasSynced
+			var wg sync.WaitGroup
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if HasSynced() {
+					t.Error("Unexpectedly synced??")
+				}
+			}()
+
+			// This goroutine increments + unlocks. The sleep is to bias the
+			// runtime such that the other goroutine usually wins (it needs to work
+			// in both orderings, this one is more likely to be buggy).
+			go func() {
+				time.Sleep(time.Millisecond)
+				Start()
+				lock.Unlock()
+			}()
+
+			wg.Wait()
+		})
 	}
 
 }

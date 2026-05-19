@@ -96,26 +96,8 @@ func StripUnsupportedFormatsPostProcessorForVersion(compatibilityVersion *versio
 			return nil
 		}
 
-		schemaType := ""
-		if len(s.Type) == 1 {
-			schemaType = s.Type[0]
-		}
-		switch schemaType {
-		case "", "string":
-			normalized := strings.ReplaceAll(s.Format, "-", "") // go-openapi default format name normalization
-			if !supportedFormatsAtVersion(compatibilityVersion).supported.Has(normalized) {
-				s.Format = ""
-			}
-		case "integer":
-			if s.Format != "int32" && s.Format != "int64" {
-				s.Format = ""
-			}
-		case "number":
-			if s.Format != "float" && s.Format != "double" {
-				s.Format = ""
-			}
-		default:
-			// Format not supported on other types
+		normalized := strings.ReplaceAll(s.Format, "-", "") // go-openapi default format name normalization
+		if !supportedFormatsAtVersion(compatibilityVersion).supported.Has(normalized) {
 			s.Format = ""
 		}
 
@@ -131,27 +113,11 @@ func GetUnrecognizedFormats(schema *spec.Schema, compatibilityVersion *version.V
 		return unrecognizedFormats
 	}
 
-	schemaType := ""
-	if len(schema.Type) == 1 {
-		schemaType = schema.Type[0]
-	}
-	switch schemaType {
-	case "", "string":
+	if len(schema.Type) == 1 && schema.Type[0] == "string" {
 		normalized := strings.ReplaceAll(schema.Format, "-", "") // go-openapi default format name normalization
 		if !supportedFormatsAtVersion(compatibilityVersion).supported.Has(normalized) {
 			unrecognizedFormats = append(unrecognizedFormats, schema.Format)
 		}
-	case "integer":
-		if schema.Format != "int32" && schema.Format != "int64" {
-			unrecognizedFormats = append(unrecognizedFormats, schema.Format)
-		}
-	case "number":
-		if schema.Format != "float" && schema.Format != "double" {
-			unrecognizedFormats = append(unrecognizedFormats, schema.Format)
-		}
-	default:
-		// Format not supported on other types
-		unrecognizedFormats = append(unrecognizedFormats, schema.Format)
 	}
 
 	return unrecognizedFormats

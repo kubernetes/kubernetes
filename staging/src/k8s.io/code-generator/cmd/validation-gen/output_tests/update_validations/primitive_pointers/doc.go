@@ -19,8 +19,6 @@ limitations under the License.
 
 // Package primitivepointers is a test package.
 //
-// +k8s:validation-gen-nolint
-//
 //nolint:unused
 package primitivepointers
 

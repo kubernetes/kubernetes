@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/generic"
-	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -37,7 +36,7 @@ import (
 
 // carpStrategy implements behavior for Carp objects
 type carpStrategy struct {
-	rest.DeclarativeValidation
+	runtime.ObjectTyper
 	names.NameGenerator
 	nsClient v1.NamespaceInterface
 }
@@ -45,7 +44,7 @@ type carpStrategy struct {
 // NewStrategy is the default logic that applies when creating and updating Carp objects.
 func NewStrategy(nsClient v1.NamespaceInterface) *carpStrategy {
 	return &carpStrategy{
-		rest.DeclarativeValidation{Scheme: legacyscheme.Scheme},
+		legacyscheme.Scheme,
 		names.SimpleNameGenerator,
 		nsClient,
 	}
@@ -85,7 +84,7 @@ func (*carpStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) [
 func (*carpStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (*carpStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
+func (*carpStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
@@ -103,7 +102,7 @@ func (*carpStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Obje
 	return nil
 }
 
-func (*carpStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
+func (*carpStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 

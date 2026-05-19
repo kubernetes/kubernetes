@@ -88,12 +88,12 @@ func (cs *ClusterServer) MemberUpdate(ctx context.Context, r *pb.MemberUpdateReq
 }
 
 func (cs *ClusterServer) MemberList(ctx context.Context, r *pb.MemberListRequest) (*pb.MemberListResponse, error) {
-	members, err := cs.server.MemberList(ctx, r)
-	if err != nil {
-		return nil, togRPCError(err)
+	if r.Linearizable {
+		if err := cs.server.LinearizableReadNotify(ctx); err != nil {
+			return nil, togRPCError(err)
+		}
 	}
-
-	membs := membersToProtoMembers(members)
+	membs := membersToProtoMembers(cs.cluster.Members())
 	return &pb.MemberListResponse{Header: cs.header(), Members: membs}, nil
 }
 

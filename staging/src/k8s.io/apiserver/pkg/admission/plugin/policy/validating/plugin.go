@@ -26,10 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/cel"
-	"k8s.io/apiserver/pkg/admission/plugin/manifest/metrics"
-	"k8s.io/apiserver/pkg/admission/plugin/policy/config"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/generic"
-	"k8s.io/apiserver/pkg/admission/plugin/policy/manifest/source"
 	"k8s.io/apiserver/pkg/admission/plugin/policy/matching"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/matchconditions"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -46,12 +43,16 @@ const (
 
 var (
 	lazyCompositionEnvTemplateWithStrictCostInit sync.Once
-	lazyCompositionEnvTemplateWithStrictCost     *environment.EnvSet
+	lazyCompositionEnvTemplateWithStrictCost     *cel.CompositionEnv
 )
 
-func getCompositionEnvTemplateWithStrictCost() *environment.EnvSet {
+func getCompositionEnvTemplateWithStrictCost() *cel.CompositionEnv {
 	lazyCompositionEnvTemplateWithStrictCostInit.Do(func() {
-		lazyCompositionEnvTemplateWithStrictCost = environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion())
+		env, err := cel.NewCompositionEnv(cel.VariablesTypeName, environment.MustBaseEnvSet(environment.DefaultCompatibilityVersion()))
+		if err != nil {
+			panic(err)
+		}
+		lazyCompositionEnvTemplateWithStrictCost = env
 	})
 	return lazyCompositionEnvTemplateWithStrictCost
 }
@@ -59,7 +60,7 @@ func getCompositionEnvTemplateWithStrictCost() *environment.EnvSet {
 // Register registers a plugin
 func Register(plugins *admission.Plugins) {
 	plugins.Register(PluginName, func(configFile io.Reader) (admission.Interface, error) {
-		return NewPlugin(configFile)
+		return NewPlugin(configFile), nil
 	})
 }
 
@@ -76,42 +77,8 @@ type Plugin struct {
 var _ admission.Interface = &Plugin{}
 var _ admission.ValidationInterface = &Plugin{}
 var _ initializer.WantsExcludedAdmissionResources = &Plugin{}
-var _ initializer.WantsManifestLoaders = &Plugin{}
 
-// SetManifestLoaders provides the manifest load functions for scheme-based defaulting and validation.
-func (a *Plugin) SetManifestLoaders(loaders *initializer.ManifestLoaders) {
-	if loaders == nil || loaders.LoadValidatingPolicyManifests == nil {
-		return
-	}
-	loadFunc := loaders.LoadValidatingPolicyManifests
-	a.SetStaticSourceFactory(func(manifestsDir string) (generic.ReloadableSource[PolicyHook], error) {
-		staticSource := source.NewStaticPolicySource(manifestsDir, a.GetAPIServerID(),
-			func(p *v1.ValidatingAdmissionPolicy) (Validator, error) {
-				v := compilePolicy(p)
-				if err := v.CompileError(); err != nil {
-					return nil, err
-				}
-				return v, nil
-			},
-			func(dir string) ([]*v1.ValidatingAdmissionPolicy, []*v1.ValidatingAdmissionPolicyBinding, string, error) {
-				return loadFunc(dir)
-			},
-			func(b *v1.ValidatingAdmissionPolicyBinding) string { return b.Spec.PolicyName },
-			metrics.VAPManifestType,
-		)
-		if err := staticSource.LoadInitial(); err != nil {
-			return nil, err
-		}
-		return staticSource, nil
-	})
-}
-
-func NewPlugin(configFile io.Reader) (*Plugin, error) {
-	cfg, err := config.LoadValidatingConfig(configFile)
-	if err != nil {
-		return nil, err
-	}
-
+func NewPlugin(_ io.Reader) *Plugin {
 	handler := admission.NewHandler(admission.Connect, admission.Create, admission.Delete, admission.Update)
 
 	p := &Plugin{
@@ -129,14 +96,13 @@ func NewPlugin(configFile io.Reader) (*Plugin, error) {
 					restMapper,
 				)
 			},
-			func(a authorizer.UnconditionalAuthorizer, m *matching.Matcher, client kubernetes.Interface) generic.Dispatcher[PolicyHook] {
+			func(a authorizer.Authorizer, m *matching.Matcher, client kubernetes.Interface) generic.Dispatcher[PolicyHook] {
 				return NewDispatcher(a, generic.NewPolicyMatcher(m))
 			},
 		),
 	}
 	p.SetEnabled(true)
-	p.SetStaticManifestsDir(cfg.StaticManifestsDir)
-	return p, nil
+	return p
 }
 
 // Validate makes an admission decision based on the request attributes.
@@ -154,11 +120,9 @@ func compilePolicy(policy *Policy) Validator {
 	failurePolicy := policy.Spec.FailurePolicy
 	var matcher matchconditions.Matcher = nil
 	matchConditions := policy.Spec.MatchConditions
-	compositionEnvTemplate := getCompositionEnvTemplateWithStrictCost()
-	filterCompiler, err := cel.NewCompositedCompiler(compositionEnvTemplate)
-	if err != nil {
-		return NewValidator(nil, nil, nil, nil, failurePolicy, err)
-	}
+	var compositionEnvTemplate *cel.CompositionEnv
+	compositionEnvTemplate = getCompositionEnvTemplateWithStrictCost()
+	filterCompiler := cel.NewCompositedCompilerFromTemplate(compositionEnvTemplate)
 	filterCompiler.CompileAndStoreVariables(convertv1beta1Variables(policy.Spec.Variables), optionalVars, environment.StoredExpressions)
 
 	if len(matchConditions) > 0 {
@@ -174,7 +138,6 @@ func compilePolicy(policy *Policy) Validator {
 		filterCompiler.CompileCondition(convertv1AuditAnnotations(policy.Spec.AuditAnnotations), optionalVars, environment.StoredExpressions),
 		filterCompiler.CompileCondition(convertv1MessageExpressions(policy.Spec.Validations), expressionOptionalVars, environment.StoredExpressions),
 		failurePolicy,
-		nil,
 	)
 
 	return res

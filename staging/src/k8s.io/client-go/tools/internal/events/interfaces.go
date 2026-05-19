@@ -43,15 +43,6 @@ type EventRecorder interface {
 	Eventf(regarding runtime.Object, related runtime.Object, eventtype, reason, action, note string, args ...interface{})
 }
 
-// AnnotatedEventRecorder is an optional extension of EventRecorder that
-// supports attaching annotations to events at creation time.
-// Annotations are intended for low-frequency correlation metadata, not as a general purpose structured-data channel.
-// Kubernetes events are best-effort, supplemental observability data and may be dropped, deduped or aggregated at any
-// point in pipeline. Do not rely on annotations for event-driven control flow.
-type AnnotatedEventRecorder interface {
-	AnnotatedEventf(regarding runtime.Object, related runtime.Object, annotations map[string]string, eventtype, reason, action, note string, args ...interface{})
-}
-
 // EventRecorderLogger extends EventRecorder such that a logger can
 // be set for methods in EventRecorder. Normally, those methods
 // uses the global default logger to record errors and debug messages.

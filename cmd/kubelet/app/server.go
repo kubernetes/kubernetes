@@ -50,7 +50,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	otelsdkresource "go.opentelemetry.io/otel/sdk/resource"
-	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 
@@ -63,7 +63,6 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/flagz"
@@ -84,7 +83,6 @@ import (
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
-	metricsfeatures "k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/tracing"
 	"k8s.io/component-base/version"
@@ -121,7 +119,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/watchdog"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/pkg/util/flock"
-	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/rlimit"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -221,10 +218,8 @@ is checked every 20 seconds (also configurable with a flag).`,
 				}
 			}
 			// Merge the kubelet configurations if --config-dir is set
-			var skippedDropinFiles []string
 			if len(kubeletFlags.KubeletDropinConfigDirectory) > 0 {
-				skippedDropinFiles, err = mergeKubeletConfigurations(kubeletConfig, kubeletFlags.KubeletDropinConfigDirectory)
-				if err != nil {
+				if err := mergeKubeletConfigurations(kubeletConfig, kubeletFlags.KubeletDropinConfigDirectory); err != nil {
 					return fmt.Errorf("failed to merge kubelet configs: %w", err)
 				}
 			}
@@ -289,14 +284,6 @@ is checked every 20 seconds (also configurable with a flag).`,
 			for k := range config.StaticPodURLHeader {
 				config.StaticPodURLHeader[k] = []string{"<masked>"}
 			}
-
-			// Log skipped drop-in files if any were encountered during configuration merge
-			if len(skippedDropinFiles) > 0 {
-				for _, skippedFile := range skippedDropinFiles {
-					logger.V(4).Info("Skipped file in drop-in directory (does not have .conf extension)", "file", skippedFile)
-				}
-			}
-
 			// log the kubelet's config for inspection
 			logger.V(5).Info("KubeletConfiguration", "configuration", klog.Format(config))
 
@@ -333,70 +320,63 @@ is checked every 20 seconds (also configurable with a flag).`,
 // configurations in files with lower numeric prefixes are applied first, followed by higher numeric prefixes.
 // For example, if the drop-in directory contains files named "10-config.conf" and "20-config.conf",
 // the configurations in "10-config.conf" will be applied first, and then the configurations in "20-config.conf" will be applied,
-// potentially overriding the previous values. Files in subdirectories are also processed in lexical order.
-// Returns a list of skipped files and an error.
-func mergeKubeletConfigurations(kubeletConfig *kubeletconfiginternal.KubeletConfiguration, kubeletDropInConfigDir string) ([]string, error) {
+// potentially overriding the previous values.
+func mergeKubeletConfigurations(kubeletConfig *kubeletconfiginternal.KubeletConfiguration, kubeletDropInConfigDir string) error {
 	const dropinFileExtension = ".conf"
-	var skippedFiles []string
 
 	// TODO: move the "internal --> versioned --> merge --> default --> internal" operation inside the loop,
 	// and use the version of each drop-in file as the versioned target once config files can be in versions other than just v1beta1
 	versionedConfig := &kubeletconfigv1beta1.KubeletConfiguration{}
 	if err := kubeletconfigv1beta1conversion.Convert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(kubeletConfig, versionedConfig, nil); err != nil {
-		return nil, err
+		return err
 	}
 
 	baseKubeletConfigJSON, err := json.Marshal(versionedConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal base config: %w", err)
+		return fmt.Errorf("failed to marshal base config: %w", err)
 	}
 	// Walk through the drop-in directory and update the configuration for each file
 	if err := filepath.WalkDir(kubeletDropInConfigDir, func(path string, info fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if info.IsDir() {
-			return nil
+		if !info.IsDir() && filepath.Ext(info.Name()) == dropinFileExtension {
+			dropinConfigJSON, gvk, err := loadDropinConfigFileIntoJSON(path)
+			if err != nil {
+				return fmt.Errorf("failed to load kubelet dropin file, path: %s, error: %w", path, err)
+			}
+			if gvk == nil || gvk.Empty() {
+				return fmt.Errorf("failed to load kubelet dropin file, path: %s, no apiVersion/kind", path)
+			}
+			// TODO: expand this once more than a single kubelet config version exists
+			if *gvk != kubeletconfigv1beta1.SchemeGroupVersion.WithKind("KubeletConfiguration") {
+				return fmt.Errorf("failed to load kubelet dropin file, path: %s, unknown apiVersion/kind: %v", path, gvk.String())
+			}
+			mergedConfigJSON, err := jsonpatch.MergePatch(baseKubeletConfigJSON, dropinConfigJSON)
+			if err != nil {
+				return fmt.Errorf("failed to merge drop-in and current config: %w", err)
+			}
+			baseKubeletConfigJSON = mergedConfigJSON
 		}
-		if filepath.Ext(info.Name()) != dropinFileExtension {
-			skippedFiles = append(skippedFiles, path)
-			return nil
-		}
-		dropinConfigJSON, gvk, err := loadDropinConfigFileIntoJSON(path)
-		if err != nil {
-			return fmt.Errorf("failed to load kubelet dropin file, path: %s, error: %w", path, err)
-		}
-		if gvk == nil || gvk.Empty() {
-			return fmt.Errorf("failed to load kubelet dropin file, path: %s, no apiVersion/kind", path)
-		}
-		// TODO: expand this once more than a single kubelet config version exists
-		if *gvk != kubeletconfigv1beta1.SchemeGroupVersion.WithKind("KubeletConfiguration") {
-			return fmt.Errorf("failed to load kubelet dropin file, path: %s, unknown apiVersion/kind: %v", path, gvk.String())
-		}
-		mergedConfigJSON, err := jsonpatch.MergePatch(baseKubeletConfigJSON, dropinConfigJSON)
-		if err != nil {
-			return fmt.Errorf("failed to merge drop-in and current config: %w", err)
-		}
-		baseKubeletConfigJSON = mergedConfigJSON
 		return nil
 	}); err != nil {
-		return nil, fmt.Errorf("failed to walk through kubelet dropin directory %q: %w", kubeletDropInConfigDir, err)
+		return fmt.Errorf("failed to walk through kubelet dropin directory %q: %w", kubeletDropInConfigDir, err)
 	}
 
 	// reset versioned config and decode
 	versionedConfig = &kubeletconfigv1beta1.KubeletConfiguration{}
 	if err := json.Unmarshal(baseKubeletConfigJSON, versionedConfig); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal merged JSON into kubelet configuration: %w", err)
+		return fmt.Errorf("failed to unmarshal merged JSON into kubelet configuration: %w", err)
 	}
 	// apply defaulting after decoding
 	kubeletconfigv1beta1conversion.SetDefaults_KubeletConfiguration(versionedConfig)
 
 	// convert back to internal config
 	if err := kubeletconfigv1beta1conversion.Convert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(versionedConfig, kubeletConfig, nil); err != nil {
-		return nil, fmt.Errorf("failed to convert merged config to internal kubelet configuration: %w", err)
+		return fmt.Errorf("failed to convert merged config to internal kubelet configuration: %w", err)
 	}
 
-	return skippedFiles, nil
+	return nil
 }
 
 // newFlagSetWithGlobals constructs a new pflag.FlagSet with global flags registered
@@ -531,7 +511,7 @@ func UnsecuredDependencies(ctx context.Context, s *options.KubeletServer, featur
 		OOMAdjuster:         oom.NewOOMAdjuster(),
 		OSInterface:         kubecontainer.RealOS{},
 		VolumePlugins:       plugins,
-		DynamicPluginProber: GetDynamicPluginProber(ctx, s.VolumePluginDir, pluginRunner),
+		DynamicPluginProber: GetDynamicPluginProber(s.VolumePluginDir, pluginRunner),
 		TLSOptions:          tlsOptions}, nil
 }
 
@@ -560,12 +540,12 @@ func setConfigz(cz *configz.Config, kc *kubeletconfiginternal.KubeletConfigurati
 	if err != nil {
 		return err
 	}
-	versioned := &kubeletconfigv1beta1.KubeletConfiguration{}
-	if err := scheme.Convert(kc, versioned, nil); err != nil {
+	versioned := kubeletconfigv1beta1.KubeletConfiguration{}
+	if err := scheme.Convert(kc, &versioned, nil); err != nil {
 		return err
 	}
-	versioned.GetObjectKind().SetGroupVersionKind(kubeletconfigv1beta1.SchemeGroupVersion.WithKind("KubeletConfiguration"))
-	return cz.Set(versioned)
+	cz.Set(versioned)
+	return nil
 }
 
 func initConfigz(ctx context.Context, kc *kubeletconfiginternal.KubeletConfiguration) error {
@@ -636,28 +616,15 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	if err != nil {
 		return err
 	}
-	// Propagate feature gate state to the metrics subsystem. This must be called
-	// after feature gates are set and before any histogram metrics are registered.
-	metricsfeatures.ApplyFeatureGates(featureGate)
 	// validate the initial KubeletServer (we set feature gates first, because this validation depends on feature gates)
 	if err := options.ValidateKubeletServer(s); err != nil {
 		return err
 	}
 
-	// Warn about MemoryQoS compatibility issues
-	if utilfeature.DefaultFeatureGate.Enabled(features.MemoryQoS) {
-		if !kubeletutil.IsCgroup2UnifiedMode() {
-			logger.Info("Warning: MemoryQoS feature only works with cgroups v2 on Linux, but enabled with cgroups v1")
-		} else {
-			kernelVersion, err := utilkernel.GetVersion()
-			if err != nil {
-				logger.Error(err, "Failed to detect kernel version for MemoryQoS compatibility check")
-			} else if kernelVersion.LessThan(utilversion.MustParseGeneric(utilkernel.MemoryQoSMinKernelVersion)) {
-				logger.Info("Warning: MemoryQoS memory.high throttling may cause process livelock on older kernels",
-					"currentKernel", kernelVersion,
-					"minimumKernel", utilkernel.MemoryQoSMinKernelVersion)
-			}
-		}
+	// Warn if MemoryQoS enabled with cgroups v1
+	if utilfeature.DefaultFeatureGate.Enabled(features.MemoryQoS) &&
+		!kubeletutil.IsCgroup2UnifiedMode() {
+		logger.Info("Warning: MemoryQoS feature only works with cgroups v2 on Linux, but enabled with cgroups v1")
 	}
 	// Obtain Kubelet Lock File
 	if s.ExitOnLockContention && s.LockFilePath == "" {
@@ -757,7 +724,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		runAuthenticatorCAReload(ctx.Done())
 	}
 
-	if err := kubelet.PreInitRuntimeService(ctx, &s.KubeletConfiguration, kubeDeps); err != nil {
+	if err := kubelet.PreInitRuntimeService(&s.KubeletConfiguration, kubeDeps); err != nil {
 		return err
 	}
 
@@ -794,7 +761,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 
 	if kubeDeps.CAdvisorInterface == nil {
 		imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(s.ContainerRuntimeEndpoint)
-		kubeDeps.CAdvisorInterface, err = cadvisor.New(klog.FromContext(ctx), imageFsInfoProvider, s.RootDirectory, cgroupRoots, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntimeEndpoint), s.LocalStorageCapacityIsolation)
+		kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDirectory, cgroupRoots, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntimeEndpoint), s.LocalStorageCapacityIsolation)
 		if err != nil {
 			return err
 		}
@@ -900,7 +867,6 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				CPUManagerReconcilePeriod:    s.CPUManagerReconcilePeriod.Duration,
 				MemoryManagerPolicy:          s.MemoryManagerPolicy,
 				MemoryManagerReservedMemory:  s.ReservedMemory,
-				MemoryReservationPolicy:      s.MemoryReservationPolicy,
 				PodPidsLimit:                 s.PodPidsLimit,
 				EnforceCPULimits:             s.CPUCFSQuota,
 				CPUCFSQuotaPeriod:            s.CPUCFSQuotaPeriod.Duration,
@@ -939,12 +905,12 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	if s.HealthzPort > 0 {
 		mux := http.NewServeMux()
 		healthz.InstallHandler(mux)
-		go wait.UntilWithContext(ctx, func(ctx context.Context) {
+		go wait.Until(func() {
 			err := http.ListenAndServe(net.JoinHostPort(s.HealthzBindAddress, strconv.Itoa(int(s.HealthzPort))), mux)
 			if err != nil {
 				logger.Error(err, "Failed to start healthz server")
 			}
-		}, 5*time.Second)
+		}, 5*time.Second, wait.NeverStop)
 	}
 
 	// If systemd is used, notify it that we have started
@@ -1172,7 +1138,7 @@ func InitializeTLS(ctx context.Context, kf *options.KubeletFlags, kc *kubeletcon
 
 	if len(tlsCipherSuites) > 0 {
 		insecureCiphers := cliflag.InsecureTLSCiphers()
-		for i := range tlsCipherSuites {
+		for i := 0; i < len(tlsCipherSuites); i++ {
 			for cipherName, cipherID := range insecureCiphers {
 				if tlsCipherSuites[i] == cipherID {
 					logger.Info("Use of insecure cipher detected.", "cipher", cipherName)
@@ -1192,18 +1158,24 @@ func InitializeTLS(ctx context.Context, kf *options.KubeletFlags, kc *kubeletcon
 		}
 	}
 
-	curvePreferences, err := cliflag.TLSCurvePreferences(kc.TLSCurvePreferences)
-	if err != nil {
-		return nil, err
+	tlsOptions := &server.TLSOptions{
+		Config: &tls.Config{
+			MinVersion:   minTLSVersion,
+			CipherSuites: tlsCipherSuites,
+		},
+		CertFile: kc.TLSCertFile,
+		KeyFile:  kc.TLSPrivateKeyFile,
 	}
 
-	tlsOptions := &server.TLSOptions{
-		MinVersion:       minTLSVersion,
-		CipherSuites:     tlsCipherSuites,
-		CurvePreferences: curvePreferences,
-		CertFile:         kc.TLSCertFile,
-		KeyFile:          kc.TLSPrivateKeyFile,
-		ClientCAFile:     kc.Authentication.X509.ClientCAFile,
+	if len(kc.Authentication.X509.ClientCAFile) > 0 {
+		clientCAs, err := certutil.NewPool(kc.Authentication.X509.ClientCAFile)
+		if err != nil {
+			return nil, fmt.Errorf("unable to load client CA file %s: %w", kc.Authentication.X509.ClientCAFile, err)
+		}
+		// Specify allowed CAs for client certificates
+		tlsOptions.Config.ClientCAs = clientCAs
+		// Populate PeerCertificates in requests, but don't reject connections without verified certificates
+		tlsOptions.Config.ClientAuth = tls.RequestClientCert
 	}
 
 	return tlsOptions, nil
@@ -1289,18 +1261,16 @@ func RunKubelet(ctx context.Context, kubeServer *options.KubeletServer, kubeDeps
 
 func startKubelet(ctx context.Context, k kubelet.Bootstrap, podCfg *config.PodConfig, kubeCfg *kubeletconfiginternal.KubeletConfiguration, kubeDeps *kubelet.Dependencies, enableServer bool) {
 	// start the kubelet
-	go k.Run(ctx, podCfg.Updates())
+	go k.Run(podCfg.Updates())
 
 	// start the kubelet server
 	if enableServer {
-		go k.ListenAndServe(ctx, kubeCfg, kubeDeps.TLSConfig, kubeDeps.Auth, kubeDeps.TracerProvider)
+		go k.ListenAndServe(ctx, kubeCfg, kubeDeps.TLSOptions, kubeDeps.Auth, kubeDeps.TracerProvider)
 	}
 	if kubeCfg.ReadOnlyPort > 0 {
 		go k.ListenAndServeReadOnly(ctx, netutils.ParseIPSloppy(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort), kubeDeps.TracerProvider)
 	}
-
 	go k.ListenAndServePodResources(ctx)
-	go k.ListenAndServePods(ctx)
 }
 
 func createAndInitKubelet(
@@ -1346,7 +1316,7 @@ func createAndInitKubelet(
 
 	k.BirthCry()
 
-	k.StartGarbageCollection(ctx)
+	k.StartGarbageCollection()
 
 	return k, nil
 }
@@ -1408,7 +1378,7 @@ func getCgroupDriverFromCRI(ctx context.Context, s *options.KubeletServer, kubeD
 	)
 	// Retry a couple of times, hoping that any errors are transient.
 	// Fail quickly on known, non transient errors.
-	for range 3 {
+	for i := 0; i < 3; i++ {
 		runtimeConfig, err = kubeDeps.RemoteRuntimeService.RuntimeConfig(ctx)
 		if err != nil {
 			s, ok := status.FromError(err)
@@ -1421,7 +1391,7 @@ func getCgroupDriverFromCRI(ctx context.Context, s *options.KubeletServer, kubeD
 			}
 			// CRI implementation doesn't support RuntimeConfig, fallback
 			legacyregistry.MustRegister(kubeletmetrics.CRILosingSupport)
-			kubeletmetrics.CRILosingSupport.WithLabelValues("1.37.0").Inc()
+			kubeletmetrics.CRILosingSupport.WithLabelValues("1.36.0").Inc()
 			logger.Info("CRI implementation should be updated to support RuntimeConfig. Falling back to using cgroupDriver from kubelet config.")
 			return nil
 		}

@@ -59,7 +59,7 @@ import (
 const PostStartHookName = "rbac/bootstrap-roles"
 
 type RESTStorageProvider struct {
-	Authorizer authorizer.UnconditionalAuthorizer
+	Authorizer authorizer.Authorizer
 }
 
 var _ genericapiserver.PostStartHookProvider = RESTStorageProvider{}

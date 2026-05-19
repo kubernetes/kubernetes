@@ -1,4 +1,5 @@
 //go:build !windows
+// +build !windows
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -20,7 +21,7 @@ package fake
 
 import (
 	"fmt"
-	"math/rand"
+	"k8s.io/apimachinery/pkg/util/rand"
 )
 
 const (

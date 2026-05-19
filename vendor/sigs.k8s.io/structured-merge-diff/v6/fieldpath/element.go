@@ -19,7 +19,7 @@ package fieldpath
 import (
 	"fmt"
 	"iter"
-	"slices"
+	"sort"
 	"strings"
 
 	"sigs.k8s.io/structured-merge-diff/v6/value"
@@ -255,13 +255,19 @@ func (s PathElementSet) Copy() PathElementSet {
 
 // Insert adds pe to the set.
 func (s *PathElementSet) Insert(pe PathElement) {
-	loc, found := slices.BinarySearchFunc(s.members, pe, func(a, b PathElement) int {
-		return a.Compare(b)
+	loc := sort.Search(len(s.members), func(i int) bool {
+		return !s.members[i].Less(pe)
 	})
-	if found {
+	if loc == len(s.members) {
+		s.members = append(s.members, pe)
 		return
 	}
-	s.members = slices.Insert(s.members, loc, pe)
+	if s.members[loc].Equals(pe) {
+		return
+	}
+	s.members = append(s.members, PathElement{})
+	copy(s.members[loc+1:], s.members[loc:])
+	s.members[loc] = pe
 }
 
 // Union returns a set containing elements that appear in either s or s2.
@@ -338,10 +344,16 @@ func (s *PathElementSet) Size() int { return len(s.members) }
 
 // Has returns true if pe is a member of the set.
 func (s *PathElementSet) Has(pe PathElement) bool {
-	_, found := slices.BinarySearchFunc(s.members, pe, func(a, b PathElement) int {
-		return a.Compare(b)
+	loc := sort.Search(len(s.members), func(i int) bool {
+		return !s.members[i].Less(pe)
 	})
-	return found
+	if loc == len(s.members) {
+		return false
+	}
+	if s.members[loc].Equals(pe) {
+		return true
+	}
+	return false
 }
 
 // Equals returns true if s and s2 have exactly the same members.

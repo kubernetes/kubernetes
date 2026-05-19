@@ -33,7 +33,6 @@ import (
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
-	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/utils/ptr"
 )
 
@@ -347,20 +346,6 @@ func rejectPodAdmissionBasedOnSupplementalGroupsPolicy(pod *v1.Pod, node *v1.Nod
 }
 
 func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) *v1.Pod {
-	isResourceBackedByDRA := func(resourceName v1.ResourceName, containerName string) bool {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.DRAExtendedResource) {
-			return false
-		}
-		if pod.Status.ExtendedResourceClaimStatus == nil {
-			return false
-		}
-		for _, resourceMapping := range pod.Status.ExtendedResourceClaimStatus.RequestMappings {
-			if v1.ResourceName(resourceMapping.ResourceName) == resourceName && resourceMapping.ContainerName == containerName {
-				return true
-			}
-		}
-		return false
-	}
 	filterExtendedResources := func(containers []v1.Container) {
 		for i, c := range containers {
 			// We only handle requests in Requests but not Limits because the
@@ -368,9 +353,6 @@ func removeMissingExtendedResources(pod *v1.Pod, nodeInfo *schedulerframework.No
 			// does not use Limits.
 			filteredResources := make(v1.ResourceList)
 			for rName, rQuant := range c.Resources.Requests {
-				if schedutil.IsDRAExtendedResourceName(rName) && isResourceBackedByDRA(rName, c.Name) {
-					continue
-				}
 				if v1helper.IsExtendedResourceName(rName) {
 					if _, found := nodeInfo.Allocatable.ScalarResources[rName]; !found {
 						continue

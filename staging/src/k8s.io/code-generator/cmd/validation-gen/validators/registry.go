@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"slices"
 	"sort"
-	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -42,6 +41,9 @@ type registry struct {
 
 	tagValidators map[string]TagValidator // keyed by tagname
 	tagIndex      []string                // all tag names
+
+	typeValidators  []TypeValidator
+	fieldValidators []FieldValidator
 }
 
 func (reg *registry) addTagValidator(tv TagValidator) {
@@ -57,7 +59,7 @@ func (reg *registry) addTagValidator(tv TagValidator) {
 		panic(fmt.Sprintf("tag %q was registered twice", name))
 	}
 	switch level := tv.Docs().StabilityLevel; level {
-	case TagStabilityLevelAlpha, TagStabilityLevelBeta, TagStabilityLevelStable:
+	case Alpha, Beta, Stable:
 		// valid
 	case "":
 		panic(fmt.Sprintf("tag %q is missing stability level", name))
@@ -65,6 +67,28 @@ func (reg *registry) addTagValidator(tv TagValidator) {
 		panic(fmt.Sprintf("tag %q has invalid stability level %q", name, level))
 	}
 	globalRegistry.tagValidators[name] = tv
+}
+
+func (reg *registry) addTypeValidator(tv TypeValidator) {
+	if reg.initialized.Load() {
+		panic("registry was modified after init")
+	}
+
+	reg.lock.Lock()
+	defer reg.lock.Unlock()
+
+	globalRegistry.typeValidators = append(globalRegistry.typeValidators, tv)
+}
+
+func (reg *registry) addFieldValidator(fv FieldValidator) {
+	if reg.initialized.Load() {
+		panic("registry was modified after init")
+	}
+
+	reg.lock.Lock()
+	defer reg.lock.Unlock()
+
+	globalRegistry.fieldValidators = append(globalRegistry.fieldValidators, fv)
 }
 
 func (reg *registry) init(c *generator.Context) {
@@ -77,7 +101,7 @@ func (reg *registry) init(c *generator.Context) {
 
 	cfg := Config{
 		GengoContext: c,
-		TagValidator: reg,
+		Validator:    reg,
 	}
 
 	for _, tv := range globalRegistry.tagValidators {
@@ -85,6 +109,20 @@ func (reg *registry) init(c *generator.Context) {
 		tv.Init(cfg)
 	}
 	sort.Strings(reg.tagIndex)
+
+	for _, tv := range reg.typeValidators {
+		tv.Init(cfg)
+	}
+	slices.SortFunc(reg.typeValidators, func(a, b TypeValidator) int {
+		return cmp.Compare(a.Name(), b.Name())
+	})
+
+	for _, fv := range reg.fieldValidators {
+		fv.Init(cfg)
+	}
+	slices.SortFunc(reg.fieldValidators, func(a, b FieldValidator) int {
+		return cmp.Compare(a.Name(), b.Name())
+	})
 
 	reg.initialized.Store(true)
 }
@@ -115,40 +153,56 @@ func (reg *registry) ExtractValidations(context Context, tags ...codetags.Tag) (
 	if !reg.initialized.Load() {
 		panic("registry.init() was not called")
 	}
+	validations := Validations{}
 
-	validations, err := reg.ExtractTagValidations(context, tags...)
-	if err != nil {
-		return Validations{}, err
+	// Run tag-validators first.
+	phases := reg.sortTagsIntoPhases(tags)
+	for _, tags := range phases {
+		for _, tag := range tags {
+			tv := reg.tagValidators[tag.Name]
+			// At this point we know tv exists and is not nil due to the upfront check
+			if scopes := tv.ValidScopes(); !scopes.Has(context.Scope) {
+				return Validations{}, fmt.Errorf("tag %q cannot be specified on %s", tv.TagName(), context.Scope)
+			}
+			if err := typeCheck(tag, tv.Docs()); err != nil {
+				return Validations{}, fmt.Errorf("tag %q: %w", tv.TagName(), err)
+			}
+			if theseValidations, err := tv.GetValidations(context, tag); err != nil {
+				return Validations{}, fmt.Errorf("tag %q: %w", tv.TagName(), err)
+			} else {
+				validations.Add(theseValidations)
+			}
+		}
+	}
+
+	// Run type-validators after tag validators are done.
+	if context.Scope == ScopeType {
+		// Run all type-validators.
+		for _, tv := range reg.typeValidators {
+			if theseValidations, err := tv.GetValidations(context); err != nil {
+				return Validations{}, fmt.Errorf("type validator %q: %w", tv.Name(), err)
+			} else {
+				validations.Add(theseValidations)
+			}
+		}
+	}
+
+	// Run field-validators after tag and type validators are done.
+	if context.Scope == ScopeField {
+		// Run all field-validators.
+		for _, fv := range reg.fieldValidators {
+			if theseValidations, err := fv.GetValidations(context); err != nil {
+				return Validations{}, fmt.Errorf("field validator %q: %w", fv.Name(), err)
+			} else {
+				validations.Add(theseValidations)
+			}
+		}
 	}
 
 	return validations, nil
 }
 
-func (reg *registry) ExtractTagValidations(context Context, tags ...codetags.Tag) (Validations, error) {
-	if !reg.initialized.Load() {
-		panic("registry.init() was not called")
-	}
-	accumulatedValidations := Validations{}
-	tags = reg.sortTags(tags)
-	for _, tag := range tags {
-		tv := reg.tagValidators[tag.Name]
-		// At this point we know tv exists and is not nil due to the upfront check
-		if scopes := tv.ValidScopes(); !scopes.Has(context.Scope) {
-			return Validations{}, fmt.Errorf("tag %q cannot be specified on %s", tv.TagName(), context.Scope)
-		}
-		if err := typeCheck(tag, tv.Docs()); err != nil {
-			return Validations{}, fmt.Errorf("tag %q: %w", tv.TagName(), err)
-		}
-		if theseValidations, err := tv.GetValidations(context, tag); err != nil {
-			return Validations{}, fmt.Errorf("tag %q: %w", tv.TagName(), err)
-		} else {
-			accumulatedValidations.Add(theseValidations)
-		}
-	}
-	return accumulatedValidations, nil
-}
-
-func (reg *registry) sortTags(tags []codetags.Tag) []codetags.Tag {
+func (reg *registry) sortTagsIntoPhases(tags []codetags.Tag) [][]codetags.Tag {
 	// First sort all tags by their name, so the final output is deterministic.
 	// It is important to do this before validations are generated.
 	//
@@ -170,12 +224,22 @@ func (reg *registry) sortTags(tags []codetags.Tag) []codetags.Tag {
 	// are processed in order of appearance, so relative ordering is preserved.
 	sortedTags := make([]codetags.Tag, len(tags))
 	copy(sortedTags, tags)
-
 	slices.SortFunc(sortedTags, func(a, b codetags.Tag) int {
 		return cmp.Compare(a.Name, b.Name)
 	})
 
-	return sortedTags
+	// Now split them into phases.
+	phase0 := []codetags.Tag{} // regular tags
+	phase1 := []codetags.Tag{} // "late" tags
+	for _, tn := range sortedTags {
+		tv := reg.tagValidators[tn.Name]
+		if _, ok := tv.(LateTagValidator); ok {
+			phase1 = append(phase1, tn)
+		} else {
+			phase0 = append(phase0, tn)
+		}
+	}
+	return [][]codetags.Tag{phase0, phase1}
 }
 
 // Docs returns documentation for each tag in this registry.
@@ -194,16 +258,20 @@ func RegisterTagValidator(tv TagValidator) {
 	globalRegistry.addTagValidator(tv)
 }
 
-// TagValidationExtractor represents an aggregation of validator plugins.
-type TagValidationExtractor interface {
-	// ExtractTagValidations extracts all validations associated with the given tags.
-	// Some tag validators may update internal state and then return deferred
-	// validations.
-	ExtractTagValidations(context Context, Tags ...codetags.Tag) (Validations, error)
+// RegisterTypeValidator must be called for a TypeValidator to be used by
+// validation-gen. See TypeValidator for more information.
+func RegisterTypeValidator(tv TypeValidator) {
+	globalRegistry.addTypeValidator(tv)
 }
 
-// ValidationExtractor represents an aggregation of validator plugins.
-type ValidationExtractor interface {
+// RegisterFieldValidator must be called for a FieldValidator to be used by
+// validation-gen. See FieldValidator for more information.
+func RegisterFieldValidator(fv FieldValidator) {
+	globalRegistry.addFieldValidator(fv)
+}
+
+// Validator represents an aggregation of validator plugins.
+type Validator interface {
 
 	// ExtractTags extracts Tags from comment lines.
 	ExtractTags(context Context, comments []string) ([]codetags.Tag, error)
@@ -216,39 +284,14 @@ type ValidationExtractor interface {
 	// logic.
 	ExtractValidations(context Context, Tags ...codetags.Tag) (Validations, error)
 
-	// A ValidationExtractor is also a TagValidationExtractor.
-	TagValidationExtractor
-
 	// Docs returns documentation for each known tag.
 	Docs() []TagDoc
-
-	// Stability returns the stability level for a given tag.
-	Stability(tag string) (TagStabilityLevel, error)
-}
-
-// Stability returns the stability level for a given tag.
-func (reg *registry) Stability(tag string) (TagStabilityLevel, error) {
-	tagName := strings.TrimPrefix(tag, "+")
-	tv, ok := reg.tagValidators[tagName]
-	if !ok {
-		return "", fmt.Errorf("tag %q doesn't have stability level", tag)
-	}
-
-	if tv.Docs().StabilityLevel == "" {
-		return "", fmt.Errorf("tag %q doesn't have stability level", tag)
-	}
-	return tv.Docs().StabilityLevel, nil
-}
-
-// GetStability returns the stability level for a given tag from the global registry.
-func GetStability(tag string) (TagStabilityLevel, error) {
-	return globalRegistry.Stability(tag)
 }
 
 // InitGlobalValidator must be called exactly once by the main application to
 // initialize and safely access the global tag registry.  Once this is called,
 // no more validators may be registered.
-func InitGlobalValidator(c *generator.Context) ValidationExtractor {
+func InitGlobalValidator(c *generator.Context) Validator {
 	globalRegistry.init(c)
 	return globalRegistry
 }

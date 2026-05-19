@@ -167,12 +167,6 @@ func (cfg *Config) setupLogging() error {
 
 		logTLSHandshakeFailureFunc := func(msg string) func(conn *tls.Conn, err error) {
 			return func(conn *tls.Conn, err error) {
-				// Log EOF errors on DEBUG not to spam logs too much.
-				logFunc := cfg.logger.Warn
-				if errors.Is(err, io.EOF) {
-					logFunc = cfg.logger.Debug
-				}
-
 				state := conn.ConnectionState()
 				remoteAddr := conn.RemoteAddr().String()
 				serverName := state.ServerName
@@ -182,7 +176,7 @@ func (cfg *Config) setupLogging() error {
 					for i := range cert.IPAddresses {
 						ips[i] = cert.IPAddresses[i].String()
 					}
-					logFunc(
+					cfg.logger.Warn(
 						msg,
 						zap.String("remote-addr", remoteAddr),
 						zap.String("server-name", serverName),
@@ -191,7 +185,7 @@ func (cfg *Config) setupLogging() error {
 						zap.Error(err),
 					)
 				} else {
-					logFunc(
+					cfg.logger.Warn(
 						msg,
 						zap.String("remote-addr", remoteAddr),
 						zap.String("server-name", serverName),

@@ -68,9 +68,4 @@ func SetDefaults_CSIDriver(obj *storagev1.CSIDriver) {
 		obj.Spec.SELinuxMount = new(bool)
 		*(obj.Spec.SELinuxMount) = false
 	}
-
-	if obj.Spec.PreventPodSchedulingIfMissing == nil && utilfeature.DefaultFeatureGate.Enabled(features.VolumeLimitScaling) {
-		obj.Spec.PreventPodSchedulingIfMissing = new(bool)
-		*(obj.Spec.PreventPodSchedulingIfMissing) = false
-	}
 }

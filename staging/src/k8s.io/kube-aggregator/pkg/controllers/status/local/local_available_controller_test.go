@@ -22,6 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/dump"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
@@ -29,7 +30,6 @@ import (
 	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
 	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
 	availabilitymetrics "k8s.io/kube-aggregator/pkg/controllers/status/metrics"
-	"k8s.io/utils/dump"
 	"k8s.io/utils/ptr"
 )
 
