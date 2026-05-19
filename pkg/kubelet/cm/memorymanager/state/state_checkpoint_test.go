@@ -319,7 +319,9 @@ func TestCheckpointStateRestore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(testingDir)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(testingDir), "unable to remove dir %s", testingDir)
+	})
 
 	// create checkpoint manager for testing
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
@@ -388,7 +390,9 @@ func TestCheckpointStateStore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(testingDir)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(testingDir), "unable to remove dir %s", testingDir)
+	})
 
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
 	assert.NoError(t, err, "could not create testing checkpoint manager")
@@ -508,7 +512,9 @@ func TestCheckpointStateHelpers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(testingDir)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(testingDir), "unable to remove dir %s", testingDir)
+	})
 
 	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
 	assert.NoError(t, err, "could not create testing checkpoint manager")
@@ -578,7 +584,9 @@ func TestCheckpointStateClear(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(testingDir)
+	t.Cleanup(func() {
+		require.NoErrorf(t, os.RemoveAll(testingDir), "unable to remove dir %s", testingDir)
+	})
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
