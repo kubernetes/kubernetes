@@ -396,13 +396,6 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		nodeStageFSGroupArg)
 
 	if csiRPCError != nil {
-		if volumetypes.IsOperationFinishedError(csiRPCError) {
-			// clean up metadata
-			klog.Error(log("attacher.MountDevice failed: %v", csiRPCError))
-			if err := removeMountDir(c.plugin, deviceMountPath); err != nil {
-				klog.Error(log("attacher.MountDevice failed to remove mount dir after error [%s]: %v", deviceMountPath, err))
-			}
-		}
 		return csiRPCError
 	}
 

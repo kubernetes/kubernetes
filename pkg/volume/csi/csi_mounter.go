@@ -314,12 +314,6 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	)
 
 	if csiRPCError != nil {
-		// If operation finished with error then we can remove the mount directory.
-		if volumetypes.IsOperationFinishedError(csiRPCError) && !mounterArgs.ReconstructedVolume {
-			if removeMountDirErr := removeMountDir(c.plugin, dir); removeMountDirErr != nil {
-				klog.Error(log("mounter.SetupAt failed to remove mount dir after a NodePublish() error [%s]: %v", dir, removeMountDirErr))
-			}
-		}
 		return csiRPCError
 	}
 

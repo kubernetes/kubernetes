@@ -400,10 +400,10 @@ func TestMounterSetupJsonFileHandling(t *testing.T) {
 			shouldRemoveFile: false,
 		},
 		{
-			name:             "final error should remove json file",
+			name:             "final error should not remove json file",
 			volumeID:         fakecsi.NodePublishFinalError_VolumeID,
 			setupShouldFail:  true,
-			shouldRemoveFile: true,
+			shouldRemoveFile: false,
 		},
 		{
 			name:                "error in fsgroup permission change, should not remove json file",
@@ -1247,14 +1247,10 @@ func TestMounterSetUpFWithNodePublishFinalError(t *testing.T) {
 			mountPath := csiMounter.GetPath()
 			volPath := filepath.Dir(mountPath)
 			dataFile := filepath.Join(volPath, volDataFileName)
-			if tc.reconstructedVolume {
-				if _, err := os.Stat(dataFile); os.IsNotExist(err) {
-					t.Errorf("volume file [%s] expects to be exists, but removed", dataFile)
-				}
-				return
-			}
-			if _, err := os.Stat(dataFile); err == nil {
-				t.Errorf("volume file [%s] expects to be removed, but exists", dataFile)
+			// vol_data.json must survive a failed mount regardless of whether the
+			// volume was reconstructed — NewUnmounter needs it to run teardown.
+			if _, err := os.Stat(dataFile); os.IsNotExist(err) {
+				t.Errorf("volume file [%s] expected to exist after failed mount, but was removed", dataFile)
 			}
 		})
 	}
@@ -1371,6 +1367,65 @@ func TestUnmounterTeardownNoClientError(t *testing.T) {
 		t.Errorf("test should fail, but no error occurred")
 	} else if reflect.TypeOf(transientError) != reflect.TypeOf(err) {
 		t.Fatalf("expected exitError type: %v got: %v (%v)", reflect.TypeOf(transientError), reflect.TypeOf(err), err)
+	}
+}
+
+// TestIssue136908_FinalErrorMountFailurePreventsUnmount reproduces the bug
+// reported in https://github.com/kubernetes/kubernetes/issues/136908.
+//
+// When NodePublishVolume returns a final (non-transient) error, removeMountDir
+// deletes vol_data.json along with the mount directory. A subsequent call to
+// NewUnmounter fails because it cannot load vol_data.json, leaving the volume
+// permanently stuck — mount failed, teardown also fails on every retry.
+func TestIssue136908_FinalErrorMountFailurePreventsUnmount(t *testing.T) {
+	modes := []storage.VolumeLifecycleMode{storage.VolumeLifecyclePersistent}
+	csiDriver := getTestCSIDriver("test-driver", nil, nil, modes)
+	fakeClient := fakeclient.NewSimpleClientset(csiDriver)
+	plug, tmpDir := newTestPlugin(t, fakeClient)
+	defer os.RemoveAll(tmpDir)
+
+	registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+
+	// Use the volume ID that causes the fake CSI client to return a final
+	// (codes.Internal) error from NodePublishVolume.
+	pv := makeTestPV("test-pv", 10, testDriver, fakecsi.NodePublishFinalError_VolumeID)
+	pod := &corev1.Pod{
+		ObjectMeta: meta.ObjectMeta{UID: testPodUID, Namespace: testns, Name: testPod},
+	}
+
+	mounter, err := plug.NewMounter(
+		volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly),
+		pod,
+	)
+	if err != nil {
+		t.Fatalf("NewMounter failed: %v", err)
+	}
+
+	csiMounter := mounter.(*csiMountMgr)
+	csiMounter.csiClient = setupClient(t, true)
+
+	attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
+	attachment := makeTestAttachment(attachID, "test-node", csiMounter.spec.Name())
+	if _, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, meta.CreateOptions{}); err != nil {
+		t.Fatalf("failed to create VolumeAttachment: %v", err)
+	}
+
+	// Step 1: SetUp fails with a final error.
+	if err := csiMounter.SetUp(volume.MounterArgs{}); err == nil {
+		t.Fatal("SetUp should have failed with a final error, but succeeded")
+	}
+
+	// Step 2: vol_data.json must survive a failed mount so teardown can run.
+	dataDir := filepath.Dir(csiMounter.GetPath())
+	dataFile := filepath.Join(dataDir, volDataFileName)
+	if _, statErr := os.Stat(dataFile); os.IsNotExist(statErr) {
+		t.Errorf("vol_data.json was deleted after NodePublishVolume final error; NewUnmounter will be unable to run teardown")
+	}
+
+	// Step 3: NewUnmounter must succeed so kubelet can run TearDown.
+	_, err = plug.NewUnmounter(pv.ObjectMeta.Name, testPodUID)
+	if err != nil {
+		t.Errorf("NewUnmounter failed after a final NodePublishVolume error: %v", err)
 	}
 }
 
