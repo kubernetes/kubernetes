@@ -132,6 +132,14 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	}
 	admitPod := attrs.Pod
 
+	if attrs.Operation == ResizeOperation {
+		originalOtherPods := attrs.OtherPods
+		attrs.OtherPods = append(attrs.OtherPods, admitPod)
+		defer func() {
+			attrs.OtherPods = originalOtherPods
+		}()
+	}
+
 	// perform the checks that preemption will not help first to avoid meaningless pod eviction
 	if rejectPodAdmissionBasedOnOSSelector(admitPod, node) {
 		return PodAdmitResult{
