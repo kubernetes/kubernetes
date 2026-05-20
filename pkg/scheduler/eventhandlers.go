@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -166,6 +167,26 @@ func (sched *Scheduler) updatePod(oldObj, newObj interface{}) {
 				sched.addPodToSchedulingQueue(newPod)
 			} else if oldDeferred && !newDeferred {
 				sched.deletePodFromSchedulingQueue(oldPod, false)
+				hasResizeCond := false
+				for _, cond := range newPod.Status.Conditions {
+					if cond.Type == v1.PodResizeUnschedulable {
+						hasResizeCond = true
+						break
+					}
+				}
+				if hasResizeCond {
+					podStatusCopy := newPod.Status.DeepCopy()
+					var newConditions []v1.PodCondition
+					for _, cond := range podStatusCopy.Conditions {
+						if cond.Type != v1.PodResizeUnschedulable {
+							newConditions = append(newConditions, cond)
+						}
+					}
+					podStatusCopy.Conditions = newConditions
+					if err := schedutil.PatchPodStatus(context.Background(), sched.client, newPod.Name, newPod.Namespace, &newPod.Status, podStatusCopy); err != nil {
+						utilruntime.HandleErrorWithLogger(logger, err, "Failed to clear PodResizeUnschedulable condition", "pod", klog.KObj(newPod))
+					}
+				}
 			} else if oldDeferred && newDeferred {
 				sched.SchedulingQueue.Update(klog.NewContext(context.Background(), logger), oldPod, newPod)
 				if podRequestsChanged(oldPod, newPod) {

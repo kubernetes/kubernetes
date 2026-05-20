@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -268,6 +269,11 @@ func (sched *Scheduler) schedulingAlgorithm(
 
 	logger := klog.FromContext(ctx)
 	scheduleResult, err := sched.SchedulePod(ctx, schedFramework, state, podInfo)
+	if err == nil && resourcehelper.IsPodResizeDeferred(pod) {
+		// Treats a fitting deferred pod as unschedulable to park it in the Unschedulable queue.
+		// This ensures the pod remains tracked as a "Waiting for Kubelet" placeholder.
+		return ScheduleResult{nominatingInfo: clearNominatedNode}, fwk.NewStatus(fwk.Unschedulable, "pod resize fits, no preemption needed")
+	}
 	if err != nil {
 		if err == ErrNoNodesAvailable {
 			status := fwk.NewStatus(fwk.UnschedulableAndUnresolvable).WithError(err)
@@ -1252,7 +1258,7 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 	} else {
 		// In the case of extender, the pod may have been bound successfully, but timed out returning its response to the scheduler.
 		// It could result in the live version to carry .spec.nodeName, and that's inconsistent with the internal-queued version.
-		if len(cachedPod.Spec.NodeName) != 0 {
+		if len(cachedPod.Spec.NodeName) != 0 && !resourcehelper.IsPodResizeDeferred(cachedPod) {
 			logger.Info("Pod has been assigned to node. Abort adding it back to queue.", "pod", klog.KObj(pod), "node", cachedPod.Spec.NodeName)
 			// We need to call DonePod here because we don't call AddUnschedulableIfNotPresent in this case.
 		} else {
@@ -1280,13 +1286,54 @@ func (sched *Scheduler) handleSchedulingFailure(ctx context.Context, podFwk fram
 		sched.SchedulingQueue.AddNominatedPod(logger, podInfo.PodInfo, nominatingInfo)
 	}
 
-	if err == nil {
+	if err == nil && !resourcehelper.IsPodResizeDeferred(pod) {
 		// Only tests can reach here.
 		return
 	}
 
 	msg := truncateMessage(errMsg)
 	podFwk.EventRecorder().WithLogger(logger).Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", msg)
+
+	if resourcehelper.IsPodResizeDeferred(pod) {
+		podStatusCopy := pod.Status.DeepCopy()
+		fits := errMsg == "pod resize fits, no preemption needed"
+		preemptionHelpful := nominatingInfo != nil && nominatingInfo.NominatedNodeName != ""
+
+		var cond *v1.PodCondition
+		if fits {
+			cond = &v1.PodCondition{
+				Type:               v1.PodResizeUnschedulable,
+				Status:             v1.ConditionFalse,
+				Reason:             "ResizeFits",
+				Message:            fmt.Sprintf("Node '%s' has sufficient capacity for the pod resize request.", pod.Spec.NodeName),
+				LastTransitionTime: metav1.Now(),
+			}
+		} else if preemptionHelpful {
+			cond = &v1.PodCondition{
+				Type:               v1.PodResizeUnschedulable,
+				Status:             v1.ConditionFalse,
+				Reason:             "PreemptionRequested",
+				Message:            fmt.Sprintf("Preemption on node '%s' succeeded in finding a suitable victim required for pod resize.", pod.Spec.NodeName),
+				LastTransitionTime: metav1.Now(),
+			}
+		} else {
+			cond = &v1.PodCondition{
+				Type:               v1.PodResizeUnschedulable,
+				Status:             v1.ConditionTrue,
+				Reason:             "PreemptionFailed",
+				Message:            fmt.Sprintf("Preemption on node '%s' failed to find a suitable victim required for pod resize.", pod.Spec.NodeName),
+				LastTransitionTime: metav1.Now(),
+			}
+		}
+
+		if podutil.UpdatePodCondition(podStatusCopy, cond) {
+			if err := util.PatchPodStatus(ctx, sched.client, pod.Name, pod.Namespace, &pod.Status, podStatusCopy); err != nil {
+				utilruntime.HandleErrorWithContext(ctx, err, "Error updating pod resize condition", "pod", klog.KObj(pod))
+			}
+		}
+		return
+	}
+
 	if err := updatePod(ctx, sched.client, podFwk.APICacher(), pod, &v1.PodCondition{
 		Type:               v1.PodScheduled,
 		ObservedGeneration: podutil.CalculatePodConditionObservedGeneration(&pod.Status, pod.Generation, v1.PodScheduled),
