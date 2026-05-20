@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -291,14 +292,13 @@ func copyLogsFromFlags(from *pflag.FlagSet, to *logsapi.LoggingConfiguration) er
 	return err
 }
 
-// Creates a new filesystem watcher and adds watches for the config file.
 func (o *Options) initWatcher() error {
 	fswatcher := filesystem.NewFsnotifyWatcher()
 	err := fswatcher.Init(o.eventHandler, o.errorHandler)
 	if err != nil {
 		return err
 	}
-	err = fswatcher.AddWatch(o.ConfigFile)
+	err = fswatcher.AddWatch(filepath.Dir(o.ConfigFile))
 	if err != nil {
 		return err
 	}
@@ -307,8 +307,7 @@ func (o *Options) initWatcher() error {
 }
 
 func (o *Options) eventHandler(ent fsnotify.Event) {
-	if ent.Has(fsnotify.Write) || ent.Has(fsnotify.Rename) {
-		// error out when ConfigFile is updated
+	if ent.Name == o.ConfigFile || filepath.Base(ent.Name) == "..data" {
 		o.errCh <- fmt.Errorf("content of the proxy server's configuration file was updated")
 		return
 	}
