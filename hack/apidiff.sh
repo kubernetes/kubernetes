@@ -258,38 +258,6 @@ inTarget () {
 inTarget run "${KUBE_TEMP}/after"
 inWorktree "${KUBE_TEMP}/base" "${base}" run "${KUBE_TEMP}/before"
 
-# These are grep extended regular expressions matching known harmless incompatible changes
-# in client-go. For example, Kubernetes API changes imply changing the API's client-go typed interfaces.
-#
-# - ./informers/resource/v1beta2.Interface.DeviceTaintRules: added
-# - ./kubernetes/typed/resource/v1beta2.DeviceTaintRulesGetter.DeviceTaintRules: added
-# ...
-# - ./informers/autoscaling.Interface.V2beta1: removed
-# - ./informers/autoscaling.Interface.V2beta2: removed
-# ...
-# - package k8s.io/client-go/applyconfigurations/autoscaling/v2beta1: removed
-# - package k8s.io/client-go/applyconfigurations/autoscaling/v2beta2: removed
-# ...
-# - package k8s.io/client-go/kubernetes/typed/autoscaling/v2beta1: removed
-# ...
-# - package k8s.io/client-go/listers/autoscaling/v2beta2: removed
-# ...
-# - ./applyconfigurations/core/v1.PodCertificateProjectionApplyConfiguration: old is comparable, new is not
-# - ./informers/certificates/v1alpha1.NewFilteredPodCertificateRequestInformer: removed
-# - ./kubernetes/typed/certificates/v1alpha1.(*CertificatesV1alpha1Client).PodCertificateRequests: removed
-# - ./kubernetes/typed/certificates/v1alpha1.PodCertificateRequestsGetter.PodCertificateRequests, method set of CertificatesV1alpha1Interface: removed
-# - ./kubernetes/typed/certificates/v1alpha1/fake.(*FakeCertificatesV1alpha1).PodCertificateRequests: removed
-#
-# - ./kubernetes/typed/certificates/v1alpha1.PodCertificateRequestsGetter.PodCertificateRequests, method set of CertificatesV1alpha1Interface: removed
-incompatible_filters=(
-    -e '^- \./(informers|kubernetes/typed)/[a-z]+/v[a-z0-9]+(\.[a-zA-Z0-9]+)?\.[a-zA-Z0-9]+(, method set of .*)?: (added|removed|old is comparable, new is not)$'
-    -e '^- \./kubernetes(\.Interface|/fake...Clientset.|...Clientset.)\.[A-Za-z]+V[a-z0-9]+(, method set of .*)?: (added|removed)$'
-    -e '^- \./kubernetes/typed/[a-z]+/v[a-z0-9]+(/fake)?\.(..[a-zA-Z0-9]+.|[a-zA-Z0-9]+)\.[a-zA-Z0-9]+(, method set of .*)?: (added|removed|old is comparable, new is not)$'
-    -e '^- \./informers/[a-z]+\.Interface\.V[a-z0-9]+(, method set of .*)?: (added|removed)$'
-    -e '^- \./(listers|applyconfigurations)/[a-z]+/v1.*(, method set of .*)?: (added|removed|old is comparable, new is not)$'
-    -e '^- package k8s\.io/client-go/(applyconfigurations|informers|kubernetes/typed|listers)/[a-z]+/v[a-z0-9]+(/fake)?: (added|removed)$'
-)
-
 # Now produce a report. All changes get reported because exporting some API
 # unnecessarily might also be good to know, but the final exit code will only
 # be non-zero if there are incompatible changes.
@@ -331,14 +299,16 @@ compare () {
         tolerated=
         if [ -n "$sep" ]; then
             # This is where we filter out certain known harmless changes.
+            # Regular expressions for known harmless incompatible changes are stored
+            # in hack/api-changelog/api-changes-allowlist.
             #
             # We can do that here in a generic script because the regular expressions for client-go
             # are unlikely to match incorrectly in a different component. If this ever changes,
             # then we can also store per-component filters in special file in
             # the component and load them from there.
             incompatible=$(echo "$changes" | tail -n "+$((sep + 1))" | LC_ALL=C sort) || true
-            tolerated=$(echo "$incompatible" | grep -E "${incompatible_filters[@]}") || true
-            incompatible=$(echo "$incompatible" | grep -v -E "${incompatible_filters[@]}") || true
+            tolerated=$(echo "$incompatible" | api-changelog -grep-allowed-api-changes) || true
+            incompatible=$(echo "$incompatible" | api-changelog -v -grep-allowed-api-changes) || true
             changes=$(echo "$changes" | head -n "$((sep-1))") || true
         fi
         # One of these strings must contain some change.

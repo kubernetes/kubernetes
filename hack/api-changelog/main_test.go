@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -419,4 +420,108 @@ different content
 			t.Errorf("run() with no flags error = %v, expected operationErr", err)
 		}
 	})
+}
+
+func TestFilterChanges(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		exclude  bool
+		expected string
+	}{
+		{
+			name: "exclude-matching-lines",
+			input: `- ./informers/resource/v1beta2.Interface.DeviceTaintRules: added
+- ./kubernetes/typed/resource/v1beta2.DeviceTaintRulesGetter.DeviceTaintRules: added
+- some other change that should not be filtered
+- ./informers/autoscaling.Interface.V2beta1: removed
+- package k8s.io/client-go/applyconfigurations/autoscaling/v2beta1: removed
+- another unfiltered change`,
+			exclude: true,
+			expected: `- some other change that should not be filtered
+- another unfiltered change
+`,
+		},
+		{
+			name: "include-only-matching-lines",
+			input: `- ./informers/resource/v1beta2.Interface.DeviceTaintRules: added
+- ./kubernetes/typed/resource/v1beta2.DeviceTaintRulesGetter.DeviceTaintRules: added
+- some other change that should not be filtered
+- ./informers/autoscaling.Interface.V2beta1: removed
+- package k8s.io/client-go/applyconfigurations/autoscaling/v2beta1: removed
+- another unfiltered change`,
+			exclude: false,
+			expected: `- ./informers/resource/v1beta2.Interface.DeviceTaintRules: added
+- ./kubernetes/typed/resource/v1beta2.DeviceTaintRulesGetter.DeviceTaintRules: added
+- ./informers/autoscaling.Interface.V2beta1: removed
+- package k8s.io/client-go/applyconfigurations/autoscaling/v2beta1: removed
+`,
+		},
+		{
+			name:     "exclude-empty-input",
+			input:    "",
+			exclude:  true,
+			expected: "",
+		},
+		{
+			name:     "include-empty-input",
+			input:    "",
+			exclude:  false,
+			expected: "",
+		},
+		{
+			name: "exclude-no-matches",
+			input: `- some other change
+- another change
+- yet another change`,
+			exclude: true,
+			expected: `- some other change
+- another change
+- yet another change
+`,
+		},
+		{
+			name: "include-no-matches",
+			input: `- some other change
+- another change
+- yet another change`,
+			exclude:  false,
+			expected: "",
+		},
+		{
+			name: "exclude-all-matches",
+			input: `- ./informers/resource/v1beta2.Interface.DeviceTaintRules: added
+- ./kubernetes/typed/resource/v1beta2.DeviceTaintRulesGetter.DeviceTaintRules: added
+- package k8s.io/client-go/applyconfigurations/autoscaling/v2beta1: removed`,
+			exclude:  true,
+			expected: "",
+		},
+		{
+			name: "include-all-matches",
+			input: `- ./informers/resource/v1beta2.Interface.DeviceTaintRules: added
+- ./kubernetes/typed/resource/v1beta2.DeviceTaintRulesGetter.DeviceTaintRules: added
+- package k8s.io/client-go/applyconfigurations/autoscaling/v2beta1: removed`,
+			exclude: false,
+			expected: `- ./informers/resource/v1beta2.Interface.DeviceTaintRules: added
+- ./kubernetes/typed/resource/v1beta2.DeviceTaintRulesGetter.DeviceTaintRules: added
+- package k8s.io/client-go/applyconfigurations/autoscaling/v2beta1: removed
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := bytes.NewBufferString(tt.input)
+			var output bytes.Buffer
+
+			err := grepAPIChanges(input, &output, tt.exclude)
+			if err != nil {
+				t.Fatalf("filterChanges() error = %v", err)
+			}
+
+			if output.String() != tt.expected {
+				t.Errorf("filterChanges() output mismatch\nGot:\n%s\nExpected:\n%s", output.String(), tt.expected)
+			}
+		})
+	}
 }

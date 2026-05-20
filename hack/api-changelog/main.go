@@ -20,12 +20,19 @@ limitations under the License.
 package main
 
 import (
+	"bufio"
+	_ "embed"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
+	"regexp"
 	"strings"
 )
+
+//go:embed api-changes-allowlist
+var apiChangesAllowlist string
 
 func main() {
 	changelogFile := flag.String("changelog", "CHANGELOG.md", "path to the CHANGELOG.md file")
@@ -34,7 +41,17 @@ func main() {
 	changes := flag.String("changes", "", "expected changes content for verification or insertion")
 	title := flag.String("title", "Replace with a short title", "heading title when inserting changes")
 	description := flag.String("description", "Replace this text with a short summary of the change\nand how users of the package can deal with this breaking\nchange. If users are not expected to be affected, then\ninstead explain why. If the changes are too long,\nyou may shorten them by replacing multiple lines\nwith three dots (...).", "first paragraph when inserting changes")
+	grep := flag.Bool("grep-allowed-api-changes", false, "filter stdin by looking for lines matching allowlist patterns")
+	exclude := flag.Bool("v", false, "invert grep: look for lines not matching any allowlist pattern")
 	flag.Parse()
+
+	if *grep {
+		if err := grepAPIChanges(os.Stdin, os.Stdout, *exclude); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	if err := run(*changelogFile, *verify, *insert, *changes, *title, *description); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -237,4 +254,45 @@ func matchesWithWildcard(pattern, text []string) bool {
 	}
 
 	return pi == len(pattern) && ti == len(text)
+}
+
+// grepAPIChanges reads lines from stdin and writes to stdout.
+// When exclude is true, excludes lines that match any allowlist pattern,
+// otherwise includes them.
+func grepAPIChanges(r io.Reader, w io.Writer, exclude bool) error {
+	// Parse the allowlist file to extract regular expressions.
+	var patterns []*regexp.Regexp
+	lines := strings.Split(apiChangesAllowlist, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// Skip empty lines and comments.
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		// Compile the regular expression.
+		re, err := regexp.Compile(line)
+		if err != nil {
+			return fmt.Errorf("failed to compile regex %q: %w", line, err)
+		}
+		patterns = append(patterns, re)
+	}
+
+	// Read from stdin line by line and filter.
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		line := scanner.Text()
+		matched := false
+		for _, pattern := range patterns {
+			if pattern.MatchString(line) {
+				matched = true
+				break
+			}
+		}
+		// Write lines based on exclude parameter and whether the line matched.
+		if matched == !exclude {
+			fmt.Fprintln(w, line)
+		}
+	}
+
+	return scanner.Err()
 }
