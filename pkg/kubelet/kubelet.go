@@ -1619,8 +1619,8 @@ func (kl *Kubelet) ImageFsStats(ctx context.Context) (*statsapi.FsStats, *statsa
 }
 
 // GetCgroupStats is delegated to StatsProvider, which implements stats.Provider interface
-func (kl *Kubelet) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
-	return kl.StatsProvider.GetCgroupStats(cgroupName, updateStats)
+func (kl *Kubelet) GetCgroupStats(ctx context.Context, cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
+	return kl.StatsProvider.GetCgroupStats(ctx, cgroupName, updateStats)
 }
 
 // GetCgroupCPUAndMemoryStats is delegated to StatsProvider, which implements stats.Provider interface
@@ -1811,7 +1811,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules(ctx context.Context) {
 
 	// trigger on-demand stats collection once so that we have capacity information for ephemeral storage.
 	// ignore any errors, since if stats collection is not successful, the container manager will fail to start below.
-	kl.StatsProvider.GetCgroupStats("/", true)
+	_, _, _ = kl.StatsProvider.GetCgroupStats(ctx, "/", true)
 	// Start container manager.
 	node, err := kl.getNodeAnyWay(ctx)
 	if err != nil {

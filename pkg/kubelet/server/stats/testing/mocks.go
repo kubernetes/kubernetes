@@ -129,8 +129,8 @@ func (_c *MockProvider_GetCgroupCPUAndMemoryStats_Call) RunAndReturn(run func(cg
 }
 
 // GetCgroupStats provides a mock function for the type MockProvider
-func (_mock *MockProvider) GetCgroupStats(cgroupName string, updateStats bool) (*v1alpha1.ContainerStats, *v1alpha1.NetworkStats, error) {
-	ret := _mock.Called(cgroupName, updateStats)
+func (_mock *MockProvider) GetCgroupStats(ctx context.Context, cgroupName string, updateStats bool) (*v1alpha1.ContainerStats, *v1alpha1.NetworkStats, error) {
+	ret := _mock.Called(ctx, cgroupName, updateStats)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetCgroupStats")
@@ -139,25 +139,25 @@ func (_mock *MockProvider) GetCgroupStats(cgroupName string, updateStats bool) (
 	var r0 *v1alpha1.ContainerStats
 	var r1 *v1alpha1.NetworkStats
 	var r2 error
-	if returnFunc, ok := ret.Get(0).(func(string, bool) (*v1alpha1.ContainerStats, *v1alpha1.NetworkStats, error)); ok {
-		return returnFunc(cgroupName, updateStats)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) (*v1alpha1.ContainerStats, *v1alpha1.NetworkStats, error)); ok {
+		return returnFunc(ctx, cgroupName, updateStats)
 	}
-	if returnFunc, ok := ret.Get(0).(func(string, bool) *v1alpha1.ContainerStats); ok {
-		r0 = returnFunc(cgroupName, updateStats)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) *v1alpha1.ContainerStats); ok {
+		r0 = returnFunc(ctx, cgroupName, updateStats)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*v1alpha1.ContainerStats)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(string, bool) *v1alpha1.NetworkStats); ok {
-		r1 = returnFunc(cgroupName, updateStats)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, bool) *v1alpha1.NetworkStats); ok {
+		r1 = returnFunc(ctx, cgroupName, updateStats)
 	} else {
 		if ret.Get(1) != nil {
 			r1 = ret.Get(1).(*v1alpha1.NetworkStats)
 		}
 	}
-	if returnFunc, ok := ret.Get(2).(func(string, bool) error); ok {
-		r2 = returnFunc(cgroupName, updateStats)
+	if returnFunc, ok := ret.Get(2).(func(context.Context, string, bool) error); ok {
+		r2 = returnFunc(ctx, cgroupName, updateStats)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -170,25 +170,31 @@ type MockProvider_GetCgroupStats_Call struct {
 }
 
 // GetCgroupStats is a helper method to define mock.On call
+//   - ctx context.Context
 //   - cgroupName string
 //   - updateStats bool
-func (_e *MockProvider_Expecter) GetCgroupStats(cgroupName interface{}, updateStats interface{}) *MockProvider_GetCgroupStats_Call {
-	return &MockProvider_GetCgroupStats_Call{Call: _e.mock.On("GetCgroupStats", cgroupName, updateStats)}
+func (_e *MockProvider_Expecter) GetCgroupStats(ctx interface{}, cgroupName interface{}, updateStats interface{}) *MockProvider_GetCgroupStats_Call {
+	return &MockProvider_GetCgroupStats_Call{Call: _e.mock.On("GetCgroupStats", ctx, cgroupName, updateStats)}
 }
 
-func (_c *MockProvider_GetCgroupStats_Call) Run(run func(cgroupName string, updateStats bool)) *MockProvider_GetCgroupStats_Call {
+func (_c *MockProvider_GetCgroupStats_Call) Run(run func(ctx context.Context, cgroupName string, updateStats bool)) *MockProvider_GetCgroupStats_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 string
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(string)
+			arg0 = args[0].(context.Context)
 		}
-		var arg1 bool
+		var arg1 string
 		if args[1] != nil {
-			arg1 = args[1].(bool)
+			arg1 = args[1].(string)
+		}
+		var arg2 bool
+		if args[2] != nil {
+			arg2 = args[2].(bool)
 		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -199,7 +205,7 @@ func (_c *MockProvider_GetCgroupStats_Call) Return(containerStats *v1alpha1.Cont
 	return _c
 }
 
-func (_c *MockProvider_GetCgroupStats_Call) RunAndReturn(run func(cgroupName string, updateStats bool) (*v1alpha1.ContainerStats, *v1alpha1.NetworkStats, error)) *MockProvider_GetCgroupStats_Call {
+func (_c *MockProvider_GetCgroupStats_Call) RunAndReturn(run func(ctx context.Context, cgroupName string, updateStats bool) (*v1alpha1.ContainerStats, *v1alpha1.NetworkStats, error)) *MockProvider_GetCgroupStats_Call {
 	_c.Call.Return(run)
 	return _c
 }
