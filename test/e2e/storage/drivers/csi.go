@@ -778,6 +778,9 @@ func (m *mockCSIDriver) PrepareTest(ctx context.Context, f *framework.Framework)
 	if m.enableMutableCSINodeAllocatableCount {
 		o.Features["csi-attacher"] = []string{"MutableCSINodeAllocatableCount=true"}
 	}
+	if m.enableNodeExpansion {
+		o.Features["csi-resizer"] = []string{"AnnotateFsResize=true"}
+	}
 
 	err = utils.CreateFromManifests(ctx, f, m.driverNamespace, func(item interface{}) error {
 		if err := utils.PatchCSIDeployment(config.Framework, o, item); err != nil {

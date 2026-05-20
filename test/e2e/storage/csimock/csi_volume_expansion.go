@@ -32,12 +32,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 )
 
 type expansionStatus int
@@ -587,6 +590,149 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 			})
 		}
 	})
+
+	ginkgo.Context("CSI offline volume expansion after PVC deletion", func() {
+		ginkgo.It("should complete filesystem resize after PVC is deleted and new PVC binds to retained PV", func(ctx context.Context) {
+			var err error
+			params := testParameters{
+				enableResizing:      true,
+				enableNodeExpansion: true,
+				reclaimPolicy:       ptr.To(v1.PersistentVolumeReclaimRetain),
+			}
+			m.init(ctx, params)
+			ginkgo.DeferCleanup(m.cleanup)
+
+			sc, pvc, pod := m.createPod(ctx, pvcReference)
+			gomega.Expect(pod).NotTo(gomega.BeNil(), "while creating pod for resizing")
+
+			if !*sc.AllowVolumeExpansion {
+				framework.Fail("failed creating sc with allowed expansion")
+			}
+
+			err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod.Name, pod.Namespace)
+			framework.ExpectNoError(err, "Failed to start pod: %v", err)
+
+			pvc, err = m.cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Get(ctx, pvc.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err, "Failed to get PVC")
+			pvName := pvc.Spec.VolumeName
+			gomega.Expect(pvName).NotTo(gomega.BeEmpty(), "PVC should be bound to a PV")
+
+			ginkgo.DeferCleanup(func(cleanupCtx context.Context) {
+				_ = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+					pv, err := m.cs.CoreV1().PersistentVolumes().Get(cleanupCtx, pvName, metav1.GetOptions{})
+					if err != nil {
+						return err
+					}
+					pv.Spec.PersistentVolumeReclaimPolicy = v1.PersistentVolumeReclaimDelete
+					_, err = m.cs.CoreV1().PersistentVolumes().Update(cleanupCtx, pv, metav1.UpdateOptions{})
+					return err
+				})
+			})
+
+			ginkgo.By("Deleting the pod before expanding PVC (offline expansion)")
+			err = e2epod.DeletePodWithWait(ctx, m.cs, pod)
+			framework.ExpectNoError(err, "while deleting pod")
+
+			ginkgo.By("Expanding current pvc")
+			newSize := resource.MustParse("6Gi")
+			newPVC, err := testsuites.ExpandPVCSize(ctx, pvc, newSize, m.cs)
+			framework.ExpectNoError(err, "While updating pvc for more size")
+			pvc = newPVC
+			gomega.Expect(pvc).NotTo(gomega.BeNil())
+
+			pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
+			if pvcSize.Cmp(newSize) != 0 {
+				framework.Failf("error updating pvc size %q", pvc.Name)
+			}
+
+			ginkgo.By("Waiting for persistent volume resize to finish")
+			err = testsuites.WaitForControllerVolumeResize(ctx, pvc, m.cs, csiResizeWaitPeriod)
+			framework.ExpectNoError(err, "While waiting for CSI PV resize to finish")
+
+			ginkgo.By("Checking for conditions on pvc")
+			pvc, err = testsuites.WaitForPendingFSResizeCondition(ctx, pvc, m.cs)
+			framework.ExpectNoError(err, "While waiting for pvc to have fs resizing condition")
+
+			ginkgo.By(fmt.Sprintf("Deleting the original PVC %s", pvc.Name))
+			err = m.cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(ctx, pvc.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err, "while deleting PVC")
+
+			ginkgo.By(fmt.Sprintf("Waiting for PV %s to enter Released phase", pvName))
+			err = e2epv.WaitForPersistentVolumePhase(ctx, v1.VolumeReleased, m.cs, pvName, framework.Poll, csiResizeWaitPeriod)
+			framework.ExpectNoError(err, "while waiting for PV to be released")
+
+			ginkgo.By("Recording NodeExpandVolume call count before rebinding")
+			nodeExpandCallsBefore := countNodeExpandVolumeCalls(ctx, m)
+
+			ginkgo.By("Clearing claimRef on PV to make it Available")
+			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				pv, err := m.cs.CoreV1().PersistentVolumes().Get(ctx, pvName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+				pv.Spec.ClaimRef = nil
+				_, err = m.cs.CoreV1().PersistentVolumes().Update(ctx, pv, metav1.UpdateOptions{})
+				return err
+			})
+			framework.ExpectNoError(err, "while clearing claimRef on PV")
+
+			ginkgo.By(fmt.Sprintf("Waiting for PV %s to become Available", pvName))
+			err = e2epv.WaitForPersistentVolumePhase(ctx, v1.VolumeAvailable, m.cs, pvName, framework.Poll, csiResizeWaitPeriod)
+			framework.ExpectNoError(err, "while waiting for PV to become available")
+
+			ginkgo.By("Creating a new PVC bound to the retained PV")
+			reboundPVC := &v1.PersistentVolumeClaim{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "pvc-rebind-",
+					Namespace:    pvc.Namespace,
+				},
+				Spec: v1.PersistentVolumeClaimSpec{
+					AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+					Resources: v1.VolumeResourceRequirements{
+						Requests: v1.ResourceList{
+							v1.ResourceStorage: newSize,
+						},
+					},
+					VolumeName:       pvName,
+					StorageClassName: &sc.Name,
+				},
+			}
+			reboundPVC, err = m.cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, reboundPVC, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "while creating new PVC")
+			m.pvcs = append(m.pvcs, reboundPVC)
+
+			ginkgo.By("Waiting for new PVC to be bound")
+			_, err = e2epv.WaitForPVClaimBoundPhase(ctx, m.cs, []*v1.PersistentVolumeClaim{reboundPVC}, framework.ClaimProvisionTimeout)
+			framework.ExpectNoError(err, "while waiting for new PVC to be bound")
+
+			ginkgo.By("Creating a new pod with the rebound PVC")
+			pod2, err := m.createPodWithPVC(reboundPVC)
+			gomega.Expect(pod2).NotTo(gomega.BeNil(), "while creating pod for resizing")
+			framework.ExpectNoError(err, "while creating new pod")
+
+			err = e2epod.WaitForPodNameRunningInNamespace(ctx, m.cs, pod2.Name, pod2.Namespace)
+			framework.ExpectNoError(err, "Failed to start pod2: %v", err)
+
+			ginkgo.By("Waiting for filesystem resize to complete on new PVC")
+			reboundPVC, err = testsuites.WaitForFSResize(ctx, reboundPVC, m.cs)
+			framework.ExpectNoError(err, "while waiting for PVC filesystem resize to finish")
+
+			pvcConditions := reboundPVC.Status.Conditions
+			testsuites.ExpectNoResizeConditions(pvcConditions)
+
+			ginkgo.By("Verifying PVC capacity matches expanded size")
+			pvcCapacity := reboundPVC.Status.Capacity[v1.ResourceStorage]
+			gomega.Expect(pvcCapacity.Cmp(newSize)).To(gomega.Equal(0),
+				fmt.Sprintf("expected PVC capacity %s, got %s", newSize.String(), pvcCapacity.String()))
+
+			ginkgo.By("Verifying NodeExpandVolume was called for the rebound PVC")
+			gomega.Eventually(func() int {
+				return countNodeExpandVolumeCalls(ctx, m)
+			}).WithTimeout(csiResizeWaitPeriod).WithPolling(resizePollInterval).
+				Should(gomega.BeNumerically(">", nodeExpandCallsBefore),
+					"NodeExpandVolume should have been called for filesystem resize after rebinding")
+		})
+	})
 })
 
 func validateQuotaUsage(ctx context.Context, m *mockDriverSetup, currentQuota, expectedQuota *v1.ResourceQuota) {
@@ -830,4 +976,18 @@ func createExpansionHook(expectedExpansionStatus expansionStatus) *drivers.Hooks
 			return nil, nil
 		},
 	}
+}
+
+func countNodeExpandVolumeCalls(ctx context.Context, m *mockDriverSetup) int {
+	calls, err := m.driver.GetCalls(ctx)
+	if err != nil {
+		return 0
+	}
+	count := 0
+	for _, call := range calls {
+		if call.Method == "NodeExpandVolume" {
+			count++
+		}
+	}
+	return count
 }
