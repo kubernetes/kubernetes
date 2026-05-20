@@ -19,7 +19,6 @@ func (a *validateCustomResourceWithClient) setupWithFakeClient() {
 	c := fake.NewSimpleClientset()
 	a.secretsGetter = c.CoreV1()
 	a.sarGetter = c.AuthorizationV1()
-	a.routeValidationOptsGetter = NewRouteValidationOpts()
 }
 
 // TestValidateRoutePlugin verifies if the route validation plugin can handle admits

@@ -18,9 +18,8 @@ import (
 type validateCustomResourceWithClient struct {
 	admission.ValidationInterface
 
-	secretsGetter             corev1client.SecretsGetter
-	sarGetter                 authorizationv1client.SubjectAccessReviewsGetter
-	routeValidationOptsGetter RouteValidationOptionGetter
+	secretsGetter corev1client.SecretsGetter
+	sarGetter     authorizationv1client.SubjectAccessReviewsGetter
 }
 
 func NewValidateRoute() (admission.Interface, error) {
@@ -32,9 +31,8 @@ func NewValidateRoute() (admission.Interface, error) {
 		},
 		map[schema.GroupVersionKind]customresourcevalidation.ObjectValidator{
 			routev1.GroupVersion.WithKind("Route"): routeV1{
-				secretsGetter:             ret.getSecretsGetter,
-				sarGetter:                 ret.getSubjectAccessReviewsGetter,
-				routeValidationOptsGetter: ret.getRouteValidationOptions,
+				secretsGetter: ret.getSecretsGetter,
+				sarGetter:     ret.getSubjectAccessReviewsGetter,
 			},
 		})
 	if err != nil {
@@ -55,10 +53,6 @@ func (a *validateCustomResourceWithClient) getSubjectAccessReviewsGetter() autho
 	return a.sarGetter
 }
 
-func (a *validateCustomResourceWithClient) getRouteValidationOptions() RouteValidationOptionGetter {
-	return a.routeValidationOptsGetter
-}
-
 func (a *validateCustomResourceWithClient) SetRESTClientConfig(restClientConfig rest.Config) {
 	var err error
 
@@ -73,8 +67,6 @@ func (a *validateCustomResourceWithClient) SetRESTClientConfig(restClientConfig 
 		utilruntime.HandleError(err)
 		return
 	}
-
-	a.routeValidationOptsGetter = NewRouteValidationOpts()
 }
 
 func (a *validateCustomResourceWithClient) ValidateInitialization() error {
@@ -83,9 +75,6 @@ func (a *validateCustomResourceWithClient) ValidateInitialization() error {
 	}
 	if a.sarGetter == nil {
 		return fmt.Errorf("%s needs a subjectAccessReviewsGetter", PluginName)
-	}
-	if a.routeValidationOptsGetter == nil {
-		return fmt.Errorf("%s needs a routeValidationOptsGetter", PluginName)
 	}
 
 	return nil
