@@ -40,9 +40,8 @@ func toRoute(uncastObj runtime.Object) (*routev1.Route, field.ErrorList) {
 }
 
 type routeV1 struct {
-	secretsGetter             func() corev1client.SecretsGetter
-	sarGetter                 func() authorizationv1client.SubjectAccessReviewsGetter
-	routeValidationOptsGetter func() RouteValidationOptionGetter
+	secretsGetter func() corev1client.SecretsGetter
+	sarGetter     func() authorizationv1client.SubjectAccessReviewsGetter
 }
 
 func (r routeV1) ValidateCreate(ctx context.Context, obj runtime.Object) field.ErrorList {
@@ -51,7 +50,8 @@ func (r routeV1) ValidateCreate(ctx context.Context, obj runtime.Object) field.E
 		return errs
 	}
 
-	return routevalidation.ValidateRoute(ctx, routeObj, r.sarGetter().SubjectAccessReviews(), r.secretsGetter(), r.routeValidationOptsGetter().GetValidationOptions())
+	// RouteValidationOptions param to be removed after bumping library-go
+	return routevalidation.ValidateRoute(ctx, routeObj, r.sarGetter().SubjectAccessReviews(), r.secretsGetter())
 }
 
 func (r routeV1) ValidateUpdate(ctx context.Context, obj runtime.Object, oldObj runtime.Object) field.ErrorList {
@@ -65,7 +65,8 @@ func (r routeV1) ValidateUpdate(ctx context.Context, obj runtime.Object, oldObj 
 		return errs
 	}
 
-	return routevalidation.ValidateRouteUpdate(ctx, routeObj, routeOldObj, r.sarGetter().SubjectAccessReviews(), r.secretsGetter(), r.routeValidationOptsGetter().GetValidationOptions())
+	// RouteValidationOptions param to be removed after bumping library-go
+	return routevalidation.ValidateRouteUpdate(ctx, routeObj, routeOldObj, r.sarGetter().SubjectAccessReviews(), r.secretsGetter())
 }
 
 func (routeV1) ValidateStatusUpdate(_ context.Context, obj runtime.Object, oldObj runtime.Object) field.ErrorList {
