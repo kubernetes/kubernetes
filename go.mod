@@ -29,7 +29,7 @@ require (
 	github.com/go-logr/logr v1.4.3
 	github.com/go-openapi/jsonreference v0.21.4
 	github.com/godbus/dbus/v5 v5.2.2
-	github.com/google/cadvisor v0.56.2
+	github.com/google/cadvisor v0.57.0
 	github.com/google/cel-go v0.27.0
 	github.com/google/gnostic-models v0.7.0
 	github.com/google/go-cmp v0.7.0
