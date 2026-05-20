@@ -47,7 +47,7 @@ func newActivation(compositionCtx CompositionContext, versionedAttr *admission.V
 
 	var paramsVal, authorizerVal, requestResourceAuthorizerVal any
 	if inputs.VersionedParams != nil {
-		paramsVal = common.UnstructuredReflectToVal(inputs.VersionedParams)
+		paramsVal = common.SchemalessTypedToVal(inputs.VersionedParams)
 	}
 
 	if inputs.Authorizer != nil {
@@ -55,8 +55,8 @@ func newActivation(compositionCtx CompositionContext, versionedAttr *admission.V
 		requestResourceAuthorizerVal = library.NewResourceAuthorizerVal(versionedAttr.GetUserInfo(), inputs.Authorizer, versionedAttr)
 	}
 
-	requestVal := common.UnstructuredReflectToVal(request)
-	namespaceVal := common.UnstructuredReflectToVal(namespace)
+	requestVal := common.SchemalessTypedToVal(request)
+	namespaceVal := common.SchemalessTypedToVal(namespace)
 	va := &evaluationActivation{
 		object:                    celObjVal,
 		oldObject:                 celOldObjVal,

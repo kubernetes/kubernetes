@@ -18,7 +18,6 @@ package cel
 
 import (
 	"context"
-	"reflect"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	authenticationv1 "k8s.io/api/authentication/v1"
@@ -59,17 +58,6 @@ func NewCondition(compilationResults []CompilationResult) ConditionEvaluator {
 	return &condition{
 		compilationResults,
 	}
-}
-
-func objectToResolveVal(r runtime.Object) (interface{}, error) {
-	if r == nil || reflect.ValueOf(r).IsNil() {
-		return nil, nil
-	}
-	v, err := admission.ConvertObjectToUnstructured(r)
-	if err != nil {
-		return nil, err
-	}
-	return v.Object, nil
 }
 
 // ForInput evaluates the compiled CEL expressions converting them into CELEvaluations

@@ -71,10 +71,12 @@ type EquivF struct {
 }
 
 type EquivG struct {
-	CustomValue1   EquivCustomValue    `json:"customValue1"`
-	CustomValue2   *EquivCustomValue   `json:"customValue2"`
-	CustomPointer1 EquivCustomPointer  `json:"customPointer1"`
-	CustomPointer2 *EquivCustomPointer `json:"customPointer2"`
+	CustomValue1   EquivCustomValue      `json:"customValue1"`
+	CustomValue2   *EquivCustomValue     `json:"customValue2"`
+	CustomPointer1 EquivCustomPointer    `json:"customPointer1"`
+	CustomPointer2 *EquivCustomPointer   `json:"customPointer2"`
+	RawExtension1  runtime.RawExtension  `json:"rawExtension1"`
+	RawExtension2  *runtime.RawExtension `json:"rawExtension2"`
 }
 
 type EquivCustomValue struct {
@@ -148,7 +150,7 @@ func assertEquivalence(t *testing.T, val interface{}) {
 	}
 
 	expectedCEL := types.DefaultTypeAdapter.NativeToValue(unstrMap)
-	gotCEL := UnstructuredReflectToVal(val)
+	gotCEL := SchemalessTypedToVal(val)
 
 	if gotCEL.Equal(expectedCEL) != types.True {
 		t.Errorf("Equivalence mismatch!\nExpected: %v (Type: %T, CEL: %v)\nGot:      %v (Type: %T, CEL: %v)",
@@ -232,6 +234,8 @@ func TestEquivalence_StructG_CustomMarshaling(t *testing.T) {
 		CustomValue2:   &EquivCustomValue{Data: []byte(`[1,2]`)},
 		CustomPointer1: EquivCustomPointer{Data: []byte(`"string"`)},
 		CustomPointer2: &EquivCustomPointer{Data: []byte(`42`)},
+		RawExtension1:  runtime.RawExtension{Raw: []byte(`{"nestedKey":"nestedVal"}`)},
+		RawExtension2:  &runtime.RawExtension{Raw: []byte(`[1,2,3]`)},
 	})
 }
 

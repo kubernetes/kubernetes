@@ -276,8 +276,7 @@ func TestConvertField(t *testing.T) {
 				objectType: types.NewObjectType("Root"),
 				fields:     tc.fields,
 			}
-			var m map[string]any
-			converted, err := v.ConvertToNative(reflect.TypeOf(m))
+			converted, err := v.ConvertToNative(reflect.TypeFor[map[string]any]())
 			if tc.expectError != "" {
 				if err == nil {
 					t.Fatalf("expected error containing %q, got nil", tc.expectError)

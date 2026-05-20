@@ -34,11 +34,11 @@ type unstructuredWrapper interface {
 	ToUnstructured() interface{}
 }
 
-// UnstructuredReflectToVal wraps a Go value as a CEL ref.Val.
+// SchemalessTypedToVal wraps a Go value as a CEL ref.Val.
 // It mimics how the value would look if it were converted to an unstructured
 // map using JSON serialization, but avoids the full allocation by lazily
 // traversing the value via reflection and structured-merge-diff value package.
-func UnstructuredReflectToVal(val interface{}) ref.Val {
+func SchemalessTypedToVal(val interface{}) ref.Val {
 	if val == nil {
 		return types.NullValue
 	}
@@ -75,7 +75,7 @@ func UnstructuredReflectToVal(val interface{}) ref.Val {
 
 	// Handle special wrapper types like wrappedParam that provide a custom ToUnstructured() method.
 	if unstrObj, ok := val.(unstructuredWrapper); ok {
-		return UnstructuredReflectToVal(unstrObj.ToUnstructured())
+		return SchemalessTypedToVal(unstrObj.ToUnstructured())
 	}
 	// Custom JSON marshaling logic must be run to ensure parity with standard unstructured conversion
 	// for types implementing custom marshaling (e.g., runtime.RawExtension).
@@ -95,7 +95,7 @@ func UnstructuredReflectToVal(val interface{}) ref.Val {
 		if v.IsNil() {
 			return types.NullValue
 		}
-		return UnstructuredReflectToVal(v.Elem().Interface())
+		return SchemalessTypedToVal(v.Elem().Interface())
 	case reflect.Slice:
 		if v.Type().Elem().Kind() == reflect.Uint8 {
 			if v.IsNil() {
@@ -105,9 +105,9 @@ func UnstructuredReflectToVal(val interface{}) ref.Val {
 			// to avoid the high overhead of json serialization/deserialization.
 			return types.String(base64.StdEncoding.EncodeToString(v.Bytes()))
 		}
-		return &reflectUnstructuredList{value: v}
+		return &reflectSchemalessTypedList{value: v}
 	case reflect.Map:
-		return &reflectUnstructuredMap{value: v}
+		return &reflectSchemalessTypedMap{value: v}
 	case reflect.Struct:
 		if typedVal, ok := val.(intstr.IntOrString); ok {
 			switch typedVal.Type {
@@ -122,7 +122,7 @@ func UnstructuredReflectToVal(val interface{}) ref.Val {
 		if ptrType.Implements(reflect.TypeFor[unstructuredWrapper]()) {
 			ptr := reflect.New(v.Type())
 			ptr.Elem().Set(v)
-			return UnstructuredReflectToVal(ptr.Interface().(unstructuredWrapper).ToUnstructured())
+			return SchemalessTypedToVal(ptr.Interface().(unstructuredWrapper).ToUnstructured())
 		}
 		// Check if pointer to struct implements json.Marshaler
 		if ptrType.Implements(reflect.TypeFor[json.Marshaler]()) {
@@ -130,7 +130,7 @@ func UnstructuredReflectToVal(val interface{}) ref.Val {
 			ptr.Elem().Set(v)
 			return marshalToVal(ptr.Interface().(json.Marshaler))
 		}
-		return &reflectUnstructuredStruct{value: v}
+		return &reflectSchemalessTypedStruct{value: v}
 	// Match type aliases to primitives by kind
 	case reflect.Bool:
 		return types.Bool(v.Bool())
@@ -157,11 +157,17 @@ func marshalToVal(marshaler json.Marshaler) ref.Val {
 	return types.DefaultTypeAdapter.NativeToValue(unmarshaled)
 }
 
-type reflectUnstructuredList struct {
-	value reflect.Value
+var _ traits.Lister = &reflectSchemalessTypedList{}
+
+// reflectSchemalessTypedList wraps a Go slice/array as a lazy CEL Lister.
+// fieldCache is NOT thread-safe, as CEL-Go's synchronous value evaluation contract
+// guarantees that a single wrapped value is only ever accessed by a single goroutine.
+type reflectSchemalessTypedList struct {
+	value      reflect.Value
+	fieldCache []ref.Val
 }
 
-func (l *reflectUnstructuredList) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
+func (l *reflectSchemalessTypedList) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
 	switch typeDesc.Kind() {
 	case reflect.Slice:
 		return l.value.Interface(), nil
@@ -170,7 +176,7 @@ func (l *reflectUnstructuredList) ConvertToNative(typeDesc reflect.Type) (interf
 	}
 }
 
-func (l *reflectUnstructuredList) ConvertToType(typeValue ref.Type) ref.Val {
+func (l *reflectSchemalessTypedList) ConvertToType(typeValue ref.Type) ref.Val {
 	switch typeValue {
 	case types.ListType:
 		return l
@@ -180,7 +186,7 @@ func (l *reflectUnstructuredList) ConvertToType(typeValue ref.Type) ref.Val {
 	return types.NewErr("type conversion error from '%s' to '%s'", l.Type(), typeValue.TypeName())
 }
 
-func (l *reflectUnstructuredList) Equal(other ref.Val) ref.Val {
+func (l *reflectSchemalessTypedList) Equal(other ref.Val) ref.Val {
 	otherList, ok := other.(traits.Lister)
 	if !ok {
 		return types.MaybeNoSuchOverloadErr(other)
@@ -201,15 +207,15 @@ func (l *reflectUnstructuredList) Equal(other ref.Val) ref.Val {
 	return types.True
 }
 
-func (l *reflectUnstructuredList) Type() ref.Type {
+func (l *reflectSchemalessTypedList) Type() ref.Type {
 	return types.ListType
 }
 
-func (l *reflectUnstructuredList) Value() interface{} {
+func (l *reflectSchemalessTypedList) Value() interface{} {
 	return l.value.Interface()
 }
 
-func (l *reflectUnstructuredList) Contains(val ref.Val) ref.Val {
+func (l *reflectSchemalessTypedList) Contains(val ref.Val) ref.Val {
 	sz := l.Size().(types.Int)
 	for i := range sz {
 		v := l.Get(i)
@@ -221,7 +227,24 @@ func (l *reflectUnstructuredList) Contains(val ref.Val) ref.Val {
 	return types.False
 }
 
-func (l *reflectUnstructuredList) Get(index ref.Val) ref.Val {
+func (l *reflectSchemalessTypedList) Add(other ref.Val) ref.Val {
+	otherList, ok := other.(traits.Lister)
+	if !ok {
+		return types.MaybeNoSuchOverloadErr(other)
+	}
+	sz := l.value.Len()
+	elements := make([]interface{}, 0, sz)
+	for i := range sz {
+		elements = append(elements, l.value.Index(i).Interface())
+	}
+	it := otherList.Iterator()
+	for it.HasNext() == types.True {
+		elements = append(elements, it.Next().Value())
+	}
+	return &reflectSchemalessTypedList{value: reflect.ValueOf(elements)}
+}
+
+func (l *reflectSchemalessTypedList) Get(index ref.Val) ref.Val {
 	idx, ok := index.(types.Int)
 	if !ok {
 		return types.ValOrErr(index, "unsupported index type: %T", index)
@@ -229,47 +252,62 @@ func (l *reflectUnstructuredList) Get(index ref.Val) ref.Val {
 	if idx < 0 || int(idx) >= l.value.Len() {
 		return types.NewErr("index out of bounds: %d", idx)
 	}
-	return UnstructuredReflectToVal(l.value.Index(int(idx)).Interface())
+	i := int(idx)
+	if l.fieldCache == nil {
+		l.fieldCache = make([]ref.Val, l.value.Len())
+	}
+	if cached := l.fieldCache[i]; cached != nil {
+		return cached
+	}
+	v := SchemalessTypedToVal(l.value.Index(i).Interface())
+	l.fieldCache[i] = v
+	return v
 }
 
-func (l *reflectUnstructuredList) Iterator() traits.Iterator {
-	return &reflectUnstructuredListIterator{reflectUnstructuredList: l, idx: 0}
+func (l *reflectSchemalessTypedList) Iterator() traits.Iterator {
+	return &reflectSchemalessTypedListIterator{reflectSchemalessTypedList: l, idx: 0}
 }
 
-func (l *reflectUnstructuredList) Size() ref.Val {
+func (l *reflectSchemalessTypedList) Size() ref.Val {
 	return types.Int(l.value.Len())
 }
 
-type reflectUnstructuredListIterator struct {
-	*reflectUnstructuredList
+type reflectSchemalessTypedListIterator struct {
+	*reflectSchemalessTypedList
 	idx int
 }
 
-func (it *reflectUnstructuredListIterator) HasNext() ref.Val {
-	return types.Bool(it.idx < it.reflectUnstructuredList.value.Len())
+func (it *reflectSchemalessTypedListIterator) HasNext() ref.Val {
+	return types.Bool(it.idx < it.reflectSchemalessTypedList.value.Len())
 }
 
-func (it *reflectUnstructuredListIterator) Next() ref.Val {
-	if it.idx >= it.reflectUnstructuredList.value.Len() {
+func (it *reflectSchemalessTypedListIterator) Next() ref.Val {
+	if it.idx >= it.reflectSchemalessTypedList.value.Len() {
 		return types.NewErr("no more elements")
 	}
-	val := it.reflectUnstructuredList.Get(types.Int(it.idx))
+	val := it.reflectSchemalessTypedList.Get(types.Int(it.idx))
 	it.idx++
 	return val
 }
 
-type reflectUnstructuredMap struct {
-	value reflect.Value
+var _ traits.Mapper = &reflectSchemalessTypedMap{}
+
+// reflectSchemalessTypedMap wraps a Go map as a lazy CEL Mapper.
+// fieldCache is NOT thread-safe, as CEL-Go's synchronous value evaluation contract
+// guarantees that a single wrapped value is only ever accessed by a single goroutine.
+type reflectSchemalessTypedMap struct {
+	value      reflect.Value
+	fieldCache map[string]ref.Val
 }
 
-func (m *reflectUnstructuredMap) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
+func (m *reflectSchemalessTypedMap) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
 	if m.value.Type().AssignableTo(typeDesc) {
 		return m.value.Interface(), nil
 	}
 	return nil, fmt.Errorf("type conversion error from '%s' to '%s'", m.Type(), typeDesc)
 }
 
-func (m *reflectUnstructuredMap) ConvertToType(typeValue ref.Type) ref.Val {
+func (m *reflectSchemalessTypedMap) ConvertToType(typeValue ref.Type) ref.Val {
 	switch typeValue {
 	case types.MapType:
 		return m
@@ -279,7 +317,7 @@ func (m *reflectUnstructuredMap) ConvertToType(typeValue ref.Type) ref.Val {
 	return types.NewErr("type conversion error from '%s' to '%s'", m.Type(), typeValue.TypeName())
 }
 
-func (m *reflectUnstructuredMap) Equal(other ref.Val) ref.Val {
+func (m *reflectSchemalessTypedMap) Equal(other ref.Val) ref.Val {
 	otherMap, ok := other.(traits.Mapper)
 	if !ok {
 		return types.MaybeNoSuchOverloadErr(other)
@@ -300,15 +338,15 @@ func (m *reflectUnstructuredMap) Equal(other ref.Val) ref.Val {
 	return types.True
 }
 
-func (m *reflectUnstructuredMap) Type() ref.Type {
+func (m *reflectSchemalessTypedMap) Type() ref.Type {
 	return types.MapType
 }
 
-func (m *reflectUnstructuredMap) Value() interface{} {
+func (m *reflectSchemalessTypedMap) Value() interface{} {
 	return m.value.Interface()
 }
 
-func (m *reflectUnstructuredMap) Contains(key ref.Val) ref.Val {
+func (m *reflectSchemalessTypedMap) Contains(key ref.Val) ref.Val {
 	keyVal, ok := key.(types.String)
 	if !ok {
 		return types.ValOrErr(key, "unsupported map key type: %T", key)
@@ -322,59 +360,68 @@ func (m *reflectUnstructuredMap) Contains(key ref.Val) ref.Val {
 	return types.False
 }
 
-func (m *reflectUnstructuredMap) Find(key ref.Val) (ref.Val, bool) {
+func (m *reflectSchemalessTypedMap) Find(key ref.Val) (ref.Val, bool) {
 	keyVal, ok := key.(types.String)
 	if !ok {
 		return types.ValOrErr(key, "unsupported map key type: %T", key), false
 	}
+	fieldName := string(keyVal)
+	if m.fieldCache != nil {
+		if cached, ok := m.fieldCache[fieldName]; ok {
+			return cached, cached != nil
+		}
+	}
+
+	var result ref.Val
+	found := false
+
 	keyType := m.value.Type().Key()
-	if keyType.Kind() != reflect.String {
-		return nil, false
+	if keyType.Kind() == reflect.String {
+		reflectKey := reflect.ValueOf(fieldName).Convert(keyType)
+		val := m.value.MapIndex(reflectKey)
+		if val.IsValid() {
+			result = SchemalessTypedToVal(val.Interface())
+			found = true
+		}
 	}
-	reflectKey := reflect.ValueOf(string(keyVal)).Convert(keyType)
-	val := m.value.MapIndex(reflectKey)
-	if !val.IsValid() {
-		return nil, false
+
+	if m.fieldCache == nil {
+		m.fieldCache = make(map[string]ref.Val)
 	}
-	return UnstructuredReflectToVal(val.Interface()), true
+	m.fieldCache[fieldName] = result
+	return result, found
 }
 
-func (m *reflectUnstructuredMap) Get(key ref.Val) ref.Val {
-	keyVal, ok := key.(types.String)
-	if !ok {
-		return types.ValOrErr(key, "unsupported map key type: %T", key)
+func (m *reflectSchemalessTypedMap) Get(key ref.Val) ref.Val {
+	v, found := m.Find(key)
+	if !found {
+		if v != nil && types.IsError(v) {
+			return v
+		}
+		return types.ValOrErr(key, "no such key: %v", key)
 	}
-	keyType := m.value.Type().Key()
-	if keyType.Kind() != reflect.String {
-		return types.ValOrErr(key, "no such key: %v", keyVal)
-	}
-	reflectKey := reflect.ValueOf(string(keyVal)).Convert(keyType)
-	val := m.value.MapIndex(reflectKey)
-	if !val.IsValid() {
-		return types.ValOrErr(key, "no such key: %v", keyVal)
-	}
-	return UnstructuredReflectToVal(val.Interface())
+	return v
 }
 
-func (m *reflectUnstructuredMap) Iterator() traits.Iterator {
-	return &reflectUnstructuredMapIterator{reflectUnstructuredMap: m, keys: m.value.MapKeys(), idx: 0}
+func (m *reflectSchemalessTypedMap) Iterator() traits.Iterator {
+	return &reflectSchemalessTypedMapIterator{reflectSchemalessTypedMap: m, keys: m.value.MapKeys(), idx: 0}
 }
 
-func (m *reflectUnstructuredMap) Size() ref.Val {
+func (m *reflectSchemalessTypedMap) Size() ref.Val {
 	return types.Int(m.value.Len())
 }
 
-type reflectUnstructuredMapIterator struct {
-	*reflectUnstructuredMap
+type reflectSchemalessTypedMapIterator struct {
+	*reflectSchemalessTypedMap
 	keys []reflect.Value
 	idx  int
 }
 
-func (it *reflectUnstructuredMapIterator) HasNext() ref.Val {
+func (it *reflectSchemalessTypedMapIterator) HasNext() ref.Val {
 	return types.Bool(it.idx < len(it.keys))
 }
 
-func (it *reflectUnstructuredMapIterator) Next() ref.Val {
+func (it *reflectSchemalessTypedMapIterator) Next() ref.Val {
 	if it.idx >= len(it.keys) {
 		return types.NewErr("no more elements")
 	}
@@ -383,18 +430,24 @@ func (it *reflectUnstructuredMapIterator) Next() ref.Val {
 	return val
 }
 
-type reflectUnstructuredStruct struct {
-	value reflect.Value
+var _ traits.Mapper = &reflectSchemalessTypedStruct{}
+
+// reflectSchemalessTypedStruct wraps a Go struct as a lazy CEL Mapper.
+// fieldCache is NOT thread-safe, as CEL-Go's synchronous value evaluation contract
+// guarantees that a single wrapped value is only ever accessed by a single goroutine.
+type reflectSchemalessTypedStruct struct {
+	value      reflect.Value
+	fieldCache map[string]ref.Val
 }
 
-func (s *reflectUnstructuredStruct) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
+func (s *reflectSchemalessTypedStruct) ConvertToNative(typeDesc reflect.Type) (interface{}, error) {
 	if s.value.Type().AssignableTo(typeDesc) {
 		return s.value.Interface(), nil
 	}
 	return nil, fmt.Errorf("type conversion error from struct type %v to %v", s.value.Type(), typeDesc)
 }
 
-func (s *reflectUnstructuredStruct) ConvertToType(typeValue ref.Type) ref.Val {
+func (s *reflectSchemalessTypedStruct) ConvertToType(typeValue ref.Type) ref.Val {
 	switch typeValue {
 	case types.MapType:
 		return s
@@ -404,8 +457,8 @@ func (s *reflectUnstructuredStruct) ConvertToType(typeValue ref.Type) ref.Val {
 	return types.NewErr("type conversion error from struct to %s", typeValue.TypeName())
 }
 
-func (s *reflectUnstructuredStruct) Equal(other ref.Val) ref.Val {
-	otherStruct, ok := other.(*reflectUnstructuredStruct)
+func (s *reflectSchemalessTypedStruct) Equal(other ref.Val) ref.Val {
+	otherStruct, ok := other.(*reflectSchemalessTypedStruct)
 	if ok {
 		return types.Bool(apiequality.Semantic.DeepEqual(s.value.Interface(), otherStruct.value.Interface()))
 	}
@@ -429,15 +482,15 @@ func (s *reflectUnstructuredStruct) Equal(other ref.Val) ref.Val {
 	return types.True
 }
 
-func (s *reflectUnstructuredStruct) Type() ref.Type {
+func (s *reflectSchemalessTypedStruct) Type() ref.Type {
 	return types.MapType // Unstructured behaves exactly as a Map
 }
 
-func (s *reflectUnstructuredStruct) Value() interface{} {
+func (s *reflectSchemalessTypedStruct) Value() interface{} {
 	return s.value.Interface()
 }
 
-func (s *reflectUnstructuredStruct) IsSet(field ref.Val) ref.Val {
+func (s *reflectSchemalessTypedStruct) IsSet(field ref.Val) ref.Val {
 	v, found := s.lookupField(field)
 	if v != nil && types.IsUnknownOrError(v) {
 		return v
@@ -445,11 +498,11 @@ func (s *reflectUnstructuredStruct) IsSet(field ref.Val) ref.Val {
 	return types.Bool(found)
 }
 
-func (s *reflectUnstructuredStruct) Find(key ref.Val) (ref.Val, bool) {
+func (s *reflectSchemalessTypedStruct) Find(key ref.Val) (ref.Val, bool) {
 	return s.lookupField(key)
 }
 
-func (s *reflectUnstructuredStruct) Get(key ref.Val) ref.Val {
+func (s *reflectSchemalessTypedStruct) Get(key ref.Val) ref.Val {
 	v, found := s.lookupField(key)
 	if !found {
 		return types.ValOrErr(key, "no such key: %v", key)
@@ -457,32 +510,44 @@ func (s *reflectUnstructuredStruct) Get(key ref.Val) ref.Val {
 	return v
 }
 
-func (s *reflectUnstructuredStruct) Contains(key ref.Val) ref.Val {
+func (s *reflectSchemalessTypedStruct) Contains(key ref.Val) ref.Val {
 	_, found := s.lookupField(key)
 	return types.Bool(found)
 }
 
-func (s *reflectUnstructuredStruct) lookupField(key ref.Val) (ref.Val, bool) {
+func (s *reflectSchemalessTypedStruct) lookupField(key ref.Val) (ref.Val, bool) {
 	keyStr, ok := key.(types.String)
 	if !ok {
 		return types.MaybeNoSuchOverloadErr(key), true
 	}
 	fieldName := keyStr.Value().(string)
 
+	if s.fieldCache != nil {
+		if cached, ok := s.fieldCache[fieldName]; ok {
+			return cached, cached != nil
+		}
+	}
+
+	var result ref.Val
+	found := false
+
 	cacheEntry := value.TypeReflectEntryOf(s.value.Type())
 	fieldCache, ok := cacheEntry.Fields()[fieldName]
-	if !ok {
-		return nil, false
+	if ok {
+		if e := fieldCache.GetFrom(s.value); !fieldCache.CanOmit(e) {
+			result = SchemalessTypedToVal(e.Interface())
+			found = true
+		}
 	}
 
-	if e := fieldCache.GetFrom(s.value); !fieldCache.CanOmit(e) {
-		v := UnstructuredReflectToVal(e.Interface())
-		return v, true
+	if s.fieldCache == nil {
+		s.fieldCache = make(map[string]ref.Val)
 	}
-	return nil, false
+	s.fieldCache[fieldName] = result
+	return result, found
 }
 
-func (s *reflectUnstructuredStruct) Size() ref.Val {
+func (s *reflectSchemalessTypedStruct) Size() ref.Val {
 	cacheEntry := value.TypeReflectEntryOf(s.value.Type())
 	count := 0
 	for _, fieldCache := range cacheEntry.Fields() {
@@ -493,7 +558,7 @@ func (s *reflectUnstructuredStruct) Size() ref.Val {
 	return types.Int(count)
 }
 
-func (s *reflectUnstructuredStruct) Iterator() traits.Iterator {
+func (s *reflectSchemalessTypedStruct) Iterator() traits.Iterator {
 	cacheEntry := value.TypeReflectEntryOf(s.value.Type())
 	var keys []string
 	for fieldName, fieldCache := range cacheEntry.Fields() {
@@ -501,20 +566,20 @@ func (s *reflectUnstructuredStruct) Iterator() traits.Iterator {
 			keys = append(keys, string(fieldName))
 		}
 	}
-	return &reflectUnstructuredStructIterator{reflectUnstructuredStruct: s, keys: keys, idx: 0}
+	return &reflectSchemalessTypedStructIterator{reflectSchemalessTypedStruct: s, keys: keys, idx: 0}
 }
 
-type reflectUnstructuredStructIterator struct {
-	*reflectUnstructuredStruct
+type reflectSchemalessTypedStructIterator struct {
+	*reflectSchemalessTypedStruct
 	keys []string
 	idx  int
 }
 
-func (it *reflectUnstructuredStructIterator) HasNext() ref.Val {
+func (it *reflectSchemalessTypedStructIterator) HasNext() ref.Val {
 	return types.Bool(it.idx < len(it.keys))
 }
 
-func (it *reflectUnstructuredStructIterator) Next() ref.Val {
+func (it *reflectSchemalessTypedStructIterator) Next() ref.Val {
 	if it.idx >= len(it.keys) {
 		return types.NewErr("no more elements")
 	}

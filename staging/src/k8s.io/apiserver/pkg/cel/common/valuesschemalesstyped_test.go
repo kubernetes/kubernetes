@@ -74,7 +74,7 @@ type OmitTestStruct struct {
 	FieldOmit   *int `json:"fieldOmit,omitempty"`
 }
 
-func TestUnstructuredReflectToVal_Primitives(t *testing.T) {
+func TestSchemalessTypedToVal_Primitives(t *testing.T) {
 	tests := []struct {
 		name     string
 		val      interface{}
@@ -189,7 +189,7 @@ func TestUnstructuredReflectToVal_Primitives(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := UnstructuredReflectToVal(tc.val)
+			got := SchemalessTypedToVal(tc.val)
 			if got.Type() != tc.expected.Type() {
 				t.Fatalf("expected type %s, got %s", tc.expected.Type(), got.Type())
 			}
@@ -208,7 +208,7 @@ func TestUnstructuredReflectToVal_Primitives(t *testing.T) {
 	}
 }
 
-func TestUnstructuredReflectToVal_K8sTypes(t *testing.T) {
+func TestSchemalessTypedToVal_K8sTypes(t *testing.T) {
 	timeVal := time.Date(2026, 5, 18, 12, 0, 0, 0, time.UTC)
 	microTimeVal := time.Date(2026, 5, 18, 12, 0, 0, 1000, time.UTC)
 
@@ -276,7 +276,7 @@ func TestUnstructuredReflectToVal_K8sTypes(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := UnstructuredReflectToVal(tc.val)
+			got := SchemalessTypedToVal(tc.val)
 			if got.Type() != tc.expected.Type() {
 				t.Fatalf("expected type %s, got %s", tc.expected.Type(), got.Type())
 			}
@@ -287,12 +287,12 @@ func TestUnstructuredReflectToVal_K8sTypes(t *testing.T) {
 	}
 }
 
-func TestReflectUnstructuredList(t *testing.T) {
+func TestReflectSchemalessTypedList(t *testing.T) {
 	val := []int{1, 2, 3}
-	cellVal := UnstructuredReflectToVal(val)
-	list, ok := cellVal.(*reflectUnstructuredList)
+	cellVal := SchemalessTypedToVal(val)
+	list, ok := cellVal.(*reflectSchemalessTypedList)
 	if !ok {
-		t.Fatalf("expected *reflectUnstructuredList, got %T", cellVal)
+		t.Fatalf("expected *reflectSchemalessTypedList, got %T", cellVal)
 	}
 
 	// Type and Value
@@ -346,6 +346,28 @@ func TestReflectUnstructuredList(t *testing.T) {
 		t.Errorf("expected overload error for different type comparison")
 	}
 
+	// Add / Lister concatenation
+	otherListToAdd := SchemalessTypedToVal([]int{4, 5})
+	combinedVal := list.Add(otherListToAdd)
+	combined, ok := combinedVal.(*reflectSchemalessTypedList)
+	if !ok {
+		t.Fatalf("expected *reflectSchemalessTypedList, got %T", combinedVal)
+	}
+	if combined.Size() != types.Int(5) {
+		t.Errorf("expected combined list size to be 5, got %v", combined.Size())
+	}
+	var combinedItems []int64
+	combinedIt := combined.Iterator()
+	for combinedIt.HasNext() == types.True {
+		combinedItems = append(combinedItems, combinedIt.Next().Value().(int64))
+	}
+	if !reflect.DeepEqual(combinedItems, []int64{1, 2, 3, 4, 5}) {
+		t.Errorf("expected combined items %v, got %v", []int64{1, 2, 3, 4, 5}, combinedItems)
+	}
+	if errVal := list.Add(types.Int(10)); !types.IsError(errVal) {
+		t.Errorf("expected error for adding non-list type, got %v", errVal)
+	}
+
 	// Iterator
 	it := list.Iterator()
 	var items []int64
@@ -382,15 +404,15 @@ func TestReflectUnstructuredList(t *testing.T) {
 	}
 }
 
-func TestReflectUnstructuredMap(t *testing.T) {
+func TestReflectSchemalessTypedMap(t *testing.T) {
 	val := map[string]interface{}{
 		"a": "foo",
 		"b": 42,
 	}
-	cellVal := UnstructuredReflectToVal(val)
-	mapper, ok := cellVal.(*reflectUnstructuredMap)
+	cellVal := SchemalessTypedToVal(val)
+	mapper, ok := cellVal.(*reflectSchemalessTypedMap)
 	if !ok {
-		t.Fatalf("expected *reflectUnstructuredMap, got %T", cellVal)
+		t.Fatalf("expected *reflectSchemalessTypedMap, got %T", cellVal)
 	}
 
 	// Type and Value
@@ -446,15 +468,15 @@ func TestReflectUnstructuredMap(t *testing.T) {
 	}
 
 	// Equal
-	otherSame := UnstructuredReflectToVal(map[string]interface{}{"a": "foo", "b": 42})
+	otherSame := SchemalessTypedToVal(map[string]interface{}{"a": "foo", "b": 42})
 	if mapper.Equal(otherSame) != types.True {
 		t.Errorf("expected maps to be equal")
 	}
-	otherDiffVal := UnstructuredReflectToVal(map[string]interface{}{"a": "foo", "b": 43})
+	otherDiffVal := SchemalessTypedToVal(map[string]interface{}{"a": "foo", "b": 43})
 	if mapper.Equal(otherDiffVal) != types.False {
 		t.Errorf("expected maps with different values to not be equal")
 	}
-	otherDiffLen := UnstructuredReflectToVal(map[string]interface{}{"a": "foo"})
+	otherDiffLen := SchemalessTypedToVal(map[string]interface{}{"a": "foo"})
 	if mapper.Equal(otherDiffLen) != types.False {
 		t.Errorf("expected maps with different lengths to not be equal")
 	}
@@ -500,15 +522,15 @@ func TestReflectUnstructuredMap(t *testing.T) {
 	}
 }
 
-func TestReflectUnstructuredMap_NonStringKey(t *testing.T) {
+func TestReflectSchemalessTypedMap_NonStringKey(t *testing.T) {
 	val := map[int]string{
 		1: "foo",
 		2: "bar",
 	}
-	cellVal := UnstructuredReflectToVal(val)
-	mapper, ok := cellVal.(*reflectUnstructuredMap)
+	cellVal := SchemalessTypedToVal(val)
+	mapper, ok := cellVal.(*reflectSchemalessTypedMap)
 	if !ok {
-		t.Fatalf("expected *reflectUnstructuredMap, got %T", cellVal)
+		t.Fatalf("expected *reflectSchemalessTypedMap, got %T", cellVal)
 	}
 
 	// Find with string key
@@ -524,17 +546,17 @@ func TestReflectUnstructuredMap_NonStringKey(t *testing.T) {
 	}
 }
 
-func TestReflectUnstructuredStruct(t *testing.T) {
+func TestReflectSchemalessTypedStruct(t *testing.T) {
 	fieldCVal := 100
 	val := TestStruct{
 		FieldA: "hello",
 		FieldB: 42,
 		FieldC: &fieldCVal,
 	}
-	cellVal := UnstructuredReflectToVal(val)
-	structVal, ok := cellVal.(*reflectUnstructuredStruct)
+	cellVal := SchemalessTypedToVal(val)
+	structVal, ok := cellVal.(*reflectSchemalessTypedStruct)
 	if !ok {
-		t.Fatalf("expected *reflectUnstructuredStruct, got %T", cellVal)
+		t.Fatalf("expected *reflectSchemalessTypedStruct, got %T", cellVal)
 	}
 
 	// Type and Value
@@ -593,7 +615,7 @@ func TestReflectUnstructuredStruct(t *testing.T) {
 	}
 
 	// Equal
-	otherSame := UnstructuredReflectToVal(TestStruct{
+	otherSame := SchemalessTypedToVal(TestStruct{
 		FieldA: "hello",
 		FieldB: 42,
 		FieldC: &fieldCVal,
@@ -601,7 +623,7 @@ func TestReflectUnstructuredStruct(t *testing.T) {
 	if structVal.Equal(otherSame) != types.True {
 		t.Errorf("expected structs to be equal")
 	}
-	otherDiff := UnstructuredReflectToVal(TestStruct{
+	otherDiff := SchemalessTypedToVal(TestStruct{
 		FieldA: "diff",
 		FieldB: 42,
 		FieldC: &fieldCVal,
@@ -614,7 +636,7 @@ func TestReflectUnstructuredStruct(t *testing.T) {
 	}
 
 	// Equal with different size mapper
-	diffSizeMap := UnstructuredReflectToVal(map[string]interface{}{
+	diffSizeMap := SchemalessTypedToVal(map[string]interface{}{
 		"fieldA": "hello",
 	})
 	if structVal.Equal(diffSizeMap) != types.False {
@@ -622,7 +644,7 @@ func TestReflectUnstructuredStruct(t *testing.T) {
 	}
 
 	// Equal with same size mapper but different value
-	diffValMap := UnstructuredReflectToVal(map[string]interface{}{
+	diffValMap := SchemalessTypedToVal(map[string]interface{}{
 		"fieldA": "hello",
 		"fieldB": 43,
 		"fieldC": 100,
@@ -669,7 +691,7 @@ func TestReflectUnstructuredStruct(t *testing.T) {
 	}
 }
 
-func TestUnstructuredReflectToVal_Equivalence(t *testing.T) {
+func TestSchemalessTypedToVal_Equivalence(t *testing.T) {
 	pod := &corev1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "v1",
@@ -698,7 +720,7 @@ func TestUnstructuredReflectToVal_Equivalence(t *testing.T) {
 		},
 	}
 
-	reflectVal := UnstructuredReflectToVal(pod)
+	reflectVal := SchemalessTypedToVal(pod)
 
 	unstrMap, err := runtime.DefaultUnstructuredConverter.ToUnstructured(pod)
 	if err != nil {
@@ -708,19 +730,19 @@ func TestUnstructuredReflectToVal_Equivalence(t *testing.T) {
 
 	// They must evaluate to exact deep equality via CEL
 	if reflectVal.Equal(nativeVal) != types.True {
-		t.Errorf("UnstructuredReflectToVal does not semantically equal K8s ToUnstructured!")
+		t.Errorf("SchemalessTypedToVal does not semantically equal K8s ToUnstructured!")
 	}
 }
 
-func TestReflectUnstructuredStruct_OmitAndNil(t *testing.T) {
+func TestReflectSchemalessTypedStruct_OmitAndNil(t *testing.T) {
 	val := OmitTestStruct{
 		FieldNoOmit: nil,
 		FieldOmit:   nil,
 	}
-	cellVal := UnstructuredReflectToVal(val)
-	structVal, ok := cellVal.(*reflectUnstructuredStruct)
+	cellVal := SchemalessTypedToVal(val)
+	structVal, ok := cellVal.(*reflectSchemalessTypedStruct)
 	if !ok {
-		t.Fatalf("expected *reflectUnstructuredStruct, got %T", cellVal)
+		t.Fatalf("expected *reflectSchemalessTypedStruct, got %T", cellVal)
 	}
 
 	// FieldNoOmit should be set and contained, and its value should be NullValue.

@@ -137,7 +137,7 @@ func (l *LazyObject) CELValue() (ref.Val, error) {
 		return l.celVal, nil
 	}
 
-	l.celVal = common.UnstructuredReflectToVal(l.object)
+	l.celVal = common.SchemalessTypedToVal(l.object)
 	return l.celVal, nil
 }
 
