@@ -312,7 +312,7 @@ func newTestKubeletWithImageList(
 	kubelet.podManager = kubepod.NewBasicPodManager()
 	kubelet.podStartupLatencyTracker = kubeletutil.NewPodStartupLatencyTracker()
 	kubelet.statusManager = status.NewManager(fakeKubeClient, kubelet.podManager, &statustest.FakePodDeletionSafetyProvider{}, kubelet.podStartupLatencyTracker)
-	kubelet.nodeStartupLatencyTracker = kubeletutil.NewNodeStartupLatencyTracker()
+	kubelet.nodeStartupLatencyTracker = kubeletutil.NewNodeStartupLatencyTracker(logger)
 	kubelet.podCertificateManager = &podcertificate.NoOpManager{}
 
 	kubelet.containerRuntime = fakeRuntime
