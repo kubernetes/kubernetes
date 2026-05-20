@@ -32,9 +32,32 @@ import (
 // Public to allow building arbitrary schemes.
 // All generated defaulters are covering - they call all nested defaulters.
 func RegisterDefaults(scheme *runtime.Scheme) error {
+	scheme.AddTypeDefaultingFunc(&schedulingv1alpha3.CompositePodGroup{}, func(obj interface{}) {
+		SetObjectDefaults_CompositePodGroup(obj.(*schedulingv1alpha3.CompositePodGroup))
+	})
+	scheme.AddTypeDefaultingFunc(&schedulingv1alpha3.CompositePodGroupList{}, func(obj interface{}) {
+		SetObjectDefaults_CompositePodGroupList(obj.(*schedulingv1alpha3.CompositePodGroupList))
+	})
 	scheme.AddTypeDefaultingFunc(&schedulingv1alpha3.PodGroup{}, func(obj interface{}) { SetObjectDefaults_PodGroup(obj.(*schedulingv1alpha3.PodGroup)) })
 	scheme.AddTypeDefaultingFunc(&schedulingv1alpha3.PodGroupList{}, func(obj interface{}) { SetObjectDefaults_PodGroupList(obj.(*schedulingv1alpha3.PodGroupList)) })
+	scheme.AddTypeDefaultingFunc(&schedulingv1alpha3.Workload{}, func(obj interface{}) { SetObjectDefaults_Workload(obj.(*schedulingv1alpha3.Workload)) })
+	scheme.AddTypeDefaultingFunc(&schedulingv1alpha3.WorkloadList{}, func(obj interface{}) { SetObjectDefaults_WorkloadList(obj.(*schedulingv1alpha3.WorkloadList)) })
 	return nil
+}
+
+func SetObjectDefaults_CompositePodGroup(in *schedulingv1alpha3.CompositePodGroup) {
+	if in.Spec.DisruptionMode == nil {
+		if err := json.Unmarshal([]byte(`{"single": {}}`), &in.Spec.DisruptionMode); err != nil {
+			panic(err)
+		}
+	}
+}
+
+func SetObjectDefaults_CompositePodGroupList(in *schedulingv1alpha3.CompositePodGroupList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_CompositePodGroup(a)
+	}
 }
 
 func SetObjectDefaults_PodGroup(in *schedulingv1alpha3.PodGroup) {
@@ -49,5 +72,23 @@ func SetObjectDefaults_PodGroupList(in *schedulingv1alpha3.PodGroupList) {
 	for i := range in.Items {
 		a := &in.Items[i]
 		SetObjectDefaults_PodGroup(a)
+	}
+}
+
+func SetObjectDefaults_Workload(in *schedulingv1alpha3.Workload) {
+	for i := range in.Spec.CompositePodGroupTemplates {
+		a := &in.Spec.CompositePodGroupTemplates[i]
+		if a.DisruptionMode == nil {
+			if err := json.Unmarshal([]byte(`{"single": {}}`), &a.DisruptionMode); err != nil {
+				panic(err)
+			}
+		}
+	}
+}
+
+func SetObjectDefaults_WorkloadList(in *schedulingv1alpha3.WorkloadList) {
+	for i := range in.Items {
+		a := &in.Items[i]
+		SetObjectDefaults_Workload(a)
 	}
 }

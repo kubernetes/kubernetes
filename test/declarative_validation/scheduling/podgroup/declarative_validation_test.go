@@ -77,36 +77,36 @@ func testDeclarativeValidate(t *testing.T, apiVersion string) {
 			input:        mkValidPodGroup(setPodGroupMinCount(-1)),
 			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "schedulingPolicy", "gang", "minCount"), nil, "").WithOrigin("minimum")},
 		},
-		"no podGroupTemplateRef": {
-			input: mkValidPodGroup(unsetPodGroupTemplateRef()),
+		"no templateRef": {
+			input: mkValidPodGroup(unsetTemplateRef()),
 		},
-		"empty podGroupTemplateRef": {
-			input:        mkValidPodGroup(setEmptyPodGroupTemplateRef()),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplateRef"), nil, "").WithOrigin("union")},
+		"empty templateRef": {
+			input:        mkValidPodGroup(setEmptyTemplateRef()),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "templateRef"), nil, "").WithOrigin("union")},
 		},
-		"podGroupTemplateRef with empty template name": {
-			input:        mkValidPodGroup(setPodGroupTemplateRef("", "workload")),
-			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec", "podGroupTemplateRef", "workload", "podGroupTemplateName"), "")},
+		"templateRef with empty template name": {
+			input:        mkValidPodGroup(setTemplateRef("", "workload")),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec", "templateRef", "workload", "templateName"), "")},
 		},
-		"podGroupTemplateRef invalid template name": {
-			input:        mkValidPodGroup(setPodGroupTemplateRef("temp/late", "workload")),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplateRef", "workload", "podGroupTemplateName"), nil, "").WithOrigin("format=k8s-short-name")},
+		"templateRef invalid template name": {
+			input:        mkValidPodGroup(setTemplateRef("temp/late", "workload")),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "templateRef", "workload", "templateName"), nil, "").WithOrigin("format=k8s-short-name")},
 		},
-		"podGroupTemplateRef with empty workload name": {
-			input:        mkValidPodGroup(setPodGroupTemplateRef("template", "")),
-			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec", "podGroupTemplateRef", "workload", "workloadName"), "")},
+		"templateRef with empty workload name": {
+			input:        mkValidPodGroup(setTemplateRef("template", "")),
+			expectedErrs: field.ErrorList{field.Required(field.NewPath("spec", "templateRef", "workload", "workloadName"), "")},
 		},
-		"podGroupTemplateRef invalid workload name": {
-			input:        mkValidPodGroup(setPodGroupTemplateRef("template", "work/load")),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplateRef", "workload", "workloadName"), nil, "").WithOrigin("format=k8s-long-name")},
+		"templateRef invalid workload name": {
+			input:        mkValidPodGroup(setTemplateRef("template", "work/load")),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "templateRef", "workload", "workloadName"), nil, "").WithOrigin("format=k8s-long-name")},
 		},
-		"podGroupTemplateRef too long workload name": {
-			input:        mkValidPodGroup(setPodGroupTemplateRef("template", strings.Repeat("g", 254))),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplateRef", "workload", "workloadName"), nil, "").WithOrigin("format=k8s-long-name")},
+		"templateRef too long workload name": {
+			input:        mkValidPodGroup(setTemplateRef("template", strings.Repeat("g", 254))),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "templateRef", "workload", "workloadName"), nil, "").WithOrigin("format=k8s-long-name")},
 		},
-		"podGroupTemplateRef too long template name": {
-			input:        mkValidPodGroup(setPodGroupTemplateRef(strings.Repeat("g", 254), "workload")),
-			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "podGroupTemplateRef", "workload", "podGroupTemplateName"), nil, "").WithOrigin("format=k8s-short-name")},
+		"templateRef too long template name": {
+			input:        mkValidPodGroup(setTemplateRef(strings.Repeat("g", 254), "workload")),
+			expectedErrs: field.ErrorList{field.Invalid(field.NewPath("spec", "templateRef", "workload", "templateName"), nil, "").WithOrigin("format=k8s-short-name")},
 		},
 		"policy with neither basic nor gang": {
 			input:        mkValidPodGroup(clearPodGroupPolicy()),
@@ -386,32 +386,32 @@ func testDeclarativeValidateUpdate(t *testing.T, apiVersion string) {
 			oldObj:    mkValidPodGroup(setResourceVersion("1")),
 			updateObj: mkValidPodGroup(setResourceVersion("1")),
 		},
-		"invalid update empty podGroupTemplateRef": {
+		"invalid update empty templateRef": {
 			oldObj:    mkValidPodGroup(setResourceVersion("1")),
-			updateObj: mkValidPodGroup(setResourceVersion("1"), setEmptyPodGroupTemplateRef()),
+			updateObj: mkValidPodGroup(setResourceVersion("1"), setEmptyTemplateRef()),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroupTemplateRef"), nil, "").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "templateRef"), nil, "").WithOrigin("immutable"),
 			},
 		},
-		"invalid update unset podGroupTemplateRef": {
+		"invalid update unset templateRef": {
 			oldObj:    mkValidPodGroup(setResourceVersion("1")),
-			updateObj: mkValidPodGroup(setResourceVersion("1"), unsetPodGroupTemplateRef()),
+			updateObj: mkValidPodGroup(setResourceVersion("1"), unsetTemplateRef()),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroupTemplateRef"), nil, "").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "templateRef"), nil, "").WithOrigin("immutable"),
 			},
 		},
-		"invalid update change podGroupTemplateRef template name": {
+		"invalid update change templateRef template name": {
 			oldObj:    mkValidPodGroup(setResourceVersion("1")),
-			updateObj: mkValidPodGroup(setResourceVersion("1"), setPodGroupTemplateRef("other-template", "workload")),
+			updateObj: mkValidPodGroup(setResourceVersion("1"), setTemplateRef("other-template", "workload")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroupTemplateRef"), nil, "").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "templateRef"), nil, "").WithOrigin("immutable"),
 			},
 		},
-		"invalid update change podGroupTemplateRef workload name": {
+		"invalid update change templateRef workload name": {
 			oldObj:    mkValidPodGroup(setResourceVersion("1")),
-			updateObj: mkValidPodGroup(setResourceVersion("1"), setPodGroupTemplateRef("template", "other-workload")),
+			updateObj: mkValidPodGroup(setResourceVersion("1"), setTemplateRef("template", "other-workload")),
 			expectedErrs: field.ErrorList{
-				field.Invalid(field.NewPath("spec", "podGroupTemplateRef"), nil, "").WithOrigin("immutable"),
+				field.Invalid(field.NewPath("spec", "templateRef"), nil, "").WithOrigin("immutable"),
 			},
 		},
 		"invalid update with neither basic nor gang": {
@@ -720,10 +720,10 @@ func mkValidPodGroup(tweaks ...func(pg *scheduling.PodGroup)) scheduling.PodGrou
 	obj := scheduling.PodGroup{
 		ObjectMeta: metav1.ObjectMeta{Name: "podgroup", Namespace: "ns"},
 		Spec: scheduling.PodGroupSpec{
-			PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
-				Workload: &scheduling.WorkloadPodGroupTemplateReference{
-					WorkloadName:         "workload",
-					PodGroupTemplateName: "template",
+			TemplateRef: &scheduling.TemplateReference{
+				Workload: &scheduling.WorkloadReference{
+					WorkloadName: "workload",
+					TemplateName: "template",
 				},
 			},
 			SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
@@ -745,15 +745,15 @@ func setResourceVersion(v string) func(obj *scheduling.PodGroup) {
 	}
 }
 
-func unsetPodGroupTemplateRef() func(obj *scheduling.PodGroup) {
+func unsetTemplateRef() func(obj *scheduling.PodGroup) {
 	return func(obj *scheduling.PodGroup) {
-		obj.Spec.PodGroupTemplateRef = nil
+		obj.Spec.TemplateRef = nil
 	}
 }
 
-func setEmptyPodGroupTemplateRef() func(obj *scheduling.PodGroup) {
+func setEmptyTemplateRef() func(obj *scheduling.PodGroup) {
 	return func(obj *scheduling.PodGroup) {
-		obj.Spec.PodGroupTemplateRef = &scheduling.PodGroupTemplateReference{}
+		obj.Spec.TemplateRef = &scheduling.TemplateReference{}
 	}
 }
 
@@ -786,12 +786,12 @@ func setBothPolicies() func(obj *scheduling.PodGroup) {
 	}
 }
 
-func setPodGroupTemplateRef(templateName, workloadName string) func(obj *scheduling.PodGroup) {
+func setTemplateRef(templateName, workloadName string) func(obj *scheduling.PodGroup) {
 	return func(obj *scheduling.PodGroup) {
-		obj.Spec.PodGroupTemplateRef = &scheduling.PodGroupTemplateReference{
-			Workload: &scheduling.WorkloadPodGroupTemplateReference{
-				PodGroupTemplateName: templateName,
-				WorkloadName:         workloadName,
+		obj.Spec.TemplateRef = &scheduling.TemplateReference{
+			Workload: &scheduling.WorkloadReference{
+				TemplateName: templateName,
+				WorkloadName: workloadName,
 			},
 		}
 	}

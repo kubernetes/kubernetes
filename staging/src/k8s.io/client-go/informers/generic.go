@@ -422,6 +422,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Scheduling().V1().PriorityClasses().Informer()}, nil
 
 		// Group=scheduling.k8s.io, Version=v1alpha3
+	case schedulingv1alpha3.SchemeGroupVersion.WithResource("compositepodgroups"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Scheduling().V1alpha3().CompositePodGroups().Informer()}, nil
 	case schedulingv1alpha3.SchemeGroupVersion.WithResource("podgroups"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Scheduling().V1alpha3().PodGroups().Informer()}, nil
 	case schedulingv1alpha3.SchemeGroupVersion.WithResource("workloads"):

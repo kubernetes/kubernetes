@@ -8235,10 +8235,10 @@ func TestPrintPodGroup(t *testing.T) {
 			Namespace: "ns1",
 		},
 		Spec: scheduling.PodGroupSpec{
-			PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
-				Workload: &scheduling.WorkloadPodGroupTemplateReference{
-					WorkloadName:         "w",
-					PodGroupTemplateName: "t1",
+			TemplateRef: &scheduling.TemplateReference{
+				Workload: &scheduling.WorkloadReference{
+					WorkloadName: "w",
+					TemplateName: "t1",
 				},
 			},
 			SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
@@ -8271,10 +8271,10 @@ func TestPrintPodGroupList(t *testing.T) {
 					Namespace: "ns1",
 				},
 				Spec: scheduling.PodGroupSpec{
-					PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
-						Workload: &scheduling.WorkloadPodGroupTemplateReference{
-							WorkloadName:         "w1",
-							PodGroupTemplateName: "t1",
+					TemplateRef: &scheduling.TemplateReference{
+						Workload: &scheduling.WorkloadReference{
+							WorkloadName: "w1",
+							TemplateName: "t1",
 						},
 					},
 					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
@@ -8291,10 +8291,10 @@ func TestPrintPodGroupList(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
 				Spec: scheduling.PodGroupSpec{
-					PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
-						Workload: &scheduling.WorkloadPodGroupTemplateReference{
-							WorkloadName:         "w1",
-							PodGroupTemplateName: "t2",
+					TemplateRef: &scheduling.TemplateReference{
+						Workload: &scheduling.WorkloadReference{
+							WorkloadName: "w1",
+							TemplateName: "t2",
 						},
 					},
 					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{
@@ -8311,10 +8311,10 @@ func TestPrintPodGroupList(t *testing.T) {
 					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
 				},
 				Spec: scheduling.PodGroupSpec{
-					PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
-						Workload: &scheduling.WorkloadPodGroupTemplateReference{
-							WorkloadName:         "w2",
-							PodGroupTemplateName: "t1",
+					TemplateRef: &scheduling.TemplateReference{
+						Workload: &scheduling.WorkloadReference{
+							WorkloadName: "w2",
+							TemplateName: "t1",
 						},
 					},
 					SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{

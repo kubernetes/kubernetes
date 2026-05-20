@@ -677,10 +677,10 @@ func mkPodGroup(tweaks ...func(pg *scheduling.PodGroup)) *scheduling.PodGroup {
 	pg := &scheduling.PodGroup{
 		ObjectMeta: metav1.ObjectMeta{Name: "workload", Namespace: "ns"},
 		Spec: scheduling.PodGroupSpec{
-			PodGroupTemplateRef: &scheduling.PodGroupTemplateReference{
-				Workload: &scheduling.WorkloadPodGroupTemplateReference{
-					WorkloadName:         "w",
-					PodGroupTemplateName: "t1",
+			TemplateRef: &scheduling.TemplateReference{
+				Workload: &scheduling.WorkloadReference{
+					WorkloadName: "w",
+					TemplateName: "t1",
 				},
 			},
 			SchedulingPolicy: scheduling.PodGroupSchedulingPolicy{

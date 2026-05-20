@@ -1678,6 +1678,41 @@
           "freshness": "Current",
           "resources": [
             {
+              "resource": "compositepodgroups",
+              "responseKind": {
+                "group": "",
+                "kind": "CompositePodGroup",
+                "version": ""
+              },
+              "scope": "Namespaced",
+              "singularResource": "compositepodgroup",
+              "subresources": [
+                {
+                  "responseKind": {
+                    "group": "",
+                    "kind": "CompositePodGroup",
+                    "version": ""
+                  },
+                  "subresource": "status",
+                  "verbs": [
+                    "get",
+                    "patch",
+                    "update"
+                  ]
+                }
+              ],
+              "verbs": [
+                "create",
+                "delete",
+                "deletecollection",
+                "get",
+                "list",
+                "patch",
+                "update",
+                "watch"
+              ]
+            },
+            {
               "resource": "podgroups",
               "responseKind": {
                 "group": "",

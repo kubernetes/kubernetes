@@ -19802,12 +19802,264 @@
         }
       ]
     },
+    "io.k8s.api.scheduling.v1alpha3.AllCompositeDisruptionMode": {
+      "description": "AllCompositeDisruptionMode specifies that all children can only be disrupted together.",
+      "type": "object"
+    },
     "io.k8s.api.scheduling.v1alpha3.AllDisruptionMode": {
       "description": "AllDisruptionMode specifies that children can only be disrupted together.",
       "type": "object"
     },
+    "io.k8s.api.scheduling.v1alpha3.BasicGroupSchedulingPolicy": {
+      "description": "BasicGroupSchedulingPolicy defines basic group scheduling policy.",
+      "type": "object"
+    },
     "io.k8s.api.scheduling.v1alpha3.BasicSchedulingPolicy": {
       "description": "BasicSchedulingPolicy indicates that standard Kubernetes scheduling behavior should be used.",
+      "type": "object"
+    },
+    "io.k8s.api.scheduling.v1alpha3.CompositeDisruptionMode": {
+      "description": "CompositeDisruptionMode defines the disruption mode for a composite pod group.",
+      "properties": {
+        "all": {
+          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.AllCompositeDisruptionMode",
+          "description": "All specifies that all children can only be disrupted together."
+        },
+        "single": {
+          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.SingleCompositeDisruptionMode",
+          "description": "Single specifies that children can be disrupted independently from each other."
+        }
+      },
+      "type": "object",
+      "x-kubernetes-unions": [
+        {
+          "fields-to-discriminateBy": {
+            "all": "All",
+            "single": "Single"
+          }
+        }
+      ]
+    },
+    "io.k8s.api.scheduling.v1alpha3.CompositePodGroup": {
+      "description": "CompositePodGroup represents a runtime instance of pod groups grouped together. CompositePodGroups are created by workload controllers (LWS, JobSet, etc...) from Workload.compositePodGroupTemplates. CompositePodGroup API enablement is toggled by the CompositePodGroup feature gate.",
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta",
+          "description": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata"
+        },
+        "spec": {
+          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroupSpec",
+          "description": "Spec defines the desired state of the CompositePodGroup."
+        },
+        "status": {
+          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroupStatus",
+          "description": "Status represents the current observed state of the CompositePodGroup."
+        }
+      },
+      "required": [
+        "spec"
+      ],
+      "type": "object",
+      "x-kubernetes-group-version-kind": [
+        {
+          "group": "scheduling.k8s.io",
+          "kind": "CompositePodGroup",
+          "version": "v1alpha3"
+        }
+      ]
+    },
+    "io.k8s.api.scheduling.v1alpha3.CompositePodGroupList": {
+      "description": "CompositePodGroupList contains a list of CompositePodGroup resources.",
+      "properties": {
+        "apiVersion": {
+          "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+          "type": "string"
+        },
+        "items": {
+          "description": "Items is the list of CompositePodGroups.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroup"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+          "type": "string"
+        },
+        "metadata": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta",
+          "description": "Standard list metadata."
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "type": "object",
+      "x-kubernetes-group-version-kind": [
+        {
+          "group": "scheduling.k8s.io",
+          "kind": "CompositePodGroupList",
+          "version": "v1alpha3"
+        }
+      ]
+    },
+    "io.k8s.api.scheduling.v1alpha3.CompositePodGroupSchedulingConstraints": {
+      "description": "CompositePodGroupSchedulingConstraints defines scheduling constraints for a composite pod group.",
+      "properties": {
+        "topology": {
+          "description": "Topology defines the topology constraints for the composite pod group. Currently only a single topology constraint can be specified. This may change in the future.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.TopologyConstraint"
+          },
+          "type": "array",
+          "x-kubernetes-list-type": "atomic"
+        }
+      },
+      "type": "object"
+    },
+    "io.k8s.api.scheduling.v1alpha3.CompositePodGroupSchedulingPolicy": {
+      "description": "CompositePodGroupSchedulingPolicy defines the scheduling policy for a composite pod group.",
+      "properties": {
+        "basic": {
+          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.BasicGroupSchedulingPolicy",
+          "description": "Basic specifies that the groups of this composite group should be scheduled independently."
+        },
+        "gang": {
+          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.GangGroupSchedulingPolicy",
+          "description": "Gang specifies that the groups of this composite group should be scheduled using all-or-nothing semantics."
+        }
+      },
+      "type": "object",
+      "x-kubernetes-unions": [
+        {
+          "fields-to-discriminateBy": {
+            "basic": "Basic",
+            "gang": "Gang"
+          }
+        }
+      ]
+    },
+    "io.k8s.api.scheduling.v1alpha3.CompositePodGroupSpec": {
+      "description": "CompositePodGroupSpec defines the desired state of CompositePodGroup.",
+      "properties": {
+        "disruptionMode": {
+          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositeDisruptionMode",
+          "description": "DisruptionMode defines the mode in which a given CompositePodGroup can be disrupted. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. One of Single, All. Defaults to Single if unset. This field is immutable.\n\nThis field is available only when the WorkloadAwarePreemption feature gate is enabled."
+        },
+        "parentCompositePodGroupName": {
+          "description": "ParentCompositePodGroupName contains the name of the parent composite pod group within the same namespace as this composite pod group. It must be a DNS name. If it's nil, then this composite pod group is a root of a workload's hierarchy. This field is used only when the CompositePodGroup feature gate is enabled. This field is immutable.",
+          "type": "string"
+        },
+        "priority": {
+          "description": "Priority is the value of priority of this composite pod group. Various system components use this field to find the priority of the composite pod group. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority. This field is immutable. This field is available only when the WorkloadAwarePreemption feature gate is enabled.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "priorityClassName": {
+          "description": "PriorityClassName defines the priority that should be considered when scheduling this CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. If left unspecified, it is validated and resolved similarly to the PriorityClassName field in Pods (i.e. if no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, the composite pod group's priority will be zero). This field is immutable. This field is available only when the WorkloadAwarePreemption feature gate is enabled.",
+          "type": "string"
+        },
+        "schedulingConstraints": {
+          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroupSchedulingConstraints",
+          "description": "SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. This field is immutable. This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled."
+        },
+        "schedulingPolicy": {
+          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroupSchedulingPolicy",
+          "description": "SchedulingPolicy defines the scheduling policy for this instance of the CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. This field is immutable."
+        },
+        "workloadRef": {
+          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.WorkloadReference",
+          "description": "WorkloadRef references an optional CompositePodGroup template within the Workload object that was used to create the CompositePodGroup. This field is required. This field is immutable."
+        }
+      },
+      "required": [
+        "workloadRef",
+        "schedulingPolicy"
+      ],
+      "type": "object"
+    },
+    "io.k8s.api.scheduling.v1alpha3.CompositePodGroupStatus": {
+      "description": "CompositePodGroupStatus defines the observed state of CompositePodGroup.",
+      "properties": {
+        "conditions": {
+          "description": "Conditions represent the latest observations of the CompositePodGroup's state.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Condition"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "type"
+          ],
+          "x-kubernetes-list-type": "map",
+          "x-kubernetes-patch-merge-key": "type",
+          "x-kubernetes-patch-strategy": "merge"
+        }
+      },
+      "type": "object"
+    },
+    "io.k8s.api.scheduling.v1alpha3.CompositePodGroupTemplate": {
+      "description": "CompositePodGroupTemplate represents a template for a CompositePodGroup with a scheduling policy.",
+      "properties": {
+        "compositePodGroupTemplates": {
+          "description": "CompositePodGroupTemplates is the list of templates for children CompositePodGroups. The maximum number of templates is 8. This field is immutable.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroupTemplate"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "disruptionMode": {
+          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositeDisruptionMode",
+          "description": "DisruptionMode defines the mode in which a given CompositePodGroup can be disrupted."
+        },
+        "name": {
+          "description": "Name is a unique identifier for the CompositePodGroupTemplate within the Workload. It must be a DNS label. This field is required. This field is immutable.",
+          "type": "string"
+        },
+        "podGroupTemplates": {
+          "description": "PodGroupTemplates is the list of templates for children PodGroups. The maximum number of templates is 8. This field is immutable.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.PodGroupTemplate"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
+        "priority": {
+          "description": "Priority is the value of priority of this template.",
+          "format": "int32",
+          "type": "integer"
+        },
+        "priorityClassName": {
+          "description": "PriorityClassName defines the priority that should be considered when scheduling this template.",
+          "type": "string"
+        },
+        "schedulingConstraints": {
+          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroupSchedulingConstraints",
+          "description": "SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this template."
+        },
+        "schedulingPolicy": {
+          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroupSchedulingPolicy",
+          "description": "SchedulingPolicy defines the scheduling policy for this template."
+        }
+      },
+      "required": [
+        "name",
+        "schedulingPolicy"
+      ],
       "type": "object"
     },
     "io.k8s.api.scheduling.v1alpha3.DisruptionMode": {
@@ -19831,6 +20083,20 @@
           }
         }
       ]
+    },
+    "io.k8s.api.scheduling.v1alpha3.GangGroupSchedulingPolicy": {
+      "description": "GangGroupSchedulingPolicy defines gang group scheduling policy.",
+      "properties": {
+        "minGroupCount": {
+          "description": "MinGroupCount is the minimum number of child groups that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer.",
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "minGroupCount"
+      ],
+      "type": "object"
     },
     "io.k8s.api.scheduling.v1alpha3.GangSchedulingPolicy": {
       "description": "GangSchedulingPolicy defines the parameters for gang scheduling.",
@@ -19998,9 +20264,9 @@
           "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.DisruptionMode",
           "description": "DisruptionMode defines the mode in which a given PodGroup can be disrupted. Controllers are expected to fill this field by copying it from a PodGroupTemplate. One of Single, All. Defaults to Single if unset. This field is immutable. This field is available only when the WorkloadAwarePreemption feature gate is enabled."
         },
-        "podGroupTemplateRef": {
-          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.PodGroupTemplateReference",
-          "description": "PodGroupTemplateRef references an optional PodGroup template within other object (e.g. Workload) that was used to create the PodGroup. This field is immutable."
+        "parentCompositePodGroupName": {
+          "description": "ParentCompositePodGroupName contains the name of the parent composite pod group within the same namespace as this pod group. If it's nil, then this pod group is a root of a workload's hierarchy. This field is used only when the CompositePodGroup feature gate is enabled. This field is immutable.",
+          "type": "string"
         },
         "priority": {
           "description": "Priority is the value of priority of this pod group. Various system components use this field to find the priority of the pod group. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority. This field is immutable. This field is available only when the WorkloadAwarePreemption feature gate is enabled.",
@@ -20031,6 +20297,10 @@
         "schedulingPolicy": {
           "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.PodGroupSchedulingPolicy",
           "description": "SchedulingPolicy defines the scheduling policy for this instance of the PodGroup. Controllers are expected to fill this field by copying it from a PodGroupTemplate. This field is immutable."
+        },
+        "workloadRef": {
+          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.WorkloadReference",
+          "description": "WorkloadRef references an optional PodGroup template within the Workload object that was used to create the PodGroup. This field is immutable."
         }
       },
       "required": [
@@ -20118,22 +20388,9 @@
       ],
       "type": "object"
     },
-    "io.k8s.api.scheduling.v1alpha3.PodGroupTemplateReference": {
-      "description": "PodGroupTemplateReference references a PodGroup template defined in some object (e.g. Workload). Exactly one reference must be set.",
-      "properties": {
-        "workload": {
-          "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupTemplateReference",
-          "description": "Workload references the PodGroupTemplate within the Workload object that was used to create the PodGroup."
-        }
-      },
-      "type": "object",
-      "x-kubernetes-unions": [
-        {
-          "fields-to-discriminateBy": {
-            "workload": "Workload"
-          }
-        }
-      ]
+    "io.k8s.api.scheduling.v1alpha3.SingleCompositeDisruptionMode": {
+      "description": "SingleCompositeDisruptionMode specifies that children can be disrupted independently.",
+      "type": "object"
     },
     "io.k8s.api.scheduling.v1alpha3.SingleDisruptionMode": {
       "description": "SingleDisruptionMode specifies that children can be disrupted independently.",
@@ -20241,33 +20498,44 @@
         }
       ]
     },
-    "io.k8s.api.scheduling.v1alpha3.WorkloadPodGroupTemplateReference": {
-      "description": "WorkloadPodGroupTemplateReference references the PodGroupTemplate within the Workload object.",
+    "io.k8s.api.scheduling.v1alpha3.WorkloadReference": {
+      "description": "WorkloadReference references a Workload object.",
       "properties": {
-        "podGroupTemplateName": {
-          "description": "PodGroupTemplateName defines the PodGroupTemplate name within the Workload object.",
+        "templateName": {
+          "description": "TemplateName is the name of a template within the Workload object that was used to create a pod group or a composite pod group. It must be a DNS label. This field is immutable. This field is required.",
           "type": "string"
         },
         "workloadName": {
-          "description": "WorkloadName defines the name of the Workload object.",
+          "description": "WorkloadName is the name of the Workload object that contains a template that was used when creating a pod group or a composite pod group. It must be a DNS name. This field is immutable. This field is required.",
           "type": "string"
         }
       },
       "required": [
         "workloadName",
-        "podGroupTemplateName"
+        "templateName"
       ],
       "type": "object"
     },
     "io.k8s.api.scheduling.v1alpha3.WorkloadSpec": {
       "description": "WorkloadSpec defines the desired state of a Workload.",
       "properties": {
+        "compositePodGroupTemplates": {
+          "description": "CompositePodGroupTemplates is the list of CompositePodGroup templates that make up the Workload. The maximum number of templates is 8. This field is immutable. Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.\n\nThis field is used only when the CompositePodGroup feature gate is enabled.",
+          "items": {
+            "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroupTemplate"
+          },
+          "type": "array",
+          "x-kubernetes-list-map-keys": [
+            "name"
+          ],
+          "x-kubernetes-list-type": "map"
+        },
         "controllerRef": {
           "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.TypedLocalObjectReference",
           "description": "ControllerRef is an optional reference to the controlling object, such as a Deployment or Job. This field is intended for use by tools like CLIs to provide a link back to the original workload definition. This field is immutable."
         },
         "podGroupTemplates": {
-          "description": "PodGroupTemplates is the list of templates that make up the Workload. The maximum number of templates is 8. This field is immutable.",
+          "description": "PodGroupTemplates is the list of templates that make up the Workload. The maximum number of templates is 8. This field is immutable. Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.",
           "items": {
             "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.PodGroupTemplate"
           },
@@ -20278,9 +20546,6 @@
           "x-kubernetes-list-type": "map"
         }
       },
-      "required": [
-        "podGroupTemplates"
-      ],
       "type": "object"
     },
     "io.k8s.api.storage.v1.CSIDriver": {
@@ -94248,6 +94513,785 @@
         ]
       }
     },
+    "/apis/scheduling.k8s.io/v1alpha3/compositepodgroups": {
+      "get": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "list or watch objects of kind CompositePodGroup",
+        "operationId": "listSchedulingV1alpha3CompositePodGroupForAllNamespaces",
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor",
+          "application/json;stream=watch",
+          "application/vnd.kubernetes.protobuf;stream=watch",
+          "application/cbor-seq"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroupList"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "scheduling_v1alpha3"
+        ],
+        "x-kubernetes-action": "list",
+        "x-kubernetes-group-version-kind": {
+          "group": "scheduling.k8s.io",
+          "kind": "CompositePodGroup",
+          "version": "v1alpha3"
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/allowWatchBookmarks-HC2hJt-J"
+        },
+        {
+          "$ref": "#/parameters/continue-QfD61s0i"
+        },
+        {
+          "$ref": "#/parameters/fieldSelector-xIcQKXFG"
+        },
+        {
+          "$ref": "#/parameters/labelSelector-5Zw57w4C"
+        },
+        {
+          "$ref": "#/parameters/limit-1NfNmdNH"
+        },
+        {
+          "$ref": "#/parameters/pretty-tJGM1-ng"
+        },
+        {
+          "$ref": "#/parameters/resourceVersion-5WAnf1kx"
+        },
+        {
+          "$ref": "#/parameters/resourceVersionMatch-t8XhRHeC"
+        },
+        {
+          "$ref": "#/parameters/sendInitialEvents-rLXlEK_k"
+        },
+        {
+          "$ref": "#/parameters/shardSelector-Kgyki_3_"
+        },
+        {
+          "$ref": "#/parameters/timeoutSeconds-yvYezaOC"
+        },
+        {
+          "$ref": "#/parameters/watch-XNNPZGbK"
+        }
+      ]
+    },
+    "/apis/scheduling.k8s.io/v1alpha3/namespaces/{namespace}/compositepodgroups": {
+      "delete": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "delete collection of CompositePodGroup",
+        "operationId": "deleteSchedulingV1alpha3CollectionNamespacedCompositePodGroup",
+        "parameters": [
+          {
+            "$ref": "#/parameters/body-2Y1dVQaQ"
+          },
+          {
+            "$ref": "#/parameters/continue-QfD61s0i"
+          },
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/fieldSelector-xIcQKXFG"
+          },
+          {
+            "$ref": "#/parameters/gracePeriodSeconds--K5HaBOS"
+          },
+          {
+            "$ref": "#/parameters/ignoreStoreReadErrorWithClusterBreakingPotential-QbNkfIqj"
+          },
+          {
+            "$ref": "#/parameters/labelSelector-5Zw57w4C"
+          },
+          {
+            "$ref": "#/parameters/limit-1NfNmdNH"
+          },
+          {
+            "$ref": "#/parameters/orphanDependents-uRB25kX5"
+          },
+          {
+            "$ref": "#/parameters/propagationPolicy-6jk3prlO"
+          },
+          {
+            "$ref": "#/parameters/resourceVersion-5WAnf1kx"
+          },
+          {
+            "$ref": "#/parameters/resourceVersionMatch-t8XhRHeC"
+          },
+          {
+            "$ref": "#/parameters/sendInitialEvents-rLXlEK_k"
+          },
+          {
+            "$ref": "#/parameters/shardSelector-Kgyki_3_"
+          },
+          {
+            "$ref": "#/parameters/timeoutSeconds-yvYezaOC"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "scheduling_v1alpha3"
+        ],
+        "x-kubernetes-action": "deletecollection",
+        "x-kubernetes-group-version-kind": {
+          "group": "scheduling.k8s.io",
+          "kind": "CompositePodGroup",
+          "version": "v1alpha3"
+        }
+      },
+      "get": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "list or watch objects of kind CompositePodGroup",
+        "operationId": "listSchedulingV1alpha3NamespacedCompositePodGroup",
+        "parameters": [
+          {
+            "$ref": "#/parameters/allowWatchBookmarks-HC2hJt-J"
+          },
+          {
+            "$ref": "#/parameters/continue-QfD61s0i"
+          },
+          {
+            "$ref": "#/parameters/fieldSelector-xIcQKXFG"
+          },
+          {
+            "$ref": "#/parameters/labelSelector-5Zw57w4C"
+          },
+          {
+            "$ref": "#/parameters/limit-1NfNmdNH"
+          },
+          {
+            "$ref": "#/parameters/resourceVersion-5WAnf1kx"
+          },
+          {
+            "$ref": "#/parameters/resourceVersionMatch-t8XhRHeC"
+          },
+          {
+            "$ref": "#/parameters/sendInitialEvents-rLXlEK_k"
+          },
+          {
+            "$ref": "#/parameters/shardSelector-Kgyki_3_"
+          },
+          {
+            "$ref": "#/parameters/timeoutSeconds-yvYezaOC"
+          },
+          {
+            "$ref": "#/parameters/watch-XNNPZGbK"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor",
+          "application/json;stream=watch",
+          "application/vnd.kubernetes.protobuf;stream=watch",
+          "application/cbor-seq"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroupList"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "scheduling_v1alpha3"
+        ],
+        "x-kubernetes-action": "list",
+        "x-kubernetes-group-version-kind": {
+          "group": "scheduling.k8s.io",
+          "kind": "CompositePodGroup",
+          "version": "v1alpha3"
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/namespace-vgWSWtn3"
+        },
+        {
+          "$ref": "#/parameters/pretty-tJGM1-ng"
+        }
+      ],
+      "post": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "create a CompositePodGroup",
+        "operationId": "createSchedulingV1alpha3NamespacedCompositePodGroup",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroup"
+            }
+          },
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/fieldManager-Qy4HdaTW"
+          },
+          {
+            "description": "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
+            "in": "query",
+            "name": "fieldValidation",
+            "type": "string",
+            "uniqueItems": true
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroup"
+            }
+          },
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroup"
+            }
+          },
+          "202": {
+            "description": "Accepted",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroup"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "scheduling_v1alpha3"
+        ],
+        "x-kubernetes-action": "post",
+        "x-kubernetes-group-version-kind": {
+          "group": "scheduling.k8s.io",
+          "kind": "CompositePodGroup",
+          "version": "v1alpha3"
+        }
+      }
+    },
+    "/apis/scheduling.k8s.io/v1alpha3/namespaces/{namespace}/compositepodgroups/{name}": {
+      "delete": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "delete a CompositePodGroup",
+        "operationId": "deleteSchedulingV1alpha3NamespacedCompositePodGroup",
+        "parameters": [
+          {
+            "$ref": "#/parameters/body-2Y1dVQaQ"
+          },
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/gracePeriodSeconds--K5HaBOS"
+          },
+          {
+            "$ref": "#/parameters/ignoreStoreReadErrorWithClusterBreakingPotential-QbNkfIqj"
+          },
+          {
+            "$ref": "#/parameters/orphanDependents-uRB25kX5"
+          },
+          {
+            "$ref": "#/parameters/propagationPolicy-6jk3prlO"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+            }
+          },
+          "202": {
+            "description": "Accepted",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.Status"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "scheduling_v1alpha3"
+        ],
+        "x-kubernetes-action": "delete",
+        "x-kubernetes-group-version-kind": {
+          "group": "scheduling.k8s.io",
+          "kind": "CompositePodGroup",
+          "version": "v1alpha3"
+        }
+      },
+      "get": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "read the specified CompositePodGroup",
+        "operationId": "readSchedulingV1alpha3NamespacedCompositePodGroup",
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroup"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "scheduling_v1alpha3"
+        ],
+        "x-kubernetes-action": "get",
+        "x-kubernetes-group-version-kind": {
+          "group": "scheduling.k8s.io",
+          "kind": "CompositePodGroup",
+          "version": "v1alpha3"
+        }
+      },
+      "parameters": [
+        {
+          "description": "name of the CompositePodGroup",
+          "in": "path",
+          "name": "name",
+          "required": true,
+          "type": "string",
+          "uniqueItems": true
+        },
+        {
+          "$ref": "#/parameters/namespace-vgWSWtn3"
+        },
+        {
+          "$ref": "#/parameters/pretty-tJGM1-ng"
+        }
+      ],
+      "patch": {
+        "consumes": [
+          "application/json-patch+json",
+          "application/merge-patch+json",
+          "application/strategic-merge-patch+json",
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
+        ],
+        "description": "partially update the specified CompositePodGroup",
+        "operationId": "patchSchedulingV1alpha3NamespacedCompositePodGroup",
+        "parameters": [
+          {
+            "$ref": "#/parameters/body-78PwaGsr"
+          },
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/fieldManager-7c6nTn1T"
+          },
+          {
+            "description": "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
+            "in": "query",
+            "name": "fieldValidation",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/force-tOGGb0Yi"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroup"
+            }
+          },
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroup"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "scheduling_v1alpha3"
+        ],
+        "x-kubernetes-action": "patch",
+        "x-kubernetes-group-version-kind": {
+          "group": "scheduling.k8s.io",
+          "kind": "CompositePodGroup",
+          "version": "v1alpha3"
+        }
+      },
+      "put": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "replace the specified CompositePodGroup",
+        "operationId": "replaceSchedulingV1alpha3NamespacedCompositePodGroup",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroup"
+            }
+          },
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/fieldManager-Qy4HdaTW"
+          },
+          {
+            "description": "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
+            "in": "query",
+            "name": "fieldValidation",
+            "type": "string",
+            "uniqueItems": true
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroup"
+            }
+          },
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroup"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "scheduling_v1alpha3"
+        ],
+        "x-kubernetes-action": "put",
+        "x-kubernetes-group-version-kind": {
+          "group": "scheduling.k8s.io",
+          "kind": "CompositePodGroup",
+          "version": "v1alpha3"
+        }
+      }
+    },
+    "/apis/scheduling.k8s.io/v1alpha3/namespaces/{namespace}/compositepodgroups/{name}/status": {
+      "get": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "read status of the specified CompositePodGroup",
+        "operationId": "readSchedulingV1alpha3NamespacedCompositePodGroupStatus",
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroup"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "scheduling_v1alpha3"
+        ],
+        "x-kubernetes-action": "get",
+        "x-kubernetes-group-version-kind": {
+          "group": "scheduling.k8s.io",
+          "kind": "CompositePodGroup",
+          "version": "v1alpha3"
+        }
+      },
+      "parameters": [
+        {
+          "description": "name of the CompositePodGroup",
+          "in": "path",
+          "name": "name",
+          "required": true,
+          "type": "string",
+          "uniqueItems": true
+        },
+        {
+          "$ref": "#/parameters/namespace-vgWSWtn3"
+        },
+        {
+          "$ref": "#/parameters/pretty-tJGM1-ng"
+        }
+      ],
+      "patch": {
+        "consumes": [
+          "application/json-patch+json",
+          "application/merge-patch+json",
+          "application/strategic-merge-patch+json",
+          "application/apply-patch+yaml",
+          "application/apply-patch+cbor"
+        ],
+        "description": "partially update status of the specified CompositePodGroup",
+        "operationId": "patchSchedulingV1alpha3NamespacedCompositePodGroupStatus",
+        "parameters": [
+          {
+            "$ref": "#/parameters/body-78PwaGsr"
+          },
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/fieldManager-7c6nTn1T"
+          },
+          {
+            "description": "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
+            "in": "query",
+            "name": "fieldValidation",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/force-tOGGb0Yi"
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroup"
+            }
+          },
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroup"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "scheduling_v1alpha3"
+        ],
+        "x-kubernetes-action": "patch",
+        "x-kubernetes-group-version-kind": {
+          "group": "scheduling.k8s.io",
+          "kind": "CompositePodGroup",
+          "version": "v1alpha3"
+        }
+      },
+      "put": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "replace status of the specified CompositePodGroup",
+        "operationId": "replaceSchedulingV1alpha3NamespacedCompositePodGroupStatus",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroup"
+            }
+          },
+          {
+            "description": "When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed",
+            "in": "query",
+            "name": "dryRun",
+            "type": "string",
+            "uniqueItems": true
+          },
+          {
+            "$ref": "#/parameters/fieldManager-Qy4HdaTW"
+          },
+          {
+            "description": "fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.",
+            "in": "query",
+            "name": "fieldValidation",
+            "type": "string",
+            "uniqueItems": true
+          }
+        ],
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroup"
+            }
+          },
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.api.scheduling.v1alpha3.CompositePodGroup"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "scheduling_v1alpha3"
+        ],
+        "x-kubernetes-action": "put",
+        "x-kubernetes-group-version-kind": {
+          "group": "scheduling.k8s.io",
+          "kind": "CompositePodGroup",
+          "version": "v1alpha3"
+        }
+      }
+    },
     "/apis/scheduling.k8s.io/v1alpha3/namespaces/{namespace}/podgroups": {
       "delete": {
         "consumes": [
@@ -95509,6 +96553,257 @@
         },
         {
           "$ref": "#/parameters/limit-1NfNmdNH"
+        },
+        {
+          "$ref": "#/parameters/pretty-tJGM1-ng"
+        },
+        {
+          "$ref": "#/parameters/resourceVersion-5WAnf1kx"
+        },
+        {
+          "$ref": "#/parameters/resourceVersionMatch-t8XhRHeC"
+        },
+        {
+          "$ref": "#/parameters/sendInitialEvents-rLXlEK_k"
+        },
+        {
+          "$ref": "#/parameters/shardSelector-Kgyki_3_"
+        },
+        {
+          "$ref": "#/parameters/timeoutSeconds-yvYezaOC"
+        },
+        {
+          "$ref": "#/parameters/watch-XNNPZGbK"
+        }
+      ]
+    },
+    "/apis/scheduling.k8s.io/v1alpha3/watch/compositepodgroups": {
+      "get": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "watch individual changes to a list of CompositePodGroup. deprecated: use the 'watch' parameter with a list operation instead.",
+        "operationId": "watchSchedulingV1alpha3CompositePodGroupListForAllNamespaces",
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor",
+          "application/json;stream=watch",
+          "application/vnd.kubernetes.protobuf;stream=watch",
+          "application/cbor-seq"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "scheduling_v1alpha3"
+        ],
+        "x-kubernetes-action": "watchlist",
+        "x-kubernetes-group-version-kind": {
+          "group": "scheduling.k8s.io",
+          "kind": "CompositePodGroup",
+          "version": "v1alpha3"
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/allowWatchBookmarks-HC2hJt-J"
+        },
+        {
+          "$ref": "#/parameters/continue-QfD61s0i"
+        },
+        {
+          "$ref": "#/parameters/fieldSelector-xIcQKXFG"
+        },
+        {
+          "$ref": "#/parameters/labelSelector-5Zw57w4C"
+        },
+        {
+          "$ref": "#/parameters/limit-1NfNmdNH"
+        },
+        {
+          "$ref": "#/parameters/pretty-tJGM1-ng"
+        },
+        {
+          "$ref": "#/parameters/resourceVersion-5WAnf1kx"
+        },
+        {
+          "$ref": "#/parameters/resourceVersionMatch-t8XhRHeC"
+        },
+        {
+          "$ref": "#/parameters/sendInitialEvents-rLXlEK_k"
+        },
+        {
+          "$ref": "#/parameters/shardSelector-Kgyki_3_"
+        },
+        {
+          "$ref": "#/parameters/timeoutSeconds-yvYezaOC"
+        },
+        {
+          "$ref": "#/parameters/watch-XNNPZGbK"
+        }
+      ]
+    },
+    "/apis/scheduling.k8s.io/v1alpha3/watch/namespaces/{namespace}/compositepodgroups": {
+      "get": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "watch individual changes to a list of CompositePodGroup. deprecated: use the 'watch' parameter with a list operation instead.",
+        "operationId": "watchSchedulingV1alpha3NamespacedCompositePodGroupList",
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor",
+          "application/json;stream=watch",
+          "application/vnd.kubernetes.protobuf;stream=watch",
+          "application/cbor-seq"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "scheduling_v1alpha3"
+        ],
+        "x-kubernetes-action": "watchlist",
+        "x-kubernetes-group-version-kind": {
+          "group": "scheduling.k8s.io",
+          "kind": "CompositePodGroup",
+          "version": "v1alpha3"
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/allowWatchBookmarks-HC2hJt-J"
+        },
+        {
+          "$ref": "#/parameters/continue-QfD61s0i"
+        },
+        {
+          "$ref": "#/parameters/fieldSelector-xIcQKXFG"
+        },
+        {
+          "$ref": "#/parameters/labelSelector-5Zw57w4C"
+        },
+        {
+          "$ref": "#/parameters/limit-1NfNmdNH"
+        },
+        {
+          "$ref": "#/parameters/namespace-vgWSWtn3"
+        },
+        {
+          "$ref": "#/parameters/pretty-tJGM1-ng"
+        },
+        {
+          "$ref": "#/parameters/resourceVersion-5WAnf1kx"
+        },
+        {
+          "$ref": "#/parameters/resourceVersionMatch-t8XhRHeC"
+        },
+        {
+          "$ref": "#/parameters/sendInitialEvents-rLXlEK_k"
+        },
+        {
+          "$ref": "#/parameters/shardSelector-Kgyki_3_"
+        },
+        {
+          "$ref": "#/parameters/timeoutSeconds-yvYezaOC"
+        },
+        {
+          "$ref": "#/parameters/watch-XNNPZGbK"
+        }
+      ]
+    },
+    "/apis/scheduling.k8s.io/v1alpha3/watch/namespaces/{namespace}/compositepodgroups/{name}": {
+      "get": {
+        "consumes": [
+          "*/*"
+        ],
+        "description": "watch changes to an object of kind CompositePodGroup. deprecated: use the 'watch' parameter with a list operation instead, filtered to a single item with the 'fieldSelector' parameter.",
+        "operationId": "watchSchedulingV1alpha3NamespacedCompositePodGroup",
+        "produces": [
+          "application/json",
+          "application/yaml",
+          "application/vnd.kubernetes.protobuf",
+          "application/cbor",
+          "application/json;stream=watch",
+          "application/vnd.kubernetes.protobuf;stream=watch",
+          "application/cbor-seq"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.WatchEvent"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "schemes": [
+          "https"
+        ],
+        "tags": [
+          "scheduling_v1alpha3"
+        ],
+        "x-kubernetes-action": "watch",
+        "x-kubernetes-group-version-kind": {
+          "group": "scheduling.k8s.io",
+          "kind": "CompositePodGroup",
+          "version": "v1alpha3"
+        }
+      },
+      "parameters": [
+        {
+          "$ref": "#/parameters/allowWatchBookmarks-HC2hJt-J"
+        },
+        {
+          "$ref": "#/parameters/continue-QfD61s0i"
+        },
+        {
+          "$ref": "#/parameters/fieldSelector-xIcQKXFG"
+        },
+        {
+          "$ref": "#/parameters/labelSelector-5Zw57w4C"
+        },
+        {
+          "$ref": "#/parameters/limit-1NfNmdNH"
+        },
+        {
+          "description": "name of the CompositePodGroup",
+          "in": "path",
+          "name": "name",
+          "required": true,
+          "type": "string",
+          "uniqueItems": true
+        },
+        {
+          "$ref": "#/parameters/namespace-vgWSWtn3"
         },
         {
           "$ref": "#/parameters/pretty-tJGM1-ng"

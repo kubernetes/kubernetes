@@ -149,6 +149,9 @@ func viewRules() []rbacv1.PolicyRule {
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("workloads", "podgroups", "podgroups/status").RuleOrDie())
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("compositepodgroups", "compositepodgroups/status").RuleOrDie())
+	}
 	return rules
 }
 
@@ -192,6 +195,9 @@ func editRules() []rbacv1.PolicyRule {
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(schedulingGroup).Resources("workloads", "podgroups").RuleOrDie())
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(schedulingGroup).Resources("compositepodgroups").RuleOrDie())
 	}
 	return rules
 }
@@ -666,6 +672,10 @@ func ClusterRoles() []rbacv1.ClusterRole {
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("podgroups").RuleOrDie())
 		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule("patch", "update").Groups(schedulingGroup).Resources("podgroups/status").RuleOrDie())
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("compositepodgroups").RuleOrDie())
+		kubeSchedulerRules = append(kubeSchedulerRules, rbacv1helpers.NewRule("patch", "update").Groups(schedulingGroup).Resources("compositepodgroups/status").RuleOrDie())
 	}
 	roles = append(roles, rbacv1.ClusterRole{
 		// a role to use for the kube-scheduler

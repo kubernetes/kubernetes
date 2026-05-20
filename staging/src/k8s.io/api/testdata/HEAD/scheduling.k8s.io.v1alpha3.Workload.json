@@ -79,6 +79,67 @@
         "priorityClassName": "priorityClassNameValue",
         "priority": 7
       }
+    ],
+    "compositePodGroupTemplates": [
+      {
+        "name": "nameValue",
+        "schedulingPolicy": {
+          "basic": {},
+          "gang": {
+            "minGroupCount": 1
+          }
+        },
+        "schedulingConstraints": {
+          "topology": [
+            {
+              "key": "keyValue"
+            }
+          ]
+        },
+        "disruptionMode": {
+          "single": {},
+          "all": {}
+        },
+        "priorityClassName": "priorityClassNameValue",
+        "priority": 6,
+        "compositePodGroupTemplates": [
+          {
+            "name": "",
+            "schedulingPolicy": {}
+          }
+        ],
+        "podGroupTemplates": [
+          {
+            "name": "nameValue",
+            "schedulingPolicy": {
+              "basic": {},
+              "gang": {
+                "minCount": 1
+              }
+            },
+            "schedulingConstraints": {
+              "topology": [
+                {
+                  "key": "keyValue"
+                }
+              ]
+            },
+            "resourceClaims": [
+              {
+                "name": "nameValue",
+                "resourceClaimName": "resourceClaimNameValue",
+                "resourceClaimTemplateName": "resourceClaimTemplateNameValue"
+              }
+            ],
+            "disruptionMode": {
+              "single": {},
+              "all": {}
+            },
+            "priorityClassName": "priorityClassNameValue",
+            "priority": 7
+          }
+        ]
+      }
     ]
   }
 }

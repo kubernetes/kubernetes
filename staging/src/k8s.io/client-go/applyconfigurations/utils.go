@@ -1842,8 +1842,24 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsschedulingv1.PriorityClassApplyConfiguration{}
 
 		// Group=scheduling.k8s.io, Version=v1alpha3
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositeDisruptionMode"):
+		return &applyconfigurationsschedulingv1alpha3.CompositeDisruptionModeApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositePodGroup"):
+		return &applyconfigurationsschedulingv1alpha3.CompositePodGroupApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositePodGroupSchedulingConstraints"):
+		return &applyconfigurationsschedulingv1alpha3.CompositePodGroupSchedulingConstraintsApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositePodGroupSchedulingPolicy"):
+		return &applyconfigurationsschedulingv1alpha3.CompositePodGroupSchedulingPolicyApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositePodGroupSpec"):
+		return &applyconfigurationsschedulingv1alpha3.CompositePodGroupSpecApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositePodGroupStatus"):
+		return &applyconfigurationsschedulingv1alpha3.CompositePodGroupStatusApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("CompositePodGroupTemplate"):
+		return &applyconfigurationsschedulingv1alpha3.CompositePodGroupTemplateApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("DisruptionMode"):
 		return &applyconfigurationsschedulingv1alpha3.DisruptionModeApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("GangGroupSchedulingPolicy"):
+		return &applyconfigurationsschedulingv1alpha3.GangGroupSchedulingPolicyApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("GangSchedulingPolicy"):
 		return &applyconfigurationsschedulingv1alpha3.GangSchedulingPolicyApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("PodGroup"):
@@ -1862,16 +1878,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsschedulingv1alpha3.PodGroupStatusApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("PodGroupTemplate"):
 		return &applyconfigurationsschedulingv1alpha3.PodGroupTemplateApplyConfiguration{}
-	case schedulingv1alpha3.SchemeGroupVersion.WithKind("PodGroupTemplateReference"):
-		return &applyconfigurationsschedulingv1alpha3.PodGroupTemplateReferenceApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("TopologyConstraint"):
 		return &applyconfigurationsschedulingv1alpha3.TopologyConstraintApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("TypedLocalObjectReference"):
 		return &applyconfigurationsschedulingv1alpha3.TypedLocalObjectReferenceApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("Workload"):
 		return &applyconfigurationsschedulingv1alpha3.WorkloadApplyConfiguration{}
-	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadPodGroupTemplateReference"):
-		return &applyconfigurationsschedulingv1alpha3.WorkloadPodGroupTemplateReferenceApplyConfiguration{}
+	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadReference"):
+		return &applyconfigurationsschedulingv1alpha3.WorkloadReferenceApplyConfiguration{}
 	case schedulingv1alpha3.SchemeGroupVersion.WithKind("WorkloadSpec"):
 		return &applyconfigurationsschedulingv1alpha3.WorkloadSpecApplyConfiguration{}
 

@@ -28,13 +28,288 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "k8s.io/api/scheduling/v1alpha3";
 
+// AllCompositeDisruptionMode specifies that all children can only be disrupted together.
+message AllCompositeDisruptionMode {
+}
+
 // AllDisruptionMode specifies that children can only be disrupted together.
 message AllDisruptionMode {
+}
+
+// BasicGroupSchedulingPolicy defines basic group scheduling policy.
+message BasicGroupSchedulingPolicy {
 }
 
 // BasicSchedulingPolicy indicates that standard Kubernetes
 // scheduling behavior should be used.
 message BasicSchedulingPolicy {
+}
+
+// CompositeDisruptionMode defines the disruption mode for a composite pod group.
+// +union
+message CompositeDisruptionMode {
+  // Single specifies that children can be disrupted independently from each other.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  optional SingleCompositeDisruptionMode single = 1;
+
+  // All specifies that all children can only be disrupted together.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  optional AllCompositeDisruptionMode all = 2;
+}
+
+// CompositePodGroup represents a runtime instance of pod groups grouped together.
+// CompositePodGroups are created by workload controllers (LWS, JobSet, etc...) from
+// Workload.compositePodGroupTemplates.
+// CompositePodGroup API enablement is toggled by the CompositePodGroup feature gate.
+message CompositePodGroup {
+  // Standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  //
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
+
+  // Spec defines the desired state of the CompositePodGroup.
+  //
+  // +required
+  optional CompositePodGroupSpec spec = 2;
+
+  // Status represents the current observed state of the CompositePodGroup.
+  //
+  // +optional
+  optional CompositePodGroupStatus status = 3;
+}
+
+// CompositePodGroupList contains a list of CompositePodGroup resources.
+message CompositePodGroupList {
+  // Standard list metadata.
+  //
+  // +optional
+  optional .k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
+
+  // Items is the list of CompositePodGroups.
+  repeated CompositePodGroup items = 2;
+}
+
+// CompositePodGroupSchedulingConstraints defines scheduling constraints for a composite pod group.
+message CompositePodGroupSchedulingConstraints {
+  // Topology defines the topology constraints for the composite pod group.
+  // Currently only a single topology constraint can be specified. This may change in the future.
+  //
+  // +optional
+  // +listType=atomic
+  // +k8s:optional
+  // +k8s:maxItems=1
+  // +k8s:listType=atomic
+  repeated TopologyConstraint topology = 1;
+}
+
+// CompositePodGroupSchedulingPolicy defines the scheduling policy for a composite pod group.
+// +union
+message CompositePodGroupSchedulingPolicy {
+  // Basic specifies that the groups of this composite group should be scheduled independently.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  optional BasicGroupSchedulingPolicy basic = 1;
+
+  // Gang specifies that the groups of this composite group should be scheduled using
+  // all-or-nothing semantics.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:unionMember
+  optional GangGroupSchedulingPolicy gang = 2;
+}
+
+// CompositePodGroupSpec defines the desired state of CompositePodGroup.
+message CompositePodGroupSpec {
+  // ParentCompositePodGroupName contains the name of the parent composite pod group
+  // within the same namespace as this composite pod group. It must be a DNS name.
+  // If it's nil, then this composite pod group is a root of a workload's hierarchy.
+  // This field is used only when the CompositePodGroup feature gate is enabled.
+  // This field is immutable.
+  //
+  // +optional
+  // +k8s:optional
+  // +k8s:immutable
+  // +k8s:format=k8s-long-name
+  optional string parentCompositePodGroupName = 1;
+
+  // WorkloadRef references an optional CompositePodGroup template within the
+  // Workload object that was used to create the CompositePodGroup.
+  // This field is required.
+  // This field is immutable.
+  //
+  // +required
+  // +k8s:required
+  // +k8s:immutable
+  optional WorkloadReference workloadRef = 2;
+
+  // SchedulingPolicy defines the scheduling policy for this instance of the CompositePodGroup.
+  // Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+  // This field is immutable.
+  //
+  // +required
+  // +k8s:immutable
+  optional CompositePodGroupSchedulingPolicy schedulingPolicy = 3;
+
+  // SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this
+  // CompositePodGroup.
+  // Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+  // This field is immutable.
+  // This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.
+  //
+  // +featureGate=TopologyAwareWorkloadScheduling
+  // +optional
+  // +k8s:ifDisabled(TopologyAwareWorkloadScheduling)=+k8s:forbidden
+  // +k8s:ifEnabled(TopologyAwareWorkloadScheduling)=+k8s:optional
+  // +k8s:ifEnabled(TopologyAwareWorkloadScheduling)=+k8s:immutable
+  optional CompositePodGroupSchedulingConstraints schedulingConstraints = 4;
+
+  // DisruptionMode defines the mode in which a given CompositePodGroup can be disrupted.
+  // Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+  // One of Single, All. Defaults to Single if unset. This field is immutable.
+  //
+  // This field is available only when the WorkloadAwarePreemption feature gate
+  // is enabled.
+  //
+  // +featureGate=WorkloadAwarePreemption
+  // +optional
+  // +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:immutable
+  // +default={"single": {}}
+  optional CompositeDisruptionMode disruptionMode = 5;
+
+  // PriorityClassName defines the priority that should be considered when scheduling this CompositePodGroup.
+  // Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+  // If left unspecified, it is validated and resolved similarly to the PriorityClassName field in Pods
+  // (i.e. if no priority class is specified, admission control can set this to the global default
+  // priority class if it exists. Otherwise, the composite pod group's priority will be zero).
+  // This field is immutable.
+  // This field is available only when the WorkloadAwarePreemption feature gate
+  // is enabled.
+  //
+  // +featureGate=WorkloadAwarePreemption
+  // +optional
+  // +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:format=k8s-long-name
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:immutable
+  optional string priorityClassName = 6;
+
+  // Priority is the value of priority of this composite pod group. Various system components
+  // use this field to find the priority of the composite pod group. When Priority Admission
+  // Controller is enabled, it prevents users from setting this field. The admission
+  // controller populates this field from PriorityClassName.
+  // The higher the value, the higher the priority.
+  // This field is immutable.
+  // This field is available only when the WorkloadAwarePreemption feature gate
+  // is enabled.
+  //
+  // +featureGate=WorkloadAwarePreemption
+  // +optional
+  // +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:immutable
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:maximum=1000000000 # HighestUserDefinablePriority
+  optional int32 priority = 7;
+}
+
+// CompositePodGroupStatus defines the observed state of CompositePodGroup.
+message CompositePodGroupStatus {
+  // Conditions represent the latest observations of the CompositePodGroup's state.
+  //
+  // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
+  repeated .k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 1;
+}
+
+// CompositePodGroupTemplate represents a template for a CompositePodGroup with a scheduling policy.
+message CompositePodGroupTemplate {
+  // Name is a unique identifier for the CompositePodGroupTemplate within the Workload.
+  // It must be a DNS label. This field is required.
+  // This field is immutable.
+  //
+  // +required
+  // +k8s:required
+  // +k8s:format=k8s-short-name
+  optional string name = 1;
+
+  // SchedulingPolicy defines the scheduling policy for this template.
+  // +required
+  // +k8s:immutable
+  optional CompositePodGroupSchedulingPolicy schedulingPolicy = 2;
+
+  // SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this template.
+  // +featureGate=TopologyAwareWorkloadScheduling
+  // +optional
+  // +k8s:ifDisabled(TopologyAwareWorkloadScheduling)=+k8s:forbidden
+  // +k8s:ifEnabled(TopologyAwareWorkloadScheduling)=+k8s:optional
+  // +k8s:ifEnabled(TopologyAwareWorkloadScheduling)=+k8s:immutable
+  optional CompositePodGroupSchedulingConstraints schedulingConstraints = 3;
+
+  // DisruptionMode defines the mode in which a given CompositePodGroup can be disrupted.
+  // +featureGate=WorkloadAwarePreemption
+  // +optional
+  // +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:immutable
+  // +default={"single": {}}
+  optional CompositeDisruptionMode disruptionMode = 4;
+
+  // PriorityClassName defines the priority that should be considered when scheduling this template.
+  // +featureGate=WorkloadAwarePreemption
+  // +optional
+  // +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:format=k8s-long-name
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:immutable
+  optional string priorityClassName = 5;
+
+  // Priority is the value of priority of this template.
+  // +featureGate=WorkloadAwarePreemption
+  // +optional
+  // +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:immutable
+  optional int32 priority = 6;
+
+  // CompositePodGroupTemplates is the list of templates for children CompositePodGroups.
+  // The maximum number of templates is 8. This field is immutable.
+  //
+  // +optional
+  // +listType=map
+  // +listMapKey=name
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=name
+  // +k8s:maxItems=8
+  // +k8s:immutable
+  repeated CompositePodGroupTemplate compositePodGroupTemplates = 7;
+
+  // PodGroupTemplates is the list of templates for children PodGroups.
+  // The maximum number of templates is 8. This field is immutable.
+  //
+  // +optional
+  // +listType=map
+  // +listMapKey=name
+  // +k8s:optional
+  // +k8s:listType=map
+  // +k8s:listMapKey=name
+  // +k8s:maxItems=8
+  // +k8s:immutable
+  repeated PodGroupTemplate podGroupTemplates = 8;
 }
 
 // DisruptionMode defines how individual entities within a group can be disrupted.
@@ -55,6 +330,18 @@ message DisruptionMode {
   // +k8s:optional
   // +k8s:unionMember
   optional AllDisruptionMode all = 2;
+}
+
+// GangGroupSchedulingPolicy defines gang group scheduling policy.
+message GangGroupSchedulingPolicy {
+  // MinGroupCount is the minimum number of child groups that must be schedulable
+  // or scheduled at the same time for the scheduler to admit the entire group.
+  // It must be a positive integer.
+  //
+  // +required
+  // +k8s:required
+  // +k8s:minimum=1
+  optional int32 minGroupCount = 1;
 }
 
 // GangSchedulingPolicy defines the parameters for gang scheduling.
@@ -213,13 +500,14 @@ message PodGroupSchedulingPolicy {
 
 // PodGroupSpec defines the desired state of a PodGroup.
 message PodGroupSpec {
-  // PodGroupTemplateRef references an optional PodGroup template within other object
-  // (e.g. Workload) that was used to create the PodGroup. This field is immutable.
+  // WorkloadRef references an optional PodGroup template within the Workload
+  // object that was used to create the PodGroup.
+  // This field is immutable.
   //
   // +optional
   // +k8s:optional
   // +k8s:immutable
-  optional PodGroupTemplateReference podGroupTemplateRef = 1;
+  optional WorkloadReference workloadRef = 1;
 
   // SchedulingPolicy defines the scheduling policy for this instance of the PodGroup.
   // Controllers are expected to fill this field by copying it from a PodGroupTemplate.
@@ -313,6 +601,21 @@ message PodGroupSpec {
   // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:immutable
   // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:maximum=1000000000 # HighestUserDefinablePriority
   optional int32 priority = 7;
+
+  // ParentCompositePodGroupName contains the name of the parent composite pod group
+  // within the same namespace as this pod group.
+  // If it's nil, then this pod group is a root of a workload's hierarchy.
+  // This field is used only when the CompositePodGroup feature gate is enabled.
+  // This field is immutable.
+  //
+  // +featureGate=CompositePodGroup
+  // +optional
+  // +k8s:ifDisabled(CompositePodGroup)=+k8s:forbidden
+  // +k8s:ifEnabled(CompositePodGroup)=+k8s:optional
+  // +k8s:ifEnabled(CompositePodGroup)=+k8s:immutable
+  // +k8s:ifEnabled(CompositePodGroup)=+k8s:format=k8s-long-name
+  // +k8s:ifEnabled(CompositePodGroup)=+k8s:dependentRequired("workloadRef")
+  optional string parentCompositePodGroupName = 8;
 }
 
 // PodGroupStatus represents information about the status of a pod group.
@@ -456,6 +759,10 @@ message PodGroupTemplateReference {
   optional WorkloadPodGroupTemplateReference workload = 1;
 }
 
+// SingleCompositeDisruptionMode specifies that children can be disrupted independently.
+message SingleCompositeDisruptionMode {
+}
+
 // SingleDisruptionMode specifies that children can be disrupted independently.
 message SingleDisruptionMode {
 }
@@ -547,6 +854,32 @@ message WorkloadPodGroupTemplateReference {
   optional string podGroupTemplateName = 2;
 }
 
+// WorkloadReference references a Workload object.
+message WorkloadReference {
+  // WorkloadName is the name of the Workload object that contains a template
+  // that was used when creating a pod group or a composite pod group. It must
+  // be a DNS name.
+  // This field is immutable.
+  // This field is required.
+  //
+  // +required
+  // +k8s:required
+  // +k8s:immutable
+  // +k8s:format=k8s-long-name
+  optional string workloadName = 1;
+
+  // TemplateName is the name of a template within the Workload object that
+  // was used to create a pod group or a composite pod group. It must be a DNS label.
+  // This field is immutable.
+  // This field is required.
+  //
+  // +required
+  // +k8s:required
+  // +k8s:immutable
+  // +k8s:format=k8s-short-name
+  optional string templateName = 2;
+}
+
 // WorkloadSpec defines the desired state of a Workload.
 message WorkloadSpec {
   // ControllerRef is an optional reference to the controlling object, such as a
@@ -561,15 +894,36 @@ message WorkloadSpec {
 
   // PodGroupTemplates is the list of templates that make up the Workload.
   // The maximum number of templates is 8. This field is immutable.
+  // Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.
   //
-  // +required
+  // +optional
   // +listType=map
   // +listMapKey=name
-  // +k8s:required
+  // +k8s:optional
+  // +k8s:unionMember
   // +k8s:listType=map
   // +k8s:listMapKey=name
   // +k8s:maxItems=8
   // +k8s:immutable
   repeated PodGroupTemplate podGroupTemplates = 2;
+
+  // CompositePodGroupTemplates is the list of CompositePodGroup templates that make up the Workload.
+  // The maximum number of templates is 8. This field is immutable.
+  // Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.
+  //
+  // This field is used only when the CompositePodGroup feature gate is enabled.
+  //
+  // +featureGate=CompositePodGroup
+  // +optional
+  // +listType=map
+  // +listMapKey=name
+  // +k8s:ifDisabled("CompositePodGroup")=+k8s:forbidden
+  // +k8s:ifEnabled("CompositePodGroup")=+k8s:optional
+  // +k8s:ifEnabled("CompositePodGroup")=+k8s:unionMember
+  // +k8s:ifEnabled("CompositePodGroup")=+k8s:listType=map
+  // +k8s:ifEnabled("CompositePodGroup")=+k8s:listMapKey=name
+  // +k8s:ifEnabled("CompositePodGroup")=+k8s:maxItems=8
+  // +k8s:ifEnabled("CompositePodGroup")=+k8s:immutable
+  repeated CompositePodGroupTemplate compositePodGroupTemplates = 3;
 }
 

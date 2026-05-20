@@ -1,0 +1,58 @@
+Go version: go version go1.26.3 linux/amd64
+Usage of sort:
+      --sort-file string   file of metrics to sort
+unknown shorthand flag: 'u' in -u
+!!! [0519 21:33:55] Call tree:
+!!! [0519 21:33:55]  1: /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/hack/lib/golang.sh:976 kube::golang::dedup(...)
+!!! [0519 21:33:55]  2: hack/make-rules/build.sh:28 kube::golang::build_binaries(...)
+!!! Error in /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/hack/lib/golang.sh:161
+  Error in /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/hack/lib/golang.sh:161. 'sort -u' exited with status 0 2
+Call stack:
+  1: /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/hack/lib/golang.sh:161 kube::golang::dedup(...)
+  2: /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/hack/lib/golang.sh:976 kube::golang::build_binaries(...)
+  3: hack/make-rules/build.sh:28 main(...)
+Exiting with status 1
+Usage of sort:
+      --sort-file string   file of metrics to sort
+unknown shorthand flag: 'u' in -u
+!!! [0519 21:33:55] Call tree:
+!!! [0519 21:33:55]  1: /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/hack/lib/golang.sh:443 kube::golang::dedup(...)
+!!! [0519 21:33:55]  2: /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/hack/lib/golang.sh:979 kube::golang::normalize_go_targets(...)
+!!! [0519 21:33:55]  3: hack/make-rules/build.sh:28 kube::golang::build_binaries(...)
+!!! Error in /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/hack/lib/golang.sh:161
+  Error in /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/hack/lib/golang.sh:161. 'sort -u' exited with status 0 2
+Call stack:
+  1: /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/hack/lib/golang.sh:161 kube::golang::dedup(...)
+  2: /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/hack/lib/golang.sh:443 kube::golang::normalize_go_targets(...)
+  3: /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/hack/lib/golang.sh:979 kube::golang::build_binaries(...)
+  4: hack/make-rules/build.sh:28 main(...)
+Exiting with status 1
+Usage of sort:
+      --sort-file string   file of metrics to sort
+unknown shorthand flag: 'u' in -u
+!!! [0519 21:33:55] Call tree:
+!!! [0519 21:33:55]  1: /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/hack/lib/golang.sh:980 kube::golang::dedup(...)
+!!! [0519 21:33:55]  2: hack/make-rules/build.sh:28 kube::golang::build_binaries(...)
+!!! Error in /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/hack/lib/golang.sh:161
+  Error in /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/hack/lib/golang.sh:161. 'sort -u' exited with status 0 2
+Call stack:
+  1: /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/hack/lib/golang.sh:161 kube::golang::dedup(...)
+  2: /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/hack/lib/golang.sh:980 kube::golang::build_binaries(...)
+  3: hack/make-rules/build.sh:28 main(...)
+Exiting with status 1
++++ [0519 21:33:55] Building go targets for linux/amd64
+Env for linux/amd64: GOPATH=/usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/_output/local/go GOOS=linux GOARCH=amd64 GOROOT= CGO_ENABLED= CC=
+Building binaries with GCFLAGS= LDFLAGS=all=-X 'k8s.io/client-go/pkg/version.buildDate=2026-05-19T21:33:55Z' -X 'k8s.io/component-base/version.buildDate=2026-05-19T21:33:55Z' -X 'k8s.io/client-go/pkg/version.gitCommit=ec2b79194d39303cc8eaf3a95bea24619aee2d16' -X 'k8s.io/component-base/version.gitCommit=ec2b79194d39303cc8eaf3a95bea24619aee2d16' -X 'k8s.io/client-go/pkg/version.gitTreeState=dirty' -X 'k8s.io/component-base/version.gitTreeState=dirty' -X 'k8s.io/client-go/pkg/version.gitVersion=v1.37.0-alpha.0.979+ec2b79194d3930-dirty' -X 'k8s.io/component-base/version.gitVersion=v1.37.0-alpha.0.979+ec2b79194d3930-dirty' -X 'k8s.io/client-go/pkg/version.gitMajor=1' -X 'k8s.io/component-base/version.gitMajor=1' -X 'k8s.io/client-go/pkg/version.gitMinor=37+' -X 'k8s.io/component-base/version.gitMinor=37+' -dumpdep -s -w and -tags=selinux,notest,grpcnotrace,
++++ [0519 21:33:55] Placing binaries
++++ [0519 21:33:55] Creating /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/_output/bin symlink for non-dockerized build
++++ [0519 21:33:55] Placing binaries for linux/amd64 in /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/_output/local/bin/linux/amd64
++++ [0519 21:33:58] Placing binaries for linux/386 in /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/_output/local/bin/linux/386
++++ [0519 21:33:58] Placing binaries for linux/arm in /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/_output/local/bin/linux/arm
++++ [0519 21:33:58] Placing binaries for linux/arm64 in /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/_output/local/bin/linux/arm64
++++ [0519 21:33:58] Placing binaries for linux/s390x in /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/_output/local/bin/linux/s390x
++++ [0519 21:33:58] Placing binaries for linux/ppc64le in /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/_output/local/bin/linux/ppc64le
++++ [0519 21:33:58] Placing binaries for darwin/amd64 in /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/_output/local/bin/darwin/amd64
++++ [0519 21:33:58] Placing binaries for darwin/arm64 in /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/_output/local/bin/darwin/arm64
++++ [0519 21:33:58] Placing binaries for windows/amd64 in /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/_output/local/bin/windows/amd64
++++ [0519 21:33:58] Placing binaries for windows/386 in /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/_output/local/bin/windows/386
++++ [0519 21:33:58] Placing binaries for windows/arm64 in /usr/local/google/home/jdzikowski/gke-internal-kubernetes/src/k8s.io/k8s/_output/local/bin/windows/arm64

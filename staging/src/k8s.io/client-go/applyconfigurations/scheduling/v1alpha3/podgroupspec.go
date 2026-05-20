@@ -23,9 +23,10 @@ package v1alpha3
 //
 // PodGroupSpec defines the desired state of a PodGroup.
 type PodGroupSpecApplyConfiguration struct {
-	// PodGroupTemplateRef references an optional PodGroup template within other object
-	// (e.g. Workload) that was used to create the PodGroup. This field is immutable.
-	PodGroupTemplateRef *PodGroupTemplateReferenceApplyConfiguration `json:"podGroupTemplateRef,omitempty"`
+	// WorkloadRef references an optional PodGroup template within the Workload
+	// object that was used to create the PodGroup.
+	// This field is immutable.
+	WorkloadRef *WorkloadReferenceApplyConfiguration `json:"workloadRef,omitempty"`
 	// SchedulingPolicy defines the scheduling policy for this instance of the PodGroup.
 	// Controllers are expected to fill this field by copying it from a PodGroupTemplate.
 	// This field is immutable.
@@ -71,6 +72,12 @@ type PodGroupSpecApplyConfiguration struct {
 	// This field is available only when the WorkloadAwarePreemption feature gate
 	// is enabled.
 	Priority *int32 `json:"priority,omitempty"`
+	// ParentCompositePodGroupName contains the name of the parent composite pod group
+	// within the same namespace as this pod group.
+	// If it's nil, then this pod group is a root of a workload's hierarchy.
+	// This field is used only when the CompositePodGroup feature gate is enabled.
+	// This field is immutable.
+	ParentCompositePodGroupName *string `json:"parentCompositePodGroupName,omitempty"`
 }
 
 // PodGroupSpecApplyConfiguration constructs a declarative configuration of the PodGroupSpec type for use with
@@ -79,11 +86,11 @@ func PodGroupSpec() *PodGroupSpecApplyConfiguration {
 	return &PodGroupSpecApplyConfiguration{}
 }
 
-// WithPodGroupTemplateRef sets the PodGroupTemplateRef field in the declarative configuration to the given value
+// WithWorkloadRef sets the WorkloadRef field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the PodGroupTemplateRef field is set to the value of the last call.
-func (b *PodGroupSpecApplyConfiguration) WithPodGroupTemplateRef(value *PodGroupTemplateReferenceApplyConfiguration) *PodGroupSpecApplyConfiguration {
-	b.PodGroupTemplateRef = value
+// If called multiple times, the WorkloadRef field is set to the value of the last call.
+func (b *PodGroupSpecApplyConfiguration) WithWorkloadRef(value *WorkloadReferenceApplyConfiguration) *PodGroupSpecApplyConfiguration {
+	b.WorkloadRef = value
 	return b
 }
 
@@ -137,5 +144,13 @@ func (b *PodGroupSpecApplyConfiguration) WithPriorityClassName(value string) *Po
 // If called multiple times, the Priority field is set to the value of the last call.
 func (b *PodGroupSpecApplyConfiguration) WithPriority(value int32) *PodGroupSpecApplyConfiguration {
 	b.Priority = &value
+	return b
+}
+
+// WithParentCompositePodGroupName sets the ParentCompositePodGroupName field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the ParentCompositePodGroupName field is set to the value of the last call.
+func (b *PodGroupSpecApplyConfiguration) WithParentCompositePodGroupName(value string) *PodGroupSpecApplyConfiguration {
+	b.ParentCompositePodGroupName = &value
 	return b
 }

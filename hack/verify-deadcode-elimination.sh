@@ -18,12 +18,13 @@
 # various components we care about, such as kube-apiserver, kubelet and others
 # Usage: `hack/verify-deadcode-elimination.sh`.
 
-set -o errexit
 set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
+
+set -o errexit
 
 kube::golang::setup_env
 
@@ -46,7 +47,17 @@ FAILED_BINARIES=()
 
 for binary in "${BINARIES[@]}"; do
   echo "Processing ${binary} ..."
-  output=$(KUBE_VERBOSE=4 GOLDFLAGS=-dumpdep make "${binary}" 2>&1 | grep "\->" | ${WHYDEADCODE_BIN} 2>&1)
+  KUBE_VERBOSE=4 GOLDFLAGS=-dumpdep make "${binary}" > make_output.txt 2>&1
+  make_status=$?
+  echo "Make returned ${make_status} for ${binary}"
+  if [[ ${make_status} -ne 0 ]]; then
+    echo "Make failed! Content of make_output.txt:"
+    cat make_output.txt
+    FAILED=true
+    FAILED_BINARIES+=("${binary}")
+    continue
+  fi
+  output=$( { grep "\->" make_output.txt || true; } | ${WHYDEADCODE_BIN} 2>&1)
   if [[ -n "$output" ]]; then
     echo "golang linker is not eliminating dead code in ${binary}, please check the trace output below:"
     echo "(NOTE: that there may be false positives, but the first trace should be a real issue)"
@@ -57,7 +68,7 @@ for binary in "${BINARIES[@]}"; do
   
   # Find the binary and print its size
   echo "Finding ${binary} binary and checking its size:"
-  binary_paths=$(find _output -type f -name "${binary}" | sort)
+  binary_paths=$(find _output -type f -name "${binary}" | /usr/bin/sort)
   if [[ -n "${binary_paths}" ]]; then
     # shellcheck disable=SC2086
     ls -altrh ${binary_paths}

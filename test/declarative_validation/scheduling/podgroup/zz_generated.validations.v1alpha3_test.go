@@ -36,17 +36,10 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "union"},
 				{ErrorType: "FieldValueRequired"},
 			},
-			"spec.podGroupTemplateRef": {
-				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
-				{ErrorType: "FieldValueInvalid", Origin: "union"},
-			},
-			"spec.podGroupTemplateRef.workload.podGroupTemplateName": {
-				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-short-name"},
-				{ErrorType: "FieldValueRequired"},
-			},
-			"spec.podGroupTemplateRef.workload.workloadName": {
+			"spec.parentCompositePodGroupName": {
+				{ErrorType: "FieldValueForbidden"},
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
-				{ErrorType: "FieldValueRequired"},
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 			},
 			"spec.priority": {
 				{ErrorType: "FieldValueForbidden"},
@@ -93,6 +86,20 @@ func init() {
 			},
 			"spec.schedulingPolicy.gang.minCount": {
 				{ErrorType: "FieldValueInvalid", Origin: "minimum"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.workloadRef": {
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+				{ErrorType: "FieldValueRequired", Origin: "dependentRequired"},
+			},
+			"spec.workloadRef.templateName": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-short-name"},
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
+				{ErrorType: "FieldValueRequired"},
+			},
+			"spec.workloadRef.workloadName": {
+				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-long-name"},
+				{ErrorType: "FieldValueInvalid", Origin: "immutable"},
 				{ErrorType: "FieldValueRequired"},
 			},
 			"status.resourceClaimStatuses": {

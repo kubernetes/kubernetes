@@ -1140,9 +1140,20 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		resourcev1beta2.ResourceSliceSpec{}.OpenAPIModelName():                                                          schema_k8sio_api_resource_v1beta2_ResourceSliceSpec(ref),
 		schedulingv1.PriorityClass{}.OpenAPIModelName():                                                                 schema_k8sio_api_scheduling_v1_PriorityClass(ref),
 		schedulingv1.PriorityClassList{}.OpenAPIModelName():                                                             schema_k8sio_api_scheduling_v1_PriorityClassList(ref),
+		schedulingv1alpha3.AllCompositeDisruptionMode{}.OpenAPIModelName():                                              schema_k8sio_api_scheduling_v1alpha3_AllCompositeDisruptionMode(ref),
 		schedulingv1alpha3.AllDisruptionMode{}.OpenAPIModelName():                                                       schema_k8sio_api_scheduling_v1alpha3_AllDisruptionMode(ref),
+		schedulingv1alpha3.BasicGroupSchedulingPolicy{}.OpenAPIModelName():                                              schema_k8sio_api_scheduling_v1alpha3_BasicGroupSchedulingPolicy(ref),
 		schedulingv1alpha3.BasicSchedulingPolicy{}.OpenAPIModelName():                                                   schema_k8sio_api_scheduling_v1alpha3_BasicSchedulingPolicy(ref),
+		schedulingv1alpha3.CompositeDisruptionMode{}.OpenAPIModelName():                                                 schema_k8sio_api_scheduling_v1alpha3_CompositeDisruptionMode(ref),
+		schedulingv1alpha3.CompositePodGroup{}.OpenAPIModelName():                                                       schema_k8sio_api_scheduling_v1alpha3_CompositePodGroup(ref),
+		schedulingv1alpha3.CompositePodGroupList{}.OpenAPIModelName():                                                   schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupList(ref),
+		schedulingv1alpha3.CompositePodGroupSchedulingConstraints{}.OpenAPIModelName():                                  schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupSchedulingConstraints(ref),
+		schedulingv1alpha3.CompositePodGroupSchedulingPolicy{}.OpenAPIModelName():                                       schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupSchedulingPolicy(ref),
+		schedulingv1alpha3.CompositePodGroupSpec{}.OpenAPIModelName():                                                   schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupSpec(ref),
+		schedulingv1alpha3.CompositePodGroupStatus{}.OpenAPIModelName():                                                 schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupStatus(ref),
+		schedulingv1alpha3.CompositePodGroupTemplate{}.OpenAPIModelName():                                               schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupTemplate(ref),
 		schedulingv1alpha3.DisruptionMode{}.OpenAPIModelName():                                                          schema_k8sio_api_scheduling_v1alpha3_DisruptionMode(ref),
+		schedulingv1alpha3.GangGroupSchedulingPolicy{}.OpenAPIModelName():                                               schema_k8sio_api_scheduling_v1alpha3_GangGroupSchedulingPolicy(ref),
 		schedulingv1alpha3.GangSchedulingPolicy{}.OpenAPIModelName():                                                    schema_k8sio_api_scheduling_v1alpha3_GangSchedulingPolicy(ref),
 		schedulingv1alpha3.PodGroup{}.OpenAPIModelName():                                                                schema_k8sio_api_scheduling_v1alpha3_PodGroup(ref),
 		schedulingv1alpha3.PodGroupList{}.OpenAPIModelName():                                                            schema_k8sio_api_scheduling_v1alpha3_PodGroupList(ref),
@@ -1154,12 +1165,14 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		schedulingv1alpha3.PodGroupStatus{}.OpenAPIModelName():                                                          schema_k8sio_api_scheduling_v1alpha3_PodGroupStatus(ref),
 		schedulingv1alpha3.PodGroupTemplate{}.OpenAPIModelName():                                                        schema_k8sio_api_scheduling_v1alpha3_PodGroupTemplate(ref),
 		schedulingv1alpha3.PodGroupTemplateReference{}.OpenAPIModelName():                                               schema_k8sio_api_scheduling_v1alpha3_PodGroupTemplateReference(ref),
+		schedulingv1alpha3.SingleCompositeDisruptionMode{}.OpenAPIModelName():                                           schema_k8sio_api_scheduling_v1alpha3_SingleCompositeDisruptionMode(ref),
 		schedulingv1alpha3.SingleDisruptionMode{}.OpenAPIModelName():                                                    schema_k8sio_api_scheduling_v1alpha3_SingleDisruptionMode(ref),
 		schedulingv1alpha3.TopologyConstraint{}.OpenAPIModelName():                                                      schema_k8sio_api_scheduling_v1alpha3_TopologyConstraint(ref),
 		schedulingv1alpha3.TypedLocalObjectReference{}.OpenAPIModelName():                                               schema_k8sio_api_scheduling_v1alpha3_TypedLocalObjectReference(ref),
 		schedulingv1alpha3.Workload{}.OpenAPIModelName():                                                                schema_k8sio_api_scheduling_v1alpha3_Workload(ref),
 		schedulingv1alpha3.WorkloadList{}.OpenAPIModelName():                                                            schema_k8sio_api_scheduling_v1alpha3_WorkloadList(ref),
 		schedulingv1alpha3.WorkloadPodGroupTemplateReference{}.OpenAPIModelName():                                       schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupTemplateReference(ref),
+		schedulingv1alpha3.WorkloadReference{}.OpenAPIModelName():                                                       schema_k8sio_api_scheduling_v1alpha3_WorkloadReference(ref),
 		schedulingv1alpha3.WorkloadSpec{}.OpenAPIModelName():                                                            schema_k8sio_api_scheduling_v1alpha3_WorkloadSpec(ref),
 		schedulingv1beta1.PriorityClass{}.OpenAPIModelName():                                                            schema_k8sio_api_scheduling_v1beta1_PriorityClass(ref),
 		schedulingv1beta1.PriorityClassList{}.OpenAPIModelName():                                                        schema_k8sio_api_scheduling_v1beta1_PriorityClassList(ref),
@@ -53917,11 +53930,33 @@ func schema_k8sio_api_scheduling_v1_PriorityClassList(ref common.ReferenceCallba
 	}
 }
 
+func schema_k8sio_api_scheduling_v1alpha3_AllCompositeDisruptionMode(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AllCompositeDisruptionMode specifies that all children can only be disrupted together.",
+				Type:        []string{"object"},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_scheduling_v1alpha3_AllDisruptionMode(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "AllDisruptionMode specifies that children can only be disrupted together.",
+				Type:        []string{"object"},
+			},
+		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_BasicGroupSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "BasicGroupSchedulingPolicy defines basic group scheduling policy.",
 				Type:        []string{"object"},
 			},
 		},
@@ -53936,6 +53971,419 @@ func schema_k8sio_api_scheduling_v1alpha3_BasicSchedulingPolicy(ref common.Refer
 				Type:        []string{"object"},
 			},
 		},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_CompositeDisruptionMode(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CompositeDisruptionMode defines the disruption mode for a composite pod group.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"single": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Single specifies that children can be disrupted independently from each other.",
+							Ref:         ref(schedulingv1alpha3.SingleCompositeDisruptionMode{}.OpenAPIModelName()),
+						},
+					},
+					"all": {
+						SchemaProps: spec.SchemaProps{
+							Description: "All specifies that all children can only be disrupted together.",
+							Ref:         ref(schedulingv1alpha3.AllCompositeDisruptionMode{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-unions": []interface{}{
+						map[string]interface{}{
+							"fields-to-discriminateBy": map[string]interface{}{
+								"all":    "All",
+								"single": "Single",
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha3.AllCompositeDisruptionMode{}.OpenAPIModelName(), schedulingv1alpha3.SingleCompositeDisruptionMode{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroup(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CompositePodGroup represents a runtime instance of pod groups grouped together. CompositePodGroups are created by workload controllers (LWS, JobSet, etc...) from Workload.compositePodGroupTemplates. CompositePodGroup API enablement is toggled by the CompositePodGroup feature gate.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec defines the desired state of the CompositePodGroup.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(schedulingv1alpha3.CompositePodGroupSpec{}.OpenAPIModelName()),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Status represents the current observed state of the CompositePodGroup.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(schedulingv1alpha3.CompositePodGroupStatus{}.OpenAPIModelName()),
+						},
+					},
+				},
+				Required: []string{"spec"},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha3.CompositePodGroupSpec{}.OpenAPIModelName(), schedulingv1alpha3.CompositePodGroupStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CompositePodGroupList contains a list of CompositePodGroup resources.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard list metadata.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Items is the list of CompositePodGroups.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(schedulingv1alpha3.CompositePodGroup{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"items"},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha3.CompositePodGroup{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupSchedulingConstraints(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CompositePodGroupSchedulingConstraints defines scheduling constraints for a composite pod group.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"topology": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "atomic",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Topology defines the topology constraints for the composite pod group. Currently only a single topology constraint can be specified. This may change in the future.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(schedulingv1alpha3.TopologyConstraint{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha3.TopologyConstraint{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CompositePodGroupSchedulingPolicy defines the scheduling policy for a composite pod group.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"basic": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Basic specifies that the groups of this composite group should be scheduled independently.",
+							Ref:         ref(schedulingv1alpha3.BasicGroupSchedulingPolicy{}.OpenAPIModelName()),
+						},
+					},
+					"gang": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Gang specifies that the groups of this composite group should be scheduled using all-or-nothing semantics.",
+							Ref:         ref(schedulingv1alpha3.GangGroupSchedulingPolicy{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
+					"x-kubernetes-unions": []interface{}{
+						map[string]interface{}{
+							"fields-to-discriminateBy": map[string]interface{}{
+								"basic": "Basic",
+								"gang":  "Gang",
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha3.BasicGroupSchedulingPolicy{}.OpenAPIModelName(), schedulingv1alpha3.GangGroupSchedulingPolicy{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CompositePodGroupSpec defines the desired state of CompositePodGroup.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"parentCompositePodGroupName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ParentCompositePodGroupName contains the name of the parent composite pod group within the same namespace as this composite pod group. It must be a DNS name. If it's nil, then this composite pod group is a root of a workload's hierarchy. This field is used only when the CompositePodGroup feature gate is enabled. This field is immutable.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"workloadRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "WorkloadRef references an optional CompositePodGroup template within the Workload object that was used to create the CompositePodGroup. This field is required. This field is immutable.",
+							Ref:         ref(schedulingv1alpha3.WorkloadReference{}.OpenAPIModelName()),
+						},
+					},
+					"schedulingPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SchedulingPolicy defines the scheduling policy for this instance of the CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. This field is immutable.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(schedulingv1alpha3.CompositePodGroupSchedulingPolicy{}.OpenAPIModelName()),
+						},
+					},
+					"schedulingConstraints": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. This field is immutable. This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.",
+							Ref:         ref(schedulingv1alpha3.CompositePodGroupSchedulingConstraints{}.OpenAPIModelName()),
+						},
+					},
+					"disruptionMode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DisruptionMode defines the mode in which a given CompositePodGroup can be disrupted. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. One of Single, All. Defaults to Single if unset. This field is immutable.\n\nThis field is available only when the WorkloadAwarePreemption feature gate is enabled.",
+							Default:     map[string]interface{}{"single": map[string]interface{}{}},
+							Ref:         ref(schedulingv1alpha3.CompositeDisruptionMode{}.OpenAPIModelName()),
+						},
+					},
+					"priorityClassName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PriorityClassName defines the priority that should be considered when scheduling this CompositePodGroup. Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate. If left unspecified, it is validated and resolved similarly to the PriorityClassName field in Pods (i.e. if no priority class is specified, admission control can set this to the global default priority class if it exists. Otherwise, the composite pod group's priority will be zero). This field is immutable. This field is available only when the WorkloadAwarePreemption feature gate is enabled.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"priority": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Priority is the value of priority of this composite pod group. Various system components use this field to find the priority of the composite pod group. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority. This field is immutable. This field is available only when the WorkloadAwarePreemption feature gate is enabled.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+				Required: []string{"workloadRef", "schedulingPolicy"},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha3.CompositeDisruptionMode{}.OpenAPIModelName(), schedulingv1alpha3.CompositePodGroupSchedulingConstraints{}.OpenAPIModelName(), schedulingv1alpha3.CompositePodGroupSchedulingPolicy{}.OpenAPIModelName(), schedulingv1alpha3.WorkloadReference{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CompositePodGroupStatus defines the observed state of CompositePodGroup.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"conditions": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"type",
+								},
+								"x-kubernetes-list-type":       "map",
+								"x-kubernetes-patch-merge-key": "type",
+								"x-kubernetes-patch-strategy":  "merge",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "Conditions represent the latest observations of the CompositePodGroup's state.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(metav1.Condition{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			metav1.Condition{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_CompositePodGroupTemplate(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CompositePodGroupTemplate represents a template for a CompositePodGroup with a scheduling policy.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"name": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Name is a unique identifier for the CompositePodGroupTemplate within the Workload. It must be a DNS label. This field is required. This field is immutable.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"schedulingPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SchedulingPolicy defines the scheduling policy for this template.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(schedulingv1alpha3.CompositePodGroupSchedulingPolicy{}.OpenAPIModelName()),
+						},
+					},
+					"schedulingConstraints": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this template.",
+							Ref:         ref(schedulingv1alpha3.CompositePodGroupSchedulingConstraints{}.OpenAPIModelName()),
+						},
+					},
+					"disruptionMode": {
+						SchemaProps: spec.SchemaProps{
+							Description: "DisruptionMode defines the mode in which a given CompositePodGroup can be disrupted.",
+							Default:     map[string]interface{}{"single": map[string]interface{}{}},
+							Ref:         ref(schedulingv1alpha3.CompositeDisruptionMode{}.OpenAPIModelName()),
+						},
+					},
+					"priorityClassName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PriorityClassName defines the priority that should be considered when scheduling this template.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"priority": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Priority is the value of priority of this template.",
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+					"compositePodGroupTemplates": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "CompositePodGroupTemplates is the list of templates for children CompositePodGroups. The maximum number of templates is 8. This field is immutable.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(schedulingv1alpha3.CompositePodGroupTemplate{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+					"podGroupTemplates": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "PodGroupTemplates is the list of templates for children PodGroups. The maximum number of templates is 8. This field is immutable.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(schedulingv1alpha3.PodGroupTemplate{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"name", "schedulingPolicy"},
+			},
+		},
+		Dependencies: []string{
+			schedulingv1alpha3.CompositeDisruptionMode{}.OpenAPIModelName(), schedulingv1alpha3.CompositePodGroupSchedulingConstraints{}.OpenAPIModelName(), schedulingv1alpha3.CompositePodGroupSchedulingPolicy{}.OpenAPIModelName(), schedulingv1alpha3.CompositePodGroupTemplate{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupTemplate{}.OpenAPIModelName()},
 	}
 }
 
@@ -53975,6 +54423,28 @@ func schema_k8sio_api_scheduling_v1alpha3_DisruptionMode(ref common.ReferenceCal
 		},
 		Dependencies: []string{
 			schedulingv1alpha3.AllDisruptionMode{}.OpenAPIModelName(), schedulingv1alpha3.SingleDisruptionMode{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_GangGroupSchedulingPolicy(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "GangGroupSchedulingPolicy defines gang group scheduling policy.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"minGroupCount": {
+						SchemaProps: spec.SchemaProps{
+							Description: "MinGroupCount is the minimum number of child groups that must be schedulable or scheduled at the same time for the scheduler to admit the entire group. It must be a positive integer.",
+							Default:     0,
+							Type:        []string{"integer"},
+							Format:      "int32",
+						},
+					},
+				},
+				Required: []string{"minGroupCount"},
+			},
+		},
 	}
 }
 
@@ -54245,10 +54715,10 @@ func schema_k8sio_api_scheduling_v1alpha3_PodGroupSpec(ref common.ReferenceCallb
 				Description: "PodGroupSpec defines the desired state of a PodGroup.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"podGroupTemplateRef": {
+					"workloadRef": {
 						SchemaProps: spec.SchemaProps{
-							Description: "PodGroupTemplateRef references an optional PodGroup template within other object (e.g. Workload) that was used to create the PodGroup. This field is immutable.",
-							Ref:         ref(schedulingv1alpha3.PodGroupTemplateReference{}.OpenAPIModelName()),
+							Description: "WorkloadRef references an optional PodGroup template within the Workload object that was used to create the PodGroup. This field is immutable.",
+							Ref:         ref(schedulingv1alpha3.WorkloadReference{}.OpenAPIModelName()),
 						},
 					},
 					"schedulingPolicy": {
@@ -54308,12 +54778,19 @@ func schema_k8sio_api_scheduling_v1alpha3_PodGroupSpec(ref common.ReferenceCallb
 							Format:      "int32",
 						},
 					},
+					"parentCompositePodGroupName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "ParentCompositePodGroupName contains the name of the parent composite pod group within the same namespace as this pod group. If it's nil, then this pod group is a root of a workload's hierarchy. This field is used only when the CompositePodGroup feature gate is enabled. This field is immutable.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"schedulingPolicy"},
 			},
 		},
 		Dependencies: []string{
-			schedulingv1alpha3.DisruptionMode{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupResourceClaim{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupSchedulingConstraints{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupSchedulingPolicy{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupTemplateReference{}.OpenAPIModelName()},
+			schedulingv1alpha3.DisruptionMode{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupResourceClaim{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupSchedulingConstraints{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupSchedulingPolicy{}.OpenAPIModelName(), schedulingv1alpha3.WorkloadReference{}.OpenAPIModelName()},
 	}
 }
 
@@ -54487,6 +54964,17 @@ func schema_k8sio_api_scheduling_v1alpha3_PodGroupTemplateReference(ref common.R
 		},
 		Dependencies: []string{
 			schedulingv1alpha3.WorkloadPodGroupTemplateReference{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_api_scheduling_v1alpha3_SingleCompositeDisruptionMode(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "SingleCompositeDisruptionMode specifies that children can be disrupted independently.",
+				Type:        []string{"object"},
+			},
+		},
 	}
 }
 
@@ -54684,6 +55172,36 @@ func schema_k8sio_api_scheduling_v1alpha3_WorkloadPodGroupTemplateReference(ref 
 	}
 }
 
+func schema_k8sio_api_scheduling_v1alpha3_WorkloadReference(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "WorkloadReference references a Workload object.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"workloadName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "WorkloadName is the name of the Workload object that contains a template that was used when creating a pod group or a composite pod group. It must be a DNS name. This field is immutable. This field is required.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"templateName": {
+						SchemaProps: spec.SchemaProps{
+							Description: "TemplateName is the name of a template within the Workload object that was used to create a pod group or a composite pod group. It must be a DNS label. This field is immutable. This field is required.",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"workloadName", "templateName"},
+			},
+		},
+	}
+}
+
 func schema_k8sio_api_scheduling_v1alpha3_WorkloadSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
@@ -54707,7 +55225,7 @@ func schema_k8sio_api_scheduling_v1alpha3_WorkloadSpec(ref common.ReferenceCallb
 							},
 						},
 						SchemaProps: spec.SchemaProps{
-							Description: "PodGroupTemplates is the list of templates that make up the Workload. The maximum number of templates is 8. This field is immutable.",
+							Description: "PodGroupTemplates is the list of templates that make up the Workload. The maximum number of templates is 8. This field is immutable. Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.",
 							Type:        []string{"array"},
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
@@ -54718,12 +55236,32 @@ func schema_k8sio_api_scheduling_v1alpha3_WorkloadSpec(ref common.ReferenceCallb
 							},
 						},
 					},
+					"compositePodGroupTemplates": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-map-keys": []interface{}{
+									"name",
+								},
+								"x-kubernetes-list-type": "map",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "CompositePodGroupTemplates is the list of CompositePodGroup templates that make up the Workload. The maximum number of templates is 8. This field is immutable. Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.\n\nThis field is used only when the CompositePodGroup feature gate is enabled.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: ref(schedulingv1alpha3.CompositePodGroupTemplate{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
 				},
-				Required: []string{"podGroupTemplates"},
 			},
 		},
 		Dependencies: []string{
-			schedulingv1alpha3.PodGroupTemplate{}.OpenAPIModelName(), schedulingv1alpha3.TypedLocalObjectReference{}.OpenAPIModelName()},
+			schedulingv1alpha3.CompositePodGroupTemplate{}.OpenAPIModelName(), schedulingv1alpha3.PodGroupTemplate{}.OpenAPIModelName(), schedulingv1alpha3.TypedLocalObjectReference{}.OpenAPIModelName()},
 	}
 }
 

@@ -142,11 +142,24 @@ type WorkloadSpec struct {
 
 	// PodGroupTemplates is the list of templates that make up the Workload.
 	// The maximum number of templates is 8. This field is immutable.
+	// Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.
 	//
-	// +required
+	// +optional
 	// +listType=map
 	// +listMapKey=name
 	PodGroupTemplates []PodGroupTemplate
+
+	// CompositePodGroupTemplates is the list of CompositePodGroup templates that make up the Workload.
+	// The maximum number of templates is 8. This field is immutable.
+	// Exactly one of CompositePodGroupTemplates and PodGroupTemplates must be set.
+	//
+	// This field is used only when the CompositePodGroup feature gate is enabled.
+	//
+	// +featureGate=CompositePodGroup
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	CompositePodGroupTemplates CompositePodGroupTemplateList
 }
 
 // TypedLocalObjectReference allows to reference typed object inside the same namespace.
@@ -394,11 +407,12 @@ type PodGroupList struct {
 
 // PodGroupSpec defines the desired state of a PodGroup.
 type PodGroupSpec struct {
-	// PodGroupTemplateRef references an optional PodGroup template within other object
-	// (e.g. Workload) that was used to create the PodGroup. This field is immutable.
+	// WorkloadRef references an optional PodGroup template within the Workload
+	// object that was used to create the PodGroup.
+	// This field is immutable.
 	//
 	// +optional
-	PodGroupTemplateRef *PodGroupTemplateReference
+	WorkloadRef *WorkloadReference
 
 	// SchedulingPolicy defines the scheduling policy for this instance of the PodGroup.
 	// Controllers are expected to fill this field by copying it from a PodGroupTemplate.
@@ -469,6 +483,16 @@ type PodGroupSpec struct {
 	// +featureGate=WorkloadAwarePreemption
 	// +optional
 	Priority *int32
+
+	// ParentCompositePodGroupName contains the name of the parent composite pod group
+	// within the same namespace as this pod group.
+	// If it's nil, then this pod group is a root of a workload's hierarchy.
+	// This field is used only when the CompositePodGroup feature gate is enabled.
+	// This field is immutable.
+	//
+	// +featureGate=CompositePodGroup
+	// +optional
+	ParentCompositePodGroupName *string
 }
 
 // PodGroupStatus represents information about the status of a pod group.
@@ -592,4 +616,240 @@ type TopologyConstraint struct {
 	//
 	// +required
 	Key string
+}
+
+// WorkloadReference references the template within the Workload object.
+type WorkloadReference struct {
+	// WorkloadName defines the name of the Workload object.
+	//
+	// +required
+	WorkloadName string
+
+	// TemplateName defines the template name within the Workload object.
+	//
+	// +required
+	TemplateName string
+}
+
+// CompositePodGroupTemplate represents a template for a CompositePodGroup with a scheduling policy.
+type CompositePodGroupTemplate struct {
+	// Name is a unique identifier for the CompositePodGroupTemplate within the Workload.
+	// It must be a DNS label. This field is immutable.
+	//
+	// +required
+	Name string
+
+	// SchedulingPolicy defines the scheduling policy for this template.
+	// +required
+	SchedulingPolicy CompositePodGroupSchedulingPolicy
+
+	// SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this template.
+	// +featureGate=TopologyAwareWorkloadScheduling
+	// +optional
+	SchedulingConstraints *CompositePodGroupSchedulingConstraints
+
+	// DisruptionMode defines the mode in which a given CompositePodGroup can be disrupted.
+	// +featureGate=WorkloadAwarePreemption
+	// +optional
+	DisruptionMode *CompositeDisruptionMode
+
+	// PriorityClassName defines the priority that should be considered when scheduling this template.
+	// +featureGate=WorkloadAwarePreemption
+	// +optional
+	PriorityClassName string
+
+	// Priority is the value of priority of this template.
+	// +featureGate=WorkloadAwarePreemption
+	// +optional
+	Priority *int32
+
+	// CompositePodGroupTemplates is the list of templates for children CompositePodGroups.
+	// The maximum number of templates is 8. This field is immutable.
+	//
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	CompositePodGroupTemplates CompositePodGroupTemplateList
+
+	// PodGroupTemplates is the list of templates for children PodGroups.
+	// The maximum number of templates is 8. This field is immutable.
+	//
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	PodGroupTemplates []PodGroupTemplate
+}
+
+// CompositePodGroupTemplateList is a list of CompositePodGroupTemplates.
+// +k8s:eachVal=+k8s:opaqueType
+type CompositePodGroupTemplateList []CompositePodGroupTemplate
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// CompositePodGroup represents a runtime instance of pod groups grouped together.
+type CompositePodGroup struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ObjectMeta
+
+	// Spec defines the desired state of the CompositePodGroup.
+	// +required
+	Spec CompositePodGroupSpec
+
+	// Status represents the current observed state of the CompositePodGroup.
+	// +optional
+	Status CompositePodGroupStatus
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// CompositePodGroupList contains a list of CompositePodGroup resources.
+type CompositePodGroupList struct {
+	metav1.TypeMeta
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of CompositePodGroups.
+	Items []CompositePodGroup
+}
+
+// CompositePodGroupSpec defines the desired state of CompositePodGroup.
+type CompositePodGroupSpec struct {
+	// WorkloadRef references an optional CompositePodGroup template within the
+	// Workload object that was used to create the CompositePodGroup.
+	// This field is immutable.
+	//
+	// +optional
+	WorkloadRef *WorkloadReference
+
+	// SchedulingPolicy defines the scheduling policy for this instance of the CompositePodGroup.
+	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+	// This field is immutable.
+	//
+	// +required
+	SchedulingPolicy CompositePodGroupSchedulingPolicy
+
+	// SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this
+	// CompositePodGroup.
+	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+	// This field is immutable.
+	// This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.
+	//
+	// +featureGate=TopologyAwareWorkloadScheduling
+	// +optional
+	SchedulingConstraints *CompositePodGroupSchedulingConstraints
+
+	// DisruptionMode defines the mode in which a given CompositePodGroup can be disrupted.
+	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+	// One of Single, All. Defaults to Single if unset. This field is immutable.
+	//
+	// This field is available only when the WorkloadAwarePreemption feature gate
+	// is enabled.
+	//
+	// +featureGate=WorkloadAwarePreemption
+	// +optional
+	DisruptionMode *CompositeDisruptionMode
+
+	// PriorityClassName defines the priority that should be considered when scheduling this CompositePodGroup.
+	// Controllers are expected to fill this field by copying it from a CompositePodGroupTemplate.
+	// This field is immutable.
+	//
+	// +featureGate=WorkloadAwarePreemption
+	// +optional
+	PriorityClassName string
+
+	// Priority is the value of priority of this composite pod group.
+	// This field is immutable.
+	//
+	// +featureGate=WorkloadAwarePreemption
+	// +optional
+	Priority *int32
+
+	// ParentCompositePodGroupName contains the name of the parent composite pod group
+	// within the same namespace as this composite pod group.
+	// If it's nil, then this composite pod group is a root of a workload's hierarchy.
+	// This field is used only when the CompositePodGroup feature gate is enabled.
+	// This field is immutable.
+	//
+	// +featureGate=CompositePodGroup
+	// +optional
+	ParentCompositePodGroupName *string
+}
+
+// CompositePodGroupSchedulingPolicy defines the scheduling policy for a composite pod group.
+// +union
+type CompositePodGroupSchedulingPolicy struct {
+	// Basic specifies that the groups of this composite group should be scheduled independently.
+	//
+	// +optional
+	// +k8s:unionMember
+	Basic *BasicGroupSchedulingPolicy
+
+	// Gang specifies that the groups of this composite group should be scheduled using
+	// all-or-nothing semantics.
+	//
+	// +optional
+	// +k8s:unionMember
+	Gang *GangGroupSchedulingPolicy
+}
+
+// BasicGroupSchedulingPolicy defines basic group scheduling policy.
+type BasicGroupSchedulingPolicy struct {
+}
+
+// GangGroupSchedulingPolicy defines gang group scheduling policy.
+type GangGroupSchedulingPolicy struct {
+	// MinGroupCount is the minimum number of child groups that must be schedulable
+	// or scheduled at the same time for the scheduler to admit the entire group.
+	// It must be a positive integer.
+	//
+	// +optional
+	MinGroupCount *int32
+}
+
+// CompositePodGroupSchedulingConstraints defines scheduling constraints for a composite pod group.
+type CompositePodGroupSchedulingConstraints struct {
+	// Topology defines the topology constraints for the composite pod group.
+	// Currently only a single topology constraint can be specified.
+	//
+	// +optional
+	// +listType=atomic
+	Topology []TopologyConstraint
+}
+
+// CompositeDisruptionMode defines the disruption mode for a composite pod group.
+// +union
+type CompositeDisruptionMode struct {
+	// Single specifies that children can be disrupted independently from each other.
+	//
+	// +optional
+	// +k8s:unionMember
+	Single *SingleCompositeDisruptionMode
+
+	// All specifies that all children can only be disrupted together.
+	//
+	// +optional
+	// +k8s:unionMember
+	All *AllCompositeDisruptionMode
+}
+
+// SingleCompositeDisruptionMode specifies that children can be disrupted independently.
+type SingleCompositeDisruptionMode struct {
+}
+
+// AllCompositeDisruptionMode specifies that all children can only be disrupted together.
+type AllCompositeDisruptionMode struct {
+}
+
+// CompositePodGroupStatus defines the observed state of CompositePodGroup.
+type CompositePodGroupStatus struct {
+	// Conditions represent the latest observations of the CompositePodGroup's state.
+	//
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition
 }

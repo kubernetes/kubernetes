@@ -1619,13 +1619,11 @@ func (wrapper *PodGroupWrapper) BasicPolicy() *PodGroupWrapper {
 	return wrapper
 }
 
-// TemplateRef sets appropriate PodGroupTemplateRef field of the inner PodGroup.
-func (wrapper *PodGroupWrapper) TemplateRef(templateName, workloadName string) *PodGroupWrapper {
-	wrapper.PodGroup.Spec.PodGroupTemplateRef = &schedulingapi.PodGroupTemplateReference{
-		Workload: &schedulingapi.WorkloadPodGroupTemplateReference{
-			PodGroupTemplateName: templateName,
-			WorkloadName:         workloadName,
-		},
+// WorkloadRef sets appropriate WorkloadRef field of the inner PodGroup.
+func (wrapper *PodGroupWrapper) WorkloadRef(templateName, workloadName string) *PodGroupWrapper {
+	wrapper.PodGroup.Spec.WorkloadRef = &schedulingapi.WorkloadReference{
+		WorkloadName: workloadName,
+		TemplateName: templateName,
 	}
 	return wrapper
 }

@@ -7839,10 +7839,10 @@ func TestSyncJobPodSchedulingGroup(t *testing.T) {
 				OwnerReferences: []metav1.OwnerReference{*metav1.NewControllerRef(job, controllerKind)},
 			},
 			Spec: schedulingv1alpha3.PodGroupSpec{
-				PodGroupTemplateRef: &schedulingv1alpha3.PodGroupTemplateReference{
-					Workload: &schedulingv1alpha3.WorkloadPodGroupTemplateReference{
-						WorkloadName:         wl.Name,
-						PodGroupTemplateName: templateName,
+				TemplateRef: &schedulingv1alpha3.TemplateReference{
+					Workload: &schedulingv1alpha3.WorkloadReference{
+						WorkloadName: wl.Name,
+						TemplateName: templateName,
 					},
 				},
 			},

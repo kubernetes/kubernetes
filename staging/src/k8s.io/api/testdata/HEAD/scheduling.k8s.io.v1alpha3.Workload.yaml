@@ -33,6 +33,41 @@ metadata:
   selfLink: selfLinkValue
   uid: uidValue
 spec:
+  compositePodGroupTemplates:
+  - compositePodGroupTemplates:
+    - name: ""
+      schedulingPolicy: {}
+    disruptionMode:
+      all: {}
+      single: {}
+    name: nameValue
+    podGroupTemplates:
+    - disruptionMode:
+        all: {}
+        single: {}
+      name: nameValue
+      priority: 7
+      priorityClassName: priorityClassNameValue
+      resourceClaims:
+      - name: nameValue
+        resourceClaimName: resourceClaimNameValue
+        resourceClaimTemplateName: resourceClaimTemplateNameValue
+      schedulingConstraints:
+        topology:
+        - key: keyValue
+      schedulingPolicy:
+        basic: {}
+        gang:
+          minCount: 1
+    priority: 6
+    priorityClassName: priorityClassNameValue
+    schedulingConstraints:
+      topology:
+      - key: keyValue
+    schedulingPolicy:
+      basic: {}
+      gang:
+        minGroupCount: 1
   controllerRef:
     apiGroup: apiGroupValue
     kind: kindValue
