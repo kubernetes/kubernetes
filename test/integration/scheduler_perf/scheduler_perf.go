@@ -256,12 +256,16 @@ type testCase struct {
 	// SchedulerConfigPath is the path of scheduler configuration
 	// Optional
 	SchedulerConfigPath string
-	// APIServerQPS overrides the max QPS of the connection to the API server.
+	// SchedulerAPIClientQPS overrides the max QPS of the connection to the API server used by
+	// kubescheduler under test. The connection used by the test framework (for creating/deleting
+	// nodes, pods etc.) is not impacted by this setting.
 	// Optional
-	APIServerQPS *float32
-	// APIServerBurst overrides the throttle limit for bursts in the connection to the API server.
+	SchedulerAPIClientQPS *float32
+	// SchedulerAPIClientBurst overrides the throttle limit for bursts in the connection to the
+	// API server used by kubescheduler under test. The connection used by the test framework
+	// (for creating/deleting nodes, pods etc.) is not impacted by this setting.
 	// Optional
-	APIServerBurst *int
+	SchedulerAPIClientBurst *int
 	// Default path to spec file describing the pods to create.
 	// This path can be overridden in createPodsOp by setting PodTemplatePath .
 	// Optional
@@ -326,6 +330,14 @@ type Workload struct {
 	// Explicitly setting a feature in this map overrides the test case settings.
 	// Optional
 	FeatureGates map[featuregate.Feature]bool
+	// SchedulerAPIClientQPS overrides the max QPS of the connection to the API server.
+	// If set, it overrides the value set on the testCase level.
+	// Optional
+	SchedulerAPIClientQPS *float32
+	// SchedulerAPIClientBurst overrides the throttle limit for bursts in the connection to the API server.
+	// If set, it overrides the value set on the testCase level.
+	// Optional
+	SchedulerAPIClientBurst *int
 }
 
 // GetParam retrieves a parameter from the Workload's parameters as an integer.
@@ -721,7 +733,16 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 	timeout := 30 * time.Minute
 	tCtx = tCtx.WithTimeout(timeout, fmt.Sprintf("timed out after the %s per-test timeout", timeout))
 
-	return setupClusterForWorkload(tCtx, tc.SchedulerConfigPath, featureGates, tc.APIServerQPS, tc.APIServerBurst, opts)
+	qps := tc.SchedulerAPIClientQPS
+	if workload.SchedulerAPIClientQPS != nil {
+		qps = workload.SchedulerAPIClientQPS
+	}
+	burst := tc.SchedulerAPIClientBurst
+	if workload.SchedulerAPIClientBurst != nil {
+		burst = workload.SchedulerAPIClientBurst
+	}
+
+	return setupClusterForWorkload(tCtx, tc.SchedulerConfigPath, featureGates, qps, burst, opts)
 }
 
 func featureGatesMerge(src map[featuregate.Feature]bool, overrides map[featuregate.Feature]bool) map[featuregate.Feature]bool {

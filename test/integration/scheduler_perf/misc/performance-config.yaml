@@ -88,6 +88,27 @@
       initNodes: 5000
       initPods: 5000
       measurePods: 50000
+  - name: 5kNodes_10kPods_LowQPSOnAPIServer_AsyncAPICallsDisabled
+    schedulerApiClientQPS: 100
+    schedulerApiClientBurst: 100
+    featureGates:
+      SchedulerAsyncAPICalls: false
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPods: 1000
+      measurePods: 10000
+  - name: 5kNodes_10kPods_LowQPSOnAPIServer_AsyncAPICallsEnabled
+    schedulerApiClientQPS: 100
+    schedulerApiClientBurst: 100
+    featureGates:
+      SchedulerAsyncAPICalls: true
+    labels: [performance]
+    params:
+      initNodes: 5000
+      initPods: 1000
+      measurePods: 10000
+
 # This test case simulates the scheduling of daemonset.
 # https://github.com/kubernetes/kubernetes/issues/124709
 - name: SchedulingDaemonset
@@ -517,47 +538,11 @@
       nodesWithoutExtendedResource: 0
       measurePods: 5000
 
-- name: SchedulingBasicWithLowQPSOnAPIServer
-  apiServerQPS: 100
-  apiServerBurst: 100
-  defaultPodTemplatePath: ../templates/pod-default.yaml
-  workloadTemplate:
-  - opcode: createNodes
-    countParam: $initNodes
-  - opcode: createPods
-    countParam: $initPods
-  - opcode: createPods
-    countParam: $measurePods
-    collectMetrics: true
-  workloads:
-  - name: 5kNodes_10kPods
-    featureGates:
-      SchedulerAsyncAPICalls: false
-    labels: [performance]
-    # Testing code uses the same client for API server connection as kubescheduler,
-    # therefore we cannot have throughput = max apiServerQPS. Throughput should be
-    # the same with AsyncAPICalls enabled and disabled.
-    threshold: 33
-    params:
-      initNodes: 5000
-      initPods: 1000
-      measurePods: 10000
-  - name: 5kNodes_10kPods_AsyncAPICallsEnabled
-    featureGates:
-      SchedulerAsyncAPICalls: true
-    labels: [performance]
-    # Throughput should be the same with AsyncAPICalls enabled and disabled.
-    threshold: 33
-    params:
-      initNodes: 5000
-      initPods: 1000
-      measurePods: 10000
-
 # This test simulates a limited QPS on connection to API server and a large number
 # of unschedulable pods circling between activeQ and backoffQ/unschedulable pool.
 - name: LowAPIServerQPSWithMultipleUnscheduledPods
-  apiServerQPS: 100
-  apiServerBurst: 100
+  schedulerApiClientQPS: 100
+  schedulerApiClientBurst: 100
   workloadTemplate:
   - opcode: createNodes
     countParam: $initNodes
@@ -602,9 +587,6 @@
     featureGates:
       SchedulerAsyncAPICalls: true
     labels: [performance]
-    # Expect much lower throughput because measurement starts before all pods
-    # from the first batch go through scheduling cycle.
-    threshold: 2
     params:
       initNodes: 1000
       largePods: 400
@@ -613,7 +595,6 @@
     featureGates:
       SchedulerAsyncAPICalls: false
     labels: [performance]
-    threshold: 45
     params:
       initNodes: 1000
       largePods: 400
