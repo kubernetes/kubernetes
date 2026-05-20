@@ -3301,6 +3301,7 @@ func createRemoteRuntimeService(ctx context.Context, endpoint string, t *testing
 
 func TestNewMainKubeletStandAlone(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)
+	var testMainKubelet *Kubelet
 	tempDir, err := os.MkdirTemp("", "logs")
 	require.NoError(t, err)
 	containerLogsDir := ContainerLogsDir
@@ -3313,9 +3314,9 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 	// This is needed on Windows because a concurrent os.ReadDir in a GC goroutine
 	// can keep a handle to this directory in use and cause os.RemoveAll to fail.
 	t.Cleanup(func() {
+		testMainKubelet.waitForGarbageCollectionDone()
 		ContainerLogsDir = containerLogsDir
-		err := os.RemoveAll(tempDir)
-		require.NoError(t, err)
+		require.NoError(t, os.RemoveAll(tempDir))
 	})
 
 	ca, cert, key, err := generateCAAndCertKeyWithOptions(
@@ -3395,7 +3396,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RotateKubeletServerCertificate, false)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReloadKubeletClientCAFile, false)
 
-	testMainKubelet, err := NewMainKubelet(
+	testMainKubelet, err = NewMainKubelet(
 		tCtx,
 		kubeCfg,
 		kubeDep,
@@ -3462,6 +3463,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 
 func TestNewMainKubeletWithCertAndCAReloadingEnabled(t *testing.T) {
 	logger, tCtx := ktesting.NewTestContext(t)
+	var testMainKubelet *Kubelet
 	tempDir, err := os.MkdirTemp("", "logs")
 	require.NoError(t, err)
 	containerLogsDir := ContainerLogsDir
@@ -3474,9 +3476,9 @@ func TestNewMainKubeletWithCertAndCAReloadingEnabled(t *testing.T) {
 	// This is needed on Windows because a concurrent os.ReadDir in a GC goroutine
 	// can keep a handle to this directory in use and cause os.RemoveAll to fail.
 	t.Cleanup(func() {
+		testMainKubelet.waitForGarbageCollectionDone()
 		ContainerLogsDir = containerLogsDir
-		err := os.RemoveAll(tempDir)
-		require.NoError(t, err)
+		require.NoError(t, os.RemoveAll(tempDir))
 	})
 
 	ca, cert, key, err := generateCAAndCertKeyWithOptions(
@@ -3556,7 +3558,7 @@ func TestNewMainKubeletWithCertAndCAReloadingEnabled(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RotateKubeletServerCertificate, false)
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ReloadKubeletClientCAFile, true)
 
-	testMainKubelet, err := NewMainKubelet(
+	testMainKubelet, err = NewMainKubelet(
 		tCtx,
 		kubeCfg,
 		kubeDep,
