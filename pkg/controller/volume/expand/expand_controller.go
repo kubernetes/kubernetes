@@ -283,10 +283,11 @@ func (expc *expandController) syncHandler(ctx context.Context, key string) error
 	}
 
 	volumeResizerName := volumePlugin.GetPluginName()
-	return expc.expand(logger, pvc, pv, volumeResizerName)
+	return expc.expand(ctx, pvc, pv, volumeResizerName)
 }
 
-func (expc *expandController) expand(logger klog.Logger, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, resizerName string) error {
+func (expc *expandController) expand(ctx context.Context, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, resizerName string) error {
+	logger := klog.FromContext(ctx)
 	// if node expand is complete and pv's annotation can be removed, remove the annotation from pv and return
 	if expc.isNodeExpandComplete(logger, pvc, pv) && metav1.HasAnnotation(pv.ObjectMeta, util.AnnPreResizeCapacity) {
 		return util.DeleteAnnPreResizeCapacity(pv, expc.GetKubeClient())
@@ -315,7 +316,7 @@ func (expc *expandController) expand(logger klog.Logger, pvc *v1.PersistentVolum
 	}
 
 	logger.V(5).Info("Starting ExpandVolume for volume", "volumeName", util.GetPersistentVolumeClaimQualifiedName(pvc))
-	_, detailedErr := generatedOptions.Run()
+	_, detailedErr := generatedOptions.Run(ctx)
 
 	return detailedErr
 }

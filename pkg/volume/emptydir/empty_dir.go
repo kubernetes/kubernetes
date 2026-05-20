@@ -17,6 +17,7 @@ limitations under the License.
 package emptydir
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -227,12 +228,12 @@ func (ed *emptyDir) GetAttributes() volume.Attributes {
 }
 
 // SetUp creates new directory.
-func (ed *emptyDir) SetUp(mounterArgs volume.MounterArgs) error {
-	return ed.SetUpAt(ed.GetPath(), mounterArgs)
+func (ed *emptyDir) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
+	return ed.SetUpAt(ctx, ed.GetPath(), mounterArgs)
 }
 
 // SetUpAt creates new directory.
-func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (ed *emptyDir) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
 	notMnt, err := ed.mounter.IsLikelyNotMountPoint(dir)
 	// Getting an os.IsNotExist err from is a contingency; the directory
 	// may not exist yet, in which case, setup should run.

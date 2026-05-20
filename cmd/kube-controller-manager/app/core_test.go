@@ -72,13 +72,17 @@ func (d FakeDiscoveryWithError) ServerPreferredNamespacedResources() ([]*metav1.
 	return d.PossibleResources, d.Err
 }
 
+func (d FakeDiscoveryWithError) ServerPreferredNamespacedResourcesWithContext(ctx context.Context) ([]*metav1.APIResourceList, error) {
+	return d.PossibleResources, d.Err
+}
+
 // FakeDiscoveryWithError inherits Clientset(via FakeClientset) with overridden Discovery method.
 type FakeClientSet struct {
 	fakeclientset.Clientset
 	DiscoveryObj *FakeDiscoveryWithError
 }
 
-func (c *FakeClientSet) Discovery() discovery.DiscoveryInterface {
+func (c *FakeClientSet) Discovery() discovery.DiscoveryInterfaces {
 	return c.DiscoveryObj
 }
 

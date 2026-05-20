@@ -288,7 +288,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	}
 	csi := c.csiClient
 
-	ctx, cancel := createCSIOperationContext(spec, c.watchTimeout)
+	ctx, cancel := createCSIOperationContext(ctx, spec, c.watchTimeout)
 	defer cancel()
 	// Check whether "STAGE_UNSTAGE_VOLUME" is set
 	stageUnstageSet, err := csi.NodeSupportsStageUnstage(ctx)

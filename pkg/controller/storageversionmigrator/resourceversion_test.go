@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/metadata"
 	metadatafake "k8s.io/client-go/metadata/fake"
 	kubetesting "k8s.io/client-go/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestIsResourceMigratable(t *testing.T) {
@@ -173,15 +174,16 @@ func TestIsResourceMigratable(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {}))
 			defer server.Close()
 			discoveryClient := fakediscovery.FakeDiscovery{Fake: &kubetesting.Fake{}}
 			discoveryClient.Resources = tc.resources
 			rvController := ResourceVersionController{
-				discoveryClient: &discoveryClient,
+				discoveryClient: discovery.ToDiscoveryInterfaceWithContext(&discoveryClient),
 			}
 
-			isMigratable, err := rvController.isResourceMigratable(tc.resource)
+			isMigratable, err := rvController.isResourceMigratable(tCtx, tc.resource)
 			if err != nil {
 				if !strings.Contains(err.Error(), tc.wantErr) {
 					t.Errorf("Unexpected error: %v, want: %v", err, tc.wantErr)
@@ -501,7 +503,7 @@ func newTestRVController(
 
 	rvController := &ResourceVersionController{
 		kubeClient:      kubeClient,
-		discoveryClient: discoveryClient,
+		discoveryClient: discovery.ToDiscoveryInterfaceWithContext(discoveryClient),
 		metadataClient:  metadataClient,
 		svmListers:      svmInformer.Lister(),
 		svmSynced:       func() bool { return true },

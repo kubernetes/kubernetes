@@ -179,11 +179,11 @@ func (sv *projectedVolume) GetAttributes() volume.Attributes {
 
 }
 
-func (s *projectedVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
-	return s.SetUpAt(s.GetPath(), mounterArgs)
+func (s *projectedVolumeMounter) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
+	return s.SetUpAt(ctx, s.GetPath(), mounterArgs)
 }
 
-func (s *projectedVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (s *projectedVolumeMounter) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
 	klog.V(3).Infof("Setting up volume %v for pod %v at %v", s.volName, s.pod.UID, dir)
 
 	wrapped, err := s.plugin.host.NewWrapperMounter(s.volName, wrappedVolumeSpec(), s.pod)
@@ -191,14 +191,14 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterA
 		return err
 	}
 
-	data, err := s.collectData(mounterArgs)
+	data, err := s.collectData(ctx, mounterArgs)
 	if err != nil {
 		klog.Errorf("Error preparing data for projected volume %v for pod %v/%v: %s", s.volName, s.pod.Namespace, s.pod.Name, err.Error())
 		return err
 	}
 
 	setupSuccess := false
-	if err := wrapped.SetUpAt(dir, mounterArgs); err != nil {
+	if err := wrapped.SetUpAt(ctx, dir, mounterArgs); err != nil {
 		return err
 	}
 
@@ -244,7 +244,7 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterA
 	return nil
 }
 
-func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (map[string]volumeutil.FileProjection, error) {
+func (s *projectedVolumeMounter) collectData(ctx context.Context, mounterArgs volume.MounterArgs) (map[string]volumeutil.FileProjection, error) {
 	if s.source.DefaultMode == nil {
 		return nil, fmt.Errorf("no defaultMode used, not even the default value for it")
 	}
@@ -361,14 +361,14 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 			var trustAnchors []byte
 			if source.ClusterTrustBundle.Name != nil {
 				var err error
-				trustAnchors, err = s.plugin.kvHost.GetTrustAnchorsByName(*source.ClusterTrustBundle.Name, allowEmpty)
+				trustAnchors, err = s.plugin.kvHost.GetTrustAnchorsByName(ctx, *source.ClusterTrustBundle.Name, allowEmpty)
 				if err != nil {
 					errlist = append(errlist, err)
 					continue
 				}
 			} else if source.ClusterTrustBundle.SignerName != nil {
 				var err error
-				trustAnchors, err = s.plugin.kvHost.GetTrustAnchorsBySigner(*source.ClusterTrustBundle.SignerName, source.ClusterTrustBundle.LabelSelector, allowEmpty)
+				trustAnchors, err = s.plugin.kvHost.GetTrustAnchorsBySigner(ctx, *source.ClusterTrustBundle.SignerName, source.ClusterTrustBundle.LabelSelector, allowEmpty)
 				if err != nil {
 					errlist = append(errlist, err)
 					continue

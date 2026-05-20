@@ -30,6 +30,7 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestCanSupport(t *testing.T) {
@@ -97,6 +98,7 @@ func TestRecycler(t *testing.T) {
 }
 
 func doTestPlugin(t *testing.T, spec *volume.Spec, expectedDevice string) {
+	tCtx := ktesting.Init(t)
 	tmpDir, err := utiltesting.MkTmpdir("nfs_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
@@ -123,7 +125,7 @@ func doTestPlugin(t *testing.T, spec *volume.Spec, expectedDevice string) {
 	if volumePath != expectedPath {
 		t.Errorf("Unexpected path, expected %q, got: %q", expectedPath, volumePath)
 	}
-	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+	if err := mounter.SetUp(tCtx, volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	if _, err := os.Stat(volumePath); err != nil {

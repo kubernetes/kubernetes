@@ -17,6 +17,7 @@ limitations under the License.
 package git_repo
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
@@ -170,16 +171,16 @@ func (b *gitRepoVolumeMounter) GetAttributes() volume.Attributes {
 }
 
 // SetUp creates new directory and clones a git repo.
-func (b *gitRepoVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
+func (b *gitRepoVolumeMounter) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.GitRepoVolumeDriver) {
 		return fmt.Errorf("git-repo volume plugin has been disabled; if necessary, it may be re-enabled by enabling the feature-gate `GitRepoVolumeDriver`")
 	}
 
-	return b.SetUpAt(b.GetPath(), mounterArgs)
+	return b.SetUpAt(ctx, b.GetPath(), mounterArgs)
 }
 
 // SetUpAt creates new directory and clones a git repo.
-func (b *gitRepoVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (b *gitRepoVolumeMounter) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
 	if volumeutil.IsReady(b.getMetaDir()) {
 		return nil
 	}
@@ -189,7 +190,7 @@ func (b *gitRepoVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArg
 	if err != nil {
 		return err
 	}
-	if err := wrapped.SetUpAt(dir, mounterArgs); err != nil {
+	if err := wrapped.SetUpAt(ctx, dir, mounterArgs); err != nil {
 		return err
 	}
 

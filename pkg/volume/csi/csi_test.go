@@ -35,6 +35,7 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 // TestCSI_VolumeAll runs a close approximation of volume workflow
@@ -221,6 +222,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			tmpDir, err := utiltesting.MkTmpdir("csi-test")
 			if err != nil {
 				t.Fatalf("can't create temp dir: %v", err)
@@ -412,7 +414,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 			csiMounter.csiClient = csiClient
 			var mounterArgs volume.MounterArgs
 			mounterArgs.FsGroup = fsGroup
-			err = csiMounter.SetUp(mounterArgs)
+			err = csiMounter.SetUp(tCtx, mounterArgs)
 			if test.isInline && (test.driverSpec == nil || !containsVolumeMode(test.driverSpec.VolumeLifecycleModes, storage.VolumeLifecycleEphemeral)) {
 				// This *must* fail because a CSIDriver.Spec.VolumeLifecycleModes entry "ephemeral"
 				// is required.

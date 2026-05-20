@@ -699,11 +699,11 @@ func (f *stubVolume) GetAttributes() volume.Attributes {
 	return f.attributes
 }
 
-func (f *stubVolume) SetUp(mounterArgs volume.MounterArgs) error {
+func (f *stubVolume) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
 	return nil
 }
 
-func (f *stubVolume) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (f *stubVolume) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
 	return nil
 }
 

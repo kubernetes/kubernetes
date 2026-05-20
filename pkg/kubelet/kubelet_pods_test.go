@@ -8618,11 +8618,11 @@ func (tvm *testVolumeMounter) GetMetrics() (*volume.Metrics, error) {
 	return &volume.Metrics{}, nil
 }
 
-func (tvm *testVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
+func (tvm *testVolumeMounter) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
 	return nil
 }
 
-func (tvm *testVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (tvm *testVolumeMounter) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
 	return nil
 }
 

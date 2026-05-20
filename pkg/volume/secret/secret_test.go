@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/emptydir"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/test/utils/ktesting"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -294,6 +295,7 @@ func TestCanSupport(t *testing.T) {
 
 func TestPlugin(t *testing.T) {
 	var (
+		tCtx           = ktesting.Init(t)
 		testPodUID     = types.UID("test_pod_uid")
 		testVolumeName = "test_volume_name"
 		testNamespace  = "test_secret_namespace"
@@ -327,7 +329,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
-	err = mounter.SetUp(volume.MounterArgs{})
+	err = mounter.SetUp(tCtx, volume.MounterArgs{})
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -364,6 +366,7 @@ func TestPlugin(t *testing.T) {
 
 func TestInvalidPathSecret(t *testing.T) {
 	var (
+		tCtx           = ktesting.Init(t)
 		testPodUID     = types.UID("test_pod_uid")
 		testVolumeName = "test_volume_name"
 		testNamespace  = "test_secret_namespace"
@@ -402,7 +405,7 @@ func TestInvalidPathSecret(t *testing.T) {
 	}
 
 	var mounterArgs volume.MounterArgs
-	err = mounter.SetUp(mounterArgs)
+	err = mounter.SetUp(tCtx, mounterArgs)
 	if err == nil {
 		t.Errorf("Expected error while setting up secret")
 	}
@@ -418,6 +421,7 @@ func TestInvalidPathSecret(t *testing.T) {
 // should be mounter and the secret data written to it.
 func TestPluginReboot(t *testing.T) {
 	var (
+		tCtx           = ktesting.Init(t)
 		testPodUID     = types.UID("test_pod_uid3")
 		testVolumeName = "test_volume_name"
 		testNamespace  = "test_secret_namespace"
@@ -453,7 +457,7 @@ func TestPluginReboot(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
-	err = mounter.SetUp(volume.MounterArgs{})
+	err = mounter.SetUp(tCtx, volume.MounterArgs{})
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -471,6 +475,7 @@ func TestPluginReboot(t *testing.T) {
 
 func TestPluginOptional(t *testing.T) {
 	var (
+		tCtx           = ktesting.Init(t)
 		testPodUID     = types.UID("test_pod_uid")
 		testVolumeName = "test_volume_name"
 		testNamespace  = "test_secret_namespace"
@@ -505,7 +510,7 @@ func TestPluginOptional(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
-	err = mounter.SetUp(volume.MounterArgs{})
+	err = mounter.SetUp(tCtx, volume.MounterArgs{})
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -562,6 +567,7 @@ func TestPluginOptional(t *testing.T) {
 
 func TestPluginOptionalKeys(t *testing.T) {
 	var (
+		tCtx           = ktesting.Init(t)
 		testPodUID     = types.UID("test_pod_uid")
 		testVolumeName = "test_volume_name"
 		testNamespace  = "test_secret_namespace"
@@ -603,7 +609,7 @@ func TestPluginOptionalKeys(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
-	err = mounter.SetUp(volume.MounterArgs{})
+	err = mounter.SetUp(tCtx, volume.MounterArgs{})
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}

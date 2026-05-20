@@ -192,7 +192,7 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 		volumeSpecMap[volumeAttached.VolumeSpec] = volumeAttached.VolumeName
 	}
 
-	volumesAreAttachedFunc := func() volumetypes.OperationContext {
+	volumesAreAttachedFunc := func(ctx context.Context) volumetypes.OperationContext {
 
 		// For each volume plugin, pass the list of volume specs to VolumesAreAttached to check
 		// whether the volumes are still attached.
@@ -251,7 +251,7 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 	volumeToAttach VolumeToAttach,
 	actualStateOfWorld ActualStateOfWorldAttacherUpdater) volumetypes.GeneratedOperations {
 
-	attachVolumeFunc := func() volumetypes.OperationContext {
+	attachVolumeFunc := func(ctx context.Context) volumetypes.OperationContext {
 		attachableVolumePlugin, err :=
 			og.volumePluginMgr.FindAttachablePluginBySpec(volumeToAttach.VolumeSpec)
 
@@ -389,7 +389,7 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 		return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.NewDetacher failed", err)
 	}
 
-	detachVolumeFunc := func() volumetypes.OperationContext {
+	detachVolumeFunc := func(ctx context.Context) volumetypes.OperationContext {
 		var err error
 		if verifySafeToDetach {
 			err = og.verifyVolumeIsSafeToDetach(volumeToDetach)
@@ -442,7 +442,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		volumePluginName = volumePlugin.GetPluginName()
 	}
 
-	mountVolumeFunc := func() volumetypes.OperationContext {
+	mountVolumeFunc := func(ctx context.Context) volumetypes.OperationContext {
 		// Get mounter plugin
 		volumePlugin, err := og.volumePluginMgr.FindPluginBySpec(volumeToMount.VolumeSpec)
 
@@ -580,7 +580,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		}
 
 		// Execute mount
-		mountErr := volumeMounter.SetUp(volume.MounterArgs{
+		mountErr := volumeMounter.SetUp(ctx, volume.MounterArgs{
 			FsUser:              util.FsUserFrom(volumeToMount.Pod),
 			FsGroup:             fsGroup,
 			DesiredSize:         volumeToMount.DesiredSizeLimit,
@@ -743,7 +743,7 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 		return volumetypes.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmountVolume.NewUnmounter failed", newUnmounterErr)
 	}
 
-	unmountVolumeFunc := func() volumetypes.OperationContext {
+	unmountVolumeFunc := func(ctx context.Context) volumetypes.OperationContext {
 		subpather := og.volumePluginMgr.Host.GetSubpather()
 
 		migrated := getMigratedStatusBySpec(volumeToUnmount.VolumeSpec)
@@ -827,7 +827,7 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 		return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmountDevice.NewDeviceMounter failed", err)
 	}
 
-	unmountDeviceFunc := func() volumetypes.OperationContext {
+	unmountDeviceFunc := func(ctx context.Context) volumetypes.OperationContext {
 
 		migrated := getMigratedStatusBySpec(deviceToDetach.VolumeSpec)
 
@@ -961,7 +961,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		volumeAttacher, _ = attachableVolumePlugin.NewAttacher()
 	}
 
-	mapVolumeFunc := func() (operationContext volumetypes.OperationContext) {
+	mapVolumeFunc := func(ctx context.Context) (operationContext volumetypes.OperationContext) {
 		var devicePath string
 		var stagingPath string
 
@@ -1179,7 +1179,7 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 		return volumetypes.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmapVolume.NewUnmapper failed", newUnmapperErr)
 	}
 
-	unmapVolumeFunc := func() volumetypes.OperationContext {
+	unmapVolumeFunc := func(ctx context.Context) volumetypes.OperationContext {
 
 		migrated := getMigratedStatusBySpec(volumeToUnmount.VolumeSpec)
 
@@ -1290,7 +1290,7 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 		return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmapDevice.NewUnmapper failed", newUnmapperErr)
 	}
 
-	unmapDeviceFunc := func() volumetypes.OperationContext {
+	unmapDeviceFunc := func(ctx context.Context) volumetypes.OperationContext {
 		migrated := getMigratedStatusBySpec(deviceToDetach.VolumeSpec)
 		// Search under globalMapPath dir if all symbolic links from pods have been removed already.
 		// If symbolic links are there, pods may still refer the volume.
@@ -1405,7 +1405,7 @@ func (og *operationGenerator) GenerateVerifyControllerAttachedVolumeFunc(
 		}
 	}
 
-	verifyControllerAttachedVolumeFunc := func() volumetypes.OperationContext {
+	verifyControllerAttachedVolumeFunc := func(ctx context.Context) volumetypes.OperationContext {
 		migrated := getMigratedStatusBySpec(volumeToMount.VolumeSpec)
 		claimSize := actualStateOfWorld.GetClaimSize(volumeToMount.VolumeName)
 
@@ -1527,7 +1527,7 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 		return volumetypes.GeneratedOperations{}, fmt.Errorf("can not find plugin for expanding volume: %q", util.GetPersistentVolumeClaimQualifiedName(pvc))
 	}
 
-	expandVolumeFunc := func() volumetypes.OperationContext {
+	expandVolumeFunc := func(ctx context.Context) volumetypes.OperationContext {
 		migrated := false
 
 		newSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
@@ -1619,7 +1619,7 @@ func (og *operationGenerator) GenerateExpandAndRecoverVolumeFunc(
 		return volumetypes.GeneratedOperations{}, fmt.Errorf("can not find plugin for expanding volume: %q", util.GetPersistentVolumeClaimQualifiedName(pvc))
 	}
 
-	expandVolumeFunc := func() volumetypes.OperationContext {
+	expandVolumeFunc := func(ctx context.Context) volumetypes.OperationContext {
 		resizeOpts := inTreeResizeOpts{
 			pvc:          pvc,
 			pv:           pv,
@@ -1821,7 +1821,7 @@ func (og *operationGenerator) GenerateExpandInUseVolumeFunc(
 		return volumetypes.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("NodeExpandVolume.FindPluginBySpec failed", err)
 	}
 
-	fsResizeFunc := func() volumetypes.OperationContext {
+	fsResizeFunc := func(ctx context.Context) volumetypes.OperationContext {
 		var resizeDone bool
 		var eventErr, detailedErr error
 		migrated := false

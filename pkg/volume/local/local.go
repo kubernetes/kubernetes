@@ -17,6 +17,7 @@ limitations under the License.
 package local
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -521,12 +522,12 @@ func (m *localVolumeMounter) GetAttributes() volume.Attributes {
 }
 
 // SetUp bind mounts the directory to the volume path
-func (m *localVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
-	return m.SetUpAt(m.GetPath(), mounterArgs)
+func (m *localVolumeMounter) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
+	return m.SetUpAt(ctx, m.GetPath(), mounterArgs)
 }
 
 // SetUpAt bind mounts the directory to the volume path and sets up volume ownership
-func (m *localVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (m *localVolumeMounter) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
 	m.plugin.volumeLocks.LockKey(m.globalPath)
 	defer m.plugin.volumeLocks.UnlockKey(m.globalPath)
 

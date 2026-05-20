@@ -92,7 +92,7 @@ func (recorder *recorderImpl) eventf(logger klog.Logger, regarding runtime.Objec
 	}
 	event := recorder.makeEvent(refRegarding, refRelated, timestamp, annotations, eventtype, reason, message, recorder.reportingController, recorder.reportingInstance, action)
 	go func() {
-		defer utilruntime.HandleCrash()
+		defer utilruntime.HandleCrashWithLogger(logger)
 		recorder.Action(watch.Added, event)
 	}()
 }

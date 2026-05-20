@@ -114,7 +114,7 @@ func TestSyncHandler(t *testing.T) {
 		var expController *expandController
 		expController, _ = expc.(*expandController)
 		var expansionCalled bool
-		expController.operationGenerator = operationexecutor.NewFakeOGCounter(func() volumetypes.OperationContext {
+		expController.operationGenerator = operationexecutor.NewFakeOGCounter(func(ctx context.Context) volumetypes.OperationContext {
 			expansionCalled = true
 			return volumetypes.NewOperationContext(nil, nil, false)
 		})

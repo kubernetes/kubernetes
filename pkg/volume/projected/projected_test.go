@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/emptydir"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
 )
 
@@ -253,6 +254,7 @@ func TestCollectDataWithSecret(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 
 			testNamespace := "test_projected_namespace"
 			tc.secret.ObjectMeta = metav1.ObjectMeta{
@@ -282,7 +284,7 @@ func TestCollectDataWithSecret(t *testing.T) {
 				pod:    pod,
 			}
 
-			actualPayload, err := myVolumeMounter.collectData(volume.MounterArgs{})
+			actualPayload, err := myVolumeMounter.collectData(tCtx, volume.MounterArgs{})
 			if err != nil && tc.success {
 				t.Errorf("%v: unexpected failure making payload: %v", tc.name, err)
 				return
@@ -503,6 +505,7 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			testNamespace := "test_projected_namespace"
 			tc.configMap.ObjectMeta = metav1.ObjectMeta{
 				Namespace: testNamespace,
@@ -531,7 +534,7 @@ func TestCollectDataWithConfigMap(t *testing.T) {
 				pod:    pod,
 			}
 
-			actualPayload, err := myVolumeMounter.collectData(volume.MounterArgs{})
+			actualPayload, err := myVolumeMounter.collectData(tCtx, volume.MounterArgs{})
 			if err != nil && tc.success {
 				t.Errorf("%v: unexpected failure making payload: %v", tc.name, err)
 				return
@@ -683,6 +686,7 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			source := makeProjection("", ptr.To[int32](tc.mode), "downwardAPI")
 			source.Sources[0].DownwardAPI.Items = tc.volumeFile
 
@@ -701,7 +705,7 @@ func TestCollectDataWithDownwardAPI(t *testing.T) {
 				pod:    tc.pod,
 			}
 
-			actualPayload, err := myVolumeMounter.collectData(volume.MounterArgs{})
+			actualPayload, err := myVolumeMounter.collectData(tCtx, volume.MounterArgs{})
 			if err != nil && tc.success {
 				t.Errorf("%v: unexpected failure making payload: %v", tc.name, err)
 				return
@@ -828,6 +832,7 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			testNamespace := "test_projected_namespace"
 			source := makeProjection(tc.name, tc.defaultMode, "serviceAccountToken")
 			source.Sources[0].ServiceAccountToken.Audience = tc.audience
@@ -868,7 +873,7 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 				pod:    pod,
 			}
 
-			gotPayload, err := myVolumeMounter.collectData(volume.MounterArgs{FsUser: tc.fsUser, FsGroup: tc.fsGroup})
+			gotPayload, err := myVolumeMounter.collectData(tCtx, volume.MounterArgs{FsUser: tc.fsUser, FsGroup: tc.fsGroup})
 			if err != nil && (tc.wantErr == nil || tc.wantErr.Error() != err.Error()) {
 				t.Fatalf("collectData() = unexpected err: %v", err)
 			}
@@ -1001,6 +1006,7 @@ func TestCollectDataWithClusterTrustBundle(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
@@ -1027,7 +1033,7 @@ func TestCollectDataWithClusterTrustBundle(t *testing.T) {
 				pod:    pod,
 			}
 
-			gotPayload, err := myVolumeMounter.collectData(volume.MounterArgs{FsUser: tc.fsUser, FsGroup: tc.fsGroup})
+			gotPayload, err := myVolumeMounter.collectData(tCtx, volume.MounterArgs{FsUser: tc.fsUser, FsGroup: tc.fsGroup})
 			if err != nil {
 				t.Fatalf("Unexpected failure making payload: %v", err)
 			}
@@ -1104,6 +1110,7 @@ func TestCollectDataWithPodCertificate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
@@ -1130,7 +1137,7 @@ func TestCollectDataWithPodCertificate(t *testing.T) {
 				pod:    pod,
 			}
 
-			gotPayload, err := myVolumeMounter.collectData(volume.MounterArgs{FsUser: tc.fsUser, FsGroup: tc.fsGroup})
+			gotPayload, err := myVolumeMounter.collectData(tCtx, volume.MounterArgs{FsUser: tc.fsUser, FsGroup: tc.fsGroup})
 			if err != nil {
 				t.Fatalf("Unexpected failure making payload: %v", err)
 			}
@@ -1173,6 +1180,7 @@ func TestCanSupport(t *testing.T) {
 
 func TestPlugin(t *testing.T) {
 	var (
+		tCtx           = ktesting.Init(t)
 		testPodUID     = types.UID("test_pod_uid")
 		testVolumeName = "test_volume_name"
 		testNamespace  = "test_projected_namespace"
@@ -1206,7 +1214,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
-	err = mounter.SetUp(volume.MounterArgs{})
+	err = mounter.SetUp(tCtx, volume.MounterArgs{})
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -1234,6 +1242,7 @@ func TestPlugin(t *testing.T) {
 
 func TestInvalidPathProjected(t *testing.T) {
 	var (
+		tCtx           = ktesting.Init(t)
 		testPodUID     = types.UID("test_pod_uid")
 		testVolumeName = "test_volume_name"
 		testNamespace  = "test_projected_namespace"
@@ -1272,7 +1281,7 @@ func TestInvalidPathProjected(t *testing.T) {
 	}
 
 	var mounterArgs volume.MounterArgs
-	err = mounter.SetUp(mounterArgs)
+	err = mounter.SetUp(tCtx, mounterArgs)
 	if err == nil {
 		t.Errorf("Expected error while setting up secret")
 	}
@@ -1288,6 +1297,7 @@ func TestInvalidPathProjected(t *testing.T) {
 // should be mounter and the secret data written to it.
 func TestPluginReboot(t *testing.T) {
 	var (
+		tCtx           = ktesting.Init(t)
 		testPodUID     = types.UID("test_pod_uid3")
 		testVolumeName = "test_volume_name"
 		testNamespace  = "test_secret_namespace"
@@ -1323,7 +1333,7 @@ func TestPluginReboot(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
-	err = mounter.SetUp(volume.MounterArgs{})
+	err = mounter.SetUp(tCtx, volume.MounterArgs{})
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -1341,6 +1351,7 @@ func TestPluginReboot(t *testing.T) {
 
 func TestPluginOptional(t *testing.T) {
 	var (
+		tCtx           = ktesting.Init(t)
 		testPodUID     = types.UID("test_pod_uid")
 		testVolumeName = "test_volume_name"
 		testNamespace  = "test_secret_namespace"
@@ -1375,7 +1386,7 @@ func TestPluginOptional(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
-	err = mounter.SetUp(volume.MounterArgs{})
+	err = mounter.SetUp(tCtx, volume.MounterArgs{})
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}
@@ -1432,6 +1443,7 @@ func TestPluginOptional(t *testing.T) {
 
 func TestPluginOptionalKeys(t *testing.T) {
 	var (
+		tCtx           = ktesting.Init(t)
 		testPodUID     = types.UID("test_pod_uid")
 		testVolumeName = "test_volume_name"
 		testNamespace  = "test_secret_namespace"
@@ -1473,7 +1485,7 @@ func TestPluginOptionalKeys(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
-	err = mounter.SetUp(volume.MounterArgs{})
+	err = mounter.SetUp(tCtx, volume.MounterArgs{})
 	if err != nil {
 		t.Errorf("Failed to setup volume: %v", err)
 	}

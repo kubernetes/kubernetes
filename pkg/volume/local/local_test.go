@@ -19,6 +19,7 @@ limitations under the License.
 package local
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
+	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/mount-utils"
 	testingexec "k8s.io/utils/exec/testing"
 )
@@ -237,6 +239,7 @@ func TestGetVolumeName(t *testing.T) {
 }
 
 func TestInvalidLocalPath(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	tmpDir, plug := getPlugin(t)
 	defer os.RemoveAll(tmpDir)
 
@@ -246,7 +249,7 @@ func TestInvalidLocalPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = mounter.SetUp(volume.MounterArgs{})
+	err = mounter.SetUp(tCtx, volume.MounterArgs{})
 	expectedMsg := "invalid path: /no/backsteps/allowed/.. must not contain '..'"
 	if err.Error() != expectedMsg {
 		t.Fatalf("expected error `%s` but got `%s`", expectedMsg, err)
@@ -357,6 +360,7 @@ func TestNodeExpand(t *testing.T) {
 }
 
 func TestMountUnmount(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	tmpDir, plug := getPlugin(t)
 	defer os.RemoveAll(tmpDir)
 
@@ -375,7 +379,7 @@ func TestMountUnmount(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
-	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+	if err := mounter.SetUp(tCtx, volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 
@@ -479,7 +483,7 @@ func TestMapUnmap(t *testing.T) {
 	}
 }
 
-func testFSGroupMount(plug volume.VolumePlugin, pod *v1.Pod, tmpDir string, fsGroup int64) error {
+func testFSGroupMount(ctx context.Context, plug volume.VolumePlugin, pod *v1.Pod, tmpDir string, fsGroup int64) error {
 	mounter, err := plug.NewMounter(getTestVolume(false, tmpDir, false, nil), pod)
 	if err != nil {
 		return err
@@ -496,7 +500,7 @@ func testFSGroupMount(plug volume.VolumePlugin, pod *v1.Pod, tmpDir string, fsGr
 
 	var mounterArgs volume.MounterArgs
 	mounterArgs.FsGroup = &fsGroup
-	if err := mounter.SetUp(mounterArgs); err != nil {
+	if err := mounter.SetUp(ctx, mounterArgs); err != nil {
 		return err
 	}
 	return nil
@@ -637,6 +641,7 @@ func TestConstructBlockVolumeSpec(t *testing.T) {
 }
 
 func TestMountOptions(t *testing.T) {
+	tCtx := ktesting.Init(t)
 	tmpDir, plug := getPlugin(t)
 	defer os.RemoveAll(tmpDir)
 
@@ -653,7 +658,7 @@ func TestMountOptions(t *testing.T) {
 	fakeMounter := mount.NewFakeMounter(nil)
 	mounter.(*localVolumeMounter).mounter = fakeMounter
 
-	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+	if err := mounter.SetUp(tCtx, volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 	mountOptions := fakeMounter.MountPoints[0].Opts

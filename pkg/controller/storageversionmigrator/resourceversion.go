@@ -55,7 +55,7 @@ var verbsRequiredForMigration = []string{"update", "patch", "list"}
 // to the SVM status before the migration is initiated. This resource version is utilized for checking
 // freshness of GC cache before the migration is initiated.
 type ResourceVersionController struct {
-	discoveryClient discovery.DiscoveryInterface
+	discoveryClient discovery.DiscoveryInterfaceWithContext
 	metadataClient  metadata.Interface
 	svmListers      svmlisters.StorageVersionMigrationLister
 	svmSynced       cache.InformerSynced
@@ -79,7 +79,7 @@ func NewResourceVersionController(
 
 	rvController := &ResourceVersionController{
 		kubeClient:      kubeClient,
-		discoveryClient: discoveryClient,
+		discoveryClient: discovery.ToDiscoveryInterfaceWithContext(discoveryClient),
 		metadataClient:  metadataClient,
 		svmListers:      svmInformer.Lister(),
 		svmSynced:       svmInformer.Informer().HasSynced,
@@ -224,7 +224,7 @@ func (rv *ResourceVersionController) sync(ctx context.Context, key string) error
 		return rv.failMigration(ctx, toBeProcessedSVM, "resource does not exist in discovery")
 	}
 
-	isMigratable, err := rv.isResourceMigratable(*gvr)
+	isMigratable, err := rv.isResourceMigratable(ctx, *gvr)
 	if err != nil {
 		return err
 	}
@@ -260,7 +260,7 @@ func (rv *ResourceVersionController) sync(ctx context.Context, key string) error
 }
 
 func (rv *ResourceVersionController) getLatestResourceVersion(gvr schema.GroupVersionResource, ctx context.Context) (string, error) {
-	isResourceNamespaceScoped, err := rv.isResourceNamespaceScoped(gvr)
+	isResourceNamespaceScoped, err := rv.isResourceNamespaceScoped(ctx, gvr)
 	if err != nil {
 		return "", err
 	}
@@ -309,8 +309,8 @@ func resourceFor(mapper meta.RESTMapper, gr metav1.GroupResource) (*schema.Group
 	return nil, false, nil
 }
 
-func (rv *ResourceVersionController) isResourceNamespaceScoped(gvr schema.GroupVersionResource) (bool, error) {
-	resourceList, err := rv.discoveryClient.ServerResourcesForGroupVersion(gvr.GroupVersion().String())
+func (rv *ResourceVersionController) isResourceNamespaceScoped(ctx context.Context, gvr schema.GroupVersionResource) (bool, error) {
+	resourceList, err := rv.discoveryClient.ServerResourcesForGroupVersionWithContext(ctx, gvr.GroupVersion().String())
 	if err != nil {
 		return false, err
 	}
@@ -328,8 +328,8 @@ func (rv *ResourceVersionController) isResourceNamespaceScoped(gvr schema.GroupV
 // migration. Returns true if all verbs are in the discovery document and false
 // otherwise. If there is an error querying the discovery client or we fail to
 // get the GVR, return an error.
-func (rv *ResourceVersionController) isResourceMigratable(gvr schema.GroupVersionResource) (bool, error) {
-	resourceList, err := rv.discoveryClient.ServerResourcesForGroupVersion(gvr.GroupVersion().String())
+func (rv *ResourceVersionController) isResourceMigratable(ctx context.Context, gvr schema.GroupVersionResource) (bool, error) {
+	resourceList, err := rv.discoveryClient.ServerResourcesForGroupVersionWithContext(ctx, gvr.GroupVersion().String())
 	if apierrors.IsNotFound(err) {
 		return false, nil
 	}

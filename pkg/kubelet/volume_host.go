@@ -265,12 +265,12 @@ func (kvh *kubeletVolumeHost) DeleteServiceAccountTokenFunc() func(podUID types.
 	return kvh.tokenManager.DeleteServiceAccountToken
 }
 
-func (kvh *kubeletVolumeHost) GetTrustAnchorsByName(name string, allowMissing bool) ([]byte, error) {
-	return kvh.clusterTrustBundleManager.GetTrustAnchorsByName(name, allowMissing)
+func (kvh *kubeletVolumeHost) GetTrustAnchorsByName(ctx context.Context, name string, allowMissing bool) ([]byte, error) {
+	return kvh.clusterTrustBundleManager.GetTrustAnchorsByName(ctx, name, allowMissing)
 }
 
-func (kvh *kubeletVolumeHost) GetTrustAnchorsBySigner(signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error) {
-	return kvh.clusterTrustBundleManager.GetTrustAnchorsBySigner(signerName, labelSelector, allowMissing)
+func (kvh *kubeletVolumeHost) GetTrustAnchorsBySigner(ctx context.Context, signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error) {
+	return kvh.clusterTrustBundleManager.GetTrustAnchorsBySigner(ctx, signerName, labelSelector, allowMissing)
 }
 
 func (kvh *kubeletVolumeHost) GetPodCertificateCredentialBundle(ctx context.Context, namespace, podName, podUID, volumeName string, sourceIndex int) ([]byte, []byte, error) {

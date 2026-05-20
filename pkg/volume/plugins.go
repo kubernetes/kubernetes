@@ -308,11 +308,11 @@ type KubeletVolumeHost interface {
 	GetHostUtil() hostutil.HostUtils
 
 	// Returns trust anchors from the named ClusterTrustBundle.
-	GetTrustAnchorsByName(name string, allowMissing bool) ([]byte, error)
+	GetTrustAnchorsByName(ctx context.Context, name string, allowMissing bool) ([]byte, error)
 
 	// Returns trust anchors from the ClusterTrustBundles selected by signer
 	// name and label selector.
-	GetTrustAnchorsBySigner(signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error)
+	GetTrustAnchorsBySigner(ctx context.Context, signerName string, labelSelector *metav1.LabelSelector, allowMissing bool) ([]byte, error)
 
 	// Returns the credential bundle for the specified podCertificate projected volume source.
 	GetPodCertificateCredentialBundle(ctx context.Context, namespace, podName, podUID, volumeName string, sourceIndex int) ([]byte, []byte, error)

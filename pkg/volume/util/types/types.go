@@ -18,6 +18,7 @@ limitations under the License.
 package types
 
 import (
+	"context"
 	"errors"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -40,7 +41,7 @@ type UniquePVCName types.UID
 type GeneratedOperations struct {
 	// Name of operation - could be used for resetting shared exponential backoff
 	OperationName     string
-	OperationFunc     func() (context OperationContext)
+	OperationFunc     func(ctx context.Context) (context OperationContext)
 	EventRecorderFunc func(*error)
 	CompleteFunc      func(CompleteFuncParam)
 }
@@ -65,7 +66,7 @@ type CompleteFuncParam struct {
 }
 
 // Run executes the operations and its supporting functions
-func (o *GeneratedOperations) Run() (eventErr, detailedErr error) {
+func (o *GeneratedOperations) Run(ctx context.Context) (eventErr, detailedErr error) {
 	var context OperationContext
 	if o.CompleteFunc != nil {
 		c := CompleteFuncParam{
@@ -80,7 +81,7 @@ func (o *GeneratedOperations) Run() (eventErr, detailedErr error) {
 	// Handle panic, if any, from operationFunc()
 	defer runtime.RecoverFromPanic(&detailedErr)
 
-	context = o.OperationFunc()
+	context = o.OperationFunc(ctx)
 	return context.EventErr, context.DetailedErr
 }
 

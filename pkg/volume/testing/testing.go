@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -744,10 +745,10 @@ func (_ *FakeVolume) GetAttributes() volume.Attributes {
 	}
 }
 
-func (fv *FakeVolume) SetUp(mounterArgs volume.MounterArgs) error {
+func (fv *FakeVolume) SetUp(ctx context.Context, mounterArgs volume.MounterArgs) error {
 	fv.Lock()
 	defer fv.Unlock()
-	err := fv.setupInternal(mounterArgs)
+	err := fv.setupInternal(ctx, mounterArgs)
 	fv.SetUpCallCount++
 	if fv.SetUpHook != nil {
 		return fv.SetUpHook(fv.Plugin, mounterArgs)
@@ -755,7 +756,7 @@ func (fv *FakeVolume) SetUp(mounterArgs volume.MounterArgs) error {
 	return err
 }
 
-func (fv *FakeVolume) setupInternal(mounterArgs volume.MounterArgs) error {
+func (fv *FakeVolume) setupInternal(ctx context.Context, mounterArgs volume.MounterArgs) error {
 	if fv.VolName == TimeoutOnSetupVolumeName {
 		fv.VolumeMountState[fv.VolName] = volumeMountUncertain
 		return volumetypes.NewUncertainProgressError("time out on setup")
@@ -794,7 +795,7 @@ func (fv *FakeVolume) setupInternal(mounterArgs volume.MounterArgs) error {
 	}
 
 	fv.VolumeMountState[fv.VolName] = volumeNotMounted
-	return fv.SetUpAt(fv.getPath(), mounterArgs)
+	return fv.SetUpAt(ctx, fv.getPath(), mounterArgs)
 }
 
 func (fv *FakeVolume) GetSetUpCallCount() int {
@@ -803,7 +804,7 @@ func (fv *FakeVolume) GetSetUpCallCount() int {
 	return fv.SetUpCallCount
 }
 
-func (fv *FakeVolume) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
+func (fv *FakeVolume) SetUpAt(ctx context.Context, dir string, mounterArgs volume.MounterArgs) error {
 	return os.MkdirAll(dir, 0750)
 }
 
