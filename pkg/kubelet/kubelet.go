@@ -702,6 +702,7 @@ func NewMainKubelet(ctx context.Context,
 		klet.statusManager.AddPodUpdateNotifier(klet.podsServer)
 	}
 	klet.allocationManager = allocation.NewManager(
+		klog.FromContext(ctx),
 		klet.getRootDir(),
 		klet.statusManager,
 		klet.syncPodNow,

@@ -372,7 +372,7 @@ func NewKubeGenericRuntimeManager(
 		versionCacheTTL,
 	)
 
-	kubeRuntimeManager.actuatedState, err = state.NewStateCheckpoint(rootDirectory, actuatedPodsStateFile)
+	kubeRuntimeManager.actuatedState, err = state.NewStateCheckpoint(klog.FromContext(ctx), rootDirectory, actuatedPodsStateFile)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initialize actuated state checkpoint: %w", err)
 	}

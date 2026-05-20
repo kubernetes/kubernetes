@@ -33,12 +33,14 @@ import (
 const testCheckpoint = "pod_status_manager_state"
 
 func newTestStateCheckpoint(t *testing.T) *stateCheckpoint {
+	logger, _ := ktesting.NewTestContext(t)
 	testingDir := getTestDir(t)
-	cache := NewStateMemory(PodResourceInfoMap{})
+	cache := NewStateMemory(logger, PodResourceInfoMap{})
 	checkpointManager, err := checkpointmanager.NewCheckpointManager(testingDir)
 	require.NoError(t, err, "failed to create checkpoint manager")
 	checkpointName := "pod_state_checkpoint"
 	sc := &stateCheckpoint{
+		logger:            logger,
 		cache:             cache,
 		checkpointManager: checkpointManager,
 		checkpointName:    checkpointName,
@@ -118,7 +120,7 @@ func Test_stateCheckpoint_storeState(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			logger, _ := ktesting.NewTestContext(t)
 			testDir := getTestDir(t)
-			originalSC, err := NewStateCheckpoint(testDir, testCheckpoint)
+			originalSC, err := NewStateCheckpoint(logger, testDir, testCheckpoint)
 			require.NoError(t, err)
 
 			for podUID, alloc := range tt.args.resInfoMap {
@@ -129,7 +131,7 @@ func Test_stateCheckpoint_storeState(t *testing.T) {
 			actual := originalSC.GetPodResourceInfoMap()
 			verifyPodResourceAllocation(t, &tt.args.resInfoMap, &actual, "stored pod resource allocation is not equal to original pod resource allocation")
 
-			newSC, err := NewStateCheckpoint(testDir, testCheckpoint)
+			newSC, err := NewStateCheckpoint(logger, testDir, testCheckpoint)
 			require.NoError(t, err)
 
 			actual = newSC.GetPodResourceInfoMap()
@@ -192,7 +194,7 @@ func Test_stateCheckpoint_formatUpgraded(t *testing.T) {
 
 	require.Equal(t, expectedPodResourceAllocation, actualPodResourceAllocation, "pod resource allocation info is not equal")
 
-	sc.cache = NewStateMemory(actualPodResourceAllocation)
+	sc.cache = NewStateMemory(logger, actualPodResourceAllocation)
 
 	actualPodResourceAllocation = sc.cache.GetPodResourceInfoMap()
 
