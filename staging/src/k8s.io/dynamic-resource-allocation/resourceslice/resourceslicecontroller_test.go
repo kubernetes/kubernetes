@@ -131,7 +131,7 @@ func TestControllerSyncPool(t *testing.T) {
 			},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
-					ResourceVersion("0").
+					ResourceVersion("1").
 					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
 					Driver(driverName).Devices([]resourceapi.Device{}).
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
@@ -610,7 +610,7 @@ func TestControllerSyncPool(t *testing.T) {
 			},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
-					ResourceVersion("0").
+					ResourceVersion("1").
 					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
 					Driver(driverName).Devices([]resourceapi.Device{newDevice(deviceName)}).
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 3, ResourceSliceCount: 1}).Obj(),
@@ -796,7 +796,7 @@ func TestControllerSyncPool(t *testing.T) {
 					Driver(driverName).Devices([]resourceapi.Device{newDevice(deviceName3)}).
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 2, ResourceSliceCount: 4}).Obj(),
 				*MakeResourceSlice().Name(generateName4+"0").GenerateName(generateName4).
-					ResourceVersion("0").
+					ResourceVersion("1").
 					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
 					Driver(driverName).Devices([]resourceapi.Device{newDevice(deviceName4)}).
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 2, ResourceSliceCount: 4}).Obj(),
@@ -819,7 +819,7 @@ func TestControllerSyncPool(t *testing.T) {
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(encodeIndex(0, resourceSliceIndexMinLength) + "-" + driverName + "-0").
 					GenerateName(encodeIndex(0, resourceSliceIndexMinLength) + "-" + driverName + "-").
-					ResourceVersion("0").
+					ResourceVersion("1").
 					AllNodes(true).
 					NodeName("").
 					NodeSelector(nil).
@@ -843,7 +843,7 @@ func TestControllerSyncPool(t *testing.T) {
 			},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(generateName1 + "0").GenerateName(generateName1).
-					ResourceVersion("0").
+					ResourceVersion("1").
 					AppOwnerReferences(ownerName).NodeSelector(nodeSelector).
 					Driver(driverName).Devices([]resourceapi.Device{newDevice(deviceName)}).
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 1}).Obj(),
@@ -864,7 +864,7 @@ func TestControllerSyncPool(t *testing.T) {
 			expectedStats: Stats{NumCreates: 1},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
-					ResourceVersion("0").
+					ResourceVersion("1").
 					NodeOwnerReferences(ownerName, string(nodeUID)).
 					AllNodes(true).
 					NodeName("").
@@ -889,7 +889,7 @@ func TestControllerSyncPool(t *testing.T) {
 			expectedStats: Stats{NumCreates: 1},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
-					ResourceVersion("0").
+					ResourceVersion("1").
 					NodeOwnerReferences(ownerName, string(nodeUID)).
 					NodeSelector(nodeSelector).
 					Driver(driverName).Devices([]resourceapi.Device{newDevice(deviceName)}).
@@ -910,7 +910,7 @@ func TestControllerSyncPool(t *testing.T) {
 			expectedStats: Stats{NumCreates: 1},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
-					ResourceVersion("0").
+					ResourceVersion("1").
 					NodeOwnerReferences(ownerName, string(nodeUID)).
 					PerDeviceNodeSelection(true).
 					Driver(driverName).Devices([]resourceapi.Device{newDevice(deviceName, nodeSelector)}).
@@ -981,7 +981,7 @@ func TestControllerSyncPool(t *testing.T) {
 			},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
-					ResourceVersion("0").
+					ResourceVersion("1").
 					AppOwnerReferences(ownerName).
 					AllNodes(false).
 					NodeName("").
@@ -997,7 +997,7 @@ func TestControllerSyncPool(t *testing.T) {
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 2}).
 					Obj(),
 				*MakeResourceSlice().Name(resourceSlice2).GenerateName(generateName2).
-					ResourceVersion("0").
+					ResourceVersion("1").
 					AppOwnerReferences(ownerName).
 					AllNodes(false).
 					NodeName("").
@@ -1060,7 +1060,7 @@ func TestControllerSyncPool(t *testing.T) {
 			},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
-					ResourceVersion("0").
+					ResourceVersion("1").
 					AppOwnerReferences(ownerName).
 					AllNodes(false).
 					NodeName("").
@@ -1070,7 +1070,7 @@ func TestControllerSyncPool(t *testing.T) {
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 1, ResourceSliceCount: 2}).
 					Obj(),
 				*MakeResourceSlice().Name(resourceSlice2).GenerateName(generateName2).
-					ResourceVersion("0").
+					ResourceVersion("1").
 					AppOwnerReferences(ownerName).
 					AllNodes(false).
 					NodeName("").
@@ -1109,7 +1109,7 @@ func TestControllerSyncPool(t *testing.T) {
 			},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
-					ResourceVersion("0").
+					ResourceVersion("1").
 					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
 					Driver(driverName).
 					Devices(func() []resourceapi.Device {
@@ -1147,7 +1147,7 @@ func TestControllerSyncPool(t *testing.T) {
 			},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
-					ResourceVersion("0").
+					ResourceVersion("1").
 					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
 					Driver(driverName).
 					Devices([]resourceapi.Device{newDevice(deviceName)}).
@@ -1322,17 +1322,17 @@ func TestControllerSyncPool(t *testing.T) {
 			},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(resourceSlice1).GenerateName(generateName1).
-					ResourceVersion("0").
+					ResourceVersion("1").
 					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
 					Driver(driverName).Devices([]resourceapi.Device{newDevice(deviceName1)}).
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 2, ResourceSliceCount: 3}).Obj(),
 				*MakeResourceSlice().Name(resourceSlice2).GenerateName(generateName2).
-					ResourceVersion("0").
+					ResourceVersion("1").
 					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
 					Driver(driverName).Devices([]resourceapi.Device{newDevice(deviceName2)}).
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 2, ResourceSliceCount: 3}).Obj(),
 				*MakeResourceSlice().Name(resourceSlice3).GenerateName(generateName3).
-					ResourceVersion("0").
+					ResourceVersion("1").
 					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
 					Driver(driverName).Devices([]resourceapi.Device{newDevice(deviceName3)}).
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 2, ResourceSliceCount: 3}).Obj(),
@@ -1372,7 +1372,7 @@ func TestControllerSyncPool(t *testing.T) {
 			},
 			expectedResourceSlices: []resourceapi.ResourceSlice{
 				*MakeResourceSlice().Name(generateName1+"0").GenerateName(generateName1).
-					ResourceVersion("0").
+					ResourceVersion("1").
 					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
 					Driver(driverName).Devices([]resourceapi.Device{newDevice(deviceName1)}).
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 2, ResourceSliceCount: 3}).Obj(),
@@ -1381,7 +1381,7 @@ func TestControllerSyncPool(t *testing.T) {
 					Driver(driverName).Devices([]resourceapi.Device{newDevice(deviceName2)}).
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 2, ResourceSliceCount: 3}).Obj(),
 				*MakeResourceSlice().Name(generateName3+"1").GenerateName(generateName3).
-					ResourceVersion("0").
+					ResourceVersion("1").
 					NodeOwnerReferences(ownerName, string(nodeUID)).NodeName(ownerName).
 					Driver(driverName).Devices([]resourceapi.Device{newDevice(deviceName3)}).
 					Pool(resourceapi.ResourcePool{Name: poolName, Generation: 2, ResourceSliceCount: 3}).Obj(),
@@ -1629,8 +1629,9 @@ func createResourceSliceCreateReactor(features features, timeAdded metav1.Time) 
 		mutex.Lock()
 		defer mutex.Unlock()
 		resourceslice := action.(k8stesting.CreateAction).GetObject().(*resourceapi.ResourceSlice)
-		// Assign initial ResourceVersion "0" to newly created slices.
-		resourceslice.ResourceVersion = "0"
+		// Assign initial ResourceVersion "1" to newly created slices.
+		// Avoid using "0" because "0" and "" are treated the same by client-go's MutationCache.
+		resourceslice.ResourceVersion = "1"
 		if resourceslice.Name == "" && resourceslice.GenerateName != "" {
 			resourceslice.Name = fmt.Sprintf("%s%d", resourceslice.GenerateName, nameCounter)
 		}
