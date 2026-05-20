@@ -55,7 +55,7 @@ func main() {
 
 	if err := run(*changelogFile, *verify, *insert, *changes, *title, *description); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		if errors.Is(err, verificationFailErr) {
+		if errors.Is(err, errVerificationFail) {
 			os.Exit(2)
 		}
 		os.Exit(1)
@@ -63,18 +63,18 @@ func main() {
 }
 
 var (
-	// operationErr is returned when neither or both of -insert and -verify are specified.
-	operationErr = errors.New("exactly one of -insert or -verify must be selected")
-	// verificationFailErr is returned when verification fails because expected changes are not found.
-	verificationFailErr = errors.New("changes not found in code blocks of first heading")
+	// errOperation is returned when neither or both of -insert and -verify are specified.
+	errOperation = errors.New("exactly one of -insert or -verify must be selected")
+	// errVerificationFail is returned when verification fails because expected changes are not found.
+	errVerificationFail = errors.New("changes not found in code blocks of first heading")
 )
 
 // run executes the main logic for either inserting or verifying changelog entries.
-// Returns verificationFailErr (exit code 2) if verification fails, or other errors (exit code 1).
+// Returns errVerificationFail (exit code 2) if verification fails, or other errors (exit code 1).
 func run(changelogFile string, verify bool, insert bool, changes, title, description string) error {
 	if !verify && !insert ||
 		verify && insert {
-		return operationErr
+		return errOperation
 	}
 	if changes == "" {
 		return errors.New("no changes specified")
@@ -117,12 +117,12 @@ func run(changelogFile string, verify bool, insert bool, changes, title, descrip
 			}
 		}
 		if !found {
-			return verificationFailErr
+			return errVerificationFail
 		}
 		fmt.Println("Verification successful")
 	default:
 		// Not reached in practice, added for the sake of completeness.
-		return operationErr
+		return errOperation
 	}
 
 	return nil
@@ -262,8 +262,7 @@ func matchesWithWildcard(pattern, text []string) bool {
 func grepAPIChanges(r io.Reader, w io.Writer, exclude bool) error {
 	// Parse the allowlist file to extract regular expressions.
 	var patterns []*regexp.Regexp
-	lines := strings.Split(apiChangesAllowlist, "\n")
-	for _, line := range lines {
+	for line := range strings.SplitSeq(apiChangesAllowlist, "\n") {
 		line = strings.TrimSpace(line)
 		// Skip empty lines and comments.
 		if line == "" || strings.HasPrefix(line, "#") {
@@ -290,7 +289,9 @@ func grepAPIChanges(r io.Reader, w io.Writer, exclude bool) error {
 		}
 		// Write lines based on exclude parameter and whether the line matched.
 		if matched == !exclude {
-			fmt.Fprintln(w, line)
+			if _, err := fmt.Fprintln(w, line); err != nil {
+				return fmt.Errorf("failed to write output: %w", err)
+			}
 		}
 	}
 

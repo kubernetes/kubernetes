@@ -18,6 +18,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -392,8 +393,8 @@ different content
 		}
 
 		err := run(changelogPath, true, false, "expected content", "", "")
-		if err != verificationFailErr {
-			t.Errorf("run() verify mode error = %v, expected verificationFailErr", err)
+		if !errors.Is(err, errVerificationFail) {
+			t.Errorf("run() verify mode error = %v, expected errVerificationFail", err)
 		}
 	})
 
@@ -408,16 +409,16 @@ different content
 	t.Run("both-flags-set", func(t *testing.T) {
 		changelogPath := filepath.Join(tempDir, "test.md")
 		err := run(changelogPath, true, true, "changes", "", "")
-		if err != operationErr {
-			t.Errorf("run() with both flags error = %v, expected operationErr", err)
+		if !errors.Is(err, errOperation) {
+			t.Errorf("run() with both flags error = %v, expected errOperation", err)
 		}
 	})
 
 	t.Run("no-flags-set", func(t *testing.T) {
 		changelogPath := filepath.Join(tempDir, "test.md")
 		err := run(changelogPath, false, false, "changes", "", "")
-		if err != operationErr {
-			t.Errorf("run() with no flags error = %v, expected operationErr", err)
+		if !errors.Is(err, errOperation) {
+			t.Errorf("run() with no flags error = %v, expected errOperation", err)
 		}
 	})
 }
@@ -516,11 +517,11 @@ func TestFilterChanges(t *testing.T) {
 
 			err := grepAPIChanges(input, &output, tt.exclude)
 			if err != nil {
-				t.Fatalf("filterChanges() error = %v", err)
+				t.Fatalf("grepAPIChanges() error = %v", err)
 			}
 
 			if output.String() != tt.expected {
-				t.Errorf("filterChanges() output mismatch\nGot:\n%s\nExpected:\n%s", output.String(), tt.expected)
+				t.Errorf("grepAPIChanges() output mismatch\nGot:\n%s\nExpected:\n%s", output.String(), tt.expected)
 			}
 		})
 	}
