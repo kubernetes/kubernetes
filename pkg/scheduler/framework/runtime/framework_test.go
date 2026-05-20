@@ -4676,3 +4676,196 @@ scheduler_plugin_evaluation_total{extension_point="Score",plugin="plugin-eval-sc
 		t.Fatalf("unexpected plugin_evaluation_total metric output:\n%v", err)
 	}
 }
+
+type testResizePlugin struct {
+	name                  string
+	preFilterCalledCount  int
+	filterCalledCount     int
+	postFilterCalledCount int
+	interested            bool
+}
+
+func (p *testResizePlugin) Name() string {
+	return p.name
+}
+
+func (p *testResizePlugin) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+	p.preFilterCalledCount++
+	return nil, nil
+}
+
+func (p *testResizePlugin) PreFilterExtensions() fwk.PreFilterExtensions {
+	return nil
+}
+
+func (p *testResizePlugin) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	p.filterCalledCount++
+	return nil
+}
+
+func (p *testResizePlugin) PostFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, filteredNodeStatusMap fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
+	p.postFilterCalledCount++
+	return nil, fwk.NewStatus(fwk.Unschedulable, "preempted")
+}
+
+func (p *testResizePlugin) ShouldHandleDeferredResize(ctx context.Context, pod *v1.Pod, nodeName string) bool {
+	return p.interested
+}
+
+type testStandardPostFilterPlugin struct {
+	name                  string
+	postFilterCalledCount int
+}
+
+func (p *testStandardPostFilterPlugin) Name() string {
+	return p.name
+}
+
+func (p *testStandardPostFilterPlugin) PostFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, filteredNodeStatusMap fwk.NodeToStatusReader) (*fwk.PostFilterResult, *fwk.Status) {
+	p.postFilterCalledCount++
+	return nil, fwk.NewStatus(fwk.Unschedulable, "preempted")
+}
+
+func TestDeferredResizePodFiltering(t *testing.T) {
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// 1. Register plugins:
+	// - "interested-plugin": implements ResizeInterestedPlugin and returns true
+	// - "not-interested-plugin": implements ResizeInterestedPlugin and returns false
+	// - "standard-plugin": does not implement ResizeInterestedPlugin at all
+	registry := Registry{}
+	
+	interestedPl := &testResizePlugin{name: "interested-plugin", interested: true}
+	if err := registry.Register(interestedPl.name, func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+		return interestedPl, nil
+	}); err != nil {
+		t.Fatalf("failed to register: %v", err)
+	}
+
+	notInterestedPl := &testResizePlugin{name: "not-interested-plugin", interested: false}
+	if err := registry.Register(notInterestedPl.name, func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+		return notInterestedPl, nil
+	}); err != nil {
+		t.Fatalf("failed to register: %v", err)
+	}
+
+	standardPl := &TestPlugin{name: "standard-plugin", inj: injectedResult{PreFilterStatus: int(fwk.Success), FilterStatus: int(fwk.Success)}}
+	if err := registry.Register(standardPl.name, func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+		return standardPl, nil
+	}); err != nil {
+		t.Fatalf("failed to register: %v", err)
+	}
+
+	standardPostFilterPl := &testStandardPostFilterPlugin{name: "standard-postfilter-plugin"}
+	if err := registry.Register(standardPostFilterPl.name, func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+		return standardPostFilterPl, nil
+	}); err != nil {
+		t.Fatalf("failed to register: %v", err)
+	}
+
+	cfgPls := &config.Plugins{}
+	cfgPls.PreFilter.Enabled = append(cfgPls.PreFilter.Enabled,
+		config.Plugin{Name: interestedPl.name},
+		config.Plugin{Name: notInterestedPl.name},
+		config.Plugin{Name: standardPl.name},
+	)
+	cfgPls.Filter.Enabled = append(cfgPls.Filter.Enabled,
+		config.Plugin{Name: interestedPl.name},
+		config.Plugin{Name: notInterestedPl.name},
+		config.Plugin{Name: standardPl.name},
+	)
+	cfgPls.PostFilter.Enabled = append(cfgPls.PostFilter.Enabled,
+		config.Plugin{Name: interestedPl.name},
+		config.Plugin{Name: notInterestedPl.name},
+		config.Plugin{Name: standardPostFilterPl.name},
+	)
+
+	profile := config.KubeSchedulerProfile{
+		SchedulerName: testProfileName,
+		Plugins:       cfgPls,
+	}
+
+	f, err := newFrameworkWithQueueSortAndBind(ctx, registry, profile, WithSnapshotSharedLister(cache.NewEmptySnapshot()))
+	if err != nil {
+		t.Fatalf("failed to create framework: %v", err)
+	}
+	defer func() { _ = f.Close() }()
+
+	// Construct a deferred resize pod
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "deferred-pod", Namespace: "default"},
+		Spec: v1.PodSpec{
+			NodeName: "node1",
+		},
+		Status: v1.PodStatus{
+			Conditions: []v1.PodCondition{
+				{
+					Type:   v1.PodResizePending,
+					Reason: v1.PodReasonDeferred,
+				},
+			},
+		},
+	}
+
+	state := framework.NewCycleState()
+
+	// 2. Run PreFilter:
+	_, status, _ := f.RunPreFilterPlugins(ctx, state, pod)
+	if status != nil && !status.IsSuccess() {
+		t.Fatalf("RunPreFilterPlugins returned unexpected status: %v", status)
+	}
+
+	// Verify prefilter calls:
+	if interestedPl.preFilterCalledCount != 1 {
+		t.Errorf("expected interested-plugin PreFilter to be called 1 time, got %d", interestedPl.preFilterCalledCount)
+	}
+	if notInterestedPl.preFilterCalledCount != 0 {
+		t.Errorf("expected not-interested-plugin PreFilter to not be called, got %d", notInterestedPl.preFilterCalledCount)
+	}
+
+	// Verify skipped filter plugins set on CycleState:
+	skipped := state.GetSkipFilterPlugins()
+	if !skipped.Has(notInterestedPl.name) {
+		t.Errorf("expected not-interested-plugin to be marked as skipped, but wasn't")
+	}
+	if !skipped.Has(standardPl.name) {
+		t.Errorf("expected standard-plugin to be marked as skipped, but wasn't")
+	}
+	if skipped.Has(interestedPl.name) {
+		t.Errorf("expected interested-plugin to not be marked as skipped, but was")
+	}
+
+	// 3. Run Filter:
+	nodeInfo := framework.NewNodeInfo()
+	node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node1"}}
+	nodeInfo.SetNode(node)
+	stFilter := f.RunFilterPlugins(ctx, state, pod, nodeInfo)
+	if stFilter != nil && !stFilter.IsSuccess() {
+		t.Fatalf("RunFilterPlugins returned unexpected status: %v", stFilter)
+	}
+
+	if interestedPl.filterCalledCount != 1 {
+		t.Errorf("expected interested-plugin Filter to be called 1 time, got %d", interestedPl.filterCalledCount)
+	}
+	if notInterestedPl.filterCalledCount != 0 {
+		t.Errorf("expected not-interested-plugin Filter to not be called, got %d", notInterestedPl.filterCalledCount)
+	}
+
+	// 4. Run PostFilter:
+	_, stPostFilter := f.RunPostFilterPlugins(ctx, state, pod, nil)
+	if stPostFilter == nil || stPostFilter.Code() != fwk.Unschedulable {
+		t.Fatalf("RunPostFilterPlugins returned unexpected status: %v", stPostFilter)
+	}
+
+	if interestedPl.postFilterCalledCount != 1 {
+		t.Errorf("expected interested-plugin PostFilter to be called 1 time, got %d", interestedPl.postFilterCalledCount)
+	}
+	if notInterestedPl.postFilterCalledCount != 0 {
+		t.Errorf("expected not-interested-plugin PostFilter to not be called, got %d", notInterestedPl.postFilterCalledCount)
+	}
+	if standardPostFilterPl.postFilterCalledCount != 0 {
+		t.Errorf("expected standard-postfilter-plugin PostFilter to not be called, got %d", standardPostFilterPl.postFilterCalledCount)
+	}
+}

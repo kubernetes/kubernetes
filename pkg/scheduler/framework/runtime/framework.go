@@ -36,6 +36,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/component-helpers/resource"
 	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -944,6 +945,12 @@ func (f *frameworkImpl) RunPreFilterPlugins(ctx context.Context, state fwk.Cycle
 			logger := klog.LoggerWithName(logger, pl.Name())
 			ctx = klog.NewContext(ctx, logger)
 		}
+		if pod != nil && resource.IsPodResizeDeferred(pod) {
+			if rip, ok := unwrapPlugin(pl).(fwk.ResizeInterestedPlugin); !ok || !rip.ShouldHandleDeferredResize(ctx, pod, pod.Spec.NodeName) {
+				skipPlugins.Insert(pl.Name())
+				continue
+			}
+		}
 		r, s := f.runPreFilterPlugin(ctx, pl, state, pod, nodes)
 		if s.IsSkip() {
 			skipPlugins.Insert(pl.Name())
@@ -1106,6 +1113,11 @@ func (f *frameworkImpl) RunFilterPlugins(
 		if state.GetSkipFilterPlugins().Has(pl.Name()) {
 			continue
 		}
+		if pod != nil && resource.IsPodResizeDeferred(pod) {
+			if rip, ok := unwrapPlugin(pl).(fwk.ResizeInterestedPlugin); !ok || !rip.ShouldHandleDeferredResize(ctx, pod, pod.Spec.NodeName) {
+				continue
+			}
+		}
 		ctx := ctx
 		if verboseLogs {
 			logger := klog.LoggerWithName(logger, pl.Name())
@@ -1158,6 +1170,11 @@ func (f *frameworkImpl) RunPostFilterPlugins(ctx context.Context, state fwk.Cycl
 	var reasons []string
 	var rejectorPlugin string
 	for _, pl := range f.postFilterPlugins {
+		if pod != nil && resource.IsPodResizeDeferred(pod) {
+			if rip, ok := unwrapPlugin(pl).(fwk.ResizeInterestedPlugin); !ok || !rip.ShouldHandleDeferredResize(ctx, pod, pod.Spec.NodeName) {
+				continue
+			}
+		}
 		ctx := ctx
 		if verboseLogs {
 			logger := klog.LoggerWithName(logger, pl.Name())
@@ -2266,4 +2283,23 @@ func (f *frameworkImpl) APICacher() fwk.APICacher {
 // TotalBatchedPods returns the total number of batched pods. Used only for tests
 func (f *frameworkImpl) TotalBatchedPods() int64 {
 	return f.batch.batchedPods
+}
+
+func unwrapPlugin(pl fwk.Plugin) fwk.Plugin {
+	if pl == nil {
+		return nil
+	}
+	if wrapped, ok := pl.(*instrumentedPreFilterPlugin); ok {
+		return unwrapPlugin(wrapped.PreFilterPlugin)
+	}
+	if wrapped, ok := pl.(*instrumentedFilterPlugin); ok {
+		return unwrapPlugin(wrapped.FilterPlugin)
+	}
+	if wrapped, ok := pl.(*instrumentedPreScorePlugin); ok {
+		return unwrapPlugin(wrapped.PreScorePlugin)
+	}
+	if wrapped, ok := pl.(*instrumentedScorePlugin); ok {
+		return unwrapPlugin(wrapped.ScorePlugin)
+	}
+	return pl
 }

@@ -801,6 +801,13 @@ type PlacementScorePlugin interface {
 	PlacementScoreExtensions() PlacementScoreExtensions
 }
 
+// ResizeInterestedPlugin is an optional interface for plugins.
+type ResizeInterestedPlugin interface {
+	// ShouldHandleDeferredResize allows a plugin to opt-in or opt-out 
+	// of the scheduling cycle for a deferred resize.
+	ShouldHandleDeferredResize(ctx context.Context, pod *v1.Pod, nodeName string) bool
+}
+
 // Handle provides data and some tools that plugins can use. It is
 // passed to the plugin factories at the time of plugin initialization. Plugins
 // must store and use this handle to call framework functions.

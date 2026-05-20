@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
@@ -29,9 +30,11 @@ import (
 // NodeName is a plugin that checks if a pod spec node name matches the current node.
 type NodeName struct{}
 
+var _ fwk.PreFilterPlugin = &NodeName{}
 var _ fwk.FilterPlugin = &NodeName{}
 var _ fwk.EnqueueExtensions = &NodeName{}
 var _ fwk.SignPlugin = &NodeName{}
+var _ fwk.ResizeInterestedPlugin = &NodeName{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -61,6 +64,26 @@ func (pl *NodeName) SignPod(ctx context.Context, pod *v1.Pod) ([]fwk.SignFragmen
 	return []fwk.SignFragment{
 		{Key: fwk.NodeNameSignerName, Value: pod.Spec.NodeName},
 	}, nil
+}
+
+// PreFilter invoked at the beginning of the scheduling cycle.
+func (pl *NodeName) PreFilter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodes []fwk.NodeInfo) (*fwk.PreFilterResult, *fwk.Status) {
+	if len(pod.Spec.NodeName) > 0 {
+		return &fwk.PreFilterResult{
+			NodeNames: sets.New(pod.Spec.NodeName),
+		}, nil
+	}
+	return nil, nil
+}
+
+// PreFilterExtensions returns nil as this plugin does not require extensions.
+func (pl *NodeName) PreFilterExtensions() fwk.PreFilterExtensions {
+	return nil
+}
+
+// ShouldHandleDeferredResize returns true because NodeName is interested in evaluating deferred-resize pods.
+func (pl *NodeName) ShouldHandleDeferredResize(ctx context.Context, pod *v1.Pod, nodeName string) bool {
+	return true
 }
 
 // Filter invoked at the filter extension point.

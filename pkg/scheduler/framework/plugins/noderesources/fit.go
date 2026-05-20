@@ -48,6 +48,7 @@ var _ fwk.PreScorePlugin = &Fit{}
 var _ fwk.ScorePlugin = &Fit{}
 var _ fwk.SignPlugin = &Fit{}
 var _ fwk.PlacementScorePlugin = &Fit{}
+var _ fwk.ResizeInterestedPlugin = &Fit{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -168,6 +169,11 @@ func getPreScoreState(cycleState fwk.CycleState) (*preScoreState, error) {
 // Name returns name of the plugin. It is used in logs, etc.
 func (f *Fit) Name() string {
 	return Name
+}
+
+// ShouldHandleDeferredResize returns true because Fit (NodeResourcesFit) is interested in evaluating deferred-resize pods.
+func (f *Fit) ShouldHandleDeferredResize(ctx context.Context, pod *v1.Pod, nodeName string) bool {
+	return true
 }
 
 // Filtering and scoring based on the container resources and overheads.
@@ -606,7 +612,12 @@ func (f *Fit) Filter(ctx context.Context, cycleState fwk.CycleState, pod *v1.Pod
 		EnableDRAExtendedResource: f.enableDRAExtendedResource,
 	}
 
-	insufficientResources := fitsRequest(s, nodeInfo, f.ignoredResources, f.ignoredResourceGroups, draManager, opts)
+	isAssignedNode := false
+	if pod.Spec.NodeName != "" && nodeInfo != nil && nodeInfo.Node() != nil {
+		isAssignedNode = pod.Spec.NodeName == nodeInfo.Node().Name
+	}
+
+	insufficientResources := fitsRequest(pod, s, nodeInfo, f.ignoredResources, f.ignoredResourceGroups, draManager, opts, isAssignedNode)
 
 	if len(insufficientResources) != 0 {
 		// We will keep all failure reasons.
@@ -641,10 +652,14 @@ type InsufficientResource struct {
 
 // Fits checks if node have enough resources to host the pod.
 func Fits(pod *v1.Pod, nodeInfo fwk.NodeInfo, draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) []InsufficientResource {
-	return fitsRequest(computePodResourceRequest(pod, opts), nodeInfo, nil, nil, draManager, opts)
+	isAssignedNode := false
+	if pod != nil && pod.Spec.NodeName != "" && nodeInfo != nil && nodeInfo.Node() != nil {
+		isAssignedNode = pod.Spec.NodeName == nodeInfo.Node().Name
+	}
+	return fitsRequest(pod, computePodResourceRequest(pod, opts), nodeInfo, nil, nil, draManager, opts, isAssignedNode)
 }
 
-func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.Set[string], draManager fwk.SharedDRAManager, opts ResourceRequestsOptions) []InsufficientResource {
+func fitsRequest(pod *v1.Pod, podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.Set[string], draManager fwk.SharedDRAManager, opts ResourceRequestsOptions, isAssignedNode bool) []InsufficientResource {
 	insufficientResources := make([]InsufficientResource, 0, 4)
 
 	allowedPodNumber := nodeInfo.GetAllocatable().GetAllowedPodNumber()
@@ -665,36 +680,90 @@ func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExten
 		return insufficientResources
 	}
 
-	if podRequest.MilliCPU > 0 && podRequest.MilliCPU > (nodeInfo.GetAllocatable().GetMilliCPU()-nodeInfo.GetRequested().GetMilliCPU()) {
-		insufficientResources = append(insufficientResources, InsufficientResource{
-			ResourceName: v1.ResourceCPU,
-			Reason:       "Insufficient cpu",
-			Requested:    podRequest.MilliCPU,
-			Used:         nodeInfo.GetRequested().GetMilliCPU(),
-			Capacity:     nodeInfo.GetAllocatable().GetMilliCPU(),
-			Unresolvable: podRequest.MilliCPU > nodeInfo.GetAllocatable().GetMilliCPU(),
-		})
+	var cpuScaleUp, memScaleUp, ephemeralScaleUp bool
+	if pod != nil {
+		var allocatedCPU, allocatedMem, allocatedEphemeral int64
+		for _, cs := range pod.Status.ContainerStatuses {
+			if cs.AllocatedResources != nil {
+				allocatedCPU += cs.AllocatedResources.Cpu().MilliValue()
+				allocatedMem += cs.AllocatedResources.Memory().Value()
+				allocatedEphemeral += cs.AllocatedResources.StorageEphemeral().Value()
+			}
+		}
+		cpuScaleUp = podRequest.MilliCPU > allocatedCPU
+		memScaleUp = podRequest.Memory > allocatedMem
+		ephemeralScaleUp = podRequest.EphemeralStorage > allocatedEphemeral
+	} else {
+		cpuScaleUp = true
+		memScaleUp = true
+		ephemeralScaleUp = true
 	}
-	if podRequest.Memory > 0 && podRequest.Memory > (nodeInfo.GetAllocatable().GetMemory()-nodeInfo.GetRequested().GetMemory()) {
-		insufficientResources = append(insufficientResources, InsufficientResource{
-			ResourceName: v1.ResourceMemory,
-			Reason:       "Insufficient memory",
-			Requested:    podRequest.Memory,
-			Used:         nodeInfo.GetRequested().GetMemory(),
-			Capacity:     nodeInfo.GetAllocatable().GetMemory(),
-			Unresolvable: podRequest.Memory > nodeInfo.GetAllocatable().GetMemory(),
-		})
+
+	if podRequest.MilliCPU > 0 {
+		var isOverLimit bool
+		if isAssignedNode {
+			if cpuScaleUp {
+				isOverLimit = nodeInfo.GetRequested().GetMilliCPU() > nodeInfo.GetAllocatable().GetMilliCPU()
+			} else {
+				isOverLimit = false
+			}
+		} else {
+			isOverLimit = podRequest.MilliCPU > (nodeInfo.GetAllocatable().GetMilliCPU() - nodeInfo.GetRequested().GetMilliCPU())
+		}
+		if isOverLimit {
+			insufficientResources = append(insufficientResources, InsufficientResource{
+				ResourceName: v1.ResourceCPU,
+				Reason:       "Insufficient cpu",
+				Requested:    podRequest.MilliCPU,
+				Used:         nodeInfo.GetRequested().GetMilliCPU(),
+				Capacity:     nodeInfo.GetAllocatable().GetMilliCPU(),
+				Unresolvable: podRequest.MilliCPU > nodeInfo.GetAllocatable().GetMilliCPU(),
+			})
+		}
 	}
-	if podRequest.EphemeralStorage > 0 &&
-		podRequest.EphemeralStorage > (nodeInfo.GetAllocatable().GetEphemeralStorage()-nodeInfo.GetRequested().GetEphemeralStorage()) {
-		insufficientResources = append(insufficientResources, InsufficientResource{
-			ResourceName: v1.ResourceEphemeralStorage,
-			Reason:       "Insufficient ephemeral-storage",
-			Requested:    podRequest.EphemeralStorage,
-			Used:         nodeInfo.GetRequested().GetEphemeralStorage(),
-			Capacity:     nodeInfo.GetAllocatable().GetEphemeralStorage(),
-			Unresolvable: podRequest.GetEphemeralStorage() > nodeInfo.GetAllocatable().GetEphemeralStorage(),
-		})
+	if podRequest.Memory > 0 {
+		var isOverLimit bool
+		if isAssignedNode {
+			if memScaleUp {
+				isOverLimit = nodeInfo.GetRequested().GetMemory() > nodeInfo.GetAllocatable().GetMemory()
+			} else {
+				isOverLimit = false
+			}
+		} else {
+			isOverLimit = podRequest.Memory > (nodeInfo.GetAllocatable().GetMemory() - nodeInfo.GetRequested().GetMemory())
+		}
+		if isOverLimit {
+			insufficientResources = append(insufficientResources, InsufficientResource{
+				ResourceName: v1.ResourceMemory,
+				Reason:       "Insufficient memory",
+				Requested:    podRequest.Memory,
+				Used:         nodeInfo.GetRequested().GetMemory(),
+				Capacity:     nodeInfo.GetAllocatable().GetMemory(),
+				Unresolvable: podRequest.Memory > nodeInfo.GetAllocatable().GetMemory(),
+			})
+		}
+	}
+	if podRequest.EphemeralStorage > 0 {
+		var isOverLimit bool
+		if isAssignedNode {
+			if ephemeralScaleUp {
+				isOverLimit = nodeInfo.GetRequested().GetEphemeralStorage() > nodeInfo.GetAllocatable().GetEphemeralStorage()
+			} else {
+				isOverLimit = false
+			}
+		} else {
+			isOverLimit = podRequest.EphemeralStorage > (nodeInfo.GetAllocatable().GetEphemeralStorage() - nodeInfo.GetRequested().GetEphemeralStorage())
+		}
+		if isOverLimit {
+			insufficientResources = append(insufficientResources, InsufficientResource{
+				ResourceName: v1.ResourceEphemeralStorage,
+				Reason:       "Insufficient ephemeral-storage",
+				Requested:    podRequest.EphemeralStorage,
+				Used:         nodeInfo.GetRequested().GetEphemeralStorage(),
+				Capacity:     nodeInfo.GetAllocatable().GetEphemeralStorage(),
+				Unresolvable: podRequest.GetEphemeralStorage() > nodeInfo.GetAllocatable().GetEphemeralStorage(),
+			})
+		}
 	}
 
 	for rName, rQuant := range podRequest.ScalarResources {
@@ -718,7 +787,34 @@ func fitsRequest(podRequest *preFilterState, nodeInfo fwk.NodeInfo, ignoredExten
 		if shouldDelegateResourceToDRA(rName, nodeInfo, draManager, opts) {
 			continue
 		}
-		if rQuant > (nodeInfo.GetAllocatable().GetScalarResources()[rName] - nodeInfo.GetRequested().GetScalarResources()[rName]) {
+
+		var scalarScaleUp bool
+		if pod != nil {
+			var allocatedScalar int64
+			for _, cs := range pod.Status.ContainerStatuses {
+				if cs.AllocatedResources != nil {
+					if val, ok := cs.AllocatedResources[rName]; ok {
+						allocatedScalar += val.Value()
+					}
+				}
+			}
+			scalarScaleUp = rQuant > allocatedScalar
+		} else {
+			scalarScaleUp = true
+		}
+
+		var isOverLimit bool
+		if isAssignedNode {
+			if scalarScaleUp {
+				isOverLimit = nodeInfo.GetRequested().GetScalarResources()[rName] > nodeInfo.GetAllocatable().GetScalarResources()[rName]
+			} else {
+				isOverLimit = false
+			}
+		} else {
+			isOverLimit = rQuant > (nodeInfo.GetAllocatable().GetScalarResources()[rName] - nodeInfo.GetRequested().GetScalarResources()[rName])
+		}
+
+		if isOverLimit {
 			insufficientResources = append(insufficientResources, InsufficientResource{
 				ResourceName: rName,
 				Reason:       fmt.Sprintf("Insufficient %v", rName),
