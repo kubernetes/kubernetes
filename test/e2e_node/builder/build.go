@@ -17,7 +17,6 @@ limitations under the License.
 package builder
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -28,9 +27,9 @@ import (
 	"k8s.io/kubernetes/test/utils"
 )
 
-var k8sBinDir = flag.String("k8s-bin-dir", "", "Directory containing k8s kubelet binaries.")
-var useDockerizedBuild = flag.Bool("use-dockerized-build", false, "Use dockerized build for test artifacts")
-var targetBuildArch = flag.String("target-build-arch", "linux/amd64", "Target architecture for the test artifacts for dockerized build")
+var k8sBinDir = CommandLine.String("k8s-bin-dir", "", "Directory containing k8s kubelet binaries.")
+var useDockerizedBuild = CommandLine.Bool("use-dockerized-build", false, "Use dockerized build for test artifacts")
+var targetBuildArch = CommandLine.String("target-build-arch", "linux/amd64", "Target architecture for the test artifacts for dockerized build")
 
 var buildCGOTargets = []string{
 	"cmd/kubelet",
