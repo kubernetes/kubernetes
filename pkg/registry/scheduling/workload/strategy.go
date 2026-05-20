@@ -65,7 +65,7 @@ func (workloadStrategy) DeclarativeValidationConfig(ctx context.Context, obj, ol
 	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
 		opts = append(opts, string(features.WorkloadAwarePreemption))
 	}
-	return rest.DeclarativeValidationConfig{DeclarativeEnforcement: true, Options: opts}
+	return rest.DeclarativeValidationConfig{Options: opts}
 }
 
 func (workloadStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {

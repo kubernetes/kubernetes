@@ -175,7 +175,7 @@ func TestValidateDeclaratively(t *testing.T) {
 			} else {
 				cfg.OpType = operation.Update
 			}
-			results := panicSafeValidateFunc(validateDeclaratively)(ctx, scheme, tc.object, tc.oldObject, cfg)
+			results := runDeclarativeValidationWithRecover(ctx, scheme, tc.object, tc.oldObject, cfg)
 			matcher := field.ErrorMatcher{}.ByType().ByField().ByOrigin()
 			matcher.Test(t, tc.expected, results)
 		})
@@ -458,187 +458,73 @@ func TestCompareDeclarativeErrorsAndEmitMismatches(t *testing.T) {
 	}
 }
 
-func TestWithRecover(t *testing.T) {
-	ctx := context.Background()
-	scheme := runtime.NewScheme()
-	var options []string
-	obj := &runtime.Unknown{}
+func TestRunDeclarativeValidationWithRecover(t *testing.T) {
+	ctx := genericapirequest.WithRequestInfo(context.Background(), &genericapirequest.RequestInfo{
+		APIGroup:   "",
+		APIVersion: "v1",
+	})
+	obj := &v1.Pod{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"}}
 
 	testCases := []struct {
-		name               string
-		validateFn         func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList
-		enforcementEnabled bool
-		wantErrs           field.ErrorList
-		expectLogRegex     string
+		name       string
+		opType     operation.Type
+		oldObj     runtime.Object
+		validateFn func(ctx context.Context, op operation.Operation, object, oldObject any) field.ErrorList
+		wantErrs   field.ErrorList
 	}{
 		{
-			name: "no panic",
-			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList {
-				return field.ErrorList{
-					field.Invalid(field.NewPath("field"), "value", "reason"),
-				}
+			name:   "no panic on create",
+			opType: operation.Create,
+			validateFn: func(context.Context, operation.Operation, any, any) field.ErrorList {
+				return field.ErrorList{field.Invalid(field.NewPath("field"), "value", "reason")}
 			},
-			enforcementEnabled: false,
-			wantErrs: field.ErrorList{
-				field.Invalid(field.NewPath("field"), "value", "reason"),
-			},
-			expectLogRegex: "",
+			wantErrs: field.ErrorList{field.Invalid(field.NewPath("field"), "value", "reason")},
 		},
 		{
-			name: "panic with enforcement disabled",
-			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList {
+			name:   "panic on create returns InternalError",
+			opType: operation.Create,
+			validateFn: func(context.Context, operation.Operation, any, any) field.ErrorList {
 				panic("test panic")
 			},
-			enforcementEnabled: false,
-			wantErrs:           nil,
-			// logs have a prefix of the form - E0309 21:05:33.865030 1926106 validate.go:199]
-			expectLogRegex: "E.*panic during declarative validation: test panic",
-		},
-		{
-			name: "panic with enforcement enabled",
-			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList {
-				panic("test panic")
-			},
-			enforcementEnabled: true,
 			wantErrs: field.ErrorList{
 				field.InternalError(nil, fmt.Errorf("panic during declarative validation: test panic")),
 			},
-			expectLogRegex: "",
 		},
 		{
-			name: "nil return, no panic",
-			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList {
-				return nil
-			},
-			enforcementEnabled: false,
-			wantErrs:           nil,
-			expectLogRegex:     "",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			klog.SetOutput(&buf)
-			klog.LogToStderr(false)
-			defer klog.LogToStderr(true)
-
-			wrapped := panicSafeValidateFunc(tc.validateFn)
-			gotErrs := wrapped(ctx, scheme, obj, nil, &ValidationConfigOption{ValidationIdentifier: "test_validationIdentifier", OpType: operation.Create, DeclarativeValidationConfig: DeclarativeValidationConfig{Options: options, DeclarativeEnforcement: tc.enforcementEnabled}})
-
-			klog.Flush()
-			logOutput := buf.String()
-
-			// Compare gotErrs vs. tc.wantErrs
-			if !equalErrorLists(gotErrs, tc.wantErrs) {
-				t.Errorf("panicSafeValidateFunc() gotErrs = %#v, want %#v", gotErrs, tc.wantErrs)
-			}
-
-			// Check logs if needed
-			if tc.expectLogRegex != "" {
-				matched, err := regexp.MatchString(tc.expectLogRegex, logOutput)
-				if err != nil {
-					t.Fatalf("Bad regex: %v", err)
-				}
-				if !matched {
-					t.Errorf("Expected log output %q, but got:\n%s", tc.expectLogRegex, logOutput)
-				}
-			} else if strings.Contains(logOutput, "panic during declarative validation") {
-				t.Errorf("Unexpected panic log found: %s", logOutput)
-			}
-		})
-	}
-}
-
-func TestWithRecoverUpdate(t *testing.T) {
-	ctx := context.Background()
-	scheme := runtime.NewScheme()
-	var options []string
-	obj := &runtime.Unknown{}
-	oldObj := &runtime.Unknown{}
-
-	testCases := []struct {
-		name               string
-		validateFn         func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList
-		enforcementEnabled bool
-		wantErrs           field.ErrorList
-		expectLogRegex     string
-	}{
-		{
-			name: "no panic",
-			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList {
-				return field.ErrorList{
-					field.Invalid(field.NewPath("field"), "value", "reason"),
-				}
-			},
-			enforcementEnabled: false,
-			wantErrs: field.ErrorList{
-				field.Invalid(field.NewPath("field"), "value", "reason"),
-			},
-			expectLogRegex: "",
-		},
-		{
-			name: "panic with enforcement disabled",
-			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList {
+			name:   "panic on update returns InternalError",
+			opType: operation.Update,
+			oldObj: &v1.Pod{TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"}},
+			validateFn: func(context.Context, operation.Operation, any, any) field.ErrorList {
 				panic("test update panic")
 			},
-			enforcementEnabled: false,
-			wantErrs:           nil,
-			// logs have a prefix of the form - E0309 21:05:33.865030 1926106 validate.go:199]
-			expectLogRegex: "E.*panic during declarative validation: test update panic",
-		},
-		{
-			name: "panic with enforcement enabled",
-			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList {
-				panic("test update panic")
-			},
-			enforcementEnabled: true,
 			wantErrs: field.ErrorList{
 				field.InternalError(nil, fmt.Errorf("panic during declarative validation: test update panic")),
 			},
-			expectLogRegex: "",
 		},
 		{
-			name: "nil return, no panic",
-			validateFn: func(context.Context, *runtime.Scheme, runtime.Object, runtime.Object, *ValidationConfigOption) field.ErrorList {
+			name:   "nil return, no panic",
+			opType: operation.Create,
+			validateFn: func(context.Context, operation.Operation, any, any) field.ErrorList {
 				return nil
 			},
-			enforcementEnabled: false,
-			wantErrs:           nil,
-			expectLogRegex:     "",
+			wantErrs: nil,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			klog.SetOutput(&buf)
-			klog.LogToStderr(false)
-			defer klog.LogToStderr(true)
+			scheme := runtime.NewScheme()
+			scheme.AddKnownTypes(schema.GroupVersion{Version: "v1"}, &v1.Pod{})
+			scheme.AddValidationFunc(&v1.Pod{}, tc.validateFn)
 
-			// Pass the enforcement flag to panicSafeValidateUpdateFunc
-			wrapped := panicSafeValidateFunc(tc.validateFn)
-			gotErrs := wrapped(ctx, scheme, obj, oldObj, &ValidationConfigOption{ValidationIdentifier: "test_validationIdentifier", OpType: operation.Update, DeclarativeValidationConfig: DeclarativeValidationConfig{Options: options, DeclarativeEnforcement: tc.enforcementEnabled}})
-
-			klog.Flush()
-			logOutput := buf.String()
-
-			// Compare gotErrs with wantErrs
-			if !equalErrorLists(gotErrs, tc.wantErrs) {
-				t.Errorf("panicSafeValidateUpdateFunc() gotErrs = %#v, want %#v", gotErrs, tc.wantErrs)
+			cfg := &ValidationConfigOption{
+				ValidationIdentifier: "test_validationIdentifier",
+				OpType:               tc.opType,
 			}
+			gotErrs := runDeclarativeValidationWithRecover(ctx, scheme, obj, tc.oldObj, cfg)
 
-			// Verify log output
-			if tc.expectLogRegex != "" {
-				matched, err := regexp.MatchString(tc.expectLogRegex, logOutput)
-				if err != nil {
-					t.Fatalf("Bad regex: %v", err)
-				}
-				if !matched {
-					t.Errorf("Expected log pattern %q, but got:\n%s", tc.expectLogRegex, logOutput)
-				}
-			} else if strings.Contains(logOutput, "panic during declarative validation") {
-				t.Errorf("Unexpected panic log found: %s", logOutput)
+			if !equalErrorLists(gotErrs, tc.wantErrs) {
+				t.Errorf("runDeclarativeValidationWithRecover() gotErrs = %#v, want %#v", gotErrs, tc.wantErrs)
 			}
 		})
 	}
@@ -832,86 +718,65 @@ func TestValidateDeclarativelyWithMigrationChecks(t *testing.T) {
 	errDVAlpha := field.Invalid(field.NewPath("spec", "alpha"), "decAlpha", "declarative alpha").MarkAlpha()
 
 	testCases := []struct {
-		name                   string
-		dvFeatureEnabled       bool
-		declarativeEnforcement bool
-		betaGateEnabled        bool
-		imperativeErrors       field.ErrorList
-		declarativeErrors      field.ErrorList
-		expectedErrors         field.ErrorList
-		shouldPanic            bool
+		name              string
+		dvFeatureEnabled  bool
+		betaGateEnabled   bool
+		imperativeErrors  field.ErrorList
+		declarativeErrors field.ErrorList
+		expectedErrors    field.ErrorList
+		shouldPanic       bool
 	}{
 		{
-			name:              "Feature Disabled, Not Enforced -> Skips declarative, Returns HV",
+			name:              "Feature Disabled -> Enforces Standard (HV kept+DV returned, duplicate expected if HV not deleted)",
 			imperativeErrors:  field.ErrorList{errHVStandardCovered},
-			declarativeErrors: field.ErrorList{errDVStandard},
-			expectedErrors:    field.ErrorList{errHVStandardCovered},
+			declarativeErrors: field.ErrorList{errDVStandard, errDVAdditional},
+			expectedErrors:    field.ErrorList{errHVStandardCovered, errDVStandard, errDVAdditional},
 		},
 		{
-			name:                   "Feature Disabled, Enforced -> Enforces Standard (HV kept+DV returned, duplicate expected if HV not deleted)",
-			declarativeEnforcement: true,
-			imperativeErrors:       field.ErrorList{errHVStandardCovered},
-			declarativeErrors:      field.ErrorList{errDVStandard, errDVAdditional},
-			expectedErrors:         field.ErrorList{errHVStandardCovered, errDVStandard, errDVAdditional},
-		},
-		{
-			name:              "Feature Enabled, Not Enforced -> Returns imperative (Shadow Mode)",
+			name:              "Feature Enabled -> Enforces Standard (HV kept+DV returned, duplicate expected if HV not deleted)",
 			dvFeatureEnabled:  true,
 			imperativeErrors:  field.ErrorList{errHVStandardCovered},
-			declarativeErrors: field.ErrorList{errDVStandard},
-			expectedErrors:    field.ErrorList{errHVStandardCovered},
+			declarativeErrors: field.ErrorList{errDVStandard, errDVAdditional},
+			expectedErrors:    field.ErrorList{errHVStandardCovered, errDVStandard, errDVAdditional},
 		},
 		{
-			name:                   "Feature Enabled, Enforced -> Enforces Standard (HV kept+DV returned, duplicate expected if HV not deleted)",
-			dvFeatureEnabled:       true,
-			declarativeEnforcement: true,
-			imperativeErrors:       field.ErrorList{errHVStandardCovered},
-			declarativeErrors:      field.ErrorList{errDVStandard, errDVAdditional},
-			expectedErrors:         field.ErrorList{errHVStandardCovered, errDVStandard, errDVAdditional},
-		},
-		{
-			name:                   "Feature Disabled, Enforced, Panics -> Returns InternalError",
-			declarativeEnforcement: true,
-			imperativeErrors:       field.ErrorList{errHVStandardCovered},
-			shouldPanic:            true,
+			name:             "Feature Disabled, Panics -> Returns InternalError",
+			imperativeErrors: field.ErrorList{errHVStandardCovered},
+			shouldPanic:      true,
 			// Standard HV is kept. Panic error appended.
 			expectedErrors: append(field.ErrorList{errHVStandardCovered}, field.InternalError(nil, fmt.Errorf("panic during declarative validation: test panic"))),
 		},
 		{
-			name:                   "Feature Enabled, Enforced, InternalError -> Returns InternalError",
-			dvFeatureEnabled:       true,
-			declarativeEnforcement: true,
-			imperativeErrors:       field.ErrorList{errHVStandardCovered},
-			declarativeErrors:      field.ErrorList{field.InternalError(nil, fmt.Errorf("internal error"))},
+			name:              "Feature Enabled, InternalError -> Returns InternalError",
+			dvFeatureEnabled:  true,
+			imperativeErrors:  field.ErrorList{errHVStandardCovered},
+			declarativeErrors: field.ErrorList{field.InternalError(nil, fmt.Errorf("internal error"))},
 			// Standard HV kept. Internal error appended.
 			expectedErrors: field.ErrorList{errHVStandardCovered, field.InternalError(nil, fmt.Errorf("internal error"))},
 		},
 		{
-			name:                   "Enforced, Beta Gate Enabled -> Enforces Beta (HV removed, DV returned)",
-			dvFeatureEnabled:       true,
-			declarativeEnforcement: true,
-			betaGateEnabled:        true,
-			imperativeErrors:       field.ErrorList{errHVBetaCovered},
-			declarativeErrors:      field.ErrorList{errDVBeta},
-			expectedErrors:         field.ErrorList{errDVBeta},
+			name:              "Beta Gate Enabled -> Enforces Beta (HV removed, DV returned)",
+			dvFeatureEnabled:  true,
+			betaGateEnabled:   true,
+			imperativeErrors:  field.ErrorList{errHVBetaCovered},
+			declarativeErrors: field.ErrorList{errDVBeta},
+			expectedErrors:    field.ErrorList{errDVBeta},
 		},
 		{
-			name:                   "Enforced, Beta Gate Disabled -> Shadows Beta (HV kept, DV hidden)",
-			dvFeatureEnabled:       true,
-			declarativeEnforcement: true,
-			betaGateEnabled:        false,
-			imperativeErrors:       field.ErrorList{errHVBetaCovered},
-			declarativeErrors:      field.ErrorList{errDVBeta},
-			expectedErrors:         field.ErrorList{errHVBetaCovered},
+			name:              "Beta Gate Disabled -> Shadows Beta (HV kept, DV hidden)",
+			dvFeatureEnabled:  true,
+			betaGateEnabled:   false,
+			imperativeErrors:  field.ErrorList{errHVBetaCovered},
+			declarativeErrors: field.ErrorList{errDVBeta},
+			expectedErrors:    field.ErrorList{errHVBetaCovered},
 		},
 		{
-			name:                   "Enforced, Alpha -> Shadows Alpha (HV kept, DV hidden)",
-			dvFeatureEnabled:       true,
-			declarativeEnforcement: true,
-			betaGateEnabled:        true,
-			imperativeErrors:       field.ErrorList{errHVAlpha},
-			declarativeErrors:      field.ErrorList{errDVAlpha},
-			expectedErrors:         field.ErrorList{errHVAlpha},
+			name:              "Alpha -> Shadows Alpha (HV kept, DV hidden)",
+			dvFeatureEnabled:  true,
+			betaGateEnabled:   true,
+			imperativeErrors:  field.ErrorList{errHVAlpha},
+			declarativeErrors: field.ErrorList{errDVAlpha},
+			expectedErrors:    field.ErrorList{errHVAlpha},
 		},
 	}
 
@@ -952,11 +817,7 @@ func TestValidateDeclarativelyWithMigrationChecks(t *testing.T) {
 			inputErrs := make(field.ErrorList, len(tc.imperativeErrors))
 			copy(inputErrs, tc.imperativeErrors)
 
-			config := DeclarativeValidationConfig{
-				DeclarativeEnforcement: tc.declarativeEnforcement,
-			}
-
-			gotErrs := ValidateDeclarativelyWithMigrationChecks(ctx, localScheme, obj, nil, inputErrs, operation.Create, config)
+			gotErrs := ValidateDeclarativelyWithMigrationChecks(ctx, localScheme, obj, nil, inputErrs, operation.Create, DeclarativeValidationConfig{})
 
 			if !equalErrorLists(gotErrs, tc.expectedErrors) {
 				t.Errorf("Expected errors: %v, got: %v", tc.expectedErrors, gotErrs)
