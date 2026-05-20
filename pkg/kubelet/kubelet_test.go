@@ -397,9 +397,14 @@ func newTestKubeletWithImageList(
 		UID:       types.UID(kubelet.nodeName),
 		Namespace: "",
 	}
+
+	// Create a standalone eviction admit handler linked by a shared state.
+	evictionState := eviction.NewNodeConditionsState()
+	evictionAdmitHandler := eviction.NewAdmitHandler(evictionState)
+
 	// setup eviction manager
-	evictionManager, evictionAdmitHandler := eviction.NewManager(kubelet.resourceAnalyzer, eviction.Config{},
-		killPodNow(tCtx, kubelet.podWorkers, fakeRecorder), kubelet.imageManager, kubelet.containerGC, fakeRecorder, nodeRef, kubelet.clock, kubelet.supportLocalStorageCapacityIsolation())
+	evictionManager := eviction.NewManager(kubelet.resourceAnalyzer, eviction.Config{},
+		killPodNow(tCtx, kubelet.podWorkers, fakeRecorder), kubelet.imageManager, kubelet.containerGC, fakeRecorder, nodeRef, kubelet.clock, kubelet.supportLocalStorageCapacityIsolation(), evictionState)
 
 	kubelet.evictionManager = evictionManager
 	handlers := []lifecycle.PodAdmitHandler{}

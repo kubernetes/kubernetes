@@ -1070,9 +1070,13 @@ func NewMainKubelet(ctx context.Context,
 		return eventTime.Sub(lastUpdate) > 600*time.Second
 	}
 
+	// Create a standalone eviction admit handler linked by a shared state.
+	evictionState := eviction.NewNodeConditionsState()
+	evictionAdmitHandler := eviction.NewAdmitHandler(evictionState)
+
 	// setup eviction manager
-	evictionManager, evictionAdmitHandler := eviction.NewManager(klet.resourceAnalyzer, evictionConfig,
-		killPodNow(ctx, klet.podWorkers, kubeDeps.Recorder), klet.imageManager, klet.containerGC, kubeDeps.Recorder, nodeRef, klet.clock, kubeCfg.LocalStorageCapacityIsolation)
+	evictionManager := eviction.NewManager(klet.resourceAnalyzer, evictionConfig,
+		killPodNow(ctx, klet.podWorkers, kubeDeps.Recorder), klet.imageManager, klet.containerGC, kubeDeps.Recorder, nodeRef, klet.clock, kubeCfg.LocalStorageCapacityIsolation, evictionState)
 
 	klet.evictionManager = evictionManager
 	handlers := []lifecycle.PodAdmitHandler{}
