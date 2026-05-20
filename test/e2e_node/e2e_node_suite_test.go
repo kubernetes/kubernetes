@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/test/e2e_node/criproxy"
 	"k8s.io/kubernetes/test/e2e_node/mounter"
 	gcpcredentialprovider "k8s.io/kubernetes/test/e2e_node/plugins/gcp-credential-provider/pkg"
+	"k8s.io/kubernetes/test/e2e_node/runner/node"
 	"k8s.io/kubernetes/test/e2e_node/services"
 	e2enodetestingmanifests "k8s.io/kubernetes/test/e2e_node/testing-manifests"
 	system "k8s.io/system-validators/validators"
@@ -135,6 +136,7 @@ func TestMain(m *testing.M) {
     mounter (no flags) - emulate cluster/gce/gci/mounter
 
 Usage as e2e_node.test:
+    e2e_node.test remote <remote flags> - run remote testing, replacing "testgrid2 noop -test=node", see "remote -help" for flags
     e2e_node.test <test flags> - execute Ginkgo test suite, see following flags
 
 `)
@@ -146,6 +148,8 @@ Usage as e2e_node.test:
 		gcpcredentialprovider.Main()
 	case strings.HasPrefix(cmdName, "mounter"):
 		mounter.Main()
+	case len(os.Args) > 1 && os.Args[1] == "remote":
+		node.Main(os.Args[2:])
 	default:
 		testMain(m)
 	}

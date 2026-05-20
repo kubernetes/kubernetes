@@ -40,17 +40,45 @@ func init() {
 	RegisterTestSuite("default", &NodeE2ERemote{})
 }
 
+var ginkgoBin = CommandLine.String("ginkgo-binary", "", "Existing Ginkgo binary to be used on the target instead of building from source")
+var kubeletBin = CommandLine.String("kubelet-binary", "", "Existing kubelet binary to be used on the target instead of building from source")
+var e2eNodeBin = CommandLine.String("e2e-node-binary", "", "Existing e2e-node.test binary to be used on the target instead of building from source")
+
 // SetupTestPackage sets up the test package with binaries k8s required for node e2e tests
 func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
-	// Build the executables required below.
-	if err := builder.BuildTargets("cmd/kubelet", "test/e2e_node/e2e_node.test", "github.com/onsi/ginkgo/v2/ginkgo"); err != nil {
-		return fmt.Errorf("failed to build the dependencies: %w", err)
+	requiredBins := map[string]struct {
+		file   string
+		target string
+	}{
+		"ginkgo":        {*ginkgoBin, "github.com/onsi/ginkgo/v2/ginkgo"},
+		"kubelet":       {*kubeletBin, "cmd/kubelet"},
+		"e2e_node.test": {*e2eNodeBin, "test/e2e_node/e2e_node.test"},
 	}
 
-	// Make sure we can find the newly built binaries
-	buildOutputDir, err := utils.GetK8sBuildOutputDir(builder.IsDockerizedBuild(), builder.GetTargetBuildArch())
-	if err != nil {
-		return fmt.Errorf("failed to locate kubernetes build output directory: %w", err)
+	// Build only targets for which we don't have a binary already.
+	var targets []string
+	for _, entry := range requiredBins {
+		if entry.file == "" {
+			targets = append(targets, entry.target)
+		}
+	}
+	if len(targets) > 0 {
+		// Build the missing executables required below.
+		if err := builder.BuildTargets(targets...); err != nil {
+			return fmt.Errorf("failed to build the dependencies: %w", err)
+		}
+
+		// Make sure we can find the newly built binaries
+		buildOutputDir, err := utils.GetK8sBuildOutputDir(builder.IsDockerizedBuild(), builder.GetTargetBuildArch())
+		if err != nil {
+			return fmt.Errorf("failed to locate kubernetes build output directory: %w", err)
+		}
+		for bin, entry := range requiredBins {
+			if entry.file == "" {
+				entry.file = filepath.Join(buildOutputDir, bin)
+			}
+			requiredBins[bin] = entry
+		}
 	}
 
 	rootDir, err := utils.GetK8sRootDir()
@@ -59,9 +87,8 @@ func (n *NodeE2ERemote) SetupTestPackage(tardir, systemSpecName string) error {
 	}
 
 	// Copy binaries
-	requiredBins := []string{"kubelet", "e2e_node.test", "ginkgo"}
-	for _, bin := range requiredBins {
-		source := filepath.Join(buildOutputDir, bin)
+	for bin, entry := range requiredBins {
+		source := entry.file
 		klog.V(2).Infof("Copying binaries from %s", source)
 		if _, err := os.Stat(source); err != nil {
 			return fmt.Errorf("failed to locate test binary %s: %w", bin, err)
