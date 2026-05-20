@@ -20,7 +20,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -69,17 +68,17 @@ func (e *envs) Set(value string) error {
 // nodeEnvs is the node envs from the flag `node-env`.
 var nodeEnvs = make(envs)
 
-var project = flag.String("project", "", "gce project the hosts live in (gce)")
-var zone = flag.String("zone", "", "gce zone that the hosts live in (gce)")
-var instanceMetadata = flag.String("instance-metadata", "", "key/value metadata for instances separated by '=' or '<', 'k=v' means the key is 'k' and the value is 'v'; 'k<p' means the key is 'k' and the value is extracted from the local path 'p', e.g. k1=v1,k2<p2  (gce)")
-var imageProject = flag.String("image-project", "", "gce project the hosts live in  (gce)")
-var instanceType = flag.String("instance-type", "e2-medium", "GCP Machine type to use for test")
-var preemptibleInstances = flag.Bool("preemptible-instances", false, "If true, gce instances will be configured to be preemptible  (gce)")
-var network = flag.String("network", "", "Specifies the network that the VM instance are a part of")
-var subnet = flag.String("subnet", "", "Specifies the subnet that the VM instance are a part of")
+var project = remote.CommandLine.String("project", "", "gce project the hosts live in (gce)")
+var zone = remote.CommandLine.String("zone", "", "gce zone that the hosts live in (gce)")
+var instanceMetadata = remote.CommandLine.String("instance-metadata", "", "key/value metadata for instances separated by '=' or '<', 'k=v' means the key is 'k' and the value is 'v'; 'k<p' means the key is 'k' and the value is extracted from the local path 'p', e.g. k1=v1,k2<p2  (gce)")
+var imageProject = remote.CommandLine.String("image-project", "", "gce project the hosts live in  (gce)")
+var instanceType = remote.CommandLine.String("instance-type", "e2-medium", "GCP Machine type to use for test")
+var preemptibleInstances = remote.CommandLine.Bool("preemptible-instances", false, "If true, gce instances will be configured to be preemptible  (gce)")
+var network = remote.CommandLine.String("network", "", "Specifies the network that the VM instance are a part of")
+var subnet = remote.CommandLine.String("subnet", "", "Specifies the subnet that the VM instance are a part of")
 
 func init() {
-	flag.Var(&nodeEnvs, "node-env", "An environment variable passed to instance as metadata, e.g. when '--node-env=PATH=/usr/bin' is specified, there will be an extra instance metadata 'PATH=/usr/bin'.")
+	remote.CommandLine.Var(&nodeEnvs, "node-env", "An environment variable passed to instance as metadata, e.g. when '--node-env=PATH=/usr/bin' is specified, there will be an extra instance metadata 'PATH=/usr/bin'.")
 }
 
 type GCERunner struct {
