@@ -22,26 +22,3 @@
   errorType: '*'
   origin: '*'
   reason: Not served by kube-apiserver.
-
-# Scale subresource: no dedicated Strategy in the new tree; tested separately
-# via VerifyVersionedValidationEquivalence (which doesn't populate the
-# in-process coverage accumulator). extensions/v1beta1/Scale is covered by
-# the group-level entry above.
-- apiVersion: autoscaling/v1
-  kind: Scale
-  path: '*'
-  errorType: '*'
-  origin: '*'
-  reason: Scale subresource has no dedicated Strategy; tested separately.
-- apiVersion: apps/v1beta1
-  kind: Scale
-  path: '*'
-  errorType: '*'
-  origin: '*'
-  reason: Scale subresource has no dedicated Strategy; tested separately.
-- apiVersion: apps/v1beta2
-  kind: Scale
-  path: '*'
-  errorType: '*'
-  origin: '*'
-  reason: Scale subresource has no dedicated Strategy; tested separately.
