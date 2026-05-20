@@ -76,11 +76,11 @@ var (
 	permittedResponseHeaderValueRE = regexp.MustCompile(strings.Replace(permittedHeaderValueTemplate, "XYZ", "res", 1))
 )
 
-func ValidateRoute(ctx context.Context, route *routev1.Route, sarCreator routecommon.SubjectAccessReviewCreator, secretsGetter corev1client.SecretsGetter, opts routecommon.RouteValidationOptions) field.ErrorList {
+func ValidateRoute(ctx context.Context, route *routev1.Route, sarCreator routecommon.SubjectAccessReviewCreator, secretsGetter corev1client.SecretsGetter) field.ErrorList {
 	allErrs := field.ErrorList{}
 	pathFieldPath := field.NewPath("spec", "path")
 	allErrs = append(allErrs, validatePath(route.Spec.Path, pathFieldPath)...)
-	allErrs = append(allErrs, validateRoute(ctx, route, true, sarCreator, secretsGetter, opts)...)
+	allErrs = append(allErrs, validateRoute(ctx, route, true, sarCreator, secretsGetter)...)
 	return allErrs
 }
 
@@ -105,7 +105,7 @@ func checkLabelSegments(host string) bool {
 }
 
 // validateRoute - private function to validate route
-func validateRoute(ctx context.Context, route *routev1.Route, checkHostname bool, sarc routecommon.SubjectAccessReviewCreator, secrets corev1client.SecretsGetter, opts routecommon.RouteValidationOptions) field.ErrorList {
+func validateRoute(ctx context.Context, route *routev1.Route, checkHostname bool, sarc routecommon.SubjectAccessReviewCreator, secrets corev1client.SecretsGetter) field.ErrorList {
 	//ensure meta is set properly
 	result := validateObjectMeta(&route.ObjectMeta, true, validateRouteName, field.NewPath("metadata"))
 
@@ -212,7 +212,7 @@ func validateRoute(ctx context.Context, route *routev1.Route, checkHostname bool
 		}
 	}
 
-	if errs := validateTLS(ctx, route, specPath.Child("tls"), sarc, secrets, opts); len(errs) != 0 {
+	if errs := validateTLS(ctx, route, specPath.Child("tls"), sarc, secrets); len(errs) != 0 {
 		result = append(result, errs...)
 	}
 
@@ -233,11 +233,11 @@ func validatePath(pathValue string, fldPath *field.Path) field.ErrorList {
 	return result
 }
 
-func ValidateRouteUpdate(ctx context.Context, route *routev1.Route, older *routev1.Route, sarc routecommon.SubjectAccessReviewCreator, secrets corev1client.SecretsGetter, opts routecommon.RouteValidationOptions) field.ErrorList {
+func ValidateRouteUpdate(ctx context.Context, route *routev1.Route, older *routev1.Route, sarc routecommon.SubjectAccessReviewCreator, secrets corev1client.SecretsGetter) field.ErrorList {
 	allErrs := validateObjectMetaUpdate(&route.ObjectMeta, &older.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, apimachineryvalidation.ValidateImmutableField(route.Spec.WildcardPolicy, older.Spec.WildcardPolicy, field.NewPath("spec", "wildcardPolicy"))...)
 	hostnameUpdated := route.Spec.Host != older.Spec.Host
-	allErrs = append(allErrs, validateRoute(ctx, route, hostnameUpdated && validLabels(older.Spec.Host), sarc, secrets, opts)...)
+	allErrs = append(allErrs, validateRoute(ctx, route, hostnameUpdated && validLabels(older.Spec.Host), sarc, secrets)...)
 	if route.Spec.Path != older.Spec.Path {
 		pathFieldPath := field.NewPath("spec", "path")
 		allErrs = append(allErrs, validatePath(route.Spec.Path, pathFieldPath)...)
@@ -258,7 +258,7 @@ func ValidateRouteStatusUpdate(route *routev1.Route, older *routev1.Route) field
 
 // validateTLS tests fields for different types of TLS combinations are set.  Called
 // by ValidateRoute.
-func validateTLS(ctx context.Context, route *routev1.Route, fldPath *field.Path, sarc routecommon.SubjectAccessReviewCreator, secrets corev1client.SecretsGetter, opts routecommon.RouteValidationOptions) field.ErrorList {
+func validateTLS(ctx context.Context, route *routev1.Route, fldPath *field.Path, sarc routecommon.SubjectAccessReviewCreator, secrets corev1client.SecretsGetter) field.ErrorList {
 	result := field.ErrorList{}
 	tls := route.Spec.TLS
 
@@ -272,7 +272,7 @@ func validateTLS(ctx context.Context, route *routev1.Route, fldPath *field.Path,
 	// reencrypt may specify destination ca cert
 	// externalCert, cert, key, cacert may not be specified because the route may be a wildcard
 	case routev1.TLSTerminationReencrypt:
-		if opts.AllowExternalCertificates && tls.ExternalCertificate != nil {
+		if tls.ExternalCertificate != nil {
 			if len(tls.Certificate) > 0 && len(tls.ExternalCertificate.Name) > 0 {
 				result = append(result, field.Invalid(fldPath.Child("externalCertificate"), tls.ExternalCertificate.Name, "cannot specify both tls.certificate and tls.externalCertificate"))
 			} else if len(tls.ExternalCertificate.Name) > 0 {
@@ -290,7 +290,7 @@ func validateTLS(ctx context.Context, route *routev1.Route, fldPath *field.Path,
 			result = append(result, field.Invalid(fldPath.Child("key"), "redacted key data", "passthrough termination does not support certificates"))
 		}
 
-		if opts.AllowExternalCertificates && tls.ExternalCertificate != nil {
+		if tls.ExternalCertificate != nil {
 			if len(tls.ExternalCertificate.Name) > 0 {
 				result = append(result, field.Invalid(fldPath.Child("externalCertificate"), tls.ExternalCertificate.Name, "passthrough termination does not support certificates"))
 			}
@@ -310,7 +310,7 @@ func validateTLS(ctx context.Context, route *routev1.Route, fldPath *field.Path,
 			result = append(result, field.Invalid(fldPath.Child("destinationCACertificate"), "redacted destination ca certificate data", "edge termination does not support destination certificates"))
 		}
 
-		if opts.AllowExternalCertificates && tls.ExternalCertificate != nil {
+		if tls.ExternalCertificate != nil {
 			if len(tls.Certificate) > 0 && len(tls.ExternalCertificate.Name) > 0 {
 				result = append(result, field.Invalid(fldPath.Child("externalCertificate"), tls.ExternalCertificate.Name, "cannot specify both tls.certificate and tls.externalCertificate"))
 			} else if len(tls.ExternalCertificate.Name) > 0 {

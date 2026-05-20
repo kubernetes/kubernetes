@@ -32,7 +32,7 @@ type APIServerEncryptionApplyConfiguration struct {
 	// The Key Management Service (KMS) instance provides symmetric encryption and is responsible for
 	// managing the lifecyle of the encryption keys outside of the control plane.
 	// This allows integration with an external provider to manage the data encryption keys securely.
-	KMS *KMSConfigApplyConfiguration `json:"kms,omitempty"`
+	KMS *KMSPluginConfigApplyConfiguration `json:"kms,omitempty"`
 }
 
 // APIServerEncryptionApplyConfiguration constructs a declarative configuration of the APIServerEncryption type for use with
@@ -52,7 +52,7 @@ func (b *APIServerEncryptionApplyConfiguration) WithType(value configv1.Encrypti
 // WithKMS sets the KMS field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the KMS field is set to the value of the last call.
-func (b *APIServerEncryptionApplyConfiguration) WithKMS(value *KMSConfigApplyConfiguration) *APIServerEncryptionApplyConfiguration {
+func (b *APIServerEncryptionApplyConfiguration) WithKMS(value *KMSPluginConfigApplyConfiguration) *APIServerEncryptionApplyConfiguration {
 	b.KMS = value
 	return b
 }

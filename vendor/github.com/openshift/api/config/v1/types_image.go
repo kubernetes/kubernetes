@@ -165,20 +165,50 @@ type RegistryLocation struct {
 // +kubebuilder:validation:XValidation:rule="has(self.blockedRegistries) ? !has(self.allowedRegistries) : true",message="Only one of blockedRegistries or allowedRegistries may be set"
 type RegistrySources struct {
 	// insecureRegistries are registries which do not have a valid TLS certificates or only support HTTP connections.
+	// Each entry must be a valid registry scope in the format hostname[:port][/path],
+	// optionally prefixed with "*." for wildcard subdomains (e.g., "*.example.com").
+	// The hostname must consist of valid DNS labels separated by dots, where each label
+	// contains only alphanumeric characters and hyphens and does not start or end with a hyphen.
+	// Entries must not be empty, must not include tags (e.g., ":latest") or digests (e.g., "@sha256:..."),
+	// and must be at most 256 characters in length. The list may contain at most 1024 entries.
 	// +optional
 	// +listType=atomic
+	// +kubebuilder:validation:MaxItems=1024
+	// +kubebuilder:validation:items:MinLength=1
+	// +kubebuilder:validation:items:MaxLength=256
+	// +kubebuilder:validation:items:XValidation:rule="self.matches('^\\\\*(?:\\\\.(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]))+$|^((?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])(?:(?:\\\\.(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]))+)?(?::[0-9]+)?)(?:(?:/[a-z0-9]+(?:(?:(?:[._]|__|[-]*)[a-z0-9]+)+)?)+)?$')",message="each registry must be a valid hostname[:port][/path] or wildcard *.hostname format without tags or digests"
 	InsecureRegistries []string `json:"insecureRegistries,omitempty"`
 	// blockedRegistries cannot be used for image pull and push actions. All other registries are permitted.
+	// Each entry must be a valid registry scope in the format hostname[:port][/path],
+	// optionally prefixed with "*." for wildcard subdomains (e.g., "*.example.com").
+	// The hostname must consist of valid DNS labels separated by dots, where each label
+	// contains only alphanumeric characters and hyphens and does not start or end with a hyphen.
+	// Entries must not be empty, must not include tags (e.g., ":latest") or digests (e.g., "@sha256:..."),
+	// and must be at most 256 characters in length. The list may contain at most 1024 entries.
 	//
 	// Only one of BlockedRegistries or AllowedRegistries may be set.
 	// +optional
 	// +listType=atomic
+	// +kubebuilder:validation:MaxItems=1024
+	// +kubebuilder:validation:items:MinLength=1
+	// +kubebuilder:validation:items:MaxLength=256
+	// +kubebuilder:validation:items:XValidation:rule="self.matches('^\\\\*(?:\\\\.(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]))+$|^((?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])(?:(?:\\\\.(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]))+)?(?::[0-9]+)?)(?:(?:/[a-z0-9]+(?:(?:(?:[._]|__|[-]*)[a-z0-9]+)+)?)+)?$')",message="each registry must be a valid hostname[:port][/path] or wildcard *.hostname format without tags or digests"
 	BlockedRegistries []string `json:"blockedRegistries,omitempty"`
 	// allowedRegistries are the only registries permitted for image pull and push actions. All other registries are denied.
+	// Each entry must be a valid registry scope in the format hostname[:port][/path],
+	// optionally prefixed with "*." for wildcard subdomains (e.g., "*.example.com").
+	// The hostname must consist of valid DNS labels separated by dots, where each label
+	// contains only alphanumeric characters and hyphens and does not start or end with a hyphen.
+	// Entries must not be empty, must not include tags (e.g., ":latest") or digests (e.g., "@sha256:..."),
+	// and must be at most 256 characters in length. The list may contain at most 1024 entries.
 	//
 	// Only one of BlockedRegistries or AllowedRegistries may be set.
 	// +optional
 	// +listType=atomic
+	// +kubebuilder:validation:MaxItems=1024
+	// +kubebuilder:validation:items:MinLength=1
+	// +kubebuilder:validation:items:MaxLength=256
+	// +kubebuilder:validation:items:XValidation:rule="self.matches('^\\\\*(?:\\\\.(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]))+$|^((?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9])(?:(?:\\\\.(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]))+)?(?::[0-9]+)?)(?:(?:/[a-z0-9]+(?:(?:(?:[._]|__|[-]*)[a-z0-9]+)+)?)+)?$')",message="each registry must be a valid hostname[:port][/path] or wildcard *.hostname format without tags or digests"
 	AllowedRegistries []string `json:"allowedRegistries,omitempty"`
 	// containerRuntimeSearchRegistries are registries that will be searched when pulling images that do not have fully qualified
 	// domains in their pull specs. Registries will be searched in the order provided in the list.

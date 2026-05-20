@@ -58,7 +58,7 @@ type MetricsServerConfigApplyConfiguration struct {
 	// - name: memory
 	// request: 40Mi
 	// limit: null
-	// Maximum length for this list is 10.
+	// Maximum length for this list is 5.
 	// Minimum length for this list is 1.
 	// Each resource name must be unique within this list.
 	Resources []ContainerResourceApplyConfiguration `json:"resources,omitempty"`

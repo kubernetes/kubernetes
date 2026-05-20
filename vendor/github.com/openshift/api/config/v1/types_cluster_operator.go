@@ -160,8 +160,9 @@ const (
 	// is actively rolling out new code, propagating config changes (e.g, a version change), or otherwise
 	// moving from one steady state to another. Operators should not report
 	// Progressing when they are reconciling (without action) a previously known
-	// state. Operators should not report Progressing only because DaemonSets owned by them
-	// are adjusting to a new node from cluster scaleup or a node rebooting from cluster upgrade.
+	// state. Operators should not report Progressing only because resources owned by them,
+	// such as DaemonSets and Deployments, are adjusting to a new node from cluster scaleup
+	// or a node rebooting from cluster upgrade.
 	// If the observed cluster state has changed and the component is
 	// reacting to it (updated proxy configuration for instance), Progressing should become true
 	// since it is moving from one steady state to another.

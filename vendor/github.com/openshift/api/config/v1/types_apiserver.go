@@ -209,7 +209,7 @@ type APIServerNamedServingCert struct {
 }
 
 // APIServerEncryption is used to encrypt sensitive resources on the cluster.
-// +openshift:validation:FeatureGateAwareXValidation:featureGate=KMSEncryptionProvider,rule="has(self.type) && self.type == 'KMS' ?  has(self.kms) : !has(self.kms)",message="kms config is required when encryption type is KMS, and forbidden otherwise"
+// +openshift:validation:FeatureGateAwareXValidation:featureGate=KMSEncryption,rule="has(self.type) && self.type == 'KMS' ?  has(self.kms) : !has(self.kms)",message="kms config is required when encryption type is KMS, and forbidden otherwise"
 // +union
 type APIServerEncryption struct {
 	// type defines what encryption type should be used to encrypt resources at the datastore layer.
@@ -238,14 +238,13 @@ type APIServerEncryption struct {
 	// managing the lifecyle of the encryption keys outside of the control plane.
 	// This allows integration with an external provider to manage the data encryption keys securely.
 	//
-	// +openshift:enable:FeatureGate=KMSEncryptionProvider
+	// +openshift:enable:FeatureGate=KMSEncryption
 	// +unionMember
 	// +optional
-	KMS *KMSConfig `json:"kms,omitempty"`
+	KMS KMSPluginConfig `json:"kms,omitempty,omitzero"`
 }
 
 // +openshift:validation:FeatureGateAwareEnum:featureGate="",enum="";identity;aescbc;aesgcm
-// +openshift:validation:FeatureGateAwareEnum:featureGate=KMSEncryptionProvider,enum="";identity;aescbc;aesgcm;KMS
 // +openshift:validation:FeatureGateAwareEnum:featureGate=KMSEncryption,enum="";identity;aescbc;aesgcm;KMS
 type EncryptionType string
 

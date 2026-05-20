@@ -38,7 +38,7 @@ type SecurityContextConstraintsApplyConfiguration struct {
 	// allowPrivilegedContainer determines if a container can request to be run as privileged.
 	AllowPrivilegedContainer *bool `json:"allowPrivilegedContainer,omitempty"`
 	// defaultAddCapabilities is the default set of capabilities that will be added to the container
-	// unless the pod spec specifically drops the capability.  You may not list a capabiility in both
+	// unless the pod spec specifically drops the capability.  You may not list a capability in both
 	// DefaultAddCapabilities and RequiredDropCapabilities.
 	DefaultAddCapabilities []corev1.Capability `json:"defaultAddCapabilities,omitempty"`
 	// requiredDropCapabilities are the capabilities that will be dropped from the container.  These
@@ -99,7 +99,7 @@ type SecurityContextConstraintsApplyConfiguration struct {
 	Groups []string `json:"groups,omitempty"`
 	// seccompProfiles lists the allowed profiles that may be set for the pod or
 	// container's seccomp annotations.  An unset (nil) or empty value means that no profiles may
-	// be specifid by the pod or container.	The wildcard '*' may be used to allow all profiles.  When
+	// be specified by the pod or container.	The wildcard '*' may be used to allow all profiles.  When
 	// used to generate a value for a pod the first non-wildcard profile will be used as
 	// the default.
 	SeccompProfiles []string `json:"seccompProfiles,omitempty"`

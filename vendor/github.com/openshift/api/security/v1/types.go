@@ -57,7 +57,7 @@ type SecurityContextConstraints struct {
 	// allowPrivilegedContainer determines if a container can request to be run as privileged.
 	AllowPrivilegedContainer bool `json:"allowPrivilegedContainer" protobuf:"varint,3,opt,name=allowPrivilegedContainer"`
 	// defaultAddCapabilities is the default set of capabilities that will be added to the container
-	// unless the pod spec specifically drops the capability.  You may not list a capabiility in both
+	// unless the pod spec specifically drops the capability.  You may not list a capability in both
 	// DefaultAddCapabilities and RequiredDropCapabilities.
 	// +nullable
 	// +listType=atomic
@@ -103,7 +103,6 @@ type SecurityContextConstraints struct {
 	// When "AllowHostLevel" is set, a pod author may set `hostUsers` to either `true` or `false`.
 	// When "RequirePodLevel" is set, a pod author must set `hostUsers` to `false`.
 	// When omitted, the default value is "AllowHostLevel".
-	// +openshift:enable:FeatureGate=UserNamespacesPodSecurityStandards
 	// +kubebuilder:validation:Enum="AllowHostLevel";"RequirePodLevel"
 	// +kubebuilder:default:="AllowHostLevel"
 	// +default="AllowHostLevel"
@@ -151,7 +150,7 @@ type SecurityContextConstraints struct {
 
 	// seccompProfiles lists the allowed profiles that may be set for the pod or
 	// container's seccomp annotations.  An unset (nil) or empty value means that no profiles may
-	// be specifid by the pod or container.	The wildcard '*' may be used to allow all profiles.  When
+	// be specified by the pod or container.	The wildcard '*' may be used to allow all profiles.  When
 	// used to generate a value for a pod the first non-wildcard profile will be used as
 	// the default.
 	// +nullable

@@ -85,14 +85,20 @@ type PrometheusConfigApplyConfiguration struct {
 	// resources defines the compute resource requests and limits for the Prometheus container.
 	// This includes CPU, memory and HugePages constraints to help control scheduling and resource usage.
 	// When not specified, defaults are used by the platform. Requests cannot exceed limits.
-	// Each entry must have a unique resource name.
-	// Minimum of 1 and maximum of 10 resource entries can be specified.
+	// This field is optional.
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	// This is a simplified API that maps to Kubernetes ResourceRequirements.
 	// The current default values are:
 	// resources:
 	// - name: cpu
 	// request: 4m
+	// limit: null
 	// - name: memory
 	// request: 40Mi
+	// limit: null
+	// Maximum length for this list is 5.
+	// Minimum length for this list is 1.
+	// Each resource name must be unique within this list.
 	Resources []ContainerResourceApplyConfiguration `json:"resources,omitempty"`
 	// retention configures how long Prometheus retains metrics data and how much storage it can use.
 	// When omitted, the platform chooses reasonable defaults (currently 15 days retention, no size limit).
