@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	statstest "k8s.io/kubernetes/pkg/kubelet/server/stats/testing"
+	"k8s.io/utils/ptr"
 )
 
 var (
@@ -148,6 +149,55 @@ func TestSummaryProviderGetStatsNoSplitFileSystem(t *testing.T) {
 		IO:                 cgroupStatsMap["/pods"].cs.IO,
 	})
 	assert.Equal(summary.Pods, podStats)
+}
+
+func TestSummaryProviderGetStatsZeroUsageNanoCores(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.KubeletPSI, true)
+	ctx := context.Background()
+	assert := assert.New(t)
+
+	// Setup pod stats with 0 UsageNanoCores
+	podStats := []statsapi.PodStats{
+		{
+			PodRef:    statsapi.PodReference{Name: "test-pod", Namespace: "test-namespace", UID: "UID_test-pod"},
+			StartTime: metav1.NewTime(time.Now()),
+			Containers: []statsapi.ContainerStats{
+				{
+					Name:      "test-container",
+					StartTime: metav1.NewTime(time.Now()),
+					CPU: &statsapi.CPUStats{
+						Time:           metav1.NewTime(time.Now()),
+						UsageNanoCores: ptr.To[uint64](0),
+					},
+				},
+			},
+		},
+	}
+
+	mockStatsProvider := statstest.NewMockProvider(t)
+	mockStatsProvider.EXPECT().GetNode(ctx).Return(node, nil)
+	mockStatsProvider.EXPECT().GetNodeConfig().Return(nodeConfig)
+	mockStatsProvider.EXPECT().GetPodCgroupRoot().Return(cgroupRoot)
+	mockStatsProvider.EXPECT().ListPodStatsAndUpdateCPUNanoCoreUsage(ctx).Return(podStats, nil)
+	mockStatsProvider.EXPECT().ImageFsStats(ctx).Return(imageFsStats, imageFsStats, nil)
+	mockStatsProvider.EXPECT().RootFsStats().Return(rootFsStats, nil)
+	mockStatsProvider.EXPECT().RlimitStats().Return(rlimitStats, nil)
+
+	// Mock system containers
+	mockStatsProvider.EXPECT().GetCgroupStats("/", true).Return(getContainerStats(), getNetworkStats(), nil)
+	mockStatsProvider.EXPECT().GetCgroupStats("/runtime", false).Return(getContainerStats(), getNetworkStats(), nil)
+	mockStatsProvider.EXPECT().GetCgroupStats("/misc", false).Return(getContainerStats(), getNetworkStats(), nil)
+	mockStatsProvider.EXPECT().GetCgroupStats("/kubelet", false).Return(getContainerStats(), getNetworkStats(), nil)
+	mockStatsProvider.EXPECT().GetCgroupStats("/kubepods", true).Return(getContainerStats(), getNetworkStats(), nil)
+
+	provider := summaryProviderImpl{kubeletCreationTime: metav1.Now(), systemBootTime: metav1.Now(), provider: mockStatsProvider}
+	summary, err := provider.Get(ctx, true)
+	assert.NoError(err)
+
+	assert.Len(summary.Pods, 1)
+	assert.Equal("test-container", summary.Pods[0].Containers[0].Name)
+	assert.NotNil(summary.Pods[0].Containers[0].CPU.UsageNanoCores)
+	assert.Equal(uint64(0), *summary.Pods[0].Containers[0].CPU.UsageNanoCores)
 }
 
 func TestSummaryProviderGetStatsSplitImageFs(t *testing.T) {
