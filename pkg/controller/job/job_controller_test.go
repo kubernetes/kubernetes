@@ -2803,7 +2803,7 @@ func TestPastDeadlineJobFinished(t *testing.T) {
 	manager.podStoreSynced = alwaysReady
 	manager.jobStoreSynced = alwaysReady
 	manager.expectations = FakeJobExpectations{
-		controller.NewControllerExpectations(), true, func() {
+		controller.NewControllerExpectations(nil), true, func() {
 		},
 	}
 	sharedInformerFactory.Start(ctx.Done())
@@ -6384,7 +6384,7 @@ func TestSyncJobExpectations(t *testing.T) {
 	podIndexer.Add(pods[0])
 
 	manager.expectations = FakeJobExpectations{
-		controller.NewControllerExpectations(), true, func() {
+		controller.NewControllerExpectations(nil), true, func() {
 			// If we check active pods before checking expectations, the job
 			// will create a new replica because it doesn't see this pod, but
 			// has fulfilled its expectations.

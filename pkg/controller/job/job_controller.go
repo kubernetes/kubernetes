@@ -258,7 +258,7 @@ func newControllerWithClock(ctx context.Context, kubeClient clientset.Interface,
 			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
 			OnWrite:    podWriteCallback,
 		},
-		expectations:            controller.NewControllerExpectations(),
+		expectations:            controller.NewControllerExpectations(expectationsMetrics{}),
 		finalizerExpectations:   newUIDTrackingExpectations(),
 		queue:                   workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.NewTypedItemExponentialFailureRateLimiter[string](DefaultJobApiBackOff, MaxJobApiBackOff), workqueue.TypedRateLimitingQueueConfig[string]{Name: "job", Clock: clock}),
 		orphanQueue:             workqueue.NewTypedRateLimitingQueueWithConfig(workqueue.NewTypedItemExponentialFailureRateLimiter[orphanPodKey](DefaultJobApiBackOff, MaxJobApiBackOff), workqueue.TypedRateLimitingQueueConfig[orphanPodKey]{Name: "job_orphan_pod", Clock: clock}),
@@ -2249,4 +2249,10 @@ func managedByExternalController(jobObj *batch.Job) *string {
 		}
 	}
 	return nil
+}
+
+type expectationsMetrics struct{}
+
+func (expectationsMetrics) ObserveExpectationsWaiting(expType string) {
+	metrics.ExpectationsWaiting.WithLabelValues(expType).Inc()
 }

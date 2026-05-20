@@ -2627,6 +2627,16 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: expectations_waiting_total
+  subsystem: daemonset_controller
+  help: Total number of times DaemonSet expectations were checked and found unsatisfied.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - type
+  componentEndpoints:
+  - component: kube-controller-manager
+    endpoint: /metrics
 - name: stale_sync_skips_total
   subsystem: daemonset_controller
   help: Total number of DaemonSet syncs skipped due to a stale watch cache.
@@ -3238,6 +3248,16 @@
   - component: kube-scheduler
     endpoint: /metrics
   - component: kubelet
+    endpoint: /metrics
+- name: expectations_waiting_total
+  subsystem: job_controller
+  help: Total number of times Job expectations were checked and found unsatisfied.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - type
+  componentEndpoints:
+  - component: kube-controller-manager
     endpoint: /metrics
 - name: job_finished_indexes_total
   subsystem: job_controller
@@ -5672,6 +5692,16 @@
   stabilityLevel: ALPHA
   componentEndpoints:
   - component: kubelet
+    endpoint: /metrics
+- name: expectations_waiting_total
+  subsystem: replicaset_controller
+  help: Total number of times ReplicaSet expectations were checked and found unsatisfied.
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - type
+  componentEndpoints:
+  - component: kube-controller-manager
     endpoint: /metrics
 - name: sorting_deletion_age_ratio
   subsystem: replicaset_controller

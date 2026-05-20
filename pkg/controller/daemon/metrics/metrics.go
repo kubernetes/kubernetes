@@ -36,6 +36,16 @@ var (
 		// These are the labels (dimensions)
 		[]string{"group", "resource"},
 	)
+
+	ExpectationsWaiting = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      DaemonControllerSubsystem,
+			Name:           "expectations_waiting_total",
+			Help:           "Total number of times DaemonSet expectations were checked and found unsatisfied.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"type"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -44,5 +54,6 @@ var registerMetrics sync.Once
 func Register() {
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(DaemonsetRequeueSkips)
+		legacyregistry.MustRegister(ExpectationsWaiting)
 	})
 }
