@@ -24,6 +24,8 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -154,7 +156,7 @@ func NewCmdCp(f cmdutil.Factory, ioStreams genericiooptions.IOStreams) *cobra.Co
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd, args))
 			cmdutil.CheckErr(o.Validate())
-			cmdutil.CheckErr(o.Run())
+			cmdutil.CheckErr(o.RunWithContext(cmd.Context()))
 		},
 	}
 	cmdutil.AddContainerVarFlags(cmd, &o.Container, o.Container)
@@ -235,8 +237,13 @@ func (o *CopyOptions) Validate() error {
 	return nil
 }
 
-// Run performs the execution
+// Run performs the execution.
 func (o *CopyOptions) Run() error {
+	return o.RunWithContext(context.Background())
+}
+
+// RunWithContext performs the execution using the command context.
+func (o *CopyOptions) RunWithContext(ctx context.Context) error {
 	srcSpec, err := extractFileSpec(o.args[0])
 	if err != nil {
 		return err
@@ -254,10 +261,10 @@ func (o *CopyOptions) Run() error {
 	}
 
 	if len(srcSpec.PodName) != 0 {
-		return o.copyFromPod(srcSpec, destSpec)
+		return o.copyFromPod(ctx, srcSpec, destSpec)
 	}
 	if len(destSpec.PodName) != 0 {
-		return o.copyToPod(srcSpec, destSpec, &exec.ExecOptions{})
+		return o.copyToPod(ctx, srcSpec, destSpec, &exec.ExecOptions{})
 	}
 	return fmt.Errorf("one of src or dest must be a remote file specification")
 }
@@ -266,7 +273,7 @@ func (o *CopyOptions) Run() error {
 // determines if the provided destination path exists on the
 // pod. If the destination path does not exist or is _not_ a
 // directory, an error is returned with the exit code received.
-func (o *CopyOptions) checkDestinationIsDir(dest fileSpec) error {
+func (o *CopyOptions) checkDestinationIsDir(ctx context.Context, dest fileSpec) error {
 	options := &exec.ExecOptions{
 		StreamOptions: exec.StreamOptions{
 			IOStreams: genericiooptions.IOStreams{
@@ -282,13 +289,13 @@ func (o *CopyOptions) checkDestinationIsDir(dest fileSpec) error {
 		Executor: o.Executor,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
 	done := make(chan error)
 
 	go func() {
-		done <- o.execute(options)
+		done <- o.execute(ctx, options)
 	}()
 
 	select {
@@ -299,16 +306,20 @@ func (o *CopyOptions) checkDestinationIsDir(dest fileSpec) error {
 	}
 }
 
-func (o *CopyOptions) copyToPod(src, dest fileSpec, options *exec.ExecOptions) error {
+func (o *CopyOptions) copyToPod(ctx context.Context, src, dest fileSpec, options *exec.ExecOptions) error {
 	if _, err := os.Stat(src.File.String()); err != nil {
 		return fmt.Errorf("%s doesn't exist in local filesystem", src.File)
 	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	reader, writer := io.Pipe()
 
 	srcFile := src.File.(localPath)
 	destFile := dest.File.(remotePath)
 
-	if err := o.checkDestinationIsDir(dest); err == nil {
+	if err := o.checkDestinationIsDir(ctx, dest); err == nil {
 		// If no error, dest.File was found to be a directory.
 		// Copy specified src into it
 		destFile = destFile.Join(srcFile.Base())
@@ -318,10 +329,6 @@ func (o *CopyOptions) copyToPod(src, dest fileSpec, options *exec.ExecOptions) e
 		return err
 	}
 
-	go func(src localPath, dest remotePath, writer io.WriteCloser) {
-		defer writer.Close()
-		cmdutil.CheckErr(makeTar(src, dest, writer))
-	}(srcFile, destFile, writer)
 	var cmdArr []string
 
 	if o.NoPreserve {
@@ -336,9 +343,9 @@ func (o *CopyOptions) copyToPod(src, dest fileSpec, options *exec.ExecOptions) e
 
 	options.StreamOptions = exec.StreamOptions{
 		IOStreams: genericiooptions.IOStreams{
-			In:     reader,
-			Out:    o.Out,
-			ErrOut: o.ErrOut,
+			In:     &contextReader{ctx: ctx, r: reader},
+			Out:    &contextWriter{ctx: ctx, w: o.Out},
+			ErrOut: &contextWriter{ctx: ctx, w: o.ErrOut},
 		},
 		Stdin: true,
 
@@ -348,62 +355,328 @@ func (o *CopyOptions) copyToPod(src, dest fileSpec, options *exec.ExecOptions) e
 
 	options.Command = cmdArr
 	options.Executor = o.Executor
-	return o.execute(options)
+
+	execDone := make(chan error, 1)
+	go func() {
+		execDone <- o.execute(ctx, options)
+	}()
+
+	tarDone := make(chan error, 1)
+	go func() {
+		tarDone <- makeTar(srcFile, destFile, writer)
+	}()
+
+	var execErr, tarErr error
+	select {
+	case execErr = <-execDone:
+		// Exec finished first (remote tar exited or failed); stop local tar.
+		_ = writer.Close()
+		_ = reader.Close()
+		select {
+		case tarErr = <-tarDone:
+		case <-time.After(30 * time.Second):
+		}
+		if execErr != nil {
+			return execErr
+		}
+		return wrapCopyWriteError(tarErr)
+
+	case tarErr = <-tarDone:
+		// Local tar finished; send EOF to remote tar and wait for it to exit.
+		_ = writer.Close()
+		if tarErr != nil {
+			// Local failure: kill remote tar immediately instead of waiting for EOF.
+			cancel()
+			_ = reader.Close()
+		}
+		select {
+		case execErr = <-execDone:
+		case <-time.After(30 * time.Second):
+			cancel()
+			_ = reader.Close()
+			return fmt.Errorf("timed out waiting for remote tar to complete")
+		}
+		if tarErr != nil {
+			return wrapCopyWriteError(tarErr)
+		}
+		return execErr
+	}
 }
 
-func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
-	reader := newTarPipe(src, o)
+// contextReader stops supplying stdin to the remote tar when the copy is cancelled.
+type contextReader struct {
+	ctx context.Context
+	r   io.Reader
+}
+
+func (cr *contextReader) Read(p []byte) (int, error) {
+	if err := cr.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return cr.r.Read(p)
+}
+
+// contextWriter stops forwarding remote output when the copy is cancelled.
+type contextWriter struct {
+	ctx context.Context
+	w   io.Writer
+}
+
+func (cw *contextWriter) Write(p []byte) (int, error) {
+	if err := cw.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return cw.w.Write(p)
+}
+
+// podToLocalTarCommand starts tar as the exec session process (no shell wrapper).
+// A shell pipeline leaves tar/cat as children of sh; when the stream closes, sh exits
+// and those children are reparented to the container init and keep running.
+func podToLocalTarCommand(path string, resumeFrom uint64) []string {
+	if resumeFrom > 0 {
+		escaped := strings.ReplaceAll(path, "'", `'\''`)
+		script := fmt.Sprintf("trap 'kill 0' TERM; tar cf - '%s' | tail -c+%d", escaped, resumeFrom)
+		return []string{"sh", "-c", script}
+	}
+	return []string{"tar", "cf", "-", path}
+}
+
+func podToLocalTarKillPattern(path string) string {
+	return fmt.Sprintf("tar cf - %s", path)
+}
+
+// killPodToLocalTarProcess stops orphaned tar from a failed pod-to-local copy.
+// Busybox tar may keep running after the exec stream closes; pkill is the exec
+// process itself (no shell) so it does not accumulate sh/cat/pkill zombies.
+func (o *CopyOptions) killPodToLocalTarProcess(src fileSpec, path string) {
+	pattern := podToLocalTarKillPattern(path)
+	for _, sig := range []string{"TERM", "KILL"} {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		options := &exec.ExecOptions{
+			StreamOptions: exec.StreamOptions{
+				IOStreams: genericiooptions.IOStreams{
+					Out:    io.Discard,
+					ErrOut: io.Discard,
+				},
+				Namespace: src.PodNamespace,
+				PodName:   src.PodName,
+			},
+			Command:  []string{"pkill", "-" + sig, "-f", pattern},
+			Executor: o.Executor,
+		}
+		_ = o.execute(ctx, options)
+		cancel()
+	}
+}
+
+func (o *CopyOptions) finishPodToLocalCopy(src fileSpec, path string, err error) error {
+	if err != nil {
+		o.killPodToLocalTarProcess(src, path)
+	}
+	return err
+}
+
+func (o *CopyOptions) copyFromPod(ctx context.Context, src, dest fileSpec) error {
+	if o.MaxTries != 0 {
+		return o.copyFromPodWithRetry(ctx, src, dest)
+	}
+	return o.copyFromPodOnce(ctx, src, dest)
+}
+
+// copyFromPodOnce copies from a pod without --retries. It mirrors copyToPod teardown:
+// cancel the exec stream and wait for the remote tar to exit instead of only closing
+// the local pipe (which can return "closed pipe" while tar keeps running in the pod).
+func (o *CopyOptions) copyFromPodOnce(ctx context.Context, src, dest fileSpec) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	reader, writer := io.Pipe()
+
 	srcFile := src.File.(remotePath)
 	destFile := dest.File.(localPath)
-	// remove extraneous path shortcuts - these could occur if a path contained extra "../"
-	// and attempted to navigate beyond "/" in a remote filesystem
 	prefix := stripPathShortcuts(srcFile.StripSlashes().Clean().String())
-	return o.untarAll(src.PodNamespace, src.PodName, prefix, srcFile, destFile, reader)
+
+	options := &exec.ExecOptions{
+		StreamOptions: exec.StreamOptions{
+			IOStreams: genericiooptions.IOStreams{
+				In:     nil,
+				Out:    &contextWriter{ctx: ctx, w: writer},
+				ErrOut: &contextWriter{ctx: ctx, w: o.ErrOut},
+			},
+			Namespace: src.PodNamespace,
+			PodName:   src.PodName,
+		},
+		Command:  podToLocalTarCommand(srcFile.String(), 0),
+		Executor: o.Executor,
+	}
+
+	execDone := make(chan error, 1)
+	go func() {
+		execDone <- o.execute(ctx, options)
+	}()
+
+	untarDone := make(chan error, 1)
+	go func() {
+		untarDone <- o.untarAll(src.PodNamespace, src.PodName, prefix, srcFile, destFile, reader)
+	}()
+
+	teardownStreams := func() {
+		cancel()
+		_ = writer.Close()
+		_ = reader.Close()
+	}
+
+	var execErr, untarErr error
+	select {
+	case execErr = <-execDone:
+		select {
+		case untarErr = <-untarDone:
+		case <-time.After(30 * time.Second):
+		}
+		teardownStreams()
+		if execErr != nil {
+			return o.finishPodToLocalCopy(src, srcFile.String(), execErr)
+		}
+		return o.finishPodToLocalCopy(src, srcFile.String(), wrapCopyWriteError(untarErr))
+
+	case untarErr = <-untarDone:
+		teardownStreams()
+		select {
+		case execErr = <-execDone:
+		case <-time.After(30 * time.Second):
+			return o.finishPodToLocalCopy(src, srcFile.String(), fmt.Errorf("timed out waiting for remote tar to complete"))
+		}
+		if untarErr != nil {
+			return o.finishPodToLocalCopy(src, srcFile.String(), wrapCopyWriteError(untarErr))
+		}
+		return o.finishPodToLocalCopy(src, srcFile.String(), execErr)
+	}
+}
+
+func (o *CopyOptions) copyFromPodWithRetry(ctx context.Context, src, dest fileSpec) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	tp := newTarPipe(src, o, ctx)
+	defer tp.Close()
+
+	srcFile := src.File.(remotePath)
+	destFile := dest.File.(localPath)
+	prefix := stripPathShortcuts(srcFile.StripSlashes().Clean().String())
+	err := o.untarAll(src.PodNamespace, src.PodName, prefix, srcFile, destFile, tp)
+	if err != nil {
+		cancel()
+		tp.waitExec(30 * time.Second)
+	}
+	return o.finishPodToLocalCopy(src, srcFile.String(), wrapCopyWriteError(err))
 }
 
 type TarPipe struct {
 	src       fileSpec
 	o         *CopyOptions
+	ctx       context.Context
 	reader    *io.PipeReader
 	outStream *io.PipeWriter
 	bytesRead uint64
 	retries   int
+
+	mu            sync.Mutex
+	sessionCancel context.CancelFunc
+	execDone      chan error
+	wg            sync.WaitGroup
+	closed        bool
 }
 
-func newTarPipe(src fileSpec, o *CopyOptions) *TarPipe {
-	t := new(TarPipe)
-	t.src = src
-	t.o = o
+func newTarPipe(src fileSpec, o *CopyOptions, ctx context.Context) *TarPipe {
+	t := &TarPipe{
+		src: src,
+		o:   o,
+		ctx: ctx,
+	}
 	t.initReadFrom(0)
 	return t
 }
 
+// Close stops the remote tar process and waits for the exec session to finish.
+func (t *TarPipe) Close() error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.closed {
+		return nil
+	}
+	t.closed = true
+	t.endSessionLocked()
+	return nil
+}
+
+func (t *TarPipe) endSessionLocked() {
+	if t.sessionCancel != nil {
+		t.sessionCancel()
+		t.sessionCancel = nil
+	}
+	// Close the write half first so a blocked remote-command copy unblocks when the
+	// local untar stops reading (e.g. no space left on device on the host).
+	if t.outStream != nil {
+		_ = t.outStream.Close()
+		t.outStream = nil
+	}
+	if t.reader != nil {
+		_ = t.reader.Close()
+		t.reader = nil
+	}
+	t.wg.Wait()
+}
+
 func (t *TarPipe) initReadFrom(n uint64) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.closed {
+		return
+	}
+	t.endSessionLocked()
+
 	t.reader, t.outStream = io.Pipe()
+	sessionCtx, sessionCancel := context.WithCancel(t.ctx)
+	t.sessionCancel = sessionCancel
+
 	options := &exec.ExecOptions{
 		StreamOptions: exec.StreamOptions{
 			IOStreams: genericiooptions.IOStreams{
 				In:     nil,
-				Out:    t.outStream,
-				ErrOut: t.o.Out,
+				Out:    &contextWriter{ctx: sessionCtx, w: t.outStream},
+				ErrOut: &contextWriter{ctx: sessionCtx, w: t.o.ErrOut},
 			},
 
 			Namespace: t.src.PodNamespace,
 			PodName:   t.src.PodName,
 		},
 
-		Command:  []string{"tar", "cf", "-", t.src.File.String()},
+		Command:  podToLocalTarCommand(t.src.File.String(), n),
 		Executor: t.o.Executor,
 	}
-	if t.o.MaxTries != 0 {
-		escapedPath := strings.ReplaceAll(t.src.File.String(), "'", `'\''`)
-		options.Command = []string{"sh", "-c", fmt.Sprintf("tar cf - '%s' | tail -c+%d", escapedPath, n)}
-	}
 
+	writer := t.outStream
+	t.execDone = make(chan error, 1)
+	t.wg.Add(1)
 	go func() {
-		defer t.outStream.Close()
-		cmdutil.CheckErr(t.o.execute(options))
+		defer t.wg.Done()
+		defer writer.Close()
+		t.execDone <- t.o.execute(sessionCtx, options)
 	}()
+}
+
+// waitExec blocks until the remote tar exec finishes or times out.
+func (t *TarPipe) waitExec(timeout time.Duration) {
+	t.mu.Lock()
+	done := t.execDone
+	t.mu.Unlock()
+	if done == nil {
+		return
+	}
+	select {
+	case <-done:
+	case <-time.After(timeout):
+	}
 }
 
 func (t *TarPipe) Read(p []byte) (n int, err error) {
@@ -411,11 +684,11 @@ func (t *TarPipe) Read(p []byte) (n int, err error) {
 	if err != nil {
 		if t.o.MaxTries < 0 || t.retries < t.o.MaxTries {
 			t.retries++
-			fmt.Printf("Resuming copy at %d bytes, retry %d/%d\n", t.bytesRead, t.retries, t.o.MaxTries)
+			fmt.Fprintf(t.o.ErrOut, "Resuming copy at %d bytes, retry %d/%d\n", t.bytesRead, t.retries, t.o.MaxTries)
 			t.initReadFrom(t.bytesRead + 1)
 			err = nil
 		} else {
-			fmt.Printf("Dropping out copy after %d retries\n", t.retries)
+			fmt.Fprintf(t.o.ErrOut, "Dropping out copy after %d retries\n", t.retries)
 		}
 	} else {
 		t.bytesRead += uint64(n)
@@ -562,8 +835,8 @@ func (o *CopyOptions) untarAll(ns, pod string, prefix string, src remotePath, de
 		if err != nil {
 			return err
 		}
-		defer outFile.Close()
 		if _, err := io.Copy(outFile, tarReader); err != nil {
+			outFile.Close()
 			return err
 		}
 		if err := outFile.Close(); err != nil {
@@ -574,7 +847,21 @@ func (o *CopyOptions) untarAll(ns, pod string, prefix string, src remotePath, de
 	return nil
 }
 
-func (o *CopyOptions) execute(options *exec.ExecOptions) error {
+func wrapCopyWriteError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, syscall.ENOSPC) {
+		return fmt.Errorf("copy failed: no space left on device: %w", err)
+	}
+	var pathErr *os.PathError
+	if errors.As(err, &pathErr) && errors.Is(pathErr.Err, syscall.ENOSPC) {
+		return fmt.Errorf("copy failed: no space left on device while writing %q: %w", pathErr.Path, err)
+	}
+	return err
+}
+
+func (o *CopyOptions) execute(ctx context.Context, options *exec.ExecOptions) error {
 	if len(options.Namespace) == 0 {
 		options.Namespace = o.Namespace
 	}
@@ -590,5 +877,9 @@ func (o *CopyOptions) execute(options *exec.ExecOptions) error {
 		return err
 	}
 
-	return options.Run()
+	if options.Executor == nil {
+		options.Executor = o.Executor
+	}
+
+	return options.RunWithContext(ctx)
 }

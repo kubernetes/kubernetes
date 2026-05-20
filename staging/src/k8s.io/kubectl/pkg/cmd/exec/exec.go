@@ -314,12 +314,18 @@ func (o *StreamOptions) SetupTTY() term.TTY {
 
 // Run executes a validated remote execution against a pod.
 func (p *ExecOptions) Run() error {
+	return p.RunWithContext(context.Background())
+}
+
+// RunWithContext executes a validated remote execution against a pod. The context
+// controls the lifetime of the remote command stream.
+func (p *ExecOptions) RunWithContext(ctx context.Context) error {
 	var err error
 	// we still need legacy pod getter when PodName in ExecOptions struct is provided,
 	// since there are any other command run this function by providing Podname with PodsGetter
 	// and without resource builder, eg: `kubectl cp`.
 	if len(p.PodName) != 0 {
-		p.Pod, err = p.PodClient.Pods(p.Namespace).Get(context.TODO(), p.PodName, metav1.GetOptions{})
+		p.Pod, err = p.PodClient.Pods(p.Namespace).Get(ctx, p.PodName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -403,7 +409,7 @@ func (p *ExecOptions) Run() error {
 			TTY:       t.Raw,
 		}, scheme.ParameterCodec)
 
-		return p.Executor.Execute(req.URL(), p.Config, p.In, p.Out, p.ErrOut, t.Raw, sizeQueue)
+		return p.Executor.ExecuteWithContext(ctx, req.URL(), p.Config, p.In, p.Out, p.ErrOut, t.Raw, sizeQueue)
 	}
 
 	if err := t.Safe(fn); err != nil {

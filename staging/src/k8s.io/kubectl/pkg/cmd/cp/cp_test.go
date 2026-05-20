@@ -29,6 +29,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -731,7 +732,7 @@ func TestCopyFromPod(t *testing.T) {
 			dest:            destDir,
 			podName:         "pod-name",
 			retries:         1,
-			expectedCommand: `sh -c tar cf - '/tmp/path'\''with'\''quotes' | tail -c+1`,
+			expectedCommand: `sh -c trap 'kill 0' TERM; tar cf - '/tmp/path'\''with'\''quotes' | tail -c+1`,
 		},
 	}
 
@@ -741,7 +742,7 @@ func TestCopyFromPod(t *testing.T) {
 		if err := opts.Complete(tf, cmd, []string{test.src, test.dest}); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		remoteExec := &testingRemoteExecutor{}
+		remoteExec := &testingRemoteExecutor{writeEmptyTar: test.retries == 0}
 		opts.Executor = remoteExec
 		t.Run(name, func(t *testing.T) {
 			err := opts.Run()
@@ -774,6 +775,7 @@ func TestCopyFromPod(t *testing.T) {
 type testingRemoteExecutor struct {
 	capturedPath  string
 	capturedQuery string
+	writeEmptyTar bool
 }
 
 func (t *testingRemoteExecutor) Execute(url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
@@ -783,6 +785,13 @@ func (t *testingRemoteExecutor) Execute(url *url.URL, config *restclient.Config,
 func (t *testingRemoteExecutor) ExecuteWithContext(ctx context.Context, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
 	t.capturedPath = url.Path
 	t.capturedQuery = url.RawQuery
+	if t.writeEmptyTar && stdout != nil {
+		// Empty tar stream so pod-to-local copy tests do not race on a closed pipe.
+		tw := tar.NewWriter(stdout)
+		if err := tw.Close(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -840,7 +849,7 @@ func TestCopyToPodNoPreserve(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			options := &kexec.ExecOptions{}
 			opts.NoPreserve = test.nopreserve
-			err = opts.copyToPod(src, dest, options)
+			err = opts.copyToPod(context.Background(), src, dest, options)
 			if !(reflect.DeepEqual(test.expectedCmd, options.Command)) {
 				t.Errorf("expected cmd: %v, got: %v", test.expectedCmd, options.Command)
 			}
@@ -1102,4 +1111,29 @@ type testWriter testing.T
 func (t *testWriter) Write(p []byte) (n int, err error) {
 	t.Log(string(p))
 	return len(p), nil
+}
+
+func TestTarPipeCloseCancelsSession(t *testing.T) {
+	tp := &TarPipe{ctx: context.Background()}
+	tp.reader, tp.outStream = io.Pipe()
+	sessionCtx, sessionCancel := context.WithCancel(tp.ctx)
+	tp.sessionCancel = sessionCancel
+
+	done := make(chan struct{})
+	tp.wg.Add(1)
+	go func() {
+		defer tp.wg.Done()
+		<-sessionCtx.Done()
+		close(done)
+	}()
+
+	if err := tp.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("session context was not cancelled after TarPipe.Close")
+	}
 }

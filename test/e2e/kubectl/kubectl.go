@@ -1577,6 +1577,74 @@ metadata:
 				framework.Failf("Failed copying remote file contents. Expected %s but got %s", remoteContents, string(localData))
 			}
 		})
+
+		/*
+			Release: v1.35
+			Testname: Kubectl, copy failure does not leave tar running in pod
+			Description: When kubectl cp to a pod fails because the destination volume is full,
+				the remote tar process must not keep running in the pod.
+		*/
+		ginkgo.It("should not leave tar running when copy to pod fails on full volume", func(ctx context.Context) {
+			const (
+				volumeName   = "small-data"
+				volumeMount  = "/small-data"
+				sizeLimitMiB = 2
+				fileSizeMiB  = 5
+			)
+
+			sizeLimit := resource.MustParse(fmt.Sprintf("%dMi", sizeLimitMiB))
+			podName := "kubectl-cp-full-" + string(uuid.NewUUID())
+			grace := int64(0)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: podName},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{{
+						Name: volumeName,
+						VolumeSource: v1.VolumeSource{
+							EmptyDir: &v1.EmptyDirVolumeSource{SizeLimit: &sizeLimit},
+						},
+					}},
+					Containers: []v1.Container{{
+						Name:    "busybox",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"/bin/sh"},
+						Args:    []string{"-c", e2epod.InfiniteSleepCommand},
+						VolumeMounts: []v1.VolumeMount{{
+							Name: volumeName, MountPath: volumeMount,
+						}},
+					}},
+					TerminationGracePeriodSeconds: &grace,
+					RestartPolicy:                 v1.RestartPolicyNever,
+				},
+			}
+
+			ginkgo.By("creating a pod with a small emptyDir volume")
+			e2epod.NewPodClient(f).CreateSync(ctx, pod)
+			defer func() {
+				e2epod.NewPodClient(f).DeleteSync(ctx, podName, metav1.DeleteOptions{GracePeriodSeconds: &grace}, e2epod.PodDeleteTimeout)
+			}()
+
+			ginkgo.By("creating a local file larger than the volume limit")
+			localFile, err := os.CreateTemp("", "kubectl-cp-large-")
+			framework.ExpectNoError(err)
+			defer os.Remove(localFile.Name())
+			framework.ExpectNoError(localFile.Truncate(int64(fileSizeMiB * 1024 * 1024)))
+			framework.ExpectNoError(localFile.Close())
+
+			podDest := fmt.Sprintf("%s:%s/", podName, volumeMount)
+			ginkgo.By("copying the file to the pod (expected to fail)")
+			_, stderr, err := e2ekubectl.RunKubectlWithFullOutput(ns, "cp", localFile.Name(), podDest)
+			gomega.Expect(err).To(gomega.HaveOccurred(), "kubectl cp should fail when the pod volume is full")
+			framework.Logf("kubectl cp stderr: %s", stderr)
+
+			ginkgo.By("checking that no tar extract process remains in the pod")
+			gomega.Eventually(func() string {
+				out, pollErr := e2ekubectl.RunKubectl(ns, "exec", podName, "--", "sh", "-c", "pgrep -f 'tar -xmf' || true")
+				framework.ExpectNoError(pollErr)
+				return strings.TrimSpace(out)
+			}, 30*time.Second, 2*time.Second).Should(gomega.BeEmpty())
+		})
 	})
 
 	ginkgo.Describe("Kubectl patch", func() {
