@@ -76,6 +76,10 @@ type CycleState interface {
 	// ShouldSkipAllPostFilterPlugins returns whether all plugins should be skipped in the PostFilter extension point.
 	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
 	ShouldSkipAllPostFilterPlugins() bool
+	// SetSkipAllScorePlugins sets whether to skip all plugins in the Score extension point.
+	SetSkipAllScorePlugins(flag bool)
+	// ShouldSkipAllScorePlugins returns whether to skip all plugins in the Score extension point.
+	ShouldSkipAllScorePlugins() bool
 
 	// Read retrieves data with the given "key" from CycleState. If the key is not
 	// present, ErrNotFound is returned.

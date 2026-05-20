@@ -251,6 +251,67 @@ func (sched *Scheduler) prepareForBindingCycle(
 	return assumedPodInfo, nil
 }
 
+type SimulationResult struct {
+	Pod                *v1.Pod
+	ScheduleResult     ScheduleResult
+	Status             *fwk.Status
+	RequiresPreemption bool
+	AssumedPodInfo     *framework.QueuedPodInfo
+}
+
+func (sched *Scheduler) SimulateScheduling(ctx context.Context,
+	state fwk.CycleState,
+	schedFramework framework.Framework,
+	podInfo *framework.QueuedPodInfo,
+) (*SimulationResult, func()) {
+	pod := podInfo.GetPod()
+
+	requiresPreemption := false
+	scheduleResult, status := sched.schedulingAlgorithm(ctx, state, schedFramework, podInfo, time.Now())
+	if !status.IsSuccess() {
+		if scheduleResult.nominatingInfo != nil && scheduleResult.nominatingInfo.NominatedNodeName != "" {
+			// If the NominatedNodeName is set, the preemption is required.
+			// Continue with assuming and reserving, because the subsequent pods from this group
+			// have to see this one as already scheduled on its nominated place.
+			// Set SuggestedHost to NominatedNodeName to handle the pod similarly to one that is feasible.
+			scheduleResult.SuggestedHost = scheduleResult.nominatingInfo.NominatedNodeName
+			requiresPreemption = true
+		} else {
+			// In case of pod being just unschedulable or having an error, just return now.
+			return &SimulationResult{
+				Pod:            pod,
+				ScheduleResult: scheduleResult,
+				Status:         status,
+			}, nil
+		}
+	}
+
+	assumedPodInfo, assumeStatus := sched.assumeAndReserve(ctx, state, schedFramework, podInfo, scheduleResult)
+	if !assumeStatus.IsSuccess() {
+		return &SimulationResult{
+			Pod:            pod,
+			ScheduleResult: ScheduleResult{nominatingInfo: clearNominatedNode},
+			Status:         assumeStatus,
+		}, nil
+	}
+
+	revertFn := func() {
+		err := sched.unreserveAndForget(ctx, state, schedFramework, assumedPodInfo, scheduleResult.SuggestedHost)
+		if err != nil {
+			utilruntime.HandleErrorWithContext(ctx, err, "ForgetPod failed")
+		}
+	}
+
+	return &SimulationResult{
+		Pod:                pod,
+		ScheduleResult:     scheduleResult,
+		Status:             status,
+		RequiresPreemption: requiresPreemption,
+		AssumedPodInfo:     assumedPodInfo,
+	}, revertFn
+
+}
+
 // schedulingAlgorithm runs fitering and scoring phases for a single pod,
 // together with post filter when the pod is unschedulable.
 func (sched *Scheduler) schedulingAlgorithm(

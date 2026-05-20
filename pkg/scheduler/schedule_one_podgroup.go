@@ -416,46 +416,21 @@ func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, sche
 
 	logger.V(4).Info("Attempting to schedule a pod belonging to a pod group", "podGroup", klog.KObj(podGroupInfo), "pod", klog.KObj(pod))
 
-	requiresPreemption := false
-	scheduleResult, status := sched.schedulingAlgorithm(ctx, podCtx.state, schedFwk, podInfo, start)
-	if !status.IsSuccess() {
-		if scheduleResult.nominatingInfo != nil && scheduleResult.nominatingInfo.NominatedNodeName != "" {
-			// If the NominatedNodeName is set, the preemption is required.
-			// Continue with assuming and reserving, because the subsequent pods from this group
-			// have to see this one as already scheduled on its nominated place.
-			// Set SuggestedHost to NominatedNodeName to handle the pod similarly to one that is feasible.
-			scheduleResult.SuggestedHost = scheduleResult.nominatingInfo.NominatedNodeName
-			requiresPreemption = true
-		} else {
-			// In case of pod being just unschedulable or having an error, just return now.
-			return algorithmResult{
-				pod:                pod,
-				scheduleResult:     scheduleResult,
-				podCtx:             podCtx,
-				schedulingDuration: time.Since(start),
-				status:             status,
-			}, nil
-		}
-	}
-	assumedPodInfo, assumeStatus := sched.assumeAndReserve(ctx, podCtx.state, schedFwk, podInfo, scheduleResult)
-	if !assumeStatus.IsSuccess() {
+	simResult, revertFn := sched.SimulateScheduling(ctx, podCtx.state, schedFwk, podInfo)
+
+	if simResult.AssumedPodInfo == nil {
 		return algorithmResult{
-			pod:                pod,
-			scheduleResult:     ScheduleResult{nominatingInfo: clearNominatedNode},
+			pod:                simResult.Pod,
+			scheduleResult:     simResult.ScheduleResult,
 			podCtx:             podCtx,
 			schedulingDuration: time.Since(start),
-			status:             assumeStatus,
+			status:             simResult.Status,
 		}, nil
 	}
 
-	revertFn := func() {
-		err := sched.unreserveAndForget(ctx, podCtx.state, schedFwk, assumedPodInfo, scheduleResult.SuggestedHost)
-		if err != nil {
-			utilruntime.HandleErrorWithContext(ctx, err, "ForgetPod failed")
-		}
-	}
+	assumedPodInfo := simResult.AssumedPodInfo
 
-	_, permitStatus := schedFwk.RunPermitPlugins(ctx, podCtx.state, assumedPodInfo.Pod, scheduleResult.SuggestedHost)
+	_, permitStatus := schedFwk.RunPermitPlugins(ctx, podCtx.state, assumedPodInfo.Pod, simResult.ScheduleResult.SuggestedHost)
 	if !permitStatus.IsWait() && !permitStatus.IsSuccess() {
 		revertFn()
 		if permitStatus.IsRejected() {
@@ -466,7 +441,7 @@ func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, sche
 					NodeToStatus: framework.NewDefaultNodeToStatus(),
 				},
 			}
-			fitErr.Diagnosis.NodeToStatus.Set(scheduleResult.SuggestedHost, permitStatus)
+			fitErr.Diagnosis.NodeToStatus.Set(simResult.ScheduleResult.SuggestedHost, permitStatus)
 			fitErr.Diagnosis.AddPluginStatus(permitStatus)
 			permitStatus = fwk.NewStatus(permitStatus.Code()).WithError(fitErr)
 		}
@@ -481,12 +456,12 @@ func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, sche
 
 	return algorithmResult{
 		pod:                pod,
-		scheduleResult:     scheduleResult,
+		scheduleResult:     simResult.ScheduleResult,
 		podCtx:             podCtx,
 		schedulingDuration: time.Since(start),
-		status:             status,
+		status:             simResult.Status,
 		permitStatus:       permitStatus,
-		requiresPreemption: requiresPreemption,
+		requiresPreemption: simResult.RequiresPreemption,
 	}, revertFn
 }
 
