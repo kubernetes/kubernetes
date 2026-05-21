@@ -3281,6 +3281,8 @@ type ContainerStateRunning struct {
 // ContainerStateTerminated is a terminated state of a container.
 type ContainerStateTerminated struct {
 	// Exit status from the last termination of the container
+	// +optional
+	// +k8s:optional
 	ExitCode int32 `json:"exitCode" protobuf:"varint,1,opt,name=exitCode"`
 	// Signal from the last termination of the container
 	// +optional
@@ -6664,12 +6666,18 @@ type NodeSystemInfo struct {
 	// MachineID reported by the node. For unique machine identification
 	// in the cluster this field is preferred. Learn more from man(5)
 	// machine-id: http://man7.org/linux/man-pages/man5/machine-id.5.html
+	// +optional
+	// +k8s:optional
 	MachineID string `json:"machineID" protobuf:"bytes,1,opt,name=machineID"`
 	// SystemUUID reported by the node. For unique machine identification
 	// MachineID is preferred. This field is specific to Red Hat hosts
 	// https://access.redhat.com/documentation/en-us/red_hat_subscription_management/1/html/rhsm/uuid
+	// +optional
+	// +k8s:optional
 	SystemUUID string `json:"systemUUID" protobuf:"bytes,2,opt,name=systemUUID"`
 	// Boot ID reported by the node.
+	// +optional
+	// +k8s:optional
 	BootID string `json:"bootID" protobuf:"bytes,3,opt,name=bootID"`
 	// Kernel Version reported by the node from 'uname -r' (e.g. 3.16.0-0.bpo.4-amd64).
 	KernelVersion string `json:"kernelVersion" protobuf:"bytes,4,opt,name=kernelVersion"`
