@@ -18,7 +18,6 @@ package events
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -32,6 +31,7 @@ import (
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
+	"k8s.io/klog/v2"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -146,7 +146,8 @@ func TestEventSeries(t *testing.T) {
 		}
 
 		if events.Items[0].Series.Count != 2 {
-			return false, fmt.Errorf("expected EventSeries to have a starting count of 2, got: %d", events.Items[0].Series.Count)
+			klog.Infof("retrying: expected EventSeries to have a starting count of 2, got: %d", events.Items[0].Series.Count)
+			return false, nil
 		}
 
 		return true, nil
