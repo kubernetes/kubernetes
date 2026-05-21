@@ -379,6 +379,10 @@
     lockToDefault: false
     preRelease: Deprecated
     version: "1.36"
+  - default: false
+    lockToDefault: true
+    preRelease: Deprecated
+    version: "1.37"
 - name: DeploymentReplicaSetTerminatingReplicas
   versionedSpecs:
   - default: false
