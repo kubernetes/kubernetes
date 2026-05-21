@@ -202,7 +202,7 @@ func (o TopPodOptions) RunTopPod() error {
 		return err
 	}
 
-	if len(o.FieldSelector) > 0 {
+	if len(metrics.Items) != 0 && len(o.FieldSelector) > 0 {
 		metrics, err = filterPodMetricsByFieldSelector(o, metrics, labelSelector, fieldSelector)
 		if err != nil {
 			return err
