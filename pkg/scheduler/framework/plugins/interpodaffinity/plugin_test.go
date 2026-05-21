@@ -159,6 +159,40 @@ func Test_isSchedulableAfterAssignedPodChange(t *testing.T) {
 			oldPod:       st.MakePod().NominatedNodeName("fake-node").Label("service", "securityscan").Obj(),
 			expectedHint: fwk.Queue,
 		},
+		{
+			name: "modify pod label to change it from matching only one of target pod's anti-affinity terms to matching none",
+			pod: st.MakePod().UID("p").Name("p").
+				PodAntiAffinityIn("service", "region", []string{"securityscan"}, st.PodAntiAffinityWithRequiredReq).
+				PodAntiAffinityIn("app", "region", []string{"web"}, st.PodAntiAffinityWithRequiredReq).Obj(),
+			newPod:       st.MakePod().UID("other").Node("fake-node").Label("service", "foo").Label("app", "bar").Obj(),
+			oldPod:       st.MakePod().UID("other").Node("fake-node").Label("service", "securityscan").Label("app", "bar").Obj(),
+			expectedHint: fwk.Queue,
+		},
+		{
+			name: "modify pod label but it still matches one of target pod's anti-affinity terms",
+			pod: st.MakePod().UID("p").Name("p").
+				PodAntiAffinityIn("service", "region", []string{"securityscan"}, st.PodAntiAffinityWithRequiredReq).
+				PodAntiAffinityIn("app", "region", []string{"web"}, st.PodAntiAffinityWithRequiredReq).Obj(),
+			newPod:       st.MakePod().UID("other").Node("fake-node").Label("service", "foo").Label("app", "web").Obj(),
+			oldPod:       st.MakePod().UID("other").Node("fake-node").Label("service", "securityscan").Label("app", "bar").Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		{
+			name: "delete a pod which matches only one of target pod's anti-affinity terms",
+			pod: st.MakePod().UID("p").Name("p").
+				PodAntiAffinityIn("service", "region", []string{"securityscan"}, st.PodAntiAffinityWithRequiredReq).
+				PodAntiAffinityIn("app", "region", []string{"web"}, st.PodAntiAffinityWithRequiredReq).Obj(),
+			oldPod:       st.MakePod().UID("other").Node("fake-node").Label("service", "securityscan").Obj(),
+			expectedHint: fwk.Queue,
+		},
+		{
+			name: "delete a pod with anti-affinity that matches pending pod on only one term",
+			pod:  st.MakePod().Name("p").Label("service", "securityscan").Obj(),
+			oldPod: st.MakePod().Node("fake-node").UID("other").
+				PodAntiAffinityIn("service", "region", []string{"securityscan"}, st.PodAntiAffinityWithRequiredReq).
+				PodAntiAffinityIn("app", "region", []string{"web"}, st.PodAntiAffinityWithRequiredReq).Obj(),
+			expectedHint: fwk.Queue,
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
