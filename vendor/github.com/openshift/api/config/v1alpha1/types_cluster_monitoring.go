@@ -133,6 +133,31 @@ type ClusterMonitoringSpec struct {
 	// When set, at least one field must be specified within telemeterClientConfig.
 	// +optional
 	TelemeterClientConfig TelemeterClientConfig `json:"telemeterClientConfig,omitempty,omitzero"`
+	// thanosQuerierConfig is an optional field that can be used to configure the Thanos Querier
+	// component that runs in the openshift-monitoring namespace. The Thanos Querier provides
+	// a global query view by aggregating and deduplicating metrics from multiple Prometheus instances.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time.
+	// The current default deploys the Thanos Querier on linux nodes with 5m CPU and 12Mi memory
+	// requests, and no custom tolerations or topology spread constraints.
+	// When set, at least one field must be specified within thanosQuerierConfig.
+	// +optional
+	ThanosQuerierConfig ThanosQuerierConfig `json:"thanosQuerierConfig,omitempty,omitzero"`
+	// nodeExporterConfig is an optional field that can be used to configure the node-exporter agent
+	// that runs as a DaemonSet in the openshift-monitoring namespace. The node-exporter agent collects
+	// hardware and OS-level metrics from every node in the cluster.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time.
+	// +optional
+	NodeExporterConfig NodeExporterConfig `json:"nodeExporterConfig,omitempty,omitzero"`
+	// monitoringPluginConfig is an optional field that can be used to configure the monitoring plugin
+	// that runs as a dynamic plugin of the OpenShift web console. The monitoring plugin provides
+	// the monitoring UI in the OpenShift web console for visualizing metrics, alerts, and dashboards.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time.
+	// The current default deploys the monitoring-plugin as a single-replica Deployment
+	// on linux nodes with 10m CPU and 50Mi memory requests, and no custom tolerations
+	// or topology spread constraints.
+	// When set, at least one field must be specified within monitoringPluginConfig.
+	// +optional
+	MonitoringPluginConfig MonitoringPluginConfig `json:"monitoringPluginConfig,omitempty,omitzero"`
 }
 
 // OpenShiftStateMetricsConfig provides configuration options for the openshift-state-metrics agent
@@ -199,6 +224,528 @@ type OpenShiftStateMetricsConfig struct {
 	// Maximum length for this list is 10.
 	// Minimum length for this list is 1.
 	// Entries must have unique topologyKey and whenUnsatisfiable pairs.
+	// +kubebuilder:validation:MaxItems=10
+	// +kubebuilder:validation:MinItems=1
+	// +listType=map
+	// +listMapKey=topologyKey
+	// +listMapKey=whenUnsatisfiable
+	// +optional
+	TopologySpreadConstraints []v1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
+}
+
+// NodeExporterConfig provides configuration options for the node-exporter agent
+// that runs as a DaemonSet in the `openshift-monitoring` namespace. The node-exporter agent collects
+// hardware and OS-level metrics from every node in the cluster, including CPU, memory, disk, and
+// network statistics.
+// At least one field must be specified.
+// +kubebuilder:validation:MinProperties=1
+type NodeExporterConfig struct {
+	// nodeSelector defines the nodes on which the Pods are scheduled.
+	// nodeSelector is optional.
+	//
+	// When omitted, this means the user has no opinion and the platform is left
+	// to choose reasonable defaults. These defaults are subject to change over time.
+	// The current default value is `kubernetes.io/os: linux`.
+	// When specified, nodeSelector must contain at least 1 entry and must not contain more than 10 entries.
+	// +optional
+	// +kubebuilder:validation:MinProperties=1
+	// +kubebuilder:validation:MaxProperties=10
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+	// resources defines the compute resource requests and limits for the node-exporter container.
+	// This includes CPU, memory and HugePages constraints to help control scheduling and resource usage.
+	// When not specified, defaults are used by the platform. Requests cannot exceed limits.
+	// This field is optional.
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	// This is a simplified API that maps to Kubernetes ResourceRequirements.
+	// The current default values are:
+	//   resources:
+	//    - name: cpu
+	//      request: 8m
+	//      limit: null
+	//    - name: memory
+	//      request: 32Mi
+	//      limit: null
+	// ---
+	// maxItems is set to 5 to stay within the Kubernetes CRD CEL validation cost budget.
+	// See the MaxItems comment near the ContainerResource type definition for details.
+	// Minimum length for this list is 1.
+	// Each resource name must be unique within this list.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=5
+	// +kubebuilder:validation:MinItems=1
+	Resources []ContainerResource `json:"resources,omitempty"`
+	// tolerations defines tolerations for the pods.
+	// tolerations is optional.
+	//
+	// When omitted, this means the user has no opinion and the platform is left
+	// to choose reasonable defaults. These defaults are subject to change over time.
+	// The current default is to tolerate all taints (operator: Exists without any key),
+	// which is typical for DaemonSets that must run on every node.
+	// Maximum length for this list is 10.
+	// Minimum length for this list is 1.
+	// +kubebuilder:validation:MaxItems=10
+	// +kubebuilder:validation:MinItems=1
+	// +listType=atomic
+	// +optional
+	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
+	// collectors configures which node-exporter metric collectors are enabled.
+	// collectors is optional.
+	// Each collector can be individually enabled or disabled. Some collectors may have
+	// additional configuration options.
+	//
+	// When omitted, this means no opinion and the platform is left to choose a reasonable
+	// default, which is subject to change over time.
+	// +optional
+	Collectors NodeExporterCollectorConfig `json:"collectors,omitempty,omitzero"`
+	// maxProcs sets the target number of CPUs on which the node-exporter process will run.
+	// maxProcs is optional.
+	// Use this setting to override the default value, which is set either to 4 or to the number
+	// of CPUs on the host, whichever is smaller.
+	// The default value is computed at runtime and set via the GOMAXPROCS environment variable before
+	// node-exporter is launched.
+	// If a kernel deadlock occurs or if performance degrades when reading from sysfs concurrently,
+	// you can change this value to 1, which limits node-exporter to running on one CPU.
+	// For nodes with a high CPU count, setting the limit to a low number saves resources by preventing
+	// Go routines from being scheduled to run on all CPUs. However, I/O performance degrades if the
+	// maxProcs value is set too low and there are many metrics to collect.
+	// The minimum value is 1 and the maximum value is 1024.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default,
+	// which is subject to change over time. The current default is min(4, number of host CPUs).
+	// +optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=1024
+	MaxProcs int32 `json:"maxProcs,omitempty"`
+	// ignoredNetworkDevices is a list of regular expression patterns that match network devices
+	// to be excluded from the relevant collector configuration such as netdev, netclass, and ethtool.
+	// ignoredNetworkDevices is optional.
+	//
+	// When omitted, the Cluster Monitoring Operator uses a predefined list of devices to be excluded
+	// to minimize the impact on memory usage.
+	// When set as an empty list, no devices are excluded.
+	// If you modify this setting, monitor the prometheus-k8s deployment closely for excessive memory usage.
+	// Maximum length for this list is 50.
+	// Each entry must be at least 1 character and at most 1024 characters long.
+	// +kubebuilder:validation:MaxItems=50
+	// +kubebuilder:validation:MinItems=0
+	// +listType=set
+	// +optional
+	IgnoredNetworkDevices *[]NodeExporterIgnoredNetworkDevice `json:"ignoredNetworkDevices,omitempty"`
+}
+
+// NodeExporterIgnoredNetworkDevice is a string that is interpreted as a Go regular expression
+// pattern by the controller to match network device names to exclude from node-exporter
+// metric collection for collectors such as netdev, netclass, and ethtool.
+// Invalid regular expressions will cause a controller-level error at runtime.
+// Must be at least 1 character and at most 1024 characters.
+// +kubebuilder:validation:MinLength=1
+// +kubebuilder:validation:MaxLength=1024
+type NodeExporterIgnoredNetworkDevice string
+
+// NodeExporterCollectorCollectionPolicy declares whether a node-exporter collector should collect metrics.
+// Valid values are "Collect" and "DoNotCollect".
+// +kubebuilder:validation:Enum=Collect;DoNotCollect
+// +enum
+type NodeExporterCollectorCollectionPolicy string
+
+const (
+	// NodeExporterCollectorCollectionPolicyCollect means the collector is active and will produce metrics.
+	NodeExporterCollectorCollectionPolicyCollect NodeExporterCollectorCollectionPolicy = "Collect"
+	// NodeExporterCollectorCollectionPolicyDoNotCollect means the collector is inactive and will not produce metrics.
+	NodeExporterCollectorCollectionPolicyDoNotCollect NodeExporterCollectorCollectionPolicy = "DoNotCollect"
+)
+
+// NodeExporterNetclassStatsGatherer identifies how the netclass collector gathers device statistics
+// (for example via sysfs or netlink, as implemented in node_exporter).
+// Valid values are "Sysfs" and "Netlink".
+// +kubebuilder:validation:Enum=Sysfs;Netlink
+// +enum
+type NodeExporterNetclassStatsGatherer string
+
+const (
+	// NodeExporterNetclassStatsGathererSysfs uses the sysfs-based implementation.
+	NodeExporterNetclassStatsGathererSysfs NodeExporterNetclassStatsGatherer = "Sysfs"
+	// NodeExporterNetclassStatsGathererNetlink uses the netlink-based implementation.
+	NodeExporterNetclassStatsGathererNetlink NodeExporterNetclassStatsGatherer = "Netlink"
+)
+
+// NodeExporterCollectorConfig defines settings for individual collectors
+// of the node-exporter agent. Each collector can be individually set to collect or not collect metrics.
+// At least one collector must be specified.
+// +kubebuilder:validation:MinProperties=1
+type NodeExporterCollectorConfig struct {
+	// cpuFreq configures the cpufreq collector, which collects CPU frequency statistics.
+	// cpuFreq is optional.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default,
+	// which is subject to change over time. The current default is disabled.
+	// Consider enabling when you need to observe CPU frequency scaling; expect higher CPU usage on
+	// many-core nodes when collectionPolicy is Collect.
+	// +optional
+	CpuFreq NodeExporterCollectorCpufreqConfig `json:"cpuFreq,omitempty,omitzero"`
+	// tcpStat configures the tcpstat collector, which collects TCP connection statistics.
+	// tcpStat is optional.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default,
+	// which is subject to change over time. The current default is disabled.
+	// Enable when debugging TCP connection behavior or capacity at the node level.
+	// +optional
+	TcpStat NodeExporterCollectorTcpStatConfig `json:"tcpStat,omitempty,omitzero"`
+	// ethtool configures the ethtool collector, which collects ethernet device statistics.
+	// ethtool is optional.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default,
+	// which is subject to change over time. The current default is disabled.
+	// Enable when you need NIC driver-level ethtool metrics beyond generic netdev counters.
+	// +optional
+	Ethtool NodeExporterCollectorEthtoolConfig `json:"ethtool,omitempty,omitzero"`
+	// netDev configures the netdev collector, which collects network device statistics.
+	// netDev is optional.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default,
+	// which is subject to change over time. The current default is enabled.
+	// Turn off if you must reduce per-interface metric cardinality on hosts with many virtual interfaces.
+	// +optional
+	NetDev NodeExporterCollectorNetDevConfig `json:"netDev,omitempty,omitzero"`
+	// netClass configures the netclass collector, which collects information about network devices.
+	// netClass is optional.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default,
+	// which is subject to change over time. The current default is enabled with netlink mode active.
+	// Use statsGatherer when sysfs vs netlink implementation matters or when matching node_exporter tuning.
+	// +optional
+	NetClass NodeExporterCollectorNetClassConfig `json:"netClass,omitempty,omitzero"`
+	// buddyInfo configures the buddyinfo collector, which collects statistics about memory
+	// fragmentation from the node_buddyinfo_blocks metric. This metric collects data from /proc/buddyinfo.
+	// buddyInfo is optional.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default,
+	// which is subject to change over time. The current default is disabled.
+	// Enable when investigating kernel memory fragmentation; typically for advanced troubleshooting only.
+	// +optional
+	BuddyInfo NodeExporterCollectorBuddyInfoConfig `json:"buddyInfo,omitempty,omitzero"`
+	// mountStats configures the mountstats collector, which collects statistics about NFS volume
+	// I/O activities.
+	// mountStats is optional.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default,
+	// which is subject to change over time. The current default is disabled.
+	// Enabling this collector may produce metrics with high cardinality. If you enable this
+	// collector, closely monitor the prometheus-k8s deployment for excessive memory usage.
+	// Enable when you care about per-mount NFS client statistics.
+	// +optional
+	MountStats NodeExporterCollectorMountStatsConfig `json:"mountStats,omitempty,omitzero"`
+	// ksmd configures the ksmd collector, which collects statistics from the kernel same-page
+	// merger daemon.
+	// ksmd is optional.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default,
+	// which is subject to change over time. The current default is disabled.
+	// Enable on nodes where KSM is in use and you want visibility into merging activity.
+	// +optional
+	Ksmd NodeExporterCollectorKSMDConfig `json:"ksmd,omitempty,omitzero"`
+	// processes configures the processes collector, which collects statistics from processes and
+	// threads running in the system.
+	// processes is optional.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default,
+	// which is subject to change over time. The current default is disabled.
+	// Enable for process/thread-level insight; can be expensive on busy nodes.
+	// +optional
+	Processes NodeExporterCollectorProcessesConfig `json:"processes,omitempty,omitzero"`
+	// systemd configures the systemd collector, which collects statistics on the systemd daemon
+	// and its managed services.
+	// systemd is optional.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default,
+	// which is subject to change over time. The current default is disabled.
+	// Enabling this collector with a long list of selected units may produce metrics with high
+	// cardinality. If you enable this collector, closely monitor the prometheus-k8s deployment
+	// for excessive memory usage.
+	// Enable when you need metrics for specific units; scope units carefully.
+	// +optional
+	Systemd NodeExporterCollectorSystemdConfig `json:"systemd,omitempty,omitzero"`
+	// softirqs configures the softirqs collector, which exposes detailed softirq statistics
+	// from /proc/softirqs.
+	// softirqs is optional.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default,
+	// which is subject to change over time. The current default is disabled.
+	// Enable when you need visibility into kernel softirq processing across CPUs.
+	// +optional
+	Softirqs NodeExporterCollectorSoftirqsConfig `json:"softirqs,omitempty,omitzero"`
+}
+
+// NodeExporterCollectorCpufreqConfig provides configuration for the cpufreq collector
+// of the node-exporter agent. The cpufreq collector collects CPU frequency statistics.
+// It is disabled by default.
+type NodeExporterCollectorCpufreqConfig struct {
+	// collectionPolicy declares whether the cpufreq collector collects metrics.
+	// This field is required.
+	// Valid values are "Collect" and "DoNotCollect".
+	// When set to "Collect", the cpufreq collector is active and CPU frequency statistics are collected.
+	// When set to "DoNotCollect", the cpufreq collector is inactive.
+	// +required
+	CollectionPolicy NodeExporterCollectorCollectionPolicy `json:"collectionPolicy,omitempty"`
+}
+
+// NodeExporterCollectorTcpStatConfig provides configuration for the tcpstat collector
+// of the node-exporter agent. The tcpstat collector collects TCP connection statistics.
+// It is disabled by default.
+type NodeExporterCollectorTcpStatConfig struct {
+	// collectionPolicy declares whether the tcpstat collector collects metrics.
+	// This field is required.
+	// Valid values are "Collect" and "DoNotCollect".
+	// When set to "Collect", the tcpstat collector is active and TCP connection statistics are collected.
+	// When set to "DoNotCollect", the tcpstat collector is inactive.
+	// +required
+	CollectionPolicy NodeExporterCollectorCollectionPolicy `json:"collectionPolicy,omitempty"`
+}
+
+// NodeExporterCollectorEthtoolConfig provides configuration for the ethtool collector
+// of the node-exporter agent. The ethtool collector collects ethernet device statistics.
+// It is disabled by default.
+type NodeExporterCollectorEthtoolConfig struct {
+	// collectionPolicy declares whether the ethtool collector collects metrics.
+	// This field is required.
+	// Valid values are "Collect" and "DoNotCollect".
+	// When set to "Collect", the ethtool collector is active and ethernet device statistics are collected.
+	// When set to "DoNotCollect", the ethtool collector is inactive.
+	// +required
+	CollectionPolicy NodeExporterCollectorCollectionPolicy `json:"collectionPolicy,omitempty"`
+}
+
+// NodeExporterCollectorNetDevConfig provides configuration for the netdev collector
+// of the node-exporter agent. The netdev collector collects network device statistics
+// such as bytes, packets, errors, and drops per device.
+// It is enabled by default.
+type NodeExporterCollectorNetDevConfig struct {
+	// collectionPolicy declares whether the netdev collector collects metrics.
+	// This field is required.
+	// Valid values are "Collect" and "DoNotCollect".
+	// When set to "Collect", the netdev collector is active and network device statistics are collected.
+	// When set to "DoNotCollect", the netdev collector is inactive and the corresponding metrics become unavailable.
+	// +required
+	CollectionPolicy NodeExporterCollectorCollectionPolicy `json:"collectionPolicy,omitempty"`
+}
+
+// NodeExporterCollectorNetClassConfig provides configuration for the netclass collector
+// of the node-exporter agent. The netclass collector collects information about network devices
+// such as network speed, MTU, and carrier status.
+// It is enabled by default.
+// When collectionPolicy is DoNotCollect, the collect field must not be set.
+// +kubebuilder:validation:XValidation:rule="has(self.collectionPolicy) && self.collectionPolicy == 'Collect' ? true : !has(self.collect)",message="collect is forbidden when collectionPolicy is not Collect"
+// +union
+type NodeExporterCollectorNetClassConfig struct {
+	// collectionPolicy declares whether the netclass collector collects metrics.
+	// This field is required.
+	// Valid values are "Collect" and "DoNotCollect".
+	// When set to "Collect", the netclass collector is active and network class information is collected.
+	// When set to "DoNotCollect", the netclass collector is inactive and the corresponding metrics become unavailable.
+	// When set to "DoNotCollect", the collect field must not be set.
+	// +unionDiscriminator
+	// +required
+	CollectionPolicy NodeExporterCollectorCollectionPolicy `json:"collectionPolicy,omitempty"`
+	// collect contains configuration options that apply only when the netclass collector is actively collecting metrics
+	// (i.e. when collectionPolicy is Collect).
+	// collect is optional and may be omitted even when collectionPolicy is Collect.
+	// collect may only be set when collectionPolicy is Collect.
+	// When set, at least one field must be specified within collect.
+	// +unionMember
+	// +optional
+	Collect NodeExporterCollectorNetClassCollectConfig `json:"collect,omitzero,omitempty"`
+}
+
+// NodeExporterCollectorNetClassCollectConfig holds configuration options for the netclass collector
+// when it is actively collecting metrics. At least one field must be specified.
+// +kubebuilder:validation:MinProperties=1
+type NodeExporterCollectorNetClassCollectConfig struct {
+	// statsGatherer selects which implementation the netclass collector uses to gather statistics (sysfs or netlink).
+	// statsGatherer is optional.
+	// Valid values are "Sysfs" and "Netlink".
+	// When set to "Netlink", the netlink implementation is used; when set to "Sysfs", the sysfs implementation is used.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default,
+	// which is subject to change over time. The current default is Netlink.
+	// +optional
+	StatsGatherer NodeExporterNetclassStatsGatherer `json:"statsGatherer,omitempty"`
+}
+
+// NodeExporterCollectorBuddyInfoConfig provides configuration for the buddyinfo collector
+// of the node-exporter agent. The buddyinfo collector collects statistics about memory fragmentation
+// from the node_buddyinfo_blocks metric using data from /proc/buddyinfo.
+// It is disabled by default.
+type NodeExporterCollectorBuddyInfoConfig struct {
+	// collectionPolicy declares whether the buddyinfo collector collects metrics.
+	// This field is required.
+	// Valid values are "Collect" and "DoNotCollect".
+	// When set to "Collect", the buddyinfo collector is active and memory fragmentation statistics are collected.
+	// When set to "DoNotCollect", the buddyinfo collector is inactive.
+	// +required
+	CollectionPolicy NodeExporterCollectorCollectionPolicy `json:"collectionPolicy,omitempty"`
+}
+
+// NodeExporterCollectorMountStatsConfig provides configuration for the mountstats collector
+// of the node-exporter agent. The mountstats collector collects statistics about NFS volume I/O activities.
+// It is disabled by default.
+// Enabling this collector may produce metrics with high cardinality. If you enable this
+// collector, closely monitor the prometheus-k8s deployment for excessive memory usage.
+type NodeExporterCollectorMountStatsConfig struct {
+	// collectionPolicy declares whether the mountstats collector collects metrics.
+	// This field is required.
+	// Valid values are "Collect" and "DoNotCollect".
+	// When set to "Collect", the mountstats collector is active and NFS volume I/O statistics are collected.
+	// When set to "DoNotCollect", the mountstats collector is inactive.
+	// +required
+	CollectionPolicy NodeExporterCollectorCollectionPolicy `json:"collectionPolicy,omitempty"`
+}
+
+// NodeExporterCollectorKSMDConfig provides configuration for the ksmd collector
+// of the node-exporter agent. The ksmd collector collects statistics from the kernel
+// same-page merger daemon.
+// It is disabled by default.
+type NodeExporterCollectorKSMDConfig struct {
+	// collectionPolicy declares whether the ksmd collector collects metrics.
+	// This field is required.
+	// Valid values are "Collect" and "DoNotCollect".
+	// When set to "Collect", the ksmd collector is active and kernel same-page merger statistics are collected.
+	// When set to "DoNotCollect", the ksmd collector is inactive.
+	// +required
+	CollectionPolicy NodeExporterCollectorCollectionPolicy `json:"collectionPolicy,omitempty"`
+}
+
+// NodeExporterCollectorProcessesConfig provides configuration for the processes collector
+// of the node-exporter agent. The processes collector collects statistics from processes and threads
+// running in the system.
+// It is disabled by default.
+type NodeExporterCollectorProcessesConfig struct {
+	// collectionPolicy declares whether the processes collector collects metrics.
+	// This field is required.
+	// Valid values are "Collect" and "DoNotCollect".
+	// When set to "Collect", the processes collector is active and process/thread statistics are collected.
+	// When set to "DoNotCollect", the processes collector is inactive.
+	// +required
+	CollectionPolicy NodeExporterCollectorCollectionPolicy `json:"collectionPolicy,omitempty"`
+}
+
+// NodeExporterCollectorSystemdConfig provides configuration for the systemd collector
+// of the node-exporter agent. The systemd collector collects statistics on the systemd daemon
+// and its managed services.
+// It is disabled by default.
+// Enabling this collector with a long list of selected units may produce metrics with high
+// cardinality. If you enable this collector, closely monitor the prometheus-k8s deployment
+// for excessive memory usage.
+// When collectionPolicy is DoNotCollect, the collect field must not be set.
+// +kubebuilder:validation:XValidation:rule="has(self.collectionPolicy) && self.collectionPolicy == 'Collect' ? true : !has(self.collect)",message="collect is forbidden when collectionPolicy is not Collect"
+// +union
+type NodeExporterCollectorSystemdConfig struct {
+	// collectionPolicy declares whether the systemd collector collects metrics.
+	// This field is required.
+	// Valid values are "Collect" and "DoNotCollect".
+	// When set to "Collect", the systemd collector is active and systemd unit statistics are collected.
+	// When set to "DoNotCollect", the systemd collector is inactive and the collect field must not be set.
+	// +unionDiscriminator
+	// +required
+	CollectionPolicy NodeExporterCollectorCollectionPolicy `json:"collectionPolicy,omitempty"`
+	// collect contains configuration options that apply only when the systemd collector is actively collecting metrics
+	// (i.e. when collectionPolicy is Collect).
+	// collect is optional and may be omitted even when collectionPolicy is Collect.
+	// collect may only be set when collectionPolicy is Collect.
+	// When set, at least one field must be specified within collect.
+	// +unionMember
+	// +optional
+	Collect NodeExporterCollectorSystemdCollectConfig `json:"collect,omitzero,omitempty"`
+}
+
+// NodeExporterCollectorSystemdCollectConfig holds configuration options for the systemd collector
+// when it is actively collecting metrics. At least one field must be specified.
+// +kubebuilder:validation:MinProperties=1
+type NodeExporterCollectorSystemdCollectConfig struct {
+	// units is a list of regular expression patterns that match systemd units to be included
+	// by the systemd collector.
+	// units is optional.
+	// By default, the list is empty, so the collector exposes no metrics for systemd units.
+	// Each entry is a regular expression pattern and must be at least 1 character and at most 1024 characters.
+	// Maximum length for this list is 50.
+	// Minimum length for this list is 1.
+	// Entries in this list must be unique.
+	// +kubebuilder:validation:MaxItems=50
+	// +kubebuilder:validation:MinItems=1
+	// +listType=set
+	// +optional
+	Units []NodeExporterSystemdUnit `json:"units,omitempty"`
+}
+
+// NodeExporterSystemdUnit is a string that is interpreted as a Go regular expression
+// pattern by the controller to match systemd unit names.
+// Invalid regular expressions will cause a controller-level error at runtime.
+// Must be at least 1 character and at most 1024 characters.
+// +kubebuilder:validation:MinLength=1
+// +kubebuilder:validation:MaxLength=1024
+type NodeExporterSystemdUnit string
+
+// NodeExporterCollectorSoftirqsConfig provides configuration for the softirqs collector
+// of the node-exporter agent. The softirqs collector exposes detailed softirq statistics
+// from /proc/softirqs.
+// It is disabled by default.
+type NodeExporterCollectorSoftirqsConfig struct {
+	// collectionPolicy declares whether the softirqs collector collects metrics.
+	// This field is required.
+	// Valid values are "Collect" and "DoNotCollect".
+	// When set to "Collect", the softirqs collector is active and softirq statistics are collected.
+	// When set to "DoNotCollect", the softirqs collector is inactive.
+	// +required
+	CollectionPolicy NodeExporterCollectorCollectionPolicy `json:"collectionPolicy,omitempty"`
+}
+
+// MonitoringPluginConfig provides configuration options for the monitoring plugin
+// that runs as a dynamic plugin of the OpenShift web console.
+// The monitoring plugin provides the monitoring UI in the OpenShift web console
+// for visualizing metrics, alerts, and dashboards.
+// At least one field must be specified; an empty monitoringPluginConfig object is not allowed.
+// +kubebuilder:validation:MinProperties=1
+type MonitoringPluginConfig struct {
+	// nodeSelector defines the nodes on which the Pods are scheduled.
+	// nodeSelector is optional.
+	//
+	// When omitted, this means the user has no opinion and the platform is left
+	// to choose reasonable defaults. These defaults are subject to change over time.
+	// The current default value is `kubernetes.io/os: linux`.
+	// When specified, nodeSelector must contain at least 1 entry and must not contain more than 10 entries.
+	// +optional
+	// +kubebuilder:validation:MinProperties=1
+	// +kubebuilder:validation:MaxProperties=10
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+	// resources defines the compute resource requests and limits for the monitoring-plugin container.
+	// This includes CPU, memory and HugePages constraints to help control scheduling and resource usage.
+	// When not specified, defaults are used by the platform. Requests cannot exceed limits.
+	// This field is optional.
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	// This is a simplified API that maps to Kubernetes ResourceRequirements.
+	// The current default values are:
+	//   resources:
+	//    - name: cpu
+	//      request: 10m
+	//    - name: memory
+	//      request: 50Mi
+	//
+	// When specified, resources must contain at least 1 entry and must not exceed 5 entries.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=5
+	// +kubebuilder:validation:MinItems=1
+	Resources []ContainerResource `json:"resources,omitempty"`
+	// tolerations defines the tolerations required for the monitoring-plugin Pods.
+	// This field is optional.
+	//
+	// When omitted, the monitoring-plugin Pods will not have any tolerations, which
+	// means they will only be scheduled on nodes with no taints.
+	// When specified, tolerations must contain at least 1 entry and must not contain more than 10 entries.
+	// +optional
+	// +listType=atomic
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=10
+	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
+	// topologySpreadConstraints defines rules for how monitoring-plugin Pods should be distributed
+	// across topology domains such as zones, nodes, or other user-defined labels.
+	// topologySpreadConstraints is optional.
+	// This helps improve high availability and resource efficiency by avoiding placing
+	// too many replicas in the same failure domain.
+	//
+	// When omitted, this means no opinion and the platform is left to choose a default, which is subject to change over time.
+	// This field maps directly to the `topologySpreadConstraints` field in the Pod spec.
+	// Default is empty list.
+	// When specified, this list must contain at least 1 entry and must not exceed 10 entries.
 	// +kubebuilder:validation:MaxItems=10
 	// +kubebuilder:validation:MinItems=1
 	// +listType=map
@@ -422,6 +969,7 @@ type ContainerResource struct {
 	// request is the minimum amount of the resource required (e.g. "2Mi", "1Gi").
 	// This field is optional.
 	// When limit is specified, request cannot be greater than limit.
+	// The value must be greater than 0 when specified.
 	// +optional
 	// +kubebuilder:validation:XIntOrString
 	// +kubebuilder:validation:MaxLength=20
@@ -1816,6 +2364,79 @@ type TelemeterClientConfig struct {
 	// When omitted, this means no opinion and the platform is left to choose a default, which is subject to change over time.
 	// This field maps directly to the `topologySpreadConstraints` field in the Pod spec.
 	// Default is empty list.
+	// Maximum length for this list is 10.
+	// Minimum length for this list is 1.
+	// Entries must have unique topologyKey and whenUnsatisfiable pairs.
+	// +kubebuilder:validation:MaxItems=10
+	// +kubebuilder:validation:MinItems=1
+	// +listType=map
+	// +listMapKey=topologyKey
+	// +listMapKey=whenUnsatisfiable
+	// +optional
+	TopologySpreadConstraints []v1.TopologySpreadConstraint `json:"topologySpreadConstraints,omitempty"`
+}
+
+// ThanosQuerierConfig provides configuration options for the Thanos Querier component
+// that runs in the `openshift-monitoring` namespace.
+// At least one field must be specified; an empty thanosQuerierConfig object is not allowed.
+// +kubebuilder:validation:MinProperties=1
+type ThanosQuerierConfig struct {
+	// nodeSelector defines the nodes on which the Pods are scheduled.
+	// nodeSelector is optional.
+	//
+	// When omitted, this means the user has no opinion and the platform is left
+	// to choose reasonable defaults. These defaults are subject to change over time.
+	// The current default value is `kubernetes.io/os: linux`.
+	// When specified, nodeSelector must contain at least 1 entry and must not contain more than 10 entries.
+	// +optional
+	// +kubebuilder:validation:MinProperties=1
+	// +kubebuilder:validation:MaxProperties=10
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+	// resources defines the compute resource requests and limits for the Thanos Querier container.
+	// resources is optional.
+	//
+	// When omitted, this means the user has no opinion and the platform is left
+	// to choose reasonable defaults. These defaults are subject to change over time.
+	// Requests cannot exceed limits.
+	// More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	// This is a simplified API that maps to Kubernetes ResourceRequirements.
+	// The current default values are:
+	//   resources:
+	//    - name: cpu
+	//      request: 5m
+	//    - name: memory
+	//      request: 12Mi
+	// Maximum length for this list is 5.
+	// Minimum length for this list is 1.
+	// Each resource name must be unique within this list.
+	// +optional
+	// +listType=map
+	// +listMapKey=name
+	// +kubebuilder:validation:MaxItems=5
+	// +kubebuilder:validation:MinItems=1
+	Resources []ContainerResource `json:"resources,omitempty"`
+	// tolerations defines tolerations for the pods.
+	// tolerations is optional.
+	//
+	// When omitted, this means the user has no opinion and the platform is left
+	// to choose reasonable defaults. These defaults are subject to change over time.
+	// Defaults are empty/unset.
+	// Maximum length for this list is 10.
+	// Minimum length for this list is 1.
+	// +kubebuilder:validation:MaxItems=10
+	// +kubebuilder:validation:MinItems=1
+	// +listType=atomic
+	// +optional
+	Tolerations []v1.Toleration `json:"tolerations,omitempty"`
+	// topologySpreadConstraints defines rules for how Thanos Querier Pods should be distributed
+	// across topology domains such as zones, nodes, or other user-defined labels.
+	// topologySpreadConstraints is optional.
+	// This helps improve high availability and resource efficiency by avoiding placing
+	// too many replicas in the same failure domain.
+	//
+	// When omitted, this means no opinion and the platform is left to choose a default, which is subject to change over time.
+	// This field maps directly to the `topologySpreadConstraints` field in the Pod spec.
+	// Defaults are empty/unset.
 	// Maximum length for this list is 10.
 	// Minimum length for this list is 1.
 	// Entries must have unique topologyKey and whenUnsatisfiable pairs.

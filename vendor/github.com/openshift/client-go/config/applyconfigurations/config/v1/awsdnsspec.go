@@ -10,6 +10,11 @@ type AWSDNSSpecApplyConfiguration struct {
 	// privateZoneIAMRole contains the ARN of an IAM role that should be assumed when performing
 	// operations on the cluster's private hosted zone specified in the cluster DNS config.
 	// When left empty, no role should be assumed.
+	//
+	// The ARN must follow the format: arn:<partition>:iam::<account-id>:role/<role-name>, where:
+	// <partition> is the AWS partition (aws, aws-cn, aws-us-gov, or aws-eusc),
+	// <account-id> is a 12-digit numeric identifier for the AWS account,
+	// <role-name> is the IAM role name.
 	PrivateZoneIAMRole *string `json:"privateZoneIAMRole,omitempty"`
 }
 

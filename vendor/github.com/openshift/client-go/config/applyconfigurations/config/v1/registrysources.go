@@ -8,12 +8,30 @@ package v1
 // RegistrySources holds cluster-wide information about how to handle the registries config.
 type RegistrySourcesApplyConfiguration struct {
 	// insecureRegistries are registries which do not have a valid TLS certificates or only support HTTP connections.
+	// Each entry must be a valid registry scope in the format hostname[:port][/path],
+	// optionally prefixed with "*." for wildcard subdomains (e.g., "*.example.com").
+	// The hostname must consist of valid DNS labels separated by dots, where each label
+	// contains only alphanumeric characters and hyphens and does not start or end with a hyphen.
+	// Entries must not be empty, must not include tags (e.g., ":latest") or digests (e.g., "@sha256:..."),
+	// and must be at most 256 characters in length. The list may contain at most 1024 entries.
 	InsecureRegistries []string `json:"insecureRegistries,omitempty"`
 	// blockedRegistries cannot be used for image pull and push actions. All other registries are permitted.
+	// Each entry must be a valid registry scope in the format hostname[:port][/path],
+	// optionally prefixed with "*." for wildcard subdomains (e.g., "*.example.com").
+	// The hostname must consist of valid DNS labels separated by dots, where each label
+	// contains only alphanumeric characters and hyphens and does not start or end with a hyphen.
+	// Entries must not be empty, must not include tags (e.g., ":latest") or digests (e.g., "@sha256:..."),
+	// and must be at most 256 characters in length. The list may contain at most 1024 entries.
 	//
 	// Only one of BlockedRegistries or AllowedRegistries may be set.
 	BlockedRegistries []string `json:"blockedRegistries,omitempty"`
 	// allowedRegistries are the only registries permitted for image pull and push actions. All other registries are denied.
+	// Each entry must be a valid registry scope in the format hostname[:port][/path],
+	// optionally prefixed with "*." for wildcard subdomains (e.g., "*.example.com").
+	// The hostname must consist of valid DNS labels separated by dots, where each label
+	// contains only alphanumeric characters and hyphens and does not start or end with a hyphen.
+	// Entries must not be empty, must not include tags (e.g., ":latest") or digests (e.g., "@sha256:..."),
+	// and must be at most 256 characters in length. The list may contain at most 1024 entries.
 	//
 	// Only one of BlockedRegistries or AllowedRegistries may be set.
 	AllowedRegistries []string `json:"allowedRegistries,omitempty"`

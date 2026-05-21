@@ -683,7 +683,7 @@ type UsernameClaimMapping struct {
 // +enum
 type UsernamePrefixPolicy string
 
-var (
+const (
 	// NoOpinion let's the cluster assign prefixes.  If the username claim is email, there is no prefix
 	// If the username claim is anything else, it is prefixed by the issuerURL
 	NoOpinion UsernamePrefixPolicy = ""
@@ -735,10 +735,10 @@ type TokenValidationRuleType string
 const (
 	// TokenValidationRuleTypeRequiredClaim indicates that the token must contain a specific claim.
 	// Used as a value for TokenValidationRuleType.
-	TokenValidationRuleTypeRequiredClaim = "RequiredClaim"
+	TokenValidationRuleTypeRequiredClaim TokenValidationRuleType = "RequiredClaim"
 	// TokenValidationRuleTypeCEL indicates that the token validation is defined via a CEL expression.
 	// Used as a value for TokenValidationRuleType.
-	TokenValidationRuleTypeCEL = "CEL"
+	TokenValidationRuleTypeCEL TokenValidationRuleType = "CEL"
 )
 
 // TokenClaimValidationRule represents a validation rule based on token claims.

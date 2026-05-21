@@ -5,8 +5,7 @@ securitycontextconstraints.security.openshift.io:
   CRDName: securitycontextconstraints.security.openshift.io
   Capability: ""
   Category: ""
-  FeatureGates:
-  - UserNamespacesPodSecurityStandards
+  FeatureGates: []
   FilenameOperatorName: config-operator
   FilenameOperatorOrdering: "01"
   FilenameRunLevel: "0000_03"
