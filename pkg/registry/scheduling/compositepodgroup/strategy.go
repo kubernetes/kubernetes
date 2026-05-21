@@ -80,7 +80,7 @@ func (*compositePodGroupStrategy) DeclarativeValidationConfig(ctx context.Contex
 	if utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
 		opts = append(opts, string(features.CompositePodGroup))
 	}
-	return rest.DeclarativeValidationConfig{Options: opts, DeclarativeEnforcement: true}
+	return rest.DeclarativeValidationConfig{Options: opts}
 }
 
 func (*compositePodGroupStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {

@@ -34,6 +34,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -109,6 +110,8 @@ type SchedulingQueue interface {
 	AddUnschedulablePodIfNotPresent(logger klog.Logger, pInfo *framework.QueuedPodInfo, podSchedulingCycle int64) error
 	// AddAttemptedPodGroupIfNotPresent adds an attempted pod group back to scheduling queue.
 	AddAttemptedPodGroupIfNotPresent(logger klog.Logger, pgInfo *framework.QueuedPodGroupInfo, schedulingCycle int64) error
+	// AddAttemptedCompositePodGroupIfNotPresent adds an attempted composite pod group back to scheduling queue.
+	AddAttemptedCompositePodGroupIfNotPresent(logger klog.Logger, cpgInfo *framework.QueuedCompositePodGroupInfo, schedulingCycle int64) error
 	// SchedulingCycle returns the current number of scheduling cycle which is
 	// cached by scheduling queue. Normally, incrementing this number whenever
 	// a pod is popped (e.g. called Pop()) is enough.
@@ -121,6 +124,12 @@ type SchedulingQueue interface {
 	Done(types.UID)
 	Update(ctx context.Context, oldPod, newPod *v1.Pod)
 	Delete(logger klog.Logger, pod *v1.Pod)
+	AddPodGroup(pg *v1alpha3.PodGroup)
+	RemovePodGroup(pg *v1alpha3.PodGroup)
+	AddCompositePodGroup(cpg *v1alpha3.CompositePodGroup)
+	RemoveCompositePodGroup(cpg *v1alpha3.CompositePodGroup)
+	UpdatePodGroup(oldPG, newPG *v1alpha3.PodGroup)
+	UpdateCompositePodGroup(oldCPG, newCPG *v1alpha3.CompositePodGroup)
 	// Important Note: preCheck shouldn't include anything that depends on the in-tree plugins' logic.
 	// (e.g., filter Pods based on added/updated Node's capacity, etc.)
 	MoveAllToActiveOrBackoffQueue(logger klog.Logger, event fwk.ClusterEvent, oldObj, newObj interface{}, preCheck PreEnqueueCheck)
@@ -186,6 +195,15 @@ type PriorityQueue struct {
 	unschedulableEntities *unschedulableEntities
 	// pendingPodGroupPods stores all pending pods that wait for their corresponding pod group to be requeued.
 	pendingPodGroupPods *pendingPodGroupMemberPods
+
+	// cpgs stores all known CPGs, keyed by namespace/name.
+	cpgs map[string]*framework.QueuedCompositePodGroupInfo
+	// orphanCPGs stores CPGs waiting for their parent CPG, keyed by parent CPG name.
+	orphanCPGs map[string][]*framework.QueuedCompositePodGroupInfo
+	// orphanPGs stores PGs waiting for their parent CPG, keyed by parent CPG name.
+	orphanPGs map[string][]*framework.QueuedPodGroupInfo
+	// pgs stores all known PGs, keyed by namespace/name.
+	pgs map[string]*framework.QueuedPodGroupInfo
 
 	// preEnqueuePluginMap is keyed with profile and plugin name, valued with registered preEnqueue plugins.
 	preEnqueuePluginMap map[string]map[string]fwk.PreEnqueuePlugin
@@ -367,6 +385,14 @@ func newQueuedPodGroupInfoForLookup(pod *v1.Pod) *framework.QueuedPodGroupInfo {
 	}
 }
 
+// newQueuedCompositePodGroupInfoForLookup builds a QueuedCompositePodGroupInfo object for a lookup in the queue.
+func newQueuedCompositePodGroupInfoForLookup(namespace, name string) *framework.QueuedCompositePodGroupInfo {
+	return &framework.QueuedCompositePodGroupInfo{
+		Namespace: namespace,
+		Name:      name,
+	}
+}
+
 // NewPriorityQueue creates a PriorityQueue object.
 func NewPriorityQueue(
 	lessFn fwk.LessFunc,
@@ -394,6 +420,10 @@ func NewPriorityQueue(
 		backoffQ:                          backoffQ,
 		unschedulableEntities:             newUnschedulableEntities(metrics.NewUnschedulablePodsRecorder(), metrics.NewGatedPodsRecorder()),
 		pendingPodGroupPods:               newPendingPodGroupMemberPods(),
+		cpgs:                              make(map[string]*framework.QueuedCompositePodGroupInfo),
+		orphanCPGs:                        make(map[string][]*framework.QueuedCompositePodGroupInfo),
+		orphanPGs:                         make(map[string][]*framework.QueuedPodGroupInfo),
+		pgs:                               make(map[string]*framework.QueuedPodGroupInfo),
 		preEnqueuePluginMap:               options.preEnqueuePluginMap,
 		queueingHintMap:                   options.queueingHintMap,
 		pluginToEventsMap:                 buildEventMap(options.queueingHintMap),
@@ -414,6 +444,238 @@ func NewPriorityQueue(
 	pq.nominator = newPodNominator(options.podLister)
 
 	return pq
+}
+
+func (pq *PriorityQueue) AddCompositePodGroup(cpg *v1alpha3.CompositePodGroup) {
+	pq.lock.Lock()
+	defer pq.lock.Unlock()
+
+	key := fmt.Sprintf("%s/%s", cpg.Namespace, cpg.Name)
+	cpgInfo, ok := pq.cpgs[key]
+	if !ok {
+		cpgInfo = framework.NewQueuedCompositePodGroupInfo(cpg.Namespace, cpg.Name)
+		pq.cpgs[key] = cpgInfo
+	}
+
+	if cpg.Spec.ParentCompositePodGroupName != nil {
+		cpgInfo.ParentCompositePodGroupName = *cpg.Spec.ParentCompositePodGroupName
+	}
+
+	// Link any orphans waiting for this CPG
+	if orphans, ok := pq.orphanCPGs[key]; ok {
+		for _, orphan := range orphans {
+			cpgInfo.AddChildCPG(orphan)
+		}
+		delete(pq.orphanCPGs, key)
+	}
+	if orphans, ok := pq.orphanPGs[key]; ok {
+		for _, orphan := range orphans {
+			cpgInfo.AddChildPG(orphan)
+		}
+		delete(pq.orphanPGs, key)
+	}
+
+	// Link to parent if specified
+	if cpg.Spec.ParentCompositePodGroupName != nil {
+		parentName := *cpg.Spec.ParentCompositePodGroupName
+		parentKey := fmt.Sprintf("%s/%s", cpg.Namespace, parentName)
+		if parent, ok := pq.cpgs[parentKey]; ok {
+			parent.AddChildCPG(cpgInfo)
+
+			// Find root CPG and activate it
+			root := parent
+			for root.Parent != nil {
+				root = root.Parent
+			}
+			if root.ParentCompositePodGroupName == "" {
+				logger := klog.Background()
+				if pq.activate(logger, root) {
+					pq.logQueueStateLocked(logger)
+					pq.activeQ.broadcast()
+				}
+			}
+		} else {
+			// Parent not found, put in orphans
+			pq.orphanCPGs[parentKey] = append(pq.orphanCPGs[parentKey], cpgInfo)
+		}
+	} else {
+		// Root CPG, move to activeQ
+		logger := klog.Background()
+		if added := pq.moveToActiveQ(logger, cpgInfo, framework.EventUnscheduledPodAdd.Label(), false); added {
+			pq.logQueueStateLocked(logger)
+			pq.activeQ.broadcast()
+		}
+	}
+}
+
+func (pq *PriorityQueue) RemoveCompositePodGroup(cpg *v1alpha3.CompositePodGroup) {
+	pq.lock.Lock()
+	defer pq.lock.Unlock()
+
+	key := fmt.Sprintf("%s/%s", cpg.Namespace, cpg.Name)
+	cpgInfo, ok := pq.cpgs[key]
+	if !ok {
+		// Check orphans
+		if cpg.Spec.ParentCompositePodGroupName == nil {
+			return
+		}
+
+		parentKey := fmt.Sprintf("%s/%s", cpg.Namespace, *cpg.Spec.ParentCompositePodGroupName)
+		if orphans, ok := pq.orphanCPGs[parentKey]; ok {
+			for i, orphan := range orphans {
+				if orphan.Name == cpg.Name {
+					pq.orphanCPGs[parentKey] = append(orphans[:i], orphans[i+1:]...)
+					break
+				}
+			}
+			if len(pq.orphanCPGs[parentKey]) == 0 {
+				delete(pq.orphanCPGs, parentKey)
+			}
+		}
+
+		return
+	}
+
+	// Unlink from parent
+	if cpgInfo.Parent != nil {
+		parent := cpgInfo.Parent
+		parent.RemoveChildCPG(cpgInfo.Name)
+	}
+
+	// Make children orphans
+	for _, child := range cpgInfo.ChildrenCPGs {
+		child.Parent = nil
+		pq.orphanCPGs[key] = append(pq.orphanCPGs[key], child)
+	}
+	for _, child := range cpgInfo.ChildrenPGs {
+		child.Parent = nil
+		pq.orphanPGs[key] = append(pq.orphanPGs[key], child)
+	}
+
+	delete(pq.cpgs, key)
+}
+
+func (pq *PriorityQueue) AddPodGroup(pg *v1alpha3.PodGroup) {
+	pq.lock.Lock()
+	defer pq.lock.Unlock()
+
+	key := fmt.Sprintf("%s/%s", pg.Namespace, pg.Name)
+	pgInfo, ok := pq.pgs[key]
+	if !ok {
+		pgInfo = &framework.QueuedPodGroupInfo{
+			PodGroupInfo: &framework.PodGroupInfo{
+				Namespace: pg.Namespace,
+				Name:      pg.Name,
+			},
+		}
+		pq.pgs[key] = pgInfo
+	}
+
+	// Update spec info
+	if pg.Spec.SchedulingPolicy.Gang != nil {
+		pgInfo.MinCount = pg.Spec.SchedulingPolicy.Gang.MinCount
+	} else {
+		pgInfo.MinCount = 1
+	}
+
+	// Link to parent if specified
+	if pg.Spec.ParentCompositePodGroupName != nil {
+		// Delete from any queue if it was there as a standalone PG!
+		pq.deleteFromAnyQueue(pgInfo)
+
+		pgInfo.ParentCompositePodGroupName = *pg.Spec.ParentCompositePodGroupName
+		parentKey := fmt.Sprintf("%s/%s", pg.Namespace, pgInfo.ParentCompositePodGroupName)
+		if parent, ok := pq.cpgs[parentKey]; ok {
+			parent.AddChildPG(pgInfo)
+			// Find root CPG
+			root := parent
+			for root.Parent != nil {
+				root = root.Parent
+			}
+			if root.ParentCompositePodGroupName == "" && pq.activate(klog.Background(), root) {
+				pq.logQueueStateLocked(klog.Background())
+				pq.activeQ.broadcast()
+			}
+		} else {
+			// Parent not found, put in orphans
+			pq.orphanPGs[parentKey] = append(pq.orphanPGs[parentKey], pgInfo)
+		}
+		return
+	}
+
+	// Standalone PG.
+	// If it already has pods (because pods arrived first), queue it now!
+	if added := pq.moveToActiveQ(klog.Background(), pgInfo, framework.EventUnscheduledPodAdd.Label(), false); added {
+		pq.logQueueStateLocked(klog.Background())
+		pq.activeQ.broadcast()
+	}
+}
+
+func (pq *PriorityQueue) RemovePodGroup(pg *v1alpha3.PodGroup) {
+	pq.lock.Lock()
+	defer pq.lock.Unlock()
+
+	key := fmt.Sprintf("%s/%s", pg.Namespace, pg.Name)
+	pgInfo, ok := pq.pgs[key]
+	if !ok {
+		if pg.Spec.ParentCompositePodGroupName == nil {
+			return
+		}
+
+		// Check if it is an orphan
+		parentKey := fmt.Sprintf("%s/%s", pg.Namespace, *pg.Spec.ParentCompositePodGroupName)
+		if orphans, ok := pq.orphanPGs[parentKey]; ok {
+			for i, orphan := range orphans {
+				if orphan.Name == pg.Name {
+					pq.orphanPGs[parentKey] = append(orphans[:i], orphans[i+1:]...)
+					break
+				}
+			}
+			if len(pq.orphanPGs[parentKey]) == 0 {
+				delete(pq.orphanPGs, parentKey)
+			}
+		}
+		return
+	}
+
+	// Unlink from parent
+	if pgInfo.Parent != nil {
+		parent := pgInfo.Parent
+		parent.RemoveChildPG(pgInfo.Name)
+	}
+
+	delete(pq.pgs, key)
+}
+
+func (pq *PriorityQueue) UpdatePodGroup(oldPG, newPG *v1alpha3.PodGroup) {
+	pq.lock.Lock()
+	key := fmt.Sprintf("%s/%s", newPG.Namespace, newPG.Name)
+	pgInfo, ok := pq.pgs[key]
+	if !ok {
+		pq.lock.Unlock()
+		pq.AddPodGroup(newPG)
+		return
+	}
+
+	// Update MinCount
+	if newPG.Spec.SchedulingPolicy.Gang != nil {
+		pgInfo.MinCount = newPG.Spec.SchedulingPolicy.Gang.MinCount
+	} else {
+		pgInfo.MinCount = 1
+	}
+	pq.lock.Unlock()
+}
+
+func (pq *PriorityQueue) UpdateCompositePodGroup(oldCPG, newCPG *v1alpha3.CompositePodGroup) {
+	pq.lock.Lock()
+	key := fmt.Sprintf("%s/%s", newCPG.Namespace, newCPG.Name)
+	if _, ok := pq.cpgs[key]; !ok {
+		pq.lock.Unlock()
+		pq.AddCompositePodGroup(newCPG)
+		return
+	}
+
+	pq.lock.Unlock()
 }
 
 // ConvertLessFn wraps fwk.LessFunc and converts it to take framework.QueuedEntityInfo as arguments.
@@ -483,6 +745,44 @@ func (p *PriorityQueue) isEventOfInterest(logger klog.Logger, event fwk.ClusterE
 // isPodGroupMember returns true if the pod is a member of a pod group.
 func (p *PriorityQueue) isPodGroupMember(pod *v1.Pod) bool {
 	return p.isGenericWorkloadEnabled && pod.Spec.SchedulingGroup != nil
+}
+
+// isCPGMember returns true if the pod is a member of a composite pod group hierarchy.
+func (p *PriorityQueue) isCPGMember(pod *v1.Pod) bool {
+	if !p.isPodGroupMember(pod) {
+		return false
+	}
+	pgKey := fmt.Sprintf("%s/%s", pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
+	pgInfo, ok := p.pgs[pgKey]
+	return ok && pgInfo.ParentCompositePodGroupName != ""
+}
+
+// getRootCPGName returns the name of the root composite pod group for the given pod.
+// It returns false if the hierarchy is incomplete or the pod does not belong to a CPG.
+func (p *PriorityQueue) getRootCPGName(pod *v1.Pod) (string, bool) {
+	if pod.Spec.SchedulingGroup == nil {
+		return "", false
+	}
+	pgKey := fmt.Sprintf("%s/%s", pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
+	pgInfo, ok := p.pgs[pgKey]
+	if !ok || pgInfo.ParentCompositePodGroupName == "" {
+		return "", false
+	}
+
+	currentCPGName := pgInfo.ParentCompositePodGroupName
+	for {
+		cpgKey := fmt.Sprintf("%s/%s", pod.Namespace, currentCPGName)
+		cpgInfo, ok := p.cpgs[cpgKey]
+		if !ok {
+			// Missing link.
+			return "", false
+		}
+		if cpgInfo.ParentCompositePodGroupName == "" {
+			// Found the declared root!
+			return currentCPGName, true
+		}
+		currentCPGName = cpgInfo.ParentCompositePodGroupName
+	}
 }
 
 // isEntityWorthRequeuing calls isPodWorthRequeuing for all pods belonging to the entity and returns the highest queueing strategy.
@@ -723,16 +1023,19 @@ func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, entity framework.Queue
 	// If SchedulerPopFromBackoffQ feature gate is enabled,
 	// PreEnqueue plugins were called when the entity was added to the backoffQ.
 	// Don't need to repeat it here when the entity is directly moved from the backoffQ.
+	logger.Info("Move to active queue", "entity", entity.GetName())
 	skipPreEnqueue := p.isPopFromBackoffQEnabled && movesFromBackoffQ
 	if !skipPreEnqueue {
+		logger.Info("Run pre enqueue plugins for entity", entity.GetName())
 		p.runPreEnqueuePlugins(context.Background(), entity)
 	}
 
 	if entity.Gated() {
 		if p.unschedulableEntities.get(entity) == nil {
-			logger.V(5).Info("Entity moved to an internal scheduling queue, because it is gated", "type", entity.Type(), "entity", klog.KObj(entity), "event", event, "queue", unschedulableQ)
+			logger.Info("Entity moved to an internal scheduling queue, because it is gated", "type", entity.Type(), "entity", klog.KObj(entity), "event", event, "queue", unschedulableQ)
 		}
 		p.unschedulableEntities.addOrUpdate(entity, gatedBefore, event)
+		p.logQueueStateLocked(logger)
 		// Entity not moved to activeQ.
 		return false
 	}
@@ -741,6 +1044,7 @@ func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, entity framework.Queue
 	p.unschedulableEntities.delete(entity, gatedBefore)
 
 	p.activeQ.add(logger, entity, event)
+	p.logQueueStateLocked(logger)
 	// Pod successfully moved to activeQ.
 	return true
 }
@@ -753,19 +1057,23 @@ func (p *PriorityQueue) moveToBackoffQ(logger klog.Logger, entity framework.Queu
 	// If SchedulerPopFromBackoffQ feature gate is enabled,
 	// PreEnqueue plugins are called on inserting entities to the backoffQ,
 	// not to call them again on popping out.
+	logger.Info("Move to backoff queue", "entity", entity.GetName())
 	if p.isPopFromBackoffQEnabled {
+		logger.Info("Run pre enqueue plugins for entity", entity.GetName())
 		p.runPreEnqueuePlugins(context.Background(), entity)
 		if entity.Gated() {
 			if uInfo := p.unschedulableEntities.get(entity); uInfo == nil {
-				logger.V(5).Info("Entity moved to an internal scheduling queue, because it is gated", "type", entity.Type(), "entity", klog.KObj(entity), "event", event, "queue", unschedulableQ)
+				logger.Info("Entity moved to an internal scheduling queue, because it is gated", "type", entity.Type(), "entity", klog.KObj(entity), "event", event, "queue", unschedulableQ)
 			}
 			p.unschedulableEntities.addOrUpdate(entity, gatedBefore, event)
+			p.logQueueStateLocked(logger)
 			return false
 		}
 	}
 	p.unschedulableEntities.delete(entity, gatedBefore)
 
 	p.backoffQ.add(logger, entity, event)
+	p.logQueueStateLocked(logger)
 	return true
 }
 
@@ -803,19 +1111,57 @@ func (p *PriorityQueue) addPodGroupMember(logger klog.Logger, pInfo *framework.Q
 		return
 	}
 	pgInfoLookup := newQueuedPodGroupInfoForLookup(pInfo.Pod)
-	if p.activeQ.isLastPoppedEntity(pgInfoLookup) {
-		// If the last popped entity is the matching pod group, add the pod to the pending pod group pods,
+
+	// Find the root entity to check if it is being scheduled.
+	var rootEntity framework.QueuedEntityInfo = pgInfoLookup
+	if rootCPGName, ok := p.getRootCPGName(pInfo.Pod); ok {
+		rootEntity = newQueuedCompositePodGroupInfoForLookup(pInfo.Pod.Namespace, rootCPGName)
+	}
+
+	if p.activeQ.isLastPoppedEntity(rootEntity) {
+		// If the last popped entity is the matching pod group (or its root CPG), add the pod to the pending pod group pods,
 		// so it will be added to the pod group when it's requeued.
 		p.pendingPodGroupPods.add(pgInfoLookup, pInfo)
-		logger.V(5).Info("Pod added to pending pod group pods, waiting for its pod group to be requeued", "podGroup", klog.KObj(pgInfoLookup), "pod", klog.KObj(pInfo))
+		logger.Info("Pod added to pending pod group pods, waiting for its pod group to be requeued", "podGroup", klog.KObj(pgInfoLookup), "pod", klog.KObj(pInfo))
 	} else {
-		// Create a new group as it's the first member pod in the queue.
-		pgInfo := p.newQueuedPodGroupInfo(pInfo)
-		if added := p.moveToActiveQ(logger, pgInfo, framework.EventUnscheduledPodAdd.Label(), false); added {
+		key := fmt.Sprintf("%s/%s", pInfo.Pod.Namespace, *pInfo.Pod.Spec.SchedulingGroup.PodGroupName)
+		var pgInfo *framework.QueuedPodGroupInfo
+
+		if existingPG, ok := p.pgs[key]; ok {
+			pgInfo = existingPG
+			pgInfo.AddPod(pInfo)
+		} else {
+			pgInfo = p.newQueuedPodGroupInfo(pInfo)
+			p.pgs[key] = pgInfo
+		}
+
+		// The pod group that we have in pgInfo might have CPG parent. We deal with this in AddPodGroup when the informer finally gets the PodGroup.
+		// Then we delete it from the queue. For now we move it to activeQ, but it doesn't matter. If it belongs to CPG it won't pass PreEnqueue.
+		var entity framework.QueuedEntityInfo = pgInfo
+		if pgInfo.ParentCompositePodGroupName != "" {
+			// It belongs to a CPG hierarchy.
+			if rootCPGName, ok := p.getRootCPGName(pInfo.Pod); ok {
+				if rootCPG, ok := p.cpgs[rootCPGName]; ok {
+					entity = rootCPG
+				} else {
+					// Root CPG not in cache yet. Do not queue anything.
+					logger.Info("Skipping queueing for child PG because root CPG is not yet available", "pg", pgInfo.Name, "rootCPG", rootCPGName)
+					return
+				}
+			} else {
+				// Hierarchy incomplete. Do not queue anything.
+				logger.Info("Skipping queueing for child PG because hierarchy is incomplete", "pg", pgInfo.Name)
+				return
+			}
+		}
+		if added := p.moveToActiveQ(logger, entity, framework.EventUnscheduledPodAdd.Label(), false); added {
+			p.logQueueStateLocked(logger)
 			p.activeQ.broadcast()
 		}
-		logger.V(5).Info("Pod added to new pod group info", "podGroup", klog.KObj(pgInfoLookup), "pod", klog.KObj(pInfo))
 	}
+
+	logger.Info("Pod added to new pod group info", "podGroup", klog.KObj(pgInfoLookup), "pod", klog.KObj(pInfo))
+
 }
 
 // deleteFromAnyQueue deletes an entity from any queue it may be in and returns
@@ -840,18 +1186,47 @@ func (p *PriorityQueue) deleteFromAnyQueue(entityLookup framework.QueuedEntityIn
 func (p *PriorityQueue) addToPodGroupIfExists(logger klog.Logger, pInfo *framework.QueuedPodInfo) bool {
 	pgInfoLookup := newQueuedPodGroupInfoForLookup(pInfo.Pod)
 
-	entity, strategy := p.deleteFromAnyQueue(pgInfoLookup)
+	var entityLookup framework.QueuedEntityInfo = pgInfoLookup
+	rootCPGName, ok := p.getRootCPGName(pInfo.Pod)
+	if ok {
+		entityLookup = newQueuedCompositePodGroupInfoForLookup(pInfo.Pod.Namespace, rootCPGName)
+	}
+
+	entity, strategy := p.deleteFromAnyQueue(entityLookup)
 	if entity == nil {
+		logger.Info("Deleted from queue (addToPodGroupIfExists). NIL entity.", "entityLookup", entityLookup.GetName())
 		return false
 	}
-	pgInfo := entity.(*framework.QueuedPodGroupInfo)
+	logger.Info("Deleted from queue (addToPodGroupIfExists)", "entityLookup", entityLookup.GetName(), "entity", entity.GetName, "strategy", strategy)
+
+	key := fmt.Sprintf("%s/%s", pInfo.Pod.Namespace, *pInfo.Pod.Spec.SchedulingGroup.PodGroupName)
+	pgInfo, ok := p.pgs[key]
+	if !ok {
+		// This shouldn't happen if entity was found in queue!
+		// But if it does, we should probably put the entity back!
+		p.requeueEntityWithQueueingStrategy(logger, entity, strategy, framework.EventUnscheduledPodAdd.Label())
+		return false
+	}
 
 	pgInfo.AddPod(pInfo)
-	queue := p.requeueEntityWithQueueingStrategy(logger, pgInfo, strategy, framework.EventUnscheduledPodAdd.Label())
+
+	if pgInfo.ParentCompositePodGroupName != "" && entity == pgInfoLookup {
+		// We somehow found the child PG in the queue (maybe it was there before this fix).
+		// We should NOT requeue it! Just drop it.
+		logger.Info("Found child PG in queue, dropping it instead of requeueing", "pg", pgInfo.Name)
+		return true
+	}
+
+	if strategy == queueSkip && rootCPGName != "" {
+		// If it was in unschedulableEntities and it belongs to a CPG, wake it up because state changed!
+		// Use queueAfterBackoff to prevent spamming if pods arrive rapidly.
+		strategy = queueAfterBackoff
+	}
+	queue := p.requeueEntityWithQueueingStrategy(logger, entity, strategy, framework.EventUnscheduledPodAdd.Label())
 	if queue == activeQ || (p.isPopFromBackoffQEnabled && queue == backoffQ) {
 		p.activeQ.broadcast()
 	}
-	logger.V(5).Info("Pod added to existing pod group info", "podGroup", klog.KObj(pgInfo), "pod", klog.KObj(pInfo), "queue", queue)
+	logger.V(5).Info("Pod added to existing group info", "entity", klog.KObj(entity), "pod", klog.KObj(pInfo), "queue", queue)
 	return true
 }
 
@@ -868,7 +1243,13 @@ func (p *PriorityQueue) Activate(logger klog.Logger, pods map[string]*v1.Pod) {
 	activated := false
 	for _, pod := range pods {
 		var entityLookup framework.QueuedEntityInfo
-		if p.isPodGroupMember(pod) {
+		if p.isCPGMember(pod) {
+			rootCPGName, ok := p.getRootCPGName(pod)
+			if !ok {
+				continue
+			}
+			entityLookup = newQueuedCompositePodGroupInfoForLookup(pod.Namespace, rootCPGName)
+		} else if p.isPodGroupMember(pod) {
 			entityLookup = newQueuedPodGroupInfoForLookup(pod)
 		} else {
 			entityLookup = newQueuedPodInfoForLookup(pod)
@@ -1032,9 +1413,18 @@ func (p *PriorityQueue) addUnschedulablePodGroupMember(logger klog.Logger, pInfo
 	// At this point, the matching pod group should not be in the scheduling queue,
 	// because it is the last popped entity and will be re-added after all pods are re-added.
 	// The pod should be put into the pending pod group pods.
-	pgInfoLookup := newQueuedPodGroupInfoForLookup(pInfo.Pod)
-	p.pendingPodGroupPods.add(pgInfoLookup, pInfo)
-	logger.V(5).Info("Pod added to pending pod group pods, waiting for its pod group to be requeued", "podGroup", klog.KObj(pgInfoLookup), "pod", klog.KObj(pInfo))
+	var entityLookup framework.QueuedEntityInfo
+	if p.isCPGMember(pInfo.Pod) {
+		if rootCPGName, ok := p.getRootCPGName(pInfo.Pod); ok {
+			entityLookup = newQueuedCompositePodGroupInfoForLookup(pInfo.Pod.Namespace, rootCPGName)
+		} else {
+			entityLookup = newQueuedPodGroupInfoForLookup(pInfo.Pod)
+		}
+	} else {
+		entityLookup = newQueuedPodGroupInfoForLookup(pInfo.Pod)
+	}
+	p.pendingPodGroupPods.add(entityLookup, pInfo)
+	logger.Info("Pod added to pending pod group pods", "namespace", entityLookup.GetNamespace(), "name", entityLookup.GetName(), "pod", klog.KObj(pInfo))
 }
 
 // AddAttemptedPodGroupIfNotPresent adds an attempted pod group back to scheduling queue.
@@ -1112,6 +1502,97 @@ func (p *PriorityQueue) AddAttemptedPodGroupIfNotPresent(logger klog.Logger, pgI
 	return nil
 }
 
+func forEachDescendantPG(cpg *framework.QueuedCompositePodGroupInfo, fn func(pg *framework.QueuedPodGroupInfo)) {
+	for _, childPG := range cpg.ChildrenPGs {
+		fn(childPG)
+	}
+	for _, childCPG := range cpg.ChildrenCPGs {
+		forEachDescendantPG(childCPG, fn)
+	}
+}
+
+// AddAttemptedCompositePodGroupIfNotPresent adds an attempted composite pod group back to scheduling queue.
+// Should be called synchronously to the pod group scheduling cycle.
+func (p *PriorityQueue) AddAttemptedCompositePodGroupIfNotPresent(logger klog.Logger, cpgInfo *framework.QueuedCompositePodGroupInfo, schedulingCycle int64) error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	if p.unschedulableEntities.get(cpgInfo) != nil {
+		logger.Info("Composite pod group %v is already present in unschedulable queue", "compositePodGroup", klog.KObj(cpgInfo))
+		return fmt.Errorf("composite pod group %v is already present in unschedulable queue", klog.KObj(cpgInfo))
+	}
+
+	if p.activeQ.has(cpgInfo) {
+		logger.Info("Composite pod group %v is already present in the active queue", "compositePodGroup", klog.KObj(cpgInfo))
+		return fmt.Errorf("composite pod group %v is already present in the active queue", klog.KObj(cpgInfo))
+	}
+	if p.backoffQ.has(cpgInfo) {
+		logger.Info("Composite pod group %v is already present in the backoff queue", "compositePodGroup", klog.KObj(cpgInfo))
+		return fmt.Errorf("composite pod group %v is already present in the backoff queue", klog.KObj(cpgInfo))
+	}
+
+	p.activeQ.clearPoppedEntity()
+	// Get the pending pods and put them into the pod groups.
+	hasPendingPods := false
+	forEachDescendantPG(cpgInfo, func(pg *framework.QueuedPodGroupInfo) {
+		pendingPods := p.pendingPodGroupPods.get(pg)
+		if len(pendingPods) > 0 {
+			pg.SetPods(pendingPods)
+			p.pendingPodGroupPods.clear(pg)
+			hasPendingPods = true
+		}
+	})
+
+	if !hasPendingPods {
+		// Put in unschedulable queue so it can be woken up by hints!
+		logger.Info("No pending pods for composite pod group %v, moving to unschedulable queue", "compositePodGroup", klog.KObj(cpgInfo))
+		p.unschedulableEntities.addOrUpdate(cpgInfo, cpgInfo.Gated(), "NoPendingPods")
+		return nil
+	}
+
+	hasErrorPods := false
+	cpgInfo.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+		if pInfo.UnschedulablePlugins.Len() == 0 && pInfo.PendingPlugins.Len() == 0 {
+			hasErrorPods = true
+			return false
+		}
+		return true
+	})
+	if hasErrorPods {
+		cpgInfo.ConsecutiveErrorsCount++
+	} else {
+		cpgInfo.UnschedulableCount++
+		cpgInfo.ConsecutiveErrorsCount = 0
+	}
+	// Refresh the timestamp since the pod is re-added.
+	cpgInfo.Timestamp = p.clock.Now()
+	// We changed ConsecutiveErrorsCount or UnschedulableCount plus Timestamp, and now the calculated backoff time should be different,
+	// removing the cached backoff time.
+	cpgInfo.BackoffExpiration = time.Time{}
+	// Clear the flush flag since the pod is returning to the queue after a scheduling attempt.
+	cpgInfo.WasFlushedFromUnschedulable = false
+
+	rejectorPlugins := cpgInfo.UnschedulablePlugins.Union(cpgInfo.PendingPlugins)
+
+	// Try to requeue this composite pod group to activeQ or backoffQ.
+	queue := unschedulableQ
+	if p.backoffQ.isEntityBackingoff(cpgInfo) {
+		if added := p.moveToBackoffQ(logger, cpgInfo, framework.ScheduleAttemptFailure); added {
+			queue = backoffQ
+		}
+	} else {
+		if added := p.moveToActiveQ(logger, cpgInfo, framework.ScheduleAttemptFailure, false); added {
+			queue = activeQ
+		}
+	}
+	logger.Info("Composite pod group moved to an internal scheduling queue", "compositePodGroup", klog.KObj(cpgInfo), "event", framework.ScheduleAttemptFailure, "queue", queue, "schedulingCycle", schedulingCycle, "unschedulable plugins", rejectorPlugins)
+	if queue == activeQ || (p.isPopFromBackoffQEnabled && queue == backoffQ) {
+		p.activeQ.broadcast()
+	}
+
+	return nil
+}
+
 // flushBackoffQCompleted Moves all pods from backoffQ which have completed backoff in to activeQ
 func (p *PriorityQueue) flushBackoffQCompleted(logger klog.Logger) {
 	p.lock.Lock()
@@ -1156,7 +1637,67 @@ func (p *PriorityQueue) flushUnschedulablePodsLeftover(logger klog.Logger) {
 // Note: This method should NOT be locked by the p.lock at any moment,
 // as it would lead to scheduling throughput degradation.
 func (p *PriorityQueue) Pop(logger klog.Logger) (framework.QueuedEntityInfo, error) {
-	return p.activeQ.pop(logger)
+	entity, err := p.activeQ.pop(logger)
+	if err != nil {
+		return nil, err
+	}
+	if entity == nil {
+		return nil, nil
+	}
+	logger.Info("Popped entity from queue", "entity", klog.KObj(entity), "type", entity.Type())
+	p.logQueueStateOnPop(logger)
+
+	return entity, nil
+}
+
+func (p *PriorityQueue) logQueueStateOnPop(logger klog.Logger) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	p.logQueueStateLocked(logger)
+}
+
+func (p *PriorityQueue) logQueueStateLocked(logger klog.Logger) {
+	var activeNames, backoffNames, unschedulableNames []string
+
+	if aq, ok := p.activeQ.(*activeQueue); ok {
+		aq.lock.RLock()
+		for _, entity := range aq.queue.List() {
+			activeNames = append(activeNames, fmt.Sprintf("%s/%s", entity.GetNamespace(), entity.GetName()))
+		}
+		aq.lock.RUnlock()
+	}
+
+	if bq, ok := p.backoffQ.(*backoffQueue); ok {
+		bq.lock.RLock()
+		for _, entity := range bq.entityBackoffQ.List() {
+			backoffNames = append(backoffNames, fmt.Sprintf("%s/%s", entity.GetNamespace(), entity.GetName()))
+		}
+		for _, entity := range bq.entityErrorBackoffQ.List() {
+			backoffNames = append(backoffNames, fmt.Sprintf("%s/%s", entity.GetNamespace(), entity.GetName()))
+		}
+		bq.lock.RUnlock()
+	}
+
+	for _, entity := range p.unschedulableEntities.entityInfoMap {
+		unschedulableNames = append(unschedulableNames, fmt.Sprintf("%s/%s", entity.GetNamespace(), entity.GetName()))
+	}
+
+	msg := "\n--- Queue State ---\n"
+	msg += "ActiveQ:\n"
+	for _, name := range activeNames {
+		msg += fmt.Sprintf("  - %s\n", name)
+	}
+	msg += "BackoffQ:\n"
+	for _, name := range backoffNames {
+		msg += fmt.Sprintf("  - %s\n", name)
+	}
+	msg += "UnschedulableQ:\n"
+	for _, name := range unschedulableNames {
+		msg += fmt.Sprintf("  - %s\n", name)
+	}
+	msg += "--------------------------"
+
+	logger.Info(msg)
 }
 
 // Done must be called for pod returned by Pop. This allows the queue to
@@ -1182,7 +1723,13 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 	events := framework.PodSchedulingPropertiesChange(newPod, oldPod, true)
 
 	var entityLookup framework.QueuedEntityInfo
-	if p.isPodGroupMember(oldPod) {
+	if p.isCPGMember(oldPod) {
+		if rootCPGName, ok := p.getRootCPGName(oldPod); ok {
+			entityLookup = newQueuedCompositePodGroupInfoForLookup(oldPod.Namespace, rootCPGName)
+		} else {
+			entityLookup = newQueuedPodGroupInfoForLookup(oldPod)
+		}
+	} else if p.isPodGroupMember(oldPod) {
 		entityLookup = newQueuedPodGroupInfoForLookup(oldPod)
 	} else {
 		entityLookup = newQueuedPodInfoForLookup(oldPod)
@@ -1256,7 +1803,7 @@ func (p *PriorityQueue) Update(ctx context.Context, oldPod, newPod *v1.Pod) {
 		}
 		return
 	} else if p.isPodGroupMember(newPod) {
-		pgInfoLookup := entityLookup.(*framework.QueuedPodGroupInfo)
+		pgInfoLookup := newQueuedPodGroupInfoForLookup(newPod)
 		if p.pendingPodGroupPods.has(pgInfoLookup) {
 			if updated := p.pendingPodGroupPods.update(pgInfoLookup, newPod); updated {
 				return
@@ -1308,12 +1855,13 @@ func (p *PriorityQueue) deletePodGroupMember(logger klog.Logger, pod *v1.Pod) {
 		for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
 			metrics.UnschedulableReason(plugin, pInfo.Pod.Spec.SchedulerName).Dec()
 		}
-		logger.V(5).Info("Pod deleted from pending pod group info", "podGroup", klog.KObj(pgInfoLookup), "pod", klog.KObj(pInfo))
+		logger.Info("Pod deleted from pending pod group info", "podGroup", klog.KObj(pgInfoLookup), "pod", klog.KObj(pInfo))
 		return
 	}
 	pgInfo := entity.(*framework.QueuedPodGroupInfo)
 
 	pInfo := pgInfo.RemovePod(pod)
+
 	if pInfo != nil {
 		// Drop metric for deleted pod.
 		for plugin := range pInfo.UnschedulablePlugins.Union(pInfo.PendingPlugins) {
@@ -1428,6 +1976,7 @@ func (p *PriorityQueue) requeueEntityWithQueueingStrategy(logger klog.Logger, en
 	if strategy == queueSkip {
 		// Current Gate status is required for already exisiting entities. For new entities, this parameter is ignored/unused by addPod/addPodGroup.
 		p.unschedulableEntities.addOrUpdate(entity, entity.Gated(), event)
+		p.logQueueStateLocked(logger)
 		return unschedulableQ
 	}
 
@@ -1580,7 +2129,13 @@ func (p *PriorityQueue) GetPod(name, namespace string, schedulingGroup *v1.PodSc
 
 func (p *PriorityQueue) getPod(podLookup *v1.Pod, unlockedActiveQ unlockedActiveQueueReader) *framework.QueuedPodInfo {
 	var entityLookup framework.QueuedEntityInfo
-	if p.isPodGroupMember(podLookup) {
+	if p.isCPGMember(podLookup) {
+		if rootCPGName, ok := p.getRootCPGName(podLookup); ok {
+			entityLookup = newQueuedCompositePodGroupInfoForLookup(podLookup.Namespace, rootCPGName)
+		} else {
+			entityLookup = newQueuedPodGroupInfoForLookup(podLookup)
+		}
+	} else if p.isPodGroupMember(podLookup) {
 		entityLookup = newQueuedPodGroupInfoForLookup(podLookup)
 	} else {
 		entityLookup = newQueuedPodInfoForLookup(podLookup)

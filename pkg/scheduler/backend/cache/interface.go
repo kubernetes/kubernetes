@@ -22,6 +22,7 @@ import (
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 )
 
 // Cache collects pods' information and provides node-level aggregated information.
@@ -114,6 +115,9 @@ type Cache interface {
 	// PodGroupStates returns a PodGroupStateLister.
 	PodGroupStates() fwk.PodGroupStateLister
 
+	// GetCompositePodGroupState returns the state for a composite pod group.
+	GetCompositePodGroupState(namespace, name string) (fwk.CompositePodGroupState, error)
+
 	// AddPodGroupMember adds not assigned and not assumed pod to its pod group state.
 	AddPodGroupMember(pod *v1.Pod)
 
@@ -122,6 +126,19 @@ type Cache interface {
 
 	// RemovePodGroupMember removes a pod from its pod group state.
 	RemovePodGroupMember(pod *v1.Pod)
+
+	// AddPodGroup adds a pod group to the cache.
+	AddPodGroup(pg *schedulingapi.PodGroup)
+	// RemovePodGroup removes a pod group from the cache.
+	RemovePodGroup(pg *schedulingapi.PodGroup)
+	// AddCompositePodGroup adds a composite pod group to the cache.
+	AddCompositePodGroup(cpg *schedulingapi.CompositePodGroup)
+	// RemoveCompositePodGroup removes a composite pod group from the cache.
+	RemoveCompositePodGroup(cpg *schedulingapi.CompositePodGroup)
+	// UpdatePodGroup updates a pod group in the cache.
+	UpdatePodGroup(oldPG, newPG *schedulingapi.PodGroup)
+	// UpdateCompositePodGroup updates a composite pod group in the cache.
+	UpdateCompositePodGroup(oldCPG, newCPG *schedulingapi.CompositePodGroup)
 }
 
 // Dump is a dump of the cache state.

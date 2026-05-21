@@ -23,6 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -131,6 +132,8 @@ func (sched *Scheduler) addPod(obj interface{}) {
 		return
 	}
 
+	logger.Info("AddPod received", "pod", pod.Name)
+
 	if assignedPod(pod) {
 		sched.addAssignedPodToCache(pod)
 	} else if responsibleForPod(pod, sched.Profiles) {
@@ -150,6 +153,7 @@ func (sched *Scheduler) updatePod(oldObj, newObj interface{}) {
 		utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert newObj to *v1.Pod", "newObj", newObj)
 		return
 	}
+	logger.Info("UpdatePod received", "oldObj", oldPod.Name, "newObj", newPod.Name)
 
 	if assignedPod(oldPod) {
 		sched.updateAssignedPodInCache(oldPod, newPod)
@@ -175,6 +179,7 @@ func (sched *Scheduler) deletePod(obj interface{}) {
 	switch t := obj.(type) {
 	case *v1.Pod:
 		pod = t
+		logger.Info("DeletePod received", "pod", pod.Name)
 		if assignedPod(pod) {
 			sched.deleteAssignedPodFromCache(pod)
 		} else if responsibleForPod(pod, sched.Profiles) {
@@ -209,7 +214,7 @@ func (sched *Scheduler) addPodToSchedulingQueue(pod *v1.Pod) {
 	defer metrics.EventHandlingLatency.ObserveSince(time.Now(), framework.EventUnscheduledPodAdd.Label())()
 
 	logger := sched.logger
-	logger.V(3).Info("Add event for unscheduled pod", "pod", klog.KObj(pod))
+	logger.Info("Add event for unscheduled pod", "pod", klog.KObj(pod))
 	sched.Cache.AddPodGroupMember(pod)
 	sched.SchedulingQueue.Add(klog.NewContext(context.Background(), logger), pod)
 	if utilfeature.DefaultFeatureGate.Enabled(features.GangScheduling) {
@@ -370,7 +375,7 @@ func (sched *Scheduler) addAssignedPodToCache(pod *v1.Pod) {
 
 	logger := sched.logger
 
-	logger.V(3).Info("Add event for scheduled pod", "pod", klog.KObj(pod))
+	logger.Info("Add event for scheduled pod", "pod", klog.KObj(pod))
 	if err := sched.Cache.AddPod(logger, pod); err != nil {
 		utilruntime.HandleErrorWithLogger(logger, err, "Scheduler cache AddPod failed", "pod", klog.KObj(pod))
 	}
@@ -624,7 +629,106 @@ func addAllEventHandlers(
 		case fwk.PodGroup:
 			if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 				if handlerRegistration, err = informerFactory.Scheduling().V1alpha3().PodGroups().Informer().AddEventHandler(
-					buildEvtResHandler(at, fwk.PodGroup),
+					cache.ResourceEventHandlerFuncs{
+						AddFunc: func(obj interface{}) {
+							pg := obj.(*v1alpha3.PodGroup)
+							sched.Cache.AddPodGroup(pg)
+							sched.SchedulingQueue.AddPodGroup(pg)
+							// Wake up pods
+							evt := fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Add}
+							defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
+							sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, nil, obj, nil)
+						},
+						UpdateFunc: func(old, obj interface{}) {
+							oldPG := old.(*v1alpha3.PodGroup)
+							pg := obj.(*v1alpha3.PodGroup)
+							sched.Cache.UpdatePodGroup(oldPG, pg)
+							sched.SchedulingQueue.UpdatePodGroup(oldPG, pg)
+							// Wake up pods
+							evt := fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Update}
+							start := time.Now()
+							sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, old, obj, nil)
+							metrics.EventHandlingLatency.WithLabelValues(evt.Label()).Observe(metrics.SinceInSeconds(start))
+						},
+						DeleteFunc: func(obj interface{}) {
+							var pg *v1alpha3.PodGroup
+							switch t := obj.(type) {
+							case *v1alpha3.PodGroup:
+								pg = t
+							case cache.DeletedFinalStateUnknown:
+								var ok bool
+								pg, ok = t.Obj.(*v1alpha3.PodGroup)
+								if !ok {
+									utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1alpha3.PodGroup", "obj", t.Obj)
+									return
+								}
+							default:
+								utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1alpha3.PodGroup", "obj", obj)
+								return
+							}
+							sched.Cache.RemovePodGroup(pg)
+							sched.SchedulingQueue.RemovePodGroup(pg)
+							// Wake up pods
+							evt := fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Delete}
+							start := time.Now()
+							sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, obj, nil, nil)
+							metrics.EventHandlingLatency.WithLabelValues(evt.Label()).Observe(metrics.SinceInSeconds(start))
+						},
+					},
+				); err != nil {
+					return err
+				}
+				handlers = append(handlers, handlerRegistration)
+			}
+		case fwk.EventResource("scheduling.k8s.io/CompositePodGroup"):
+			if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) && utilfeature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+				if handlerRegistration, err = informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer().AddEventHandler(
+					cache.ResourceEventHandlerFuncs{
+						AddFunc: func(obj interface{}) {
+							cpg := obj.(*v1alpha3.CompositePodGroup)
+							sched.Cache.AddCompositePodGroup(cpg)
+							sched.SchedulingQueue.AddCompositePodGroup(cpg)
+							// Wake up pods
+							evt := fwk.ClusterEvent{Resource: fwk.EventResource("scheduling.k8s.io/CompositePodGroup"), ActionType: fwk.Add}
+							defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
+							sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, nil, obj, nil)
+						},
+						UpdateFunc: func(old, obj interface{}) {
+							oldCPG := old.(*v1alpha3.CompositePodGroup)
+							cpg := obj.(*v1alpha3.CompositePodGroup)
+							sched.Cache.UpdateCompositePodGroup(oldCPG, cpg)
+							sched.SchedulingQueue.UpdateCompositePodGroup(oldCPG, cpg)
+							// Wake up pods
+							evt := fwk.ClusterEvent{Resource: fwk.EventResource("scheduling.k8s.io/CompositePodGroup"), ActionType: fwk.Update}
+							start := time.Now()
+							sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, old, obj, nil)
+							metrics.EventHandlingLatency.WithLabelValues(evt.Label()).Observe(metrics.SinceInSeconds(start))
+						},
+						DeleteFunc: func(obj interface{}) {
+							var cpg *v1alpha3.CompositePodGroup
+							switch t := obj.(type) {
+							case *v1alpha3.CompositePodGroup:
+								cpg = t
+							case cache.DeletedFinalStateUnknown:
+								var ok bool
+								cpg, ok = t.Obj.(*v1alpha3.CompositePodGroup)
+								if !ok {
+									utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1alpha3.CompositePodGroup", "obj", t.Obj)
+									return
+								}
+							default:
+								utilruntime.HandleErrorWithLogger(logger, nil, "Cannot convert to *v1alpha3.CompositePodGroup", "obj", obj)
+								return
+							}
+							sched.Cache.RemoveCompositePodGroup(cpg)
+							sched.SchedulingQueue.RemoveCompositePodGroup(cpg)
+							// Wake up pods
+							evt := fwk.ClusterEvent{Resource: fwk.EventResource("scheduling.k8s.io/CompositePodGroup"), ActionType: fwk.Delete}
+							start := time.Now()
+							sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, obj, nil, nil)
+							metrics.EventHandlingLatency.WithLabelValues(evt.Label()).Observe(metrics.SinceInSeconds(start))
+						},
+					},
 				); err != nil {
 					return err
 				}

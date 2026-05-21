@@ -139,7 +139,7 @@ func (mp *fakePlacementFeasiblePlugin) Name() string {
 // - The outer slice represents distinct placements (e.g., when evaluating multiple topology placements).
 // - The inner slice represents the pod-by-pod evaluation within a single placement.
 // It uses placementCycleState to track how many pods have been evaluated in the current placement.
-func (mp *fakePlacementFeasiblePlugin) PlacementFeasible(ctx context.Context, placementCycleState fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo) *fwk.Status {
+func (mp *fakePlacementFeasiblePlugin) PlacementFeasible(ctx context.Context, placementCycleState fwk.PodGroupCycleState, entity framework.QueuedEntityInfo) *fwk.Status {
 	// If no mock statuses are configured, always succeed.
 	if len(mp.placementFeasibleStatuses) == 0 {
 		return nil
@@ -2429,6 +2429,7 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 					ScheduleResult{},
 					fwk.Status{}),
 				cmpopts.IgnoreFields(algorithmResult{}, "podCtx", "schedulingDuration"),
+				cmpopts.IgnoreFields(podGroupAlgorithmResult{}, "revertFn"),
 				statusCmpOpt,
 			}
 
@@ -2883,6 +2884,7 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 		podGroupLister:                 podGroupLister,
 		workloadAwarePreemptionEnabled: true,
 		client:                         client,
+		SchedulingQueue:                internalqueue.NewTestQueue(ctx, nil),
 	}
 
 	// Mock SchedulePod to return Unschedulable initially, and success on subsequent calls
@@ -2923,3 +2925,186 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 		t.Errorf("Expected p2 to not be nominated, got %v", capturedFailureHandler[p2.Name])
 	}
 }
+
+// TestScheduleCPGNode_PartialSuccess verifies that a CPG node succeeds
+// if the number of successful children meets MinGroupCount, even if some children fail.
+//
+// Tree structure:
+//        cpg-root (MinGroupCount: 1)
+//        /      \
+//     pg1        pg2
+//    (fail)    (success)
+func TestScheduleCPGNode_PartialSuccess(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CompositePodGroup, true)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	_, ctx = ktesting.NewTestContext(t)
+	cache := internalcache.New(ctx, nil, true)
+
+	// Create a mock framework
+	schedFwk, _ := frameworkruntime.NewFramework(ctx, nil, nil)
+
+	sched := &Scheduler{
+		Profiles:         profile.Map{"default-scheduler": schedFwk},
+		Cache:            cache,
+		nodeInfoSnapshot: internalcache.NewEmptySnapshot(),
+	}
+
+	// Mock SchedulePod to fail for p1 and succeed for p2
+	sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) (ScheduleResult, error) {
+		if podInfo.Pod.Name == "p1" {
+			return ScheduleResult{}, &framework.FitError{Pod: podInfo.Pod, NumAllNodes: 1}
+		}
+		if podInfo.Pod.Name == "p2" {
+			return ScheduleResult{SuggestedHost: "node1"}, nil
+		}
+		return ScheduleResult{}, fmt.Errorf("unexpected pod")
+	}
+
+	// Root CPG (MinGroupCount: 1)
+	rootCPG := framework.NewQueuedCompositePodGroupInfo("default", "cpg-root")
+
+	// Child PG 1 (fails)
+	pg1 := &framework.QueuedPodGroupInfo{
+		PodGroupInfo: &framework.PodGroupInfo{Namespace: "default", Name: "pg1"},
+		MinCount: 1,
+	}
+	p1 := st.MakePod().Name("p1").Namespace("default").UID("p1").PodGroupName("pg1").Obj()
+	pg1.QueuedPodInfos = []*framework.QueuedPodInfo{{PodInfo: &framework.PodInfo{Pod: p1}}}
+
+	// Child PG 2 (succeeds)
+	pg2 := &framework.QueuedPodGroupInfo{
+		PodGroupInfo: &framework.PodGroupInfo{Namespace: "default", Name: "pg2"},
+		MinCount: 1,
+	}
+	p2 := st.MakePod().Name("p2").Namespace("default").UID("p2").PodGroupName("pg2").Obj()
+	pg2.QueuedPodInfos = []*framework.QueuedPodInfo{{PodInfo: &framework.PodInfo{Pod: p2}}}
+
+	rootCPG.AddChildPG(pg1)
+	rootCPG.AddChildPG(pg2)
+
+	cpgState := framework.NewCPGSchedulingState()
+	cycleState := framework.NewCycleState()
+	cycleState.Write(framework.CPGSchedulingStateKey, cpgState)
+
+	allResults, revertFn, status := sched.scheduleCPGNode(ctx, schedFwk, cycleState, rootCPG, cpgState)
+
+	if !status.IsSuccess() {
+		t.Fatalf("Expected success, got status: %v", status)
+	}
+
+	successfulCount := 0
+	var successResult *podGroupAlgorithmResult
+	for i := range allResults {
+		if allResults[i].status.IsSuccess() {
+			successfulCount++
+			successResult = &allResults[i]
+		}
+	}
+	if successfulCount != 1 {
+		t.Errorf("Expected 1 successful PG result, got %d", successfulCount)
+	}
+
+	if successResult == nil || len(successResult.podResults) != 1 {
+		t.Errorf("Expected 1 pod result in success PG, got %d", len(successResult.podResults))
+	}
+
+	if successResult != nil && successResult.podResults[0].pod.Name != "p2" {
+		t.Errorf("Expected p2 to be scheduled, got %s", successResult.podResults[0].pod.Name)
+	}
+
+	if revertFn == nil {
+		t.Errorf("Expected non-nil revertFn")
+	}
+}
+
+// TestScheduleCPGNode_MinGroupCount2_Success verifies that a CPG node succeeds
+// if the number of successful children meets MinGroupCount (2 in this case).
+//
+// Tree structure:
+//        cpg-root (MinGroupCount: 2)
+//       /    |    \
+//    pg1    pg2    pg3
+// (success)(success)(fail)
+func TestScheduleCPGNode_MinGroupCount2_Success(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CompositePodGroup, true)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	_, ctx = ktesting.NewTestContext(t)
+	cache := internalcache.New(ctx, nil, true)
+
+	// Create a mock framework
+	schedFwk, _ := frameworkruntime.NewFramework(ctx, nil, nil)
+
+	sched := &Scheduler{
+		Profiles:         profile.Map{"default-scheduler": schedFwk},
+		Cache:            cache,
+		nodeInfoSnapshot: internalcache.NewEmptySnapshot(),
+	}
+
+	// Mock SchedulePod to fail for p3 and succeed for p1 and p2
+	sched.SchedulePod = func(ctx context.Context, fwk framework.Framework, state fwk.CycleState, podInfo *framework.QueuedPodInfo) (ScheduleResult, error) {
+		if podInfo.Pod.Name == "p3" {
+			return ScheduleResult{}, &framework.FitError{Pod: podInfo.Pod, NumAllNodes: 1}
+		}
+		return ScheduleResult{SuggestedHost: "node1"}, nil
+	}
+
+	// Root CPG (MinGroupCount: 2)
+	rootCPG := framework.NewQueuedCompositePodGroupInfo("default", "cpg-root")
+
+	// Child PG 1 (succeeds)
+	pg1 := &framework.QueuedPodGroupInfo{
+		PodGroupInfo: &framework.PodGroupInfo{Namespace: "default", Name: "pg1"},
+		MinCount: 1,
+	}
+	p1 := st.MakePod().Name("p1").Namespace("default").UID("p1").PodGroupName("pg1").Obj()
+	pg1.QueuedPodInfos = []*framework.QueuedPodInfo{{PodInfo: &framework.PodInfo{Pod: p1}}}
+
+	// Child PG 2 (succeeds)
+	pg2 := &framework.QueuedPodGroupInfo{
+		PodGroupInfo: &framework.PodGroupInfo{Namespace: "default", Name: "pg2"},
+		MinCount: 1,
+	}
+	p2 := st.MakePod().Name("p2").Namespace("default").UID("p2").PodGroupName("pg2").Obj()
+	pg2.QueuedPodInfos = []*framework.QueuedPodInfo{{PodInfo: &framework.PodInfo{Pod: p2}}}
+
+	// Child PG 3 (fails)
+	pg3 := &framework.QueuedPodGroupInfo{
+		PodGroupInfo: &framework.PodGroupInfo{Namespace: "default", Name: "pg3"},
+		MinCount: 1,
+	}
+	p3 := st.MakePod().Name("p3").Namespace("default").UID("p3").PodGroupName("pg3").Obj()
+	pg3.QueuedPodInfos = []*framework.QueuedPodInfo{{PodInfo: &framework.PodInfo{Pod: p3}}}
+
+	rootCPG.AddChildPG(pg1)
+	rootCPG.AddChildPG(pg2)
+	rootCPG.AddChildPG(pg3)
+
+	cpgState := framework.NewCPGSchedulingState()
+	cycleState := framework.NewCycleState()
+	cycleState.Write(framework.CPGSchedulingStateKey, cpgState)
+
+	allResults, _, status := sched.scheduleCPGNode(ctx, schedFwk, cycleState, rootCPG, cpgState)
+
+	if !status.IsSuccess() {
+		t.Fatalf("Expected success, got status: %v", status)
+	}
+
+	successfulCount := 0
+	for i := range allResults {
+		if allResults[i].status.IsSuccess() {
+			successfulCount++
+		}
+	}
+	if successfulCount != 2 {
+		t.Errorf("Expected 2 successful PG results, got %d", successfulCount)
+	}
+}
+

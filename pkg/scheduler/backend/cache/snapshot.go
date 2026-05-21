@@ -61,6 +61,12 @@ type Snapshot struct {
 	assumedPods map[string]*v1.Pod
 	// podGroupStates maps a pod group key to a snapshot of its state, used during a pod group scheduling cycle.
 	podGroupStates map[podGroupKey]*podGroupStateSnapshot
+	// cpgStates maps a pod group key to a snapshot of its state, used during a pod group scheduling cycle.
+	cpgStates map[podGroupKey]*compositePodGroupStateSnapshot
+	// orphanPGs maps a parent CPG key to a set of child PG keys that arrived before the parent.
+	orphanPGs map[podGroupKey]sets.Set[podGroupKey]
+	// orphanCPGs maps a parent CPG key to a set of child CPG keys that arrived before the parent.
+	orphanCPGs map[podGroupKey]sets.Set[podGroupKey]
 	// placementNodes stores nodes that are present in the current placement.
 	// If placement is not set, this is nil.
 	// It should only be set in the pod group scheduling cycle, when checking if pod group can be scheduled within the placement.
@@ -82,6 +88,9 @@ func NewEmptySnapshot() *Snapshot {
 		usedPVCSet:             sets.New[string](),
 		assumedPods:            make(map[string]*v1.Pod),
 		podGroupStates:         make(map[podGroupKey]*podGroupStateSnapshot),
+		cpgStates:              make(map[podGroupKey]*compositePodGroupStateSnapshot),
+		orphanPGs:              make(map[podGroupKey]sets.Set[podGroupKey]),
+		orphanCPGs:             make(map[podGroupKey]sets.Set[podGroupKey]),
 		genericWorkloadEnabled: utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload),
 	}
 }
@@ -293,6 +302,16 @@ func (l *podGroupStateSnapshotLister) Get(namespace string, podGroupName string)
 		return nil, fmt.Errorf("pod group state not found for pod group %s", key)
 	}
 	return state, nil
+}
+
+// GetCompositePodGroupState returns the state for a composite pod group from the snapshot.
+func (s *Snapshot) GetCompositePodGroupState(namespace, name string) (fwk.CompositePodGroupState, error) {
+	key := newPodGroupKey(namespace, name)
+	cpg, ok := s.cpgStates[key]
+	if !ok {
+		return nil, fmt.Errorf("composite pod group %s not found in snapshot", key)
+	}
+	return cpg, nil
 }
 
 // NumNodesInPlacement returns the number of nodes in the snapshot for the current placement.

@@ -77,6 +77,10 @@ type podGroupStateData struct {
 	assumedPods map[types.UID]*v1.Pod
 	// assignedPods tracks all pods belonging to the group that are assigned (bound).
 	assignedPods sets.Set[types.UID]
+	// minCount is the minimum number of pods that must be scheduled for this group.
+	minCount int
+	// parentCPG is the parent composite pod group key, if any.
+	parentCPG *podGroupKey
 }
 
 func newPodGroupStateData() podGroupStateData {

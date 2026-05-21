@@ -707,6 +707,8 @@ type QueuedPodInfo struct {
 	QueueingParams
 	// PodSignature for opportunistic batching
 	PodSignature fwk.PodSignature
+	// Parent points to the parent PG in the hierarchy.
+	Parent *QueuedPodGroupInfo
 }
 
 func (pqi *QueuedPodInfo) Type() string {
@@ -792,9 +794,15 @@ func (pqi *QueuedPodInfo) ClearRejectorPlugins() {
 type QueuedPodGroupInfo struct {
 	*PodGroupInfo
 	QueueingParams
+	ParentCompositePodGroupName string
 	// QueuedPodInfos are the pod group's pods that are currently queued.
 	// The order of the pods is deterministic and based on the priority and timestamp.
 	QueuedPodInfos []*QueuedPodInfo
+	// Parent points to the parent CPG in the hierarchy.
+	Parent *QueuedCompositePodGroupInfo
+
+	// MinCount is the minimum number of pods that must be schedulable.
+	MinCount int32
 }
 
 func (pgqi *QueuedPodGroupInfo) Type() string {
@@ -810,6 +818,7 @@ func (pgqi *QueuedPodGroupInfo) AddPod(pInfo *QueuedPodInfo) {
 	index, _ := slices.BinarySearchFunc(pgqi.QueuedPodInfos, pInfo, PodGroupMemberPodsOrderingFunc)
 	pgqi.QueuedPodInfos = slices.Insert(pgqi.QueuedPodInfos, index, pInfo)
 	pgqi.UnscheduledPods = slices.Insert(pgqi.UnscheduledPods, index, pInfo.Pod)
+	pInfo.Parent = pgqi
 }
 
 // RemovePod removes a pod from the queued pod group info.
@@ -818,6 +827,7 @@ func (pgqi *QueuedPodGroupInfo) RemovePod(pod *v1.Pod) *QueuedPodInfo {
 		if pInfo.Pod.Name == pod.Name && pInfo.Pod.Namespace == pod.Namespace {
 			pgqi.QueuedPodInfos = slices.Delete(pgqi.QueuedPodInfos, i, i+1)
 			pgqi.UnscheduledPods = slices.Delete(pgqi.UnscheduledPods, i, i+1)
+			pInfo.Parent = nil
 			return pInfo
 		}
 	}
@@ -831,6 +841,7 @@ func (pgqi *QueuedPodGroupInfo) SetPods(pInfos []*QueuedPodInfo) {
 	pgqi.UnscheduledPods = make([]*v1.Pod, 0, len(pgqi.QueuedPodInfos))
 	for _, pInfo := range pgqi.QueuedPodInfos {
 		pgqi.UnscheduledPods = append(pgqi.UnscheduledPods, pInfo.Pod)
+		pInfo.Parent = pgqi
 	}
 }
 
@@ -934,6 +945,152 @@ func (pgqi *QueuedPodGroupInfo) SetGatingPlugin(gatingPlugin string, gatingEvent
 	// as each pod has its own gating plugin and events.
 	pgqi.GatingPlugin = gatingPlugin
 	pgqi.GatingPluginEvents = gatingEvents
+}
+
+// QueuedCompositePodGroupInfo is a wrapper around CompositePodGroup API object
+// together with links to its children and parent in the scheduling queue.
+type QueuedCompositePodGroupInfo struct {
+	Namespace string
+	Name      string
+	ParentCompositePodGroupName string
+	QueueingParams
+
+	// Parent points to the parent CPG in the hierarchy.
+	Parent *QueuedCompositePodGroupInfo
+
+	// ChildrenCPGs are direct child CPGs.
+	ChildrenCPGs map[string]*QueuedCompositePodGroupInfo
+	// ChildrenPGs are direct child PGs.
+	ChildrenPGs map[string]*QueuedPodGroupInfo
+}
+
+func NewQueuedCompositePodGroupInfo(namespace, name string) *QueuedCompositePodGroupInfo {
+	return &QueuedCompositePodGroupInfo{
+		Namespace:    namespace,
+		Name:         name,
+		ChildrenCPGs: make(map[string]*QueuedCompositePodGroupInfo),
+		ChildrenPGs:  make(map[string]*QueuedPodGroupInfo),
+	}
+}
+
+func (c *QueuedCompositePodGroupInfo) AddChildCPG(child *QueuedCompositePodGroupInfo) {
+	c.ChildrenCPGs[child.Name] = child
+	child.Parent = c
+}
+
+func (c *QueuedCompositePodGroupInfo) RemoveChildCPG(name string) *QueuedCompositePodGroupInfo {
+	if child, ok := c.ChildrenCPGs[name]; ok {
+		delete(c.ChildrenCPGs, name)
+		child.Parent = nil
+		return child
+	}
+	return nil
+}
+
+
+
+func (c *QueuedCompositePodGroupInfo) AddChildPG(child *QueuedPodGroupInfo) {
+	c.ChildrenPGs[child.Name] = child
+	child.Parent = c
+}
+
+func (c *QueuedCompositePodGroupInfo) RemoveChildPG(name string) *QueuedPodGroupInfo {
+	if child, ok := c.ChildrenPGs[name]; ok {
+		delete(c.ChildrenPGs, name)
+		child.Parent = nil
+		return child
+	}
+	return nil
+}
+
+func (c *QueuedCompositePodGroupInfo) Type() string {
+	return "CompositePodGroup"
+}
+
+func (c *QueuedCompositePodGroupInfo) GetName() string {
+	return c.Name
+}
+
+func (c *QueuedCompositePodGroupInfo) GetNamespace() string {
+	return c.Namespace
+}
+
+func (c *QueuedCompositePodGroupInfo) ForEachPodInfo(fn func(pInfo *QueuedPodInfo) bool) {
+	for _, child := range c.ChildrenCPGs {
+		child.ForEachPodInfo(fn)
+	}
+	for _, child := range c.ChildrenPGs {
+		child.ForEachPodInfo(fn)
+	}
+}
+
+func (c *QueuedCompositePodGroupInfo) Update(pod *v1.Pod) (*QueuedPodInfo, error) {
+	for _, child := range c.ChildrenCPGs {
+		if pInfo, err := child.Update(pod); err == nil {
+			return pInfo, nil
+		}
+	}
+	for _, child := range c.ChildrenPGs {
+		if pInfo, err := child.Update(pod); err == nil {
+			return pInfo, nil
+		}
+	}
+	return nil, fmt.Errorf("pod %v not found in CPG %s/%s", pod.Name, c.Namespace, c.Name)
+}
+
+func (c *QueuedCompositePodGroupInfo) Gated() bool {
+	for _, child := range c.ChildrenCPGs {
+		if child.Gated() {
+			return true
+		}
+	}
+	for _, child := range c.ChildrenPGs {
+		if child.Gated() {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *QueuedCompositePodGroupInfo) Size() int {
+	size := 0
+	for _, child := range c.ChildrenCPGs {
+		size += child.Size()
+	}
+	for _, child := range c.ChildrenPGs {
+		size += child.Size()
+	}
+	return size
+}
+
+func (c *QueuedCompositePodGroupInfo) GetPriority() int32 {
+	var priority int32
+	c.ForEachPodInfo(func(pInfo *QueuedPodInfo) bool {
+		priority = pInfo.GetPriority()
+		return false
+	})
+	return priority
+}
+
+func (c *QueuedCompositePodGroupInfo) IncAttempts() {
+	c.Attempts++
+}
+
+func (c *QueuedCompositePodGroupInfo) SetInitialAttemptTimestamp(t time.Time) {
+	c.InitialAttemptTimestamp = &t
+}
+
+func (c *QueuedCompositePodGroupInfo) SetWasFlushedFromUnschedulable(flushed bool) {
+	c.WasFlushedFromUnschedulable = flushed
+}
+
+func (c *QueuedCompositePodGroupInfo) SetBackoffExpiration(t time.Time) {
+	c.BackoffExpiration = t
+}
+
+func (c *QueuedCompositePodGroupInfo) SetGatingPlugin(gatingPlugin string, gatingEvents []fwk.ClusterEvent) {
+	c.GatingPlugin = gatingPlugin
+	c.GatingPluginEvents = gatingEvents
 }
 
 // PodGroupInfo is a wrapper around the PodGroup API object together with a list of pods that belong to the pod group.

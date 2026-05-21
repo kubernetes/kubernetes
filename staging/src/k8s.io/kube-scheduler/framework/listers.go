@@ -168,6 +168,17 @@ type CSIManager interface {
 type PodGroupManager interface {
 	// PodGroupStates returns the PodGroupStateLister.
 	PodGroupStates() PodGroupStateLister
+	// GetCompositePodGroupState returns the state for a composite pod group.
+	GetCompositePodGroupState(namespace, name string) (CompositePodGroupState, error)
+}
+
+// CompositePodGroupState provides an interface to view the state of a composite pod group in the tree.
+type CompositePodGroupState interface {
+	GetName() string
+	GetNamespace() string
+	GetMinGroupCount() int
+	GetChildrenCPGs() []string
+	GetChildrenPGs() []string
 }
 
 // PodGroupState provides an interface to view the state of a single pod group.

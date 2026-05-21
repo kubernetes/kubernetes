@@ -109,3 +109,11 @@ func (u *unschedulableEntities) clear() {
 	u.unschedulableRecorder.Clear()
 	u.gatedRecorder.Clear()
 }
+
+func (u *unschedulableEntities) list() []framework.QueuedEntityInfo {
+	var result []framework.QueuedEntityInfo
+	for _, e := range u.entityInfoMap {
+		result = append(result, e)
+	}
+	return result
+}

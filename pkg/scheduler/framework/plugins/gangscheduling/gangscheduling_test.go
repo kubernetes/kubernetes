@@ -17,6 +17,7 @@ limitations under the License.
 package gangscheduling
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -25,6 +26,7 @@ import (
 	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -452,14 +454,14 @@ func TestPlacementFeasible(t *testing.T) {
 			},
 		},
 		{
-			name:            "Non-gang pod group ignored",
-			minCount:        0, // No gang policy
+			name:            "Basic pod group requires at least 1 scheduled pod",
+			minCount:        0, // Basic policy
 			unscheduledPods: []*v1.Pod{st.MakePod().Name("p1").Obj()},
 			podStatuses: []fwk.Code{
 				fwk.Unschedulable,
 			},
 			expectedStatuses: []fwk.Code{
-				fwk.Success,
+				fwk.UnschedulableAndUnresolvable,
 			},
 		},
 		{
@@ -621,10 +623,12 @@ func TestPlacementFeasible(t *testing.T) {
 			// Inject the mock lister
 			pl.snapshotLister = mockLister
 
-			pgInfo := &testPodGroupInfo{
-				namespace:       namespace,
-				name:            pgName,
-				unscheduledPods: tc.unscheduledPods,
+			pgInfo := &schedulerframework.QueuedPodGroupInfo{
+				PodGroupInfo: &schedulerframework.PodGroupInfo{
+					Namespace:       namespace,
+					Name:            pgName,
+					UnscheduledPods: tc.unscheduledPods,
+				},
 			}
 
 			cycleState := schedulerframework.NewCycleState()
@@ -644,12 +648,254 @@ func TestPlacementFeasible(t *testing.T) {
 	}
 }
 
-type testPodGroupInfo struct {
-	namespace       string
-	name            string
-	unscheduledPods []*v1.Pod
+func TestPlacementFeasible_CompositePodGroup(t *testing.T) {
+	tests := []struct {
+		name              string
+		minGroupCount     int32
+		scheduledChildren int
+		expectedStatus    fwk.Code
+		isBasic           bool
+	}{
+		{
+			name:              "Gang CPG: minGroupCount met",
+			minGroupCount:     2,
+			scheduledChildren: 2,
+			expectedStatus:    fwk.Success,
+		},
+		{
+			name:              "Gang CPG: minGroupCount not met",
+			minGroupCount:     2,
+			scheduledChildren: 1,
+			expectedStatus:    fwk.Unschedulable,
+		},
+		{
+			name:              "Basic CPG: 1 child scheduled",
+			scheduledChildren: 1,
+			expectedStatus:    fwk.Success,
+			isBasic:           true,
+		},
+		{
+			name:              "Basic CPG: 0 children scheduled",
+			scheduledChildren: 0,
+			expectedStatus:    fwk.Unschedulable,
+			isBasic:           true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+
+			cpgName := "test-cpg"
+			namespace := "default"
+			cpg := &schedulingapi.CompositePodGroup{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Name:      cpgName,
+				},
+			}
+			if !tc.isBasic {
+				cpg.Spec.SchedulingPolicy.Gang = &schedulingapi.GangGroupSchedulingPolicy{MinGroupCount: tc.minGroupCount}
+			} else {
+				cpg.Spec.SchedulingPolicy.Basic = &schedulingapi.BasicGroupSchedulingPolicy{}
+			}
+
+			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(cpg), 0)
+			informerFactory.Scheduling().V1alpha3().CompositePodGroups().Informer()
+			informerFactory.StartWithContext(ctx)
+			informerFactory.WaitForCacheSyncWithContext(ctx)
+
+			cpgInfo := &schedulerframework.QueuedCompositePodGroupInfo{
+				Namespace: namespace,
+				Name:      cpgName,
+			}
+
+			results := &PlacementFeasibleResults{Results: make(map[string]bool)}
+			for i := 0; i < tc.scheduledChildren; i++ {
+				childName := fmt.Sprintf("child-cpg-%d", i)
+				childInfo := &schedulerframework.QueuedCompositePodGroupInfo{
+					Namespace: namespace,
+					Name:      childName,
+				}
+				if cpgInfo.ChildrenCPGs == nil {
+					cpgInfo.ChildrenCPGs = make(map[string]*schedulerframework.QueuedCompositePodGroupInfo)
+				}
+				cpgInfo.ChildrenCPGs[childName] = childInfo
+				results.Results[fmt.Sprintf("%s/%s", namespace, childName)] = true
+			}
+
+			cycleState := schedulerframework.NewCycleState()
+			cycleState.Write(PlacementFeasibleResultsKey, results)
+
+			fh, err := frameworkruntime.NewFramework(ctx, nil, nil,
+				frameworkruntime.WithInformerFactory(informerFactory),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+
+			p, err := New(ctx, nil, fh, feature.Features{EnableGangScheduling: true})
+			if err != nil {
+				t.Fatalf("Failed to create plugin: %v", err)
+			}
+			pl := p.(*GangScheduling)
+
+			gotStatus := pl.PlacementFeasible(ctx, cycleState, cpgInfo)
+
+			if gotCode := gotStatus.Code(); gotCode != tc.expectedStatus {
+				t.Errorf("Expected status %v, got %v", tc.expectedStatus, gotCode)
+			}
+		})
+	}
 }
 
-func (t *testPodGroupInfo) GetNamespace() string          { return t.namespace }
-func (t *testPodGroupInfo) GetName() string               { return t.name }
-func (t *testPodGroupInfo) GetUnscheduledPods() []*v1.Pod { return t.unscheduledPods }
+func TestPreEnqueue(t *testing.T) {
+	tests := []struct {
+		name                 string
+		pod                  *v1.Pod
+		initialPodGroups     []*schedulingapi.PodGroup
+		initialCPGs          []*schedulingapi.CompositePodGroup
+		initialPods          []*v1.Pod
+		wantStatus           *fwk.Status
+	}{
+		{
+			name: "Pod without scheduling group",
+			pod:  st.MakePod().Namespace("default").Name("pod1").Obj(),
+			wantStatus: nil,
+		},
+		{
+			name: "Pod with scheduling group but PG not found",
+			pod:  st.MakePod().Namespace("default").Name("pod1").PodGroupName("pg1").Obj(),
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for pods's pod group \"pg1\" to appear in scheduling queue"),
+		},
+		{
+			name: "Pod with basic PG without parent CPG",
+			pod:  st.MakePod().Namespace("default").Name("pod1").PodGroupName("pg1").Obj(),
+			initialPodGroups: []*schedulingapi.PodGroup{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "pg1"},
+					Spec: schedulingapi.PodGroupSpec{
+						SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
+							Basic: &schedulingapi.BasicSchedulingPolicy{},
+						},
+					},
+				},
+			},
+			wantStatus: nil,
+		},
+		{
+			name: "Pod with basic PG with parent CPG (not ready)",
+			pod:  st.MakePod().Namespace("default").Name("pod1").PodGroupName("pg1").Obj(),
+			initialPodGroups: func() []*schedulingapi.PodGroup {
+				cpgName := "cpg1"
+				return []*schedulingapi.PodGroup{
+					{
+						ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "pg1"},
+						Spec: schedulingapi.PodGroupSpec{
+							SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
+								Basic: &schedulingapi.BasicSchedulingPolicy{},
+							},
+							ParentCompositePodGroupName: &cpgName,
+						},
+					},
+				}
+			}(),
+			initialCPGs: []*schedulingapi.CompositePodGroup{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cpg1"},
+					Spec: schedulingapi.CompositePodGroupSpec{
+						SchedulingPolicy: schedulingapi.CompositePodGroupSchedulingPolicy{
+							Gang: &schedulingapi.GangGroupSchedulingPolicy{MinGroupCount: 2},
+						},
+					},
+				},
+			},
+			wantStatus: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, "waiting for root composite pod group \"cpg1\" tree to meet quorum"),
+		},
+		{
+			name: "Pod with basic PG with parent CPG (ready)",
+			pod:  st.MakePod().Namespace("default").Name("pod1").PodGroupName("pg1").Obj(),
+			initialPodGroups: func() []*schedulingapi.PodGroup {
+				cpgName := "cpg1"
+				return []*schedulingapi.PodGroup{
+					{
+						ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "pg1"},
+						Spec: schedulingapi.PodGroupSpec{
+							SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
+								Basic: &schedulingapi.BasicSchedulingPolicy{},
+							},
+							ParentCompositePodGroupName: &cpgName,
+						},
+					},
+				}
+			}(),
+			initialCPGs: []*schedulingapi.CompositePodGroup{
+				{
+					ObjectMeta: metav1.ObjectMeta{Namespace: "default", Name: "cpg1"},
+					Spec: schedulingapi.CompositePodGroupSpec{
+						SchedulingPolicy: schedulingapi.CompositePodGroupSchedulingPolicy{
+							Gang: &schedulingapi.GangGroupSchedulingPolicy{MinGroupCount: 1},
+						},
+					},
+				},
+			},
+			initialPods: []*v1.Pod{
+				st.MakePod().Namespace("default").Name("pod2").PodGroupName("pg1").Obj(),
+			},
+			wantStatus: nil,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+			_, ctx := ktesting.NewTestContext(t)
+			cache := internalcache.New(ctx, nil, true)
+
+			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(), 0)
+			podGroupInformer := informerFactory.Scheduling().V1alpha3().PodGroups()
+			cpgInformer := informerFactory.Scheduling().V1alpha3().CompositePodGroups()
+
+			fh, err := frameworkruntime.NewFramework(ctx, nil, nil,
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithPodGroupManager(cache),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+
+			// Populate informers and manager state
+			for _, cpg := range tc.initialCPGs {
+				err := cpgInformer.Informer().GetStore().Add(cpg)
+				if err != nil {
+					t.Fatalf("Failed to add cpg %s to store: %v", cpg.Name, err)
+				}
+				cache.AddCompositePodGroup(cpg)
+			}
+			for _, pg := range tc.initialPodGroups {
+				err := podGroupInformer.Informer().GetStore().Add(pg)
+				if err != nil {
+					t.Fatalf("Failed to add podGroup %s to store: %v", pg.Name, err)
+				}
+				cache.AddPodGroup(pg)
+			}
+			for _, p := range tc.initialPods {
+				cache.AddPodGroupMember(p)
+			}
+
+			p, err := New(ctx, nil, fh, feature.Features{EnableGangScheduling: true})
+			if err != nil {
+				t.Fatalf("Failed to create plugin: %v", err)
+			}
+			pl := p.(*GangScheduling)
+
+			gotStatus := pl.PreEnqueue(ctx, tc.pod)
+
+			if diff := cmp.Diff(tc.wantStatus, gotStatus); diff != "" {
+				t.Errorf("Unexpected PreEnqueue status (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+

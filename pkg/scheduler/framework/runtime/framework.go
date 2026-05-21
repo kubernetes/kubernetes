@@ -2014,14 +2014,14 @@ func (f *frameworkImpl) runPermitPlugin(ctx context.Context, pl fwk.PermitPlugin
 // If any plugin returns invalid status, the result will be Error and the remaining plugins won't be invoked.
 // Otherwise, if at least 1 plugin returns UnschedulableAndUnresolvable, the remaining plugins won't be invoked and the result will be UnschdulableAndUnresolvable.
 // Otherwise, if at least 1 plugin returns Unschedulable, the remaining plugins will be invoked and the result will be Unschedulable.
-func (f *frameworkImpl) RunPlacementFeasiblePlugins(ctx context.Context, placementCycleState fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo) (status *fwk.Status) {
+func (f *frameworkImpl) RunPlacementFeasiblePlugins(ctx context.Context, placementCycleState fwk.PodGroupCycleState, entity framework.QueuedEntityInfo) (status *fwk.Status) {
 	startTime := time.Now()
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PlacementFeasible, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
 
 	for _, pl := range f.placementFeasiblePlugins {
-		plStatus := f.runPlacementFeasiblePlugin(ctx, pl, placementCycleState, podGroupInfo)
+		plStatus := f.runPlacementFeasiblePlugin(ctx, pl, placementCycleState, entity)
 		if plStatus.IsSuccess() {
 			continue
 		}
@@ -2041,12 +2041,12 @@ func (f *frameworkImpl) RunPlacementFeasiblePlugins(ctx context.Context, placeme
 	return status
 }
 
-func (f *frameworkImpl) runPlacementFeasiblePlugin(ctx context.Context, pl framework.PlacementFeasiblePlugin, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo) *fwk.Status {
+func (f *frameworkImpl) runPlacementFeasiblePlugin(ctx context.Context, pl framework.PlacementFeasiblePlugin, state fwk.PodGroupCycleState, entity framework.QueuedEntityInfo) *fwk.Status {
 	if !state.ShouldRecordPluginMetrics() {
-		return pl.PlacementFeasible(ctx, state, podGroup)
+		return pl.PlacementFeasible(ctx, state, entity)
 	}
 	startTime := time.Now()
-	status := pl.PlacementFeasible(ctx, state, podGroup)
+	status := pl.PlacementFeasible(ctx, state, entity)
 	f.metricsRecorder.ObservePluginDurationAsync(metrics.PlacementFeasible, pl.Name(), status.Code().String(), metrics.SinceInSeconds(startTime))
 	return status
 }

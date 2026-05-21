@@ -76,6 +76,10 @@ type cacheImpl struct {
 	imageStates map[string]*fwk.ImageStateSummary
 	// podGroupStates stores the runtime state for each known pod group (only if GenericWorkload feature gate is enabled).
 	podGroupStates map[podGroupKey]*podGroupState
+	cpgStates      map[podGroupKey]*compositePodGroupState
+	orphanPGs      map[podGroupKey]sets.Set[podGroupKey]
+	orphanCPGs     map[podGroupKey]sets.Set[podGroupKey]
+
 	// genericWorkloadEnabled stores the GenericWorkload feature gate value.
 	genericWorkloadEnabled bool
 	// apiDispatcher is used for the methods that are expected to send API calls.
@@ -99,6 +103,9 @@ func newCache(ctx context.Context, period time.Duration, apiDispatcher fwk.APIDi
 		podStates:              make(map[string]*podState),
 		imageStates:            make(map[string]*fwk.ImageStateSummary),
 		podGroupStates:         make(map[podGroupKey]*podGroupState),
+		cpgStates:              make(map[podGroupKey]*compositePodGroupState),
+		orphanPGs:              make(map[podGroupKey]sets.Set[podGroupKey]),
+		orphanCPGs:             make(map[podGroupKey]sets.Set[podGroupKey]),
 		genericWorkloadEnabled: genericWorkloadEnabled,
 		apiDispatcher:          apiDispatcher,
 	}
@@ -292,6 +299,9 @@ func (cache *cacheImpl) UpdateSnapshot(logger klog.Logger, nodeSnapshot *Snapsho
 	// Take a snapshot of pod group states for this scheduling cycle.
 	cache.updatePodGroupStateSnapshot(nodeSnapshot)
 
+	// Take a snapshot of composite pod group states for this scheduling cycle.
+	cache.updateCPGStateSnapshot(nodeSnapshot)
+
 	return nil
 }
 
@@ -312,6 +322,36 @@ func (cache *cacheImpl) updatePodGroupStateSnapshot(snapshot *Snapshot) {
 			continue
 		}
 		snapshot.podGroupStates[key] = podGroupState.snapshot()
+	}
+}
+
+// updateCPGStateSnapshot updates the composite pod group state portion of the given snapshot.
+// It assumes that the cache lock is already held.
+// It removes entries that no longer exist in the live cache
+// and clones entries whose generation has advanced since the last snapshot.
+func (cache *cacheImpl) updateCPGStateSnapshot(snapshot *Snapshot) {
+	// Remove cpg states from snapshot that no longer exist in cache.
+	for key := range snapshot.cpgStates {
+		if _, exists := cache.cpgStates[key]; !exists {
+			delete(snapshot.cpgStates, key)
+		}
+	}
+	// Clone only cpg states that changed since the last snapshot.
+	for key, cpgState := range cache.cpgStates {
+		if existing, ok := snapshot.cpgStates[key]; ok && existing.generation == cpgState.generation {
+			continue
+		}
+		snapshot.cpgStates[key] = cpgState.snapshot()
+	}
+
+	// Update orphans (full copy for simplicity)
+	snapshot.orphanPGs = make(map[podGroupKey]sets.Set[podGroupKey], len(cache.orphanPGs))
+	for k, v := range cache.orphanPGs {
+		snapshot.orphanPGs[k] = v.Clone()
+	}
+	snapshot.orphanCPGs = make(map[podGroupKey]sets.Set[podGroupKey], len(cache.orphanCPGs))
+	for k, v := range cache.orphanCPGs {
+		snapshot.orphanCPGs[k] = v.Clone()
 	}
 }
 
@@ -513,6 +553,7 @@ func (cache *cacheImpl) removePod(logger klog.Logger, pod *v1.Pod, forgetPod boo
 }
 
 func (cache *cacheImpl) AddPod(logger klog.Logger, pod *v1.Pod) error {
+	logger.Info("Cache received AddPod", "pod", klog.KObj(pod))
 	key, err := framework.GetPodKey(pod)
 	if err != nil {
 		return err
@@ -846,7 +887,9 @@ func (cache *cacheImpl) removePodGroupMember(pod *v1.Pod) {
 	if !exists {
 		return
 	}
+
 	podGroupState.deletePod(pod.UID)
+
 	if podGroupState.empty() {
 		delete(cache.podGroupStates, key)
 	}
@@ -862,20 +905,25 @@ func (cache *cacheImpl) assumePodGroupMember(pod *v1.Pod) {
 		podGroupState.allPods[pod.UID] = pod
 		cache.podGroupStates[key] = podGroupState
 	}
+
 	podGroupState.assumePod(pod)
+
+	if podGroupState.empty() {
+		delete(cache.podGroupStates, key)
+	}
 }
 
 // forgetPodGroupMember moves the pod back from assumed to unscheduled in its pod group state.
 // Assumes that the cache lock is already held.
 func (cache *cacheImpl) forgetPodGroupMember(logger klog.Logger, pod *v1.Pod) {
 	key := newPodGroupKey(pod.Namespace, *pod.Spec.SchedulingGroup.PodGroupName)
-	pgs, exists := cache.podGroupStates[key]
+	podGroupState, exists := cache.podGroupStates[key]
 	if !exists {
-		// This should not happen: the pod group state should have been already created by a prior pod add or assume action.
 		utilruntime.HandleErrorWithLogger(logger, nil, "Pod group state not found for forget, this indicates a missed add or assume event", "pod", klog.KObj(pod), "podGroupKey", key)
 		return
 	}
-	pgs.forgetPod(pod.UID)
+
+	podGroupState.forgetPod(pod.UID)
 }
 
 // PodGroupStates returns the PodGroupStateLister for this cache.

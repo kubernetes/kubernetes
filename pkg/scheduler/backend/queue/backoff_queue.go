@@ -73,6 +73,8 @@ type backoffQueuer interface {
 	has(entityLookup framework.QueuedEntityInfo) bool
 	// list returns all pods that are in the queue.
 	list() []*v1.Pod
+	// listEntities returns all entities that are in the queue.
+	listEntities() []framework.QueuedEntityInfo
 	// len returns length of the queue.
 	len() int
 }
@@ -410,6 +412,13 @@ func (bq *backoffQueue) list() []*v1.Pod {
 		})
 	}
 	return result
+}
+
+func (bq *backoffQueue) listEntities() []framework.QueuedEntityInfo {
+	bq.lock.RLock()
+	defer bq.lock.RUnlock()
+
+	return append(bq.entityBackoffQ.List(), bq.entityErrorBackoffQ.List()...)
 }
 
 // len returns length of the queue.

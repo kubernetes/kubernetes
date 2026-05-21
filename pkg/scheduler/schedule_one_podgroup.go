@@ -48,6 +48,27 @@ func (sched *Scheduler) scheduleOnePodGroup(ctx context.Context, podGroupInfo *f
 	logger = klog.LoggerWithValues(logger, "podGroup", klog.KObj(podGroupInfo))
 	ctx = klog.NewContext(ctx, logger)
 
+	logger.Info("scheduleOnePodGroup", "podGroupInfo.Name()", podGroupInfo.Name, "parentCPG", podGroupInfo.ParentCompositePodGroupName)
+	// // There could be a race condition between informers and what gets created in the queue. The race results in treating pg as a standalone pg,
+	// // when it is in fact a child pod group.
+	// if podGroupInfo.ParentCompositePodGroupName != "" {
+	// 	logger.Info("Skipping standalone scheduling for child pod group", "parentCPG", podGroupInfo.ParentCompositePodGroupName)
+	// }
+	// 	// Trigger requeueing for the root CPG.
+	// 	// This handles cases where the root CPG starved in unschedulableEntities
+	// 	// because the event that added these pods failed to wake it up (e.g. due to informer lag).
+	// 	if len(podGroupInfo.QueuedPodInfos) > 0 {
+	// 		pInfo := podGroupInfo.QueuedPodInfos[0]
+	// 		logger.Info("Triggering requeueing for root CPG on behalf of child pod group", "pod", klog.KObj(pInfo.Pod))
+	// 		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, framework.EventUnscheduledPodAdd, nil, pInfo.Pod, nil)
+	// 	}
+
+	// 	for _, pInfo := range podGroupInfo.QueuedPodInfos {
+	// 		sched.SchedulingQueue.Done(pInfo.Pod.UID)
+	// 	}
+	// 	return
+	// }
+
 	schedFwk, err := sched.frameworkForPodGroup(podGroupInfo)
 	if err != nil {
 		for _, podInfo := range podGroupInfo.QueuedPodInfos {
@@ -60,6 +81,10 @@ func (sched *Scheduler) scheduleOnePodGroup(ctx context.Context, podGroupInfo *f
 				return
 			}
 			sched.FailureHandler(ctx, podFwk, podInfo, fwk.AsStatus(err), clearNominatedNode, time.Now())
+		}
+		err := sched.SchedulingQueue.AddAttemptedPodGroupIfNotPresent(logger, podGroupInfo, sched.SchedulingQueue.SchedulingCycle())
+		if err != nil {
+			utilruntime.HandleErrorWithContext(ctx, err, "Failed to pod group back to scheduling queue", "podGroup", klog.KObj(podGroupInfo))
 		}
 		return
 	}
@@ -282,6 +307,8 @@ func (ar *algorithmResult) GetNodeName() string {
 // podGroupAlgorithmResult stores the scheduling pod scheduling results for a pod group
 // and any information needed to act on these results.
 type podGroupAlgorithmResult struct {
+	// podGroupInfo is the pod group this result belongs to.
+	podGroupInfo *framework.QueuedPodGroupInfo
 	// podResults is the list of scheduling results for each pod in the group.
 	// Only in the case of a pod group-wide Unschedulable or Error status can it contain fewer pods.
 	podResults []algorithmResult
@@ -301,6 +328,8 @@ type podGroupAlgorithmResult struct {
 	// waitingOnPreemption indicates whether this pod group requires or is waiting for preemption to complete.
 	// This can only be set to true when the status is Unschedulable.
 	waitingOnPreemption bool
+	// revertFn is a function to revert all assumptions made during the algorithm.
+	revertFn func()
 }
 
 // podGroupSchedulingDefaultAlgorithm runs the default algorithm for scheduling a pod group.
@@ -309,6 +338,7 @@ type podGroupAlgorithmResult struct {
 // treat that pod as already scheduled on that node with victims being already removed in memory.
 func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, podGroupInfo *framework.QueuedPodGroupInfo, postFilterMode podGroupPostFilterMode) podGroupAlgorithmResult {
 	result := podGroupAlgorithmResult{
+		podGroupInfo:        podGroupInfo,
 		podResults:          make([]algorithmResult, 0, len(podGroupInfo.QueuedPodInfos)),
 		status:              fwk.NewStatus(fwk.Unschedulable).WithError(errPodGroupUnschedulable),
 		waitingOnPreemption: false,
@@ -323,13 +353,20 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 
 	requiresPreemption := false
 	anyScheduled := false
+	var revertFns []func()
+	defer func() {
+		if !result.status.IsSuccess() {
+			for _, fn := range revertFns {
+				fn()
+			}
+		}
+	}()
+
 	for _, podInfo := range podGroupInfo.QueuedPodInfos {
 		podResult, revertFn := sched.podGroupPodSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, podGroupInfo, podInfo, postFilterMode)
 		result.podResults = append(result.podResults, podResult)
 		if revertFn != nil {
-			// We unreserve the pod at the end of the whole algorithm (via defer) because it should be ultimately returned to the queue,
-			// without binding it yet. We only assumed the pod to check feasibility of subsequent pods in the group.
-			defer revertFn()
+			revertFns = append(revertFns, revertFn)
 		}
 
 		if !podResult.status.IsSuccess() && !podResult.status.IsRejected() {
@@ -370,6 +407,15 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 		} else if !anyScheduled {
 			// The framework requires at least 1 pod to be scheduled in order to return a success status.
 			result.status = fwk.NewStatus(fwk.Unschedulable).WithError(errPodGroupUnschedulable)
+		}
+	}
+
+	// Handle revert functions
+	if result.status.IsSuccess() && len(revertFns) > 0 {
+		result.revertFn = func() {
+			for _, fn := range revertFns {
+				fn()
+			}
 		}
 	}
 
@@ -465,6 +511,18 @@ func completePodGroupAlgorithmResult(ctx context.Context, podGroupInfo *framewor
 // If the preemption is required for this pod group, all pods are moved back to the scheduling queue
 // and require the next pod group scheduling cycle to verify the preemption outcome.
 func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, schedFwk framework.Framework, podGroupState *framework.CycleState, podGroupInfo *framework.QueuedPodGroupInfo, podGroupResult podGroupAlgorithmResult, start time.Time) {
+	sched.applyPodGroupAlgorithmResult(ctx, schedFwk, podGroupState, podGroupInfo, podGroupResult, start)
+
+	logger := klog.FromContext(ctx)
+	err := sched.SchedulingQueue.AddAttemptedPodGroupIfNotPresent(logger, podGroupInfo, sched.SchedulingQueue.SchedulingCycle())
+	if err != nil {
+		utilruntime.HandleErrorWithContext(ctx, err, "Failed to add attempted pod group to scheduling queue", "podGroup", klog.KObj(podGroupInfo))
+	}
+}
+
+// applyPodGroupAlgorithmResult applies the result of the pod group scheduling algorithm.
+// It assumes pods, runs binding cycles, and updates conditions, but does not add the pod group to the attempted list in the queue.
+func (sched *Scheduler) applyPodGroupAlgorithmResult(ctx context.Context, schedFwk framework.Framework, podGroupState *framework.CycleState, podGroupInfo *framework.QueuedPodGroupInfo, podGroupResult podGroupAlgorithmResult, start time.Time) {
 	logger := klog.FromContext(ctx)
 
 	if len(podGroupResult.podResults) != len(podGroupInfo.QueuedPodInfos) {
@@ -581,11 +639,6 @@ func (sched *Scheduler) submitPodGroupAlgorithmResult(ctx context.Context, sched
 		metrics.PodGroupScheduleError(schedFwk.ProfileName(), metrics.SinceInSeconds(start))
 	}
 	sched.updatePodGroupCondition(ctx, podGroupInfo, condition)
-
-	err := sched.SchedulingQueue.AddAttemptedPodGroupIfNotPresent(logger, podGroupInfo, sched.SchedulingQueue.SchedulingCycle())
-	if err != nil {
-		utilruntime.HandleErrorWithContext(ctx, err, "Failed to add attempted pod group to scheduling queue", "podGroup", klog.KObj(podGroupInfo))
-	}
 }
 
 // updatePodGroupCondition patches the given condition on a PodGroup.
@@ -627,7 +680,8 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	allNodes, err := sched.nodeInfoSnapshot.NodeInfos().List()
 	if err != nil {
 		return podGroupAlgorithmResult{
-			status: fwk.AsStatus(fmt.Errorf("failed to list node infos: %w", err)),
+			podGroupInfo: podGroupInfo,
+			status:       fwk.AsStatus(fmt.Errorf("failed to list node infos: %w", err)),
 		}
 	}
 
@@ -636,7 +690,8 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	placements, status := schedFwk.RunPlacementGeneratePlugins(ctx, podGroupCycleState, podGroupInfo.PodGroupInfo, allNodes)
 	if !status.IsSuccess() {
 		return podGroupAlgorithmResult{
-			status: status,
+			podGroupInfo: podGroupInfo,
+			status:       status,
 		}
 	}
 
@@ -648,7 +703,8 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 		err := sched.nodeInfoSnapshot.AssumePlacement(placement)
 		if err != nil {
 			return podGroupAlgorithmResult{
-				status: fwk.AsStatus(fmt.Errorf("failed to assume pod group placement: %w", err)),
+				podGroupInfo: podGroupInfo,
+				status:       fwk.AsStatus(fmt.Errorf("failed to assume pod group placement: %w", err)),
 			}
 		}
 		result := sched.podGroupSchedulingDefaultAlgorithm(ctx, schedFwk, podGroupCycleState, podGroupInfo, postFilterMode)
@@ -682,7 +738,8 @@ func (sched *Scheduler) podGroupSchedulingPlacementAlgorithm(ctx context.Context
 	bestPlacement, status := sched.findBestPlacement(ctx, schedFwk, podGroupCycleState, podGroupInfo, successfulResults)
 	if !status.IsSuccess() {
 		return podGroupAlgorithmResult{
-			status: status,
+			podGroupInfo: podGroupInfo,
+			status:       status,
 		}
 	}
 
@@ -755,4 +812,158 @@ func (sched *Scheduler) podGroupSchedulingAlgorithm(ctx context.Context, schedFw
 		return sched.podGroupSchedulingPlacementAlgorithm(podGroupCycleCtx, schedFwk, podGroupCycleState, podGroupInfo, postFilterMode)
 	}
 	return sched.podGroupSchedulingDefaultAlgorithm(podGroupCycleCtx, schedFwk, podGroupCycleState, podGroupInfo, postFilterMode)
+}
+
+// scheduleOneCompositePodGroup does the entire workload-aware scheduling workflow for a composite pod group.
+func (sched *Scheduler) scheduleOneCompositePodGroup(ctx context.Context, cpgInfo *framework.QueuedCompositePodGroupInfo) {
+	logger := klog.FromContext(ctx)
+	logger = klog.LoggerWithValues(logger, "compositePodGroup", klog.KObj(cpgInfo))
+	ctx = klog.NewContext(ctx, logger)
+
+	possiblePG := findFirstPossibleDescendantPodGroup(cpgInfo)
+	if possiblePG == nil {
+		logger.Info("Composite pod group has no child pod groups with pods, nothing to schedule")
+		err := sched.SchedulingQueue.AddAttemptedCompositePodGroupIfNotPresent(logger, cpgInfo, sched.SchedulingQueue.SchedulingCycle())
+		if err != nil {
+			utilruntime.HandleErrorWithContext(ctx, err, "Failed to add attempted composite pod group to scheduling queue", "compositePodGroup", klog.KObj(cpgInfo))
+		}
+		return
+	}
+
+	schedFwk, err := sched.frameworkForPodGroup(possiblePG)
+	if err != nil {
+		logger.Error(err, "Failed to find framework for composite pod group")
+		return
+	}
+
+	logger.V(3).Info("Attempting to schedule composite pod group", "cpg", klog.KObj(cpgInfo))
+
+	sched.compositePodGroupCycle(ctx, schedFwk, framework.NewCycleState(), cpgInfo)
+}
+
+// compositePodGroupCycle runs a composite pod group scheduling cycle.
+func (sched *Scheduler) compositePodGroupCycle(ctx context.Context, schedFwk framework.Framework, cycleState *framework.CycleState, cpgInfo *framework.QueuedCompositePodGroupInfo) {
+	logger := klog.FromContext(ctx)
+	start := time.Now()
+
+	if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
+		logger.Error(err, "Error updating snapshot", "cpg", klog.KObj(cpgInfo))
+		return
+	}
+
+	// Initialize CPGSchedulingState in cycleState
+	cpgState := framework.NewCPGSchedulingState()
+	cycleState.Write(framework.CPGSchedulingStateKey, cpgState)
+
+	allPGResults, revertFn, status := sched.compositePodGroupSchedulingAlgorithm(ctx, schedFwk, cycleState, cpgInfo)
+
+	// Basic submit logic: if success, log success. If failure, log failure.
+	// Real implementation would involve FailureHandler for all pods.
+	if status.IsSuccess() {
+		logger.V(2).Info("Successfully scheduled composite pod group", "cpg", klog.KObj(cpgInfo))
+		for _, pgResult := range allPGResults {
+			sched.applyPodGroupAlgorithmResult(ctx, schedFwk, cycleState, pgResult.podGroupInfo, pgResult, start)
+		}
+		err := sched.SchedulingQueue.AddAttemptedCompositePodGroupIfNotPresent(logger, cpgInfo, sched.SchedulingQueue.SchedulingCycle())
+		if err != nil {
+			utilruntime.HandleErrorWithContext(ctx, err, "Failed to add attempted composite pod group to scheduling queue", "compositePodGroup", klog.KObj(cpgInfo))
+		}
+		return
+	}
+
+	if revertFn != nil {
+		revertFn()
+	}
+	logger.V(2).Info("Unable to schedule composite pod group", "cpg", klog.KObj(cpgInfo), "err", status.Message())
+
+	// We need to remove all pods from the inflight queue. This is needed because for a CPG we schedule it
+	// the next time and it will be added back to the queue. If we don't remove it from the inflight queue,
+	// we will have duplicate entries in the inflight queue.
+	cpgInfo.ForEachPodInfo(func(pInfo *framework.QueuedPodInfo) bool {
+		sched.SchedulingQueue.Done(pInfo.Pod.UID)
+		return true
+	})
+
+	err := sched.SchedulingQueue.AddAttemptedCompositePodGroupIfNotPresent(logger, cpgInfo, sched.SchedulingQueue.SchedulingCycle())
+	if err != nil {
+		utilruntime.HandleErrorWithContext(ctx, err, "Failed to add attempted composite pod group to scheduling queue", "compositePodGroup", klog.KObj(cpgInfo))
+	}
+}
+
+// compositePodGroupSchedulingAlgorithm attempts to schedule pods in the CPG tree.
+func (sched *Scheduler) compositePodGroupSchedulingAlgorithm(ctx context.Context, schedFwk framework.Framework, cycleState *framework.CycleState, cpgInfo *framework.QueuedCompositePodGroupInfo) ([]podGroupAlgorithmResult, func(), *fwk.Status) {
+	cpgStateData, _ := cycleState.Read(framework.CPGSchedulingStateKey)
+	cpgState := cpgStateData.(*framework.CPGSchedulingState)
+
+	return sched.scheduleCPGNode(ctx, schedFwk, cycleState, cpgInfo, cpgState)
+}
+
+// scheduleCPGNode recursively schedules a CPG node and its children.
+func (sched *Scheduler) scheduleCPGNode(ctx context.Context, schedFwk framework.Framework, cycleState *framework.CycleState, node *framework.QueuedCompositePodGroupInfo, cpgState *framework.CPGSchedulingState) ([]podGroupAlgorithmResult, func(), *fwk.Status) {
+	logger := klog.FromContext(ctx)
+	logger.Info("Scheduling CPG node", "cpg", klog.KObj(node))
+
+	var allPGResults []podGroupAlgorithmResult
+	var revertFns []func()
+	var success bool
+
+	defer func() {
+		if !success {
+			logger.Info("CPG node failed or unfeasible, reverting assumed pods", "cpg", klog.KObj(node), "revertFnsCount", len(revertFns))
+			for _, fn := range revertFns {
+				fn()
+			}
+		}
+	}()
+
+	for _, childCPG := range node.ChildrenCPGs {
+		logger.Info("Recursively scheduling child CPG", "parent", klog.KObj(node), "child", klog.KObj(childCPG))
+		childResults, revertFn, status := sched.scheduleCPGNode(ctx, schedFwk, cycleState, childCPG, cpgState)
+		allPGResults = append(allPGResults, childResults...)
+		if status.IsSuccess() && revertFn != nil {
+			revertFns = append(revertFns, revertFn)
+		}
+	}
+
+	for _, pgInfo := range node.ChildrenPGs {
+		logger.Info("Scheduling child PG", "parent", klog.KObj(node), "child", klog.KObj(pgInfo))
+		pgResult := sched.podGroupSchedulingAlgorithm(ctx, schedFwk, cycleState, pgInfo, runAllPostFilters)
+		logger.Info("Scheduling child PG result", "parent", klog.KObj(node), "child", klog.KObj(pgInfo), "status", pgResult.status)
+		allPGResults = append(allPGResults, pgResult)
+		if pgResult.status.IsSuccess() && pgResult.revertFn != nil {
+			logger.Info("Revert function for child PG", "parent", klog.KObj(node), "child", klog.KObj(pgInfo), "revertFnsCount", len(revertFns))
+			revertFns = append(revertFns, pgResult.revertFn)
+		}
+	}
+
+	logger.Info("Running PlacementFeasible for CPG node", "cpg", klog.KObj(node))
+	placementFeasibleStatus := schedFwk.RunPlacementFeasiblePlugins(ctx, cycleState, node)
+	if placementFeasibleStatus.IsSuccess() {
+		logger.Info("PlacementFeasible succeeded for CPG node", "cpg", klog.KObj(node))
+		success = true
+		combinedRevertFn := func() {
+			for _, fn := range revertFns {
+				fn()
+			}
+		}
+		return allPGResults, combinedRevertFn, placementFeasibleStatus
+	}
+
+	logger.Info("PlacementFeasible failed for CPG node", "cpg", klog.KObj(node), "status", placementFeasibleStatus.Message())
+	return nil, nil, placementFeasibleStatus
+}
+
+// findFirstPossibleDescendantPodGroup finds the first descendant pod group that has pods.
+func findFirstPossibleDescendantPodGroup(cpg *framework.QueuedCompositePodGroupInfo) *framework.QueuedPodGroupInfo {
+	for _, childPG := range cpg.ChildrenPGs {
+		if len(childPG.QueuedPodInfos) > 0 {
+			return childPG
+		}
+	}
+	for _, childCPG := range cpg.ChildrenCPGs {
+		if pg := findFirstPossibleDescendantPodGroup(childCPG); pg != nil {
+			return pg
+		}
+	}
+	return nil
 }

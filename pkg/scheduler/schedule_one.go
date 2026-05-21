@@ -77,6 +77,8 @@ func (sched *Scheduler) ScheduleOne(ctx context.Context) {
 	}
 
 	switch specificEntity := entity.(type) {
+	case *framework.QueuedCompositePodGroupInfo:
+		sched.scheduleOneCompositePodGroup(ctx, specificEntity)
 	case *framework.QueuedPodGroupInfo:
 		sched.scheduleOnePodGroup(ctx, specificEntity)
 	case *framework.QueuedPodInfo:

@@ -114,7 +114,8 @@ type Scheduler struct {
 	// panic.
 	logger klog.Logger
 
-	podGroupLister schedulinglisters.PodGroupLister
+	podGroupLister          schedulinglisters.PodGroupLister
+	compositePodGroupLister schedulinglisters.CompositePodGroupLister
 
 	// registeredHandlers contains the registrations of all handlers. It's used to check if all handlers have finished syncing before the scheduling cycles start.
 	registeredHandlers []cache.ResourceEventHandlerRegistration
@@ -314,8 +315,12 @@ func New(ctx context.Context,
 	podLister := informerFactory.Core().V1().Pods().Lister()
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	var podGroupLister schedulinglisters.PodGroupLister
+	var compositePodGroupLister schedulinglisters.CompositePodGroupLister
 	if feature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
 		podGroupLister = informerFactory.Scheduling().V1alpha3().PodGroups().Lister()
+		if feature.DefaultFeatureGate.Enabled(features.CompositePodGroup) {
+			compositePodGroupLister = informerFactory.Scheduling().V1alpha3().CompositePodGroups().Lister()
+		}
 	}
 
 	snapshot := internalcache.NewEmptySnapshot()
@@ -454,6 +459,7 @@ func New(ctx context.Context,
 		APIDispatcher:                          apiDispatcher,
 		nominatedNodeNameForExpectationEnabled: feature.DefaultFeatureGate.Enabled(features.NominatedNodeNameForExpectation),
 		podGroupLister:                         podGroupLister,
+		compositePodGroupLister:                compositePodGroupLister,
 		genericWorkloadEnabled:                 feature.DefaultFeatureGate.Enabled(features.GenericWorkload),
 		workloadAwarePreemptionEnabled:         feature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption),
 	}

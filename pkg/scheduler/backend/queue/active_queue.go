@@ -42,6 +42,7 @@ type activeQueuer interface {
 	delete(entityLookup framework.QueuedEntityInfo) framework.QueuedEntityInfo
 	pop(logger klog.Logger) (framework.QueuedEntityInfo, error)
 	list() []*v1.Pod
+	listEntities() []framework.QueuedEntityInfo
 	len() int
 	has(entityLookup framework.QueuedEntityInfo) bool
 	// add adds a new entity to the activeQ.
@@ -342,6 +343,7 @@ func (aq *activeQueue) unlockedPop(logger klog.Logger) (framework.QueuedEntityIn
 		}
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("active", framework.PopFromBackoffQ).Add(float64(entity.Size()))
 	}
+
 	err = aq.unlockedMoveEntityToInFlight(entity)
 	if err != nil {
 		// Just report it as an error, but no need to stop the scheduler
@@ -381,6 +383,12 @@ func (aq *activeQueue) list() []*v1.Pod {
 		})
 	}
 	return result
+}
+
+func (aq *activeQueue) listEntities() []framework.QueuedEntityInfo {
+	aq.lock.RLock()
+	defer aq.lock.RUnlock()
+	return aq.queue.List()
 }
 
 // len returns length of the queue.

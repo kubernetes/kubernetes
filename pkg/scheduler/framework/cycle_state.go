@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"maps"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -168,4 +169,23 @@ func (c *CycleState) Write(key fwk.StateKey, val fwk.StateData) {
 // See CycleState for notes on concurrency.
 func (c *CycleState) Delete(key fwk.StateKey) {
 	c.storage.Delete(key)
+}
+
+// CPGSchedulingStateKey is a reserved state key for tracking CPG scheduling progress.
+var CPGSchedulingStateKey fwk.StateKey = "kubernetes.io/cpg-scheduling-state"
+
+// CPGSchedulingState stores the number of successfully scheduled children for each CPG.
+type CPGSchedulingState struct {
+	// Map is keyed with namespaced CPG name, and valued with the count of scheduled children.
+	ScheduledChildren map[string]int
+}
+
+// Clone creates a deep copy of the state.
+func (s *CPGSchedulingState) Clone() fwk.StateData {
+	return &CPGSchedulingState{ScheduledChildren: maps.Clone(s.ScheduledChildren)}
+}
+
+// NewCPGSchedulingState instantiates a CPGSchedulingState object.
+func NewCPGSchedulingState() *CPGSchedulingState {
+	return &CPGSchedulingState{ScheduledChildren: make(map[string]int)}
 }

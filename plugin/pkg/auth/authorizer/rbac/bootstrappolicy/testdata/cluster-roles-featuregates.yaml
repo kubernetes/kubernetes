@@ -264,6 +264,7 @@ items:
     - scheduling.k8s.io
     resources:
     - podgroups
+    - compositepodgroups
     - workloads
     verbs:
     - create
@@ -430,6 +431,8 @@ items:
     resources:
     - podgroups
     - podgroups/status
+    - compositepodgroups
+    - compositepodgroups/status
     - workloads
     verbs:
     - get
@@ -1008,6 +1011,7 @@ items:
     - scheduling.k8s.io
     resources:
     - podgroups
+    - compositepodgroups
     verbs:
     - get
     - list
@@ -1016,6 +1020,7 @@ items:
     - scheduling.k8s.io
     resources:
     - podgroups/status
+    - compositepodgroups/status
     verbs:
     - patch
     - update

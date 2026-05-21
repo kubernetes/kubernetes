@@ -155,6 +155,9 @@ func NewPodsToActivate() *PodsToActivate {
 	return &PodsToActivate{Map: make(map[string]*v1.Pod)}
 }
 
+// CPGSchedulingStateKey is a reserved state key for tracking CPG scheduling progress.
+
+
 // SortedScoredNodes is a list of scored nodes, returned from scheduling.
 type SortedScoredNodes interface {
 	Pop() string
@@ -192,7 +195,7 @@ type PlacementFeasiblePlugin interface {
 	// The scheduler will give up this placement and won't even evaluate remaining pods. The placement will remain eligible for preemption.
 	// Return Success status if the pod group can be scheduled in the current partially evaluated placement.
 	// After returning Success, the plugin should keep returning Success for the remaining pods.
-	PlacementFeasible(ctx context.Context, placementCycleState fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo) *fwk.Status
+	PlacementFeasible(ctx context.Context, placementCycleState fwk.PodGroupCycleState, entity QueuedEntityInfo) *fwk.Status
 }
 
 // Framework manages the set of plugins in use by the scheduling framework.
@@ -283,7 +286,7 @@ type Framework interface {
 	// If any plugin returns invalid status, the result will be Error and the remaining plugins won't be invoked.
 	// Otherwise, if at least 1 plugin returns UnschedulableAndUnresolvable, the remaining plugins won't be invoked and the result will be UnschdulableAndUnresolvable. The placement will remain eligible for preemption.
 	// Otherwise, if at least 1 plugin returns Unschedulable, the remaining plugins will be invoked and the result will be Unschedulable.
-	RunPlacementFeasiblePlugins(ctx context.Context, placementCycleState fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo) *fwk.Status
+	RunPlacementFeasiblePlugins(ctx context.Context, placementCycleState fwk.PodGroupCycleState, entity QueuedEntityInfo) *fwk.Status
 
 	// AddWaitingPod creates a waiting pod instance and adds it to the framework.
 	// It takes the pluginsWaitTime map returned by the RunPermitPlugins.

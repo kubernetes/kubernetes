@@ -31,6 +31,7 @@ import (
 	resourcebetaapi "k8s.io/api/resource/v1beta2"
 	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	storagev1 "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -1154,5 +1155,272 @@ func TestDeletePod(t *testing.T) {
 				t.Errorf("Unexpected pod group state in cache after pod removal")
 			}
 		})
+	}
+}
+
+func TestPodGroupEventHandlers(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CompositePodGroup, true)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	client := fake.NewClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+	schedulingQueue := internalqueue.NewTestQueue(ctx, nil)
+	schedulerCache := internalcache.New(ctx, nil, true)
+
+	sched := &Scheduler{
+		Cache:           schedulerCache,
+		SchedulingQueue: schedulingQueue,
+		logger:          logger,
+		StopEverything:  ctx.Done(),
+	}
+
+	gvkMap := map[fwk.EventResource]fwk.ActionType{
+		fwk.PodGroup: fwk.Add | fwk.Update | fwk.Delete,
+		fwk.EventResource("scheduling.k8s.io/CompositePodGroup"): fwk.Add | fwk.Update | fwk.Delete,
+	}
+
+	scheme := runtime.NewScheme()
+	dynclient := dyfake.NewSimpleDynamicClient(scheme)
+	dynInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(dynclient, 0)
+
+	if err := addAllEventHandlers(sched, informerFactory, dynInformerFactory, nil, nil, nil, gvkMap); err != nil {
+		t.Fatalf("Add event handlers failed: %v", err)
+	}
+
+	informerFactory.Start(sched.StopEverything)
+	informerFactory.WaitForCacheSync(sched.StopEverything)
+
+	pgName := "test-pg"
+	namespace := "default"
+	pg := &schedulingapi.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pgName,
+			Namespace: namespace,
+		},
+		Spec: schedulingapi.PodGroupSpec{
+			SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
+				Gang: &schedulingapi.GangSchedulingPolicy{
+					MinCount: 1,
+				},
+			},
+		},
+	}
+
+	// Add PodGroup via client to trigger event handler
+	_, err := client.SchedulingV1alpha3().PodGroups(namespace).Create(ctx, pg, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create PodGroup: %v", err)
+	}
+
+	// Wait a bit for the handler to run
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify state in Cache
+	_, err = schedulerCache.PodGroupStates().Get(namespace, pgName)
+	if err != nil {
+		t.Errorf("Expected PodGroup to be in cache: %v", err)
+	}
+}
+
+func TestCPGEventHandlers(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericWorkload, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CompositePodGroup, true)
+
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	client := fake.NewClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+
+	schedulingQueue := internalqueue.NewTestQueue(ctx, nil)
+	schedulerCache := internalcache.New(ctx, nil, true)
+
+	sched := &Scheduler{
+		Cache:           schedulerCache,
+		SchedulingQueue: schedulingQueue,
+		logger:          logger,
+		StopEverything:  ctx.Done(),
+		Profiles:        profile.Map{"": nil},
+	}
+
+	gvkMap := map[fwk.EventResource]fwk.ActionType{
+		fwk.PodGroup: fwk.Add | fwk.Update | fwk.Delete,
+		fwk.EventResource("scheduling.k8s.io/CompositePodGroup"): fwk.Add | fwk.Update | fwk.Delete,
+	}
+
+	scheme := runtime.NewScheme()
+	dynclient := dyfake.NewSimpleDynamicClient(scheme)
+	dynInformerFactory := dynamicinformer.NewDynamicSharedInformerFactory(dynclient, 0)
+
+	if err := addAllEventHandlers(sched, informerFactory, dynInformerFactory, nil, nil, nil, gvkMap); err != nil {
+		t.Fatalf("Add event handlers failed: %v", err)
+	}
+
+	informerFactory.Start(sched.StopEverything)
+	informerFactory.WaitForCacheSync(sched.StopEverything)
+
+	namespace := "default"
+	rootCPGName := "root-cpg"
+	childCPG1Name := "child-cpg-1"
+	childCPG2Name := "child-cpg-2"
+	pg1Name := "test-pg-1"
+	pg2Name := "test-pg-2"
+
+	// 1. Create Root CPG (MinGroupCount: 2)
+	rootCPG := &schedulingapi.CompositePodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rootCPGName,
+			Namespace: namespace,
+		},
+		Spec: schedulingapi.CompositePodGroupSpec{
+			SchedulingPolicy: schedulingapi.CompositePodGroupSchedulingPolicy{
+				Gang: &schedulingapi.GangGroupSchedulingPolicy{
+					MinGroupCount: 2,
+				},
+			},
+		},
+	}
+	_, err := client.SchedulingV1alpha3().CompositePodGroups(namespace).Create(ctx, rootCPG, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create Root CPG: %v", err)
+	}
+
+	// 2. Create Child CPG 1
+	childCPG1 := &schedulingapi.CompositePodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      childCPG1Name,
+			Namespace: namespace,
+		},
+		Spec: schedulingapi.CompositePodGroupSpec{
+			SchedulingPolicy: schedulingapi.CompositePodGroupSchedulingPolicy{
+				Gang: &schedulingapi.GangGroupSchedulingPolicy{
+					MinGroupCount: 1,
+				},
+			},
+			ParentCompositePodGroupName: &rootCPGName,
+		},
+	}
+	_, err = client.SchedulingV1alpha3().CompositePodGroups(namespace).Create(ctx, childCPG1, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create Child CPG 1: %v", err)
+	}
+
+	// 3. Create Child CPG 2
+	childCPG2 := &schedulingapi.CompositePodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      childCPG2Name,
+			Namespace: namespace,
+		},
+		Spec: schedulingapi.CompositePodGroupSpec{
+			SchedulingPolicy: schedulingapi.CompositePodGroupSchedulingPolicy{
+				Gang: &schedulingapi.GangGroupSchedulingPolicy{
+					MinGroupCount: 1,
+				},
+			},
+			ParentCompositePodGroupName: &rootCPGName,
+		},
+	}
+	_, err = client.SchedulingV1alpha3().CompositePodGroups(namespace).Create(ctx, childCPG2, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create Child CPG 2: %v", err)
+	}
+
+	// 4. Create PGs
+	pg1 := &schedulingapi.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pg1Name,
+			Namespace: namespace,
+		},
+		Spec: schedulingapi.PodGroupSpec{
+			SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
+				Gang: &schedulingapi.GangSchedulingPolicy{
+					MinCount: 1,
+				},
+			},
+			ParentCompositePodGroupName: &childCPG1Name,
+		},
+	}
+	_, err = client.SchedulingV1alpha3().PodGroups(namespace).Create(ctx, pg1, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create PG 1: %v", err)
+	}
+
+	pg2 := &schedulingapi.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pg2Name,
+			Namespace: namespace,
+		},
+		Spec: schedulingapi.PodGroupSpec{
+			SchedulingPolicy: schedulingapi.PodGroupSchedulingPolicy{
+				Gang: &schedulingapi.GangSchedulingPolicy{
+					MinCount: 1,
+				},
+			},
+			ParentCompositePodGroupName: &childCPG2Name,
+		},
+	}
+	_, err = client.SchedulingV1alpha3().PodGroups(namespace).Create(ctx, pg2, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create PG 2: %v", err)
+	}
+
+	// Wait for handlers to run
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify state in Queue via exported methods
+	podsInActive := schedulingQueue.PodsInActiveQ()
+	if len(podsInActive) != 0 {
+		t.Errorf("Expected no pods in activeQ, got %v", len(podsInActive))
+	}
+
+	// 5. Add Pod 1 to PG1 -> Child CPG 1 becomes ready
+	pod1 := st.MakePod().Name("pod1").Namespace(namespace).UID("pod1").PodGroupName(pg1Name).Obj()
+	_, err = client.CoreV1().Pods(namespace).Create(ctx, pod1, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create Pod 1: %v", err)
+	}
+
+	// Wait for handlers to run
+	time.Sleep(100 * time.Millisecond)
+
+	podsInActive = schedulingQueue.PodsInActiveQ()
+	if len(podsInActive) != 1 {
+		t.Errorf("Expected 1 pod in activeQ after pod1, got %v", len(podsInActive))
+	}
+
+	// 6. Add Pod 2 to PG2 -> Child CPG 2 becomes ready -> Root becomes ready
+	pod2 := st.MakePod().Name("pod2").Namespace(namespace).UID("pod2").PodGroupName(pg2Name).Obj()
+	_, err = client.CoreV1().Pods(namespace).Create(ctx, pod2, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create Pod 2: %v", err)
+	}
+
+	// Wait for handlers to run
+	time.Sleep(100 * time.Millisecond)
+
+	podsInActive = schedulingQueue.PodsInActiveQ()
+	if len(podsInActive) != 2 {
+		t.Errorf("Expected 2 pods in activeQ after pod2, got %v", len(podsInActive))
+	}
+
+	// Verify that both pods are in activeQ
+	foundPod1 := false
+	foundPod2 := false
+	for _, p := range podsInActive {
+		if p.Name == "pod1" {
+			foundPod1 = true
+		}
+		if p.Name == "pod2" {
+			foundPod2 = true
+		}
+	}
+	if !foundPod1 || !foundPod2 {
+		t.Errorf("Expected to find both pod1 and pod2 in activeQ")
 	}
 }
