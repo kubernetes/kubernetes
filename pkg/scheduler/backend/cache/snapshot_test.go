@@ -18,6 +18,7 @@ package cache
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -188,48 +189,47 @@ func TestCreateImageExistenceMap(t *testing.T) {
 	}
 }
 
-func TestCreateUsedPVCSet(t *testing.T) {
+func TestCreateUsedPVCRefCounts(t *testing.T) {
 	tests := []struct {
-		name     string
-		pods     []*v1.Pod
-		expected sets.Set[string]
+		name        string
+		nodeInfoMap map[string]*framework.NodeInfo
+		expected    map[string]int
 	}{
 		{
-			name:     "empty pods list",
-			pods:     []*v1.Pod{},
-			expected: sets.New[string](),
+			name:        "empty nodeInfoMap",
+			nodeInfoMap: map[string]*framework.NodeInfo{},
+			expected:    map[string]int{},
 		},
 		{
-			name: "pods not scheduled",
-			pods: []*v1.Pod{
-				st.MakePod().Name("foo").Namespace("foo").Obj(),
-				st.MakePod().Name("bar").Namespace("bar").Obj(),
+			name: "no PVCs used",
+			nodeInfoMap: map[string]*framework.NodeInfo{
+				"node1": framework.NewNodeInfo(),
+				"node2": framework.NewNodeInfo(),
 			},
-			expected: sets.New[string](),
+			expected: map[string]int{},
 		},
 		{
-			name: "scheduled pods that do not use any PVC",
-			pods: []*v1.Pod{
-				st.MakePod().Name("foo").Namespace("foo").Node("node-1").Obj(),
-				st.MakePod().Name("bar").Namespace("bar").Node("node-2").Obj(),
+			name: "PVCs used across nodes",
+			nodeInfoMap: map[string]*framework.NodeInfo{
+				"node1": {
+					PVCRefCounts: map[string]int{"ns/pvc1": 1},
+				},
+				"node2": {
+					PVCRefCounts: map[string]int{"ns/pvc1": 1, "ns/pvc2": 1},
+				},
 			},
-			expected: sets.New[string](),
-		},
-		{
-			name: "scheduled pods that use PVC",
-			pods: []*v1.Pod{
-				st.MakePod().Name("foo").Namespace("foo").Node("node-1").PVC("pvc1").Obj(),
-				st.MakePod().Name("bar").Namespace("bar").Node("node-2").PVC("pvc2").Obj(),
+			expected: map[string]int{
+				"ns/pvc1": 2,
+				"ns/pvc2": 1,
 			},
-			expected: sets.New("foo/pvc1", "bar/pvc2"),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			usedPVCs := createUsedPVCSet(test.pods)
-			if diff := cmp.Diff(test.expected, usedPVCs); diff != "" {
-				t.Errorf("Unexpected usedPVCs (-want +got):\n%s", diff)
+			usedPVCRefCounts := createUsedPVCRefCounts(test.nodeInfoMap)
+			if diff := cmp.Diff(test.expected, usedPVCRefCounts); diff != "" {
+				t.Errorf("Unexpected usedPVCRefCounts (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -256,12 +256,13 @@ func TestNewSnapshot(t *testing.T) {
 		expectedNumNodes             int
 		expectedPodsWithAffinity     int
 		expectedPodsWithAntiAffinity int
-		expectedUsedPVCSet           sets.Set[string]
+		expectedUsedPVCounts         map[string]int
 	}{
 		{
-			name:  "no pods no nodes",
-			pods:  nil,
-			nodes: nil,
+			name:                 "no pods no nodes",
+			pods:                 nil,
+			nodes:                nil,
+			expectedUsedPVCounts: map[string]int{},
 		},
 		{
 			name: "single pod single node",
@@ -278,7 +279,8 @@ func TestNewSnapshot(t *testing.T) {
 					},
 				},
 			},
-			expectedNumNodes: 1,
+			expectedNumNodes:     1,
+			expectedUsedPVCounts: map[string]int{},
 		},
 		{
 			name: "multiple nodes, pods with PVCs",
@@ -305,8 +307,8 @@ func TestNewSnapshot(t *testing.T) {
 					},
 				},
 			},
-			expectedNumNodes:   3,
-			expectedUsedPVCSet: sets.New("foo/pvc0", "bar/pvc1", "baz/pvc2"),
+			expectedNumNodes:     3,
+			expectedUsedPVCounts: map[string]int{"foo/pvc0": 1, "bar/pvc1": 1, "baz/pvc2": 1},
 		},
 		{
 			name: "multiple nodes, pod with affinity",
@@ -346,6 +348,7 @@ func TestNewSnapshot(t *testing.T) {
 			},
 			expectedNumNodes:         3,
 			expectedPodsWithAffinity: 1,
+			expectedUsedPVCounts:     map[string]int{},
 		},
 		{
 			name: "multiple nodes, pod with affinity, pod with anti-affinity",
@@ -391,6 +394,7 @@ func TestNewSnapshot(t *testing.T) {
 			expectedNumNodes:             2,
 			expectedPodsWithAffinity:     1,
 			expectedPodsWithAntiAffinity: 1,
+			expectedUsedPVCounts:         map[string]int{},
 		},
 	}
 
@@ -433,13 +437,13 @@ func TestNewSnapshot(t *testing.T) {
 				t.Errorf("unexpected antiAffinityList number, want: %v, got: %v", test.expectedPodsWithAntiAffinity, len(antiAffinityList))
 			}
 
-			for key := range test.expectedUsedPVCSet {
+			for key := range test.expectedUsedPVCounts {
 				if !snapshot.IsPVCUsedByPods(key) {
 					t.Errorf("unexpected IsPVCUsedByPods for %s, want: true, got: false", key)
 				}
 			}
 
-			if diff := cmp.Diff(test.expectedUsedPVCSet, snapshot.usedPVCSet); diff != "" {
+			if diff := cmp.Diff(test.expectedUsedPVCounts, snapshot.usedPVCRefCounts); diff != "" {
 				t.Errorf("Unexpected usedPVCSet (-want +got):\n%s", diff)
 			}
 		})
@@ -940,5 +944,81 @@ func TestSnapshot_MultipleBackups(t *testing.T) {
 	_, err = s.BackupSnapshot()
 	if err != nil {
 		t.Fatalf("failed to prepare a backup after restoring: %v", err)
+	}
+}
+
+func TestSnapshot_CreateUsedPVCRefCounts(t *testing.T) {
+	tests := []struct {
+		name                string
+		nodeInfoMap         map[string]*framework.NodeInfo
+		expectedPVCRefCount map[string]int
+	}{
+		{
+			name:                "empty map should generate empty counts",
+			nodeInfoMap:         map[string]*framework.NodeInfo{},
+			expectedPVCRefCount: map[string]int{},
+		},
+		{
+			name: "1 node with 1 unique PVC should generate 1 count",
+			nodeInfoMap: map[string]*framework.NodeInfo{
+				"test-node-1": {
+					PVCRefCounts: map[string]int{
+						"test-pvc-1": 1,
+					},
+				},
+			},
+			expectedPVCRefCount: map[string]int{
+				"test-pvc-1": 1,
+			},
+		},
+		{
+			name: "2 node with 1 unique PVC should generate 1 count",
+			nodeInfoMap: map[string]*framework.NodeInfo{
+				"test-node-1": {
+					PVCRefCounts: map[string]int{
+						"test-pvc-1": 1,
+					},
+				},
+				"test-node-2": {
+					PVCRefCounts: map[string]int{
+						"test-pvc-1": 1,
+					},
+				},
+			},
+			expectedPVCRefCount: map[string]int{
+				"test-pvc-1": 2,
+			},
+		},
+		{
+			name: "2 node with 3 unique PVC should generate 1 count",
+			nodeInfoMap: map[string]*framework.NodeInfo{
+				"test-node-1": {
+					PVCRefCounts: map[string]int{
+						"test-pvc-1": 1,
+						"test-pvc-2": 1,
+					},
+				},
+				"test-node-2": {
+					PVCRefCounts: map[string]int{
+						"test-pvc-1": 1,
+						"test-pvc-3": 1,
+					},
+				},
+			},
+			expectedPVCRefCount: map[string]int{
+				"test-pvc-1": 2,
+				"test-pvc-2": 1,
+				"test-pvc-3": 1,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := createUsedPVCRefCounts(tt.nodeInfoMap)
+			if !reflect.DeepEqual(actual, tt.expectedPVCRefCount) {
+				t.Errorf("expected %v, got %v", tt.expectedPVCRefCount, actual)
+			}
+		})
 	}
 }
