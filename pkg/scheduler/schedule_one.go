@@ -207,7 +207,7 @@ func (sched *Scheduler) prepareForBindingCycle(
 	podsToActivate *framework.PodsToActivate,
 	scheduleResult ScheduleResult,
 ) (*framework.QueuedPodInfo, *fwk.Status) {
-	assumedPodInfo, status := sched.assumeAndReserve(ctx, state, schedFramework, podInfo, scheduleResult)
+	assumedPodInfo, status := sched.AssumeAndReserve(ctx, state, schedFramework, podInfo, scheduleResult)
 	if !status.IsSuccess() {
 		return assumedPodInfo, status
 	}
@@ -219,7 +219,7 @@ func (sched *Scheduler) prepareForBindingCycle(
 		schedFramework.AddWaitingPod(assumedPod, pluginsWaitTime)
 	} else if !runPermitStatus.IsSuccess() {
 		// trigger un-reserve plugins to clean up state associated with the reserved Pod
-		err := sched.unreserveAndForget(ctx, state, schedFramework, assumedPodInfo, scheduleResult.SuggestedHost)
+		err := sched.UnreserveAndForget(ctx, state, schedFramework, assumedPodInfo, scheduleResult.SuggestedHost)
 		if err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "ForgetPod failed")
 		}
@@ -251,19 +251,29 @@ func (sched *Scheduler) prepareForBindingCycle(
 	return assumedPodInfo, nil
 }
 
-type SimulationResult struct {
-	Pod                *v1.Pod
-	ScheduleResult     ScheduleResult
-	Status             *fwk.Status
+// SchedulingTryResult holds the outcome of a TryScheduling operation.
+type SchedulingTryResult struct {
+	// Pod is the pod that was tentatively scheduled.
+	Pod *v1.Pod
+	// ScheduleResult contains the details of the scheduling decision (e.g., suggested host).
+	ScheduleResult ScheduleResult
+	// Status indicates the success or failure of the scheduling operation.
+	Status *fwk.Status
+	// RequiresPreemption is true if the pod was only schedulable after nominating a node for preemption.
 	RequiresPreemption bool
-	AssumedPodInfo     *framework.QueuedPodInfo
+	// AssumedPodInfo contains the queued pod info after assumption and reservation.
+	AssumedPodInfo *framework.QueuedPodInfo
 }
 
-func (sched *Scheduler) SimulateScheduling(ctx context.Context,
+// TryScheduling performs a tentative scheduling of a pod by running the scheduling
+// algorithm and assuming the pod in memory.
+// It returns a revert function that can be used to undo the assumption/reservation.
+// This is primarily used in pod group scheduling to check if an entire group can fit.
+func (sched *Scheduler) TryScheduling(ctx context.Context,
 	state fwk.CycleState,
 	schedFramework framework.Framework,
 	podInfo *framework.QueuedPodInfo,
-) (*SimulationResult, func()) {
+) (*SchedulingTryResult, func()) {
 	pod := podInfo.GetPod()
 
 	requiresPreemption := false
@@ -278,7 +288,7 @@ func (sched *Scheduler) SimulateScheduling(ctx context.Context,
 			requiresPreemption = true
 		} else {
 			// In case of pod being just unschedulable or having an error, just return now.
-			return &SimulationResult{
+			return &SchedulingTryResult{
 				Pod:            pod,
 				ScheduleResult: scheduleResult,
 				Status:         status,
@@ -286,9 +296,9 @@ func (sched *Scheduler) SimulateScheduling(ctx context.Context,
 		}
 	}
 
-	assumedPodInfo, assumeStatus := sched.assumeAndReserve(ctx, state, schedFramework, podInfo, scheduleResult)
+	assumedPodInfo, assumeStatus := sched.AssumeAndReserve(ctx, state, schedFramework, podInfo, scheduleResult)
 	if !assumeStatus.IsSuccess() {
-		return &SimulationResult{
+		return &SchedulingTryResult{
 			Pod:            pod,
 			ScheduleResult: ScheduleResult{nominatingInfo: clearNominatedNode},
 			Status:         assumeStatus,
@@ -296,13 +306,13 @@ func (sched *Scheduler) SimulateScheduling(ctx context.Context,
 	}
 
 	revertFn := func() {
-		err := sched.unreserveAndForget(ctx, state, schedFramework, assumedPodInfo, scheduleResult.SuggestedHost)
+		err := sched.UnreserveAndForget(ctx, state, schedFramework, assumedPodInfo, scheduleResult.SuggestedHost)
 		if err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "ForgetPod failed")
 		}
 	}
 
-	return &SimulationResult{
+	return &SchedulingTryResult{
 		Pod:                pod,
 		ScheduleResult:     scheduleResult,
 		Status:             status,
@@ -371,7 +381,7 @@ func (sched *Scheduler) schedulingAlgorithm(
 }
 
 // assumeAndReserve assumes and reserves the pod in scheduler's memory.
-func (sched *Scheduler) assumeAndReserve(
+func (sched *Scheduler) AssumeAndReserve(
 	ctx context.Context,
 	state fwk.CycleState,
 	schedFramework framework.Framework,
@@ -397,7 +407,7 @@ func (sched *Scheduler) assumeAndReserve(
 	// Run the Reserve method of reserve plugins.
 	if sts := schedFramework.RunReservePluginsReserve(ctx, state, assumedPod, scheduleResult.SuggestedHost); !sts.IsSuccess() {
 		// trigger un-reserve to clean up state associated with the reserved Pod
-		err := sched.unreserveAndForget(ctx, state, schedFramework, assumedPodInfo, scheduleResult.SuggestedHost)
+		err := sched.UnreserveAndForget(ctx, state, schedFramework, assumedPodInfo, scheduleResult.SuggestedHost)
 		if err != nil {
 			utilruntime.HandleErrorWithContext(ctx, err, "ForgetPod failed")
 		}
@@ -422,7 +432,7 @@ func (sched *Scheduler) assumeAndReserve(
 // unreserveAndForget unreserves and forgets the pod from scheduler's memory.
 // This function shouldn't be called during binding cycle with a state, where IsPodGroupSchedulingCycle is set to true,
 // but this shouldn't happen, because such pods with such state cannot reach binding.
-func (sched *Scheduler) unreserveAndForget(
+func (sched *Scheduler) UnreserveAndForget(
 	ctx context.Context,
 	state fwk.CycleState,
 	schedFramework framework.Framework,
@@ -575,7 +585,7 @@ func (sched *Scheduler) handleBindingCycleError(
 
 	assumedPod := podInfo.Pod
 	// trigger un-reserve plugins to clean up state associated with the reserved Pod
-	if forgetErr := sched.unreserveAndForget(ctx, state, fwk, podInfo, scheduleResult.SuggestedHost); forgetErr != nil {
+	if forgetErr := sched.UnreserveAndForget(ctx, state, fwk, podInfo, scheduleResult.SuggestedHost); forgetErr != nil {
 		utilruntime.HandleErrorWithContext(ctx, forgetErr, "ForgetPod failed")
 	} else {
 		// "Forget"ing an assumed Pod in binding cycle should be treated as a PodDelete event,

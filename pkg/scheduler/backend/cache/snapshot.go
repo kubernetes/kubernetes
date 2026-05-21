@@ -480,3 +480,28 @@ func (s *Snapshot) ListNodesInPlacement() ([]fwk.NodeInfo, error) {
 	}
 	return s.placementNodes.nodeInfoList, nil
 }
+
+// AssumeAllExistingPods assumes all pods that are already present in the snapshot.
+func (s *Snapshot) AssumeAllExistingPods() error {
+	currentlyAssumed := sets.New[string]()
+	revertAssumed := func() {
+		for key := range currentlyAssumed {
+			delete(s.assumedPods, key)
+		}
+	}
+
+	for _, nodeInfo := range s.nodeInfoList {
+		for _, podInfo := range nodeInfo.GetPods() {
+			p := podInfo.GetPod()
+			key, err := framework.GetPodKey(p)
+			if err != nil {
+				revertAssumed()
+				return fmt.Errorf("couldn't create key for pod: %w", err)
+			}
+			s.assumedPods[key] = p
+			currentlyAssumed.Insert(key)
+		}
+	}
+
+	return nil
+}

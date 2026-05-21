@@ -798,6 +798,71 @@ func TestSnapshot_Placement(t *testing.T) {
 	}
 }
 
+func TestSnapshot_AssumeAllExistingPods(t *testing.T) {
+	node1 := st.MakeNode().Name("node-1").Obj()
+	node2 := st.MakeNode().Name("node-2").Obj()
+
+	pod1 := st.MakePod().Name("pod-1").Namespace("ns").UID("pod-1").Node("node-1").Obj()
+	pod2 := st.MakePod().Name("pod-2").Namespace("ns").UID("pod-2").Node("node-1").Obj()
+	pod3 := st.MakePod().Name("pod-3").Namespace("ns").UID("pod-3").Node("node-2").Obj()
+
+	tests := []struct {
+		name                string
+		initialPods         []*v1.Pod
+		initialNodes        []*v1.Node
+		preAssumedPods      map[string]*v1.Pod
+		expectedAssumedPods sets.Set[string]
+	}{
+		{
+			name:                "all existing pods assumed successfully",
+			initialPods:         []*v1.Pod{pod1, pod2, pod3},
+			initialNodes:        []*v1.Node{node1, node2},
+			expectedAssumedPods: sets.New("pod-1", "pod-2", "pod-3"),
+		},
+		{
+			name:                "empty snapshot, no pods assumed",
+			initialPods:         nil,
+			initialNodes:        []*v1.Node{node1, node2},
+			expectedAssumedPods: sets.New[string](),
+		},
+		{
+			name:         "pods already pre-assumed are kept or overwritten",
+			initialPods:  []*v1.Pod{pod1},
+			initialNodes: []*v1.Node{node1},
+			preAssumedPods: map[string]*v1.Pod{
+				"pod-2": pod2,
+			},
+			expectedAssumedPods: sets.New("pod-1", "pod-2"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			snapshot := NewSnapshot(tt.initialPods, tt.initialNodes)
+			if tt.preAssumedPods != nil {
+				for k, v := range tt.preAssumedPods {
+					snapshot.assumedPods[k] = v
+				}
+			}
+
+			err := snapshot.AssumeAllExistingPods()
+			if err != nil {
+				t.Fatalf("AssumeAllExistingPods() failed: %v", err)
+			}
+
+			if len(tt.expectedAssumedPods) != len(snapshot.assumedPods) {
+				t.Errorf("Unexpected number of assumed pods: want %d, got %d", len(tt.expectedAssumedPods), len(snapshot.assumedPods))
+			}
+
+			for key := range tt.expectedAssumedPods {
+				if _, ok := snapshot.assumedPods[key]; !ok {
+					t.Errorf("Expected pod %q to be assumed, but it wasn't", key)
+				}
+			}
+		})
+	}
+}
+
 func TestSnapshot_BackupRestore(t *testing.T) {
 	podWithAffinity := st.MakePod().Name("p-aff").Namespace("ns").UID("p-aff").PodAffinity("key", &metav1.LabelSelector{MatchLabels: map[string]string{"key": "value"}}, st.PodAffinityWithRequiredReq).Node("node-1").Obj()
 	podWithAntiAffinity := st.MakePod().Name("p-anti").Namespace("ns").UID("p-anti").PodAntiAffinity("key", &metav1.LabelSelector{MatchLabels: map[string]string{"key": "value"}}, st.PodAntiAffinityWithRequiredReq).Node("node-1").Obj()

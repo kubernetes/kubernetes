@@ -416,21 +416,21 @@ func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, sche
 
 	logger.V(4).Info("Attempting to schedule a pod belonging to a pod group", "podGroup", klog.KObj(podGroupInfo), "pod", klog.KObj(pod))
 
-	simResult, revertFn := sched.SimulateScheduling(ctx, podCtx.state, schedFwk, podInfo)
+	tryResult, revertFn := sched.TryScheduling(ctx, podCtx.state, schedFwk, podInfo)
+	assumedPodInfo := tryResult.AssumedPodInfo
+	schedRes := tryResult.ScheduleResult
 
-	if simResult.AssumedPodInfo == nil {
+	if assumedPodInfo == nil {
 		return algorithmResult{
-			pod:                simResult.Pod,
-			scheduleResult:     simResult.ScheduleResult,
+			pod:                tryResult.Pod,
+			scheduleResult:     tryResult.ScheduleResult,
 			podCtx:             podCtx,
 			schedulingDuration: time.Since(start),
-			status:             simResult.Status,
+			status:             tryResult.Status,
 		}, nil
 	}
 
-	assumedPodInfo := simResult.AssumedPodInfo
-
-	_, permitStatus := schedFwk.RunPermitPlugins(ctx, podCtx.state, assumedPodInfo.Pod, simResult.ScheduleResult.SuggestedHost)
+	_, permitStatus := schedFwk.RunPermitPlugins(ctx, podCtx.state, assumedPodInfo.Pod, schedRes.SuggestedHost)
 	if !permitStatus.IsWait() && !permitStatus.IsSuccess() {
 		revertFn()
 		if permitStatus.IsRejected() {
@@ -441,7 +441,7 @@ func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, sche
 					NodeToStatus: framework.NewDefaultNodeToStatus(),
 				},
 			}
-			fitErr.Diagnosis.NodeToStatus.Set(simResult.ScheduleResult.SuggestedHost, permitStatus)
+			fitErr.Diagnosis.NodeToStatus.Set(schedRes.SuggestedHost, permitStatus)
 			fitErr.Diagnosis.AddPluginStatus(permitStatus)
 			permitStatus = fwk.NewStatus(permitStatus.Code()).WithError(fitErr)
 		}
@@ -456,12 +456,12 @@ func (sched *Scheduler) podGroupPodSchedulingAlgorithm(ctx context.Context, sche
 
 	return algorithmResult{
 		pod:                pod,
-		scheduleResult:     simResult.ScheduleResult,
+		scheduleResult:     schedRes,
 		podCtx:             podCtx,
 		schedulingDuration: time.Since(start),
-		status:             simResult.Status,
+		status:             tryResult.Status,
 		permitStatus:       permitStatus,
-		requiresPreemption: simResult.RequiresPreemption,
+		requiresPreemption: tryResult.RequiresPreemption,
 	}, revertFn
 }
 
