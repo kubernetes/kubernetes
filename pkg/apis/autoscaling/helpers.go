@@ -16,12 +16,24 @@ limitations under the License.
 
 package autoscaling
 
+// RoundTripAnnotations returns the annotation keys used to round-trip data from later HPA versions into v1.
+func RoundTripAnnotations() []string {
+	return []string{
+		MetricSpecsAnnotation,
+		BehaviorSpecsAnnotation,
+		ToleranceScaleDownAnnotation,
+		ToleranceScaleUpAnnotation,
+		MetricStatusesAnnotation,
+		HorizontalPodAutoscalerConditionsAnnotation,
+	}
+}
+
 // DropRoundTripHorizontalPodAutoscalerAnnotations removes any annotations used to
-// serialize round-tripped fields from HorizontalPodAutoscaler later API versions,
+// serialize round-tripped fields from HorizontalPodAutoscaler later API versions into v1,
 // and returns false if no changes were made and the original input object was returned.
 //
 // It should always be called when converting internal -> external versions, prior
-// to setting any of the custom annotations:
+// to setting any of the custom annotations in v1:
 //
 //	annotations, copiedAnnotations := DropRoundTripHorizontalPodAutoscalerAnnotations(externalObj.Annotations)
 //	externalObj.Annotations = annotations
@@ -34,20 +46,16 @@ package autoscaling
 //	  externalObj.Annotations[...] = json.Marshal(...)
 //	}
 func DropRoundTripHorizontalPodAutoscalerAnnotations(in map[string]string) (out map[string]string, copied bool) {
-	_, hasMetricsSpecs := in[MetricSpecsAnnotation]
-	_, hasBehaviorSpecs := in[BehaviorSpecsAnnotation]
-	_, hasToleranceScaleDown := in[ToleranceScaleDownAnnotation]
-	_, hasToleranceScaleUp := in[ToleranceScaleUpAnnotation]
-	_, hasMetricsStatuses := in[MetricStatusesAnnotation]
-	_, hasConditions := in[HorizontalPodAutoscalerConditionsAnnotation]
-	if hasMetricsSpecs || hasBehaviorSpecs || hasToleranceScaleDown || hasToleranceScaleUp || hasMetricsStatuses || hasConditions {
-		out = DeepCopyStringMap(in)
-		delete(out, MetricSpecsAnnotation)
-		delete(out, BehaviorSpecsAnnotation)
-		delete(out, ToleranceScaleDownAnnotation)
-		delete(out, ToleranceScaleUpAnnotation)
-		delete(out, MetricStatusesAnnotation)
-		delete(out, HorizontalPodAutoscalerConditionsAnnotation)
+	for _, k := range RoundTripAnnotations() {
+		if _, exists := in[k]; exists {
+			if !copied {
+				out = DeepCopyStringMap(in)
+				copied = true
+			}
+			delete(out, k)
+		}
+	}
+	if copied {
 		return out, true
 	}
 	return in, false

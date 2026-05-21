@@ -19,17 +19,21 @@ package horizontalpodautoscaler
 import (
 	"context"
 
+	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
+
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	autoscalingv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling/validation"
 	"k8s.io/kubernetes/pkg/features"
-	"sigs.k8s.io/structured-merge-diff/v6/fieldpath"
 )
 
 // autoscalerStrategy implements behavior for HorizontalPodAutoscalers
@@ -106,6 +110,9 @@ func (autoscalerStrategy) DeclarativeValidationConfig(ctx context.Context, obj, 
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (autoscalerStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	if isV1Request(ctx) && modifiedV1RoundTripAnnotations(obj, nil) {
+		return []string{"setting v2 data in annotations is unexpected; use the v2 API instead"}
+	}
 	return nil
 }
 
@@ -144,7 +151,41 @@ func (autoscalerStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.O
 
 // WarningsOnUpdate returns warnings for the given update.
 func (autoscalerStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	if isV1Request(ctx) && modifiedV1RoundTripAnnotations(obj, old) {
+		return []string{"modifying v2 data in annotations is unexpected; use the v2 API instead"}
+	}
 	return nil
+}
+
+func isV1Request(ctx context.Context) bool {
+	requestInfo, found := genericapirequest.RequestInfoFrom(ctx)
+	return found &&
+		requestInfo.APIGroup == autoscalingv1.SchemeGroupVersion.Group &&
+		requestInfo.APIVersion == autoscalingv1.SchemeGroupVersion.Version
+}
+func modifiedV1RoundTripAnnotations(obj, old runtime.Object) bool {
+	var objAnnotations, oldAnnotations map[string]string
+
+	if objAccessor, err := meta.Accessor(obj); err != nil {
+		return false
+	} else {
+		objAnnotations = objAccessor.GetAnnotations()
+	}
+
+	if old != nil {
+		if oldAccessor, err := meta.Accessor(old); err != nil {
+			return false
+		} else {
+			oldAnnotations = oldAccessor.GetAnnotations()
+		}
+	}
+
+	for _, k := range autoscaling.RoundTripAnnotations() {
+		if objAnnotations[k] != oldAnnotations[k] {
+			return true
+		}
+	}
+	return false
 }
 
 func (autoscalerStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
@@ -186,6 +227,9 @@ func (autoscalerStatusStrategy) ValidateUpdate(ctx context.Context, obj, old run
 
 // WarningsOnUpdate returns warnings for the given update.
 func (autoscalerStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	if isV1Request(ctx) && modifiedV1RoundTripAnnotations(obj, old) {
+		return []string{"modifying v2 data in annotations is unexpected; use the v2 API instead"}
+	}
 	return nil
 }
 
