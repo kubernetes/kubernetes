@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"regexp"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -183,6 +184,8 @@ func (rtv requirednessTagValidator) doOptional(context Context) (Validations, er
 	return Validations{Functions: []FunctionGen{Function(optionalTagName, ShortCircuit|NonError, optionalValueValidator)}}, nil
 }
 
+var refRE = regexp.MustCompile(`^ref\((?P<reference>[^"]+)\)$`)
+
 // hasZeroDefault returns whether the field has a default value and whether
 // that default value is the zero value for the field's type.
 func (rtv requirednessTagValidator) hasZeroDefault(context Context) (bool, bool, error) {
@@ -205,6 +208,12 @@ func (rtv requirednessTagValidator) hasZeroDefault(context Context) (bool, bool,
 	}
 
 	payload := tags[0].Value
+	// If the default value is a reference, assume it is a non-zero value.
+	// Using ref() to point to a zero value is uncommon.
+	if refRE.MatchString(payload) {
+		return true, false, nil
+	}
+
 	var defaultValue any
 	if err := json.Unmarshal([]byte(payload), &defaultValue); err != nil {
 		return false, false, fmt.Errorf("failed to parse default value %q: %w", payload, err)

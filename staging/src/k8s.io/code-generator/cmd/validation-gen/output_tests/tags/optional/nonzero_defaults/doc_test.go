@@ -35,6 +35,8 @@ func Test(t *testing.T) {
 		field.Required(field.NewPath("intPtrField"), ""),
 		field.Required(field.NewPath("boolField"), ""),
 		field.Required(field.NewPath("boolPtrField"), ""),
+		field.Required(field.NewPath("refStringField"), ""),
+		field.Required(field.NewPath("refIntField"), ""),
 	})
 
 	st.Value(&Struct{
@@ -44,5 +46,7 @@ func Test(t *testing.T) {
 		IntPtrField:    ptr.To(0),
 		BoolField:      true,
 		BoolPtrField:   ptr.To(false),
+		RefStringField: "val",
+		RefIntField:    1,
 	}).ExpectValid()
 }
