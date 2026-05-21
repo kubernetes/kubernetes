@@ -90,7 +90,8 @@ func TestGetEarliestPodStartTime(t *testing.T) {
 				newPriorityPodWithStartTime("pod1", 1, currentTime.Add(-time.Second)),
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "pod2",
+						Name:              "pod2",
+						CreationTimestamp: metav1.NewTime(currentTime),
 					},
 					Spec: v1.PodSpec{
 						Priority: &priority,

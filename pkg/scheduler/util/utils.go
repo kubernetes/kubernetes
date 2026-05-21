@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
@@ -47,14 +46,16 @@ func GetPodFullName(pod *v1.Pod) string {
 	return pod.Name + "_" + pod.Namespace
 }
 
-// GetPodStartTime returns start time of the given pod or current timestamp
+// GetPodStartTime returns start time of the given pod or its creation time
 // if it hasn't started yet.
 func GetPodStartTime(pod *v1.Pod) *metav1.Time {
 	if pod.Status.StartTime != nil {
 		return pod.Status.StartTime
 	}
 	// Assumed pods and bound pods that haven't started don't have a StartTime yet.
-	return &metav1.Time{Time: time.Now()}
+	// We use CreationTimestamp instead of time.Now() to avoid dynamically generating
+	// a timestamp during sorting, which breaks sort's strict weak ordering.
+	return &pod.CreationTimestamp
 }
 
 // GetEarliestPodStartTime returns the earliest start time of all pods that
