@@ -588,3 +588,99 @@ func testV1beta1PodMetricsData() []metricsv1beta1api.PodMetrics {
 		},
 	}
 }
+
+func TestTopPodFieldSelectorFiltersMetrics(t *testing.T) {
+	testNS := "testns"
+
+	metricsList := testV1beta1PodMetricsData()
+	metricsList[0].Namespace = testNS
+	metricsList[1].Namespace = testNS
+	metricsList[2].Namespace = testNS
+
+	fakemetricsClientset := &metricsfake.Clientset{}
+	fakemetricsClientset.AddReactor("list", "pods", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		return true, &metricsv1beta1api.PodMetricsList{
+			ListMeta: metav1.ListMeta{
+				ResourceVersion: "2",
+			},
+			Items: metricsList,
+		}, nil
+	})
+
+	tf := cmdtesting.NewTestFactory().WithNamespace(testNS)
+	defer tf.Cleanup()
+
+	ns := scheme.Codecs.WithoutConversion()
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch req.URL.Path {
+			case "/api":
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(apibody)))}, nil
+			case "/apis":
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: io.NopCloser(bytes.NewReader([]byte(apisbodyWithMetrics)))}, nil
+			case "/api/v1/namespaces/" + testNS + "/pods":
+				body, _ := marshallBody(v1.PodList{
+					ListMeta: metav1.ListMeta{
+						ResourceVersion: "2",
+					},
+					Items: []v1.Pod{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      "pod1",
+								Namespace: testNS,
+							},
+							Spec: v1.PodSpec{
+								NodeName: "node-a",
+							},
+						},
+					},
+				})
+
+				return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
+
+			default:
+				t.Fatalf("unexpected request: %#v\nGot URL: %#v", req, req.URL)
+				return nil, nil
+			}
+		}),
+	}
+
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+
+	streams, _, buf, _ := genericiooptions.NewTestIOStreams()
+	cmd := NewCmdTopPod(tf, nil, streams)
+
+	cmdOptions := &TopPodOptions{
+		FieldSelector: "spec.nodeName=node-a",
+		IOStreams:     streams,
+	}
+
+	if err := cmdOptions.Complete(tf, cmd, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	cmdOptions.MetricsClient = fakemetricsClientset
+
+	if err := cmdOptions.Validate(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := cmdOptions.RunTopPod(); err != nil {
+		t.Fatal(err)
+	}
+
+	result := buf.String()
+
+	if !strings.Contains(result, "pod1") {
+		t.Errorf("expected metrics for pod1, got:\n%s", result)
+	}
+
+	if strings.Contains(result, "pod2") {
+		t.Errorf("unexpected metrics for pod2, got:\n%s", result)
+	}
+
+	if strings.Contains(result, "pod3") {
+		t.Errorf("unexpected metrics for pod3, got:\n%s", result)
+	}
+}
