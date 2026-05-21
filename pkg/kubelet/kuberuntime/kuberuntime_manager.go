@@ -395,7 +395,7 @@ func newRuntimeVersion(version string) (*utilversion.Version, error) {
 func (m *kubeGenericRuntimeManager) getTypedVersion(ctx context.Context) (*runtimeapi.VersionResponse, error) {
 	typedVersion, err := m.runtimeService.Version(ctx, kubeRuntimeAPIVersion)
 	if err != nil {
-		return nil, fmt.Errorf("get remote runtime typed version failed: %v", err)
+		return nil, fmt.Errorf("get remote runtime typed version failed: %w", err)
 	}
 	return typedVersion, nil
 }
@@ -1706,7 +1706,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, po
 			// known errors that are logged in other places are logged at higher levels here to avoid
 			// repetitive log spam
 			switch {
-			case err == images.ErrImagePullBackOff:
+			case errors.Is(err, images.ErrImagePullBackOff):
 				logger.V(3).Info("Container start failed in pod", "containerType", typeName, "container", spec.container.Name, "pod", klog.KObj(pod), "containerMessage", msg, "err", err)
 			default:
 				utilruntime.HandleError(fmt.Errorf("%v %v start failed in pod %v: %w: %s", typeName, spec.container.Name, format.Pod(pod), err, msg))

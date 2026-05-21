@@ -1224,7 +1224,7 @@ func (s *Server) checkpoint(request *restful.Request, response *restful.Response
 		response.WriteError(
 			http.StatusInternalServerError,
 			fmt.Errorf(
-				"checkpointing of %v/%v/%v failed (%v)",
+				"checkpointing of %v/%v/%v failed (%w)",
 				request.PathParameter("podNamespace"),
 				request.PathParameter("podID"),
 				containerName,

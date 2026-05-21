@@ -998,7 +998,7 @@ func TestVersionInfo(t *testing.T) {
 			node:             &v1.Node{},
 			versionInfoError: fmt.Errorf("foo"),
 			expectNode:       &v1.Node{},
-			expectError:      fmt.Errorf("error getting version info: foo"),
+			expectError:      fmt.Errorf("error getting version info: %w", fmt.Errorf("foo")),
 		},
 		{
 			desc:                "error getting runtime version results in Unknown runtime",
@@ -1147,7 +1147,7 @@ func TestImages(t *testing.T) {
 			desc:           "error getting image list, image list on node is reset to empty",
 			maxImages:      -1,
 			imageListError: fmt.Errorf("foo"),
-			expectError:    fmt.Errorf("error getting image list: foo"),
+			expectError:    fmt.Errorf("error getting image list: %w", fmt.Errorf("foo")),
 		},
 	}
 

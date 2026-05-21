@@ -87,7 +87,7 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 
 		client, conn, err := dial(ctx, socketPath, dialTimeoutDuration)
 		if err != nil {
-			return fmt.Errorf("RegisterPlugin error -- dial failed at socket %s, err: %v", socketPath, err)
+			return fmt.Errorf("RegisterPlugin error -- dial failed at socket %s, err: %w", socketPath, err)
 		}
 		defer conn.Close()
 
@@ -97,13 +97,13 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 
 		infoResp, err := client.GetInfo(ctxWithTimeout, &registerapi.InfoRequest{})
 		if err != nil {
-			return fmt.Errorf("RegisterPlugin error -- failed to get plugin info using RPC GetInfo at socket %s, err: %v", socketPath, err)
+			return fmt.Errorf("RegisterPlugin error -- failed to get plugin info using RPC GetInfo at socket %s, err: %w", socketPath, err)
 		}
 
 		handler, ok := pluginHandlers[infoResp.Type]
 		if !ok {
 			if err := og.notifyPlugin(ctx, client, false, fmt.Sprintf("RegisterPlugin error -- no handler registered for plugin type: %s at socket %s", infoResp.Type, socketPath)); err != nil {
-				return fmt.Errorf("RegisterPlugin error -- failed to send error at socket %s, err: %v", socketPath, err)
+				return fmt.Errorf("RegisterPlugin error -- failed to send error at socket %s, err: %w", socketPath, err)
 			}
 			return fmt.Errorf("RegisterPlugin error -- no handler registered for plugin type: %s at socket %s", infoResp.Type, socketPath)
 		}
@@ -113,7 +113,7 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 		}
 		if err := handler.ValidatePlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions); err != nil {
 			if err = og.notifyPlugin(ctx, client, false, fmt.Sprintf("RegisterPlugin error -- plugin validation failed with err: %v", err)); err != nil {
-				return fmt.Errorf("RegisterPlugin error -- failed to send error at socket %s, err: %v", socketPath, err)
+				return fmt.Errorf("RegisterPlugin error -- failed to send error at socket %s, err: %w", socketPath, err)
 			}
 			return fmt.Errorf("RegisterPlugin error -- pluginHandler.ValidatePluginFunc failed")
 		}
@@ -138,7 +138,7 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 		if err := og.notifyPlugin(ctx, client, true, ""); err != nil {
 			actualStateOfWorldUpdater.RemovePlugin(socketPath)
 			handler.DeRegisterPlugin(infoResp.Name, infoResp.Endpoint)
-			return fmt.Errorf("RegisterPlugin error -- failed to send registration status at socket %s, err: %v", socketPath, err)
+			return fmt.Errorf("RegisterPlugin error -- failed to send registration status at socket %s, err: %w", socketPath, err)
 		}
 		return nil
 	}
@@ -202,7 +202,7 @@ func dial(ctx context.Context, unixSocketPath string, timeout time.Duration) (re
 	)
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to dial socket %s, err: %v", unixSocketPath, err)
+		return nil, nil, fmt.Errorf("failed to dial socket %s, err: %w", unixSocketPath, err)
 	}
 
 	return registerapi.NewRegistrationClient(c), c, nil

@@ -60,7 +60,7 @@ func (w *Watcher) Start(ctx context.Context, stopCh <-chan struct{}) error {
 
 	fsWatcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		return fmt.Errorf("failed to start plugin fsWatcher, err: %v", err)
+		return fmt.Errorf("failed to start plugin fsWatcher, err: %w", err)
 	}
 	w.fsWatcher = fsWatcher
 
@@ -103,7 +103,7 @@ func (w *Watcher) init(ctx context.Context) error {
 	logger.V(4).Info("Ensuring Plugin directory", "path", w.path)
 
 	if err := w.fs.MkdirAll(w.path, 0755); err != nil {
-		return fmt.Errorf("error (re-)creating root %s: %v", w.path, err)
+		return fmt.Errorf("error (re-)creating root %s: %w", w.path, err)
 	}
 
 	return nil
@@ -117,13 +117,13 @@ func (w *Watcher) traversePluginDir(ctx context.Context, dir string) error {
 	// watch the new dir
 	err := w.fsWatcher.Add(dir)
 	if err != nil {
-		return fmt.Errorf("failed to watch %s, err: %v", w.path, err)
+		return fmt.Errorf("failed to watch %s, err: %w", w.path, err)
 	}
 	// traverse existing children in the dir
 	return w.fs.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			if path == dir {
-				return fmt.Errorf("error accessing path: %s error: %v", path, err)
+				return fmt.Errorf("error accessing path: %s error: %w", path, err)
 			}
 
 			logger.Error(err, "Error accessing path", "path", path)
@@ -138,7 +138,7 @@ func (w *Watcher) traversePluginDir(ctx context.Context, dir string) error {
 		mode := info.Mode()
 		if mode.IsDir() {
 			if err := w.fsWatcher.Add(path); err != nil {
-				return fmt.Errorf("failed to watch %s, err: %v", path, err)
+				return fmt.Errorf("failed to watch %s, err: %w", path, err)
 			}
 		} else if isSocket, _ := util.IsUnixDomainSocket(path); isSocket {
 			event := fsnotify.Event{
@@ -166,7 +166,7 @@ func (w *Watcher) handleCreateEvent(ctx context.Context, event fsnotify.Event) e
 
 	fi, err := getStat(event)
 	if err != nil {
-		return fmt.Errorf("stat file %s failed: %v", event.Name, err)
+		return fmt.Errorf("stat file %s failed: %w", event.Name, err)
 	}
 
 	if strings.HasPrefix(fi.Name(), ".") {
@@ -177,7 +177,7 @@ func (w *Watcher) handleCreateEvent(ctx context.Context, event fsnotify.Event) e
 	if !fi.IsDir() {
 		isSocket, err := util.IsUnixDomainSocket(util.NormalizePath(event.Name))
 		if err != nil {
-			return fmt.Errorf("failed to determine if file: %s is a unix domain socket: %v", event.Name, err)
+			return fmt.Errorf("failed to determine if file: %s is a unix domain socket: %w", event.Name, err)
 		}
 		if !isSocket {
 			logger.V(5).Info("Ignoring non socket file", "path", fi.Name())
@@ -201,7 +201,7 @@ func (w *Watcher) handlePluginRegistration(ctx context.Context, socketPath strin
 	logger.V(2).Info("Adding socket path or updating timestamp to desired state cache", "path", socketPath)
 	err := w.desiredStateOfWorld.AddOrUpdatePlugin(ctx, socketPath)
 	if err != nil {
-		return fmt.Errorf("error adding socket path %s or updating timestamp to desired state cache: %v", socketPath, err)
+		return fmt.Errorf("error adding socket path %s or updating timestamp to desired state cache: %w", socketPath, err)
 	}
 	return nil
 }

@@ -85,7 +85,7 @@ func (mc *basicMirrorClient) CreateMirrorPod(ctx context.Context, pod *v1.Pod) e
 	// See https://git.k8s.io/enhancements/keps/sig-auth/1314-node-restriction-pods/README.md
 	nodeUID, err := mc.getNodeUID()
 	if err != nil {
-		return fmt.Errorf("failed to get node UID: %v", err)
+		return fmt.Errorf("failed to get node UID: %w", err)
 	}
 	controller := true
 	copyPod.OwnerReferences = []metav1.OwnerReference{{

@@ -86,7 +86,7 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 		kubeCfg.TLSCertFile,
 		kubeCfg.TLSPrivateKeyFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize server certificate store: %v", err)
+		return nil, fmt.Errorf("failed to initialize server certificate store: %w", err)
 	}
 	var certificateRenewFailure = compbasemetrics.NewCounter(
 		&compbasemetrics.CounterOpts{
@@ -132,7 +132,7 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 		CertificateRenewFailure: certificateRenewFailure,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize server certificate manager: %v", err)
+		return nil, fmt.Errorf("failed to initialize server certificate manager: %w", err)
 	}
 	legacyregistry.RawMustRegister(compbasemetrics.NewGaugeFunc(
 		&compbasemetrics.GaugeOpts{
@@ -213,7 +213,7 @@ func NewKubeletClientCertificateManager(
 		certFile,
 		keyFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize client certificate store: %v", err)
+		return nil, fmt.Errorf("failed to initialize client certificate store: %w", err)
 	}
 	var certificateRenewFailure = compbasemetrics.NewCounter(
 		&compbasemetrics.CounterOpts{
@@ -247,7 +247,7 @@ func NewKubeletClientCertificateManager(
 		CertificateRenewFailure: certificateRenewFailure,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize client certificate manager: %v", err)
+		return nil, fmt.Errorf("failed to initialize client certificate manager: %w", err)
 	}
 
 	return m, nil

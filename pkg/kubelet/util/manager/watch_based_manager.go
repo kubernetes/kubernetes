@@ -326,7 +326,7 @@ func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
 		item.restartReflectorIfNeeded()
 	}
 	if err := wait.PollImmediate(10*time.Millisecond, time.Second, item.hasSynced); err != nil {
-		return nil, fmt.Errorf("failed to sync %s cache: %v", c.groupResource.String(), err)
+		return nil, fmt.Errorf("failed to sync %s cache: %w", c.groupResource.String(), err)
 	}
 	obj, exists, err := item.store.GetByKey(c.key(namespace, name))
 	if err != nil {

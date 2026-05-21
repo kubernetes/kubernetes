@@ -70,12 +70,13 @@ func TestAdmissionErrors(t *testing.T) {
 		}
 
 		if tc.expectedAdmissionError {
-			err, ok := tc.Error.(*TestAdmissionError)
-			if !ok {
-				t.Errorf("expected TestAdmissionError")
+			var admissionErr *TestAdmissionError
+			if !errors.As(tc.Error, &admissionErr) {
+				t.Errorf("expected *TestAdmissionError, got %T", tc.Error)
+				continue
 			}
-			if h.Reason != err.reason {
-				t.Errorf("expected PodAdmitResult.Reason = %v, got %v", err.reason, h.Reason)
+			if h.Reason != admissionErr.reason {
+				t.Errorf("expected PodAdmitResult.Reason = %v, got %v", admissionErr.reason, h.Reason)
 			}
 			continue
 		}

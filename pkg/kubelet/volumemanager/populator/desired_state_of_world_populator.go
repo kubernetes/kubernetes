@@ -444,7 +444,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 			ctx, pod.Namespace, pvcSource.ClaimName)
 		if err != nil {
 			return nil, nil, "", fmt.Errorf(
-				"error processing PVC %s/%s: %v",
+				"error processing PVC %s/%s: %w",
 				pod.Namespace,
 				pvcSource.ClaimName,
 				err)
@@ -461,7 +461,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 			dswp.getPVSpec(ctx, pvName, pvcSource.ReadOnly, pvcUID)
 		if err != nil {
 			return nil, nil, "", fmt.Errorf(
-				"error processing PVC %s/%s: %v",
+				"error processing PVC %s/%s: %w",
 				pod.Namespace,
 				pvcSource.ClaimName,
 				err)
@@ -525,7 +525,7 @@ func (dswp *desiredStateOfWorldPopulator) getPVCExtractPV(
 	pvc, err :=
 		dswp.kubeClient.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, claimName, metav1.GetOptions{})
 	if err != nil || pvc == nil {
-		return nil, fmt.Errorf("failed to fetch PVC from API server: %v", err)
+		return nil, fmt.Errorf("failed to fetch PVC from API server: %w", err)
 	}
 
 	// Pods that uses a PVC that is being deleted and not protected by
@@ -567,7 +567,7 @@ func (dswp *desiredStateOfWorldPopulator) getPVSpec(
 	pv, err := dswp.kubeClient.CoreV1().PersistentVolumes().Get(ctx, name, metav1.GetOptions{})
 	if err != nil || pv == nil {
 		return nil, "", fmt.Errorf(
-			"failed to fetch PV %s from API server: %v", name, err)
+			"failed to fetch PV %s from API server: %w", name, err)
 	}
 
 	if pv.Spec.ClaimRef == nil {

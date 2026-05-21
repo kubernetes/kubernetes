@@ -93,7 +93,7 @@ func (cgroupName CgroupName) ToSystemd() string {
 	result, err := cgroupsystemd.ExpandSlice(strings.Join(newparts, "-") + systemdSuffix)
 	if err != nil {
 		// Should never happen...
-		panic(fmt.Errorf("error converting cgroup name [%v] to systemd format: %v", cgroupName, err))
+		panic(fmt.Errorf("error converting cgroup name [%v] to systemd format: %w", cgroupName, err))
 	}
 	return result
 }
@@ -250,7 +250,7 @@ func (m *cgroupCommon) Destroy(logger klog.Logger, cgroupConfig *CgroupConfig) e
 
 	// Delete cgroups using libcontainers Managers Destroy() method
 	if err = manager.Destroy(); err != nil {
-		return fmt.Errorf("unable to destroy cgroup paths for cgroup %v : %v", cgroupConfig.Name, err)
+		return fmt.Errorf("unable to destroy cgroup paths for cgroup %v : %w", cgroupConfig.Name, err)
 	}
 
 	return nil
@@ -374,7 +374,7 @@ func (m *cgroupCommon) Update(logger klog.Logger, cgroupConfig *CgroupConfig) er
 	libcontainerCgroupConfig := m.libctCgroupConfig(logger, cgroupConfig, true)
 	manager, err := libcontainercgroupmanager.New(libcontainerCgroupConfig)
 	if err != nil {
-		return fmt.Errorf("failed to create cgroup manager: %v", err)
+		return fmt.Errorf("failed to create cgroup manager: %w", err)
 	}
 	return manager.Set(libcontainerCgroupConfig.Resources)
 }
@@ -478,7 +478,7 @@ func (m *cgroupCommon) ReduceCPULimits(logger klog.Logger, cgroupName CgroupName
 func readCgroupMemoryConfig(cgroupPath string, memLimitFile string) (*ResourceConfig, error) {
 	memLimit, err := fscommon.GetCgroupParamUint(cgroupPath, memLimitFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read %s for cgroup %v: %v", memLimitFile, cgroupPath, err)
+		return nil, fmt.Errorf("failed to read %s for cgroup %v: %w", memLimitFile, cgroupPath, err)
 	}
 	mLim := int64(memLimit)
 	//TODO(vinaykul,InPlacePodVerticalScaling): Add memory request support

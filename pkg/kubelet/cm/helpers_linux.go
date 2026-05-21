@@ -314,7 +314,7 @@ func getCgroupProcs(dir string) ([]int, error) {
 		if t := s.Text(); t != "" {
 			pid, err := strconv.Atoi(t)
 			if err != nil {
-				return nil, fmt.Errorf("unexpected line in %v; could not convert to pid: %v", procsFile, err)
+				return nil, fmt.Errorf("unexpected line in %v; could not convert to pid: %w", procsFile, err)
 			}
 			out = append(out, pid)
 		}

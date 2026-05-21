@@ -84,13 +84,13 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 		logger := klog.FromContext(ctx)
 		if nodeIPSpecified {
 			if err := validateNodeIPFunc(nodeIP); err != nil {
-				return fmt.Errorf("failed to validate nodeIP: %v", err)
+				return fmt.Errorf("failed to validate nodeIP: %w", err)
 			}
 			logger.V(4).Info("Using node IP", "IP", nodeIP.String())
 		}
 		if secondaryNodeIPSpecified {
 			if err := validateNodeIPFunc(secondaryNodeIP); err != nil {
-				return fmt.Errorf("failed to validate secondaryNodeIP: %v", err)
+				return fmt.Errorf("failed to validate secondaryNodeIP: %w", err)
 			}
 			logger.V(4).Info("Using secondary node IP", "IP", secondaryNodeIP.String())
 		}
@@ -180,7 +180,7 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 
 			if ipAddr == nil {
 				// We tried everything we could, but the IP address wasn't fetchable; error out
-				return fmt.Errorf("can't get ip address of node %s. error: %v", node.Name, err)
+				return fmt.Errorf("can't get ip address of node %s. error: %w", node.Name, err)
 			}
 			node.Status.Addresses = []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: ipAddr.String()},
@@ -346,7 +346,7 @@ func VersionInfo(versionInfoFunc func() (*cadvisorapiv1.VersionInfo, error), // 
 	return func(ctx context.Context, node *v1.Node) error {
 		verinfo, err := versionInfoFunc()
 		if err != nil {
-			return fmt.Errorf("error getting version info: %v", err)
+			return fmt.Errorf("error getting version info: %w", err)
 		}
 
 		node.Status.NodeInfo.KernelVersion = verinfo.KernelVersion
@@ -391,7 +391,7 @@ func Images(nodeStatusMaxImages int32,
 		containerImages, err := imageListFunc()
 		if err != nil {
 			node.Status.Images = imagesOnNode
-			return fmt.Errorf("error getting image list: %v", err)
+			return fmt.Errorf("error getting image list: %w", err)
 		}
 		// we expect imageListFunc to return a sorted list, so we just need to truncate
 		if int(nodeStatusMaxImages) > -1 &&

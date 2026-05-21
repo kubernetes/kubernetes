@@ -130,12 +130,12 @@ func (m *qosContainerManagerImpl) Start(ctx context.Context, getNodeAllocatable 
 		// check if it exists
 		if !cm.Exists(containerName) {
 			if err := cm.Create(logger, containerConfig); err != nil {
-				return fmt.Errorf("failed to create top level %v QOS cgroup : %v", qosClass, err)
+				return fmt.Errorf("failed to create top level %v QOS cgroup : %w", qosClass, err)
 			}
 		} else {
 			// to ensure we actually have the right state, we update the config on startup
 			if err := cm.Update(logger, containerConfig); err != nil {
-				return fmt.Errorf("failed to update top level %v QOS cgroup : %v", qosClass, err)
+				return fmt.Errorf("failed to update top level %v QOS cgroup : %w", qosClass, err)
 			}
 		}
 	}

@@ -17,10 +17,11 @@ limitations under the License.
 package checkpointmanager
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
-	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
+	kubeleterrors "k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	utilstore "k8s.io/kubernetes/pkg/kubelet/util/store"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
@@ -79,8 +80,8 @@ func (manager *impl) GetCheckpoint(checkpointKey string, checkpoint Checkpoint) 
 	defer manager.mutex.Unlock()
 	blob, err := manager.store.Read(checkpointKey)
 	if err != nil {
-		if err == utilstore.ErrKeyNotFound {
-			return errors.ErrCheckpointNotFound
+		if errors.Is(err, utilstore.ErrKeyNotFound) {
+			return kubeleterrors.ErrCheckpointNotFound
 		}
 		return err
 	}
@@ -104,7 +105,7 @@ func (manager *impl) ListCheckpoints() ([]string, error) {
 	defer manager.mutex.Unlock()
 	keys, err := manager.store.List()
 	if err != nil {
-		return []string{}, fmt.Errorf("failed to list checkpoint store: %v", err)
+		return []string{}, fmt.Errorf("failed to list checkpoint store: %w", err)
 	}
 	return keys, nil
 }

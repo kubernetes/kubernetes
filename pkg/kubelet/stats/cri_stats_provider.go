@@ -144,12 +144,12 @@ func (p *criStatsProvider) listPodStats(ctx context.Context, updateCPUNanoCoreUs
 	// the available and capacity bytes/inodes in container stats.
 	rootFsInfo, err := p.cadvisor.RootFsInfo()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get rootFs info: %v", err)
+		return nil, fmt.Errorf("failed to get rootFs info: %w", err)
 	}
 
 	containerMap, podSandboxMap, err := p.getPodAndContainerMaps(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get pod or container map: %v", err)
+		return nil, fmt.Errorf("failed to get pod or container map: %w", err)
 	}
 
 	logger := klog.FromContext(ctx)
@@ -181,13 +181,13 @@ func (p *criStatsProvider) listPodStatsPartiallyFromCRI(ctx context.Context, upd
 
 	resp, err := p.runtimeService.ListContainerStats(ctx, &runtimeapi.ContainerStatsFilter{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to list all container stats: %v", err)
+		return nil, fmt.Errorf("failed to list all container stats: %w", err)
 	}
 
 	logger := klog.FromContext(ctx)
 	allInfos, err := getCadvisorContainerInfo(logger, p.cadvisor)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch cadvisor stats: %v", err)
+		return nil, fmt.Errorf("failed to fetch cadvisor stats: %w", err)
 	}
 	caInfos, allInfos := getCRICadvisorStats(logger, allInfos)
 
@@ -195,7 +195,7 @@ func (p *criStatsProvider) listPodStatsPartiallyFromCRI(ctx context.Context, upd
 	// This is only used on Windows. For other platforms, (nil, nil) should be returned.
 	containerNetworkStats, err := p.listContainerNetworkStats(logger)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list container network stats: %v", err)
+		return nil, fmt.Errorf("failed to list container network stats: %w", err)
 	}
 	for _, stats := range resp {
 		containerID := stats.Attributes.Id
@@ -382,7 +382,7 @@ func (p *criStatsProvider) ListPodCPUAndMemoryStats(ctx context.Context) ([]stat
 	sandboxIDToPodStats := make(map[string]*statsapi.PodStats)
 	containerMap, podSandboxMap, err := p.getPodAndContainerMaps(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get pod or container map: %v", err)
+		return nil, fmt.Errorf("failed to get pod or container map: %w", err)
 	}
 	logger := klog.FromContext(ctx)
 
@@ -421,12 +421,12 @@ func (p *criStatsProvider) ListPodCPUAndMemoryStats(ctx context.Context) ([]stat
 
 	resp, err := p.runtimeService.ListContainerStats(ctx, &runtimeapi.ContainerStatsFilter{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to list all container stats: %v", err)
+		return nil, fmt.Errorf("failed to list all container stats: %w", err)
 	}
 
 	allInfos, err := getCadvisorContainerInfo(logger, p.cadvisor)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch cadvisor stats: %v", err)
+		return nil, fmt.Errorf("failed to fetch cadvisor stats: %w", err)
 	}
 	caInfos, allInfos := getCRICadvisorStats(logger, allInfos)
 
@@ -478,14 +478,14 @@ func (p *criStatsProvider) ListPodCPUAndMemoryStats(ctx context.Context) ([]stat
 func (p *criStatsProvider) getPodAndContainerMaps(ctx context.Context) (map[string]*runtimeapi.Container, map[string]*runtimeapi.PodSandbox, error) {
 	containers, err := p.runtimeService.ListContainers(ctx, &runtimeapi.ContainerFilter{})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to list all containers: %v", err)
+		return nil, nil, fmt.Errorf("failed to list all containers: %w", err)
 	}
 
 	// Creates pod sandbox map between the pod sandbox ID and the PodSandbox object.
 	podSandboxMap := make(map[string]*runtimeapi.PodSandbox)
 	podSandboxes, err := p.runtimeService.ListPodSandbox(ctx, &runtimeapi.PodSandboxFilter{})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to list all pod sandboxes: %v", err)
+		return nil, nil, fmt.Errorf("failed to list all pod sandboxes: %w", err)
 	}
 	podSandboxes = removeTerminatedPods(podSandboxes)
 	for _, s := range podSandboxes {

@@ -160,7 +160,7 @@ func (s *sourceFile) listConfig(logger klog.Logger) error {
 func (s *sourceFile) extractFromDir(logger klog.Logger, name string) ([]*v1.Pod, error) {
 	dirents, err := filepath.Glob(filepath.Join(name, "[^.]*"))
 	if err != nil {
-		return nil, fmt.Errorf("glob failed: %v", err)
+		return nil, fmt.Errorf("glob failed: %w", err)
 	}
 
 	pods := make([]*v1.Pod, 0, len(dirents))
@@ -232,7 +232,7 @@ func (s *sourceFile) extractFromFile(logger klog.Logger, filename string) (pod *
 		return pod, nil
 	}
 
-	return pod, fmt.Errorf("%v: couldn't parse as pod(%v), please check config file", filename, podErr)
+	return pod, fmt.Errorf("%v: couldn't parse as pod(%w), please check config file", filename, podErr)
 }
 
 func (s *sourceFile) replaceStore(pods ...*v1.Pod) (err error) {

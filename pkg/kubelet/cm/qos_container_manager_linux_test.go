@@ -118,7 +118,7 @@ func activeTestPods() []*v1.Pod {
 func createTestQOSContainerManager(logger klog.Logger) (*qosContainerManagerImpl, error) {
 	subsystems, err := GetCgroupSubsystems()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
+		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %w", err)
 	}
 
 	cgroupRoot := ParseCgroupfsToCgroupName("/")

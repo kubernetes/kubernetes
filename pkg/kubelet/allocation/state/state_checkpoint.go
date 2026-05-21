@@ -17,6 +17,7 @@ limitations under the License.
 package state
 
 import (
+	goerrors "errors"
 	"fmt"
 	"path"
 	"sync"
@@ -70,7 +71,7 @@ func NewStateCheckpoint(stateDir, checkpointName string) (State, error) {
 func restoreState(logger klog.Logger, checkpointManager checkpointmanager.CheckpointManager, checkpointName string) (PodResourceInfoMap, checksum.Checksum, error) {
 	checkpoint := &Checkpoint{}
 	if err := checkpointManager.GetCheckpoint(checkpointName, checkpoint); err != nil {
-		if err == errors.ErrCheckpointNotFound {
+		if goerrors.Is(err, errors.ErrCheckpointNotFound) {
 			return nil, 0, nil
 		}
 		return nil, 0, err

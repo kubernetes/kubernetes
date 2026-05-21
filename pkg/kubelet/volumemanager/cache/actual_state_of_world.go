@@ -21,6 +21,7 @@ keep track of attached volumes and the pods that mounted them.
 package cache
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -235,14 +236,16 @@ func NewActualStateOfWorld(
 // IsVolumeNotAttachedError returns true if the specified error is a
 // volumeNotAttachedError.
 func IsVolumeNotAttachedError(err error) bool {
-	_, ok := err.(volumeNotAttachedError)
+	var volumeNotAttachedError volumeNotAttachedError
+	ok := errors.As(err, &volumeNotAttachedError)
 	return ok
 }
 
 // IsRemountRequiredError returns true if the specified error is a
 // remountRequiredError.
 func IsRemountRequiredError(err error) bool {
-	_, ok := err.(remountRequiredError)
+	var remountRequiredError remountRequiredError
+	ok := errors.As(err, &remountRequiredError)
 	return ok
 }
 
@@ -680,7 +683,7 @@ func (asw *actualStateOfWorld) addVolume(logger klog.Logger,
 	volumePlugin, err := asw.volumePluginMgr.FindPluginBySpec(volumeSpec)
 	if err != nil || volumePlugin == nil {
 		return fmt.Errorf(
-			"failed to get Plugin from volumeSpec for volume %q err=%v",
+			"failed to get Plugin from volumeSpec for volume %q err=%w",
 			volumeSpec.Name(),
 			err)
 	}
@@ -689,7 +692,7 @@ func (asw *actualStateOfWorld) addVolume(logger klog.Logger,
 		volumeName, err = util.GetUniqueVolumeNameFromSpec(volumePlugin, volumeSpec)
 		if err != nil {
 			return fmt.Errorf(
-				"failed to GetUniqueVolumeNameFromSpec for volumeSpec %q using volume plugin %q err=%v",
+				"failed to GetUniqueVolumeNameFromSpec for volumeSpec %q using volume plugin %q err=%w",
 				volumeSpec.Name(),
 				volumePlugin.GetPluginName(),
 				err)
@@ -1280,7 +1283,8 @@ func newFsResizeRequiredError(
 // IsFSResizeRequiredError returns true if the specified error is a
 // fsResizeRequiredError.
 func IsFSResizeRequiredError(err error) bool {
-	_, ok := err.(FsResizeRequiredError)
+	var fsResizeRequiredError FsResizeRequiredError
+	ok := errors.As(err, &fsResizeRequiredError)
 	return ok
 }
 
@@ -1329,6 +1333,7 @@ func newSELinuxMountMismatchError(volumeName v1.UniqueVolumeName) error {
 // IsSELinuxMountMismatchError returns true if the specified error is a
 // seLinuxMountMismatchError.
 func IsSELinuxMountMismatchError(err error) bool {
-	_, ok := err.(seLinuxMountMismatchError)
+	var seLinuxMountMismatchError seLinuxMountMismatchError
+	ok := errors.As(err, &seLinuxMountMismatchError)
 	return ok
 }

@@ -88,16 +88,16 @@ func (p *cadvisorStatsProvider) ListPodStats(ctx context.Context) ([]statsapi.Po
 	// container stats.
 	rootFsInfo, err := p.cadvisor.RootFsInfo()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get rootFs info: %v", err)
+		return nil, fmt.Errorf("failed to get rootFs info: %w", err)
 	}
 	imageFsInfo, err := p.cadvisor.ImagesFsInfo(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get imageFs info: %v", err)
+		return nil, fmt.Errorf("failed to get imageFs info: %w", err)
 	}
 	logger := klog.FromContext(ctx)
 	infos, err := getCadvisorContainerInfo(logger, p.cadvisor)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get container info from cadvisor: %v", err)
+		return nil, fmt.Errorf("failed to get container info from cadvisor: %w", err)
 	}
 	filteredInfos, allInfos := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(logger, infos)
 	// Map each container to a pod and update the PodStats with container data.
@@ -228,7 +228,7 @@ func (p *cadvisorStatsProvider) ListPodCPUAndMemoryStats(ctx context.Context) ([
 	logger := klog.FromContext(ctx)
 	infos, err := getCadvisorContainerInfo(logger, p.cadvisor)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get container info from cadvisor: %v", err)
+		return nil, fmt.Errorf("failed to get container info from cadvisor: %w", err)
 	}
 	filteredInfos, allInfos := filterTerminatedContainerInfoAndAssembleByPodCgroupKey(logger, infos)
 	// Map each container to a pod and update the PodStats with container data.
@@ -289,13 +289,13 @@ func (p *cadvisorStatsProvider) ListPodCPUAndMemoryStats(ctx context.Context) ([
 func (p *cadvisorStatsProvider) ImageFsStats(ctx context.Context) (imageFsRet *statsapi.FsStats, containerFsRet *statsapi.FsStats, errCall error) {
 	imageFsInfo, err := p.cadvisor.ImagesFsInfo(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get imageFs info: %v", err)
+		return nil, nil, fmt.Errorf("failed to get imageFs info: %w", err)
 	}
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.KubeletSeparateDiskGC) {
 		imageStats, err := p.imageService.ImageStats(ctx)
 		if err != nil || imageStats == nil {
-			return nil, nil, fmt.Errorf("failed to get image stats: %v", err)
+			return nil, nil, fmt.Errorf("failed to get image stats: %w", err)
 		}
 
 		var imageFsInodesUsed *uint64

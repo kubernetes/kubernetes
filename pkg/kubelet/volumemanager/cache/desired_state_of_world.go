@@ -272,7 +272,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 	volumePlugin, err := dsw.volumePluginMgr.FindPluginBySpec(volumeSpec)
 	if err != nil || volumePlugin == nil {
 		return "", fmt.Errorf(
-			"failed to get Plugin from volumeSpec for volume %q err=%v",
+			"failed to get Plugin from volumeSpec for volume %q err=%w",
 			volumeSpec.Name(),
 			err)
 	}
@@ -292,7 +292,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 			util.GetUniqueVolumeNameFromSpec(volumePlugin, volumeSpec)
 		if err != nil {
 			return "", fmt.Errorf(
-				"failed to GetUniqueVolumeNameFromSpec for volumeSpec %q using volume plugin %q err=%v",
+				"failed to GetUniqueVolumeNameFromSpec for volumeSpec %q using volume plugin %q err=%w",
 				volumeSpec.Name(),
 				volumePlugin.GetPluginName(),
 				err)

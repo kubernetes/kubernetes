@@ -19,6 +19,7 @@ limitations under the License.
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -57,7 +58,7 @@ func (s *sourceFile) startWatch(logger klog.Logger) {
 
 		if err := s.doWatch(logger); err != nil {
 			logger.Error(err, "Unable to read config path", "path", s.path)
-			if _, retryable := err.(*retryableError); !retryable {
+			if _, ok := errors.AsType[*retryableError](err); !ok {
 				backOff.Next(backOffID, time.Now())
 			}
 		}
@@ -77,23 +78,23 @@ func (s *sourceFile) doWatch(logger klog.Logger) error {
 
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
-		return fmt.Errorf("unable to create inotify: %v", err)
+		return fmt.Errorf("unable to create inotify: %w", err)
 	}
 	defer w.Close()
 
 	err = w.Add(s.path)
 	if err != nil {
-		return fmt.Errorf("unable to create inotify for path %q: %v", s.path, err)
+		return fmt.Errorf("unable to create inotify for path %q: %w", s.path, err)
 	}
 
 	for {
 		select {
 		case event := <-w.Events:
 			if err = s.produceWatchEvent(logger, &event); err != nil {
-				return fmt.Errorf("error while processing inotify event (%+v): %v", event, err)
+				return fmt.Errorf("error while processing inotify event (%+v): %w", event, err)
 			}
 		case err = <-w.Errors:
-			return fmt.Errorf("error while watching %q: %v", s.path, err)
+			return fmt.Errorf("error while watching %q: %w", s.path, err)
 		}
 	}
 }
@@ -130,7 +131,7 @@ func (s *sourceFile) consumeWatchEvent(logger klog.Logger, e *watchEvent) error 
 	case podAdd, podModify:
 		pod, err := s.extractFromFile(logger, e.fileName)
 		if err != nil {
-			return fmt.Errorf("can't process config file %q: %v", e.fileName, err)
+			return fmt.Errorf("can't process config file %q: %w", e.fileName, err)
 		}
 		return s.store.Add(pod)
 	case podDelete:
@@ -143,7 +144,7 @@ func (s *sourceFile) consumeWatchEvent(logger klog.Logger, e *watchEvent) error 
 				return fmt.Errorf("the pod with key %s doesn't exist in cache", objKey)
 			}
 			if err = s.store.Delete(pod); err != nil {
-				return fmt.Errorf("failed to remove deleted pod from cache: %v", err)
+				return fmt.Errorf("failed to remove deleted pod from cache: %w", err)
 			}
 			delete(s.fileKeyMapping, e.fileName)
 		}

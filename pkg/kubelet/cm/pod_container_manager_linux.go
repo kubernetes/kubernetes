@@ -101,7 +101,7 @@ func (m *podContainerManagerImpl) EnsureExists(logger klog.Logger, pod *v1.Pod) 
 			logger.V(4).Info("MemoryQoS config for pod", "pod", klog.KObj(pod), "unified", containerConfig.ResourceParameters.Unified)
 		}
 		if err := m.cgroupManager.Create(logger, containerConfig); err != nil {
-			return fmt.Errorf("failed to create container for %v : %v", podContainerName, err)
+			return fmt.Errorf("failed to create container for %v : %w", podContainerName, err)
 		}
 
 	}
@@ -209,7 +209,7 @@ func (m *podContainerManagerImpl) Destroy(logger klog.Logger, podCgroup CgroupNa
 	// Try killing all the processes attached to the pod cgroup
 	if err := m.tryKillingCgroupProcesses(logger, podCgroup); err != nil {
 		logger.Info("Failed to kill all the processes attached to cgroup", "cgroupName", podCgroup, "err", err)
-		return fmt.Errorf("failed to kill all the processes attached to the %v cgroups : %v", podCgroup, err)
+		return fmt.Errorf("failed to kill all the processes attached to the %v cgroups : %w", podCgroup, err)
 	}
 
 	// Now its safe to remove the pod's cgroup
@@ -219,7 +219,7 @@ func (m *podContainerManagerImpl) Destroy(logger klog.Logger, podCgroup CgroupNa
 	}
 	if err := m.cgroupManager.Destroy(logger, containerConfig); err != nil {
 		logger.Info("Failed to delete cgroup paths", "cgroupName", podCgroup, "err", err)
-		return fmt.Errorf("failed to delete cgroup paths for %v : %v", podCgroup, err)
+		return fmt.Errorf("failed to delete cgroup paths for %v : %w", podCgroup, err)
 	}
 	return nil
 }
@@ -277,7 +277,7 @@ func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupN
 				if os.IsNotExist(err) {
 					continue
 				}
-				return nil, fmt.Errorf("failed to read the cgroup directory %v : %v", qc, err)
+				return nil, fmt.Errorf("failed to read the cgroup directory %v : %w", qc, err)
 			}
 			for i := range dirInfo {
 				// its not a directory, so continue on...

@@ -82,7 +82,7 @@ func updateTransport(logger klog.Logger, stopCh <-chan struct{}, period time.Dur
 func addCertRotation(logger klog.Logger, stopCh <-chan struct{}, period time.Duration, clientConfig *restclient.Config, clientCertificateManager certificate.Manager, exitAfter time.Duration, d *connrotation.Dialer) error {
 	tlsConfig, err := restclient.TLSConfigFor(clientConfig)
 	if err != nil {
-		return fmt.Errorf("unable to configure TLS for the rest client: %v", err)
+		return fmt.Errorf("unable to configure TLS for the rest client: %w", err)
 	}
 	if tlsConfig == nil {
 		tlsConfig = &tls.Config{}

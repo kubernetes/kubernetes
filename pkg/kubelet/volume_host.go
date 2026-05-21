@@ -95,7 +95,7 @@ func NewInitializedVolumePluginMgr(
 
 	if err := kvh.volumePluginMgr.InitPlugins(plugins, prober, kvh); err != nil {
 		return nil, fmt.Errorf(
-			"could not initialize volume plugins for KubeletVolumePluginMgr: %v",
+			"could not initialize volume plugins for KubeletVolumePluginMgr: %w",
 			err)
 	}
 
@@ -234,7 +234,7 @@ func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 	// TODO: Pass proper context when VolumeHost interface methods support context parameters
 	node, err := kvh.kubelet.getNodeAnyWay(context.TODO())
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving node: %v", err)
+		return nil, fmt.Errorf("error retrieving node: %w", err)
 	}
 	return node.Status.Allocatable, nil
 }
@@ -281,7 +281,7 @@ func (kvh *kubeletVolumeHost) GetNodeLabels() (map[string]string, error) {
 	// TODO: Pass proper context when VolumeHost interface methods support context parameters
 	node, err := kvh.kubelet.GetNode(context.TODO())
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving node: %v", err)
+		return nil, fmt.Errorf("error retrieving node: %w", err)
 	}
 	return node.Labels, nil
 }
@@ -290,7 +290,7 @@ func (kvh *kubeletVolumeHost) GetAttachedVolumesFromNodeStatus() (map[v1.UniqueV
 	// TODO: Pass proper context when VolumeHost interface methods support context parameters
 	node, err := kvh.kubelet.GetNode(context.TODO())
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving node: %v", err)
+		return nil, fmt.Errorf("error retrieving node: %w", err)
 	}
 	attachedVolumes := node.Status.VolumesAttached
 	result := map[v1.UniqueVolumeName]string{}

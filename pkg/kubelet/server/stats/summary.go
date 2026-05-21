@@ -74,20 +74,20 @@ func (sp *summaryProviderImpl) Get(ctx context.Context, updateStats bool) (*stat
 	// the following errors occur.
 	node, err := sp.provider.GetNode(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get node info: %v", err)
+		return nil, fmt.Errorf("failed to get node info: %w", err)
 	}
 	nodeConfig := sp.provider.GetNodeConfig()
 	rootStats, networkStats, err := sp.provider.GetCgroupStats("/", updateStats)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get root cgroup stats: %v", err)
+		return nil, fmt.Errorf("failed to get root cgroup stats: %w", err)
 	}
 	rootFsStats, err := sp.provider.RootFsStats()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get rootFs stats: %v", err)
+		return nil, fmt.Errorf("failed to get rootFs stats: %w", err)
 	}
 	imageFsStats, containerFsStats, err := sp.provider.ImageFsStats(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get imageFs stats: %v", err)
+		return nil, fmt.Errorf("failed to get imageFs stats: %w", err)
 	}
 	var podStats []statsapi.PodStats
 	if updateStats {
@@ -96,12 +96,12 @@ func (sp *summaryProviderImpl) Get(ctx context.Context, updateStats bool) (*stat
 		podStats, err = sp.provider.ListPodStats(ctx)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("failed to list pod stats: %v", err)
+		return nil, fmt.Errorf("failed to list pod stats: %w", err)
 	}
 
 	rlimit, err := sp.provider.RlimitStats()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get rlimit stats: %v", err)
+		return nil, fmt.Errorf("failed to get rlimit stats: %w", err)
 	}
 
 	nodeStats := statsapi.NodeStats{
@@ -131,17 +131,17 @@ func (sp *summaryProviderImpl) GetCPUAndMemoryStats(ctx context.Context) (*stats
 	// the following errors occur.
 	node, err := sp.provider.GetNode(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get node info: %v", err)
+		return nil, fmt.Errorf("failed to get node info: %w", err)
 	}
 	nodeConfig := sp.provider.GetNodeConfig()
 	rootStats, err := sp.provider.GetCgroupCPUAndMemoryStats("/", false)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get root cgroup stats: %v", err)
+		return nil, fmt.Errorf("failed to get root cgroup stats: %w", err)
 	}
 
 	podStats, err := sp.provider.ListPodCPUAndMemoryStats(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list pod stats: %v", err)
+		return nil, fmt.Errorf("failed to list pod stats: %w", err)
 	}
 
 	nodeStats := statsapi.NodeStats{

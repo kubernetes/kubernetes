@@ -93,7 +93,7 @@ func (h hostStatsProvider) getPodEtcHostsStats(podUID types.UID, rootFsInfo *cad
 	metrics := volume.NewMetricsDu(podEtcHostsPath)
 	hostMetrics, err := metrics.GetMetrics()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get stats %v", err)
+		return nil, fmt.Errorf("failed to get stats %w", err)
 	}
 	result := rootFsInfoToFsStats(rootFsInfo)
 	usedBytes := uint64(hostMetrics.Used.Value())
@@ -138,7 +138,7 @@ func metricsByPathToFsStats(metricsByPath metricsProviderByPath, rootFsInfo *cad
 	for fpath, metrics := range metricsByPath {
 		hostMetrics, err := metrics.GetMetrics()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get fsstats for %q: %v", fpath, err)
+			return nil, fmt.Errorf("failed to get fsstats for %q: %w", fpath, err)
 		}
 		usedBytes := uint64(hostMetrics.Used.Value())
 		inodesUsed := uint64(hostMetrics.InodesUsed.Value())

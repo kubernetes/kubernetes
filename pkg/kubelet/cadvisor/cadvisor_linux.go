@@ -131,10 +131,10 @@ func New(logger klog.Logger, imageFsInfoProvider ImageFsInfoProvider, rootPath s
 	if _, err := os.Stat(rootPath); err != nil {
 		if os.IsNotExist(err) {
 			if err := os.MkdirAll(path.Clean(rootPath), 0750); err != nil {
-				return nil, fmt.Errorf("error creating root directory %q: %v", rootPath, err)
+				return nil, fmt.Errorf("error creating root directory %q: %w", rootPath, err)
 			}
 		} else {
-			return nil, fmt.Errorf("failed to Stat %q: %v", rootPath, err)
+			return nil, fmt.Errorf("failed to Stat %q: %w", rootPath, err)
 		}
 	}
 

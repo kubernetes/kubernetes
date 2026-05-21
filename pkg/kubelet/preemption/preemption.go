@@ -95,7 +95,7 @@ func (c *CriticalPodAdmissionHandler) evictPodsToFreeRequests(ctx context.Contex
 	logger := klog.FromContext(ctx)
 	podsToPreempt, err := getPodsToPreempt(admitPod, c.getPodsFunc(), insufficientResources)
 	if err != nil {
-		return fmt.Errorf("preemption: error finding a set of pods to preempt: %v", err)
+		return fmt.Errorf("preemption: error finding a set of pods to preempt: %w", err)
 	}
 	for _, pod := range podsToPreempt {
 		// record that we are evicting the pod

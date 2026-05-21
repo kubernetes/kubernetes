@@ -340,7 +340,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (rvolume *reconstructe
 			pod)
 		if newMapperErr != nil {
 			return nil, fmt.Errorf(
-				"reconstructVolume.NewBlockVolumeMapper failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
+				"reconstructVolume.NewBlockVolumeMapper failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %w",
 				uniqueVolumeName,
 				volumeSpec.Name(),
 				volume.podName,
@@ -352,7 +352,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (rvolume *reconstructe
 		volumeMounter, err = plugin.NewMounter(volumeSpec, pod)
 		if err != nil {
 			return nil, fmt.Errorf(
-				"reconstructVolume.NewMounter failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
+				"reconstructVolume.NewMounter failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %w",
 				uniqueVolumeName,
 				volumeSpec.Name(),
 				volume.podName,
@@ -362,7 +362,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (rvolume *reconstructe
 		if deviceMountablePlugin != nil {
 			deviceMounter, err = deviceMountablePlugin.NewDeviceMounter()
 			if err != nil {
-				return nil, fmt.Errorf("reconstructVolume.NewDeviceMounter failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v",
+				return nil, fmt.Errorf("reconstructVolume.NewDeviceMounter failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %w",
 					uniqueVolumeName,
 					volumeSpec.Name(),
 					volume.podName,

@@ -450,7 +450,7 @@ func (im *realImageGCManager) freeOldImages(ctx context.Context, images []evicti
 		remainingImages = append(remainingImages, image)
 	}
 	if len(deletionErrors) > 0 {
-		return remainingImages, fmt.Errorf("wanted to free images older than %v, encountered errors in image deletion: %v", im.policy.MaxAge, errors.NewAggregate(deletionErrors))
+		return remainingImages, fmt.Errorf("wanted to free images older than %v, encountered errors in image deletion: %w", im.policy.MaxAge, errors.NewAggregate(deletionErrors))
 	}
 	return remainingImages, nil
 }

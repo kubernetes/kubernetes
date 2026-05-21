@@ -81,7 +81,7 @@ func fakeMetricsProvidersToStats(metricsProviders []volume.MetricsProvider, root
 	for i, metricsProvider := range metricsProviders {
 		hostMetrics, err := metricsProvider.GetMetrics()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get stats for item %d: %v", i, err)
+			return nil, fmt.Errorf("failed to get stats for item %d: %w", i, err)
 		}
 		usedBytes := uint64(hostMetrics.Used.Value())
 		inodesUsed := uint64(hostMetrics.InodesUsed.Value())

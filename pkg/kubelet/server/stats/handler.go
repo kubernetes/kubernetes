@@ -19,6 +19,7 @@ package stats
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -173,8 +174,8 @@ func writeResponse(logger klog.Logger, response *restful.Response, stats interfa
 // handleError serializes an error object into an HTTP response.
 // request is provided for logging.
 func handleError(logger klog.Logger, response *restful.Response, request string, err error) {
-	switch err {
-	case kubecontainer.ErrContainerNotFound:
+	switch {
+	case errors.Is(err, kubecontainer.ErrContainerNotFound):
 		response.WriteError(http.StatusNotFound, err)
 	default:
 		msg := fmt.Sprintf("Internal Error: %v", err)

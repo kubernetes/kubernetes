@@ -166,7 +166,7 @@ func newManagerImpl(logger klog.Logger, socketPath string, topology []cadvisorap
 
 	server, err := plugin.NewServer(logger, socketPath, manager, manager)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create plugin server: %v", err)
+		return nil, fmt.Errorf("failed to create plugin server: %w", err)
 	}
 
 	manager.server = server
@@ -178,7 +178,7 @@ func newManagerImpl(logger klog.Logger, socketPath string, topology []cadvisorap
 	manager.sourcesReady = &sourcesReadyStub{}
 	checkpointManager, err := checkpointmanager.NewCheckpointManager(manager.checkpointdir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize checkpoint manager: %v", err)
+		return nil, fmt.Errorf("failed to initialize checkpoint manager: %w", err)
 	}
 	manager.checkpointManager = checkpointManager
 
@@ -231,7 +231,7 @@ func (m *ManagerImpl) PluginConnected(ctx context.Context, resourceName string, 
 	logger := klog.FromContext(ctx)
 	options, err := p.API().GetDevicePluginOptions(ctx, &pluginapi.Empty{})
 	if err != nil {
-		return fmt.Errorf("failed to get device plugin options: %v", err)
+		return fmt.Errorf("failed to get device plugin options: %w", err)
 	}
 
 	e := newEndpointImpl(p)
@@ -536,7 +536,7 @@ func (m *ManagerImpl) writeCheckpoint(logger klog.Logger) error {
 	m.mutex.Unlock()
 	err := m.checkpointManager.CreateCheckpoint(kubeletDeviceManagerCheckpoint, data)
 	if err != nil {
-		err2 := fmt.Errorf("failed to write checkpoint file %q: %v", kubeletDeviceManagerCheckpoint, err)
+		err2 := fmt.Errorf("failed to write checkpoint file %q: %w", kubeletDeviceManagerCheckpoint, err)
 		logger.Error(err, "Failed to write checkpoint file")
 		return err2
 	}
@@ -549,7 +549,7 @@ func (m *ManagerImpl) writeCheckpoint(logger klog.Logger) error {
 func (m *ManagerImpl) readCheckpoint(logger klog.Logger) error {
 	cp, err := m.getCheckpoint()
 	if err != nil {
-		if err == errors.ErrCheckpointNotFound {
+		if goerrors.Is(err, errors.ErrCheckpointNotFound) {
 			// no point in trying anything else
 			logger.Error(err, "Failed to read data from checkpoint", "checkpoint", kubeletDeviceManagerCheckpoint)
 			return nil
@@ -1048,7 +1048,7 @@ func (m *ManagerImpl) callPreStartContainerIfNeeded(ctx context.Context, podUID,
 	logger.V(4).Info("Issuing a PreStartContainer call for container", "containerName", contName, "podUID", podUID)
 	_, err := eI.e.preStartContainer(ctx, devs)
 	if err != nil {
-		return fmt.Errorf("device plugin PreStartContainer rpc failed with err: %v", err)
+		return fmt.Errorf("device plugin PreStartContainer rpc failed with err: %w", err)
 	}
 	// TODO: Add metrics support for init RPC
 	return nil
@@ -1073,7 +1073,7 @@ func (m *ManagerImpl) callGetPreferredAllocationIfAvailable(ctx context.Context,
 	resp, err := eI.e.getPreferredAllocation(ctx, available.UnsortedList(), mustInclude.UnsortedList(), size)
 	m.mutex.Lock()
 	if err != nil {
-		return nil, fmt.Errorf("device plugin GetPreferredAllocation rpc failed with err: %v", err)
+		return nil, fmt.Errorf("device plugin GetPreferredAllocation rpc failed with err: %w", err)
 	}
 	if resp != nil && len(resp.ContainerResponses) > 0 {
 		return sets.New[string](resp.ContainerResponses[0].DeviceIDs...), nil

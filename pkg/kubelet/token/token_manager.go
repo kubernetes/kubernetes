@@ -116,9 +116,9 @@ func (m *Manager) GetServiceAccountToken(namespace, name string, tr *authenticat
 	if err != nil {
 		switch {
 		case !ok:
-			return nil, fmt.Errorf("failed to fetch token: %v", err)
+			return nil, fmt.Errorf("failed to fetch token: %w", err)
 		case m.expired(ctr):
-			return nil, fmt.Errorf("token %s expired and refresh failed: %v", key, err)
+			return nil, fmt.Errorf("token %s expired and refresh failed: %w", key, err)
 		default:
 			logger := klog.FromContext(ctx)
 			logger.Error(err, "Couldn't update token", "cacheKey", key)

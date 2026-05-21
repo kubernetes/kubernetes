@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"errors"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/types"
@@ -63,7 +64,7 @@ func assertReasonInfo(t *testing.T, cache *ReasonCache, uid types.UID, result *k
 	}
 	reason := result.Error
 	message := result.Message
-	if actualReason.Err != reason || actualReason.Message != message {
+	if !errors.Is(reason, actualReason.Err) || actualReason.Message != message {
 		t.Errorf("expected %v %q, got %v %q", reason, message, actualReason.Err, actualReason.Message)
 	}
 }

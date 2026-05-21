@@ -196,7 +196,7 @@ func newProbe(handler v1.ProbeHandler) *v1.Probe {
 func newFakePod(httpServer bool) (*fakePod, error) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		return nil, fmt.Errorf("failed to bind: %v", err)
+		return nil, fmt.Errorf("failed to bind: %w", err)
 	}
 	f := &fakePod{ln: ln, http: httpServer}
 

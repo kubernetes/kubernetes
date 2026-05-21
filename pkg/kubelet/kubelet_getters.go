@@ -344,7 +344,7 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(logger klog.Logger, podUID types
 	podVolDir := kl.getPodVolumesDir(podUID)
 
 	if pathExists, pathErr := mount.PathExists(podVolDir); pathErr != nil {
-		return volumes, fmt.Errorf("error checking if path %q exists: %v", podVolDir, pathErr)
+		return volumes, fmt.Errorf("error checking if path %q exists: %w", podVolDir, pathErr)
 	} else if !pathExists {
 		logger.V(6).Info("Path does not exist", "path", podVolDir)
 		return volumes, nil
@@ -360,7 +360,7 @@ func (kl *Kubelet) getPodVolumePathListFromDisk(logger klog.Logger, podUID types
 		volumePluginPath := filepath.Join(podVolDir, volumePluginName)
 		volumeDirs, err := utilpath.ReadDirNoStat(volumePluginPath)
 		if err != nil {
-			return volumes, fmt.Errorf("could not read directory %s: %v", volumePluginPath, err)
+			return volumes, fmt.Errorf("could not read directory %s: %w", volumePluginPath, err)
 		}
 		unescapePluginName := utilstrings.UnescapeQualifiedName(volumePluginName)
 
@@ -397,7 +397,7 @@ func (kl *Kubelet) getMountedVolumePathListFromDisk(logger klog.Logger, podUID t
 	for _, volumePath := range volumePaths {
 		isNotMount, err := kl.mounter.IsLikelyNotMountPoint(volumePath)
 		if err != nil {
-			return mountedVolumes, fmt.Errorf("fail to check mount point %q: %v", volumePath, err)
+			return mountedVolumes, fmt.Errorf("fail to check mount point %q: %w", volumePath, err)
 		}
 		if !isNotMount {
 			mountedVolumes = append(mountedVolumes, volumePath)
@@ -413,7 +413,7 @@ func (kl *Kubelet) getPodVolumeSubpathListFromDisk(logger klog.Logger, podUID ty
 	podSubpathsDir := kl.getPodVolumeSubpathsDir(podUID)
 
 	if pathExists, pathErr := mount.PathExists(podSubpathsDir); pathErr != nil {
-		return nil, fmt.Errorf("error checking if path %q exists: %v", podSubpathsDir, pathErr)
+		return nil, fmt.Errorf("error checking if path %q exists: %w", podSubpathsDir, pathErr)
 	} else if !pathExists {
 		return volumes, nil
 	}
@@ -429,7 +429,7 @@ func (kl *Kubelet) getPodVolumeSubpathListFromDisk(logger klog.Logger, podUID ty
 		volumePluginPath := filepath.Join(podSubpathsDir, volumePluginName)
 		containerDirs, err := os.ReadDir(volumePluginPath)
 		if err != nil {
-			return volumes, fmt.Errorf("could not read directory %s: %v", volumePluginPath, err)
+			return volumes, fmt.Errorf("could not read directory %s: %w", volumePluginPath, err)
 		}
 		for _, containerDir := range containerDirs {
 			containerName := containerDir.Name()
@@ -438,7 +438,7 @@ func (kl *Kubelet) getPodVolumeSubpathListFromDisk(logger klog.Logger, podUID ty
 			// mount points that may not be responsive
 			subPaths, err := utilpath.ReadDirNoStat(containerPath)
 			if err != nil {
-				return volumes, fmt.Errorf("could not read directory %s: %v", containerPath, err)
+				return volumes, fmt.Errorf("could not read directory %s: %w", containerPath, err)
 			}
 			for _, subPathDir := range subPaths {
 				volumes = append(volumes, filepath.Join(containerPath, subPathDir))

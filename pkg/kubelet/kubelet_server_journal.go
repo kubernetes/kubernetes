@@ -336,7 +336,7 @@ func (n *nodeLogQuery) copyServiceLogs(ctx context.Context, w io.Writer, service
 	cmd.Env = append(os.Environ(), cmdEnv...)
 
 	if err := cmd.Run(); err != nil {
-		if _, ok := err.(*exec.ExitError); ok {
+		if _, ok := errors.AsType[*exec.ExitError](err); ok {
 			return
 		}
 		if previousBoot == 0 {

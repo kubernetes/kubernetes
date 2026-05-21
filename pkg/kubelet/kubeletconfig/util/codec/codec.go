@@ -96,7 +96,7 @@ func DecodeKubeletConfiguration(ctx context.Context, kubeletCodecs *serializer.C
 		if lenientErr != nil {
 			// Lenient decoding failed with the current version, return the
 			// original strict error.
-			return nil, fmt.Errorf("failed lenient decoding: %v", err)
+			return nil, fmt.Errorf("failed lenient decoding: %w", err)
 		}
 		// Continue with the v1beta1 object that was decoded leniently, but emit a warning.
 		logger.Info("Using lenient decoding as strict decoding failed", "err", err)

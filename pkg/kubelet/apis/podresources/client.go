@@ -47,7 +47,7 @@ func GetV1alpha1Client(socket string, connectionTimeout time.Duration, maxMsgSiz
 		grpc.WithContextDialer(dialer),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
 	if err != nil {
-		return nil, nil, fmt.Errorf("error dialing socket %s: %v", socket, err)
+		return nil, nil, fmt.Errorf("error dialing socket %s: %w", socket, err)
 	}
 	return v1alpha1.NewPodResourcesListerClient(conn), conn, nil
 }
@@ -66,7 +66,7 @@ func GetV1Client(socket string, connectionTimeout time.Duration, maxMsgSize int)
 		grpc.WithContextDialer(dialer),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
 	if err != nil {
-		return nil, nil, fmt.Errorf("error dialing socket %s: %v", socket, err)
+		return nil, nil, fmt.Errorf("error dialing socket %s: %w", socket, err)
 	}
 	return v1.NewPodResourcesListerClient(conn), conn, nil
 }

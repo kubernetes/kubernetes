@@ -359,7 +359,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(ctx context.Context,
 	logDir := BuildContainerLogsDirectory(m.podLogsDirectory, pod.Namespace, pod.Name, pod.UID, container.Name)
 	err = m.osInterface.MkdirAll(logDir, 0755)
 	if err != nil {
-		return nil, cleanupAction, fmt.Errorf("create container log directory for container %s failed: %v", container.Name, err)
+		return nil, cleanupAction, fmt.Errorf("create container log directory for container %s failed: %w", container.Name, err)
 	}
 	containerLogsPath := buildContainerLogsPath(container.Name, restartCount)
 	stopsignal := getContainerConfigStopSignal(container)
@@ -511,7 +511,7 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 		containerLogPath := filepath.Join(opts.PodContainerDir, cid)
 		fs, err := m.osInterface.Create(containerLogPath)
 		if err != nil {
-			utilruntime.HandleError(fmt.Errorf("error on creating termination-log file %q: %v", containerLogPath, err))
+			utilruntime.HandleError(fmt.Errorf("error on creating termination-log file %q: %w", containerLogPath, err))
 		} else {
 			fs.Close()
 
@@ -520,7 +520,7 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 			// ~umask". But we want to make sure the specified mode is used
 			// in the file no matter what the umask is.
 			if err := m.osInterface.Chmod(containerLogPath, 0666); err != nil {
-				utilruntime.HandleError(fmt.Errorf("unable to set termination-log file permissions %q: %v", containerLogPath, err))
+				utilruntime.HandleError(fmt.Errorf("unable to set termination-log file permissions %q: %w", containerLogPath, err))
 			}
 
 			// Volume Mounts fail on Windows if it is not of the form C:/
@@ -994,7 +994,7 @@ func (m *kubeGenericRuntimeManager) pruneInitContainersBeforeStart(ctx context.C
 			// prune all other init containers that match this container name
 			logger.V(4).Info("Removing init container", "containerName", status.Name, "containerID", status.ID.ID, "count", count)
 			if err := m.removeContainer(ctx, status.ID.ID, false); err != nil {
-				utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %v; Skipping pod %q", status.Name, err, format.Pod(pod)))
+				utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %w; Skipping pod %q", status.Name, err, format.Pod(pod)))
 				continue
 			}
 		}
@@ -1020,7 +1020,7 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(ctx context.Context, pod
 			// Purge all init containers that match this container name
 			logger.V(4).Info("Removing init container", "containerName", status.Name, "containerID", status.ID.ID, "count", count)
 			if err := m.removeContainer(ctx, status.ID.ID, false); err != nil {
-				utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %v; Skipping pod %q", status.Name, err, format.Pod(pod)))
+				utilruntime.HandleError(fmt.Errorf("failed to remove pod init container %q: %w; Skipping pod %q", status.Name, err, format.Pod(pod)))
 				continue
 			}
 		}
@@ -1406,7 +1406,7 @@ func (m *kubeGenericRuntimeManager) removeContainerLog(ctx context.Context, cont
 
 	resp, err := m.runtimeService.ContainerStatus(ctx, containerID, false)
 	if err != nil {
-		return fmt.Errorf("failed to get container status %q: %v", containerID, err)
+		return fmt.Errorf("failed to get container status %q: %w", containerID, err)
 	}
 	status := resp.GetStatus()
 	if status == nil {
@@ -1418,7 +1418,7 @@ func (m *kubeGenericRuntimeManager) removeContainerLog(ctx context.Context, cont
 	legacySymlink := legacyLogSymlink(containerID, labeledInfo.ContainerName, labeledInfo.PodName,
 		labeledInfo.PodNamespace)
 	if err := m.osInterface.Remove(legacySymlink); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to remove container %q log legacy symbolic link %q: %v",
+		return fmt.Errorf("failed to remove container %q log legacy symbolic link %q: %w",
 			containerID, legacySymlink, err)
 	}
 	return nil

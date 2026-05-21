@@ -1324,7 +1324,7 @@ func TestEvalCRIPullErr(t *testing.T) {
 		},
 		{
 			name:  "registry is unavailable with additional error message",
-			input: fmt.Errorf("%v: foo", crierrors.ErrRegistryUnavailable),
+			input: fmt.Errorf("%w: foo", crierrors.ErrRegistryUnavailable),
 			assert: func(msg string, err error) {
 				assert.ErrorIs(t, err, crierrors.ErrRegistryUnavailable)
 				assert.Equal(t, "image pull failed for test because the registry is unavailable: foo", msg)

@@ -503,7 +503,7 @@ func (kl *Kubelet) tryUpdateNodeStatus(ctx context.Context, tryNumber int) error
 		originalNode, err = kl.heartbeatClient.CoreV1().Nodes().Get(ctx, string(kl.nodeName), opts)
 	}
 	if err != nil {
-		return fmt.Errorf("error getting node %q: %v", kl.nodeName, err)
+		return fmt.Errorf("error getting node %q: %w", kl.nodeName, err)
 	}
 	if originalNode == nil {
 		return fmt.Errorf("nil %q node object", kl.nodeName)

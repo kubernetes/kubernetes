@@ -60,7 +60,7 @@ func LoadClientConfig(logger klog.Logger, kubeconfigPath, bootstrapPath, certDir
 	if len(bootstrapPath) == 0 {
 		clientConfig, err := loadRESTClientConfig(kubeconfigPath)
 		if err != nil {
-			return nil, nil, fmt.Errorf("unable to load kubeconfig: %v", err)
+			return nil, nil, fmt.Errorf("unable to load kubeconfig: %w", err)
 		}
 		logger.V(2).Info("No bootstrapping requested, will use kubeconfig")
 		return clientConfig, restclient.CopyConfig(clientConfig), nil
@@ -80,7 +80,7 @@ func LoadClientConfig(logger klog.Logger, kubeconfigPath, bootstrapPath, certDir
 	if ok {
 		clientConfig, err := loadRESTClientConfig(kubeconfigPath)
 		if err != nil {
-			return nil, nil, fmt.Errorf("unable to load kubeconfig: %v", err)
+			return nil, nil, fmt.Errorf("unable to load kubeconfig: %w", err)
 		}
 		logger.V(2).Info("Current kubeconfig file contents are still valid, no bootstrap necessary")
 		return clientConfig, restclient.CopyConfig(clientConfig), nil
@@ -88,7 +88,7 @@ func LoadClientConfig(logger klog.Logger, kubeconfigPath, bootstrapPath, certDir
 
 	bootstrapClientConfig, err := loadRESTClientConfig(bootstrapPath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to load bootstrap kubeconfig: %v", err)
+		return nil, nil, fmt.Errorf("unable to load bootstrap kubeconfig: %w", err)
 	}
 
 	clientConfig := restclient.AnonymousClientConfig(bootstrapClientConfig)
@@ -122,12 +122,12 @@ func LoadClientCert(ctx context.Context, kubeconfigPath, bootstrapPath, certDir 
 
 	bootstrapClientConfig, err := loadRESTClientConfig(bootstrapPath)
 	if err != nil {
-		return fmt.Errorf("unable to load bootstrap kubeconfig: %v", err)
+		return fmt.Errorf("unable to load bootstrap kubeconfig: %w", err)
 	}
 
 	bootstrapClient, err := clientset.NewForConfig(bootstrapClientConfig)
 	if err != nil {
-		return fmt.Errorf("unable to create certificates signing request client: %v", err)
+		return fmt.Errorf("unable to create certificates signing request client: %w", err)
 	}
 
 	store, err := certificate.NewFileStore("kubelet-client", certDir, certDir, "", "")
@@ -235,30 +235,30 @@ func isClientConfigStillValid(kubeconfigPath string) (bool, error) {
 		return false, nil
 	}
 	if err != nil {
-		return false, fmt.Errorf("error reading existing bootstrap kubeconfig %s: %v", kubeconfigPath, err)
+		return false, fmt.Errorf("error reading existing bootstrap kubeconfig %s: %w", kubeconfigPath, err)
 	}
 	bootstrapClientConfig, err := loadRESTClientConfig(kubeconfigPath)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to read existing bootstrap client config from %s: %v", kubeconfigPath, err))
+		utilruntime.HandleError(fmt.Errorf("unable to read existing bootstrap client config from %s: %w", kubeconfigPath, err))
 		return false, nil
 	}
 	transportConfig, err := bootstrapClientConfig.TransportConfig()
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to load transport configuration from existing bootstrap client config read from %s: %v", kubeconfigPath, err))
+		utilruntime.HandleError(fmt.Errorf("unable to load transport configuration from existing bootstrap client config read from %s: %w", kubeconfigPath, err))
 		return false, nil
 	}
 	// has side effect of populating transport config data fields
 	if _, err := transport.TLSConfigFor(transportConfig); err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to load TLS configuration from existing bootstrap client config read from %s: %v", kubeconfigPath, err))
+		utilruntime.HandleError(fmt.Errorf("unable to load TLS configuration from existing bootstrap client config read from %s: %w", kubeconfigPath, err))
 		return false, nil
 	}
 	certs, err := certutil.ParseCertsPEM(transportConfig.TLS.CertData)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("unable to load TLS certificates from existing bootstrap client config read from %s: %v", kubeconfigPath, err))
+		utilruntime.HandleError(fmt.Errorf("unable to load TLS certificates from existing bootstrap client config read from %s: %w", kubeconfigPath, err))
 		return false, nil
 	}
 	if len(certs) == 0 {
-		utilruntime.HandleError(fmt.Errorf("unable to read TLS certificates from existing bootstrap client config read from %s: %v", kubeconfigPath, err))
+		utilruntime.HandleError(fmt.Errorf("unable to read TLS certificates from existing bootstrap client config read from %s: %w", kubeconfigPath, err))
 		return false, nil
 	}
 	now := time.Now()
@@ -285,7 +285,7 @@ func waitForServer(ctx context.Context, cfg restclient.Config, deadline time.Dur
 	cfg.Timeout = 1 * time.Second
 	cli, err := restclient.UnversionedRESTClientFor(&cfg)
 	if err != nil {
-		return fmt.Errorf("couldn't create client: %v", err)
+		return fmt.Errorf("couldn't create client: %w", err)
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, deadline)
@@ -322,11 +322,11 @@ func requestNodeCertificate(ctx context.Context, client clientset.Interface, pri
 
 	privateKey, err := keyutil.ParsePrivateKeyPEM(privateKeyData)
 	if err != nil {
-		return nil, fmt.Errorf("invalid private key for certificate request: %v", err)
+		return nil, fmt.Errorf("invalid private key for certificate request: %w", err)
 	}
 	csrData, err := certutil.MakeCSR(privateKey, subject, nil, nil)
 	if err != nil {
-		return nil, fmt.Errorf("unable to generate certificate request: %v", err)
+		return nil, fmt.Errorf("unable to generate certificate request: %w", err)
 	}
 
 	usages := []certificatesv1.KeyUsage{

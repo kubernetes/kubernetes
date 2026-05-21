@@ -194,7 +194,7 @@ func (m *managerImpl) start(ctx context.Context) (chan struct{}, error) {
 	if periodRequested := m.podManager.periodRequested(); periodRequested > currentInhibitDelay {
 		err := m.dbusCon.OverrideInhibitDelay(periodRequested)
 		if err != nil {
-			return nil, fmt.Errorf("unable to override inhibit delay by shutdown manager: %v", err)
+			return nil, fmt.Errorf("unable to override inhibit delay by shutdown manager: %w", err)
 		}
 
 		err = m.dbusCon.ReloadLogindConf()
@@ -245,9 +245,9 @@ func (m *managerImpl) start(ctx context.Context) (chan struct{}, error) {
 	if err != nil {
 		releaseErr := m.dbusCon.ReleaseInhibitLock(m.inhibitLock)
 		if releaseErr != nil {
-			return nil, fmt.Errorf("failed releasing inhibitLock: %v and failed monitoring shutdown: %v", releaseErr, err)
+			return nil, fmt.Errorf("failed releasing inhibitLock: %w and failed monitoring shutdown: %w", releaseErr, err)
 		}
-		return nil, fmt.Errorf("failed to monitor shutdown: %v", err)
+		return nil, fmt.Errorf("failed to monitor shutdown: %w", err)
 	}
 
 	stop := make(chan struct{})

@@ -161,7 +161,7 @@ func validateSystemRequirements(logger klog.Logger, mountUtil mount.Interface) (
 	)
 	mountPoints, err := mountUtil.List()
 	if err != nil {
-		return f, fmt.Errorf("%s - %v", localErr, err)
+		return f, fmt.Errorf("%s - %w", localErr, err)
 	}
 
 	if cgroups.IsCgroup2UnifiedMode() {
@@ -211,7 +211,7 @@ func NewContainerManager(ctx context.Context, mountUtil mount.Interface, cadviso
 
 	subsystems, err := GetCgroupSubsystems()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
+		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %w", err)
 	}
 
 	isSwapOn, err := swap.IsSwapOn()
@@ -551,7 +551,7 @@ func (cm *containerManagerImpl) setupNode(ctx context.Context, activePods Active
 		}
 		err = cm.qosContainerManager.Start(ctx, cm.GetNodeAllocatableAbsolute, activePods)
 		if err != nil {
-			return fmt.Errorf("failed to initialize top level QOS containers: %v", err)
+			return fmt.Errorf("failed to initialize top level QOS containers: %w", err)
 		}
 	}
 
@@ -675,7 +675,7 @@ func (cm *containerManagerImpl) Start(ctx context.Context, node *v1.Node,
 	if localStorageCapacityIsolation {
 		rootfs, err := cm.cadvisorInterface.RootFsInfo()
 		if err != nil {
-			return fmt.Errorf("failed to get rootfs info: %v", err)
+			return fmt.Errorf("failed to get rootfs info: %w", err)
 		}
 		cm.Lock()
 		for rName, rCap := range cadvisor.EphemeralStorageCapacityFromFsInfo(rootfs) {
@@ -830,13 +830,13 @@ func ensureProcessInContainerWithOOMScore(logger klog.Logger, pid int, oomScoreA
 	if manager != nil {
 		cont, err := getContainer(logger, pid)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to find container of PID %d: %v", pid, err))
+			errs = append(errs, fmt.Errorf("failed to find container of PID %d: %w", pid, err))
 		}
 
 		name := ""
 		cgroups, err := manager.GetCgroups()
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to get cgroups for %d: %v", pid, err))
+			errs = append(errs, fmt.Errorf("failed to get cgroups for %d: %w", pid, err))
 		} else {
 			name = cgroups.Name
 		}
@@ -844,7 +844,7 @@ func ensureProcessInContainerWithOOMScore(logger klog.Logger, pid int, oomScoreA
 		if cont != name {
 			err = manager.Apply(pid)
 			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to move PID %d (in %q) to %q: %v", pid, cont, name, err))
+				errs = append(errs, fmt.Errorf("failed to move PID %d (in %q) to %q: %w", pid, cont, name, err))
 			}
 		}
 	}
@@ -854,7 +854,7 @@ func ensureProcessInContainerWithOOMScore(logger klog.Logger, pid int, oomScoreA
 	logger.V(5).Info("Attempting to apply oom_score_adj to process", "oomScoreAdj", oomScoreAdj, "pid", pid)
 	if err := oomAdjuster.ApplyOOMScoreAdj(pid, oomScoreAdj); err != nil {
 		logger.V(3).Info("Failed to apply oom_score_adj to process", "oomScoreAdj", oomScoreAdj, "pid", pid, "err", err)
-		errs = append(errs, fmt.Errorf("failed to apply oom score %d to PID %d: %v", oomScoreAdj, pid, err))
+		errs = append(errs, fmt.Errorf("failed to apply oom score %d to PID %d: %w", oomScoreAdj, pid, err))
 	}
 	return utilerrors.NewAggregate(errs)
 }
@@ -924,7 +924,7 @@ func ensureSystemCgroups(logger klog.Logger, rootCgroupPath string, manager cgro
 	for i := 0; i <= 10; i++ {
 		allPids, err := cmutil.GetPids(rootCgroupPath)
 		if err != nil {
-			finalErr = fmt.Errorf("failed to list PIDs for root: %v", err)
+			finalErr = fmt.Errorf("failed to list PIDs for root: %w", err)
 			continue
 		}
 
@@ -953,7 +953,7 @@ func ensureSystemCgroups(logger klog.Logger, rootCgroupPath string, manager cgro
 					name = cgroups.Name
 				}
 
-				finalErr = fmt.Errorf("failed to move PID %d into the system container %q: %v", pid, name, err)
+				finalErr = fmt.Errorf("failed to move PID %d into the system container %q: %w", pid, name, err)
 			}
 		}
 

@@ -46,7 +46,7 @@ func NewCheckpointState(logger klog.Logger, stateDir, checkpointName, policyName
 	logger = klog.LoggerWithName(logger, "Memory Manager state checkpoint")
 	checkpointManager, err := checkpointmanager.NewCheckpointManager(stateDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize checkpoint manager: %v", err)
+		return nil, fmt.Errorf("failed to initialize checkpoint manager: %w", err)
 	}
 	stateCheckpoint := &stateCheckpoint{
 		logger:            logger,
@@ -58,7 +58,7 @@ func NewCheckpointState(logger klog.Logger, stateDir, checkpointName, policyName
 
 	if err := stateCheckpoint.restoreState(); err != nil {
 		//nolint:staticcheck // ST1005 user-facing error message
-		return nil, fmt.Errorf("could not restore state from checkpoint: %v, please drain this node and delete the memory manager checkpoint file %q before restarting Kubelet",
+		return nil, fmt.Errorf("could not restore state from checkpoint: %w, please drain this node and delete the memory manager checkpoint file %q before restarting Kubelet",
 			err, filepath.Join(stateDir, checkpointName))
 	}
 

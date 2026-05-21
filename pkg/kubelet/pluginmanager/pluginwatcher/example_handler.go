@@ -90,7 +90,7 @@ func (p *exampleHandler) RegisterPlugin(ctx context.Context, pluginName, endpoin
 	// Verifies the grpcServer is ready to serve services.
 	_, conn, err := dial(ctx, endpoint, time.Second)
 	if err != nil {
-		return fmt.Errorf("failed dialing endpoint (%s): %v", endpoint, err)
+		return fmt.Errorf("failed dialing endpoint (%s): %w", endpoint, err)
 	}
 	defer conn.Close()
 
@@ -101,13 +101,13 @@ func (p *exampleHandler) RegisterPlugin(ctx context.Context, pluginName, endpoin
 	// Tests v1beta1 GetExampleInfo
 	_, err = v1beta1Client.GetExampleInfo(ctx, &v1beta1.ExampleRequest{})
 	if err != nil {
-		return fmt.Errorf("failed GetExampleInfo for v1beta2Client(%s): %v", endpoint, err)
+		return fmt.Errorf("failed GetExampleInfo for v1beta2Client(%s): %w", endpoint, err)
 	}
 
 	// Tests v1beta1 GetExampleInfo
 	_, err = v1beta2Client.GetExampleInfo(ctx, &v1beta2.ExampleRequest{})
 	if err != nil {
-		return fmt.Errorf("failed GetExampleInfo for v1beta2Client(%s): %v", endpoint, err)
+		return fmt.Errorf("failed GetExampleInfo for v1beta2Client(%s): %w", endpoint, err)
 	}
 
 	return nil
@@ -149,7 +149,7 @@ func dial(ctx context.Context, unixSocketPath string, timeout time.Duration) (re
 	)
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to dial socket %s, err: %v", unixSocketPath, err)
+		return nil, nil, fmt.Errorf("failed to dial socket %s, err: %w", unixSocketPath, err)
 	}
 
 	return registerapi.NewRegistrationClient(c), c, nil

@@ -120,7 +120,7 @@ func (p *Provider) GetCgroupStats(cgroupName string, updateStats bool) (*statsap
 		if errors.Is(err, cadvisormemory.ErrDataNotFound) {
 			return nil, nil, fmt.Errorf("cgroup stats not found for %q: %w", cgroupName, cadvisormemory.ErrDataNotFound)
 		}
-		return nil, nil, fmt.Errorf("failed to get cgroup stats for %q: %v", cgroupName, err)
+		return nil, nil, fmt.Errorf("failed to get cgroup stats for %q: %w", cgroupName, err)
 	}
 	// Use klog.TODO() because we currently do not have a proper logger to pass in.
 	// Replace this with an appropriate logger when refactoring this function to accept a context parameter.
@@ -139,7 +139,7 @@ func (p *Provider) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats boo
 		if errors.Is(err, cadvisormemory.ErrDataNotFound) {
 			return nil, fmt.Errorf("cgroup stats not found for %q: %w", cgroupName, cadvisormemory.ErrDataNotFound)
 		}
-		return nil, fmt.Errorf("failed to get cgroup stats for %q: %v", cgroupName, err)
+		return nil, fmt.Errorf("failed to get cgroup stats for %q: %w", cgroupName, err)
 	}
 	// Rootfs and imagefs doesn't make sense for raw cgroup.
 	s := cadvisorInfoToContainerCPUAndMemoryStats(cgroupName, info)
@@ -150,7 +150,7 @@ func (p *Provider) GetCgroupCPUAndMemoryStats(cgroupName string, updateStats boo
 func (p *Provider) RootFsStats() (*statsapi.FsStats, error) {
 	rootFsInfo, err := p.cadvisor.RootFsInfo()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get rootFs info: %v", err)
+		return nil, fmt.Errorf("failed to get rootFs info: %w", err)
 	}
 
 	var nodeFsInodesUsed *uint64
@@ -163,7 +163,7 @@ func (p *Provider) RootFsStats() (*statsapi.FsStats, error) {
 	// imageFs stats timestamp.  Don't force a stats update, as we only want the timestamp.
 	rootStats, err := getCgroupStats(p.cadvisor, "/", false)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get root container stats: %v", err)
+		return nil, fmt.Errorf("failed to get root container stats: %w", err)
 	}
 
 	return &statsapi.FsStats{

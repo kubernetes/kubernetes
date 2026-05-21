@@ -18,6 +18,7 @@ package reconciler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -185,7 +186,8 @@ func (rc *reconciler) mountOrAttachVolumes(logger klog.Logger) {
 		} else if !volMounted || cache.IsRemountRequiredError(err) {
 			rc.mountAttachedVolumes(logger, volumeToMount, err)
 		} else if cache.IsFSResizeRequiredError(err) {
-			fsResizeRequiredErr, _ := err.(cache.FsResizeRequiredError)
+			var fsResizeRequiredErr cache.FsResizeRequiredError
+			errors.As(err, &fsResizeRequiredErr)
 			rc.expandVolume(logger, volumeToMount, fsResizeRequiredErr.CurrentSize)
 		}
 	}
