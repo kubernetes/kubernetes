@@ -4268,7 +4268,7 @@ func (x *ImageSpec) GetImageRef() string {
 type KeyValue struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
-	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	Value         []byte                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4310,11 +4310,11 @@ func (x *KeyValue) GetKey() string {
 	return ""
 }
 
-func (x *KeyValue) GetValue() string {
+func (x *KeyValue) GetValue() []byte {
 	if x != nil {
 		return x.Value
 	}
-	return ""
+	return nil
 }
 
 // LinuxContainerResources specifies Linux specific configuration for
@@ -11823,7 +11823,7 @@ const file_staging_src_k8s_io_cri_api_pkg_apis_runtime_v1_api_proto_rawDesc = ""
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"2\n" +
 	"\bKeyValue\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value\"\x95\x04\n" +
+	"\x05value\x18\x02 \x01(\fR\x05value\"\x95\x04\n" +
 	"\x17LinuxContainerResources\x12\x1d\n" +
 	"\n" +
 	"cpu_period\x18\x01 \x01(\x03R\tcpuPeriod\x12\x1b\n" +
