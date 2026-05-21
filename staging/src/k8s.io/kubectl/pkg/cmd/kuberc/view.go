@@ -26,11 +26,11 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+
 	"k8s.io/kubectl/pkg/config/v1beta1"
 	"k8s.io/kubectl/pkg/kuberc"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
-	"sigs.k8s.io/yaml"
 )
 
 var (
@@ -112,7 +112,7 @@ func (o *ViewOptions) Validate() error {
 
 // Run executes the view command
 func (o *ViewOptions) Run() error {
-	data, err := os.ReadFile(o.KubeRCFile)
+	pref, err := kuberc.LoadPreference(o.KubeRCFile)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return fmt.Errorf("error reading kuberc file: %w", err)
@@ -132,11 +132,6 @@ func (o *ViewOptions) Run() error {
 			pref := kuberc.CreateDefaultPreference()
 			return kuberc.SavePreference(pref, o.KubeRCFile, o.Out)
 		}
-	}
-
-	var pref *v1beta1.Preference
-	if err := yaml.Unmarshal(data, &pref); err != nil {
-		return fmt.Errorf("error parsing kuberc file: %w", err)
 	}
 
 	if pref.Aliases == nil {
