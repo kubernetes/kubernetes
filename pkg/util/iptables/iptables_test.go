@@ -249,12 +249,13 @@ func testEnsureChain(t *testing.T, protocol Protocol) {
 	if exists {
 		t.Errorf("%s new chain: Expected exists = false", protocol)
 	}
-	if fcmd.CombinedOutputCalls != 2 {
-		t.Errorf("%s new chain: Expected 2 CombinedOutput() calls, got %d", protocol, fcmd.CombinedOutputCalls)
+	numCalls := len(fcmd.CombinedOutputScript) - 2 // we haven't used all of fcmd.CombinedOutputScript yet
+	if fcmd.CombinedOutputCalls != numCalls {
+		t.Errorf("%s new chain: Expected %d CombinedOutput() calls, got %d", protocol, numCalls, fcmd.CombinedOutputCalls)
 	}
 	cmd := iptablesCommand(protocol)
-	if !sets.New(fcmd.CombinedOutputLog[1]...).HasAll(cmd, "-t", "nat", "-N", "FOOBAR") {
-		t.Errorf("%s new chain: Expected cmd containing '%s -t nat -N FOOBAR', got %s", protocol, cmd, fcmd.CombinedOutputLog[2])
+	if !sets.New(fcmd.CombinedOutputLog[numCalls-1]...).HasAll(cmd, "-t", "nat", "-N", "FOOBAR") {
+		t.Errorf("%s new chain: Expected cmd containing '%s -t nat -N FOOBAR', got %s", protocol, cmd, fcmd.CombinedOutputLog[numCalls-1])
 	}
 	// Exists.
 	exists, err = runner.EnsureChain(TableNAT, Chain("FOOBAR"))
@@ -303,11 +304,12 @@ func TestFlushChain(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
-	if fcmd.CombinedOutputCalls != 2 {
-		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	numCalls := len(fcmd.CombinedOutputScript) - 1 // we haven't used all of fcmd.CombinedOutputScript yet
+	if fcmd.CombinedOutputCalls != numCalls {
+		t.Errorf("expected %d CombinedOutput() calls, got %d", numCalls, fcmd.CombinedOutputCalls)
 	}
-	if !sets.New(fcmd.CombinedOutputLog[1]...).HasAll("iptables", "-t", "nat", "-F", "FOOBAR") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
+	if !sets.New(fcmd.CombinedOutputLog[numCalls-1]...).HasAll("iptables", "-t", "nat", "-F", "FOOBAR") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[numCalls-1])
 	}
 	// Failure.
 	err = runner.FlushChain(TableNAT, Chain("FOOBAR"))
@@ -340,11 +342,12 @@ func TestDeleteChain(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
-	if fcmd.CombinedOutputCalls != 2 {
-		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	numCalls := len(fcmd.CombinedOutputScript) - 1 // we haven't used all of fcmd.CombinedOutputScript yet
+	if fcmd.CombinedOutputCalls != numCalls {
+		t.Errorf("expected %d CombinedOutput() calls, got %d", numCalls, fcmd.CombinedOutputCalls)
 	}
-	if !sets.New(fcmd.CombinedOutputLog[1]...).HasAll("iptables", "-t", "nat", "-X", "FOOBAR") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
+	if !sets.New(fcmd.CombinedOutputLog[numCalls-1]...).HasAll("iptables", "-t", "nat", "-X", "FOOBAR") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[numCalls-1])
 	}
 	// Failure.
 	err = runner.DeleteChain(TableNAT, Chain("FOOBAR"))
@@ -376,11 +379,12 @@ func TestEnsureRuleAlreadyExists(t *testing.T) {
 	if !exists {
 		t.Errorf("expected exists = true")
 	}
-	if fcmd.CombinedOutputCalls != 2 {
-		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	numCalls := len(fcmd.CombinedOutputScript)
+	if fcmd.CombinedOutputCalls != numCalls {
+		t.Errorf("expected %d CombinedOutput() calls, got %d", numCalls, fcmd.CombinedOutputCalls)
 	}
-	if !sets.New(fcmd.CombinedOutputLog[1]...).HasAll("iptables", "-t", "nat", "-C", "OUTPUT", "abc", "123") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
+	if !sets.New(fcmd.CombinedOutputLog[numCalls-1]...).HasAll("iptables", "-t", "nat", "-C", "OUTPUT", "abc", "123") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[numCalls-1])
 	}
 }
 
@@ -410,11 +414,12 @@ func TestEnsureRuleNew(t *testing.T) {
 	if exists {
 		t.Errorf("expected exists = false")
 	}
-	if fcmd.CombinedOutputCalls != 3 {
-		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	numCalls := len(fcmd.CombinedOutputScript)
+	if fcmd.CombinedOutputCalls != numCalls {
+		t.Errorf("expected %d CombinedOutput() calls, got %d", numCalls, fcmd.CombinedOutputCalls)
 	}
-	if !sets.New(fcmd.CombinedOutputLog[2]...).HasAll("iptables", "-t", "nat", "-A", "OUTPUT", "abc", "123") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[3])
+	if !sets.New(fcmd.CombinedOutputLog[numCalls-1]...).HasAll("iptables", "-t", "nat", "-A", "OUTPUT", "abc", "123") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[numCalls-1])
 	}
 }
 
@@ -438,8 +443,9 @@ func TestEnsureRuleErrorChecking(t *testing.T) {
 	if err == nil {
 		t.Errorf("expected failure")
 	}
-	if fcmd.CombinedOutputCalls != 2 {
-		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	numCalls := len(fcmd.CombinedOutputScript)
+	if fcmd.CombinedOutputCalls != numCalls {
+		t.Errorf("expected %d CombinedOutput() calls, got %d", numCalls, fcmd.CombinedOutputCalls)
 	}
 }
 
@@ -466,8 +472,9 @@ func TestEnsureRuleErrorCreating(t *testing.T) {
 	if err == nil {
 		t.Errorf("expected failure")
 	}
-	if fcmd.CombinedOutputCalls != 3 {
-		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	numCalls := len(fcmd.CombinedOutputScript)
+	if fcmd.CombinedOutputCalls != numCalls {
+		t.Errorf("expected %d CombinedOutput() calls, got %d", numCalls, fcmd.CombinedOutputCalls)
 	}
 }
 
@@ -491,11 +498,12 @@ func TestDeleteRuleDoesNotExist(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
-	if fcmd.CombinedOutputCalls != 2 {
-		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	numCalls := len(fcmd.CombinedOutputScript)
+	if fcmd.CombinedOutputCalls != numCalls {
+		t.Errorf("expected %d CombinedOutput() calls, got %d", numCalls, fcmd.CombinedOutputCalls)
 	}
-	if !sets.New(fcmd.CombinedOutputLog[1]...).HasAll("iptables", "-t", "nat", "-C", "OUTPUT", "abc", "123") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
+	if !sets.New(fcmd.CombinedOutputLog[numCalls-1]...).HasAll("iptables", "-t", "nat", "-C", "OUTPUT", "abc", "123") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[numCalls-1])
 	}
 }
 
@@ -522,11 +530,12 @@ func TestDeleteRuleExists(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected success, got %v", err)
 	}
-	if fcmd.CombinedOutputCalls != 3 {
-		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	numCalls := len(fcmd.CombinedOutputScript)
+	if fcmd.CombinedOutputCalls != numCalls {
+		t.Errorf("expected %d CombinedOutput() calls, got %d", numCalls, fcmd.CombinedOutputCalls)
 	}
-	if !sets.New(fcmd.CombinedOutputLog[2]...).HasAll("iptables", "-t", "nat", "-D", "OUTPUT", "abc", "123") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[3])
+	if !sets.New(fcmd.CombinedOutputLog[numCalls-1]...).HasAll("iptables", "-t", "nat", "-D", "OUTPUT", "abc", "123") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[numCalls-1])
 	}
 }
 
@@ -550,8 +559,9 @@ func TestDeleteRuleErrorChecking(t *testing.T) {
 	if err == nil {
 		t.Errorf("expected failure")
 	}
-	if fcmd.CombinedOutputCalls != 2 {
-		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	numCalls := len(fcmd.CombinedOutputScript)
+	if fcmd.CombinedOutputCalls != numCalls {
+		t.Errorf("expected %d CombinedOutput() calls, got %d", numCalls, fcmd.CombinedOutputCalls)
 	}
 }
 
@@ -578,8 +588,9 @@ func TestDeleteRuleErrorDeleting(t *testing.T) {
 	if err == nil {
 		t.Errorf("expected failure")
 	}
-	if fcmd.CombinedOutputCalls != 3 {
-		t.Errorf("expected 3 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	numCalls := len(fcmd.CombinedOutputScript)
+	if fcmd.CombinedOutputCalls != numCalls {
+		t.Errorf("expected %d CombinedOutput() calls, got %d", numCalls, fcmd.CombinedOutputCalls)
 	}
 }
 
@@ -657,14 +668,16 @@ COMMIT
 		t.Errorf("%s: Expected output '%s', got '%v'", protocol, output, buffer.String())
 	}
 
-	if fcmd.CombinedOutputCalls != 1 {
-		t.Errorf("%s: Expected 1 CombinedOutput() calls, got %d", protocol, fcmd.CombinedOutputCalls)
+	numCombinedOutputCalls := 1
+	if fcmd.CombinedOutputCalls != numCombinedOutputCalls {
+		t.Errorf("%s: Expected %d CombinedOutput() calls, got %d", protocol, numCombinedOutputCalls, fcmd.CombinedOutputCalls)
 	}
-	if fcmd.RunCalls != 1 {
-		t.Errorf("%s: Expected 1 Run() call, got %d", protocol, fcmd.RunCalls)
+	numRunCalls := 1
+	if fcmd.RunCalls != numRunCalls {
+		t.Errorf("%s: Expected %d Run() calls, got %d", protocol, numRunCalls, fcmd.RunCalls)
 	}
-	if !sets.New(fcmd.RunLog[0]...).HasAll(iptablesSaveCmd, "-t", "nat") {
-		t.Errorf("%s: Expected cmd containing '%s -t nat', got '%s'", protocol, iptablesSaveCmd, fcmd.RunLog[0])
+	if !sets.New(fcmd.RunLog[numRunCalls-1]...).HasAll(iptablesSaveCmd, "-t", "nat") {
+		t.Errorf("%s: Expected cmd containing '%s -t nat', got '%s'", protocol, iptablesSaveCmd, fcmd.RunLog[numRunCalls-1])
 	}
 
 	// Failure.
@@ -713,6 +726,7 @@ func testRestore(t *testing.T, protocol Protocol) {
 		},
 	}
 	runner := newInternal(fexec, protocol)
+	numCalls := 1
 
 	// both flags true
 	err := runner.Restore(TableNAT, []byte{}, FlushTables, RestoreCounters)
@@ -720,9 +734,10 @@ func testRestore(t *testing.T, protocol Protocol) {
 		t.Errorf("%s flush,restore: Expected success, got %v", protocol, err)
 	}
 
-	commandSet := sets.New(fcmd.CombinedOutputLog[1]...)
+	numCalls++
+	commandSet := sets.New(fcmd.CombinedOutputLog[numCalls-1]...)
 	if !commandSet.HasAll(iptablesRestoreCmd, "-T", string(TableNAT), "--counters") || commandSet.HasAny("--noflush") {
-		t.Errorf("%s flush, restore: Expected cmd containing '%s -T %s --counters', got '%s'", protocol, iptablesRestoreCmd, string(TableNAT), fcmd.CombinedOutputLog[1])
+		t.Errorf("%s flush, restore: Expected cmd containing '%s -T %s --counters', got '%s'", protocol, iptablesRestoreCmd, string(TableNAT), fcmd.CombinedOutputLog[numCalls-1])
 	}
 
 	// FlushTables, NoRestoreCounters
@@ -730,10 +745,11 @@ func testRestore(t *testing.T, protocol Protocol) {
 	if err != nil {
 		t.Errorf("%s flush, no restore: Expected success, got %v", protocol, err)
 	}
+	numCalls++
 
-	commandSet = sets.New(fcmd.CombinedOutputLog[2]...)
+	commandSet = sets.New(fcmd.CombinedOutputLog[numCalls-1]...)
 	if !commandSet.HasAll(iptablesRestoreCmd, "-T", string(TableNAT)) || commandSet.HasAny("--noflush", "--counters") {
-		t.Errorf("%s flush, no restore: Expected cmd containing '--noflush' or '--counters', got '%s'", protocol, fcmd.CombinedOutputLog[2])
+		t.Errorf("%s flush, no restore: Expected cmd containing '--noflush' or '--counters', got '%s'", protocol, fcmd.CombinedOutputLog[numCalls-1])
 	}
 
 	// NoFlushTables, RestoreCounters
@@ -741,10 +757,11 @@ func testRestore(t *testing.T, protocol Protocol) {
 	if err != nil {
 		t.Errorf("%s no flush, restore: Expected success, got %v", protocol, err)
 	}
+	numCalls++
 
-	commandSet = sets.New(fcmd.CombinedOutputLog[3]...)
+	commandSet = sets.New(fcmd.CombinedOutputLog[numCalls-1]...)
 	if !commandSet.HasAll(iptablesRestoreCmd, "-T", string(TableNAT), "--noflush", "--counters") {
-		t.Errorf("%s no flush, restore: Expected cmd containing '--noflush' and '--counters', got '%s'", protocol, fcmd.CombinedOutputLog[3])
+		t.Errorf("%s no flush, restore: Expected cmd containing '--noflush' and '--counters', got '%s'", protocol, fcmd.CombinedOutputLog[numCalls-1])
 	}
 
 	// NoFlushTables, NoRestoreCounters
@@ -752,14 +769,15 @@ func testRestore(t *testing.T, protocol Protocol) {
 	if err != nil {
 		t.Errorf("%s no flush, no restore: Expected success, got %v", protocol, err)
 	}
+	numCalls++
 
-	commandSet = sets.New(fcmd.CombinedOutputLog[4]...)
+	commandSet = sets.New(fcmd.CombinedOutputLog[numCalls-1]...)
 	if !commandSet.HasAll(iptablesRestoreCmd, "-T", string(TableNAT), "--noflush") || commandSet.HasAny("--counters") {
-		t.Errorf("%s no flush, no restore: Expected cmd containing '%s -T %s --noflush', got '%s'", protocol, iptablesRestoreCmd, string(TableNAT), fcmd.CombinedOutputLog[4])
+		t.Errorf("%s no flush, no restore: Expected cmd containing '%s -T %s --noflush', got '%s'", protocol, iptablesRestoreCmd, string(TableNAT), fcmd.CombinedOutputLog[numCalls-1])
 	}
 
-	if fcmd.CombinedOutputCalls != 5 {
-		t.Errorf("%s: Expected 5 total CombinedOutput() calls, got %d", protocol, fcmd.CombinedOutputCalls)
+	if fcmd.CombinedOutputCalls != numCalls {
+		t.Errorf("%s: Expected %d total CombinedOutput() calls, got %d", protocol, numCalls, fcmd.CombinedOutputCalls)
 	}
 
 	// Failure.
@@ -801,13 +819,14 @@ func TestRestoreAll(t *testing.T) {
 		t.Fatalf("expected success, got %v", err)
 	}
 
-	commandSet := sets.New(fcmd.CombinedOutputLog[1]...)
-	if !commandSet.HasAll("iptables-restore", "--counters", "--noflush") {
-		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[2])
+	numCalls := len(fcmd.CombinedOutputScript) - 1
+	if fcmd.CombinedOutputCalls != numCalls {
+		t.Errorf("expected %d CombinedOutput() calls, got %d", numCalls, fcmd.CombinedOutputCalls)
 	}
 
-	if fcmd.CombinedOutputCalls != 2 {
-		t.Errorf("expected 2 CombinedOutput() calls, got %d", fcmd.CombinedOutputCalls)
+	commandSet := sets.New(fcmd.CombinedOutputLog[numCalls-1]...)
+	if !commandSet.HasAll("iptables-restore", "--counters", "--noflush") {
+		t.Errorf("wrong CombinedOutput() log, got %s", fcmd.CombinedOutputLog[numCalls-1])
 	}
 
 	// Failure.
