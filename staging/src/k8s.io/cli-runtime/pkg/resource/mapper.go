@@ -73,11 +73,16 @@ func (m *mapper) infoForData(data []byte, source string) (*Info, error) {
 		}
 		ret.Mapping = mapping
 
-		client, err := m.clientFn(gvk.GroupVersion())
+		client, err := m.clientFn(mapping.GroupVersionKind.GroupVersion())
 		if err != nil {
 			return nil, fmt.Errorf("unable to connect to a server to handle %q: %v", mapping.Resource, err)
 		}
 		ret.Client = client
+
+		// Clear already retrieved object only when explicitly specified object version is different
+		if len(gvk.Version) > 0 && mapping.GroupVersionKind != *gvk {
+			ret.Object = nil
+		}
 	}
 
 	return ret, nil
@@ -119,11 +124,16 @@ func (m *mapper) infoForObject(obj runtime.Object, typer runtime.ObjectTyper, pr
 		}
 		ret.Mapping = mapping
 
-		client, err := m.clientFn(gvk.GroupVersion())
+		client, err := m.clientFn(mapping.GroupVersionKind.GroupVersion())
 		if err != nil {
 			return nil, fmt.Errorf("unable to connect to a server to handle %q: %v", mapping.Resource, err)
 		}
 		ret.Client = client
+
+		// Clear already retrieved object only when explicitly specified object version is different
+		if len(gvk.Version) > 0 && mapping.GroupVersionKind != gvk {
+			ret.Object = nil
+		}
 	}
 
 	return ret, nil

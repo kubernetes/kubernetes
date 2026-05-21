@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -766,4 +767,26 @@ func getNameAndNamespace(object runtime.Object) (name, namespace string) {
 		return resultName, resultNamespace
 	}
 	return "", ""
+}
+
+func TestDescribeRESTMapper(t *testing.T) {
+	gk := schema.GroupKind{Group: "autoscaling", Kind: "HorizontalPodAutoscaler"}
+
+	mapper := meta.NewDefaultRESTMapper([]schema.GroupVersion{
+		{Group: "autoscaling", Version: "v1"},
+		{Group: "autoscaling", Version: "v2"},
+	})
+	mapper.Add(schema.GroupVersionKind{Group: "autoscaling", Version: "v1", Kind: "HorizontalPodAutoscaler"}, meta.RESTScopeNamespace)
+	mapper.Add(schema.GroupVersionKind{Group: "autoscaling", Version: "v2", Kind: "HorizontalPodAutoscaler"}, meta.RESTScopeNamespace)
+
+	describeMapper := &describeRESTMapper{RESTMapper: mapper}
+
+	mapping, err := describeMapper.RESTMapping(gk)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if mapping.GroupVersionKind.Version != "v2" {
+		t.Errorf("expected version v2, got %v", mapping.GroupVersionKind.Version)
+	}
 }
