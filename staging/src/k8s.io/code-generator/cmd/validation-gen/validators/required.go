@@ -186,7 +186,6 @@ func (rtv requirednessTagValidator) doOptional(context Context) (Validations, er
 // hasZeroDefault returns whether the field has a default value and whether
 // that default value is the zero value for the field's type.
 func (rtv requirednessTagValidator) hasZeroDefault(context Context) (bool, bool, error) {
-	t := util.NonPointer(util.NativeType(context.Type))
 	// This validator only applies to fields, so Member must be valid.
 	tagsByName, err := gengo.ExtractFunctionStyleCommentTags("+", []string{defaultTagName}, context.Member.CommentLines)
 	if err != nil {
@@ -213,6 +212,14 @@ func (rtv requirednessTagValidator) hasZeroDefault(context Context) (bool, bool,
 		return false, false, fmt.Errorf("failed to parse default value %q: unmarshalled to nil", payload)
 	}
 
+	// For nilable types (pointer, slice, map, interface), the caller
+	// ignores zeroDefault and always treats a field-with-default as
+	// effectively required. Skip the zero-value comparison.
+	if util.IsNilableType(context.Type) {
+		return true, false, nil
+	}
+
+	t := util.NonPointer(util.NativeType(context.Type))
 	zero, found := typeZeroValue[t.String()]
 	if !found {
 		return false, false, fmt.Errorf("unknown zero-value for type %s", t.String())
