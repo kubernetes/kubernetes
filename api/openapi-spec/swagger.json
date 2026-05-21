@@ -2112,7 +2112,7 @@
         }
       },
       "required": [
-        "revision"
+        "data"
       ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
@@ -2182,6 +2182,9 @@
           "description": "The current status of this daemon set. This data may be out of date by some window of time. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
         }
       },
+      "required": [
+        "spec"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -2215,10 +2218,6 @@
           "type": "string"
         }
       },
-      "required": [
-        "type",
-        "status"
-      ],
       "type": "object"
     },
     "io.k8s.api.apps.v1.DaemonSetList": {
@@ -2396,6 +2395,9 @@
           "description": "Most recently observed status of the Deployment."
         }
       },
+      "required": [
+        "spec"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -2433,10 +2435,6 @@
           "type": "string"
         }
       },
-      "required": [
-        "type",
-        "status"
-      ],
       "type": "object"
     },
     "io.k8s.api.apps.v1.DeploymentList": {
@@ -2618,6 +2616,9 @@
           "description": "Status is the most recently observed status of the ReplicaSet. This data may be out of date by some window of time. Populated by the system. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status"
         }
       },
+      "required": [
+        "spec"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -2651,10 +2652,6 @@
           "type": "string"
         }
       },
-      "required": [
-        "type",
-        "status"
-      ],
       "type": "object"
     },
     "io.k8s.api.apps.v1.ReplicaSetList": {
@@ -2838,6 +2835,9 @@
           "description": "Status is the current status of Pods in this StatefulSet. This data may be out of date by some window of time."
         }
       },
+      "required": [
+        "spec"
+      ],
       "type": "object",
       "x-kubernetes-group-version-kind": [
         {
@@ -2871,10 +2871,6 @@
           "type": "string"
         }
       },
-      "required": [
-        "type",
-        "status"
-      ],
       "type": "object"
     },
     "io.k8s.api.apps.v1.StatefulSetList": {
