@@ -180,6 +180,22 @@ type PrivateFieldsSpec struct {
 	Visible string `json:"visible"`
 }
 
+type privateEmbeddedFields struct {
+	Hidden  []byte `json:"-"`
+	private []byte
+	Visible string `json:"visible"`
+}
+
+type PrivateEmbeddedFieldsObject struct {
+	privateEmbeddedFields
+	Skipped string `json:"-"`
+}
+
+type PrivateEmbeddedFieldsPointerObject struct {
+	*privateEmbeddedFields
+	Skipped string `json:"-"`
+}
+
 func doRoundTrip(t *testing.T, item interface{}) {
 	data, err := json.Marshal(item)
 	if err != nil {
@@ -1023,6 +1039,67 @@ func TestConverterIgnoresPrivateAndSkippedFields(t *testing.T) {
 		require.NoError(t, json.Unmarshal(jsonData, &unstr))
 
 		got := &PrivateFieldsObject{}
+		require.NotPanics(t, func() {
+			err := runtime.NewTestUnstructuredConverterWithValidation(simpleEquality).FromUnstructuredWithValidation(unstr, got, true)
+			require.NoError(t, err)
+		})
+		assert.Equal(t, expected, got)
+	})
+}
+
+func TestConverterMatchesJSONForUnexportedEmbeddedFields(t *testing.T) {
+	toUnstructuredCases := []struct {
+		name string
+		obj  interface{}
+	}{
+		{
+			name: "embedded value field",
+			obj: &PrivateEmbeddedFieldsObject{
+				privateEmbeddedFields: privateEmbeddedFields{
+					Hidden:  []byte("hidden"),
+					private: []byte("private"),
+					Visible: "value",
+				},
+				Skipped: "skipped",
+			},
+		},
+		{
+			name: "embedded pointer field",
+			obj: &PrivateEmbeddedFieldsPointerObject{
+				privateEmbeddedFields: &privateEmbeddedFields{
+					Hidden:  []byte("hidden"),
+					private: []byte("private"),
+					Visible: "value",
+				},
+				Skipped: "skipped",
+			},
+		},
+	}
+
+	for _, tc := range toUnstructuredCases {
+		t.Run("to-unstructured/"+tc.name, func(t *testing.T) {
+			expectedJSON, err := json.Marshal(tc.obj)
+			require.NoError(t, err)
+
+			expected := map[string]interface{}{}
+			require.NoError(t, json.Unmarshal(expectedJSON, &expected))
+
+			got, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tc.obj)
+			require.NoError(t, err)
+			assert.Equal(t, expected, got)
+		})
+	}
+
+	t.Run("from-unstructured/embedded value field", func(t *testing.T) {
+		jsonData := []byte(`{"visible":"value"}`)
+
+		expected := &PrivateEmbeddedFieldsObject{}
+		require.NoError(t, json.Unmarshal(jsonData, expected))
+
+		unstr := map[string]interface{}{}
+		require.NoError(t, json.Unmarshal(jsonData, &unstr))
+
+		got := &PrivateEmbeddedFieldsObject{}
 		require.NotPanics(t, func() {
 			err := runtime.NewTestUnstructuredConverterWithValidation(simpleEquality).FromUnstructuredWithValidation(unstr, got, true)
 			require.NoError(t, err)
