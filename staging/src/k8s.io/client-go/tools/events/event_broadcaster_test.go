@@ -19,12 +19,17 @@ package events
 import (
 	"context"
 	"reflect"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
+	v1 "k8s.io/api/core/v1"
 	eventsv1 "k8s.io/api/events/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2/ktesting"
 )
 
@@ -101,5 +106,52 @@ func TestRecordEventToSink(t *testing.T) {
 				t.Errorf("expected to have recorded Event: %#+v, got: %#+v\n diff: %s", tc.expectedRecordedEvent, recordedEvent, cmp.Diff(tc.expectedRecordedEvent, recordedEvent))
 			}
 		})
+	}
+}
+
+// TestConcurrentIsomorphicEventfRace stresses concurrent isomorphic Eventf calls; run with -race.
+func TestConcurrentIsomorphicEventfRace(t *testing.T) {
+	const concurrency = 100
+
+	kubeClient := fake.NewSimpleClientset()
+	eventSink := &EventSinkImpl{Interface: kubeClient.EventsV1()}
+	eventBroadcaster := newBroadcaster(eventSink, 100*time.Millisecond, map[eventKey]*eventsv1.Event{})
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	eventBroadcaster.StartRecordingToSink(stopCh)
+
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, "test")
+	regarding := &v1.ObjectReference{Name: "foo", Namespace: metav1.NamespaceDefault, UID: "bar"}
+
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(concurrency)
+	for i := 0; i < concurrency; i++ {
+		go func() {
+			defer wg.Done()
+			<-start
+			recorder.Eventf(regarding, nil, v1.EventTypeNormal, "memoryPressure", "killed", "memory pressure")
+		}()
+	}
+	close(start)
+	wg.Wait()
+
+	err := wait.PollUntilContextTimeout(context.Background(), 50*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+		events, listErr := kubeClient.EventsV1().Events(metav1.NamespaceDefault).List(ctx, metav1.ListOptions{})
+		if listErr != nil {
+			return false, listErr
+		}
+		if len(events.Items) != 1 {
+			return false, nil
+		}
+		if events.Items[0].Series == nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		events, _ := kubeClient.EventsV1().Events(metav1.NamespaceDefault).List(context.Background(), metav1.ListOptions{})
+		t.Fatalf("expected exactly 1 Event with non-nil Series, got %d events: %#v", len(events.Items), events.Items)
 	}
 }
