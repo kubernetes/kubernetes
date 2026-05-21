@@ -1,11 +1,11 @@
 # Nodelocal DNS Cache
 
-Using NodeLocal DNSCache in Kubernetes clusters(https://kubernetes.io/docs/tasks/administer-cluster/nodelocaldns/).
-This addon runs a node-local-dns pod on all cluster nodes. The pod runs CoreDNS as the dns cache. It runs with `hostNetwork:True` and creates a dedicated dummy interface with a link local ip(169.254.20.10/32 by default) to listen for DNS queries. The cache instances connect to clusterDNS in case of cache misses.
+Using NodeLocal DNSCache in Kubernetes clusters (https://kubernetes.io/docs/tasks/administer-cluster/nodelocaldns/).
+This addon runs a node-local-dns pod on all cluster nodes. The pod runs CoreDNS as the dns cache. It runs with `hostNetwork:True` and creates a dedicated dummy interface with a link local ip (169.254.20.10/32 by default) to listen for DNS queries. The cache instances connect to clusterDNS in case of cache misses.
 
-Design details [here](https://github.com/kubernetes/enhancements/blob/master/keps/sig-network/1024-nodelocal-cache-dns/README.md)
+See more [design details](https://github.com/kubernetes/enhancements/blob/master/keps/sig-network/1024-nodelocal-cache-dns/README.md).
 
-This feature is graduating to GA in release 1.18(Beta in release 1.15).
+This feature is graduating to GA in release 1.18 (Beta in release 1.15).
 
 ## nodelocaldns addon template
 
@@ -14,8 +14,8 @@ The variables will be substituted by the configure scripts when the yaml is copi
 
 We have the following variables in the yaml:
 `__PILLAR__DNS__SERVER__` - set to kube-dns service IP.
-`__PILLAR__LOCAL__DNS__`  - set to the link-local IP(169.254.20.10 by default).
-`__PILLAR__DNS__DOMAIN__` - set to the cluster domain(cluster.local by default).
+`__PILLAR__LOCAL__DNS__`  - set to the link-local IP (169.254.20.10 by default).
+`__PILLAR__DNS__DOMAIN__` - set to the cluster domain (cluster.local by default).
 
 Note: The local listen IP address for NodeLocal DNSCache can be any address that can be guaranteed to not collide with any existing IP in your cluster. It's recommended to use an address with a local scope, per example, from the link-local range 169.254.0.0/16 for IPv4 or from the Unique Local Address range in IPv6 fd00::/8.
 
