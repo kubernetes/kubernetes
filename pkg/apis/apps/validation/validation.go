@@ -648,7 +648,14 @@ func ValidateDeploymentSpec(spec, oldSpec *apps.DeploymentSpec, fldPath *field.P
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "empty selector is invalid for deployment"))
 		}
 	}
-
+	// Short-circuit on selector immutability validation to mirror DV behavior
+	if oldSpec != nil {
+		immutableErrs := apivalidation.ValidateImmutableField(spec.Selector, oldSpec.Selector, fldPath.Child("selector")).WithOrigin("immutable").MarkCoveredByDeclarative()
+		if len(immutableErrs) > 0 {
+			allErrs = append(allErrs, immutableErrs...)
+			return allErrs
+		}
+	}
 	selector, err := metav1.LabelSelectorAsSelector(spec.Selector)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("selector"), spec.Selector, "invalid label selector"))

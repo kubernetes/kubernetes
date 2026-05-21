@@ -424,6 +424,8 @@ type Deployment struct {
 
 	// Specification of the desired behavior of the Deployment.
 	// +optional
+	// +k8s:optional
+	// +k8s:beta=+k8s:immutable
 	Spec DeploymentSpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 
 	// Most recently observed status of the Deployment.

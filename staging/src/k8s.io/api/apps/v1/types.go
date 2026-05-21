@@ -375,6 +375,8 @@ type Deployment struct {
 
 	// Most recently observed status of the Deployment.
 	// +optional
+	// +k8s:optional
+	// +k8s:beta=+k8s:immutable
 	Status DeploymentStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 

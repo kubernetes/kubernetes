@@ -137,6 +137,8 @@ message DeploymentSpec {
   // selector is the label selector for pods. Existing ReplicaSets whose pods are
   // selected by this will be the ones affected by this deployment.
   // +optional
+  // +k8s:optional
+  // +k8s:beta=+k8s:immutable
   optional .k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
   // Template describes the pods that will be created.

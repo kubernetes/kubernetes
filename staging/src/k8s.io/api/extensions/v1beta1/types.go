@@ -114,6 +114,8 @@ type DeploymentSpec struct {
 	// Label selector for pods. Existing ReplicaSets whose pods are
 	// selected by this will be the ones affected by this deployment.
 	// +optional
+	// +k8s:optional
+	// +k8s:beta=+k8s:immutable
 	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,2,opt,name=selector"`
 
 	// Template describes the pods that will be created.

@@ -235,6 +235,8 @@ message Deployment {
 
   // Most recently observed status of the Deployment.
   // +optional
+  // +k8s:optional
+  // +k8s:beta=+k8s:immutable
   optional DeploymentStatus status = 3;
 }
 
