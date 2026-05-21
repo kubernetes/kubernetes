@@ -191,6 +191,15 @@ func TestValidateWorkload(t *testing.T) {
 		"no scheduling constraints": mkWorkload(func(w *scheduling.Workload) {
 			w.Spec.PodGroupTemplates[1].SchedulingConstraints = nil
 		}),
+		"default preemption policy (nil)": mkWorkload(), // preemption policy is unset (nil) by default
+		"valid preemption policy (Never)": mkWorkload(func(w *scheduling.Workload) {
+			preemptNever := core.PreemptNever
+			w.Spec.PodGroupTemplates[0].PreemptionPolicy = &preemptNever
+		}),
+		"valid preemption policy (PreemptLowerPriority)": mkWorkload(func(w *scheduling.Workload) {
+			preemptLowerPriority := core.PreemptLowerPriority
+			w.Spec.PodGroupTemplates[0].PreemptionPolicy = &preemptLowerPriority
+		}),
 	}
 	for name, workload := range successCases {
 		errs := ValidateWorkload(workload)
@@ -249,6 +258,15 @@ func TestValidateWorkload(t *testing.T) {
 			}),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("metadata", "namespace"), strings.Repeat("n", 64), "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+			},
+		},
+		"invalid preemption policy": {
+			workload: mkWorkload(func(w *scheduling.Workload) {
+				invalidPolicy := core.PreemptionPolicy("Invalid")
+				w.Spec.PodGroupTemplates[0].PreemptionPolicy = &invalidPolicy
+			}),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(field.NewPath("spec", "podGroupTemplates").Index(0).Child("preemptionPolicy"), "Invalid", []string{"PreemptLowerPriority", "Never"}),
 			},
 		},
 	}
@@ -363,6 +381,15 @@ func TestValidatePodGroup(t *testing.T) {
 		"no scheduling constraints": mkPodGroup(func(pg *scheduling.PodGroup) {
 			pg.Spec.SchedulingConstraints = nil
 		}),
+		"default preemption policy (nil)": mkPodGroup(), // preemption policy is unset (nil) by default
+		"valid preemption policy (Never)": mkPodGroup(func(pg *scheduling.PodGroup) {
+			preemptNever := core.PreemptNever
+			pg.Spec.PreemptionPolicy = &preemptNever
+		}),
+		"valid preemption policy (PreemptLowerPriority)": mkPodGroup(func(pg *scheduling.PodGroup) {
+			preemptLowerPriority := core.PreemptLowerPriority
+			pg.Spec.PreemptionPolicy = &preemptLowerPriority
+		}),
 	}
 	for name, podGroup := range successCases {
 		errs := ValidatePodGroup(podGroup)
@@ -421,6 +448,15 @@ func TestValidatePodGroup(t *testing.T) {
 			}),
 			expectedErrs: field.ErrorList{
 				field.Invalid(field.NewPath("metadata", "namespace"), strings.Repeat("n", 64), "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')"),
+			},
+		},
+		"invalid preemption policy": {
+			podGroup: mkPodGroup(func(pg *scheduling.PodGroup) {
+				invalidPolicy := core.PreemptionPolicy("Invalid")
+				pg.Spec.PreemptionPolicy = &invalidPolicy
+			}),
+			expectedErrs: field.ErrorList{
+				field.NotSupported(field.NewPath("spec", "preemptionPolicy"), "Invalid", []string{"PreemptLowerPriority", "Never"}),
 			},
 		},
 	}

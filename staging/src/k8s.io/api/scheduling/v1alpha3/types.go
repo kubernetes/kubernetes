@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha3
 
 import (
+	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -201,6 +202,18 @@ type PodGroupTemplate struct {
 	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
 	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:maximum=1000000000 # HighestUserDefinablePriority
 	Priority *int32 `json:"priority,omitempty" protobuf:"varint,7,opt,name=priority"`
+
+	// PreemptionPolicy is the Policy for preempting pods with lower priority.
+	// One of Never, PreemptLowerPriority.
+	// Defaults to PreemptLowerPriority if unset.
+	// This field is available only when the WorkloadAwarePreemption feature gate
+	// is enabled.
+	//
+	// +featureGate=WorkloadAwarePreemption
+	// +optional
+	// +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
+	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
+	PreemptionPolicy *apiv1.PreemptionPolicy `json:"preemptionPolicy,omitempty" protobuf:"bytes,8,opt,name=preemptionPolicy"`
 }
 
 // PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup.
@@ -471,6 +484,21 @@ type PodGroupSpec struct {
 	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:immutable
 	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:maximum=1000000000 # HighestUserDefinablePriority
 	Priority *int32 `json:"priority,omitempty" protobuf:"varint,7,opt,name=priority"`
+
+	// PreemptionPolicy is the Policy for preempting pods with lower priority.
+	// One of Never, PreemptLowerPriority.
+	// Defaults to PreemptLowerPriority if unset.
+	// This field is immutable.
+	// This field is available only when the WorkloadAwarePreemption feature gate
+	// is enabled.
+	//
+	// +featureGate=WorkloadAwarePreemption
+	// +optional
+	// +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
+	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
+	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:immutable
+	// +default="PreemptLowerPriority"
+	PreemptionPolicy *apiv1.PreemptionPolicy `json:"preemptionPolicy,omitempty" protobuf:"bytes,8,opt,name=preemptionPolicy"`
 }
 
 // PodGroupStatus represents information about the status of a pod group.

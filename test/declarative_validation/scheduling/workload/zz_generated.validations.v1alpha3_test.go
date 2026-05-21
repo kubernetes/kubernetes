@@ -60,6 +60,9 @@ func init() {
 				{ErrorType: "FieldValueInvalid", Origin: "format=k8s-short-name"},
 				{ErrorType: "FieldValueRequired"},
 			},
+			"spec.podGroupTemplates[*].preemptionPolicy": {
+				{ErrorType: "FieldValueForbidden"},
+			},
 			"spec.podGroupTemplates[*].priority": {
 				{ErrorType: "FieldValueForbidden"},
 				{ErrorType: "FieldValueInvalid", Origin: "maximum"},

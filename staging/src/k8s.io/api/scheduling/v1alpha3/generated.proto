@@ -21,6 +21,7 @@ syntax = "proto2";
 
 package k8s.io.api.scheduling.v1alpha3;
 
+import "k8s.io/api/core/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
@@ -313,6 +314,21 @@ message PodGroupSpec {
   // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:immutable
   // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:maximum=1000000000 # HighestUserDefinablePriority
   optional int32 priority = 7;
+
+  // PreemptionPolicy is the Policy for preempting pods with lower priority.
+  // One of Never, PreemptLowerPriority.
+  // Defaults to PreemptLowerPriority if unset.
+  // This field is immutable.
+  // This field is available only when the WorkloadAwarePreemption feature gate
+  // is enabled.
+  //
+  // +featureGate=WorkloadAwarePreemption
+  // +optional
+  // +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:immutable
+  // +default="PreemptLowerPriority"
+  optional string preemptionPolicy = 8;
 }
 
 // PodGroupStatus represents information about the status of a pod group.
@@ -444,6 +460,18 @@ message PodGroupTemplate {
   // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
   // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:maximum=1000000000 # HighestUserDefinablePriority
   optional int32 priority = 7;
+
+  // PreemptionPolicy is the Policy for preempting pods with lower priority.
+  // One of Never, PreemptLowerPriority.
+  // Defaults to PreemptLowerPriority if unset.
+  // This field is available only when the WorkloadAwarePreemption feature gate
+  // is enabled.
+  //
+  // +featureGate=WorkloadAwarePreemption
+  // +optional
+  // +k8s:ifDisabled("WorkloadAwarePreemption")=+k8s:forbidden
+  // +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:optional
+  optional string preemptionPolicy = 8;
 }
 
 // PodGroupTemplateReference references a PodGroup template defined in some object (e.g. Workload).

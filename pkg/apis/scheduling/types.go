@@ -244,6 +244,16 @@ type PodGroupTemplate struct {
 	// +featureGate=WorkloadAwarePreemption
 	// +optional
 	Priority *int32
+
+	// PreemptionPolicy is the Policy for preempting pods with lower priority.
+	// One of Never, PreemptLowerPriority.
+	// Defaults to PreemptLowerPriority if unset.
+	// This field is available only when the WorkloadAwarePreemption feature gate
+	// is enabled.
+	//
+	// +featureGate=WorkloadAwarePreemption
+	// +optional
+	PreemptionPolicy *core.PreemptionPolicy
 }
 
 // PodGroupSchedulingPolicy defines the scheduling configuration for a PodGroup.
@@ -469,6 +479,17 @@ type PodGroupSpec struct {
 	// +featureGate=WorkloadAwarePreemption
 	// +optional
 	Priority *int32
+
+	// PreemptionPolicy is the Policy for preempting pods with lower priority.
+	// One of Never, PreemptLowerPriority.
+	// Defaults to PreemptLowerPriority if unset.
+	// This field is immutable.
+	// This field is available only when the WorkloadAwarePreemption feature gate
+	// is enabled.
+	//
+	// +featureGate=WorkloadAwarePreemption
+	// +optional
+	PreemptionPolicy *core.PreemptionPolicy
 }
 
 // PodGroupStatus represents information about the status of a pod group.

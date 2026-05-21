@@ -25,6 +25,7 @@ import (
 	context "context"
 	fmt "fmt"
 
+	v1 "k8s.io/api/core/v1"
 	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
@@ -839,6 +840,47 @@ func Validate_PodGroupSpec(
 		errs = append(errs, fn(fldPath.Child("priority"), obj.Priority, oldVal, oldObj != nil)...)
 	}
 
+	{ // field schedulingv1alpha3.PodGroupSpec.PreemptionPolicy
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.PreemptionPolicy,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "WorkloadAwarePreemption", false, validate.ForbiddenPointer).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "WorkloadAwarePreemption", false, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "WorkloadAwarePreemption", true, // optional fields with default values are effectively required
+				validate.RequiredPointer).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "WorkloadAwarePreemption", true, validate.Immutable).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *schedulingv1alpha3.PodGroupSpec) *v1.PreemptionPolicy {
+				return oldObj.PreemptionPolicy
+			})
+		errs = append(errs, fn(fldPath.Child("preemptionPolicy"), obj.PreemptionPolicy, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 
@@ -1192,6 +1234,41 @@ func Validate_PodGroupTemplate(
 				return oldObj.Priority
 			})
 		errs = append(errs, fn(fldPath.Child("priority"), obj.Priority, oldVal, oldObj != nil)...)
+	}
+
+	{ // field schedulingv1alpha3.PodGroupTemplate.PreemptionPolicy
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *v1.PreemptionPolicy,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "WorkloadAwarePreemption", false, validate.ForbiddenPointer).MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "WorkloadAwarePreemption", false, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.IfOption(ctx, op, fldPath, obj, oldObj, "WorkloadAwarePreemption", true, validate.OptionalPointer).MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *schedulingv1alpha3.PodGroupTemplate) *v1.PreemptionPolicy {
+				return oldObj.PreemptionPolicy
+			})
+		errs = append(errs, fn(fldPath.Child("preemptionPolicy"), obj.PreemptionPolicy, oldVal, oldObj != nil)...)
 	}
 
 	return errs

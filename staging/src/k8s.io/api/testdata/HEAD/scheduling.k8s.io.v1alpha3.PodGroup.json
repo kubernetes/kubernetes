@@ -75,7 +75,8 @@
       "all": {}
     },
     "priorityClassName": "priorityClassNameValue",
-    "priority": 7
+    "priority": 7,
+    "preemptionPolicy": "preemptionPolicyValue"
   },
   "status": {
     "conditions": [

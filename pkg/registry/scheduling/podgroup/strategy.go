@@ -179,6 +179,7 @@ func dropDisabledPodGroupSpecFields(podGroupSpec, oldPodGroupSpec *scheduling.Po
 	dropDisabledDisruptionModeField(podGroupSpec, oldPodGroupSpec)
 	dropDisabledPriorityClassNameField(podGroupSpec, oldPodGroupSpec)
 	dropDisabledPriorityField(podGroupSpec, oldPodGroupSpec)
+	dropDisabledPreemptionPolicyField(podGroupSpec, oldPodGroupSpec)
 }
 
 func dropDisabledPodGroupStatusFields(newPodGroup, oldPodGroup *scheduling.PodGroup) {
@@ -244,6 +245,16 @@ func dropDisabledPriorityField(podGroupSpec, oldPodGroupSpec *scheduling.PodGrou
 	podGroupSpec.Priority = nil
 }
 
+// dropDisabledPreemptionPolicyField removes the PreemptionPolicy field unless it is
+// already used in the old PodGroup spec.
+func dropDisabledPreemptionPolicyField(podGroupSpec, oldPodGroupSpec *scheduling.PodGroupSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) || preemptionPolicyInUse(oldPodGroupSpec) {
+		// No need to drop anything.
+		return
+	}
+	podGroupSpec.PreemptionPolicy = nil
+}
+
 func schedulingConstraintsInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
 	return podGroupSpec != nil && podGroupSpec.SchedulingConstraints != nil
 }
@@ -262,4 +273,8 @@ func priorityClassNameInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
 
 func priorityInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
 	return podGroupSpec != nil && podGroupSpec.Priority != nil
+}
+
+func preemptionPolicyInUse(podGroupSpec *scheduling.PodGroupSpec) bool {
+	return podGroupSpec != nil && podGroupSpec.PreemptionPolicy != nil
 }

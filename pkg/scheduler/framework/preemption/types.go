@@ -42,10 +42,8 @@ type podGroupPreemptor struct {
 
 func newPodGroupPreemptor(pg *schedulingapi.PodGroup, pods []*v1.Pod) *podGroupPreemptor {
 	preemptionPolicy := v1.PreemptLowerPriority
-	for _, pod := range pods {
-		if p := pod.Spec.PreemptionPolicy; p != nil && *p == v1.PreemptNever {
-			preemptionPolicy = *p
-		}
+	if pg != nil && pg.Spec.PreemptionPolicy != nil {
+		preemptionPolicy = *pg.Spec.PreemptionPolicy
 	}
 	return &podGroupPreemptor{
 		priority:         util.PodGroupPriority(pg),

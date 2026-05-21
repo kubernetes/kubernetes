@@ -22,7 +22,8 @@ limitations under the License.
 package v1alpha3
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -286,6 +287,11 @@ func (in *PodGroupSpec) DeepCopyInto(out *PodGroupSpec) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.PreemptionPolicy != nil {
+		in, out := &in.PreemptionPolicy, &out.PreemptionPolicy
+		*out = new(v1.PreemptionPolicy)
+		**out = **in
+	}
 	return
 }
 
@@ -304,7 +310,7 @@ func (in *PodGroupStatus) DeepCopyInto(out *PodGroupStatus) {
 	*out = *in
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
-		*out = make([]v1.Condition, len(*in))
+		*out = make([]metav1.Condition, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -353,6 +359,11 @@ func (in *PodGroupTemplate) DeepCopyInto(out *PodGroupTemplate) {
 	if in.Priority != nil {
 		in, out := &in.Priority, &out.Priority
 		*out = new(int32)
+		**out = **in
+	}
+	if in.PreemptionPolicy != nil {
+		in, out := &in.PreemptionPolicy, &out.PreemptionPolicy
+		*out = new(v1.PreemptionPolicy)
 		**out = **in
 	}
 	return

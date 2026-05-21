@@ -287,6 +287,11 @@ func (in *PodGroupSpec) DeepCopyInto(out *PodGroupSpec) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.PreemptionPolicy != nil {
+		in, out := &in.PreemptionPolicy, &out.PreemptionPolicy
+		*out = new(core.PreemptionPolicy)
+		**out = **in
+	}
 	return
 }
 
@@ -354,6 +359,11 @@ func (in *PodGroupTemplate) DeepCopyInto(out *PodGroupTemplate) {
 	if in.Priority != nil {
 		in, out := &in.Priority, &out.Priority
 		*out = new(int32)
+		**out = **in
+	}
+	if in.PreemptionPolicy != nil {
+		in, out := &in.PreemptionPolicy, &out.PreemptionPolicy
+		*out = new(core.PreemptionPolicy)
 		**out = **in
 	}
 	return

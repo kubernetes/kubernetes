@@ -27,6 +27,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 
 	// Side-effect import: registers PodGroup with legacyscheme.Scheme so
@@ -92,6 +93,12 @@ func podGroupWithDisruptionModeBoth() *scheduling.PodGroup {
 	return pg
 }
 
+func podGroupWithPreemptionPolicy(policy core.PreemptionPolicy) *scheduling.PodGroup {
+	pg := podGroupWithDisruptionModeSingle()
+	pg.Spec.PreemptionPolicy = &policy
+	return pg
+}
+
 var (
 	fieldImmutableError    = "field is immutable"
 	minCountError          = "must be greater than or equal to 1"
@@ -101,6 +108,7 @@ var (
 	maximumError           = "must be less than or equal to 1000000000"
 	subdomainNameError     = "lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
 	forbiddenError         = "Forbidden"
+	supportedPoliciesError = `supported values: "PreemptLowerPriority", "Never"`
 )
 
 func TestStrategy(t *testing.T) {
@@ -276,6 +284,25 @@ func TestStrategyCreate(t *testing.T) {
 			}(),
 			enableWorkloadAwarePreemption: true,
 			expectValidationError:         maximumError,
+		},
+		"workload aware preemption disabled - drop preemptionPolicy": {
+			obj:       podGroupWithPreemptionPolicy(core.PreemptNever),
+			expectObj: podGroup,
+		},
+		"workload aware preemption enabled - preserve preemptionPolicy (Never)": {
+			obj:                           podGroupWithPreemptionPolicy(core.PreemptNever),
+			expectObj:                     podGroupWithPreemptionPolicy(core.PreemptNever),
+			enableWorkloadAwarePreemption: true,
+		},
+		"workload aware preemption enabled - preserve preemptionPolicy (PreemptLowerPriority)": {
+			obj:                           podGroupWithPreemptionPolicy(core.PreemptLowerPriority),
+			expectObj:                     podGroupWithPreemptionPolicy(core.PreemptLowerPriority),
+			enableWorkloadAwarePreemption: true,
+		},
+		"workload aware preemption enabled - invalid preemptionPolicy": {
+			obj:                           podGroupWithPreemptionPolicy(core.PreemptionPolicy("Invalid")),
+			enableWorkloadAwarePreemption: true,
+			expectValidationError:         supportedPoliciesError,
 		},
 	}
 
@@ -464,6 +491,17 @@ func TestStrategyUpdate(t *testing.T) {
 				pg.Spec.Priority = new(int32(2000))
 				return pg
 			}(),
+			enableWorkloadAwarePreemption: true,
+			expectValidationError:         fieldImmutableError,
+		},
+		"preemptionPolicy update, workload aware preemption disabled": {
+			oldObj:                podGroupWithPreemptionPolicy(core.PreemptNever),
+			newObj:                podGroupWithPreemptionPolicy(core.PreemptLowerPriority),
+			expectValidationError: forbiddenError,
+		},
+		"preemptionPolicy update, workload aware preemption enabled": {
+			oldObj:                        podGroupWithPreemptionPolicy(core.PreemptNever),
+			newObj:                        podGroupWithPreemptionPolicy(core.PreemptLowerPriority),
 			enableWorkloadAwarePreemption: true,
 			expectValidationError:         fieldImmutableError,
 		},

@@ -54322,6 +54322,15 @@ func schema_k8sio_api_scheduling_v1alpha3_PodGroupSpec(ref common.ReferenceCallb
 							Format:      "int32",
 						},
 					},
+					"preemptionPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PreemptionPolicy is the Policy for preempting pods with lower priority. One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset. This field is immutable. This field is available only when the WorkloadAwarePreemption feature gate is enabled.\n\n\nPossible enum values:\n - `\"Never\"` means that pod never preempts other pods with lower priority.\n - `\"PreemptLowerPriority\"` means that pod can preempt other pods with lower priority.",
+							Default:     "PreemptLowerPriority",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Never", "PreemptLowerPriority"},
+						},
+					},
 				},
 				Required: []string{"schedulingPolicy"},
 			},
@@ -54461,6 +54470,14 @@ func schema_k8sio_api_scheduling_v1alpha3_PodGroupTemplate(ref common.ReferenceC
 							Description: "Priority is the value of priority of pod groups created from this template. Various system components use this field to find the priority of the pod group. When Priority Admission Controller is enabled, it prevents users from setting this field. The admission controller populates this field from PriorityClassName. The higher the value, the higher the priority. This field is available only when the WorkloadAwarePreemption feature gate is enabled.",
 							Type:        []string{"integer"},
 							Format:      "int32",
+						},
+					},
+					"preemptionPolicy": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PreemptionPolicy is the Policy for preempting pods with lower priority. One of Never, PreemptLowerPriority. Defaults to PreemptLowerPriority if unset. This field is available only when the WorkloadAwarePreemption feature gate is enabled.\n\n\nPossible enum values:\n - `\"Never\"` means that pod never preempts other pods with lower priority.\n - `\"PreemptLowerPriority\"` means that pod can preempt other pods with lower priority.",
+							Type:        []string{"string"},
+							Format:      "",
+							Enum:        []interface{}{"Never", "PreemptLowerPriority"},
 						},
 					},
 				},
