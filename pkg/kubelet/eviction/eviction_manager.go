@@ -600,9 +600,7 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(logger klog.Logger,
 
 	for _, containerStat := range podStats.Containers {
 		containerUsed := diskUsage(containerStat.Logs)
-		if !*m.dedicatedImageFs {
-			containerUsed.Add(*diskUsage(containerStat.Rootfs))
-		}
+		containerUsed.Add(*diskUsage(containerStat.Rootfs))
 
 		if ephemeralStorageThreshold, ok := thresholdsMap[containerStat.Name]; ok {
 			if ephemeralStorageThreshold.Cmp(*containerUsed) < 0 {

@@ -32,6 +32,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -3169,5 +3170,43 @@ func TestContainerEphemeralStorageLimitEvictionForRestartableInitContainers(t *t
 	}
 	if len(evictedPods) != 1 || evictedPods[0].Name != pod.Name {
 		t.Fatalf("Expected evicted pod %q, got %v", pod.Name, evictedPods)
+	}
+}
+
+func TestContainerEphemeralStorageLimitEvictionWithDedicatedImageFs(t *testing.T) {
+	pod := newPod("container-ephemeral-storage-limit", 0, []v1.Container{
+		newContainer("writer", nil, newResourceList("", "", "500Mi")),
+		newContainer("sidecar", nil, newResourceList("", "", "500Mi")),
+	}, nil)
+
+	writerUsed := uint64(resource.MustParse("700Mi").Value())
+	zeroUsed := uint64(0)
+	podStats := statsapi.PodStats{
+		Containers: []statsapi.ContainerStats{
+			{
+			Name:   "writer",
+			Logs:   &statsapi.FsStats{UsedBytes: &zeroUsed},
+			Rootfs: &statsapi.FsStats{UsedBytes: &writerUsed},
+			},
+			{
+			Name:   "sidecar",
+			Logs:   &statsapi.FsStats{UsedBytes: &zeroUsed},
+			Rootfs: &statsapi.FsStats{UsedBytes: &zeroUsed},
+			},
+		},
+	}
+
+	podKiller := &mockPodKiller{}
+	mgr := &managerImpl{
+		killPodFunc:      podKiller.killPodNow,
+		recorder:         &record.FakeRecorder{},
+		dedicatedImageFs: ptr.To(true),
+	}
+
+	if !mgr.containerEphemeralStorageLimitEviction(klog.Background(), podStats, pod) {
+		t.Fatalf("expected pod eviction")
+	}
+	if podKiller.pod != pod {
+		t.Fatalf("expected pod %q to be evicted", pod.Name)
 	}
 }
