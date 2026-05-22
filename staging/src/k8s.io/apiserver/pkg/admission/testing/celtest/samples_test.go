@@ -18,6 +18,8 @@ package celtest
 
 import (
 	admissionv1 "k8s.io/api/admission/v1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"testing"
 )
@@ -67,6 +69,57 @@ func TestParseAndEvalVAPMatchConditionsAndAuditAnnotations(t *testing.T) {
 	}
 	if len(auditResult.Annotations) != 1 || auditResult.Annotations[0].Value != "test-pod" {
 		t.Fatalf("unexpected audit annotations: %#v", auditResult.Annotations)
+	}
+}
+
+func TestTypedPolicyAndInputTable(t *testing.T) {
+	e, err := NewEvaluator()
+	if err != nil {
+		t.Fatalf("NewEvaluator() error: %v", err)
+	}
+
+	policy, err := NewFromValidatingAdmissionPolicy(&admissionregistrationv1.ValidatingAdmissionPolicy{
+		Spec: admissionregistrationv1.ValidatingAdmissionPolicySpec{
+			ParamKind: &admissionregistrationv1.ParamKind{APIVersion: "v1", Kind: "ConfigMap"},
+			Validations: []admissionregistrationv1.Validation{{
+				Expression: "has(object.metadata.labels) && object.metadata.labels.team == params.data.requiredTeam",
+				Message:    "pod team label must match policy params",
+			}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewFromValidatingAdmissionPolicy() error: %v", err)
+	}
+
+	tests := []struct {
+		name    string
+		labels  map[string]string
+		allowed bool
+	}{
+		{name: "matching label", labels: map[string]string{"team": "platform"}, allowed: true},
+		{name: "different label", labels: map[string]string{"team": "frontend"}, allowed: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := e.EvalAdmission(policy, &AdmissionInput{
+				Object: &corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "sample",
+						Labels: tt.labels,
+					},
+				},
+				Params: &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{Name: "policy-params"},
+					Data:       map[string]string{"requiredTeam": "platform"},
+				},
+			})
+			if err != nil {
+				t.Fatalf("EvalAdmission() error: %v", err)
+			}
+			if result.Allowed != tt.allowed {
+				t.Fatalf("Allowed = %v, want %v; violations: %s", result.Allowed, tt.allowed, result.FormatViolations())
+			}
+		})
 	}
 }
 

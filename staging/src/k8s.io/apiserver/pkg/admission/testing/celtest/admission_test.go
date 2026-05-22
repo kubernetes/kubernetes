@@ -17,10 +17,28 @@ limitations under the License.
 package celtest
 
 import (
-	admissionv1 "k8s.io/api/admission/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"strings"
 	"testing"
+
+	admissionv1 "k8s.io/api/admission/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
+
+type unconvertibleRuntimeObject struct {
+	metav1.TypeMeta `json:",inline"`
+	Values          []uint64 `json:"values,omitempty"`
+}
+
+func (o *unconvertibleRuntimeObject) DeepCopyObject() runtime.Object {
+	if o == nil {
+		return nil
+	}
+	out := *o
+	out.Values = append([]uint64(nil), o.Values...)
+	return &out
+}
 
 func TestEvalAdmission_Allowed(t *testing.T) {
 	e, err := NewEvaluator()
@@ -50,6 +68,134 @@ func TestEvalAdmission_Allowed(t *testing.T) {
 	}
 	if result.Cost <= 0 {
 		t.Errorf("EvalAdmission() Cost = %d, want > 0", result.Cost)
+	}
+}
+
+func TestEvalAdmission_TypedAdmissionInput(t *testing.T) {
+	e, err := NewEvaluator()
+	if err != nil {
+		t.Fatalf("NewEvaluator() error: %v", err)
+	}
+
+	policy := &AdmissionPolicy{
+		Validations: []Validation{
+			{Path: "validations[0]", Expression: "object.kind == 'Pod'"},
+			{Path: "validations[1]", Expression: "request.kind.kind == 'Pod'"},
+			{Path: "validations[2]", Expression: "request.resource.resource == 'pods'"},
+			{Path: "validations[3]", Expression: "object.metadata.name == 'typed-pod'"},
+			{Path: "validations[4]", Expression: "object.metadata.namespace == 'default'"},
+			{Path: "validations[5]", Expression: "params.kind == 'ConfigMap'"},
+			{Path: "validations[6]", Expression: "params.data.requiredTeam == object.metadata.labels.team"},
+		},
+	}
+	policy.SetHasParams(true)
+
+	input := &AdmissionInput{
+		Object: &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "typed-pod",
+				Namespace: "default",
+				Labels:    map[string]string{"team": "platform"},
+			},
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "app", Image: "registry.k8s.io/pause:3.10"}},
+			},
+		},
+		Params: &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{Name: "policy-config"},
+			Data:       map[string]string{"requiredTeam": "platform"},
+		},
+	}
+
+	result, err := e.EvalAdmission(policy, input)
+	if err != nil {
+		t.Fatalf("EvalAdmission() error: %v", err)
+	}
+	if !result.Allowed {
+		t.Fatalf("expected Allowed=true for typed input, got violations: %s", result.FormatViolations())
+	}
+}
+
+func TestEvalAdmission_TypedOldObject(t *testing.T) {
+	e, err := NewEvaluator()
+	if err != nil {
+		t.Fatalf("NewEvaluator() error: %v", err)
+	}
+
+	policy := &AdmissionPolicy{
+		Validations: []Validation{
+			{Path: "validations[0]", Expression: "request.operation == 'UPDATE'"},
+			{Path: "validations[1]", Expression: "oldObject.metadata.labels.version == 'old'"},
+			{Path: "validations[2]", Expression: "object.metadata.labels.version == 'new'"},
+		},
+	}
+	input := &AdmissionInput{
+		Object: &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "typed-pod",
+				Labels: map[string]string{"version": "new"},
+			},
+		},
+		OldObject: &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "typed-pod",
+				Labels: map[string]string{"version": "old"},
+			},
+		},
+	}
+
+	result, err := e.EvalAdmission(policy, input)
+	if err != nil {
+		t.Fatalf("EvalAdmission() error: %v", err)
+	}
+	if !result.Allowed {
+		t.Fatalf("expected typed oldObject update to allow, got violations: %s", result.FormatViolations())
+	}
+}
+
+func TestEvalAdmission_TypedAdmissionInputConversionErrors(t *testing.T) {
+	e, err := NewEvaluator()
+	if err != nil {
+		t.Fatalf("NewEvaluator() error: %v", err)
+	}
+
+	badObject := func() *unconvertibleRuntimeObject {
+		return &unconvertibleRuntimeObject{
+			TypeMeta: metav1.TypeMeta{APIVersion: "example.com/v1", Kind: "Bad"},
+			Values:   []uint64{^uint64(0)},
+		}
+	}
+	tests := []struct {
+		name string
+		in   *AdmissionInput
+		want string
+	}{
+		{
+			name: "object",
+			in:   &AdmissionInput{Object: badObject()},
+			want: "converting object",
+		},
+		{
+			name: "oldObject",
+			in:   &AdmissionInput{OldObject: badObject()},
+			want: "converting oldObject",
+		},
+		{
+			name: "params",
+			in:   &AdmissionInput{Params: badObject()},
+			want: "converting params",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := e.EvalExpression("true", tt.in)
+			if err == nil {
+				t.Fatal("expected conversion error")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %q, want to contain %q", err.Error(), tt.want)
+			}
+		})
 	}
 }
 

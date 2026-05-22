@@ -209,12 +209,14 @@ type PatchResult struct {
 }
 
 // AdmissionInput provides the runtime values for CEL evaluation.
-// Object and OldObject are unstructured maps; GVK is inferred from their
-// apiVersion/kind fields or from Request.Kind if provided.
+// Object, OldObject, and Params may be unstructured map[string]interface{}
+// values or typed Kubernetes runtime.Object values. Typed values are converted
+// to unstructured objects internally. GVK is inferred from Object, OldObject,
+// or Request.Kind when provided.
 type AdmissionInput struct {
-	Object     map[string]interface{}
-	OldObject  map[string]interface{}
-	Params     map[string]interface{}
+	Object     interface{}
+	OldObject  interface{}
+	Params     interface{}
 	Request    *admissionv1.AdmissionRequest
 	Namespace  *corev1.Namespace
 	Authorizer authorizer.Authorizer
@@ -890,7 +892,7 @@ func ParseAdmissionInputFile(path string) (*AdmissionInput, error) {
 	return parseAdmissionInputFile(path)
 }
 
-// FormatViolations returns a comma-separated summary of all violation messages and errors.
+// FormatViolations returns a newline-separated summary of all violation messages and errors.
 func (r *AdmissionResult) FormatViolations() string {
 	if len(r.Violations) == 0 {
 		return ""
@@ -899,13 +901,14 @@ func (r *AdmissionResult) FormatViolations() string {
 	for _, violation := range r.Violations {
 		if violation.Error != nil {
 			msgs = append(msgs, fmt.Sprintf("error evaluating %q: %v", violation.Expression, violation.Error))
-			continue
-		}
-		if violation.Message != "" {
+		} else if violation.Message != "" {
 			msgs = append(msgs, violation.Message)
 		} else {
 			msgs = append(msgs, fmt.Sprintf("expression %q evaluated to false", violation.Expression))
 		}
+		if violation.MessageError != nil {
+			msgs = append(msgs, fmt.Sprintf("error evaluating messageExpression for %q: %v", violation.Expression, violation.MessageError))
+		}
 	}
-	return strings.Join(msgs, ", ")
+	return strings.Join(msgs, "\n")
 }

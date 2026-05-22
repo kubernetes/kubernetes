@@ -114,6 +114,15 @@ func parseValidatingAdmissionPolicy(data []byte) (*AdmissionPolicy, error) {
 		return nil, fmt.Errorf("parsing ValidatingAdmissionPolicy: %w", err)
 	}
 
+	return NewFromValidatingAdmissionPolicy(&vap)
+}
+
+// NewFromValidatingAdmissionPolicy converts a typed ValidatingAdmissionPolicy
+// into an AdmissionPolicy that can be evaluated by this package.
+func NewFromValidatingAdmissionPolicy(vap *admissionregistrationv1.ValidatingAdmissionPolicy) (*AdmissionPolicy, error) {
+	if vap == nil {
+		return nil, fmt.Errorf("ValidatingAdmissionPolicy is nil")
+	}
 	policy := &AdmissionPolicy{}
 	policy.hasParams = vap.Spec.ParamKind != nil
 	policy.hasParamsSet = true
@@ -142,6 +151,15 @@ func parseMutatingAdmissionPolicy(data []byte) (*AdmissionPolicy, error) {
 		return nil, fmt.Errorf("parsing MutatingAdmissionPolicy: %w", err)
 	}
 
+	return NewFromMutatingAdmissionPolicy(&map_)
+}
+
+// NewFromMutatingAdmissionPolicy converts a typed MutatingAdmissionPolicy into
+// an AdmissionPolicy that can be evaluated by this package.
+func NewFromMutatingAdmissionPolicy(map_ *admissionregistrationv1.MutatingAdmissionPolicy) (*AdmissionPolicy, error) {
+	if map_ == nil {
+		return nil, fmt.Errorf("MutatingAdmissionPolicy is nil")
+	}
 	policy := &AdmissionPolicy{}
 	policy.hasParams = map_.Spec.ParamKind != nil
 	policy.hasParamsSet = true
@@ -168,6 +186,16 @@ func parseValidatingWebhookConfiguration(data []byte) (*AdmissionPolicy, error) 
 		return nil, fmt.Errorf("parsing ValidatingWebhookConfiguration: %w", err)
 	}
 
+	return NewFromValidatingWebhookConfiguration(&config)
+}
+
+// NewFromValidatingWebhookConfiguration converts a typed
+// ValidatingWebhookConfiguration into an AdmissionPolicy containing its
+// matchConditions.
+func NewFromValidatingWebhookConfiguration(config *admissionregistrationv1.ValidatingWebhookConfiguration) (*AdmissionPolicy, error) {
+	if config == nil {
+		return nil, fmt.Errorf("ValidatingWebhookConfiguration is nil")
+	}
 	policy := &AdmissionPolicy{}
 	policy.hasParams = false
 	policy.hasParamsSet = true
@@ -177,7 +205,7 @@ func parseValidatingWebhookConfiguration(data []byte) (*AdmissionPolicy, error) 
 		}
 	}
 	if len(policy.MatchConditions) == 0 {
-		return nil, fmt.Errorf("webhook configuration does not contain matchConditions")
+		return nil, fmt.Errorf("ValidatingWebhookConfiguration does not contain CEL expressions")
 	}
 	return policy, nil
 }
@@ -190,6 +218,16 @@ func parseMutatingWebhookConfiguration(data []byte) (*AdmissionPolicy, error) {
 		return nil, fmt.Errorf("parsing MutatingWebhookConfiguration: %w", err)
 	}
 
+	return NewFromMutatingWebhookConfiguration(&config)
+}
+
+// NewFromMutatingWebhookConfiguration converts a typed
+// MutatingWebhookConfiguration into an AdmissionPolicy containing its
+// matchConditions.
+func NewFromMutatingWebhookConfiguration(config *admissionregistrationv1.MutatingWebhookConfiguration) (*AdmissionPolicy, error) {
+	if config == nil {
+		return nil, fmt.Errorf("MutatingWebhookConfiguration is nil")
+	}
 	policy := &AdmissionPolicy{}
 	policy.hasParams = false
 	policy.hasParamsSet = true
@@ -199,7 +237,7 @@ func parseMutatingWebhookConfiguration(data []byte) (*AdmissionPolicy, error) {
 		}
 	}
 	if len(policy.MatchConditions) == 0 {
-		return nil, fmt.Errorf("webhook configuration does not contain matchConditions")
+		return nil, fmt.Errorf("MutatingWebhookConfiguration does not contain CEL expressions")
 	}
 	return policy, nil
 }

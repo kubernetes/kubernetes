@@ -183,6 +183,34 @@ func TestFormatViolations(t *testing.T) {
 			t.Errorf("FormatViolations() = %q, expected to contain 'compile error'", got)
 		}
 	})
+
+	t.Run("multiple violations use newlines", func(t *testing.T) {
+		r := &AdmissionResult{
+			Violations: []Violation{
+				{Expression: "false", Message: "first violation"},
+				{Expression: "object.metadata.name == 'allowed'"},
+				{Expression: "bad", Error: fmt.Errorf("compile error")},
+			},
+		}
+		want := "first violation\nexpression \"object.metadata.name == 'allowed'\" evaluated to false\nerror evaluating \"bad\": compile error"
+		if got := r.FormatViolations(); got != want {
+			t.Errorf("FormatViolations() = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("includes message expression error", func(t *testing.T) {
+		r := &AdmissionResult{
+			Violations: []Violation{{
+				Expression:   "false",
+				Message:      "static fallback",
+				MessageError: fmt.Errorf("message line 1\nmessage line 2"),
+			}},
+		}
+		want := "static fallback\nerror evaluating messageExpression for \"false\": message line 1\nmessage line 2"
+		if got := r.FormatViolations(); got != want {
+			t.Errorf("FormatViolations() = %q, want %q", got, want)
+		}
+	})
 }
 
 func TestWithVersion(t *testing.T) {

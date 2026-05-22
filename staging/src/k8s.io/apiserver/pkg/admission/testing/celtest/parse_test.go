@@ -17,10 +17,14 @@ limitations under the License.
 package celtest
 
 import (
-	admissionv1 "k8s.io/api/admission/v1"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"testing"
+
+	admissionv1 "k8s.io/api/admission/v1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 )
 
 func TestParseAdmissionPolicy_Flat(t *testing.T) {
@@ -298,11 +302,13 @@ namespaceObject:
 	if err != nil {
 		t.Fatalf("ParseAdmissionInput() error: %v", err)
 	}
-	if input.Object["kind"] != "Pod" {
-		t.Errorf("object.kind = %v, want Pod", input.Object["kind"])
+	object := input.Object.(map[string]interface{})
+	if object["kind"] != "Pod" {
+		t.Errorf("object.kind = %v, want Pod", object["kind"])
 	}
-	if input.Params["kind"] != "ConfigMap" {
-		t.Errorf("params.kind = %v, want ConfigMap", input.Params["kind"])
+	params := input.Params.(map[string]interface{})
+	if params["kind"] != "ConfigMap" {
+		t.Errorf("params.kind = %v, want ConfigMap", params["kind"])
 	}
 	if input.Request == nil || input.Request.Operation != admissionv1.Create {
 		t.Fatalf("request.operation = %v, want CREATE", input.Request)
@@ -494,5 +500,255 @@ spec:
 	}
 	if !policy.hasParams {
 		t.Error("hasParams should be true when paramKind is set")
+	}
+}
+
+func TestNewFromTypedAdmissionPoliciesMatchesYAMLParsers(t *testing.T) {
+	tests := []struct {
+		name       string
+		yaml       string
+		fromTyped  func() (*AdmissionPolicy, error)
+		checkParam bool
+		wantParams bool
+	}{
+		{
+			name: "ValidatingAdmissionPolicy",
+			yaml: `
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+spec:
+  paramKind:
+    apiVersion: v1
+    kind: ConfigMap
+  variables:
+    - name: podName
+      expression: "object.metadata.name"
+  matchConditions:
+    - name: only-pods
+      expression: "request.resource.resource == 'pods'"
+  validations:
+    - expression: "variables.podName != 'bad'"
+      message: "name must not be bad"
+      messageExpression: "'bad name: ' + variables.podName"
+  auditAnnotations:
+    - key: pod-name
+      valueExpression: "variables.podName"
+`,
+			fromTyped: func() (*AdmissionPolicy, error) {
+				return NewFromValidatingAdmissionPolicy(&admissionregistrationv1.ValidatingAdmissionPolicy{
+					Spec: admissionregistrationv1.ValidatingAdmissionPolicySpec{
+						ParamKind: &admissionregistrationv1.ParamKind{APIVersion: "v1", Kind: "ConfigMap"},
+						Variables: []admissionregistrationv1.Variable{{
+							Name:       "podName",
+							Expression: "object.metadata.name",
+						}},
+						MatchConditions: []admissionregistrationv1.MatchCondition{{
+							Name:       "only-pods",
+							Expression: "request.resource.resource == 'pods'",
+						}},
+						Validations: []admissionregistrationv1.Validation{{
+							Expression:        "variables.podName != 'bad'",
+							Message:           "name must not be bad",
+							MessageExpression: "'bad name: ' + variables.podName",
+						}},
+						AuditAnnotations: []admissionregistrationv1.AuditAnnotation{{
+							Key:             "pod-name",
+							ValueExpression: "variables.podName",
+						}},
+					},
+				})
+			},
+			checkParam: true,
+			wantParams: true,
+		},
+		{
+			name: "MutatingAdmissionPolicy",
+			yaml: `
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicy
+spec:
+  paramKind:
+    apiVersion: v1
+    kind: ConfigMap
+  variables:
+    - name: replicas
+      expression: "object.spec.replicas"
+  matchConditions:
+    - name: only-deployments
+      expression: "request.resource.resource == 'deployments'"
+  mutations:
+    - patchType: ApplyConfiguration
+      applyConfiguration:
+        expression: "Object{spec: Object.spec{replicas: int(params.data.replicas)}}"
+    - patchType: JSONPatch
+      jsonPatch:
+        expression: "[JSONPatch{op: 'replace', path: '/spec/replicas', value: 3}]"
+`,
+			fromTyped: func() (*AdmissionPolicy, error) {
+				return NewFromMutatingAdmissionPolicy(&admissionregistrationv1.MutatingAdmissionPolicy{
+					Spec: admissionregistrationv1.MutatingAdmissionPolicySpec{
+						ParamKind: &admissionregistrationv1.ParamKind{APIVersion: "v1", Kind: "ConfigMap"},
+						Variables: []admissionregistrationv1.Variable{{
+							Name:       "replicas",
+							Expression: "object.spec.replicas",
+						}},
+						MatchConditions: []admissionregistrationv1.MatchCondition{{
+							Name:       "only-deployments",
+							Expression: "request.resource.resource == 'deployments'",
+						}},
+						Mutations: []admissionregistrationv1.Mutation{
+							{
+								PatchType:          admissionregistrationv1.PatchTypeApplyConfiguration,
+								ApplyConfiguration: &admissionregistrationv1.ApplyConfiguration{Expression: "Object{spec: Object.spec{replicas: int(params.data.replicas)}}"},
+							},
+							{
+								PatchType: admissionregistrationv1.PatchTypeJSONPatch,
+								JSONPatch: &admissionregistrationv1.JSONPatch{Expression: "[JSONPatch{op: 'replace', path: '/spec/replicas', value: 3}]"},
+							},
+						},
+					},
+				})
+			},
+			checkParam: true,
+			wantParams: true,
+		},
+		{
+			name: "ValidatingWebhookConfiguration",
+			yaml: `
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+webhooks:
+  - name: validate.example.com
+    matchConditions:
+      - name: exclude-leases
+        expression: "request.resource.resource != 'leases'"
+`,
+			fromTyped: func() (*AdmissionPolicy, error) {
+				return NewFromValidatingWebhookConfiguration(&admissionregistrationv1.ValidatingWebhookConfiguration{
+					Webhooks: []admissionregistrationv1.ValidatingWebhook{{
+						Name: "validate.example.com",
+						MatchConditions: []admissionregistrationv1.MatchCondition{{
+							Name:       "exclude-leases",
+							Expression: "request.resource.resource != 'leases'",
+						}},
+					}},
+				})
+			},
+			checkParam: true,
+			wantParams: false,
+		},
+		{
+			name: "MutatingWebhookConfiguration",
+			yaml: `
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+webhooks:
+  - name: mutate.example.com
+    matchConditions:
+      - name: only-pods
+        expression: "request.resource.resource == 'pods'"
+`,
+			fromTyped: func() (*AdmissionPolicy, error) {
+				return NewFromMutatingWebhookConfiguration(&admissionregistrationv1.MutatingWebhookConfiguration{
+					Webhooks: []admissionregistrationv1.MutatingWebhook{{
+						Name: "mutate.example.com",
+						MatchConditions: []admissionregistrationv1.MatchCondition{{
+							Name:       "only-pods",
+							Expression: "request.resource.resource == 'pods'",
+						}},
+					}},
+				})
+			},
+			checkParam: true,
+			wantParams: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fromYAML, err := ParseAdmissionPolicy(tt.yaml)
+			if err != nil {
+				t.Fatalf("ParseAdmissionPolicy() error: %v", err)
+			}
+			fromTyped, err := tt.fromTyped()
+			if err != nil {
+				t.Fatalf("typed constructor error: %v", err)
+			}
+			if !reflect.DeepEqual(fromTyped, fromYAML) {
+				t.Fatalf("typed constructor policy differs from YAML parser:\ntyped: %#v\nYAML:  %#v", fromTyped, fromYAML)
+			}
+			if tt.checkParam && fromTyped.hasParams != tt.wantParams {
+				t.Fatalf("hasParams = %v, want %v", fromTyped.hasParams, tt.wantParams)
+			}
+		})
+	}
+}
+
+func TestNewFromTypedAdmissionPolicyErrors(t *testing.T) {
+	tests := []struct {
+		name    string
+		create  func() (*AdmissionPolicy, error)
+		wantErr string
+	}{
+		{
+			name:    "nil ValidatingAdmissionPolicy",
+			create:  func() (*AdmissionPolicy, error) { return NewFromValidatingAdmissionPolicy(nil) },
+			wantErr: "ValidatingAdmissionPolicy is nil",
+		},
+		{
+			name: "empty ValidatingAdmissionPolicy",
+			create: func() (*AdmissionPolicy, error) {
+				return NewFromValidatingAdmissionPolicy(&admissionregistrationv1.ValidatingAdmissionPolicy{})
+			},
+			wantErr: "ValidatingAdmissionPolicy does not contain CEL expressions",
+		},
+		{
+			name:    "nil MutatingAdmissionPolicy",
+			create:  func() (*AdmissionPolicy, error) { return NewFromMutatingAdmissionPolicy(nil) },
+			wantErr: "MutatingAdmissionPolicy is nil",
+		},
+		{
+			name: "empty MutatingAdmissionPolicy",
+			create: func() (*AdmissionPolicy, error) {
+				return NewFromMutatingAdmissionPolicy(&admissionregistrationv1.MutatingAdmissionPolicy{})
+			},
+			wantErr: "MutatingAdmissionPolicy does not contain CEL expressions",
+		},
+		{
+			name:    "nil ValidatingWebhookConfiguration",
+			create:  func() (*AdmissionPolicy, error) { return NewFromValidatingWebhookConfiguration(nil) },
+			wantErr: "ValidatingWebhookConfiguration is nil",
+		},
+		{
+			name: "empty ValidatingWebhookConfiguration",
+			create: func() (*AdmissionPolicy, error) {
+				return NewFromValidatingWebhookConfiguration(&admissionregistrationv1.ValidatingWebhookConfiguration{})
+			},
+			wantErr: "ValidatingWebhookConfiguration does not contain CEL expressions",
+		},
+		{
+			name:    "nil MutatingWebhookConfiguration",
+			create:  func() (*AdmissionPolicy, error) { return NewFromMutatingWebhookConfiguration(nil) },
+			wantErr: "MutatingWebhookConfiguration is nil",
+		},
+		{
+			name: "empty MutatingWebhookConfiguration",
+			create: func() (*AdmissionPolicy, error) {
+				return NewFromMutatingWebhookConfiguration(&admissionregistrationv1.MutatingWebhookConfiguration{})
+			},
+			wantErr: "MutatingWebhookConfiguration does not contain CEL expressions",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := tt.create()
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %q, want to contain %q", err.Error(), tt.wantErr)
+			}
+		})
 	}
 }

@@ -18,6 +18,7 @@ package celtest
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/google/cel-go/cel"
 	admissionv1 "k8s.io/api/admission/v1"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	admissioncel "k8s.io/apiserver/pkg/admission/plugin/cel"
 	"k8s.io/apiserver/pkg/authentication/user"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
 // expressionAccessor implements admissioncel.ExpressionAccessor and
@@ -153,11 +155,14 @@ func buildEvaluationInputs(input *AdmissionInput) (*evaluationInputs, error) {
 	}, nil
 }
 
-func convertInputObject(value map[string]interface{}, defaultGVK schema.GroupVersionKind) (*unstructured.Unstructured, error) {
-	if value == nil {
+func convertInputObject(value interface{}, defaultGVK schema.GroupVersionKind) (*unstructured.Unstructured, error) {
+	object, err := convertObjectToUnstructured(value)
+	if err != nil {
+		return nil, err
+	}
+	if object == nil {
 		return nil, nil
 	}
-	object := &unstructured.Unstructured{Object: deepCopyMap(value)}
 	if gvk := object.GroupVersionKind(); gvk.Empty() {
 		object.SetGroupVersionKind(defaultGVK)
 	}
@@ -167,11 +172,32 @@ func convertInputObject(value map[string]interface{}, defaultGVK schema.GroupVer
 	return object, nil
 }
 
-func convertParamsObject(value map[string]interface{}) (*unstructured.Unstructured, error) {
-	if value == nil {
+func convertParamsObject(value interface{}) (*unstructured.Unstructured, error) {
+	return convertObjectToUnstructured(value)
+}
+
+func convertObjectToUnstructured(value interface{}) (*unstructured.Unstructured, error) {
+	if isNilObjectValue(value) {
 		return nil, nil
 	}
-	return &unstructured.Unstructured{Object: deepCopyMap(value)}, nil
+	switch typed := value.(type) {
+	case map[string]interface{}:
+		return &unstructured.Unstructured{Object: deepCopyMap(typed)}, nil
+	case runtime.Object:
+		content, err := runtime.DefaultUnstructuredConverter.ToUnstructured(typed)
+		if err != nil {
+			return nil, err
+		}
+		object := &unstructured.Unstructured{Object: content}
+		if gvk := object.GroupVersionKind(); gvk.Empty() {
+			if inferred, ok := gvkFromRuntimeObject(typed); ok {
+				object.SetGroupVersionKind(inferred)
+			}
+		}
+		return object, nil
+	default:
+		return nil, fmt.Errorf("unsupported value type %T, must be map[string]interface{} or runtime.Object", value)
+	}
 }
 
 func resolveEquivalentGVK(input *AdmissionInput) schema.GroupVersionKind {
@@ -188,10 +214,10 @@ func resolveEquivalentGVK(input *AdmissionInput) schema.GroupVersionKind {
 			}
 		}
 	}
-	if gvk, ok := gvkFromMap(input.Object); ok {
+	if gvk, ok := gvkFromValue(input.Object); ok {
 		return gvk
 	}
-	if gvk, ok := gvkFromMap(input.OldObject); ok {
+	if gvk, ok := gvkFromValue(input.OldObject); ok {
 		return gvk
 	}
 	return defaultObjectGVK()
@@ -314,6 +340,49 @@ func gvkFromMap(value map[string]interface{}) (schema.GroupVersionKind, bool) {
 	}
 	gvk := (&unstructured.Unstructured{Object: deepCopyMap(value)}).GroupVersionKind()
 	return gvk, !gvk.Empty()
+}
+
+func gvkFromValue(value interface{}) (schema.GroupVersionKind, bool) {
+	if isNilObjectValue(value) {
+		return schema.GroupVersionKind{}, false
+	}
+	switch typed := value.(type) {
+	case map[string]interface{}:
+		return gvkFromMap(typed)
+	case runtime.Object:
+		return gvkFromRuntimeObject(typed)
+	default:
+		return schema.GroupVersionKind{}, false
+	}
+}
+
+func gvkFromRuntimeObject(object runtime.Object) (schema.GroupVersionKind, bool) {
+	if object == nil {
+		return schema.GroupVersionKind{}, false
+	}
+	if gvk := object.GetObjectKind().GroupVersionKind(); !gvk.Empty() {
+		return gvk, true
+	}
+	// Custom types should set TypeMeta or provide AdmissionInput.Request.Kind,
+	// since they are not registered in the built-in client-go scheme.
+	gvks, _, err := clientgoscheme.Scheme.ObjectKinds(object)
+	if err != nil || len(gvks) == 0 || gvks[0].Empty() {
+		return schema.GroupVersionKind{}, false
+	}
+	return gvks[0], true
+}
+
+func isNilObjectValue(value interface{}) bool {
+	if value == nil {
+		return true
+	}
+	v := reflect.ValueOf(value)
+	switch v.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return v.IsNil()
+	default:
+		return false
+	}
 }
 
 func deepCopyMap(value map[string]interface{}) map[string]interface{} {
