@@ -19,12 +19,17 @@ package top
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sort"
+	"time"
+
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/discovery"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -46,6 +51,7 @@ type TopNodeOptions struct {
 	UseProtocolBuffers bool
 	ShowCapacity       bool
 	ShowSwap           bool
+	Watch              bool
 
 	NodeClient      corev1client.CoreV1Interface
 	Printer         *metricsutil.TopCmdPrinter
@@ -97,6 +103,7 @@ func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericiooption
 	cmd.Flags().BoolVar(&o.UseProtocolBuffers, "use-protocol-buffers", o.UseProtocolBuffers, "Enables using protocol-buffers to access Metrics API.")
 	cmd.Flags().BoolVar(&o.ShowCapacity, "show-capacity", o.ShowCapacity, "Print node resources based on Capacity instead of Allocatable(default) of the nodes.")
 	cmd.Flags().BoolVar(&o.ShowSwap, "show-swap", o.ShowSwap, "Print node resources related to swap memory.")
+	cmd.Flags().BoolVarP(&o.Watch, "watch", "w", o.Watch, "After listing the requested nodes, watch for changes by polling the metrics API.")
 
 	return cmd
 }
@@ -166,6 +173,14 @@ func (o TopNodeOptions) RunTopNode() error {
 		return errors.New("Metrics API not available")
 	}
 
+	if o.Watch {
+		return o.watchNodeMetrics(selector)
+	}
+
+	return o.fetchAndPrintNodeMetrics(selector)
+}
+
+func (o TopNodeOptions) fetchAndPrintNodeMetrics(selector labels.Selector) error {
 	metrics, err := getNodeMetricsFromMetricsAPI(o.MetricsClient, o.ResourceName, selector)
 	if err != nil {
 		return err
@@ -211,6 +226,183 @@ func (o TopNodeOptions) RunTopNode() error {
 	}
 
 	return o.Printer.PrintNodeMetrics(metrics.Items, availableResources, o.NoHeaders, o.SortBy)
+}
+
+func (o TopNodeOptions) watchNodeMetrics(selector labels.Selector) error {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	// Store previous metrics for delta calculation
+	previousMetrics := make(map[string]v1.ResourceList)
+	var previousMetricsItems []metricsapi.NodeMetrics
+
+	// Print initial metrics
+	metrics, err := getNodeMetricsFromMetricsAPI(o.MetricsClient, o.ResourceName, selector)
+	if err == nil && len(metrics.Items) > 0 {
+		if err := o.printNodeMetricsWithDelta(metrics.Items, previousMetrics); err != nil {
+			return err
+		}
+		updatePreviousNodeMetrics(metrics.Items, previousMetrics)
+		previousMetricsItems = metrics.Items
+	}
+
+	for range ticker.C {
+		metrics, err := getNodeMetricsFromMetricsAPI(o.MetricsClient, o.ResourceName, selector)
+		if err != nil {
+			fmt.Fprintf(o.ErrOut, "Error fetching metrics: %v\n", err)
+			continue
+		}
+
+		if len(metrics.Items) == 0 {
+			fmt.Fprintln(o.ErrOut, "Metrics not available yet")
+			continue
+		}
+
+		// Only update display if metrics changed
+		if nodeMetricsChanged(metrics.Items, previousMetricsItems) {
+			// Clear screen using ANSI escape codes (move cursor to home, then clear screen)
+			fmt.Fprint(o.Out, "\033[H\033[2J")
+
+			if err := o.printNodeMetricsWithDelta(metrics.Items, previousMetrics); err != nil {
+				fmt.Fprintf(o.ErrOut, "Error printing metrics: %v\n", err)
+			}
+			updatePreviousNodeMetrics(metrics.Items, previousMetrics)
+			previousMetricsItems = metrics.Items
+		}
+	}
+
+	return nil
+}
+
+func (o TopNodeOptions) printNodeMetricsWithDelta(metrics []metricsapi.NodeMetrics, previousMetrics map[string]v1.ResourceList) error {
+	if len(metrics) == 0 {
+		return nil
+	}
+
+	// Sort metrics
+	if len(o.SortBy) > 0 {
+		sort.Sort(metricsutil.NewNodeMetricsSorter(metrics, o.SortBy))
+	}
+
+	// Use TabWriter for proper column alignment
+	w := printers.GetNewTabWriter(o.Out)
+	defer w.Flush()
+
+	// Print header
+	fmt.Fprint(w, "NAME\tCPU(cores)\tCPU(Δ)\tCPU(Δ%)\tMEMORY(bytes)\tMEMORY(Δ)\tMEMORY(Δ%)\n")
+
+	// Print each node
+	for _, m := range metrics {
+		cpuQuantity := m.Usage[v1.ResourceCPU]
+		memQuantity := m.Usage[v1.ResourceMemory]
+
+		cpuAbsDelta := "-"
+		cpuPctDelta := "-"
+		memAbsDelta := "-"
+		memPctDelta := "-"
+
+		if prev, ok := previousMetrics[m.Name]; ok {
+			prevCPU := prev[v1.ResourceCPU]
+			prevMem := prev[v1.ResourceMemory]
+
+			if !prevCPU.IsZero() {
+				cpuDiff := cpuQuantity.MilliValue() - prevCPU.MilliValue()
+				cpuPctChange := float64(cpuDiff) / float64(prevCPU.MilliValue()) * 100
+				cpuAbsDelta = formatNodeAbsoluteDeltaCPU(cpuDiff)
+				cpuPctDelta = formatNodePercentDelta(cpuPctChange)
+			}
+
+			if !prevMem.IsZero() {
+				memDiff := memQuantity.Value() - prevMem.Value()
+				memPctChange := float64(memDiff) / float64(prevMem.Value()) * 100
+				memAbsDelta = formatNodeAbsoluteDeltaMemory(memDiff)
+				memPctDelta = formatNodePercentDelta(memPctChange)
+			}
+		}
+
+		fmt.Fprintf(w, "%s\t%vm\t%s\t%s\t%vMi\t%s\t%s\n",
+			m.Name,
+			cpuQuantity.MilliValue(),
+			cpuAbsDelta,
+			cpuPctDelta,
+			memQuantity.Value()/(1024*1024),
+			memAbsDelta,
+			memPctDelta,
+		)
+	}
+
+	return nil
+}
+
+func updatePreviousNodeMetrics(metrics []metricsapi.NodeMetrics, previousMetrics map[string]v1.ResourceList) {
+	for _, m := range metrics {
+		usage := make(v1.ResourceList)
+		m.Usage.DeepCopyInto(&usage)
+		previousMetrics[m.Name] = usage
+	}
+}
+
+func formatNodePercentDelta(change float64) string {
+	if change == 0 {
+		return "-"
+	}
+	sign := ""
+	if change > 0 {
+		sign = "+"
+	}
+	return fmt.Sprintf("%s%.1f%%", sign, change)
+}
+
+func formatNodeAbsoluteDeltaCPU(diffMillicores int64) string {
+	if diffMillicores == 0 {
+		return "-"
+	}
+	sign := ""
+	if diffMillicores > 0 {
+		sign = "+"
+	}
+	return fmt.Sprintf("%s%vm", sign, diffMillicores)
+}
+
+func formatNodeAbsoluteDeltaMemory(diffBytes int64) string {
+	if diffBytes == 0 {
+		return "-"
+	}
+	sign := ""
+	if diffBytes > 0 {
+		sign = "+"
+	}
+	diffMi := diffBytes / (1024 * 1024)
+	return fmt.Sprintf("%s%vMi", sign, diffMi)
+}
+
+func nodeMetricsChanged(current, previous []metricsapi.NodeMetrics) bool {
+	if len(current) != len(previous) {
+		return true
+	}
+
+	// Build a map of previous metrics for quick lookup
+	prevMap := make(map[string]v1.ResourceList)
+	for _, p := range previous {
+		usage := make(v1.ResourceList)
+		p.Usage.DeepCopyInto(&usage)
+		prevMap[p.Name] = usage
+	}
+
+	// Check if any metrics changed
+	for _, curr := range current {
+		prev, exists := prevMap[curr.Name]
+		if !exists {
+			return true // New node
+		}
+
+		if !curr.Usage[v1.ResourceCPU].Equal(prev[v1.ResourceCPU]) ||
+		   !curr.Usage[v1.ResourceMemory].Equal(prev[v1.ResourceMemory]) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func getNodeMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, resourceName string, selector labels.Selector) (*metricsapi.NodeMetricsList, error) {
