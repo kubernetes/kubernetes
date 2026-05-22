@@ -482,15 +482,13 @@ func TestEnsureRuleAlreadyExists(t *testing.T) {
 		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
 			func() ([]byte, []byte, error) { return []byte("iptables v1.9.22"), nil, nil },
-			// Success.
+			// Success on the -C call, meaning the rule exists.
 			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 		},
 	}
 	fexec := &fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			// iptables version check
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			// The second Command() call is checking the rule.  Success of that exec means "done".
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
@@ -515,17 +513,15 @@ func TestEnsureRuleNew(t *testing.T) {
 		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
 			func() ([]byte, []byte, error) { return []byte("iptables v1.9.22"), nil, nil },
-			// Status 1 on the first call.
+			// Status 1 on the -C call, meaning the rule doesn't exist
 			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
-			// Success on the second call.
+			// Success on the -A call.
 			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 		},
 	}
 	fexec := &fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			// iptables version check
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			// The second Command() call is checking the rule.  Failure of that means create it.
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
@@ -551,15 +547,13 @@ func TestEnsureRuleErrorChecking(t *testing.T) {
 		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
 			func() ([]byte, []byte, error) { return []byte("iptables v1.9.22"), nil, nil },
-			// Status 2 on the first call.
+			// Status 2 on the -C call, meaning something went wrong while checking.
 			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 2} },
 		},
 	}
 	fexec := &fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			// iptables version check
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			// The second Command() call is checking the rule.  Failure of that means create it.
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
@@ -578,17 +572,15 @@ func TestEnsureRuleErrorCreating(t *testing.T) {
 		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
 			func() ([]byte, []byte, error) { return []byte("iptables v1.9.22"), nil, nil },
-			// Status 1 on the first call.
+			// Status 1 on the -C call, meaning the rule doesn't exist.
 			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
-			// Status 1 on the second call.
+			// Status 1 on the -A call, meaning failure adding it.
 			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := &fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			// iptables version check
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			// The second Command() call is checking the rule.  Failure of that means create it.
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
@@ -608,15 +600,13 @@ func TestDeleteRuleDoesNotExist(t *testing.T) {
 		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
 			func() ([]byte, []byte, error) { return []byte("iptables v1.9.22"), nil, nil },
-			// Status 1 on the first call.
+			// Status 1 on the -C call, meaning the rule doesn't exist.
 			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := &fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			// iptables version check
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			// The second Command() call is checking the rule.  Failure of that exec means "does not exist".
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
@@ -638,17 +628,15 @@ func TestDeleteRuleExists(t *testing.T) {
 		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
 			func() ([]byte, []byte, error) { return []byte("iptables v1.9.22"), nil, nil },
-			// Success on the first call.
+			// Success on the -C call, meaning the rule exists.
 			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
-			// Success on the second call.
+			// Success on the -D call.
 			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
 		},
 	}
 	fexec := &fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			// iptables version check
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			// The second Command() call is checking the rule.  Success of that means delete it.
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
@@ -671,15 +659,13 @@ func TestDeleteRuleErrorChecking(t *testing.T) {
 		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
 			func() ([]byte, []byte, error) { return []byte("iptables v1.9.22"), nil, nil },
-			// Status 2 on the first call.
+			// Status 2 on the -C call, meaning something went wrong while checking.
 			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 2} },
 		},
 	}
 	fexec := &fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			// iptables version check
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			// The second Command() call is checking the rule.  Failure of that means create it.
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
 	}
@@ -698,17 +684,15 @@ func TestDeleteRuleErrorDeleting(t *testing.T) {
 		CombinedOutputScript: []fakeexec.FakeAction{
 			// iptables version check
 			func() ([]byte, []byte, error) { return []byte("iptables v1.9.22"), nil, nil },
-			// Success on the first call.
+			// Success on the -C call, meaning the rule exists.
 			func() ([]byte, []byte, error) { return []byte{}, nil, nil },
-			// Status 1 on the second call.
+			// Status 1 on the -D call, meaning failure to delete it.
 			func() ([]byte, []byte, error) { return nil, nil, &fakeexec.FakeExitError{Status: 1} },
 		},
 	}
 	fexec := &fakeexec.FakeExec{
 		CommandScript: []fakeexec.FakeCommandAction{
-			// iptables version check
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
-			// The second Command() call is checking the rule.  Success of that means delete it.
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 			func(cmd string, args ...string) exec.Cmd { return fakeexec.InitFakeCmd(&fcmd, cmd, args...) },
 		},
