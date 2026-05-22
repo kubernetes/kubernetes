@@ -871,6 +871,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.37"
+- name: InPlacePodVerticalScalingMemoryBackedVolumes
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.37"
 - name: InPlacePodVerticalScalingSchedulerPreemption
   versionedSpecs:
   - default: false
