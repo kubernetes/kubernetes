@@ -19,6 +19,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -186,4 +187,48 @@ func TestPruneTESTS(t *testing.T) {
 	_ = streamXML(writer, suites)
 	_ = writer.Flush()
 	assert.Equal(t, outputXML, output.String(), "tests in xml was not pruned correctly")
+}
+
+func TestAddOwner(t *testing.T) {
+	// Use packages in k/k so we can validate addOwner() directory walking
+	// on both Linux and Windows for directories returned by "go list".
+	tests := []struct {
+		name       string
+		pkg        string
+		wantPrefix string
+	}{
+		{
+			name:       "finds sig-api-machinery for apimachinery package",
+			pkg:        "k8s.io/kubernetes/test/integration/apimachinery",
+			wantPrefix: "[sig-api-machinery] ",
+		},
+		{
+			name:       "finds sig-cloud-provider for gce package",
+			pkg:        "k8s.io/kubernetes/cluster/gce/gci",
+			wantPrefix: "[sig-cloud-provider] ",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pkgs := newPackageOwners(true)
+			result := pkgs.addOwner(tt.pkg)
+			assert.Equal(t, tt.wantPrefix+tt.pkg, result)
+		})
+	}
+}
+
+func TestAddOwnerUNCPath(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("UNC paths are Windows-only")
+	}
+
+	// Validate the directory walking loop in addOwner terminates for Windows UNC paths.
+	pkgs := newPackageOwners(true)
+	pkgName := "k8s.iofake/pkg"
+	pkgs.pkgs[pkgName] = `\\server\share\some\path`
+
+	result := pkgs.addOwner(pkgName)
+	// No OWNERS file will be found, so name should be unchanged.
+	assert.Equal(t, pkgName, result, "walk over UNC path should terminate and return name unchanged")
 }

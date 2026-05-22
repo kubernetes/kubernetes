@@ -45,9 +45,10 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
+	resourceclaimmetrics "k8s.io/dynamic-resource-allocation/resourceclaim/metrics"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
-	resourceclaimmetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
+	controllermetrics "k8s.io/kubernetes/pkg/controller/resourceclaim/metrics"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/ptr"
@@ -1060,7 +1061,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	expectQueue(tCtx, []string{})
 
 	_, err = claimClient.Create(tCtx, testClaim, metav1.CreateOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: ""}, 1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: ""}, 1)
 	tCtx.Step("create claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
@@ -1077,8 +1078,8 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	})
 
 	_, err = claimClient.Update(tCtx, testClaimAllocated, metav1.UpdateOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: ""}, -1)
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: ""}, 1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: ""}, -1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: ""}, 1)
 	tCtx.Step("allocate claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
@@ -1097,7 +1098,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	otherClaimAllocated := testClaimAllocated.DeepCopy()
 	otherClaimAllocated.Name += "2"
 	_, err = claimClient.Create(tCtx, otherClaimAllocated, metav1.CreateOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: ""}, 1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: ""}, 1)
 	tCtx.Step("create allocated claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
@@ -1105,8 +1106,8 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	})
 
 	_, err = claimClient.Update(tCtx, testClaim, metav1.UpdateOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: ""}, 1)
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: ""}, -1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: ""}, 1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: ""}, -1)
 	tCtx.Step("deallocate claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
@@ -1114,7 +1115,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	})
 
 	err = claimClient.Delete(tCtx, testClaim.Name, metav1.DeleteOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: ""}, -1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: ""}, -1)
 	tCtx.Step("delete deallocated claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
@@ -1122,7 +1123,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	})
 
 	err = claimClient.Delete(tCtx, otherClaimAllocated.Name, metav1.DeleteOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: ""}, -1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: ""}, -1)
 	tCtx.Step("delete allocated claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
@@ -1130,7 +1131,7 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	})
 
 	_, err = claimClient.Create(tCtx, templatedTestClaimWithAdmin, metav1.CreateOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}, 1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}, 1)
 	tCtx.Step("create claim with admin access", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
@@ -1145,8 +1146,8 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	})
 
 	_, err = claimClient.Update(tCtx, templatedTestClaimWithAdminAllocated, metav1.UpdateOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}, -1)
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}, 1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}, -1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}, 1)
 	tCtx.Step("allocate claim with admin access", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
@@ -1163,59 +1164,59 @@ func TestResourceClaimEventHandler(t *testing.T) {
 	otherClaimAllocated = templatedTestClaimWithAdminAllocated.DeepCopy()
 	otherClaimAllocated.Name += "2"
 	_, err = claimClient.Create(tCtx, otherClaimAllocated, metav1.CreateOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}, 1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}, 1)
 	tCtx.Step("create allocated claim with admin access", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 	})
 
 	_, err = claimClient.Update(tCtx, templatedTestClaimWithAdmin, metav1.UpdateOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}, 1)
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}, -1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}, 1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}, -1)
 	tCtx.Step("deallocate claim with admin access", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 	})
 
 	err = claimClient.Delete(tCtx, templatedTestClaimWithAdmin.Name, metav1.DeleteOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}, -1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "true", Source: "resource_claim_template"}, -1)
 	tCtx.Step("delete deallocated claim with admin access", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 	})
 
 	err = claimClient.Delete(tCtx, otherClaimAllocated.Name, metav1.DeleteOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}, -1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "true", Source: "resource_claim_template"}, -1)
 	tCtx.Step("delete allocated claim with admin access", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 	})
 
 	_, err = claimClient.Create(tCtx, extendedTestClaim, metav1.CreateOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}, 1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}, 1)
 	tCtx.Step("create extended resource claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 	})
 
 	_, err = claimClient.Update(tCtx, extendedTestClaimAllocated, metav1.UpdateOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}, -1)
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: "extended_resource"}, 1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}, -1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: "extended_resource"}, 1)
 	tCtx.Step("allocate extended resource claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 	})
 
 	_, err = claimClient.Update(tCtx, extendedTestClaim, metav1.UpdateOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}, 1)
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: "extended_resource"}, -1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}, 1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "true", AdminAccess: "false", Source: "extended_resource"}, -1)
 	tCtx.Step("deallocate extended resource claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
 	})
 
 	err = claimClient.Delete(tCtx, extendedTestClaim.Name, metav1.DeleteOptions{})
-	em = em.withUpdates(resourceclaimmetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}, -1)
+	em = em.withUpdates(controllermetrics.NumResourceClaimLabels{Allocated: "false", AdminAccess: "false", Source: "extended_resource"}, -1)
 	tCtx.Step("delete extended resource claim", func(tCtx ktesting.TContext) {
 		tCtx.ExpectNoError(err)
 		em.Eventually(tCtx)
@@ -1238,7 +1239,7 @@ func testEventHandlers(tCtx ktesting.TContext) {
 		updateObjects   []object
 		deleteObjects   []object
 		expectedKeys    []string
-		expectedMetrics map[resourceclaimmetrics.NumResourceClaimLabels]float64
+		expectedMetrics map[controllermetrics.NumResourceClaimLabels]float64
 	}{
 		"nothing": {},
 		"new-podgroup-feature-disabled": {
@@ -1256,7 +1257,7 @@ func testEventHandlers(tCtx ktesting.TContext) {
 			initialObjects: []runtime.Object{testPodGroupClaim},
 			createObjects:  []object{testPodGroupWithResourceInStatus},
 			expectedKeys:   []string{},
-			expectedMetrics: map[resourceclaimmetrics.NumResourceClaimLabels]float64{
+			expectedMetrics: map[controllermetrics.NumResourceClaimLabels]float64{
 				{Allocated: "false", AdminAccess: "false"}: 1,
 			},
 		},
@@ -1265,7 +1266,7 @@ func testEventHandlers(tCtx ktesting.TContext) {
 			initialObjects: []runtime.Object{testPodGroupWithResourceInStatus},
 			createObjects:  []object{testPodGroupClaim},
 			expectedKeys:   []string{testClaimKey},
-			expectedMetrics: map[resourceclaimmetrics.NumResourceClaimLabels]float64{
+			expectedMetrics: map[controllermetrics.NumResourceClaimLabels]float64{
 				{Allocated: "false", AdminAccess: "false"}: 1,
 			},
 		},
@@ -1748,7 +1749,7 @@ func createResourceClaimReactor() func(action k8stesting.Action) (handled bool, 
 }
 
 type numMetrics struct {
-	metrics map[resourceclaimmetrics.NumResourceClaimLabels]float64
+	metrics map[controllermetrics.NumResourceClaimLabels]float64
 	lister  resourcelisters.ResourceClaimLister
 }
 
@@ -1767,7 +1768,7 @@ func getNumMetric(lister resourcelisters.ResourceClaimLister, logger klog.Logger
 		return numMetrics{}, fmt.Errorf("failed to gather metrics: %w", err)
 	}
 
-	metricName := "resourceclaim_controller_resource_claims"
+	metricName := "dynamic_resource_allocation_resource_claims"
 
 	em = newNumMetrics(lister)
 
@@ -1786,7 +1787,7 @@ func getNumMetric(lister resourcelisters.ResourceClaimLister, logger klog.Logger
 			source := labels["source"]
 			value := metric.GetGauge().GetValue()
 
-			em.metrics[resourceclaimmetrics.NumResourceClaimLabels{
+			em.metrics[controllermetrics.NumResourceClaimLabels{
 				Allocated:   allocated,
 				AdminAccess: adminAccess,
 				Source:      source,
@@ -1871,18 +1872,18 @@ func handleErr(t *testing.T, err error, metricName string) {
 }
 func setupMetrics() {
 	// Enable test mode to prevent global custom collector registration
-	resourceclaimmetrics.SetTestMode(true)
+	controllermetrics.SetTestMode(true)
 
 	// Reset counter metrics for each test (they are registered by the controller itself)
 	resourceclaimmetrics.ResourceClaimCreate.Reset()
 }
 
 func newNumMetrics(lister resourcelisters.ResourceClaimLister) numMetrics {
-	metrics := make(map[resourceclaimmetrics.NumResourceClaimLabels]float64)
+	metrics := make(map[controllermetrics.NumResourceClaimLabels]float64)
 	for _, allocated := range []string{"false", "true"} {
 		for _, adminAccess := range []string{"false", "true"} {
 			for _, source := range []string{"", "extended_resource", "resource_claim_template"} {
-				metrics[resourceclaimmetrics.NumResourceClaimLabels{
+				metrics[controllermetrics.NumResourceClaimLabels{
 					Allocated:   allocated,
 					AdminAccess: adminAccess,
 					Source:      source,
@@ -1896,7 +1897,7 @@ func newNumMetrics(lister resourcelisters.ResourceClaimLister) numMetrics {
 	}
 }
 
-func (em numMetrics) withUpdates(rcLabels resourceclaimmetrics.NumResourceClaimLabels, n float64) numMetrics {
+func (em numMetrics) withUpdates(rcLabels controllermetrics.NumResourceClaimLabels, n float64) numMetrics {
 	em.metrics[rcLabels] += n
 	return numMetrics{
 		metrics: em.metrics,

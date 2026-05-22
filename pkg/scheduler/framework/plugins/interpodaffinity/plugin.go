@@ -190,7 +190,7 @@ func (pl *InterPodAffinity) isSchedulableAfterAssignedPodChange(logger klog.Logg
 				"pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
 			return fwk.Queue, nil
 		}
-		if podMatchesAllAffinityTerms(antiTerms, originalPod) && !podMatchesAllAffinityTerms(antiTerms, modifiedPod) {
+		if podMatchesAnyAffinityTerms(antiTerms, originalPod) && !podMatchesAnyAffinityTerms(antiTerms, modifiedPod) {
 			logger.V(5).Info("a scheduled pod was updated not to match the target pod's anti affinity, and the pod may be schedulable now",
 				"pod", klog.KObj(pod), "modifiedPod", klog.KObj(modifiedPod))
 			return fwk.Queue, nil
@@ -214,7 +214,7 @@ func (pl *InterPodAffinity) isSchedulableAfterAssignedPodChange(logger klog.Logg
 
 	// Pod is deleted. Return Queue when the deleted pod matches the target pod's anti-affinity or vice versa.
 
-	if podMatchesAllAffinityTerms(antiTerms, originalPod) {
+	if podMatchesAnyAffinityTerms(antiTerms, originalPod) {
 		logger.V(5).Info("a scheduled pod was deleted and it matches the target pod's anti-affinity. The pod may be schedulable now",
 			"pod", klog.KObj(pod), "originalPod", klog.KObj(originalPod))
 		return fwk.Queue, nil
@@ -224,7 +224,7 @@ func (pl *InterPodAffinity) isSchedulableAfterAssignedPodChange(logger klog.Logg
 	if err != nil {
 		return fwk.Queue, err
 	}
-	if podMatchesAllAffinityTerms(originalPodAntiTerms, pod) {
+	if podMatchesAnyAffinityTerms(originalPodAntiTerms, pod) {
 		logger.V(5).Info("a scheduled pod was deleted and the target pod matches the deleted pod's anti-affinity. The pod may be schedulable now",
 			"pod", klog.KObj(pod), "originalPod", klog.KObj(originalPod))
 		return fwk.Queue, nil

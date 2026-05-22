@@ -28,7 +28,7 @@ package v1
 // Note that this is identical to a secret volume source without the default
 // mode.
 type SecretProjectionApplyConfiguration struct {
-	LocalObjectReferenceApplyConfiguration `json:",inline"`
+	LocalObjectReferenceApplyConfiguration `json:""`
 	// items if unspecified, each key-value pair in the Data field of the referenced
 	// Secret will be projected into the volume as a file whose name is the
 	// key and content is the value. If specified, the listed keys will be

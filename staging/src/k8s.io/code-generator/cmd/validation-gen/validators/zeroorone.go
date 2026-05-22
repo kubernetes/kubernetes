@@ -18,6 +18,7 @@ package validators
 
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
@@ -31,37 +32,31 @@ func init() {
 	// between them.  The tags are on struct fields, but the validation
 	// actually pertains to the struct itself.
 	shared := map[string]unions{}
-	RegisterTypeValidator(zeroOrOneOfTypeOrFieldValidator{shared})
-	RegisterFieldValidator(zeroOrOneOfTypeOrFieldValidator{shared})
 	RegisterTagValidator(zeroOrOneOfMemberTagValidator{shared})
 }
 
-type zeroOrOneOfTypeOrFieldValidator struct {
-	shared map[string]unions
-}
+func getZeroOrOneOfValidations(shared map[string]unions, context Context) (Validations, error) {
+	// unions are keyed by ParentPath for struct fields (ScopeField), or Path for others.
+	structPath := context.ParentPath.String()
 
-func (zeroOrOneOfTypeOrFieldValidator) Init(_ Config) {}
-
-func (zeroOrOneOfTypeOrFieldValidator) Name() string {
-	return "zeroOrOneOfTypeOrFieldValidator"
-}
-
-func (ztfv zeroOrOneOfTypeOrFieldValidator) GetValidations(context Context) (Validations, error) {
 	// Gengo does not treat struct definitions as aliases, which is
 	// inconsistent but unlikely to change. That means we don't REALLY need to
 	// handle it here, but let's be extra careful and extract the most concrete
 	// type possible.
-	if k := util.NonPointer(util.NativeType(context.Type)).Kind; k != types.Struct && k != types.Slice {
+	if k := util.NonPointer(util.NativeType(context.ParentType)).Kind; k != types.Struct && k != types.Slice {
 		return Validations{}, nil
 	}
 
-	unions := ztfv.shared[context.Path.String()]
+	unions := shared[structPath]
 	if len(unions) == 0 {
 		return Validations{}, nil
 	}
+	delete(shared, structPath)
 
-	return processUnionValidations(context, unions, zeroOrOneOfVariablePrefix,
-		zeroOrOneOfMemberTagName, zeroOrOneOfUnionValidator, types.Name{})
+	result, err := processUnionValidations(context.ParentPath, context.ParentType, unions, zeroOrOneOfVariablePrefix,
+		zeroOrOneOfMemberTagName, zeroOrOneOfUnionValidator, types.Name{},
+		Emission{field.ErrorTypeInvalid, "zeroOrOneOf", ""})
+	return result, err
 }
 
 const (
@@ -92,9 +87,13 @@ func (zmtv zeroOrOneOfMemberTagValidator) GetValidations(context Context, tag co
 	if err != nil {
 		return Validations{}, err
 	}
-	// This tag does not actually emit any validations, it just accumulates
-	// information. The validation is done by the zeroOrOneOfTypeOrFieldValidator.
-	return Validations{}, nil
+	return Validations{
+		Deferred: []DeferredGen{
+			Deferred(ParentContext, func() (Validations, error) {
+				return getZeroOrOneOfValidations(zmtv.shared, context)
+			}),
+		},
+	}, nil
 }
 
 func (zmtv zeroOrOneOfMemberTagValidator) Docs() TagDoc {

@@ -709,14 +709,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			pred:        storage.Everything,
 			expectedOut: []example.Pod{*updatedPod},
 			expectCacherRequestsToEtcd: func() []RecordedList {
-				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
-					return nil
-				}
-				return []RecordedList{
-					{
-						Key: "/registry/pods/first/",
-					},
-				}
+				return nil
 			},
 		},
 		{
@@ -878,14 +871,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			pred:        storage.Everything,
 			expectedOut: []example.Pod{},
 			expectCacherRequestsToEtcd: func() []RecordedList {
-				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
-					return nil
-				}
-				return []RecordedList{
-					{
-						Key: "/registry/pods/non-existing/",
-					},
-				}
+				return nil
 			},
 		},
 		{
@@ -897,14 +883,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 			expectedOut: []example.Pod{},
 			expectCacherRequestsToEtcd: func() []RecordedList {
-				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
-					return nil
-				}
-				return []RecordedList{
-					{
-						Key: "/registry/pods/first/",
-					},
-				}
+				return nil
 			},
 		},
 		{
@@ -932,15 +911,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Name+"\x00", int64(mustAtoi(currentRV))),
 			expectedRemainingItemCount: ptr.To[int64](1),
 			expectCacherRequestsToEtcd: func() []RecordedList {
-				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
-					return nil
-				}
-				return []RecordedList{
-					{
-						Key:         "/registry/pods/second/",
-						ListOptions: kubernetes.ListOptions{Revision: 0, Limit: 1},
-					},
-				}
+				return nil
 			},
 		},
 		{
@@ -1151,14 +1122,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			pred:        storage.Everything,
 			expectedOut: []example.Pod{*createdPods[1], *createdPods[2]},
 			expectCacherRequestsToEtcd: func() []RecordedList {
-				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
-					return nil
-				}
-				return []RecordedList{
-					{
-						Key: "/registry/pods/second/",
-					},
-				}
+				return nil
 			},
 		},
 		{
@@ -1180,23 +1144,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectedOut:    []example.Pod{*createdPods[3]},
 			expectContinue: true,
 			expectCacherRequestsToEtcd: func() []RecordedList {
-				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
-					return nil
-				}
-				return []RecordedList{
-					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Limit: 1},
-					},
-					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 2, Continue: "/registry/pods/first/bar\x00"},
-					},
-					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 4, Continue: "/registry/pods/second/foo\x00"},
-					},
-				}
+				return nil
 			},
 		},
 		{
@@ -1224,19 +1172,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectedOut:    []example.Pod{*createdPods[3]},
 			expectContinue: false,
 			expectCacherRequestsToEtcd: func() []RecordedList {
-				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
-					return nil
-				}
-				return []RecordedList{
-					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: 0, Limit: 2},
-					},
-					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 4, Continue: "/registry/pods/second/bar\x00"},
-					},
-				}
+				return nil
 			},
 		},
 		{
@@ -1276,15 +1212,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectContinue: true,
 			expectedOut:    []example.Pod{*updatedPod, *createdPods[1]},
 			expectCacherRequestsToEtcd: func() []RecordedList {
-				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
-					return nil
-				}
-				return []RecordedList{
-					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: 0, Limit: 2},
-					},
-				}
+				return nil
 			},
 		},
 		{
@@ -1310,19 +1238,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 			expectedOut: []example.Pod{*createdPods[2], *createdPods[4]},
 			expectCacherRequestsToEtcd: func() []RecordedList {
-				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
-					return nil
-				}
-				return []RecordedList{
-					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: 0, Limit: 2},
-					},
-					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: int64(continueRV) + 1, Limit: 4, Continue: "/registry/pods/second/bar\x00"},
-					},
-				}
+				return nil
 			},
 		},
 		{
@@ -1417,15 +1333,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 			expectedOut: []example.Pod{*createdPods[2], *createdPods[4]},
 			expectCacherRequestsToEtcd: func() []RecordedList {
-				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
-					return nil
-				}
-				return []RecordedList{
-					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: 0, Limit: 5},
-					},
-				}
+				return nil
 			},
 		},
 		{
@@ -1450,15 +1358,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			},
 			expectedOut: []example.Pod{*createdPods[3]},
 			expectCacherRequestsToEtcd: func() []RecordedList {
-				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
-					return nil
-				}
-				return []RecordedList{
-					{
-						Key:         "/registry/pods/",
-						ListOptions: kubernetes.ListOptions{Revision: 0, Limit: 5},
-					},
-				}
+				return nil
 			},
 		},
 		{
@@ -1479,14 +1379,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			pred:        storage.Everything,
 			expectedOut: []example.Pod{*updatedPod, *createdPods[1], *createdPods[2], *createdPods[3], *createdPods[4]},
 			expectCacherRequestsToEtcd: func() []RecordedList {
-				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
-					return nil
-				}
-				return []RecordedList{
-					{
-						Key: "/registry/pods/",
-					},
-				}
+				return nil
 			},
 		},
 		{
@@ -1529,14 +1422,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectRV:    currentRV,
 			expectedOut: []example.Pod{},
 			expectCacherRequestsToEtcd: func() []RecordedList {
-				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) {
-					return nil
-				}
-				return []RecordedList{
-					{
-						Key: "/registry/pods/empty/",
-					},
-				}
+				return nil
 			},
 		},
 		{
@@ -1725,7 +1611,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			rvMatch:     metav1.ResourceVersionMatchExact,
 			expectRV:    fmt.Sprint(continueRV + 1),
 			expectCacherRequestsToEtcd: func() []RecordedList {
-				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
 					return nil
 				}
 				return []RecordedList{
@@ -1955,7 +1841,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectContinueExact:        encodeContinueOrDie(updatedPod.Namespace+"/"+updatedPod.Name+"\x00", int64(continueRV+1)),
 			expectedRemainingItemCount: ptr.To[int64](4),
 			expectCacherRequestsToEtcd: func() []RecordedList {
-				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
 					return nil
 				}
 				return []RecordedList{
@@ -2148,7 +2034,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectContinueExact:        encodeContinueOrDie(createdPods[1].Namespace+"/"+createdPods[1].Name+"\x00", int64(continueRV+1)),
 			expectedRemainingItemCount: ptr.To[int64](3),
 			expectCacherRequestsToEtcd: func() []RecordedList {
-				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
 					return nil
 				}
 				return []RecordedList{
@@ -2170,7 +2056,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectedOut: []example.Pod{*createdPods[1], *createdPods[2], *createdPods[3], *createdPods[4]},
 			expectRV:    currentRV,
 			expectCacherRequestsToEtcd: func() []RecordedList {
-				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
 					return nil
 				}
 				return []RecordedList{
@@ -2196,7 +2082,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectRV:                   currentRV,
 			expectedRemainingItemCount: ptr.To[int64](2),
 			expectCacherRequestsToEtcd: func() []RecordedList {
-				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
 					return nil
 				}
 				return []RecordedList{
@@ -2218,7 +2104,7 @@ func RunTestList(ctx context.Context, t *testing.T, store storage.Interface, com
 			expectedOut: []example.Pod{*createdPods[3], *createdPods[4]},
 			expectRV:    currentRV,
 			expectCacherRequestsToEtcd: func() []RecordedList {
-				if utilfeature.DefaultFeatureGate.Enabled(features.ConsistentListFromCache) && utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
+				if utilfeature.DefaultFeatureGate.Enabled(features.ListFromCacheSnapshot) {
 					return nil
 				}
 				return []RecordedList{
@@ -2377,6 +2263,87 @@ func ExpectContinueMatches(t *testing.T, expect, got string) {
 		return
 	}
 	t.Errorf("expected continue token: %s, got: %s", expectDecoded, gotDecoded)
+}
+
+// RunTestDeleteWithConflictAndMissingExpectedTransformOrDecodeError verifies that, when
+// ExpectTransformOrDecodeError is true, the delete will fail if a concurrent write makes it
+// possible to decode the object.
+func RunTestDeleteWithConflictAndMissingExpectedTransformOrDecodeError(ctx context.Context, t testing.TB, store storage.Interface, setFailing func(bool)) {
+	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}}
+	key := computePodKey(obj)
+	out := &example.Pod{}
+	if err := store.Create(ctx, key, obj, out, 0); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	// During validation (immediately before executing the optimistic delete transaction),
+	// simulate a concurrent update that both increases the current revision and allows the next
+	// TransformFromStorage/Decode to succeed.
+	validateCount := 0
+	injectUpdate := func(_ context.Context, _ runtime.Object) error {
+		validateCount++
+		if validateCount > 1 {
+			return nil
+		}
+
+		setFailing(false)
+
+		return store.GuaranteedUpdate(ctx, key, &example.Pod{}, false, nil,
+			storage.SimpleUpdate(func(obj runtime.Object) (runtime.Object, error) {
+				pod := obj.(*example.Pod)
+				pod.Labels = map[string]string{"updated": "true"}
+				return pod, nil
+			}), nil)
+	}
+
+	// Initially, TransformFromStorage or Decode should fail.
+	setFailing(true)
+
+	err := store.Delete(ctx, key, &example.Pod{}, nil, injectUpdate, nil,
+		storage.DeleteOptions{ExpectTransformOrDecodeError: true})
+	if !storage.IsInvalidObj(err) {
+		t.Fatalf("Expected Delete to return an 'Invalid Object' error: %v", err)
+	}
+}
+
+// RunTestDeleteExpectedTransformOrDecodeError tests that an object that cannot be transformed or
+// decoded from storage can be deleted using the ExpectTransformOrDecodeError option.
+func RunTestDeleteExpectedTransformOrDecodeError(ctx context.Context, t testing.TB, store storage.Interface, setFailing func(bool)) {
+	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}}
+	key := computePodKey(obj)
+	out := &example.Pod{}
+	if err := store.Create(ctx, key, obj, out, 0); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	setFailing(true)
+	err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, nil,
+		storage.DeleteOptions{ExpectTransformOrDecodeError: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.Get(ctx, key, storage.GetOptions{}, &example.Pod{}); !storage.IsNotFound(err) {
+		t.Errorf("Unexpected error on reading object: %v", err)
+	}
+}
+
+// RunTestDeleteWithSuggestionAndMissingExpectedTransformOrDecodeError verifies that, when
+// ExpectTransformOrDecodeError is true, passing a suggested object does not bypass transformation
+// or decoding of the serialized object in storage.
+func RunTestDeleteWithSuggestionAndMissingExpectedTransformOrDecodeError(ctx context.Context, t testing.TB, store storage.Interface) {
+	obj := &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test-ns"}}
+	key := computePodKey(obj)
+	out := &example.Pod{}
+	if err := store.Create(ctx, key, obj, out, 0); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	err := store.Delete(ctx, key, &example.Pod{}, nil, storage.ValidateAllObjectFunc, out,
+		storage.DeleteOptions{ExpectTransformOrDecodeError: true})
+	if !storage.IsInvalidObj(err) {
+		t.Fatalf("Expected Delete to return an 'Invalid Object' error: %v", err)
+	}
 }
 
 func RunTestConsistentList(ctx context.Context, t *testing.T, store storage.Interface, increaseRV IncreaseRVFunc, cacheEnabled, consistentReadsSupported, listFromCacheSnapshot bool) {

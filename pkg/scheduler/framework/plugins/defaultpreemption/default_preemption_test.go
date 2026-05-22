@@ -2459,6 +2459,19 @@ type fakePodActivator struct {
 
 func (f *fakePodActivator) Activate(logger klog.Logger, pods map[string]*v1.Pod) {}
 
+type mockProposedAssignment struct {
+	nodeName string
+	pod      *v1.Pod
+}
+
+func (pa *mockProposedAssignment) GetNodeName() string {
+	return pa.nodeName
+}
+
+func (pa *mockProposedAssignment) GetPod() *v1.Pod {
+	return pa.pod
+}
+
 func TestPreEnqueue(t *testing.T) {
 	onePodRes := map[v1.ResourceName]string{v1.ResourcePods: "1"}
 	tests := []struct {
@@ -2624,12 +2637,23 @@ func TestPreEnqueue(t *testing.T) {
 					t.Fatalf("could not find pg: %v", err)
 				}
 				podsToPreempt := []*v1.Pod{tt.podToTriggerPreemption}
-				pgSchedulingFunc := func(ctx context.Context) *fwk.Status {
+				var pgSchedulingFunc framework.PodGroupSchedulingFunc = func(_ context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
 					nodeInfo, _ := f.SnapshotSharedLister().NodeInfos().Get("node1")
 					if len(nodeInfo.GetPods()) == 0 {
-						return fwk.NewStatus(fwk.Success)
+						return &fwk.PodGroupAssignments{
+							ProposedAssignments: []fwk.ProposedAssignment{
+								&mockProposedAssignment{
+									nodeName: "node1",
+									pod:      tt.podToTriggerPreemption,
+								},
+								&mockProposedAssignment{
+									nodeName: "node1",
+									pod:      tt.podToCheck,
+								},
+							},
+						}, fwk.NewStatus(fwk.Success)
 					}
-					return fwk.NewStatus(fwk.Unschedulable, "need to preempt")
+					return nil, fwk.NewStatus(fwk.Unschedulable, "need to preempt")
 				}
 				p.PodGroupPostFilter(ctx, pg, podsToPreempt, pgSchedulingFunc)
 			} else {

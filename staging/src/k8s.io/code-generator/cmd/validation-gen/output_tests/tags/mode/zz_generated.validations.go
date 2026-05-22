@@ -38,87 +38,148 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	// type ChainedValidation
-	scheme.AddValidationFunc((*ChainedValidation)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_ChainedValidation(ctx, op, nil /* fldPath */, obj.(*ChainedValidation), safe.Cast[*ChainedValidation](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*ChainedValidation)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_ChainedValidation(
+					ctx, op, nil, /* fldPath */
+					obj.(*ChainedValidation),
+					safe.Cast[*ChainedValidation](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type Collections
-	scheme.AddValidationFunc((*Collections)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_Collections(ctx, op, nil /* fldPath */, obj.(*Collections), safe.Cast[*Collections](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*Collections)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_Collections(
+					ctx, op, nil, /* fldPath */
+					obj.(*Collections),
+					safe.Cast[*Collections](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type ImplicitForbidden
-	scheme.AddValidationFunc((*ImplicitForbidden)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_ImplicitForbidden(ctx, op, nil /* fldPath */, obj.(*ImplicitForbidden), safe.Cast[*ImplicitForbidden](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*ImplicitForbidden)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_ImplicitForbidden(
+					ctx, op, nil, /* fldPath */
+					obj.(*ImplicitForbidden),
+					safe.Cast[*ImplicitForbidden](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type MultipleDiscriminators
-	scheme.AddValidationFunc((*MultipleDiscriminators)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_MultipleDiscriminators(ctx, op, nil /* fldPath */, obj.(*MultipleDiscriminators), safe.Cast[*MultipleDiscriminators](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*MultipleDiscriminators)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_MultipleDiscriminators(
+					ctx, op, nil, /* fldPath */
+					obj.(*MultipleDiscriminators),
+					safe.Cast[*MultipleDiscriminators](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type NonStringDiscriminator
-	scheme.AddValidationFunc((*NonStringDiscriminator)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_NonStringDiscriminator(ctx, op, nil /* fldPath */, obj.(*NonStringDiscriminator), safe.Cast[*NonStringDiscriminator](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*NonStringDiscriminator)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_NonStringDiscriminator(
+					ctx, op, nil, /* fldPath */
+					obj.(*NonStringDiscriminator),
+					safe.Cast[*NonStringDiscriminator](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type SharedField
-	scheme.AddValidationFunc((*SharedField)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_SharedField(ctx, op, nil /* fldPath */, obj.(*SharedField), safe.Cast[*SharedField](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*SharedField)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_SharedField(
+					ctx, op, nil, /* fldPath */
+					obj.(*SharedField),
+					safe.Cast[*SharedField](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type StrictUnion
-	scheme.AddValidationFunc((*StrictUnion)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_StrictUnion(ctx, op, nil /* fldPath */, obj.(*StrictUnion), safe.Cast[*StrictUnion](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*StrictUnion)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_StrictUnion(
+					ctx, op, nil, /* fldPath */
+					obj.(*StrictUnion),
+					safe.Cast[*StrictUnion](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
 // Validate_ChainedValidation validates an instance of ChainedValidation according
 // to declarative validation rules in the API schema.
-func Validate_ChainedValidation(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ChainedValidation) (errs field.ErrorList) {
-	errs = append(errs, validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldA", func(obj *ChainedValidation) *string { return obj.FieldA }, func(obj *ChainedValidation) string { return obj.D1 }, validate.DirectEqualPtr, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-		errs := field.ErrorList{}
-		errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
-		return errs
-	}, []validate.DiscriminatedRule[*string, string]{
-		{
-			Value: "A", Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-				errs := field.ErrorList{}
-				earlyReturn := false
-				if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
+func Validate_ChainedValidation(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *ChainedValidation) (errs field.ErrorList) {
+
+	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldA",
+		func(obj *ChainedValidation) *string { return obj.FieldA },
+		func(obj *ChainedValidation) string { return obj.D1 }, validate.DirectEqualPtr,
+		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+			errs := field.ErrorList{}
+			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
+			return errs
+		},
+		[]validate.DiscriminatedRule[*string, string]{
+
+			{
+				Value: "A",
+				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+					errs := field.ErrorList{}
+					earlyReturn := false
+					if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+						errs = append(errs, e...)
+						earlyReturn = true
+					}
+					if earlyReturn {
+						return errs
+					}
+					errs = append(errs, validate.MaxLength(ctx, op, fldPath, obj, oldObj, 5)...)
 					return errs
-				}
-				errs = append(errs, validate.MaxLength(ctx, op, fldPath, obj, oldObj, 5)...)
-				return errs
-			}},
-	})...)
+				},
+			},
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
 
 	// field ChainedValidation.TypeMeta has no validation
 	// field ChainedValidation.D1 has no validation
@@ -128,43 +189,64 @@ func Validate_ChainedValidation(ctx context.Context, op operation.Operation, fld
 
 // Validate_Collections validates an instance of Collections according
 // to declarative validation rules in the API schema.
-func Validate_Collections(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Collections) (errs field.ErrorList) {
-	errs = append(errs, validate.Discriminated(ctx, op, fldPath, obj, oldObj, "listField", func(obj *Collections) []string { return obj.ListField }, func(obj *Collections) string { return obj.D1 }, validate.SemanticDeepEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []string) field.ErrorList {
-		errs := field.ErrorList{}
-		errs = append(errs, validate.ForbiddenSlice(ctx, op, fldPath, obj, oldObj)...)
-		return errs
-	}, []validate.DiscriminatedRule[[]string, string]{
-		{
-			Value: "A", Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []string) field.ErrorList {
-				errs := field.ErrorList{}
-				earlyReturn := false
-				if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					earlyReturn = true
-				}
-				if earlyReturn {
+func Validate_Collections(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *Collections) (errs field.ErrorList) {
+
+	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "listField",
+		func(obj *Collections) []string { return obj.ListField },
+		func(obj *Collections) string { return obj.D1 }, validate.SemanticDeepEqual,
+		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []string) field.ErrorList {
+			errs := field.ErrorList{}
+			errs = append(errs, validate.ForbiddenSlice(ctx, op, fldPath, obj, oldObj)...)
+			return errs
+		},
+		[]validate.DiscriminatedRule[[]string, string]{
+
+			{
+				Value: "A",
+				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj []string) field.ErrorList {
+					errs := field.ErrorList{}
+					earlyReturn := false
+					if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+						earlyReturn = true
+					}
+					if earlyReturn {
+						return errs
+					}
 					return errs
-				}
-				return errs
-			}},
-	})...)
-	errs = append(errs, validate.Discriminated(ctx, op, fldPath, obj, oldObj, "mapField", func(obj *Collections) map[string]string { return obj.MapField }, func(obj *Collections) string { return obj.D1 }, validate.SemanticDeepEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj map[string]string) field.ErrorList {
-		errs := field.ErrorList{}
-		errs = append(errs, validate.ForbiddenMap(ctx, op, fldPath, obj, oldObj)...)
-		return errs
-	}, []validate.DiscriminatedRule[map[string]string, string]{
-		{
-			Value: "A", Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj map[string]string) field.ErrorList {
-				errs := field.ErrorList{}
-				earlyReturn := false
-				if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					earlyReturn = true
-				}
-				if earlyReturn {
+				},
+			},
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "mapField",
+		func(obj *Collections) map[string]string { return obj.MapField },
+		func(obj *Collections) string { return obj.D1 }, validate.SemanticDeepEqual,
+		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj map[string]string) field.ErrorList {
+			errs := field.ErrorList{}
+			errs = append(errs, validate.ForbiddenMap(ctx, op, fldPath, obj, oldObj)...)
+			return errs
+		},
+		[]validate.DiscriminatedRule[map[string]string, string]{
+
+			{
+				Value: "A",
+				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj map[string]string) field.ErrorList {
+					errs := field.ErrorList{}
+					earlyReturn := false
+					if e := validate.OptionalMap(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+						earlyReturn = true
+					}
+					if earlyReturn {
+						return errs
+					}
 					return errs
-				}
-				return errs
-			}},
-	})...)
+				},
+			},
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
 
 	// field Collections.TypeMeta has no validation
 	// field Collections.D1 has no validation
@@ -175,25 +257,37 @@ func Validate_Collections(ctx context.Context, op operation.Operation, fldPath *
 
 // Validate_ImplicitForbidden validates an instance of ImplicitForbidden according
 // to declarative validation rules in the API schema.
-func Validate_ImplicitForbidden(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *ImplicitForbidden) (errs field.ErrorList) {
-	errs = append(errs, validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldA", func(obj *ImplicitForbidden) *string { return obj.FieldA }, func(obj *ImplicitForbidden) string { return obj.D1 }, validate.DirectEqualPtr, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-		errs := field.ErrorList{}
-		errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
-		return errs
-	}, []validate.DiscriminatedRule[*string, string]{
-		{
-			Value: "A", Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-				errs := field.ErrorList{}
-				earlyReturn := false
-				if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					earlyReturn = true
-				}
-				if earlyReturn {
+func Validate_ImplicitForbidden(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *ImplicitForbidden) (errs field.ErrorList) {
+
+	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldA",
+		func(obj *ImplicitForbidden) *string { return obj.FieldA },
+		func(obj *ImplicitForbidden) string { return obj.D1 }, validate.DirectEqualPtr,
+		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+			errs := field.ErrorList{}
+			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
+			return errs
+		},
+		[]validate.DiscriminatedRule[*string, string]{
+
+			{
+				Value: "A",
+				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+					errs := field.ErrorList{}
+					earlyReturn := false
+					if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+						earlyReturn = true
+					}
+					if earlyReturn {
+						return errs
+					}
 					return errs
-				}
-				return errs
-			}},
-	})...)
+				},
+			},
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
 
 	// field ImplicitForbidden.TypeMeta has no validation
 	// field ImplicitForbidden.D1 has no validation
@@ -203,45 +297,66 @@ func Validate_ImplicitForbidden(ctx context.Context, op operation.Operation, fld
 
 // Validate_MultipleDiscriminators validates an instance of MultipleDiscriminators according
 // to declarative validation rules in the API schema.
-func Validate_MultipleDiscriminators(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MultipleDiscriminators) (errs field.ErrorList) {
-	errs = append(errs, validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldA", func(obj *MultipleDiscriminators) *string { return obj.FieldA }, func(obj *MultipleDiscriminators) string { return obj.D1 }, validate.DirectEqualPtr, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-		errs := field.ErrorList{}
-		errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
-		return errs
-	}, []validate.DiscriminatedRule[*string, string]{
-		{
-			Value: "A", Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-				errs := field.ErrorList{}
-				earlyReturn := false
-				if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
+func Validate_MultipleDiscriminators(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *MultipleDiscriminators) (errs field.ErrorList) {
+
+	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldA",
+		func(obj *MultipleDiscriminators) *string { return obj.FieldA },
+		func(obj *MultipleDiscriminators) string { return obj.D1 }, validate.DirectEqualPtr,
+		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+			errs := field.ErrorList{}
+			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
+			return errs
+		},
+		[]validate.DiscriminatedRule[*string, string]{
+
+			{
+				Value: "A",
+				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+					errs := field.ErrorList{}
+					earlyReturn := false
+					if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+						errs = append(errs, e...)
+						earlyReturn = true
+					}
+					if earlyReturn {
+						return errs
+					}
 					return errs
-				}
-				return errs
-			}},
-	})...)
-	errs = append(errs, validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldB", func(obj *MultipleDiscriminators) *string { return obj.FieldB }, func(obj *MultipleDiscriminators) string { return obj.D2 }, validate.DirectEqualPtr, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-		errs := field.ErrorList{}
-		errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
-		return errs
-	}, []validate.DiscriminatedRule[*string, string]{
-		{
-			Value: "B", Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-				errs := field.ErrorList{}
-				earlyReturn := false
-				if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
+				},
+			},
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldB",
+		func(obj *MultipleDiscriminators) *string { return obj.FieldB },
+		func(obj *MultipleDiscriminators) string { return obj.D2 }, validate.DirectEqualPtr,
+		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+			errs := field.ErrorList{}
+			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
+			return errs
+		},
+		[]validate.DiscriminatedRule[*string, string]{
+
+			{
+				Value: "B",
+				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+					errs := field.ErrorList{}
+					earlyReturn := false
+					if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+						errs = append(errs, e...)
+						earlyReturn = true
+					}
+					if earlyReturn {
+						return errs
+					}
 					return errs
-				}
-				return errs
-			}},
-	})...)
+				},
+			},
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
 
 	// field MultipleDiscriminators.TypeMeta has no validation
 	// field MultipleDiscriminators.D1 has no validation
@@ -253,26 +368,38 @@ func Validate_MultipleDiscriminators(ctx context.Context, op operation.Operation
 
 // Validate_NonStringDiscriminator validates an instance of NonStringDiscriminator according
 // to declarative validation rules in the API schema.
-func Validate_NonStringDiscriminator(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NonStringDiscriminator) (errs field.ErrorList) {
-	errs = append(errs, validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldA", func(obj *NonStringDiscriminator) *string { return obj.FieldA }, func(obj *NonStringDiscriminator) bool { return obj.D1 }, validate.DirectEqualPtr, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-		errs := field.ErrorList{}
-		errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
-		return errs
-	}, []validate.DiscriminatedRule[*string, bool]{
-		{
-			Value: true, Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-				errs := field.ErrorList{}
-				earlyReturn := false
-				if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
+func Validate_NonStringDiscriminator(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *NonStringDiscriminator) (errs field.ErrorList) {
+
+	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldA",
+		func(obj *NonStringDiscriminator) *string { return obj.FieldA },
+		func(obj *NonStringDiscriminator) bool { return obj.D1 }, validate.DirectEqualPtr,
+		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+			errs := field.ErrorList{}
+			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
+			return errs
+		},
+		[]validate.DiscriminatedRule[*string, bool]{
+
+			{
+				Value: true,
+				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+					errs := field.ErrorList{}
+					earlyReturn := false
+					if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+						errs = append(errs, e...)
+						earlyReturn = true
+					}
+					if earlyReturn {
+						return errs
+					}
 					return errs
-				}
-				return errs
-			}},
-	})...)
+				},
+			},
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
 
 	// field NonStringDiscriminator.TypeMeta has no validation
 	// field NonStringDiscriminator.D1 has no validation
@@ -282,37 +409,52 @@ func Validate_NonStringDiscriminator(ctx context.Context, op operation.Operation
 
 // Validate_SharedField validates an instance of SharedField according
 // to declarative validation rules in the API schema.
-func Validate_SharedField(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *SharedField) (errs field.ErrorList) {
-	errs = append(errs, validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldA", func(obj *SharedField) *string { return obj.FieldA }, func(obj *SharedField) string { return obj.D1 }, validate.DirectEqualPtr, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-		errs := field.ErrorList{}
-		errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
-		return errs
-	}, []validate.DiscriminatedRule[*string, string]{
-		{
-			Value: "A", Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-				errs := field.ErrorList{}
-				earlyReturn := false
-				if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					earlyReturn = true
-				}
-				if earlyReturn {
+func Validate_SharedField(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *SharedField) (errs field.ErrorList) {
+
+	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldA",
+		func(obj *SharedField) *string { return obj.FieldA },
+		func(obj *SharedField) string { return obj.D1 }, validate.DirectEqualPtr,
+		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+			errs := field.ErrorList{}
+			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
+			return errs
+		},
+		[]validate.DiscriminatedRule[*string, string]{
+
+			{
+				Value: "A",
+				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+					errs := field.ErrorList{}
+					earlyReturn := false
+					if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+						earlyReturn = true
+					}
+					if earlyReturn {
+						return errs
+					}
 					return errs
-				}
-				return errs
-			}},
-		{
-			Value: "B", Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-				errs := field.ErrorList{}
-				earlyReturn := false
-				if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					earlyReturn = true
-				}
-				if earlyReturn {
+				},
+			},
+
+			{
+				Value: "B",
+				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+					errs := field.ErrorList{}
+					earlyReturn := false
+					if e := validate.OptionalPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+						earlyReturn = true
+					}
+					if earlyReturn {
+						return errs
+					}
 					return errs
-				}
-				return errs
-			}},
-	})...)
+				},
+			},
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
 
 	// field SharedField.TypeMeta has no validation
 	// field SharedField.D1 has no validation
@@ -322,45 +464,66 @@ func Validate_SharedField(ctx context.Context, op operation.Operation, fldPath *
 
 // Validate_StrictUnion validates an instance of StrictUnion according
 // to declarative validation rules in the API schema.
-func Validate_StrictUnion(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *StrictUnion) (errs field.ErrorList) {
-	errs = append(errs, validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldA", func(obj *StrictUnion) *string { return obj.FieldA }, func(obj *StrictUnion) string { return obj.D1 }, validate.DirectEqualPtr, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-		errs := field.ErrorList{}
-		errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
-		return errs
-	}, []validate.DiscriminatedRule[*string, string]{
-		{
-			Value: "A", Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-				errs := field.ErrorList{}
-				earlyReturn := false
-				if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
+func Validate_StrictUnion(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *StrictUnion) (errs field.ErrorList) {
+
+	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldA",
+		func(obj *StrictUnion) *string { return obj.FieldA },
+		func(obj *StrictUnion) string { return obj.D1 }, validate.DirectEqualPtr,
+		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+			errs := field.ErrorList{}
+			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
+			return errs
+		},
+		[]validate.DiscriminatedRule[*string, string]{
+
+			{
+				Value: "A",
+				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+					errs := field.ErrorList{}
+					earlyReturn := false
+					if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+						errs = append(errs, e...)
+						earlyReturn = true
+					}
+					if earlyReturn {
+						return errs
+					}
 					return errs
-				}
-				return errs
-			}},
-	})...)
-	errs = append(errs, validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldB", func(obj *StrictUnion) *string { return obj.FieldB }, func(obj *StrictUnion) string { return obj.D1 }, validate.DirectEqualPtr, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-		errs := field.ErrorList{}
-		errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
-		return errs
-	}, []validate.DiscriminatedRule[*string, string]{
-		{
-			Value: "B", Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
-				errs := field.ErrorList{}
-				earlyReturn := false
-				if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
-					errs = append(errs, e...)
-					earlyReturn = true
-				}
-				if earlyReturn {
+				},
+			},
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
+	if e := validate.Discriminated(ctx, op, fldPath, obj, oldObj, "fieldB",
+		func(obj *StrictUnion) *string { return obj.FieldB },
+		func(obj *StrictUnion) string { return obj.D1 }, validate.DirectEqualPtr,
+		func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+			errs := field.ErrorList{}
+			errs = append(errs, validate.ForbiddenPointer(ctx, op, fldPath, obj, oldObj)...)
+			return errs
+		},
+		[]validate.DiscriminatedRule[*string, string]{
+
+			{
+				Value: "B",
+				Validation: func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *string) field.ErrorList {
+					errs := field.ErrorList{}
+					earlyReturn := false
+					if e := validate.RequiredPointer(ctx, op, fldPath, obj, oldObj); len(e) != 0 {
+						errs = append(errs, e...)
+						earlyReturn = true
+					}
+					if earlyReturn {
+						return errs
+					}
 					return errs
-				}
-				return errs
-			}},
-	})...)
+				},
+			},
+		}); len(e) != 0 {
+		errs = append(errs, e...)
+	}
 
 	// field StrictUnion.TypeMeta has no validation
 	// field StrictUnion.D1 has no validation

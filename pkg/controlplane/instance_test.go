@@ -49,6 +49,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	openapinamer "k8s.io/apiserver/pkg/endpoints/openapi"
+	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/options"
@@ -644,6 +645,59 @@ func TestGetResetFieldsHasAllVersions(t *testing.T) {
 							t.Errorf("%s: GetResetFieldsFilter() is missing version %q, has %v; all served versions: %v",
 								gvr(groupName, v, resource), sv, resetFieldsFilter, servedVersions)
 						}
+					}
+				}
+			}
+		}
+	}
+}
+
+// TestDeclarativeValidationEnablementInStrategies verifies that every CreateStrategy and
+// UpdateStrategy installed supports declarative validation.
+func TestDeclarativeValidationEnablementInStrategies(t *testing.T) {
+	_, config, _ := setUp(t)
+
+	client, err := kubernetes.NewForConfig(config.ControlPlane.Generic.LoopbackClientConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	providers, err := config.Complete().StorageProviders(client)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Enable all versions (including alpha and beta) so the check covers
+	// every resource that kube-apiserver can serve.
+	allVersionsConfig := DefaultAPIResourceConfigSource()
+	allVersionsConfig.EnableVersions(betaAPIGroupVersionsDisabledByDefault...)
+	allVersionsConfig.EnableVersions(alphaAPIGroupVersionsDisabledByDefault...)
+
+	for _, provider := range providers {
+		groupName := provider.GroupName()
+		apiGroupInfo, err := provider.NewRESTStorage(allVersionsConfig, config.ControlPlane.Generic.RESTOptionsGetter)
+		if err != nil {
+			t.Errorf("error creating REST storage for %s: %v", groupName, err)
+			continue
+		}
+
+		for v, resourcesInVersion := range apiGroupInfo.VersionedResourcesStorageMap {
+			for resource, storage := range resourcesInVersion {
+				gs, ok := storage.(registry.GenericStore)
+				if !ok {
+					// Non-generic storage (e.g. proxy/exec subresources)
+					// has no strategy to check.
+					continue
+				}
+				name := gvr(groupName, v, resource)
+				if cs := gs.GetCreateStrategy(); cs != nil {
+					if _, ok := cs.(rest.DeclarativeValidationStrategy); !ok {
+						t.Errorf("%s: CreateStrategy %T does not implement rest.DeclarativeValidationStrategy; embed rest.DeclarativeValidation to enable automatic declarative validation", name, cs)
+					}
+				}
+				if us := gs.GetUpdateStrategy(); us != nil {
+					if _, ok := us.(rest.DeclarativeValidationStrategy); !ok {
+						t.Errorf("%s: UpdateStrategy %T does not implement rest.DeclarativeValidationStrategy; embed rest.DeclarativeValidation to enable automatic declarative validation", name, us)
 					}
 				}
 			}

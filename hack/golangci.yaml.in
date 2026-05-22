@@ -229,6 +229,9 @@ linters:
     forbidigo:
       analyze-types: true
       forbid:
+        - pattern: \.AnnotatedEventf$
+          # https://github.com/kubernetes/kubernetes/pull/137270
+          msg: "Do not use AnnotatedEventf. Events are fire-and-forget and aggressively throttled; do not rely on them to pass state or metadata for programmatic triggers."
         - pattern: md5\.*
           # https://github.com/kubernetes/kubernetes/issues/129652
           msg: md5 is oudated, insecure, prefer a secure hash (such as sha256) or a non-cryptographic hash

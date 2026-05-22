@@ -494,21 +494,10 @@ func buildQueueingHintMap(ctx context.Context, es []fwk.EnqueueExtensions) (inte
 		// cannot be moved by any regular cluster event.
 		// So, we can just ignore such EventsToRegister here.
 
-		registerNodeAdded := false
-		registerNodeTaintUpdated := false
 		for _, event := range events {
 			fn := event.QueueingHintFn
 			if fn == nil {
 				fn = defaultQueueingHintFn
-			}
-
-			if event.Event.Resource == fwk.Node {
-				if event.Event.ActionType&fwk.Add != 0 {
-					registerNodeAdded = true
-				}
-				if event.Event.ActionType&fwk.UpdateNodeTaint != 0 {
-					registerNodeTaintUpdated = true
-				}
 			}
 
 			queueingHintFn := &internalqueue.QueueingHintFunction{
@@ -523,25 +512,6 @@ func buildQueueingHintMap(ctx context.Context, es []fwk.EnqueueExtensions) (inte
 			} else {
 				queueingHintMap[event.Event] = append(queueingHintMap[event.Event], queueingHintFn)
 			}
-		}
-		if registerNodeAdded && !registerNodeTaintUpdated {
-			// Temporally fix for the issue https://github.com/kubernetes/kubernetes/issues/109437
-			// NodeAdded QueueingHint isn't always called because of preCheck.
-			// It's definitely not something expected for plugin developers,
-			// and registering UpdateNodeTaint event is the only mitigation for now.
-			//
-			// So, here registers UpdateNodeTaint event for plugins that has NodeAdded event, but don't have UpdateNodeTaint event.
-			// It has a bad impact for the requeuing efficiency though, a lot better than some Pods being stuch in the
-			// unschedulable pod pool.
-			// This behavior will be removed when we remove the preCheck feature.
-			// See: https://github.com/kubernetes/kubernetes/issues/110175
-			queueingHintMap[fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.UpdateNodeTaint}] =
-				append(queueingHintMap[fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.UpdateNodeTaint}],
-					&internalqueue.QueueingHintFunction{
-						PluginName:     e.Name(),
-						QueueingHintFn: defaultQueueingHintFn,
-					},
-				)
 		}
 	}
 	if returnErr != nil {

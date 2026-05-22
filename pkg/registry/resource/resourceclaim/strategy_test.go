@@ -409,7 +409,7 @@ func TestStrategy(t *testing.T) {
 	if !strategy.NamespaceScoped() {
 		t.Errorf("ResourceClaim must be namespace scoped")
 	}
-	if strategy.AllowCreateOnUpdate() {
+	if strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("ResourceClaim should not allow create on update")
 	}
 }
@@ -1020,7 +1020,7 @@ func TestStatusStrategyUpdate(t *testing.T) {
 	testcases := map[string]struct {
 		oldObj                        *resource.ResourceClaim
 		newObj                        *resource.ResourceClaim
-		authz                         authorizer.Authorizer
+		authz                         authorizer.UnconditionalAuthorizer
 		ctxOverride                   func(context.Context) context.Context // if set, transforms the default ctx
 		adminAccess                   bool
 		deviceStatusFeatureGate       bool

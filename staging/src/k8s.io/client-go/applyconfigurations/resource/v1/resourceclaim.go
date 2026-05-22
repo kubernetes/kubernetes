@@ -36,7 +36,7 @@ import (
 // stanza tracks whether this claim has been satisfied and what specific
 // resources have been allocated.
 type ResourceClaimApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:""`
 	// Standard object metadata
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// Spec describes what is being requested and how to configure it.

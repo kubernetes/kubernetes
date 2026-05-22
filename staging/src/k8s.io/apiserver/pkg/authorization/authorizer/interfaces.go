@@ -77,12 +77,32 @@ type Attributes interface {
 	GetLabelSelector() (labels.Requirements, error)
 }
 
-// Authorizer makes an authorization decision based on information gained by making
-// zero or more calls to methods of the Attributes interface.  It returns nil when an action is
-// authorized, otherwise it returns an error.
-type Authorizer interface {
+// UnconditionalAuthorizer is a downscoped variant of Authorizer, which only gives the
+// caller the ability to call the conditions-unaware Authorize method.
+type UnconditionalAuthorizer interface {
 	Authorize(ctx context.Context, a Attributes) (authorized Decision, reason string, err error)
 }
+
+// Authorizer makes an authorization decision based on information gained by making
+// zero or more calls to methods of the Attributes interface. It might return
+// an error together with any decision. It is up to the caller to decide whether
+// that error is critical or not.
+//
+// The kube-apiserver WithAuthorization filter ignores errors when the decision is
+// Allow, but returns response code 500 if an error is returned with a Deny or
+// NoOpinion (instead of the usual 403).
+//
+// Any authorizer must implement this interface, but when passing a handle to an
+// authorizer, one might choose whether to pass the Authorizer or smaller UnconditionalAuthorizer
+// interface, depending on whether the receiver should be able to perform conditional
+// authorization or not.
+type Authorizer interface {
+	UnconditionalAuthorizer
+
+	// TODO(luxas): Add the conditions-aware methods in a follow-up PR.
+}
+
+var _ Authorizer = AuthorizerFunc(nil)
 
 type AuthorizerFunc func(ctx context.Context, a Attributes) (Decision, string, error)
 

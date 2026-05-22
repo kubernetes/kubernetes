@@ -697,7 +697,7 @@ func NewMainKubelet(ctx context.Context,
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodsAPI) {
-		broadcaster := pods.NewBroadcaster()
+		broadcaster := pods.NewBroadcaster(ctx)
 		klet.podsServer = pods.NewPodsServer(broadcaster, klet.podManager, klet.statusManager)
 		klet.statusManager.AddPodUpdateNotifier(klet.podsServer)
 	}
@@ -819,7 +819,6 @@ func NewMainKubelet(ctx context.Context,
 	klet.containerRuntime = runtime
 	klet.streamingRuntime = runtime
 	klet.runner = runtime
-	klet.allocationManager.SetContainerRuntime(runtime)
 	resizeAdmitHandler := allocation.NewPodResizesAdmitHandler(klet.containerManager, runtime, klet.allocationManager, logger)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime, runtimeCacheRefreshPeriod)
@@ -1695,7 +1694,7 @@ func (kl *Kubelet) setupDataDirs(logger klog.Logger) error {
 func (kl *Kubelet) StartGarbageCollection(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	loggedContainerGCFailure := false
-	go wait.Until(func() {
+	go wait.UntilWithContext(ctx, func(ctx context.Context) {
 		if err := kl.containerGC.GarbageCollect(ctx); err != nil {
 			logger.Error(err, "Container garbage collection failed")
 			kl.recorder.WithLogger(logger).Eventf(kl.nodeRef, v1.EventTypeWarning, events.ContainerGCFailed, "%s", err.Error())
@@ -1709,7 +1708,7 @@ func (kl *Kubelet) StartGarbageCollection(ctx context.Context) {
 
 			logger.V(int(vLevel)).Info("Container garbage collection succeeded")
 		}
-	}, ContainerGCPeriod, wait.NeverStop)
+	}, ContainerGCPeriod)
 
 	// when the high threshold is set to 100, and the max age is 0 (or the max age feature is disabled)
 	// stub the image GC manager
@@ -1720,7 +1719,7 @@ func (kl *Kubelet) StartGarbageCollection(ctx context.Context) {
 
 	prevImageGCFailed := false
 	beganGC := time.Now()
-	go wait.Until(func() {
+	go wait.UntilWithContext(ctx, func(ctx context.Context) {
 		if err := kl.imageManager.GarbageCollect(ctx, beganGC); err != nil {
 			if prevImageGCFailed {
 				logger.Error(err, "Image garbage collection failed multiple times in a row")
@@ -1739,7 +1738,7 @@ func (kl *Kubelet) StartGarbageCollection(ctx context.Context) {
 
 			logger.V(int(vLevel)).Info("Image garbage collection succeeded")
 		}
-	}, ImageGCPeriod, wait.NeverStop)
+	}, ImageGCPeriod)
 }
 
 // initializeModules will initialize internal modules that do not require the container runtime to be up.

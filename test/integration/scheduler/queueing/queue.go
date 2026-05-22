@@ -83,8 +83,6 @@ type CoreResourceEnqueueTestCase struct {
 	InitialVolumeAttachment []*storagev1.VolumeAttachment
 	// InitialDeviceClasses are the list of DeviceClass to be created at first.
 	InitialDeviceClasses []*resourceapi.DeviceClass
-	// InitialWorkloads is the list of Workloads to be created at first.
-	InitialWorkloads []*schedulingapi.Workload
 	// InitialPodGroups is the list of PodGroups to be created at first.
 	InitialPodGroups []*schedulingapi.PodGroup
 	// Pods are the list of Pods to be created.
@@ -144,7 +142,7 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		WantRequeuedPods: sets.New("pod2"),
 	},
 	{
-		Name:          "Pod rejected by the PodAffinity plugin is requeued when a new Node is created and turned to ready",
+		Name:          "Pod rejected by the PodAffinity plugin is requeued when a new Node is created",
 		EnablePlugins: []string{names.InterPodAffinity},
 		InitialNodes:  []*v1.Node{st.MakeNode().Name("fake-node").Label("node", "fake-node").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()},
 		InitialPods: []*v1.Pod{
@@ -155,25 +153,11 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 			st.MakePod().Label("anti", "anti").Name("pod2").PodAntiAffinityExists("anti", "node", st.PodAntiAffinityWithRequiredReq).Container("image").Obj(),
 		},
 		TriggerFn: func(testCtx *testutils.TestContext) (map[fwk.ClusterEvent]uint64, error) {
-			// Trigger a NodeCreated event.
-			// Note that this Node has a un-ready taint and pod2 should be requeued ideally because unschedulable plugins registered for pod2 is PodAffinity.
-			// However, due to preCheck, it's not requeueing pod2 to activeQ.
-			// It'll be fixed by the removal of preCheck in the future.
-			// https://github.com/kubernetes/kubernetes/issues/110175
-			node := st.MakeNode().Name("fake-node2").Label("node", "fake-node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Taints([]v1.Taint{{Key: v1.TaintNodeNotReady, Effect: v1.TaintEffectNoSchedule}}).Obj()
+			node := st.MakeNode().Name("fake-node2").Label("node", "fake-node2").Capacity(map[v1.ResourceName]string{v1.ResourceCPU: "2"}).Obj()
 			if _, err := testCtx.ClientSet.CoreV1().Nodes().Create(testCtx.Ctx, node, metav1.CreateOptions{}); err != nil {
 				return nil, fmt.Errorf("failed to create a new node: %w", err)
 			}
-
-			// As a mitigation of an issue described above, all plugins subscribing Node/Add event register UpdateNodeTaint too.
-			// So, this removal of taint moves pod2 to activeQ.
-			node.Spec.Taints = nil
-			if _, err := testCtx.ClientSet.CoreV1().Nodes().Update(testCtx.Ctx, node, metav1.UpdateOptions{}); err != nil {
-				return nil, fmt.Errorf("failed to remove taints off the node: %w", err)
-			}
-			return map[fwk.ClusterEvent]uint64{
-				{Resource: fwk.Node, ActionType: fwk.Add}:             1,
-				{Resource: fwk.Node, ActionType: fwk.UpdateNodeTaint}: 1}, nil
+			return map[fwk.ClusterEvent]uint64{{Resource: fwk.Node, ActionType: fwk.Add}: 1}, nil
 		},
 		WantRequeuedPods: sets.New("pod2"),
 	},
@@ -2543,9 +2527,6 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Obj(),
 		},
-		InitialWorkloads: []*schedulingapi.Workload{
-			st.MakeWorkload().Name("w").PodGroupTemplate(st.MakePodGroupTemplate().Name("t").MinCount(2).Obj()).Obj(),
-		},
 		InitialPodGroups: []*schedulingapi.PodGroup{
 			st.MakePodGroup().Name("pg1").MinCount(2).TemplateRef("t", "w").Obj(),
 		},
@@ -2569,9 +2550,6 @@ var CoreResourceEnqueueTestCases = []*CoreResourceEnqueueTestCase{
 		EnablePlugins: []string{names.GangScheduling},
 		InitialNodes: []*v1.Node{
 			st.MakeNode().Name("fake-node1").Obj(),
-		},
-		InitialWorkloads: []*schedulingapi.Workload{
-			st.MakeWorkload().Name("w").PodGroupTemplate(st.MakePodGroupTemplate().Name("t").MinCount(1).Obj()).Obj(),
 		},
 		Pods: []*v1.Pod{
 			st.MakePod().Name("pod1").Container("image").PodGroupName("pg1").Obj(),
@@ -2715,13 +2693,6 @@ func RunTestCoreResourceEnqueue(t *testing.T, tt *CoreResourceEnqueueTestCase) {
 		pvc.Namespace = ns
 		if _, err := testutils.CreatePVC(cs, pvc); err != nil {
 			t.Fatalf("Failed to create a PVC %q: %v", pvc.Name, err)
-		}
-	}
-
-	for _, w := range tt.InitialWorkloads {
-		w.Namespace = ns
-		if _, err := cs.SchedulingV1alpha2().Workloads(ns).Create(testCtx.Ctx, w, metav1.CreateOptions{}); err != nil {
-			t.Fatalf("Failed to create a Workload %q: %v", w.Name, err)
 		}
 	}
 

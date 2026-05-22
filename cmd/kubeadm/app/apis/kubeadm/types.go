@@ -193,7 +193,7 @@ type APIServer struct {
 // DNS defines the DNS addon that should be used in the cluster
 type DNS struct {
 	// ImageMeta allows to customize the image used for the DNS addon
-	ImageMeta `json:",inline"`
+	ImageMeta `json:""`
 
 	// Disabled specifies whether to disable this addon in the cluster
 	Disabled bool
@@ -292,7 +292,7 @@ type Etcd struct {
 type LocalEtcd struct {
 	// ImageMeta allows to customize the container image used for etcd. Passing a custom etcd image
 	// tells kubeadm upgrade that this image is user-managed and that its upgrade must be skipped.
-	ImageMeta `json:",inline"`
+	ImageMeta `json:""`
 
 	// DataDir is the directory etcd will place its data.
 	// Defaults to "/var/lib/etcd".

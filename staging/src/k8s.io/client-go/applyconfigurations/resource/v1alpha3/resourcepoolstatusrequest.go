@@ -34,7 +34,7 @@ import (
 // based on the provided filters. Once status is set, the request is considered complete and will not be reprocessed.
 // Users should delete and recreate requests to get updated information.
 type ResourcePoolStatusRequestApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:""`
 	// Standard object metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// Spec defines the filters for which pools to include in the status.

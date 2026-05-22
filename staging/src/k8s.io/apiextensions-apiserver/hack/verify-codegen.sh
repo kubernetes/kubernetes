@@ -34,10 +34,9 @@ cleanup
 echo "Ensuring models-schema is up-to-date"
 K8S_MODELS_SCHEMA="${SCRIPT_ROOT}/../../../../pkg/generated/openapi/cmd/models-schema/main.go"
 APIEXTENSIONS_MODELS_SCHEMA="${SCRIPT_ROOT}/pkg/generated/openapi/cmd/models-schema/main.go"
-# These files intentionally differ in import lines and the local lint-safe stderr write.
+# These files intentionally differ in import lines.
 if ! diff -I "k8s.io/kubernetes/pkg/generated/openapi" \
   -I "k8s.io/apiextensions-apiserver/pkg/generated/openapi" \
-  -I "Failed: %v" \
   "${K8S_MODELS_SCHEMA}" "${APIEXTENSIONS_MODELS_SCHEMA}"; then
   echo "${APIEXTENSIONS_MODELS_SCHEMA} is out of date. Compare changes with ${K8S_MODELS_SCHEMA}"
   exit 1

@@ -51,26 +51,33 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 )
 
-type KubeComponentName string
+type ClusterComponentName string
 
 // Component names.
 //
-// They match the names in the local-up-cluster.sh output, if the script runs those components.
+// They match the names in the local-up-cluster.sh and etc.sh output, if the script runs those components.
 const (
-	KubeAPIServer         = KubeComponentName("kube-apiserver")
-	KubeControllerManager = KubeComponentName("kube-controller-manager")
-	KubeScheduler         = KubeComponentName("kube-scheduler")
-	Kubelet               = KubeComponentName("kubelet")
-	KubeProxy             = KubeComponentName("kube-proxy")
-	Kubectl               = KubeComponentName("kubectl")
-	LocalUpCluster        = KubeComponentName("local-up-cluster")
+	Etcd                  = ClusterComponentName("etcd")
+	KubeAPIServer         = ClusterComponentName("kube-apiserver")
+	KubeControllerManager = ClusterComponentName("kube-controller-manager")
+	KubeScheduler         = ClusterComponentName("kube-scheduler")
+	Kubelet               = ClusterComponentName("kubelet")
+	KubeProxy             = ClusterComponentName("kube-proxy")
+	Kubectl               = ClusterComponentName("kubectl")
 )
 
 // Kubernetes components running in the cluster, in the order in which they need to be started and upgraded.
-var KubeClusterComponents = []KubeComponentName{KubeAPIServer, KubeControllerManager, KubeScheduler, Kubelet, KubeProxy}
+var KubeClusterComponents = []ClusterComponentName{KubeAPIServer, KubeControllerManager, KubeScheduler, Kubelet, KubeProxy}
+
+// featureGatedComponents lists the components that accept --feature-gates on their command line.
+var featureGatedComponents = []ClusterComponentName{KubeAPIServer, KubeControllerManager, KubeScheduler, Kubelet}
+
+// All components, including etcd.
+var components = append([]ClusterComponentName{Etcd}, KubeClusterComponents...)
 
 // RUN <name> <command line> in the local-up-cluster.sh output marks commands that we need to run.
 const localUpClusterRunPrefix = "RUN "
@@ -89,10 +96,8 @@ func repoRoot(tCtx ktesting.TContext) string {
 	}
 }
 
-func New(tCtx ktesting.TContext) *Cluster {
-	tCtx.Helper()
+func New() *Cluster {
 	c := &Cluster{}
-	tCtx.CleanupCtx(c.Stop)
 	return c
 }
 
@@ -106,7 +111,7 @@ func New(tCtx ktesting.TContext) *Cluster {
 // local-up-cluster.sh does not support more than one cluster per host, so
 // tests using this package have to run sequentially.
 type Cluster struct {
-	running    map[KubeComponentName]*Cmd
+	running    map[ClusterComponentName]*Cmd
 	dir        string
 	kubeConfig string
 	settings   map[string]string
@@ -114,7 +119,7 @@ type Cluster struct {
 
 // Start brings up the cluster anew. If it was already running, it will be stopped first.
 //
-// The cluster will be stopped automatically at the end of the test.
+// The caller must invoke Stop in a suitable context to stop the cluster.
 // If the ARTIFACTS env variable is set and the test failed,
 // log files of the kind cluster get dumped into
 // $ARTIFACTS/<test name>/kind/<cluster name> before stopping it.
@@ -124,13 +129,9 @@ type Cluster struct {
 // Kubernetes release. They will be invoked with parameters  as defined in the
 // *current* local-up-cluster.sh. This works as long as local-up-cluster.sh in its
 // default configuration doesn't depend on something which was added only recently.
-func (c *Cluster) Start(tCtx ktesting.TContext, state string, bindir string, localUpClusterEnv map[string]string) {
+func (c *Cluster) Start(tCtx ktesting.TContext, state string, bindir string, localUpClusterEnv map[string]string, featureGates string) {
 	tCtx.Helper()
 	c.Stop(tCtx)
-	tCtx.CleanupCtx(func(tCtx ktesting.TContext) {
-		// Intentional additional lambda function for source code location in log output.
-		c.Stop(tCtx)
-	})
 
 	if artifacts, ok := os.LookupEnv("ARTIFACTS"); ok {
 		// Sanitize the name:
@@ -145,14 +146,17 @@ func (c *Cluster) Start(tCtx ktesting.TContext, state string, bindir string, loc
 	} else {
 		c.dir = tCtx.TempDir()
 	}
-	c.running = make(map[KubeComponentName]*Cmd)
+	c.running = make(map[ClusterComponentName]*Cmd)
 	c.settings = make(map[string]string)
 
-	// Spawn local-up-cluster.sh in background, keep it running (for etcd!),
-	// parse output to pick up commands and run them in order.
-	lines := make(chan Output, 100)
+	// Spawn local-up-cluster.sh in the background,
+	// parse output to pick up commands and run them in order,
+	// then wait for it to finish. Once it has completed,
+	// we know everything that we need to know to run and
+	// modify the cluster.
+	lines := make(chan string, 100)
 	cmd := &Cmd{
-		Name: string(LocalUpCluster),
+		Name: "local-up-cluster",
 		CommandLine: []string{
 			path.Join(repoRoot(tCtx), "hack/local-up-cluster.sh"),
 			"-o", bindir,
@@ -160,7 +164,11 @@ func (c *Cluster) Start(tCtx ktesting.TContext, state string, bindir string, loc
 		},
 		ProcessOutput: func(output Output) {
 			// Redirect processing into the main goroutine.
-			lines <- output
+			if output.EOF {
+				close(lines)
+				return
+			}
+			lines <- output.Line
 		},
 		AdditionalEnv: localUpClusterEnv,
 	}
@@ -176,7 +184,7 @@ func (c *Cluster) Start(tCtx ktesting.TContext, state string, bindir string, loc
 		cmd.AdditionalEnv["KUBE_VERBOSE"] = "2" // Enables -x for configuration variable assignments.
 	}
 	cmd.Start(tCtx)
-	c.running[LocalUpCluster] = cmd
+	defer cmd.Stop(tCtx, "stopping")
 
 processLocalUpClusterOutput:
 	for {
@@ -184,64 +192,60 @@ processLocalUpClusterOutput:
 		case <-tCtx.Done():
 			c.Stop(tCtx)
 			tCtx.Fatalf("interrupted cluster startup: %v", context.Cause(tCtx))
-		case output := <-lines:
-			if c.processLocalUpClusterOutput(tCtx, state, output) {
+		case line, ok := <-lines:
+			if !ok {
 				break processLocalUpClusterOutput
 			}
+			c.processLocalUpClusterOutput(tCtx, state, line, featureGates)
 		}
 	}
+	// Usually it has stopped by now already because we saw the end of its output stream,
+	// but we still need to verify its exit code.
+	cmd.Wait(tCtx)
+
 	tCtx.Logf("cluster is running, use KUBECONFIG=%s to access it", c.kubeConfig)
 }
 
 // Matches e.g. "+ API_SECURE_PORT=6443".
 var varAssignment = regexp.MustCompile(`^\+ ([A-Z0-9_]+)=(.*)$`)
 
-func (c *Cluster) processLocalUpClusterOutput(tCtx ktesting.TContext, state string, output Output) bool {
-	if output.EOF {
-		if output.Line != "" {
-			tCtx.Fatalf("%s output processing failed: %s", LocalUpCluster, output.Line)
-		}
-		tCtx.Fatalf("%s terminated unexpectedly", LocalUpCluster)
-	}
+func (c *Cluster) processLocalUpClusterOutput(tCtx ktesting.TContext, state string, line string, featureGates string) {
+	tCtx.Logf("local-up-cluster: %s", line)
 
-	tCtx.Logf("local-up-cluster: %s", output.Line)
-
-	if strings.HasPrefix(output.Line, localUpClusterRunPrefix) {
-		line := output.Line[len(localUpClusterRunPrefix):]
+	if strings.HasPrefix(line, localUpClusterRunPrefix) {
+		line := line[len(localUpClusterRunPrefix):]
 		parts := strings.SplitN(line, ": ", 2)
 		if len(parts) != 2 {
-			tCtx.Fatalf("unexpected RUN line: %s", output.Line)
+			tCtx.Fatalf("unexpected RUN line: %s", line)
 		}
 		name := parts[0]
 		cmdLine := parts[1]
 
-		// Cluster components are kept running.
-		if slices.Contains(KubeClusterComponents, KubeComponentName(name)) {
-			c.runKubeComponent(tCtx, state, KubeComponentName(name), cmdLine)
-			return false
+		// Cluster components and etcd are kept running.
+		if slices.Contains(components, ClusterComponentName(name)) {
+			if featureGates != "" && slices.Contains(featureGatedComponents, ClusterComponentName(name)) {
+				splitCmdLine := strings.Split(cmdLine, " ")
+				merged, err := mergeFeatureGatesFlags(splitCmdLine, featureGates)
+				tCtx.ExpectNoError(err, "merge feature gates %s into %s command line", featureGates, name)
+				cmdLine = strings.Join(merged, " ")
+			}
+			c.runComponent(tCtx, state, ClusterComponentName(name), cmdLine)
+			return
 		}
 
 		// Other commands get invoked and need to terminate before we proceed.
 		c.runCmd(tCtx, name, cmdLine)
-		return false
+		return
 	}
-	if m := varAssignment.FindStringSubmatch(output.Line); m != nil {
+	if m := varAssignment.FindStringSubmatch(line); m != nil {
 		c.settings[m[1]] = m[2]
 		if m[1] == "CERT_DIR" {
 			c.kubeConfig = path.Join(m[2], "admin.kubeconfig")
 		}
-		return false
 	}
-	if strings.Contains(output.Line, "Local etcd is running. Run commands.") {
-		// We have seen and processed all commands.
-		// Time to start testing...
-		return true
-	}
-
-	return false
 }
 
-func (c *Cluster) runKubeComponent(tCtx ktesting.TContext, state string, component KubeComponentName, command string) {
+func (c *Cluster) runComponent(tCtx ktesting.TContext, state string, component ClusterComponentName, command string) {
 	commandLine := fromLocalUpClusterOutput(command)
 
 	cmd := &Cmd{
@@ -277,7 +281,7 @@ func fromLocalUpClusterOutput(command string) []string {
 // Stop ensures that the cluster is not running anymore.
 func (c *Cluster) Stop(tCtx ktesting.TContext) {
 	tCtx.Helper()
-	for _, component := range slices.Backward(KubeClusterComponents) {
+	for _, component := range slices.Backward(components) {
 		cmd := c.running[component]
 		if cmd == nil {
 			continue
@@ -299,7 +303,7 @@ func (c *Cluster) LoadConfig(tCtx ktesting.TContext) *restclient.Config {
 }
 
 // GetSystemLogs returns the output of the given component, the empty string and false if not started.
-func (c *Cluster) GetSystemLogs(tCtx ktesting.TContext, component KubeComponentName) (GString, bool) {
+func (c *Cluster) GetSystemLogs(tCtx ktesting.TContext, component ClusterComponentName) (GString, bool) {
 	cmd, ok := c.running[component]
 	if !ok {
 		return "", false
@@ -341,10 +345,13 @@ type ModifyOptions struct {
 	BinDir string
 
 	// FileByComponent overrides BinDir for those components which are specified here.
-	FileByComponent map[KubeComponentName]string
+	FileByComponent map[ClusterComponentName]string
+
+	// FeatureGatesByComponent specifies feature gates to apply to component command line.
+	FeatureGatesByComponent map[ClusterComponentName]string
 }
 
-func (m ModifyOptions) GetComponentFile(component KubeComponentName) string {
+func (m ModifyOptions) GetComponentFile(component ClusterComponentName) string {
 	if file, ok := m.FileByComponent[component]; ok {
 		return file
 	}
@@ -366,19 +373,17 @@ func (c *Cluster) Modify(tCtx ktesting.TContext, state string, options ModifyOpt
 	tCtx.Helper()
 
 	restore := ModifyOptions{
-		FileByComponent: make(map[KubeComponentName]string),
+		FileByComponent: make(map[ClusterComponentName]string),
 	}
 
-	// We could also do things like turning feature gates on or off.
-	// For now we only support replacing the file.
-	updated := make(map[KubeComponentName]*Cmd)
+	updated := make(map[ClusterComponentName]*Cmd)
 
 	// Phase 1: stop all components that need modification in reverse order
 	// so that dependent components (KCM, scheduler) are stopped before the
 	// apiserver they depend on.
 	for _, component := range slices.Backward(KubeClusterComponents) {
 		fileName := options.GetComponentFile(component)
-		if fileName == "" {
+		if fileName == "" && options.FeatureGatesByComponent[component] == "" {
 			continue
 		}
 		tCtx := tCtx.WithStep(fmt.Sprintf("stop %s", component))
@@ -394,17 +399,21 @@ func (c *Cluster) Modify(tCtx ktesting.TContext, state string, options ModifyOpt
 
 		// Find the command (might be wrapped by sudo!).
 		cmdLine := slices.Clone(cmd.CommandLine)
-		found := false
-		for i := range cmdLine {
-			if path.Base(cmdLine[i]) == string(component) {
-				found = true
-				restore.FileByComponent[component] = cmdLine[i]
-				cmdLine[i] = fileName
-				break
+
+		// Replace binary if requested.
+		if fileName != "" {
+			found := false
+			for i := range cmdLine {
+				if path.Base(cmdLine[i]) == string(component) {
+					found = true
+					restore.FileByComponent[component] = cmdLine[i]
+					cmdLine[i] = fileName
+					break
+				}
 			}
-		}
-		if !found {
-			tCtx.Fatal("binary filename not found")
+			if !found {
+				tCtx.Fatal("binary filename not found")
+			}
 		}
 		cmd.Name = string(component) + "-" + state
 		cmd.CommandLine = cmdLine
@@ -417,6 +426,12 @@ func (c *Cluster) Modify(tCtx ktesting.TContext, state string, options ModifyOpt
 	// apiserver.
 	for _, component := range KubeClusterComponents {
 		if cmd, ok := updated[component]; ok {
+			// Apply feature gates.
+			if featureGates, ok := options.FeatureGatesByComponent[component]; ok {
+				merged, err := mergeFeatureGatesFlags(cmd.CommandLine, featureGates)
+				tCtx.ExpectNoError(err, "merge feature gates %s into %s command line", featureGates, component)
+				cmd.CommandLine = merged
+			}
 			c.runComponentWithRetry(tCtx, component, cmd)
 		}
 	}
@@ -424,7 +439,7 @@ func (c *Cluster) Modify(tCtx ktesting.TContext, state string, options ModifyOpt
 	return restore
 }
 
-func (c *Cluster) runComponentWithRetry(tCtx ktesting.TContext, component KubeComponentName, cmd *Cmd) {
+func (c *Cluster) runComponentWithRetry(tCtx ktesting.TContext, component ClusterComponentName, cmd *Cmd) {
 	// Sometimes components fail to come up. We have to retry.
 	//
 	// For example, the apiserver's port might not be free again yet (no SO_LINGER!).
@@ -459,6 +474,12 @@ func (c *Cluster) runComponentWithRetry(tCtx ktesting.TContext, component KubeCo
 }
 
 func (c *Cluster) checkReadiness(tCtx ktesting.TContext, cmd *Cmd) {
+	if strings.HasPrefix(cmd.Name, string(Etcd)) {
+		c.checkEndpoint(tCtx, cmd, "http", c.settings["ETCD_HOST"], c.settings["ETCD_PORT"], "/health", nil)
+		return
+	}
+
+	// For all other components we expect to have the .kubeconfig file.
 	restConfig := c.LoadConfig(tCtx)
 	tCtx = tCtx.WithRESTConfig(restConfig)
 	tCtx = tCtx.WithStep(fmt.Sprintf("wait for %s readiness", cmd.Name))
@@ -546,4 +567,70 @@ func dumpProcesses(tCtx ktesting.TContext) {
 	// cmd.Start(tCtx)
 	// processes := cmd.Wait(tCtx)
 	// tCtx.Log(processes)
+}
+
+// ToggleFeatureGates restarts the feature gated components with the specified feature gates.
+// The returned ModifyOptions can be passed to Modify to restore the original state.
+func (c *Cluster) ToggleFeatureGates(tCtx ktesting.TContext, state string, featureGates string) ModifyOptions {
+	tCtx.Helper()
+
+	opts := ModifyOptions{
+		FileByComponent:         make(map[ClusterComponentName]string),
+		FeatureGatesByComponent: make(map[ClusterComponentName]string),
+	}
+
+	for _, component := range featureGatedComponents {
+		opts.FeatureGatesByComponent[component] = featureGates
+	}
+
+	return c.Modify(tCtx, state, opts)
+}
+
+// mergeFeatureGatesFlags merges the given feature gates (in "fg1=true,fg2=false" format)
+// into the command line. Any existing --feature-gates flags are merged together and
+// overridden by the new gates. The result contains exactly one --feature-gates flag at
+// the position of the first one previously found, or appended at the end if none was
+// present. If no gates result, the command line is returned unchanged.
+//
+// An error is returned if any --feature-gates flag in cmdLine or the featureGates
+// argument itself is malformed.
+func mergeFeatureGatesFlags(cmdLine []string, featureGates string) ([]string, error) {
+	gates := map[string]bool{}
+	gatesValue := cliflag.NewMapStringBool(&gates)
+
+	// Strip all --feature-gates tokens from the command line, accumulating
+	// their values into gatesValue. Remember where the first one was so the
+	// merged flag lands at the same position.
+	insertIdx := -1
+	out := make([]string, 0, len(cmdLine))
+	for _, tok := range cmdLine {
+		value, ok := strings.CutPrefix(tok, "--feature-gates=")
+		if !ok {
+			out = append(out, tok)
+			continue
+		}
+		if err := gatesValue.Set(value); err != nil {
+			return nil, fmt.Errorf("invalid --feature-gates in command line %q: %w", tok, err)
+		}
+		if insertIdx == -1 {
+			insertIdx = len(out)
+		}
+	}
+
+	// Apply the new gates on top (new values win over existing ones).
+	if featureGates != "" {
+		if err := gatesValue.Set(featureGates); err != nil {
+			return nil, fmt.Errorf("invalid feature gates %q: %w", featureGates, err)
+		}
+	}
+
+	// If no existing parseable flag was found and no gates resulted, nothing to do.
+	if insertIdx == -1 && len(gates) == 0 {
+		return out, nil
+	}
+	flag := "--feature-gates=" + gatesValue.String()
+	if insertIdx != -1 {
+		return slices.Insert(out, insertIdx, flag), nil
+	}
+	return append(out, flag), nil
 }

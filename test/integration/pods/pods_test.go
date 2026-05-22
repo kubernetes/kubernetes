@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -33,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -1624,18 +1626,31 @@ func TestNodeDeclaredFeatureAdmission(t *testing.T) {
 			podToUpdate := createdPod.DeepCopy()
 			tc.podUpdateFn(podToUpdate)
 
-			_, err = client.CoreV1().Pods(ns.Name).UpdateResize(context.TODO(), podToUpdate.Name, podToUpdate, metav1.UpdateOptions{})
-
-			if tc.expectError == "" {
-				if err != nil {
-					t.Errorf("Expected no error, but got: %v", err)
+			pollErr := wait.PollUntilContextTimeout(context.TODO(), 100*time.Millisecond, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+				_, err = client.CoreV1().Pods(ns.Name).UpdateResize(ctx, podToUpdate.Name, podToUpdate, metav1.UpdateOptions{})
+				if tc.expectError == "" {
+					if err == nil {
+						return true, nil
+					}
+					if strings.Contains(err.Error(), "not found") {
+						return false, nil
+					}
+					return false, err
+				} else {
+					if err != nil {
+						if strings.Contains(err.Error(), tc.expectError) {
+							return true, nil
+						}
+						if strings.Contains(err.Error(), "not found") {
+							return false, nil
+						}
+						return false, err
+					}
+					return false, fmt.Errorf("expected error containing %q, but got no error", tc.expectError)
 				}
-			} else {
-				if err == nil {
-					t.Errorf("Expected error containing %q, but got no error", tc.expectError)
-				} else if !strings.Contains(err.Error(), tc.expectError) {
-					t.Errorf("Expected error containing %q, but got: %v", tc.expectError, err)
-				}
+			})
+			if pollErr != nil {
+				t.Errorf("Unexpected error: %v (last error during update: %v)", pollErr, err)
 			}
 		})
 	}

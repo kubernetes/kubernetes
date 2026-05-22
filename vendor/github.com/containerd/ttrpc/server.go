@@ -113,9 +113,7 @@ func (s *Server) Serve(ctx context.Context, l net.Listener) error {
 					backoff *= 2
 				}
 
-				if max := time.Second; backoff > max {
-					backoff = max
-				}
+				backoff = min(time.Second, backoff)
 
 				sleep := time.Duration(rand.Int63n(int64(backoff)))
 				log.G(ctx).WithError(err).Errorf("ttrpc: failed accept; backoff %v", sleep)
@@ -415,6 +413,7 @@ func (c *serverConn) run(sctx context.Context) {
 					if !sendStatus(mh.StreamID, status.Newf(codes.InvalidArgument, "StreamID is no longer active")) {
 						return
 					}
+					continue
 				}
 				sh := i.(*streamHandler)
 				if mh.Flags&flagNoData != flagNoData {
@@ -428,6 +427,7 @@ func (c *serverConn) run(sctx context.Context) {
 						if !sendStatus(mh.StreamID, status.Newf(codes.InvalidArgument, "data handling error: %v", err)) {
 							return
 						}
+						continue
 					}
 				}
 
@@ -437,6 +437,7 @@ func (c *serverConn) run(sctx context.Context) {
 						if !sendStatus(mh.StreamID, status.Newf(codes.InvalidArgument, "data close message cannot include data")) {
 							return
 						}
+						continue
 					}
 				}
 			} else if mh.Type == messageTypeRequest {

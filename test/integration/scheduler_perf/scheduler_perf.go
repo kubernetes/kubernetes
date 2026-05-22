@@ -43,7 +43,6 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
@@ -76,6 +75,9 @@ const (
 	sleepOpcode                  operationCode = "sleep"
 	startCollectingMetricsOpcode operationCode = "startCollectingMetrics"
 	stopCollectingMetricsOpcode  operationCode = "stopCollectingMetrics"
+	waitForPodGroupsOpcode       operationCode = "waitForPodGroups"
+	startCollectingProfileOpcode operationCode = "startCollectingProfile"
+	stopCollectingProfileOpcode  operationCode = "stopCollectingProfile"
 )
 
 const (
@@ -157,6 +159,12 @@ var (
 				{
 					Label:  eventLabelName,
 					Values: schedframework.AllClusterEventLabels(),
+				},
+			},
+			"scheduler_podgroup_scheduling_attempt_duration_seconds": {
+				{
+					Label:  resultLabelName,
+					Values: []string{metrics.ScheduledResult, metrics.UnschedulableResult, metrics.ErrorResult},
 				},
 			},
 		},
@@ -507,6 +515,9 @@ func (op *op) UnmarshalJSON(b []byte) error {
 		sleepOpcode:                  &sleepOp{},
 		startCollectingMetricsOpcode: &startCollectingMetricsOp{},
 		stopCollectingMetricsOpcode:  &stopCollectingMetricsOp{},
+		waitForPodGroupsOpcode:       &waitForPodGroups{},
+		startCollectingProfileOpcode: &startCollectingProfileOp{},
+		stopCollectingProfileOpcode:  &stopCollectingProfileOp{},
 		// TODO(#94601): add a delete nodes op to simulate scaling behaviour?
 	}
 	// First determine the opcode using lenient decoding (= ignore extra fields).
@@ -676,12 +687,6 @@ func setupTestCase(t testing.TB, tc *testCase, featureGates map[featuregate.Feat
 	// quit *before* restoring klog settings.
 	framework.GoleakCheck(t)
 
-	if _, found := featureGates[features.OpportunisticBatching]; !found {
-		if featureGates == nil {
-			featureGates = map[featuregate.Feature]bool{}
-		}
-		featureGates[features.OpportunisticBatching] = false
-	}
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featureGates)
 
 	if opts.preRunFn != nil {
@@ -1097,6 +1102,7 @@ func runWorkload(tCtx ktesting.TContext, tc *testCase, w *Workload, topicName st
 		scheduler:                    scheduler,
 		numPodsScheduledPerNamespace: make(map[string]int),
 		podInformer:                  podInformer,
+		podGroupInformer:             informerFactory.Scheduling().V1alpha2().PodGroups(),
 		throughputErrorMargin:        throughputErrorMargin,
 		testCase:                     tc,
 		workload:                     w,

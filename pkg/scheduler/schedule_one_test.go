@@ -1271,7 +1271,7 @@ func TestSchedulerScheduleOne(t *testing.T) {
 		stopFunc()
 	}
 
-	// Test with QueueingHints, AsyncAPICalls and NominatedNodeNameForExpectation feature gates
+	// Test with AsyncAPICalls and NominatedNodeNameForExpectation feature gates
 	for _, item := range table {
 		asyncAPICallsEnabled := []bool{true, false}
 		if item.asyncAPICallsEnabled != nil {

@@ -395,13 +395,12 @@ func genTestPodWithClaims(claimNames ...string) *v1.Pod {
 	containerClaims := make([]v1.ResourceClaim, 0, len(claimNames))
 
 	for _, claimName := range claimNames {
-		cn := claimName
 		resourceClaims = append(resourceClaims, v1.PodResourceClaim{
-			Name:              cn,
-			ResourceClaimName: &cn,
+			Name:              claimName,
+			ResourceClaimName: &claimName,
 		})
 		containerClaims = append(containerClaims, v1.ResourceClaim{
-			Name: cn,
+			Name: claimName,
 		})
 	}
 

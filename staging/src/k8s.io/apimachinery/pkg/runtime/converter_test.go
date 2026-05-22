@@ -63,7 +63,7 @@ type B struct {
 
 type C struct {
 	A []A `json:"ca"`
-	B `json:",inline"`
+	B `json:""`
 	C string         `json:"cc"`
 	D *int64         `json:"cd"`
 	E map[string]int `json:"ce"`
@@ -103,20 +103,20 @@ type G struct {
 
 type H struct {
 	A A `json:"ha"`
-	C `json:",inline"`
+	C `json:""`
 }
 
 type I struct {
 	A A `json:"ia"`
-	H `json:",inline"`
+	H `json:""`
 
 	UL1 UnknownLevel1 `json:"ul1"`
 }
 
 type UnknownLevel1 struct {
 	A          int64 `json:"a"`
-	InlinedAA  `json:",inline"`
-	InlinedAAA `json:",inline"`
+	InlinedAA  `json:""`
+	InlinedAAA `json:""`
 }
 type InlinedAA struct {
 	AA int64 `json:"aa"`
@@ -128,8 +128,8 @@ type InlinedAAA struct {
 
 type UnknownLevel2 struct {
 	B          int64 `json:"b"`
-	InlinedBB  `json:",inline"`
-	InlinedBBB `json:",inline"`
+	InlinedBB  `json:""`
+	InlinedBBB `json:""`
 }
 type InlinedBB struct {
 	BB int64 `json:"bb"`
@@ -141,8 +141,8 @@ type InlinedBBB struct {
 
 type UnknownLevel3 struct {
 	C          int64 `json:"c"`
-	InlinedCC  `json:",inline"`
-	InlinedCCC `json:",inline"`
+	InlinedCC  `json:""`
+	InlinedCCC `json:""`
 }
 type InlinedCC struct {
 	CC int64 `json:"cc"`
@@ -1028,21 +1028,21 @@ func TestOmitempty(t *testing.T) {
 
 type InlineTestPrimitive struct {
 	NoNameTagPrimitive          int64 `json:""`
-	NoNameTagInlinePrimitive    int64 `json:",inline"`
+	NoNameTagInlinePrimitive    int64 `json:""`
 	NoNameTagOmitemptyPrimitive int64 `json:",omitempty"`
 }
 type InlineTestAnonymous struct {
 	NoTag
 	NoNameTag          `json:""`
 	NameTag            `json:"nameTagEmbedded"`
-	NoNameTagInline    `json:",inline"`
+	NoNameTagInline    `json:""`
 	NoNameTagOmitempty `json:",omitempty"`
 }
 type InlineTestNamed struct {
 	NoTag              NoTag
 	NoNameTag          NoNameTag          `json:""`
 	NameTag            NameTag            `json:"nameTagEmbedded"`
-	NoNameTagInline    NoNameTagInline    `json:",inline"`
+	NoNameTagInline    NoNameTagInline    `json:""`
 	NoNameTagOmitempty NoNameTagOmitempty `json:",omitempty"`
 }
 type NoTag struct {

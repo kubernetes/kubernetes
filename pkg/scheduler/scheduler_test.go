@@ -776,9 +776,8 @@ func Test_buildQueueingHintMap(t *testing.T) {
 			cfgPls := &schedulerapi.Plugins{}
 			plugins := append(tt.plugins, &fakebindPlugin{}, &fakeQueueSortPlugin{})
 			for _, pl := range plugins {
-				tmpPl := pl
 				if err := registry.Register(pl.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
-					return tmpPl, nil
+					return pl, nil
 				}); err != nil {
 					t.Fatalf("fail to register filter plugin (%s)", pl.Name())
 				}
@@ -912,7 +911,7 @@ func Test_UnionedGVKs(t *testing.T) {
 				Disabled: []schedulerapi.Plugin{{Name: "*"}}, // disable default plugins
 			},
 			want: map[fwk.EventResource]fwk.ActionType{
-				fwk.Node: fwk.Add | fwk.UpdateNodeTaint, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
+				fwk.Node: fwk.Add,
 			},
 		},
 		{
@@ -946,7 +945,7 @@ func Test_UnionedGVKs(t *testing.T) {
 				fwk.AssignedPod:    fwk.Add,
 				fwk.UnscheduledPod: fwk.Add,
 				fwk.TargetPod:      fwk.Add,
-				fwk.Node:           fwk.Add | fwk.UpdateNodeTaint, // When Node/Add is registered, Node/UpdateNodeTaint is automatically registered.
+				fwk.Node:           fwk.Add,
 			},
 		},
 		{
@@ -1101,9 +1100,8 @@ func Test_UnionedGVKs(t *testing.T) {
 			cfgPls := &schedulerapi.Plugins{MultiPoint: tt.plugins}
 			plugins := []fwk.Plugin{&fakeNodePlugin{}, &fakePodPlugin{}, &fakeAssignedPodPlugin{}, &filterWithoutEnqueueExtensionsPlugin{}, &emptyEventsToRegisterPlugin{}, &fakeQueueSortPlugin{}, &fakebindPlugin{}}
 			for _, pl := range plugins {
-				tmpPl := pl
 				if err := registry.Register(pl.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
-					return tmpPl, nil
+					return pl, nil
 				}); err != nil {
 					t.Fatalf("fail to register filter plugin (%s)", pl.Name())
 				}

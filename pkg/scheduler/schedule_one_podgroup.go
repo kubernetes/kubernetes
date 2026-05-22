@@ -280,10 +280,14 @@ func (sched *Scheduler) runWorkloadAwarePreemption(ctx context.Context, schedFwk
 	}
 	defer restoreFn()
 
-	return plugins[0].PodGroupPostFilter(ctx, pg, podGroupInfo.UnscheduledPods, func(ctx context.Context) *fwk.Status {
+	var pgSchedulingFunc framework.PodGroupSchedulingFunc = func(_ context.Context) (*fwk.PodGroupAssignments, *fwk.Status) {
 		res := sched.podGroupSchedulingAlgorithm(ctx, schedFwk, podGroupCycleState, podGroupInfo, runWithoutPostFilters)
-		return res.status
-	})
+		return &fwk.PodGroupAssignments{
+			// We do not fill the Placement struct, because we do not need it.
+			ProposedAssignments: makeProposedAssignments(&res),
+		}, res.status
+	}
+	return plugins[0].PodGroupPostFilter(ctx, pg, podGroupInfo.UnscheduledPods, pgSchedulingFunc)
 }
 
 // algorithmResult stores the scheduling result and status for a scheduling attempt of a single pod.
@@ -752,18 +756,24 @@ func (sched *Scheduler) findBestPlacement(ctx context.Context, schedFwk framewor
 func makePodGroupAssignments(successfulResults map[*fwk.Placement]*podGroupAlgorithmResult) []*fwk.PodGroupAssignments {
 	placementPodGroupAssignments := make([]*fwk.PodGroupAssignments, 0, len(successfulResults))
 	for placement, result := range successfulResults {
-		proposedAssignments := make([]fwk.ProposedAssignment, 0)
-		for _, algorithmResult := range result.podResults {
-			if algorithmResult.GetNodeName() != "" {
-				proposedAssignments = append(proposedAssignments, &algorithmResult)
-			}
-		}
+		proposedAssignments := makeProposedAssignments(result)
 		placementPodGroupAssignments = append(placementPodGroupAssignments, &fwk.PodGroupAssignments{
 			Placement:           placement,
 			ProposedAssignments: proposedAssignments,
 		})
 	}
 	return placementPodGroupAssignments
+}
+
+// makeProposedAssignments builds a list of proposedAssignments from the result of a pod group scheduling attempt.
+func makeProposedAssignments(res *podGroupAlgorithmResult) []fwk.ProposedAssignment {
+	proposedAssignments := make([]fwk.ProposedAssignment, 0)
+	for _, podRes := range res.podResults {
+		if podRes.GetNodeName() != "" {
+			proposedAssignments = append(proposedAssignments, &podRes)
+		}
+	}
+	return proposedAssignments
 }
 
 // podGroupSchedulingAlgorithm attempts to schedule pods in the pod group according to the policy and constraints and returns the scheduling result for each pod in the pod group.

@@ -158,8 +158,7 @@ func TestStorageVersionMigrationWithCRD(t *testing.T) {
 		extensionfeatures.CRDObservedGenerationTracking:                  true,
 	})
 	// decode errors are expected when using conversation webhooks
-	etcd3watcher.TestOnlySetFatalOnDecodeError(false)
-	t.Cleanup(func() { etcd3watcher.TestOnlySetFatalOnDecodeError(true) })
+	etcd3watcher.TestOnlySetFatalOnDecodeError(t, false)
 	framework.GoleakCheck(t, // block test clean up and let any lingering watches complete before making decode errors fatal again
 		goleak.IgnoreTopFunction("k8s.io/kubernetes/vendor/gopkg.in/natefinch/lumberjack%2ev2.(*Logger).millRun"),
 		goleak.IgnoreTopFunction("gopkg.in/natefinch/lumberjack%2ev2.(*Logger).millRun"),

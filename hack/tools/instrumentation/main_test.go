@@ -464,12 +464,11 @@ var _ = metrics.NewHistogram(
 			src: `
 package test
 import compbasemetrics "k8s.io/component-base/metrics"
-import "k8s.io/kubernetes/pkg/kubelet/metrics"
 var _ = compbasemetrics.NewCounter(
 	&compbasemetrics.CounterOpts{
 			Name: "importedCounter",
 			StabilityLevel: compbasemetrics.STABLE,
-			Subsystem: metrics.KubeletSubsystem,
+			Subsystem: "kubelet",
 	},
 	)
 `},

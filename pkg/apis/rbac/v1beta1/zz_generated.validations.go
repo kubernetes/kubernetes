@@ -40,65 +40,108 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
 	// type ClusterRole
-	scheme.AddValidationFunc((*rbacv1beta1.ClusterRole)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_ClusterRole(ctx, op, nil /* fldPath */, obj.(*rbacv1beta1.ClusterRole), safe.Cast[*rbacv1beta1.ClusterRole](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*rbacv1beta1.ClusterRole)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_ClusterRole(
+					ctx, op, nil, /* fldPath */
+					obj.(*rbacv1beta1.ClusterRole),
+					safe.Cast[*rbacv1beta1.ClusterRole](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type ClusterRoleBinding
-	scheme.AddValidationFunc((*rbacv1beta1.ClusterRoleBinding)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_ClusterRoleBinding(ctx, op, nil /* fldPath */, obj.(*rbacv1beta1.ClusterRoleBinding), safe.Cast[*rbacv1beta1.ClusterRoleBinding](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*rbacv1beta1.ClusterRoleBinding)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_ClusterRoleBinding(
+					ctx, op, nil, /* fldPath */
+					obj.(*rbacv1beta1.ClusterRoleBinding),
+					safe.Cast[*rbacv1beta1.ClusterRoleBinding](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type Role
-	scheme.AddValidationFunc((*rbacv1beta1.Role)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_Role(ctx, op, nil /* fldPath */, obj.(*rbacv1beta1.Role), safe.Cast[*rbacv1beta1.Role](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*rbacv1beta1.Role)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_Role(
+					ctx, op, nil, /* fldPath */
+					obj.(*rbacv1beta1.Role),
+					safe.Cast[*rbacv1beta1.Role](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type RoleBinding
-	scheme.AddValidationFunc((*rbacv1beta1.RoleBinding)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_RoleBinding(ctx, op, nil /* fldPath */, obj.(*rbacv1beta1.RoleBinding), safe.Cast[*rbacv1beta1.RoleBinding](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*rbacv1beta1.RoleBinding)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_RoleBinding(
+					ctx, op, nil, /* fldPath */
+					obj.(*rbacv1beta1.RoleBinding),
+					safe.Cast[*rbacv1beta1.RoleBinding](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
 // Validate_ClusterRole validates an instance of ClusterRole according
 // to declarative validation rules in the API schema.
-func Validate_ClusterRole(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *rbacv1beta1.ClusterRole) (errs field.ErrorList) {
+func Validate_ClusterRole(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *rbacv1beta1.ClusterRole) (errs field.ErrorList) {
+
 	// field rbacv1beta1.ClusterRole.TypeMeta has no validation
 	// field rbacv1beta1.ClusterRole.ObjectMeta has no validation
 
-	// field rbacv1beta1.ClusterRole.Rules
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []rbacv1beta1.PolicyRule, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field rbacv1beta1.ClusterRole.Rules
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []rbacv1beta1.PolicyRule,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_PolicyRule)...)
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_PolicyRule); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("rules"), obj.Rules, safe.Field(oldObj, func(oldObj *rbacv1beta1.ClusterRole) []rbacv1beta1.PolicyRule { return oldObj.Rules }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *rbacv1beta1.ClusterRole) []rbacv1beta1.PolicyRule {
+				return oldObj.Rules
+			})
+		errs = append(errs, fn(fldPath.Child("rules"), obj.Rules, oldVal, oldObj != nil)...)
+	}
 
 	// field rbacv1beta1.ClusterRole.AggregationRule has no validation
 	return errs
@@ -106,58 +149,90 @@ func Validate_ClusterRole(ctx context.Context, op operation.Operation, fldPath *
 
 // Validate_ClusterRoleBinding validates an instance of ClusterRoleBinding according
 // to declarative validation rules in the API schema.
-func Validate_ClusterRoleBinding(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *rbacv1beta1.ClusterRoleBinding) (errs field.ErrorList) {
+func Validate_ClusterRoleBinding(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *rbacv1beta1.ClusterRoleBinding) (errs field.ErrorList) {
+
 	// field rbacv1beta1.ClusterRoleBinding.TypeMeta has no validation
 	// field rbacv1beta1.ClusterRoleBinding.ObjectMeta has no validation
 
-	// field rbacv1beta1.ClusterRoleBinding.Subjects
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []rbacv1beta1.Subject, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field rbacv1beta1.ClusterRoleBinding.Subjects
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []rbacv1beta1.Subject,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Subject)...)
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Subject); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("subjects"), obj.Subjects, safe.Field(oldObj, func(oldObj *rbacv1beta1.ClusterRoleBinding) []rbacv1beta1.Subject { return oldObj.Subjects }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *rbacv1beta1.ClusterRoleBinding) []rbacv1beta1.Subject {
+				return oldObj.Subjects
+			})
+		errs = append(errs, fn(fldPath.Child("subjects"), obj.Subjects, oldVal, oldObj != nil)...)
+	}
 
-	// field rbacv1beta1.ClusterRoleBinding.RoleRef
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *rbacv1beta1.RoleRef, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field rbacv1beta1.ClusterRoleBinding.RoleRef
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *rbacv1beta1.RoleRef,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_RoleRef(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("roleRef"), &obj.RoleRef, safe.Field(oldObj, func(oldObj *rbacv1beta1.ClusterRoleBinding) *rbacv1beta1.RoleRef { return &oldObj.RoleRef }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *rbacv1beta1.ClusterRoleBinding) *rbacv1beta1.RoleRef {
+				return &oldObj.RoleRef
+			})
+		errs = append(errs, fn(fldPath.Child("roleRef"), &obj.RoleRef, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }
 
 // Validate_PolicyRule validates an instance of PolicyRule according
 // to declarative validation rules in the API schema.
-func Validate_PolicyRule(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *rbacv1beta1.PolicyRule) (errs field.ErrorList) {
-	// field rbacv1beta1.PolicyRule.Verbs
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []string, oldValueCorrelated bool) (errs field.ErrorList) {
+func Validate_PolicyRule(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *rbacv1beta1.PolicyRule) (errs field.ErrorList) {
+
+	{ // field rbacv1beta1.PolicyRule.Verbs
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.RequiredSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -165,7 +240,13 @@ func Validate_PolicyRule(ctx context.Context, op operation.Operation, fldPath *f
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("verbs"), obj.Verbs, safe.Field(oldObj, func(oldObj *rbacv1beta1.PolicyRule) []string { return oldObj.Verbs }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *rbacv1beta1.PolicyRule) []string {
+				return oldObj.Verbs
+			})
+		errs = append(errs, fn(fldPath.Child("verbs"), obj.Verbs, oldVal, oldObj != nil)...)
+	}
 
 	// field rbacv1beta1.PolicyRule.APIGroups has no validation
 	// field rbacv1beta1.PolicyRule.Resources has no validation
@@ -176,90 +257,146 @@ func Validate_PolicyRule(ctx context.Context, op operation.Operation, fldPath *f
 
 // Validate_Role validates an instance of Role according
 // to declarative validation rules in the API schema.
-func Validate_Role(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *rbacv1beta1.Role) (errs field.ErrorList) {
+func Validate_Role(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *rbacv1beta1.Role) (errs field.ErrorList) {
+
 	// field rbacv1beta1.Role.TypeMeta has no validation
 	// field rbacv1beta1.Role.ObjectMeta has no validation
 
-	// field rbacv1beta1.Role.Rules
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []rbacv1beta1.PolicyRule, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field rbacv1beta1.Role.Rules
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []rbacv1beta1.PolicyRule,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_PolicyRule)...)
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_PolicyRule); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("rules"), obj.Rules, safe.Field(oldObj, func(oldObj *rbacv1beta1.Role) []rbacv1beta1.PolicyRule { return oldObj.Rules }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *rbacv1beta1.Role) []rbacv1beta1.PolicyRule {
+				return oldObj.Rules
+			})
+		errs = append(errs, fn(fldPath.Child("rules"), obj.Rules, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }
 
 // Validate_RoleBinding validates an instance of RoleBinding according
 // to declarative validation rules in the API schema.
-func Validate_RoleBinding(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *rbacv1beta1.RoleBinding) (errs field.ErrorList) {
+func Validate_RoleBinding(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *rbacv1beta1.RoleBinding) (errs field.ErrorList) {
+
 	// field rbacv1beta1.RoleBinding.TypeMeta has no validation
 	// field rbacv1beta1.RoleBinding.ObjectMeta has no validation
 
-	// field rbacv1beta1.RoleBinding.Subjects
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []rbacv1beta1.Subject, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field rbacv1beta1.RoleBinding.Subjects
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []rbacv1beta1.Subject,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.OptionalSlice(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				earlyReturn = true
 			}
 			if earlyReturn {
 				return // do not proceed
 			}
 			// iterate the list and call the type's validation function
-			errs = append(errs, validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Subject)...)
+			if e := validate.EachSliceVal(ctx, op, fldPath, obj, oldObj, nil, nil, Validate_Subject); len(e) != 0 {
+				errs = append(errs, e...)
+			}
 			return
-		}(fldPath.Child("subjects"), obj.Subjects, safe.Field(oldObj, func(oldObj *rbacv1beta1.RoleBinding) []rbacv1beta1.Subject { return oldObj.Subjects }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *rbacv1beta1.RoleBinding) []rbacv1beta1.Subject {
+				return oldObj.Subjects
+			})
+		errs = append(errs, fn(fldPath.Child("subjects"), obj.Subjects, oldVal, oldObj != nil)...)
+	}
 
-	// field rbacv1beta1.RoleBinding.RoleRef
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *rbacv1beta1.RoleRef, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field rbacv1beta1.RoleBinding.RoleRef
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *rbacv1beta1.RoleRef,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
 			}
 			// call the type's validation function
 			errs = append(errs, Validate_RoleRef(ctx, op, fldPath, obj, oldObj)...)
 			return
-		}(fldPath.Child("roleRef"), &obj.RoleRef, safe.Field(oldObj, func(oldObj *rbacv1beta1.RoleBinding) *rbacv1beta1.RoleRef { return &oldObj.RoleRef }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *rbacv1beta1.RoleBinding) *rbacv1beta1.RoleRef {
+				return &oldObj.RoleRef
+			})
+		errs = append(errs, fn(fldPath.Child("roleRef"), &obj.RoleRef, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }
 
 // Validate_RoleRef validates an instance of RoleRef according
 // to declarative validation rules in the API schema.
-func Validate_RoleRef(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *rbacv1beta1.RoleRef) (errs field.ErrorList) {
+func Validate_RoleRef(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *rbacv1beta1.RoleRef) (errs field.ErrorList) {
+
 	// field rbacv1beta1.RoleRef.APIGroup has no validation
 	// field rbacv1beta1.RoleRef.Kind has no validation
 
-	// field rbacv1beta1.RoleRef.Name
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field rbacv1beta1.RoleRef.Name
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -267,27 +404,40 @@ func Validate_RoleRef(ctx context.Context, op operation.Operation, fldPath *fiel
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *rbacv1beta1.RoleRef) *string { return &oldObj.Name }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *rbacv1beta1.RoleRef) *string {
+				return &oldObj.Name
+			})
+		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }
 
 // Validate_Subject validates an instance of Subject according
 // to declarative validation rules in the API schema.
-func Validate_Subject(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *rbacv1beta1.Subject) (errs field.ErrorList) {
+func Validate_Subject(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *rbacv1beta1.Subject) (errs field.ErrorList) {
+
 	// field rbacv1beta1.Subject.Kind has no validation
 	// field rbacv1beta1.Subject.APIGroup has no validation
 
-	// field rbacv1beta1.Subject.Name
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj *string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field rbacv1beta1.Subject.Name
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && (obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj)) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha(); len(e) != 0 {
+			if e := validate.RequiredValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -295,7 +445,13 @@ func Validate_Subject(ctx context.Context, op operation.Operation, fldPath *fiel
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("name"), &obj.Name, safe.Field(oldObj, func(oldObj *rbacv1beta1.Subject) *string { return &oldObj.Name }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *rbacv1beta1.Subject) *string {
+				return &oldObj.Name
+			})
+		errs = append(errs, fn(fldPath.Child("name"), &obj.Name, oldVal, oldObj != nil)...)
+	}
 
 	// field rbacv1beta1.Subject.Namespace has no validation
 	return errs

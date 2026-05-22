@@ -25,7 +25,7 @@ import "k8s.io/code-generator/cmd/validation-gen/testscheme"
 
 var localSchemeBuilder = testscheme.New()
 
-type Struct struct {
+type BasicStruct struct {
 	TypeMeta int
 
 	// +k8s:minimum=1
@@ -56,6 +56,68 @@ type Struct struct {
 
 	TypedefField    IntType  `json:"typedefField"`
 	TypedefPtrField *IntType `json:"typedefPtrField"`
+}
+
+type OptionalStruct struct {
+	TypeMeta int
+
+	// +k8s:optional
+	// +k8s:minimum=1
+	OptionalIntField int `json:"optionalIntField"`
+
+	// +k8s:optional
+	// +k8s:minimum=1
+	OptionalIntPtrField *int `json:"optionalIntPtrField"`
+
+	// +k8s:optional
+	OptionalTypedefField IntType `json:"optionalTypedefField"`
+
+	// +k8s:optional
+	OptionalTypedefPtrField *IntType `json:"optionalTypedefPtrField"`
+}
+
+type RequiredStruct struct {
+	TypeMeta int
+
+	// +k8s:required
+	// +k8s:minimum=1
+	RequiredIntField int `json:"requiredIntField"`
+
+	// +k8s:required
+	// +k8s:minimum=1
+	RequiredIntPtrField *int `json:"requiredIntPtrField"`
+
+	// +k8s:required
+	RequiredTypedefField IntType `json:"requiredTypedefField"`
+
+	// +k8s:required
+	RequiredTypedefPtrField *IntType `json:"requiredTypedefPtrField"`
+}
+
+type NegativeMinimumStruct struct {
+	TypeMeta int
+
+	// +k8s:minimum=-10
+	NegativeMinimumField int `json:"negativeMinimumField"`
+
+	// +k8s:minimum=-10
+	NegativeMinimumPtrField *int `json:"negativeMinimumPtrField"`
+
+	// +k8s:optional
+	// +k8s:minimum=-10
+	OptionalNegativeMinimumField int `json:"optionalNegativeMinimumField"`
+
+	// +k8s:optional
+	// +k8s:minimum=-10
+	OptionalNegativeMinimumPtrField *int `json:"optionalNegativeMinimumPtrField"`
+
+	// +k8s:required
+	// +k8s:minimum=-10
+	RequiredNegativeMinimumField int `json:"requiredNegativeMinimumField"`
+
+	// +k8s:required
+	// +k8s:minimum=-10
+	RequiredNegativeMinimumPtrField *int `json:"requiredNegativeMinimumPtrField"`
 }
 
 // +k8s:minimum=1

@@ -18,6 +18,7 @@ package podautoscaler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	goruntime "runtime"
@@ -36,14 +37,19 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	autoscalinglisters "k8s.io/client-go/listers/autoscaling/v2"
 	scalefake "k8s.io/client-go/scale/fake"
 	core "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	metricstestutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -51,6 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/monitor"
+	consistencyutil "k8s.io/kubernetes/pkg/controller/util/consistency"
 	"k8s.io/kubernetes/pkg/controller/util/selectors"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -1724,7 +1731,7 @@ func TestScaleUpOneMetricInvalid(t *testing.T) {
 		reportedLevels:      []uint64{300, 400, 500},
 		reportedCPURequests: []resource.Quantity{resource.MustParse("1.0"), resource.MustParse("1.0"), resource.MustParse("1.0")},
 		expectedReportedReconciliationActionLabel: monitor.ActionLabelScaleUp,
-		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelSpec,
 		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
 			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleUp,
 			// Actually, such an invalid type should be validated in the kube-apiserver and invalid metric type shouldn't be recorded.
@@ -3591,7 +3598,7 @@ func TestConditionInvalidSourceType(t *testing.T) {
 			},
 		},
 		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
-		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelSpec,
 		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
 			// Actually, such an invalid type should be validated in the kube-apiserver and invalid metric type shouldn't be recorded.
 			"CheddarCheese": monitor.ActionLabelNone,
@@ -5287,7 +5294,7 @@ func TestNoScaleDownOneMetricInvalid(t *testing.T) {
 			{Type: autoscalingv2.ScalingActive, Status: v1.ConditionFalse, Reason: "InvalidMetricSourceType"},
 		},
 		expectedReportedReconciliationActionLabel: monitor.ActionLabelNone,
-		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelInternal,
+		expectedReportedReconciliationErrorLabel:  monitor.ErrorLabelSpec,
 		expectedReportedMetricComputationActionLabels: map[autoscalingv2.MetricSourceType]monitor.ActionLabel{
 			autoscalingv2.ResourceMetricSourceType: monitor.ActionLabelScaleDown,
 			"CheddarCheese":                        monitor.ActionLabelNone,
@@ -5831,6 +5838,428 @@ func TestBuildQuantity(t *testing.T) {
 				t.Errorf("expected quantity %v (Format: %v), got %v (Format: %v)",
 					tt.expected.String(), tt.expected.Format,
 					q.String(), q.Format)
+			}
+		})
+	}
+}
+
+// spyWorkQueue wraps a real rate-limiting workqueue and records whether items
+// were enqueued via Add (immediate) or AddRateLimited (delayed).
+type spyWorkQueue struct {
+	workqueue.TypedRateLimitingInterface[string]
+	mu                  sync.Mutex
+	addCalls            []string
+	addRateLimitedCalls []string
+	onAdd               func(string)
+}
+
+func newSpyWorkQueue(resyncPeriod time.Duration) *spyWorkQueue {
+	return &spyWorkQueue{
+		TypedRateLimitingInterface: workqueue.NewTypedRateLimitingQueueWithConfig(
+			NewDefaultHPARateLimiter(resyncPeriod),
+			workqueue.TypedRateLimitingQueueConfig[string]{
+				Name: "test-spy",
+			},
+		),
+	}
+}
+
+func (s *spyWorkQueue) Add(item string) {
+	s.mu.Lock()
+	s.addCalls = append(s.addCalls, item)
+	onAdd := s.onAdd
+	s.mu.Unlock()
+	if onAdd != nil {
+		onAdd(item)
+	}
+	s.TypedRateLimitingInterface.Add(item)
+}
+
+func (s *spyWorkQueue) AddRateLimited(item string) {
+	s.mu.Lock()
+	s.addRateLimitedCalls = append(s.addRateLimitedCalls, item)
+	s.mu.Unlock()
+	s.TypedRateLimitingInterface.AddRateLimited(item)
+}
+
+func (s *spyWorkQueue) getAddCalls() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	result := make([]string, len(s.addCalls))
+	copy(result, s.addCalls)
+	return result
+}
+
+func (s *spyWorkQueue) getAddRateLimitedCalls() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	result := make([]string, len(s.addRateLimitedCalls))
+	copy(result, s.addRateLimitedCalls)
+	return result
+}
+
+func newTestEnqueueController(spy *spyWorkQueue) *HorizontalController {
+	monitor.Register()
+	return &HorizontalController{
+		queue:        spy,
+		hpaSelectors: selectors.NewBiMultimap(),
+		monitor:      monitor.New(),
+	}
+}
+
+func TestEnqueueHPAAddsImmediately(t *testing.T) {
+	spy := newSpyWorkQueue(10 * time.Minute)
+	defer spy.ShutDown()
+	ctrl := newTestEnqueueController(spy)
+
+	hpa := &autoscalingv2.HorizontalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-hpa",
+			Namespace: "test-ns",
+		},
+	}
+	ctrl.enqueueHPA(hpa)
+
+	expectedKey := "test-ns/test-hpa"
+	assert.Equal(t, []string{expectedKey}, spy.getAddCalls(),
+		"enqueueHPA should use queue.Add for immediate processing")
+	assert.Empty(t, spy.getAddRateLimitedCalls(),
+		"enqueueHPA should not use queue.AddRateLimited")
+}
+
+func TestEnqueueHPARegistersSelectorBeforeQueueAdd(t *testing.T) {
+	spy := newSpyWorkQueue(10 * time.Minute)
+	defer spy.ShutDown()
+	ctrl := newTestEnqueueController(spy)
+
+	expectedKey := "test-ns/test-hpa"
+	expectedSelectorKey := selectors.Key{Name: "test-hpa", Namespace: "test-ns"}
+	spy.onAdd = func(item string) {
+		assert.Equal(t, expectedKey, item)
+		ctrl.hpaSelectorsMux.Lock()
+		defer ctrl.hpaSelectorsMux.Unlock()
+		assert.True(t, ctrl.hpaSelectors.SelectorExists(expectedSelectorKey),
+			"selector registration should happen before queue.Add")
+	}
+
+	hpa := &autoscalingv2.HorizontalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-hpa",
+			Namespace: "test-ns",
+		},
+	}
+	ctrl.enqueueHPA(hpa)
+
+	assert.Equal(t, []string{expectedKey}, spy.getAddCalls(),
+		"enqueueHPA should still enqueue immediately")
+}
+
+func TestUpdateHPAEnqueueBehavior(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAGeneration, true)
+
+	tests := []struct {
+		name                 string
+		oldObj               interface{}
+		curObj               interface{}
+		expectImmediateAdd   bool
+		expectRateLimitedAdd bool
+	}{
+		{
+			name: "generation change enqueues immediately",
+			oldObj: &autoscalingv2.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-hpa",
+					Namespace:  "test-ns",
+					Generation: 1,
+				},
+			},
+			curObj: &autoscalingv2.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-hpa",
+					Namespace:  "test-ns",
+					Generation: 2,
+				},
+			},
+			expectImmediateAdd:   true,
+			expectRateLimitedAdd: false,
+		},
+		{
+			name: "status-only change uses rate limiting",
+			oldObj: &autoscalingv2.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-hpa",
+					Namespace:  "test-ns",
+					Generation: 1,
+				},
+				Status: autoscalingv2.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 3,
+					DesiredReplicas: 3,
+				},
+			},
+			curObj: &autoscalingv2.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-hpa",
+					Namespace:  "test-ns",
+					Generation: 1,
+				},
+				Status: autoscalingv2.HorizontalPodAutoscalerStatus{
+					CurrentReplicas: 5,
+					DesiredReplicas: 5,
+				},
+			},
+			expectImmediateAdd:   false,
+			expectRateLimitedAdd: true,
+		},
+		{
+			name: "unrecognized old object type falls back to rate-limited enqueue",
+			oldObj: cache.DeletedFinalStateUnknown{
+				Key: "test-ns/test-hpa",
+				Obj: &autoscalingv2.HorizontalPodAutoscaler{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-hpa",
+						Namespace: "test-ns",
+					},
+				},
+			},
+			curObj: &autoscalingv2.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-hpa",
+					Namespace: "test-ns",
+				},
+			},
+			expectImmediateAdd:   false,
+			expectRateLimitedAdd: true,
+		},
+		{
+			name: "unrecognized new object type falls back to rate-limited enqueue",
+			oldObj: &autoscalingv2.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-hpa",
+					Namespace: "test-ns",
+				},
+			},
+			curObj: cache.DeletedFinalStateUnknown{
+				Key: "test-ns/test-hpa",
+				Obj: &autoscalingv2.HorizontalPodAutoscaler{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-hpa",
+						Namespace: "test-ns",
+					},
+				},
+			},
+			expectImmediateAdd:   false,
+			expectRateLimitedAdd: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			spy := newSpyWorkQueue(10 * time.Minute)
+			defer spy.ShutDown()
+			ctrl := newTestEnqueueController(spy)
+
+			ctrl.updateHPA(tt.oldObj, tt.curObj)
+
+			expectedKey := "test-ns/test-hpa"
+			if tt.expectImmediateAdd {
+				assert.Equal(t, []string{expectedKey}, spy.getAddCalls(),
+					"expected queue.Add to be called for immediate processing")
+			} else {
+				assert.Empty(t, spy.getAddCalls(),
+					"expected queue.Add not to be called")
+			}
+			if tt.expectRateLimitedAdd {
+				assert.Equal(t, []string{expectedKey}, spy.getAddRateLimitedCalls(),
+					"expected queue.AddRateLimited to be called for delayed processing")
+			} else {
+				assert.Empty(t, spy.getAddRateLimitedCalls(),
+					"expected queue.AddRateLimited not to be called")
+			}
+		})
+	}
+}
+
+func TestUpdateHPAFallsBackWhenFeatureDisabled(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.HPAGeneration, false)
+
+	spy := newSpyWorkQueue(10 * time.Minute)
+	defer spy.ShutDown()
+	ctrl := newTestEnqueueController(spy)
+
+	ctrl.updateHPA(
+		&autoscalingv2.HorizontalPodAutoscaler{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "test-hpa",
+				Namespace:  "test-ns",
+				Generation: 1,
+			},
+		},
+		&autoscalingv2.HorizontalPodAutoscaler{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:       "test-hpa",
+				Namespace:  "test-ns",
+				Generation: 2,
+			},
+		},
+	)
+
+	expectedKey := "test-ns/test-hpa"
+	assert.Empty(t, spy.getAddCalls(),
+		"with HPAGeneration disabled, generation changes should not trigger immediate enqueue")
+	assert.Equal(t, []string{expectedKey}, spy.getAddRateLimitedCalls(),
+		"with HPAGeneration disabled, all updates should be rate-limited")
+}
+
+// fakeRVGetter satisfies consistencyutil.LastSyncRVGetter for tests.
+type fakeRVGetter struct {
+	rv string
+}
+
+func (f *fakeRVGetter) LastStoreSyncResourceVersion() string { return f.rv }
+
+func newConsistencyTestController(hpaStore cache.Store, hpaLister autoscalinglisters.HorizontalPodAutoscalerLister, consistencyStore consistencyutil.ConsistencyStore) *HorizontalController {
+	monitor.Register()
+	return &HorizontalController{
+		hpaLister:        hpaLister,
+		hpaListerSynced:  alwaysReady,
+		hpaSelectors:     selectors.NewBiMultimap(),
+		monitor:          monitor.New(),
+		consistencyStore: consistencyStore,
+		queue: workqueue.NewTypedRateLimitingQueueWithConfig(
+			NewDefaultHPARateLimiter(time.Minute),
+			workqueue.TypedRateLimitingQueueConfig[string]{Name: "test"},
+		),
+	}
+}
+
+// TestUpdateStatusPopulatesConsistencyStore verifies updateStatus records the
+// post-write RV/UID with the consistency store so EnsureReady reports stale
+// until the informer has caught up.
+func TestUpdateStatusPopulatesConsistencyStore(t *testing.T) {
+	hpa := &autoscalingv2.HorizontalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test-hpa",
+			Namespace:       "test-ns",
+			UID:             "hpa-uid",
+			ResourceVersion: "1",
+		},
+	}
+	fakeClient := &fake.Clientset{}
+	fakeClient.AddReactor("update", "horizontalpodautoscalers", func(action core.Action) (bool, runtime.Object, error) {
+		obj := action.(core.UpdateAction).GetObject().(*autoscalingv2.HorizontalPodAutoscaler)
+		obj.ResourceVersion = "2"
+		return true, obj, nil
+	})
+
+	rvGetter := &fakeRVGetter{rv: "1"}
+	consistencyStore := consistencyutil.NewConsistencyStore(map[schema.GroupResource]consistencyutil.LastSyncRVGetter{
+		horizontalGroupResource: rvGetter,
+	})
+
+	ctrl := newConsistencyTestController(nil, nil, consistencyStore)
+	ctrl.hpaNamespacer = fakeClient.AutoscalingV2()
+	ctrl.eventRecorder = &record.FakeRecorder{}
+
+	if err := ctrl.updateStatus(context.TODO(), hpa); err != nil {
+		t.Fatalf("updateStatus returned unexpected error: %v", err)
+	}
+
+	owner := types.NamespacedName{Namespace: hpa.Namespace, Name: hpa.Name}
+	if err := consistencyStore.EnsureReady(owner); err == nil {
+		t.Error("expected consistency store to be stale (read RV 1 < written RV 2), got nil error")
+	}
+
+	rvGetter.rv = "2"
+
+	if err := consistencyStore.EnsureReady(owner); err != nil {
+		t.Errorf("expected consistency store to be ready once informer catches up, got error: %v", err)
+	}
+}
+
+// TestReconcileKeyEnsureReadyStaleCache verifies reconcileKey returns the
+// consistency error and increments the HPARequeueSkips metric when the HPA
+// informer has not yet observed the controller's last write.
+func TestReconcileKeyEnsureReadyStaleCache(t *testing.T) {
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	hpaLister := autoscalinglisters.NewHorizontalPodAutoscalerLister(indexer)
+
+	rvGetter := &fakeRVGetter{rv: "1"}
+	consistencyStore := consistencyutil.NewConsistencyStore(map[schema.GroupResource]consistencyutil.LastSyncRVGetter{
+		horizontalGroupResource: rvGetter,
+	})
+
+	owner := types.NamespacedName{Namespace: "test-ns", Name: "test-hpa"}
+	consistencyStore.WroteAt(owner, "hpa-uid", horizontalGroupResource, "5")
+
+	ctrl := newConsistencyTestController(indexer, hpaLister, consistencyStore)
+
+	deleted, err := ctrl.reconcileKey(context.TODO(), "test-ns/test-hpa")
+	if err == nil {
+		t.Fatal("expected reconcileKey to return the consistency error, got nil")
+	}
+	var consistencyErr *consistencyutil.ConsistencyError
+	if !errors.As(err, &consistencyErr) {
+		t.Fatalf("expected *ConsistencyError, got %T: %v", err, err)
+	}
+	assert.False(t, deleted, "expected deleted=false when returning early on consistency error")
+
+	v, mErr := metricstestutil.GetCounterMetricValue(monitor.HPARequeueSkips.WithLabelValues(horizontalGroupResource.Group, horizontalGroupResource.Resource))
+	if mErr != nil {
+		t.Fatalf("error getting HPARequeueSkips metric: %v", mErr)
+	}
+	assert.Equal(t, 1, int(v), "HPARequeueSkips should increment once per stale reconcile")
+}
+
+// TestDeleteHPAClearsConsistencyStore verifies deleteHPA clears the per-owner
+// consistency record, including when the informer delivers a tombstone.
+func TestDeleteHPAClearsConsistencyStore(t *testing.T) {
+	tests := []struct {
+		name string
+		obj  interface{}
+	}{
+		{
+			name: "direct HPA object",
+			obj: &autoscalingv2.HorizontalPodAutoscaler{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-hpa",
+					Namespace: "test-ns",
+					UID:       "hpa-uid",
+				},
+			},
+		},
+		{
+			name: "tombstone",
+			obj: cache.DeletedFinalStateUnknown{
+				Key: "test-ns/test-hpa",
+				Obj: &autoscalingv2.HorizontalPodAutoscaler{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-hpa",
+						Namespace: "test-ns",
+						UID:       "hpa-uid",
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rvGetter := &fakeRVGetter{rv: "1"}
+			consistencyStore := consistencyutil.NewConsistencyStore(map[schema.GroupResource]consistencyutil.LastSyncRVGetter{
+				horizontalGroupResource: rvGetter,
+			})
+			owner := types.NamespacedName{Namespace: "test-ns", Name: "test-hpa"}
+			consistencyStore.WroteAt(owner, "hpa-uid", horizontalGroupResource, "5")
+
+			if err := consistencyStore.EnsureReady(owner); err == nil {
+				t.Fatal("expected consistency store to be stale before deleteHPA, got nil")
+			}
+
+			ctrl := newConsistencyTestController(nil, nil, consistencyStore)
+			ctrl.deleteHPA(tt.obj)
+
+			if err := consistencyStore.EnsureReady(owner); err != nil {
+				t.Errorf("expected consistency store record to be cleared after deleteHPA, got: %v", err)
 			}
 		})
 	}

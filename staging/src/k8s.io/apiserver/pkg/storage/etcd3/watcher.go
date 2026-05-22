@@ -65,12 +65,23 @@ var fatalOnDecodeError atomic.Bool
 func init() {
 	// check to see if we are running in a test environment
 	b, _ := strconv.ParseBool(os.Getenv("KUBE_PANIC_WATCH_DECODE_ERROR"))
-	TestOnlySetFatalOnDecodeError(b)
+	fatalOnDecodeError.Store(b)
+}
+
+// TestingTB is the subset of testing.TB required by TestOnlySetFatalOnDecodeError. Avoids importing
+// the testing package.
+type TestingTB interface {
+	Helper()
+	Cleanup(func())
 }
 
 // TestOnlySetFatalOnDecodeError should only be used for cases where decode errors are expected and need to be tested. e.g. conversion webhooks.
-func TestOnlySetFatalOnDecodeError(b bool) {
-	fatalOnDecodeError.Store(b)
+func TestOnlySetFatalOnDecodeError(tb TestingTB, b bool) {
+	tb.Helper()
+	old := fatalOnDecodeError.Swap(b)
+	tb.Cleanup(func() {
+		fatalOnDecodeError.Store(old)
+	})
 }
 
 type watcher struct {

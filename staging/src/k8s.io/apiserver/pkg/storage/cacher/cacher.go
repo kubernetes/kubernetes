@@ -484,10 +484,13 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 }
 
 func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
+	startTime := time.Now()
 	c.watchCache.SetOnReplace(func() {
 		c.ready.setReady()
-		klog.V(1).InfoS("cacher initialized", "group", c.groupResource.Group, "resource", c.groupResource.Resource)
+		duration := time.Since(startTime)
+		klog.V(1).InfoS("cacher initialized", "group", c.groupResource.Group, "resource", c.groupResource.Resource, "duration", duration)
 		metrics.WatchCacheInitializations.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Inc()
+		metrics.WatchCacheInitializationDuration.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Observe(duration.Seconds())
 	})
 	var err error
 	defer func() {
@@ -498,6 +501,7 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 	err = c.reflector.ListAndWatch(stopChannel)
 	if err != nil {
 		klog.Errorf("cacher (%v): unexpected ListAndWatch error: %v; reinitializing...", c.groupResource.String(), err)
+		metrics.WatchCacheInitializationErrors.WithLabelValues(c.groupResource.Group, c.groupResource.Resource).Inc()
 	}
 }
 
@@ -521,19 +525,9 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		return nil, err
 	}
 
-	var readyGeneration int
-	if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		var err error
-		var downtime time.Duration
-		readyGeneration, downtime, err = c.ready.checkAndReadGeneration()
-		if err != nil {
-			return nil, errors.NewTooManyRequests(err.Error(), calculateRetryAfterForUnreadyCache(downtime))
-		}
-	} else {
-		readyGeneration, err = c.ready.waitAndReadGeneration(ctx)
-		if err != nil {
-			return nil, errors.NewServiceUnavailable(err.Error())
-		}
+	readyGeneration, downtime, err := c.ready.checkAndReadGeneration()
+	if err != nil {
+		return nil, errors.NewTooManyRequests(err.Error(), calculateRetryAfterForUnreadyCache(downtime))
 	}
 
 	// determine the namespace and name scope of the watch, first from the request, secondarily from the field selector
@@ -760,16 +754,10 @@ func (c *Cacher) GetList(ctx context.Context, key string, opts storage.ListOptio
 		attribute.Stringer("type", c.groupResource))
 	defer span.End(500 * time.Millisecond)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ResilientWatchCacheInitialization) {
-		if downtime, err := c.ready.check(); err != nil {
-			// If Cacher is not initialized, reject List requests
-			// as described in https://kep.k8s.io/4568
-			return errors.NewTooManyRequests(err.Error(), calculateRetryAfterForUnreadyCache(downtime))
-		}
-	} else {
-		if err := c.ready.wait(ctx); err != nil {
-			return errors.NewServiceUnavailable(err.Error())
-		}
+	if downtime, err := c.ready.check(); err != nil {
+		// If Cacher is not initialized, reject List requests
+		// as described in https://kep.k8s.io/4568
+		return errors.NewTooManyRequests(err.Error(), calculateRetryAfterForUnreadyCache(downtime))
 	}
 	span.AddEvent("Ready")
 

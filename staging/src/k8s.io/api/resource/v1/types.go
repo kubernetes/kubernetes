@@ -93,7 +93,7 @@ const (
 // For resources that are not local to a node, the node name is not set. Instead,
 // the driver may use a node selector to specify where the devices are available.
 type ResourceSlice struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -755,6 +755,7 @@ type DeviceAttribute struct {
 	// +k8s:listType=atomic
 	// +k8s:alpha(since: "1.36")=+k8s:optional
 	// +k8s:alpha(since: "1.36")=+k8s:unionMember
+	// +k8s:alpha(since: "1.37")=+k8s:eachVal=+k8s:maxBytes=64
 	// +featureGate=DRAListTypeAttributes
 	StringValues []string `json:"strings,omitempty" protobuf:"bytes,8,opt,name=strings"`
 
@@ -864,7 +865,7 @@ const (
 
 // ResourceSliceList is a collection of ResourceSlices.
 type ResourceSliceList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard list metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -884,7 +885,7 @@ type ResourceSliceList struct {
 // stanza tracks whether this claim has been satisfied and what specific
 // resources have been allocated.
 type ResourceClaim struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -1319,7 +1320,7 @@ type CELDeviceSelector struct {
 	//  - driver (string): the name of the driver which defines this device.
 	//  - attributes (map[string]object): the device's attributes, grouped by prefix
 	//    (e.g. device.attributes["dra.example.com"] evaluates to an object with all
-	//    of the attributes which were prefixed by "dra.example.com".
+	//    of the attributes which were prefixed by "dra.example.com").
 	//  - capacity (map[string]object): the device's capacities, grouped by prefix.
 	//  - allowMultipleAllocations (bool): the allowMultipleAllocations property of the device
 	//    (v1.34+ with the DRAConsumableCapacity feature enabled).
@@ -1351,6 +1352,15 @@ type CELDeviceSelector struct {
 	//
 	// A robust expression should check for the existence of attributes
 	// before referencing them.
+	//
+	// Common errors:
+	// - "no such key": Use optional chaining (.? followed by orValue())
+	//   or guarding the check with has() for optional fields.
+	//   See CEL Optional Types for details:
+	//   https://pkg.go.dev/github.com/google/cel-go@v0.17.4/cel#OptionalTypes
+	//
+	// For more CEL expression syntax and examples, see:
+	// https://kubernetes.io/docs/reference/using-api/cel/
 	//
 	// For ease of use, the cel.bind() function is enabled, and can be used
 	// to simplify expressions that access multiple attributes with the
@@ -1495,7 +1505,7 @@ type DeviceClaimConfiguration struct {
 	// +k8s:alpha(since: "1.36")=+k8s:maxItems=32
 	Requests []string `json:"requests,omitempty" protobuf:"bytes,1,opt,name=requests"`
 
-	DeviceConfiguration `json:",inline" protobuf:"bytes,2,name=deviceConfiguration"`
+	DeviceConfiguration `json:"" protobuf:"bytes,2,name=deviceConfiguration"`
 }
 
 // DeviceConfiguration must have exactly one field set. It gets embedded
@@ -1893,7 +1903,7 @@ type DeviceAllocationConfiguration struct {
 	// +k8s:alpha(since: "1.36")=+k8s:maxItems=32
 	Requests []string `json:"requests,omitempty" protobuf:"bytes,2,opt,name=requests"`
 
-	DeviceConfiguration `json:",inline" protobuf:"bytes,3,name=deviceConfiguration"`
+	DeviceConfiguration `json:"" protobuf:"bytes,3,name=deviceConfiguration"`
 }
 
 // +enum
@@ -1911,7 +1921,7 @@ const (
 
 // ResourceClaimList is a collection of claims.
 type ResourceClaimList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard list metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -1930,7 +1940,7 @@ type ResourceClaimList struct {
 // the device requests of a claim to apply these presets.
 // Cluster scoped.
 type DeviceClass struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object metadata
 	// +optional
 	// +k8s:alpha(since: "1.36")=+k8s:subfield(name)=+k8s:optional
@@ -1996,7 +2006,7 @@ type DeviceClassSpec struct {
 
 // DeviceClassConfiguration is used in DeviceClass.
 type DeviceClassConfiguration struct {
-	DeviceConfiguration `json:",inline" protobuf:"bytes,1,opt,name=deviceConfiguration"`
+	DeviceConfiguration `json:"" protobuf:"bytes,1,opt,name=deviceConfiguration"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -2004,7 +2014,7 @@ type DeviceClassConfiguration struct {
 
 // DeviceClassList is a collection of classes.
 type DeviceClassList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard list metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -2019,7 +2029,7 @@ type DeviceClassList struct {
 
 // ResourceClaimTemplate is used to produce ResourceClaim objects.
 type ResourceClaimTemplate struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -2053,7 +2063,7 @@ type ResourceClaimTemplateSpec struct {
 
 // ResourceClaimTemplateList is a collection of claim templates.
 type ResourceClaimTemplateList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard list metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`

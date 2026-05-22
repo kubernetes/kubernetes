@@ -18,18 +18,17 @@ package apidefinitions
 
 import (
 	"context"
-	"encoding/json"
 	"slices"
 	"strings"
 	"testing"
-
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	v1 "k8s.io/api/core/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -77,7 +76,12 @@ func (d *Definition) ResourceClient() dynamic.ResourceInterface {
 // discoverable resource. It registers a fixed set of CRDs so that a sample
 // set of custom resources discoverable and tested.
 func TestAllDefinitions(t *testing.T, testNamespace string, testFunc DefinitionTestFunc) {
-	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), []string{"--disable-admission-plugins", "ServiceAccount,TaintNodesByCondition"}, framework.SharedEtcd())
+	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), []string{
+		"--disable-admission-plugins", "ServiceAccount,TaintNodesByCondition",
+		// Enable all APIs and features
+		"--runtime-config=api/all=true",
+		"--feature-gates=AllAlpha=true,AllBeta=true",
+	}, framework.SharedEtcd())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,16 +186,10 @@ func ResourceString(gvr schema.GroupVersionResource) string {
 	return gvr.Resource + "." + gvr.Version + "." + gvr.Group
 }
 
-// matchesException returns true if gvr matches any entry in exceptions.
-// Each entry must be a kubectl-style resource string in either
-// "resource.group" form (e.g. "pods", "deployments.apps",
-// "customresourcedefinitions.apiextensions.k8s.io"), which matches all
-// versions of that resource, or "resource.version.group" form (e.g.
-// "pods.v1", "deployments.v1.apps"), which matches a single version.
+// matchesException returns true if gvr matches an entry in exceptions.
+// Excepttions are of the form "resource.version.group". For example,
+// "pods.v1" or "deployments.v1.apps".
 func matchesException(gvr schema.GroupVersionResource, exceptions sets.Set[string]) bool {
-	if exceptions.Has(gvr.GroupResource().String()) {
-		return true
-	}
 	return exceptions.Has(ResourceString(gvr))
 }
 

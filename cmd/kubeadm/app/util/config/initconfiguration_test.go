@@ -314,3 +314,56 @@ func TestBytesToInitConfiguration(t *testing.T) {
 		}
 	}
 }
+
+func TestSetInitDynamicDefaultsSkipAPIEndpoint(t *testing.T) {
+	// "not-an-ip" is a sentinel that would cause SetAPIEndpointDynamicDefaults to return
+	// an error if invoked. With skipAPIEndpoint=true, the value must be left untouched.
+	const sentinel = "not-an-ip"
+
+	tests := []struct {
+		name            string
+		skipAPIEndpoint bool
+		expectErr       bool
+		expectAdvertise string
+	}{
+		{
+			name:            "skip leaves AdvertiseAddress untouched",
+			skipAPIEndpoint: true,
+			expectErr:       false,
+			expectAdvertise: sentinel,
+		},
+		{
+			name:            "no skip surfaces invalid AdvertiseAddress error",
+			skipAPIEndpoint: false,
+			expectErr:       true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := &kubeadmapi.InitConfiguration{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					KubernetesVersion: constants.CurrentKubernetesVersion.String(),
+				},
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
+					AdvertiseAddress: sentinel,
+				},
+			}
+
+			err := SetInitDynamicDefaults(cfg, true /* skipCRIDetect */, tc.skipAPIEndpoint)
+			if tc.expectErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if cfg.LocalAPIEndpoint.AdvertiseAddress != tc.expectAdvertise {
+				t.Errorf("AdvertiseAddress = %q, want %q",
+					cfg.LocalAPIEndpoint.AdvertiseAddress, tc.expectAdvertise)
+			}
+		})
+	}
+}

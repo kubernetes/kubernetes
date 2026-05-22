@@ -356,7 +356,7 @@ spec:
             name: socket-dir
 
         - name: csi-provisioner
-          image: registry.k8s.io/sig-storage/csi-provisioner:v6.1.1
+          image: registry.k8s.io/sig-storage/csi-provisioner:v6.2.0
           args:
             - -v=5
             - --csi-address=/csi/csi.sock
@@ -400,7 +400,7 @@ spec:
               name: socket-dir
 
         - name: csi-snapshot-metadata
-          image: registry.k8s.io/sig-storage/csi-snapshot-metadata:v0.2.0
+          image: registry.k8s.io/sig-storage/csi-snapshot-metadata:v1.0.0
           imagePullPolicy: IfNotPresent
           args:
           - --csi-address=/csi/csi.sock

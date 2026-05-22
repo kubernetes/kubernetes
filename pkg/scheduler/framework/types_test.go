@@ -2923,6 +2923,150 @@ func TestQueuedPodInfo_UpdateInvalidatesSignature(t *testing.T) {
 	}
 }
 
+func TestPodInfo_Update(t *testing.T) {
+	pod1 := st.MakePod().Name("pod1").UID("uid1").Obj()
+	pod2 := pod1.DeepCopy()
+	pod2.Labels = map[string]string{"foo": "bar"}
+	pod3 := st.MakePod().Name("pod2").UID("uid2").Obj()
+
+	tests := []struct {
+		name        string
+		podInfo     *PodInfo
+		pod         *v1.Pod
+		expectedErr string
+		verify      func(t *testing.T, pi *PodInfo)
+	}{
+		{
+			name:    "successful update (same UID)",
+			podInfo: func() *PodInfo { pi, _ := NewPodInfo(pod1); return pi }(),
+			pod:     pod2,
+			verify: func(t *testing.T, pi *PodInfo) {
+				if pi.Pod.Labels["foo"] != "bar" {
+					t.Errorf("Expected updated labels, got %v", pi.Pod.Labels)
+				}
+			},
+		},
+		{
+			name: "successful update (same UID) - clears cachedResource",
+			podInfo: func() *PodInfo {
+				pi, _ := NewPodInfo(pod1)
+				pi.cachedResource = &fwk.PodResource{}
+				return pi
+			}(),
+			pod: pod2,
+			verify: func(t *testing.T, pi *PodInfo) {
+				if pi.cachedResource != nil {
+					t.Errorf("Expected cachedResource to be nil after Update, got %v", pi.cachedResource)
+				}
+			},
+		},
+		{
+			name:        "failed update (different UID)",
+			podInfo:     func() *PodInfo { pi, _ := NewPodInfo(pod1); return pi }(),
+			pod:         pod3,
+			expectedErr: "pod UID mismatch",
+		},
+		{
+			name:        "failed update (nil pod)",
+			podInfo:     func() *PodInfo { pi, _ := NewPodInfo(pod1); return pi }(),
+			pod:         nil,
+			expectedErr: "cannot update with nil pod",
+		},
+		{
+			name:        "failed update (nil PodInfo.Pod)",
+			podInfo:     &PodInfo{},
+			pod:         pod1,
+			expectedErr: "cannot update PodInfo - its Pod is nil",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.podInfo.Update(tc.pod)
+			if tc.expectedErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.expectedErr) {
+					t.Errorf("Expected error containing '%s', got %v", tc.expectedErr, err)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Expected no error, got %v", err)
+				}
+				if tc.verify != nil {
+					tc.verify(t, tc.podInfo)
+				}
+			}
+		})
+	}
+}
+
+func TestNewPodInfo(t *testing.T) {
+	affinity := &v1.Affinity{
+		PodAffinity: &v1.PodAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+				{
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"foo": "bar"},
+					},
+					TopologyKey: "kubernetes.io/hostname",
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name        string
+		pod         *v1.Pod
+		expectedErr string
+		verify      func(t *testing.T, pi *PodInfo)
+	}{
+		{
+			name:        "nil pod",
+			pod:         nil,
+			expectedErr: "pod cannot be nil",
+		},
+		{
+			name: "pod without affinity",
+			pod:  st.MakePod().Name("pod1").Obj(),
+			verify: func(t *testing.T, pi *PodInfo) {
+				if pi.Pod.Name != "pod1" {
+					t.Errorf("Expected pod name 'pod1', got %v", pi.Pod.Name)
+				}
+			},
+		},
+		{
+			name: "pod with affinity",
+			pod: func() *v1.Pod {
+				p := st.MakePod().Name("pod2").Obj()
+				p.Spec.Affinity = affinity
+				return p
+			}(),
+			verify: func(t *testing.T, pi *PodInfo) {
+				if len(pi.RequiredAffinityTerms) != 1 {
+					t.Errorf("Expected 1 required affinity term, got %v", len(pi.RequiredAffinityTerms))
+				}
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			pi, err := NewPodInfo(tc.pod)
+			if tc.expectedErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.expectedErr) {
+					t.Errorf("Expected error containing '%s', got %v", tc.expectedErr, err)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Expected no error, got %v", err)
+				}
+				if tc.verify != nil {
+					tc.verify(t, pi)
+				}
+			}
+		})
+	}
+}
+
 func TestUpdateNodeAllocatableDRAClaimState(t *testing.T) {
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRANodeAllocatableResources, true)
 	claim1NamespacedName := types.NamespacedName{

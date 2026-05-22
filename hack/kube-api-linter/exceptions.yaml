@@ -23,10 +23,7 @@
 # Commentstart - Ignore commentstart issues for existing API group
 # TODO: For each existing API group, we aim to remove it over time.
 - text: "godoc for field .* should start with '.* ...'"
-  path: "staging/src/k8s.io/api/(apps|autoscaling|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
-- text: "field .* is missing godoc comment"
-  path: "staging/src/k8s.io/api/autoscaling/"
-
+  path: "staging/src/k8s.io/api/(apps|batch|certificates|coordination|core|discovery|events|extensions|flowcontrol|imagepolicy|networking|node|policy|rbac|resource|scheduling|storage|storagemigration)"
 
 # notimestamp: Legacy 'Timestamp' fields retained for backward compatibility
 - text: 'notimestamp: naming convention "notimestamp": field TokenRequestStatus.ExpirationTimestamp: prefer use of the term ''time'' over ''timestamp'''
@@ -110,7 +107,7 @@
 # OptionalOrRequired is being enabled over time. For now, each API group should be added to this list until we comb through each group and fix the missing tags.
 # The nonpointerstructs linter is included here as well as these two should be enabled hand-in-hand on each API group.
 - text: "must be marked as optional or required|is a non-pointer struct with no required fields."
-  path: "staging/src/k8s.io/api/(admissionregistration|apidiscovery|apps|authorization|autoscaling|batch|certificates|core|discovery|events|flowcontrol|networking|storage)"
+  path: "staging/src/k8s.io/api/(admissionregistration|apidiscovery|authorization|autoscaling|batch|certificates|core|discovery|events|flowcontrol|networking|storage)"
 
 # OptionalOrRequired - Existing fields that are marked as both optional and required (based on standard optional vs kubebuilder:validation:Required) and should not be fixed.
 - text: "field (PortStatus|IngressPortStatus)\\.Error must not be marked as both optional and required"

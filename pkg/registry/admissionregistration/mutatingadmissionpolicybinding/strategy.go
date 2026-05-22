@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/features"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -34,9 +35,9 @@ import (
 
 // MutatingAdmissionPolicyBindingStrategy implements verification logic for MutatingAdmissionPolicyBinding.
 type mutatingAdmissionPolicyBindingStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
-	authorizer       authorizer.Authorizer
+	authorizer       authorizer.UnconditionalAuthorizer
 	policyGetter     PolicyGetter
 	resourceResolver resolver.ResourceResolver
 }
@@ -48,13 +49,13 @@ type PolicyGetter interface {
 }
 
 // NewStrategy is the default logic that applies when creating and updating MutatingAdmissionPolicyBinding objects.
-func NewStrategy(authorizer authorizer.Authorizer, policyGetter PolicyGetter, resourceResolver resolver.ResourceResolver) *mutatingAdmissionPolicyBindingStrategy {
+func NewStrategy(authorizer authorizer.UnconditionalAuthorizer, policyGetter PolicyGetter, resourceResolver resolver.ResourceResolver) *mutatingAdmissionPolicyBindingStrategy {
 	return &mutatingAdmissionPolicyBindingStrategy{
-		ObjectTyper:      legacyscheme.Scheme,
-		NameGenerator:    names.SimpleNameGenerator,
-		authorizer:       authorizer,
-		policyGetter:     policyGetter,
-		resourceResolver: resourceResolver,
+		DeclarativeValidation: rest.DeclarativeValidation{Scheme: legacyscheme.Scheme},
+		NameGenerator:         names.SimpleNameGenerator,
+		authorizer:            authorizer,
+		policyGetter:          policyGetter,
+		resourceResolver:      resourceResolver,
 	}
 }
 
@@ -112,7 +113,7 @@ func (v *mutatingAdmissionPolicyBindingStrategy) Canonicalize(obj runtime.Object
 }
 
 // AllowCreateOnUpdate is false for MutatingAdmissionPolicyBinding; this means you may not create one with a PUT request.
-func (v *mutatingAdmissionPolicyBindingStrategy) AllowCreateOnUpdate() bool {
+func (v *mutatingAdmissionPolicyBindingStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -138,6 +139,6 @@ func (v *mutatingAdmissionPolicyBindingStrategy) WarningsOnUpdate(ctx context.Co
 
 // AllowUnconditionalUpdate is the default update policy for MutatingAdmissionPolicyBinding objects. Status update should
 // only be allowed if version match.
-func (v *mutatingAdmissionPolicyBindingStrategy) AllowUnconditionalUpdate() bool {
+func (v *mutatingAdmissionPolicyBindingStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }

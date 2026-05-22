@@ -237,11 +237,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				},
 			}
 
-			for i, t := range tests {
-				// Beware of closure, use local variables instead of those from
-				// outer scope
-				test := t
-
+			for i, test := range tests {
 				if !framework.ProviderIs(test.CloudProviders...) {
 					framework.Logf("Skipping %q: cloud providers is not %v", test.Name, test.CloudProviders)
 					continue

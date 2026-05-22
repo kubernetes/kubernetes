@@ -39,176 +39,331 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	// type Struct
-	scheme.AddValidationFunc((*Struct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_Struct(ctx, op, nil /* fldPath */, obj.(*Struct), safe.Cast[*Struct](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*Struct)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_Struct(
+					ctx, op, nil, /* fldPath */
+					obj.(*Struct),
+					safe.Cast[*Struct](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type StructWithNestedTypedef
-	scheme.AddValidationFunc((*StructWithNestedTypedef)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_StructWithNestedTypedef(ctx, op, nil /* fldPath */, obj.(*StructWithNestedTypedef), safe.Cast[*StructWithNestedTypedef](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*StructWithNestedTypedef)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_StructWithNestedTypedef(
+					ctx, op, nil, /* fldPath */
+					obj.(*StructWithNestedTypedef),
+					safe.Cast[*StructWithNestedTypedef](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
 // Validate_Struct validates an instance of Struct according
 // to declarative validation rules in the API schema.
-func Validate_Struct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Struct) (errs field.ErrorList) {
+func Validate_Struct(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *Struct) (errs field.ErrorList) {
+
 	// field Struct.TypeMeta has no validation
 
-	// field Struct.Items
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []Item, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.Items
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []Item,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a Item, b Item) bool { return a.Key == b.Key })...)
-			func() { // cohort {"key": "target"}
-				errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key == "target" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
-					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item Items[key=target] 1")
-				})...)
-				errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key == "target" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
-					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item Items[key=target] 2")
-				})...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+				func(a Item, b Item) bool { return a.Key == b.Key }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			func() { // cohort = "{"key": "target"}"
+				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+					func(item *Item) bool { return item.Key == "target" }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
+						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item Items[key=target] 1")
+					}); len(e) != 0 {
+					errs = append(errs, e...)
+				}
+				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+					func(item *Item) bool { return item.Key == "target" }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
+						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item Items[key=target] 2")
+					}); len(e) != 0 {
+					errs = append(errs, e...)
+				}
 			}()
 			return
-		}(fldPath.Child("items"), obj.Items, safe.Field(oldObj, func(oldObj *Struct) []Item { return oldObj.Items }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) []Item {
+				return oldObj.Items
+			})
+		errs = append(errs, fn(fldPath.Child("items"), obj.Items, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.IntKeyItems
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []IntKeyItem, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.IntKeyItems
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []IntKeyItem,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a IntKeyItem, b IntKeyItem) bool { return a.IntField == b.IntField })...)
-			func() { // cohort {"intField": 42}
-				errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *IntKeyItem) bool { return item.IntField == 42 }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *IntKeyItem) field.ErrorList {
-					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item IntKeyItems[intField=42] 1")
-				})...)
-				errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *IntKeyItem) bool { return item.IntField == 42 }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *IntKeyItem) field.ErrorList {
-					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item IntKeyItems[intField=42] 2")
-				})...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+				func(a IntKeyItem, b IntKeyItem) bool { return a.IntField == b.IntField }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			func() { // cohort = "{"intField": 42}"
+				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+					func(item *IntKeyItem) bool { return item.IntField == 42 }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *IntKeyItem) field.ErrorList {
+						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item IntKeyItems[intField=42] 1")
+					}); len(e) != 0 {
+					errs = append(errs, e...)
+				}
+				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+					func(item *IntKeyItem) bool { return item.IntField == 42 }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *IntKeyItem) field.ErrorList {
+						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item IntKeyItems[intField=42] 2")
+					}); len(e) != 0 {
+					errs = append(errs, e...)
+				}
 			}()
 			return
-		}(fldPath.Child("intKeyItems"), obj.IntKeyItems, safe.Field(oldObj, func(oldObj *Struct) []IntKeyItem { return oldObj.IntKeyItems }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) []IntKeyItem {
+				return oldObj.IntKeyItems
+			})
+		errs = append(errs, fn(fldPath.Child("intKeyItems"), obj.IntKeyItems, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.BoolKeyItems
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []BoolKeyItem, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.BoolKeyItems
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []BoolKeyItem,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a BoolKeyItem, b BoolKeyItem) bool { return a.BoolField == b.BoolField })...)
-			func() { // cohort {"boolField": true}
-				errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *BoolKeyItem) bool { return item.BoolField == true }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *BoolKeyItem) field.ErrorList {
-					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item BoolKeyItems[boolField=true] 1")
-				})...)
-				errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *BoolKeyItem) bool { return item.BoolField == true }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *BoolKeyItem) field.ErrorList {
-					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item BoolKeyItems[boolField=true] 2")
-				})...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+				func(a BoolKeyItem, b BoolKeyItem) bool { return a.BoolField == b.BoolField }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			func() { // cohort = "{"boolField": true}"
+				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+					func(item *BoolKeyItem) bool { return item.BoolField == true }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *BoolKeyItem) field.ErrorList {
+						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item BoolKeyItems[boolField=true] 1")
+					}); len(e) != 0 {
+					errs = append(errs, e...)
+				}
+				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+					func(item *BoolKeyItem) bool { return item.BoolField == true }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *BoolKeyItem) field.ErrorList {
+						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item BoolKeyItems[boolField=true] 2")
+					}); len(e) != 0 {
+					errs = append(errs, e...)
+				}
 			}()
 			return
-		}(fldPath.Child("boolKeyItems"), obj.BoolKeyItems, safe.Field(oldObj, func(oldObj *Struct) []BoolKeyItem { return oldObj.BoolKeyItems }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) []BoolKeyItem {
+				return oldObj.BoolKeyItems
+			})
+		errs = append(errs, fn(fldPath.Child("boolKeyItems"), obj.BoolKeyItems, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.TypedefItems
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj TypedefItemList, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.TypedefItems
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj TypedefItemList,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a TypedefItem, b TypedefItem) bool { return a.ID == b.ID })...)
-			func() { // cohort {"id": "typedef-target"}
-				errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *TypedefItem) bool { return item.ID == "typedef-target" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *TypedefItem) field.ErrorList {
-					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item TypedefItems[id=typedef-target] 1")
-				})...)
-				errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *TypedefItem) bool { return item.ID == "typedef-target" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *TypedefItem) field.ErrorList {
-					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item TypedefItems[id=typedef-target] 2")
-				})...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+				func(a TypedefItem, b TypedefItem) bool { return a.ID == b.ID }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			func() { // cohort = "{"id": "typedef-target"}"
+				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+					func(item *TypedefItem) bool { return item.ID == "typedef-target" }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *TypedefItem) field.ErrorList {
+						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item TypedefItems[id=typedef-target] 1")
+					}); len(e) != 0 {
+					errs = append(errs, e...)
+				}
+				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+					func(item *TypedefItem) bool { return item.ID == "typedef-target" }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *TypedefItem) field.ErrorList {
+						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item TypedefItems[id=typedef-target] 2")
+					}); len(e) != 0 {
+					errs = append(errs, e...)
+				}
 			}()
 			return
-		}(fldPath.Child("typedefItems"), obj.TypedefItems, safe.Field(oldObj, func(oldObj *Struct) TypedefItemList { return oldObj.TypedefItems }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) TypedefItemList {
+				return oldObj.TypedefItems
+			})
+		errs = append(errs, fn(fldPath.Child("typedefItems"), obj.TypedefItems, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.AtomicUniqueMapItems
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []Item, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.AtomicUniqueMapItems
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []Item,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a Item, b Item) bool { return a.Key == b.Key })...)
-			func() { // cohort {"key": "target"}
-				errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *Item) bool { return item.Key == "target" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
-					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item AtomicUniqueMapItems[key=target]")
-				})...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+				func(a Item, b Item) bool { return a.Key == b.Key }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			func() { // cohort = "{"key": "target"}"
+				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+					func(item *Item) bool { return item.Key == "target" }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *Item) field.ErrorList {
+						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item AtomicUniqueMapItems[key=target]")
+					}); len(e) != 0 {
+					errs = append(errs, e...)
+				}
 			}()
 			return
-		}(fldPath.Child("atomicUniqueMapItems"), obj.AtomicUniqueMapItems, safe.Field(oldObj, func(oldObj *Struct) []Item { return oldObj.AtomicUniqueMapItems }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) []Item {
+				return oldObj.AtomicUniqueMapItems
+			})
+		errs = append(errs, fn(fldPath.Child("atomicUniqueMapItems"), obj.AtomicUniqueMapItems, oldVal, oldObj != nil)...)
+	}
 
-	// field Struct.PtrKeyItems
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []PtrKeyItem, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field Struct.PtrKeyItems
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []PtrKeyItem,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a PtrKeyItem, b PtrKeyItem) bool {
-				return ((a.Key == nil && b.Key == nil) || (a.Key != nil && b.Key != nil && *a.Key == *b.Key))
-			})...)
-			func() { // cohort {"key": "target-ptr"}
-				errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *PtrKeyItem) bool { return item.Key != nil && *item.Key == "target-ptr" }, validate.SemanticDeepEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *PtrKeyItem) field.ErrorList {
-					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item PtrKeyItems[key=target-ptr]")
-				})...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+				func(a PtrKeyItem, b PtrKeyItem) bool {
+					return ((a.Key == nil && b.Key == nil) || (a.Key != nil && b.Key != nil && *a.Key == *b.Key))
+				}); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			func() { // cohort = "{"key": "target-ptr"}"
+				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+					func(item *PtrKeyItem) bool { return item.Key != nil && *item.Key == "target-ptr" }, validate.SemanticDeepEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *PtrKeyItem) field.ErrorList {
+						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item PtrKeyItems[key=target-ptr]")
+					}); len(e) != 0 {
+					errs = append(errs, e...)
+				}
 			}()
 			return
-		}(fldPath.Child("ptrKeyItems"), obj.PtrKeyItems, safe.Field(oldObj, func(oldObj *Struct) []PtrKeyItem { return oldObj.PtrKeyItems }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *Struct) []PtrKeyItem {
+				return oldObj.PtrKeyItems
+			})
+		errs = append(errs, fn(fldPath.Child("ptrKeyItems"), obj.PtrKeyItems, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }
 
 // Validate_StructWithNestedTypedef validates an instance of StructWithNestedTypedef according
 // to declarative validation rules in the API schema.
-func Validate_StructWithNestedTypedef(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *StructWithNestedTypedef) (errs field.ErrorList) {
+func Validate_StructWithNestedTypedef(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *StructWithNestedTypedef) (errs field.ErrorList) {
+
 	// field StructWithNestedTypedef.TypeMeta has no validation
 
-	// field StructWithNestedTypedef.NestedItems
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj []NestedTypedefItem, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field StructWithNestedTypedef.NestedItems
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj []NestedTypedefItem,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			// lists with map semantics require unique keys
-			errs = append(errs, validate.Unique(ctx, op, fldPath, obj, oldObj, func(a NestedTypedefItem, b NestedTypedefItem) bool { return a.Key == b.Key })...)
-			func() { // cohort {"key": "nested-target"}
-				errs = append(errs, validate.SliceItem(ctx, op, fldPath, obj, oldObj, func(item *NestedTypedefItem) bool { return item.Key == "nested-target" }, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NestedTypedefItem) field.ErrorList {
-					return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item NestedItems[key=nested-target]")
-				})...)
+			if e := validate.Unique(ctx, op, fldPath, obj, oldObj,
+				func(a NestedTypedefItem, b NestedTypedefItem) bool { return a.Key == b.Key }); len(e) != 0 {
+				errs = append(errs, e...)
+			}
+			func() { // cohort = "{"key": "nested-target"}"
+				if e := validate.SliceItem(ctx, op, fldPath, obj, oldObj,
+					func(item *NestedTypedefItem) bool { return item.Key == "nested-target" }, validate.DirectEqual,
+					func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *NestedTypedefItem) field.ErrorList {
+						return validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "item NestedItems[key=nested-target]")
+					}); len(e) != 0 {
+					errs = append(errs, e...)
+				}
 			}()
 			return
-		}(fldPath.Child("nestedItems"), obj.NestedItems, safe.Field(oldObj, func(oldObj *StructWithNestedTypedef) []NestedTypedefItem { return oldObj.NestedItems }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *StructWithNestedTypedef) []NestedTypedefItem {
+				return oldObj.NestedItems
+			})
+		errs = append(errs, fn(fldPath.Child("nestedItems"), obj.NestedItems, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }

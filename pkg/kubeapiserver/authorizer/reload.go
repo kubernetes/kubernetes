@@ -47,6 +47,9 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 )
 
+var _ = authorizer.Authorizer(&reloadableAuthorizerResolver{})
+var _ = authorizer.RuleResolver(&reloadableAuthorizerResolver{})
+
 type reloadableAuthorizerResolver struct {
 	// initialConfig holds the ReloadFile used to initiate background reloading,
 	// and information used to construct webhooks that isn't exposed in the authorization
@@ -71,7 +74,7 @@ type reloadableAuthorizerResolver struct {
 }
 
 type authorizerResolver struct {
-	authorizer   authorizer.Authorizer
+	authorizer   authorizer.UnconditionalAuthorizer
 	ruleResolver authorizer.RuleResolver
 }
 
@@ -84,13 +87,13 @@ func (r *reloadableAuthorizerResolver) RulesFor(ctx context.Context, user user.I
 }
 
 // newForConfig constructs
-func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.AuthorizationConfiguration) (authorizer.Authorizer, authorizer.RuleResolver, error) {
+func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.AuthorizationConfiguration) (authorizer.UnconditionalAuthorizer, authorizer.RuleResolver, error) {
 	if len(authzConfig.Authorizers) == 0 {
 		return nil, nil, fmt.Errorf("at least one authorization mode must be passed")
 	}
 
 	var (
-		authorizers   []authorizer.Authorizer
+		authorizers   []authorizer.UnconditionalAuthorizer
 		ruleResolvers []authorizer.RuleResolver
 	)
 

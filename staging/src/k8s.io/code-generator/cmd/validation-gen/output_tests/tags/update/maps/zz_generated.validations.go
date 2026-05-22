@@ -39,31 +39,45 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *testscheme.Scheme) error {
 	// type UpdateMapStruct
-	scheme.AddValidationFunc((*UpdateMapStruct)(nil), func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
-		switch op.Request.SubresourcePath() {
-		case "/":
-			return Validate_UpdateMapStruct(ctx, op, nil /* fldPath */, obj.(*UpdateMapStruct), safe.Cast[*UpdateMapStruct](oldObj))
-		}
-		return field.ErrorList{field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath()))}
-	})
+	scheme.AddValidationFunc(
+		(*UpdateMapStruct)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_UpdateMapStruct(
+					ctx, op, nil, /* fldPath */
+					obj.(*UpdateMapStruct),
+					safe.Cast[*UpdateMapStruct](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
 // Validate_UpdateMapStruct validates an instance of UpdateMapStruct according
 // to declarative validation rules in the API schema.
-func Validate_UpdateMapStruct(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *UpdateMapStruct) (errs field.ErrorList) {
+func Validate_UpdateMapStruct(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *UpdateMapStruct) (errs field.ErrorList) {
+
 	// field UpdateMapStruct.TypeMeta has no validation
 
-	// field UpdateMapStruct.MapNoSet
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj map[string]string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field UpdateMapStruct.MapNoSet
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj map[string]string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.UpdateMap(ctx, op, fldPath, obj, oldObj, validate.NoSet); len(e) != 0 {
+			if e := validate.UpdateMap(ctx, op, fldPath, obj, oldObj, validate.NoSet).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -71,18 +85,28 @@ func Validate_UpdateMapStruct(ctx context.Context, op operation.Operation, fldPa
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("mapNoSet"), obj.MapNoSet, safe.Field(oldObj, func(oldObj *UpdateMapStruct) map[string]string { return oldObj.MapNoSet }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *UpdateMapStruct) map[string]string {
+				return oldObj.MapNoSet
+			})
+		errs = append(errs, fn(fldPath.Child("mapNoSet"), obj.MapNoSet, oldVal, oldObj != nil)...)
+	}
 
-	// field UpdateMapStruct.MapNoUnset
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj map[string]string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field UpdateMapStruct.MapNoUnset
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj map[string]string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.UpdateMap(ctx, op, fldPath, obj, oldObj, validate.NoUnset); len(e) != 0 {
+			if e := validate.UpdateMap(ctx, op, fldPath, obj, oldObj, validate.NoUnset).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -90,18 +114,28 @@ func Validate_UpdateMapStruct(ctx context.Context, op operation.Operation, fldPa
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("mapNoUnset"), obj.MapNoUnset, safe.Field(oldObj, func(oldObj *UpdateMapStruct) map[string]string { return oldObj.MapNoUnset }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *UpdateMapStruct) map[string]string {
+				return oldObj.MapNoUnset
+			})
+		errs = append(errs, fn(fldPath.Child("mapNoUnset"), obj.MapNoUnset, oldVal, oldObj != nil)...)
+	}
 
-	// field UpdateMapStruct.MapNoAdd
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj map[string]string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field UpdateMapStruct.MapNoAdd
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj map[string]string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.UpdateMap(ctx, op, fldPath, obj, oldObj, validate.NoAddItem); len(e) != 0 {
+			if e := validate.UpdateMap(ctx, op, fldPath, obj, oldObj, validate.NoAddItem).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -109,18 +143,28 @@ func Validate_UpdateMapStruct(ctx context.Context, op operation.Operation, fldPa
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("mapNoAdd"), obj.MapNoAdd, safe.Field(oldObj, func(oldObj *UpdateMapStruct) map[string]string { return oldObj.MapNoAdd }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *UpdateMapStruct) map[string]string {
+				return oldObj.MapNoAdd
+			})
+		errs = append(errs, fn(fldPath.Child("mapNoAdd"), obj.MapNoAdd, oldVal, oldObj != nil)...)
+	}
 
-	// field UpdateMapStruct.MapNoRemove
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj map[string]string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field UpdateMapStruct.MapNoRemove
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj map[string]string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.UpdateMap(ctx, op, fldPath, obj, oldObj, validate.NoRemoveItem); len(e) != 0 {
+			if e := validate.UpdateMap(ctx, op, fldPath, obj, oldObj, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -128,18 +172,28 @@ func Validate_UpdateMapStruct(ctx context.Context, op operation.Operation, fldPa
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("mapNoRemove"), obj.MapNoRemove, safe.Field(oldObj, func(oldObj *UpdateMapStruct) map[string]string { return oldObj.MapNoRemove }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *UpdateMapStruct) map[string]string {
+				return oldObj.MapNoRemove
+			})
+		errs = append(errs, fn(fldPath.Child("mapNoRemove"), obj.MapNoRemove, oldVal, oldObj != nil)...)
+	}
 
-	// field UpdateMapStruct.MapFrozenShape
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj map[string]string, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field UpdateMapStruct.MapFrozenShape
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj map[string]string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.UpdateMap(ctx, op, fldPath, obj, oldObj, validate.NoAddItem, validate.NoRemoveItem); len(e) != 0 {
+			if e := validate.UpdateMap(ctx, op, fldPath, obj, oldObj, validate.NoAddItem, validate.NoRemoveItem).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -147,18 +201,28 @@ func Validate_UpdateMapStruct(ctx context.Context, op operation.Operation, fldPa
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("mapFrozenShape"), obj.MapFrozenShape, safe.Field(oldObj, func(oldObj *UpdateMapStruct) map[string]string { return oldObj.MapFrozenShape }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *UpdateMapStruct) map[string]string {
+				return oldObj.MapFrozenShape
+			})
+		errs = append(errs, fn(fldPath.Child("mapFrozenShape"), obj.MapFrozenShape, oldVal, oldObj != nil)...)
+	}
 
-	// field UpdateMapStruct.MapSetThenFreeze
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj map[string]MapItem, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field UpdateMapStruct.MapSetThenFreeze
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj map[string]MapItem,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.UpdateMap(ctx, op, fldPath, obj, oldObj, validate.NoSet, validate.NoAddItem); len(e) != 0 {
+			if e := validate.UpdateMap(ctx, op, fldPath, obj, oldObj, validate.NoSet, validate.NoAddItem).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -166,20 +230,31 @@ func Validate_UpdateMapStruct(ctx context.Context, op operation.Operation, fldPa
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("mapSetThenFreeze"), obj.MapSetThenFreeze, safe.Field(oldObj, func(oldObj *UpdateMapStruct) map[string]MapItem { return oldObj.MapSetThenFreeze }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *UpdateMapStruct) map[string]MapItem {
+				return oldObj.MapSetThenFreeze
+			})
+		errs = append(errs, fn(fldPath.Child("mapSetThenFreeze"), obj.MapSetThenFreeze, oldVal, oldObj != nil)...)
+	}
 
-	// field UpdateMapStruct.EachValNoModifyMap
-	errs = append(errs,
-		func(fldPath *field.Path, obj, oldObj map[string]MapItem, oldValueCorrelated bool) (errs field.ErrorList) {
+	{ // field UpdateMapStruct.EachValNoModifyMap
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj map[string]MapItem,
+			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
-			if oldValueCorrelated && op.Type == operation.Update && equality.Semantic.DeepEqual(obj, oldObj) {
-				return nil
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
 			}
 			// call field-attached validations
 			earlyReturn := false
-			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
-				return validate.UpdateStruct(ctx, op, fldPath, obj, oldObj, validate.NoModify)
-			}); len(e) != 0 {
+			if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual,
+				func(ctx context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *MapItem) field.ErrorList {
+					return validate.UpdateStruct(ctx, op, fldPath, obj, oldObj, validate.NoModify)
+				}).MarkShortCircuit(); len(e) != 0 {
 				errs = append(errs, e...)
 				earlyReturn = true
 			}
@@ -187,7 +262,13 @@ func Validate_UpdateMapStruct(ctx context.Context, op operation.Operation, fldPa
 				return // do not proceed
 			}
 			return
-		}(fldPath.Child("eachValNoModifyMap"), obj.EachValNoModifyMap, safe.Field(oldObj, func(oldObj *UpdateMapStruct) map[string]MapItem { return oldObj.EachValNoModifyMap }), oldObj != nil)...)
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *UpdateMapStruct) map[string]MapItem {
+				return oldObj.EachValNoModifyMap
+			})
+		errs = append(errs, fn(fldPath.Child("eachValNoModifyMap"), obj.EachValNoModifyMap, oldVal, oldObj != nil)...)
+	}
 
 	return errs
 }

@@ -17,10 +17,11 @@
 # is linked against musl libc.
 ARG BASEIMAGE=alpine
 
+# latest as of 2026-05-08
+FROM golang@sha256:efaccb5b497e90df3ebe5216cc25cd9f98e73874e2d638b56e38d4a3f098c41c AS preparer
+
 ARG GOLANG_VERSION
-
-FROM golang:$GOLANG_VERSION AS preparer
-
+ARG GOTOOLCHAIN=go${GOLANG_VERSION}
 RUN go install github.com/google/go-containerregistry/cmd/crane@latest && \
     apt-get update && apt-get install -y jq
 
@@ -33,8 +34,7 @@ RUN chmod +x /prepare_registry.sh
 RUN /prepare_registry.sh
 
 FROM $BASEIMAGE AS main
-
-CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
+ARG TARGETARCH
 
 # from dnsutils image
 # install necessary packages:
@@ -51,7 +51,7 @@ RUN apk --update add bind-tools curl netcat-openbsd iproute2 iperf bash util-lin
     && ln -s /usr/bin/iperf /usr/local/bin/iperf \
     && ls -altrh /usr/local/bin/iperf
 
-ADD https://github.com/coredns/coredns/releases/download/v1.6.2/coredns_1.6.2_linux_BASEARCH.tgz /coredns.tgz
+ADD https://github.com/coredns/coredns/releases/download/v1.6.2/coredns_1.6.2_linux_${TARGETARCH}.tgz /coredns.tgz
 RUN tar -xzvf /coredns.tgz && rm -f /coredns.tgz
 
 # PORT 80 needed by: test-webserver

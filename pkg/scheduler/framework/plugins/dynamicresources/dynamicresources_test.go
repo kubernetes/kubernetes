@@ -1827,7 +1827,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
-						status: fwk.AsStatus(errors.New(`claim default/my-pod-my-resource: selector #0: CEL runtime error: no such key: ` + string(attrName))),
+						status: fwk.AsStatus(errors.New(`claim default/my-pod-my-resource: selector #0 on device some-driver/worker/instance-1: CEL runtime error: no such key: ` + string(attrName) + `. consider using CEL optional chaining (.? followed by orValue()) or guarding the check with has() for optional fields`)),
 					},
 				},
 			},
@@ -1841,7 +1841,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
-						status: fwk.AsStatus(errors.New(`class my-resource-class: selector #0: CEL runtime error: no such key: ` + string(attrName))),
+						status: fwk.AsStatus(errors.New(`class my-resource-class: selector #0 on device some-driver/worker/instance-1: CEL runtime error: no such key: ` + string(attrName) + `. consider using CEL optional chaining (.? followed by orValue()) or guarding the check with has() for optional fields`)),
 					},
 				},
 			},
@@ -1861,7 +1861,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
-						status: fwk.AsStatus(errors.New(`claim default/my-pod-my-resource: selector #0: CEL runtime error: no such key: ` + string(attrName))),
+						status: fwk.AsStatus(errors.New(`claim default/my-pod-my-resource: selector #0 on device some-driver/worker/instance-1: CEL runtime error: no such key: ` + string(attrName) + `. consider using CEL optional chaining (.? followed by orValue()) or guarding the check with has() for optional fields`)),
 					},
 				},
 			},
@@ -1877,12 +1877,12 @@ func testPlugin(tCtx ktesting.TContext) {
 			want: want{
 				filter: perNodeResult{
 					workerNode.Name: {
-						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `claim default/my-pod-my-resource: selector #0: CEL runtime error: no such key: `+string(attrName)),
+						status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `claim default/my-pod-my-resource: selector #0 on device some-driver/worker/instance-1: CEL runtime error: no such key: `+string(attrName)+`. consider using CEL optional chaining (.? followed by orValue()) or guarding the check with has() for optional fields`),
 					},
 				},
 				prescore: result{
 					// This is the error found during Filter.
-					status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `filter node worker: claim default/my-pod-my-resource: selector #0: CEL runtime error: no such key: healthy`),
+					status: fwk.NewStatus(fwk.UnschedulableAndUnresolvable, `filter node worker: claim default/my-pod-my-resource: selector #0 on device some-driver/worker/instance-1: CEL runtime error: no such key: healthy. consider using CEL optional chaining (.? followed by orValue()) or guarding the check with has() for optional fields`),
 				},
 			},
 		},
@@ -2232,7 +2232,7 @@ func testPlugin(tCtx ktesting.TContext) {
 			classes:                   []*resourceapi.DeviceClass{deviceClassWithExtendResourceName},
 			want:                      want{},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				_, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.ErrorContains(tCtx, err, "not found")
 			},
 		},
@@ -2302,7 +2302,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				_, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.ErrorContains(tCtx, err, "not found")
 			},
 		},
@@ -2324,7 +2324,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.NoError(tCtx, err)
 				require.Equal(tCtx, 1, int(metric["success"]))
 			},
@@ -2347,7 +2347,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.NoError(tCtx, err)
 				require.Equal(tCtx, 1, int(metric["success"]))
 			},
@@ -2370,7 +2370,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.NoError(tCtx, err)
 				require.Equal(tCtx, 1, int(metric["success"]))
 			},
@@ -2395,7 +2395,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.NoError(tCtx, err)
 				require.Equal(tCtx, 1, int(metric["success"]))
 			},
@@ -2418,7 +2418,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				_, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.ErrorContains(tCtx, err, "not found")
 			},
 		},
@@ -2440,7 +2440,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				_, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				_, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.ErrorContains(tCtx, err, "not found")
 			},
 		},
@@ -2462,7 +2462,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.NoError(tCtx, err)
 				require.Equal(tCtx, 1, int(metric["success"]))
 			},
@@ -2479,7 +2479,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				unreserveBeforePreBind: &result{},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.NoError(tCtx, err)
 				require.Equal(tCtx, 1, int(metric["success"]))
 			},
@@ -2510,7 +2510,7 @@ func testPlugin(tCtx ktesting.TContext) {
 				},
 			},
 			metrics: func(tCtx ktesting.TContext, g compbasemetrics.Gatherer) {
-				metric, err := testutil.GetCounterValuesFromGatherer(g, "scheduler_resourceclaim_creates_total", map[string]string{}, "status")
+				metric, err := testutil.GetCounterValuesFromGatherer(g, "dynamic_resource_allocation_resourceclaim_creates_total", map[string]string{}, "status")
 				require.NoError(tCtx, err)
 				require.Equal(tCtx, 1, int(metric["failure"]))
 			},

@@ -20,5 +20,7 @@ limitations under the License.
 // +k8s:defaulter-gen-input=k8s.io/api/imagepolicy/v1alpha1
 
 // +groupName=imagepolicy.k8s.io
+// +k8s:validation-gen=TypeMeta
+// +k8s:validation-gen-input=k8s.io/api/imagepolicy/v1alpha1
 
 package v1alpha1

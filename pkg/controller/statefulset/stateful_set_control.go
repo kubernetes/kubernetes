@@ -422,7 +422,7 @@ func (ssc *defaultStatefulSetControl) processReplica(ctx context.Context, set *a
 	// (e.g. terminated on node reboot) is determined by the exit code of the
 	// container, not by the reason for pod termination. We should restart the pod
 	// regardless of the exit code.
-	if isFailed(replicas[i]) || isSucceeded(replicas[i]) {
+	if isTerminalPhase(replicas[i]) {
 		if replicas[i].DeletionTimestamp == nil {
 			if err := ssc.podControl.DeleteStatefulPod(set, replicas[i]); err != nil {
 				return true, err
@@ -818,8 +818,7 @@ func updateStatefulSetAfterInvariantEstablished(ctx context.Context, ssc *defaul
 		for target := len(replicas) - 1; target >= updateMin && remainingBudget > 0; target-- {
 			pod := replicas[target]
 			if getPodRevision(pod) != updateRevision.Name &&
-				isRunningAndAvailable(pod, set.Spec.MinReadySeconds, now) &&
-				!isTerminating(pod) {
+				!isUnavailable(pod, set.Spec.MinReadySeconds, now) {
 				logger.V(2).Info("StatefulSet terminating Pod for update",
 					"statefulSet", klog.KObj(set), "pod", klog.KObj(pod))
 				if err := ssc.podControl.DeleteStatefulPod(set, pod); err != nil {
@@ -859,8 +858,8 @@ func (ssc *defaultStatefulSetControl) updateStatefulSetStatus(
 	ctx context.Context,
 	set *apps.StatefulSet,
 	status *apps.StatefulSetStatus) error {
-	// complete any in progress rolling update if necessary
-	completeRollingUpdate(set, status)
+	// complete any in progress update if necessary
+	completeUpdate(set, status)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.MaxUnavailableStatefulSet) {
 		// Update metrics - this ensures metrics are always updated regardless of update strategy

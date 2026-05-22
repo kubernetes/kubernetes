@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -34,33 +35,34 @@ func TestFieldsWipingConsistency(t *testing.T) {
 	// APIs where creating via the main endpoint does not wipe status.
 	createDoesNotWipeStatus := sets.New(
 		// Nodes allow all fields, including status, to be set on create.
-		"nodes",
+		"nodes.v1",
 	)
 
 	// APIs where updating via the /status endpoint does not wipe metadata.
 	// All new APIs should use ResetObjectMetaForStatus.
 	statusDoesNotWipeMetadata := sets.New(
 		// https://github.com/kubernetes/kubernetes/issues/137681
-		"customresourcedefinitions.apiextensions.k8s.io",
+		"customresourcedefinitions.v1.apiextensions.k8s.io",
 
 		// APIs that do not use ResetObjectMetaForStatus:
-		"certificatesigningrequests.certificates.k8s.io",
-		"cronjobs.batch",
-		"daemonsets.apps",
-		"horizontalpodautoscalers.autoscaling",
-		"ingresses.networking.k8s.io",
-		"jobs.batch",
-		"namespaces",
-		"nodes",
-		"persistentvolumeclaims",
-		"persistentvolumes",
-		"poddisruptionbudgets.policy",
-		"pods",
-		"replicasets.apps",
-		"replicationcontrollers",
-		"resourcequotas",
-		"services",
-		"statefulsets.apps",
+		"certificatesigningrequests.v1.certificates.k8s.io",
+		"cronjobs.v1.batch",
+		"daemonsets.v1.apps",
+		"horizontalpodautoscalers.v1.autoscaling",
+		"horizontalpodautoscalers.v2.autoscaling",
+		"ingresses.v1.networking.k8s.io",
+		"jobs.v1.batch",
+		"namespaces.v1",
+		"nodes.v1",
+		"persistentvolumeclaims.v1",
+		"persistentvolumes.v1",
+		"poddisruptionbudgets.v1.policy",
+		"pods.v1",
+		"replicasets.v1.apps",
+		"replicationcontrollers.v1",
+		"resourcequotas.v1",
+		"services.v1",
+		"statefulsets.v1.apps",
 	)
 
 	TestAllDefinitions(t, "reset-fields-test", func(t *testing.T, api Definition) {
@@ -144,8 +146,10 @@ func TestFieldsWipingConsistency(t *testing.T) {
 		if baselineSpec != nil && differentSpec != "" {
 			result, err := rsc.Patch(context.TODO(), name, types.MergePatchType, []byte(differentSpec), metav1.PatchOptions{}, "status")
 			if err != nil {
+				if !errors.IsInvalid(err) {
+					t.Fatalf("Unexpected error from Patch to status endpoint with different spec: %v", err)
+				}
 				statusWipesSpec = true
-				t.Logf("Patch to status endpoint with different spec returned an error (OK if validation rejects it): %v", err)
 			} else {
 				statusWipesSpec = !checkPatch(t, differentSpec, "spec", result.Object)
 			}

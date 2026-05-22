@@ -23,6 +23,7 @@ import (
 	"io"
 	"math/rand"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -274,9 +275,9 @@ func TestDecodeBrokenJSON(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error with json: prefix, got no error")
 	}
-	const msg = `json: offset 28: invalid character '"' after object key:value pair`
-	if msg != err.Error() {
-		t.Fatalf("expected %q, got %q", msg, err.Error())
+	const msg = `json: .*invalid character.*".*after object key:value pair`
+	if matched, _ := regexp.MatchString(msg, err.Error()); !matched {
+		t.Fatalf("expected string matching %q, got %q", msg, err.Error())
 	}
 }
 

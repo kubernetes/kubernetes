@@ -549,7 +549,7 @@ var envLineRE = regexp.MustCompile(`^(?:admin|user|claim)_[a-zA-Z0-9_]*=.*$`)
 
 func TestContainerEnv(tCtx ktesting.TContext, pod *v1.Pod, containerName string, fullMatch bool, env ...string) {
 	tCtx.Helper()
-	stdout, stderr, err := e2epod.ExecWithOptionsTCtx(tCtx, e2epod.ExecOptions{
+	stdout, stderr, err := e2epod.Exec(tCtx, e2epod.ExecOptions{
 		Command:       []string{"env"},
 		Namespace:     pod.Namespace,
 		PodName:       pod.Name,

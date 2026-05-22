@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/net"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -613,6 +614,123 @@ func TestPatchPodGroupStatus(t *testing.T) {
 			}
 			if diff := cmp.Diff(wantStatus, retrievedPG.Status); diff != "" {
 				t.Errorf("unexpected podgroup status (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestBindPod(t *testing.T) {
+	binding := &v1.Binding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod",
+			Namespace: "ns",
+		},
+		Target: v1.ObjectReference{
+			Name: "node",
+		},
+	}
+
+	validateNoErr := func(err error) bool { return err == nil }
+
+	tests := []struct {
+		name          string
+		errFunc       func() error
+		failCalls     int
+		expectedCalls int
+		validateErr   func(error) bool
+	}{
+		{
+			name:          "successful",
+			failCalls:     0,
+			expectedCalls: 1,
+			validateErr:   validateNoErr,
+		},
+		{
+			name: "no retry on conflict",
+			errFunc: func() error {
+				return apierrors.NewConflict(v1.Resource("pods"), "pod", errors.New("conflict"))
+			},
+			failCalls:     1,
+			expectedCalls: 1,
+			validateErr:   apierrors.IsConflict,
+		},
+		{
+			name: "retry on internal error and succeed",
+			errFunc: func() error {
+				return apierrors.NewInternalError(errors.New("internal"))
+			},
+			failCalls:     1,
+			expectedCalls: 2,
+			validateErr:   validateNoErr,
+		},
+		{
+			name: "retry on service unavailable and succeed",
+			errFunc: func() error {
+				return apierrors.NewServiceUnavailable("service unavailable")
+			},
+			failCalls:     1,
+			expectedCalls: 2,
+			validateErr:   validateNoErr,
+		},
+		{
+			name: "retry on connection refused and succeed",
+			errFunc: func() error {
+				return fmt.Errorf("connection refused: %w", syscall.ECONNREFUSED)
+			},
+			failCalls:     1,
+			expectedCalls: 2,
+			validateErr:   validateNoErr,
+		},
+		{
+			name: "no retry on not found",
+			errFunc: func() error {
+				return apierrors.NewNotFound(v1.Resource("pods"), "pod")
+			},
+			failCalls:     1,
+			expectedCalls: 1,
+			validateErr:   apierrors.IsNotFound,
+		},
+		{
+			name: "persistent internal error fails after retries",
+			errFunc: func() error {
+				return apierrors.NewInternalError(errors.New("internal"))
+			},
+			failCalls:     retry.DefaultBackoff.Steps,
+			expectedCalls: retry.DefaultBackoff.Steps,
+			validateErr:   apierrors.IsInternalError,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			client := clientsetfake.NewClientset()
+			calls := 0
+			client.PrependReactor("create", "pods", func(action clienttesting.Action) (bool, runtime.Object, error) {
+				createAction := action.(clienttesting.CreateActionImpl)
+				if createAction.Subresource != "binding" {
+					return false, nil, nil
+				}
+				calls++
+
+				if calls <= tc.failCalls {
+					return true, nil, tc.errFunc()
+				}
+
+				return true, nil, nil
+			})
+
+			err := BindPod(ctx, client, binding)
+
+			if !tc.validateErr(err) {
+				t.Errorf("BindPod() returned unexpected error: %v", err)
+			}
+
+			if calls != tc.expectedCalls {
+				t.Errorf("Expected %d calls to binding API, got %d", tc.expectedCalls, calls)
 			}
 		})
 	}

@@ -37,7 +37,7 @@ import (
 // by listing EndpointSlices in the service's namespace whose `kubernetes.io/service-name`
 // label contains the service's name.
 type EndpointSliceApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:""`
 	// Standard object's metadata.
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// addressType specifies the type of address carried by this EndpointSlice.

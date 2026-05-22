@@ -1452,7 +1452,7 @@ func assertImpersonationMetrics(t *testing.T, ctx context.Context, client client
 	}
 
 	var gotMetricStrings []string
-	trimFP := regexp.MustCompile(`(.*)(} \d+\.\d+.*)`)
+	trimFP := regexp.MustCompile(`(} )[\de.+-]+(.*)`)
 	for line := range strings.SplitSeq(string(body), "\n") {
 		if !strings.HasPrefix(line, "apiserver_impersonation_") {
 			continue
@@ -1462,7 +1462,7 @@ func assertImpersonationMetrics(t *testing.T, ctx context.Context, client client
 			continue
 		}
 		if strings.Contains(line, "_seconds_sum") {
-			line = trimFP.ReplaceAllString(line, `$1`) + "} FP"
+			line = trimFP.ReplaceAllString(line, "${1}FP")
 		}
 		gotMetricStrings = append(gotMetricStrings, line)
 	}

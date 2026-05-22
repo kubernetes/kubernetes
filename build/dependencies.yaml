@@ -48,7 +48,7 @@ dependencies:
 
   # CRI Tools
   - name: "crictl"
-    version: 1.35.0
+    version: 1.36.0
     refPaths:
     - path: cluster/gce/windows/k8s-node-setup.psm1
       match: CRICTL_VERSION =
@@ -64,7 +64,7 @@ dependencies:
 
   # etcd
   - name: "etcd"
-    version: 3.6.10
+    version: 3.6.11
     refPaths:
     - path: cluster/gce/manifests/etcd.manifest
       match: etcd_docker_tag|etcd_version
@@ -259,7 +259,7 @@ dependencies:
 
   # GCB docker gcloud image
   - name: "gcb-docker-gcloud: dependents"
-    version: v20240523-a15ad90fc9@sha256:bb04162508c2c61637eae700a0d8e8c8be8f2d4c831d2b75e59db2d4dd6cf75d
+    version: v20260108-7f313c340e@sha256:4d778a001ae3f4247b2b61d8a870319e71d66c87556969a6399b90972e4d0491
     refPaths:
     - path: build/pause/cloudbuild.yaml
       match: gcr.io/k8s-staging-test-infra/gcb-docker-gcloud

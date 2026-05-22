@@ -348,7 +348,6 @@ func newTestKubeletWithImageList(
 		config.NewSourcesReady(func(_ sets.Set[string]) bool { return enableResizing }),
 		kubelet.recorder,
 	)
-	kubelet.allocationManager.SetContainerRuntime(fakeRuntime)
 	volumeStatsAggPeriod := time.Second * 10
 	kubelet.resourceAnalyzer = serverstats.NewResourceAnalyzer(tCtx, kubelet, volumeStatsAggPeriod, kubelet.recorder)
 
@@ -3302,12 +3301,21 @@ func createRemoteRuntimeService(ctx context.Context, endpoint string, t *testing
 func TestNewMainKubeletStandAlone(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	tempDir, err := os.MkdirTemp("", "logs")
-	ContainerLogsDir = tempDir
 	require.NoError(t, err)
-	defer func() {
-		err := os.RemoveAll(ContainerLogsDir)
+	containerLogsDir := ContainerLogsDir
+	// Point the package-level log directory at this test's temp dir so the
+	// garbage collection path uses an isolated directory, then restore it during
+	// cleanup.
+	ContainerLogsDir = tempDir
+	// Use t.Cleanup instead of defer so that the cleanup registered by the second
+	// ktesting.Init in this test cancels the GC context before RemoveAll runs.
+	// This is needed on Windows because a concurrent os.ReadDir in a GC goroutine
+	// can keep a handle to this directory in use and cause os.RemoveAll to fail.
+	t.Cleanup(func() {
+		ContainerLogsDir = containerLogsDir
+		err := os.RemoveAll(tempDir)
 		require.NoError(t, err)
-	}()
+	})
 
 	ca, cert, key, err := generateCAAndCertKeyWithOptions(
 		"localhost",
@@ -3454,12 +3462,21 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 func TestNewMainKubeletWithCertAndCAReloadingEnabled(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	tempDir, err := os.MkdirTemp("", "logs")
-	ContainerLogsDir = tempDir
 	require.NoError(t, err)
-	defer func() {
-		err := os.RemoveAll(ContainerLogsDir)
+	containerLogsDir := ContainerLogsDir
+	// Point the package-level log directory at this test's temp dir so the
+	// garbage collection path uses an isolated directory, then restore it during
+	// cleanup.
+	ContainerLogsDir = tempDir
+	// Use t.Cleanup instead of defer so that the cleanup registered by the second
+	// ktesting.Init in this test cancels the GC context before RemoveAll runs.
+	// This is needed on Windows because a concurrent os.ReadDir in a GC goroutine
+	// can keep a handle to this directory in use and cause os.RemoveAll to fail.
+	t.Cleanup(func() {
+		ContainerLogsDir = containerLogsDir
+		err := os.RemoveAll(tempDir)
 		require.NoError(t, err)
-	}()
+	})
 
 	ca, cert, key, err := generateCAAndCertKeyWithOptions(
 		"localhost",
@@ -3665,7 +3682,6 @@ func TestSyncPodSpans(t *testing.T) {
 		kubelet.podStartupLatencyTracker,
 	)
 	assert.NoError(t, err)
-	kubelet.allocationManager.SetContainerRuntime(kubelet.containerRuntime)
 
 	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
 		Containers: []v1.Container{

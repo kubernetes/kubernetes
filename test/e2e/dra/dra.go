@@ -111,6 +111,48 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 		})
 
 		/*
+		   Release: v1.37
+		   Testname: CRUD operations for devicetaintrules
+		   Description: kube-apiserver must support create/update/list/patch/delete operations for resource.k8s.io/v1beta2 DeviceTaintRule.
+		*/
+		f.It("resource.k8s.io/v1beta2 DeviceTaintRule", f.WithFeatureGate(features.DRADeviceTaintRules), func(ctx context.Context) {
+			lastTransitionTime := metav1.Now()
+			lastTransitionTimeEncoded, err := lastTransitionTime.MarshalJSON()
+			framework.ExpectNoError(err)
+			e2econformance.TestResource(ctx, f,
+				&e2econformance.ResourceTestcase[*resourcev1beta2.DeviceTaintRule]{
+					GVR:        resourcev1beta2.SchemeGroupVersion.WithResource("devicetaintrules"),
+					Namespaced: ptr.To(false),
+					InitialSpec: &resourcev1beta2.DeviceTaintRule{
+						Spec: resourcev1beta2.DeviceTaintRuleSpec{
+							// Empty DeviceSelector => no devices selected, so this test is safe.
+							Taint: resourcev1beta2.DeviceTaint{
+								Key:    "testing",
+								Effect: resourcev1beta2.DeviceTaintEffectNone,
+							},
+						},
+					},
+					UpdateSpec: func(obj *resourcev1beta2.DeviceTaintRule) *resourcev1beta2.DeviceTaintRule {
+						obj.Spec.Taint.Effect = resourcev1beta2.DeviceTaintEffectNoExecute
+						return obj
+					},
+					StrategicMergePatchSpec: `{"spec": {"taint": {"effect": "NoExecute"}}}`,
+					UpdateStatus: func(obj *resourcev1beta2.DeviceTaintRule) *resourcev1beta2.DeviceTaintRule {
+						obj.Status.Conditions = append(obj.Status.Conditions, metav1.Condition{
+							Type:               "Testing",
+							Status:             metav1.ConditionTrue,
+							LastTransitionTime: lastTransitionTime,
+							Reason:             "E2E_test_running",
+							Message:            "This condition can be ignored.",
+						})
+						return obj
+					},
+					StrategicMergePatchStatus: fmt.Sprintf(`{"status": {"conditions": [{"type": "Testing", "status": "True", "lastTransitionTime": %s, "reason": "E2E_test_running", "message": "This condition can be ignored."}]}}`, string(lastTransitionTimeEncoded)),
+				},
+			)
+		})
+
+		/*
 		   Release: v1.35
 		   Testname: CRUD operations for resourceclaims
 		   Description: kube-apiserver must support create/update/list/patch/delete operations for resource.k8s.io/v1 ResourceClaim.
@@ -248,6 +290,8 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 						return obj
 					},
 					StrategicMergePatchSpec: `{"metadata": {"labels": {"test.dra.example.com": "test"}}}`,
+
+					// UpdateStatus is missing here. Needs to be added before graduation.
 				},
 			)
 		})
@@ -2502,6 +2546,21 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			}
 			b.Create(tCtx, quota)
 
+			// Wait for the quota controller to initialize the status with zero usage.
+			// This prevents "status unknown for quota" errors when creating pods.
+			ginkgo.By("Waiting for ResourceQuota status to be initialized")
+			initialUsedResources := v1.ResourceList{}
+			for resourceName := range hard {
+				initialUsedResources[resourceName] = resource.MustParse("0")
+			}
+			gomega.Eventually(ctx, framework.GetObject(f.ClientSet.CoreV1().ResourceQuotas(quota.Namespace).Get, quota.Name, metav1.GetOptions{})).
+				WithTimeout(time.Minute).
+				Should(gstruct.PointTo(gstruct.MatchFields(gstruct.IgnoreExtras, gstruct.Fields{
+					"Status": gomega.Equal(v1.ResourceQuotaStatus{
+						Hard: hard,
+						Used: initialUsedResources,
+					})})))
+
 			// create a class with an extended resource
 			b.Create(tCtx, class)
 
@@ -2778,6 +2837,10 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			framework.ExpectNoError(err, "start pod")
 
 			ginkgo.By("Check that pod is processed by the DRA driver")
+			pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			gomega.Expect(pod.Status.ExtendedResourceClaimStatus).NotTo(gomega.BeNil(),
+				"after device plugin uninstall, DRA must serve the resource and create a special claim")
 			containerEnv := []string{
 				"container_0_request_0", "true",
 			}
@@ -2923,6 +2986,29 @@ var _ = framework.SIGDescribe("node")(framework.WithLabel("DRA"), func() {
 			ginkgo.By("Check that pod is processed by the DRA driver")
 			containerEnv := []string{"container_0_request_0", "true"}
 			drautils.TestContainerEnv(tCtx, pod, pod.Spec.Containers[0].Name, false, containerEnv...)
+		})
+		// When both a device plugin and a DRA driver advertise the same resource
+		// name on the same node, the device-plugin path wins.
+		// 1.35 is required because of https://github.com/kubernetes/kubernetes/issues/133488.
+		f.It("must prefer device plugin over DRA when both advertise the same resource on a node", f.WithSerial(), f.WithKubeletMinVersion("1.35"), func(ctx context.Context) {
+			tCtx := f.TContext(ctx)
+			// Deploy DP on nodes.NodeNames[0], where the DRA driver is also active.
+			extendedResourceName := deployDevicePlugin(tCtx, f, nodes.NodeNames[0:1], false)
+			gomega.Expect(string(extendedResourceName)).To(gomega.Equal(e2enode.SampleDeviceResourceName))
+
+			res := v1.ResourceList{extendedResourceName: resource.MustParse("1")}
+			pod := b.Pod()
+			pod.Spec.Containers[0].Resources.Requests = res
+			pod.Spec.Containers[0].Resources.Limits = res
+			b.Create(tCtx, b.ClassWithExtendedResource(e2enode.SampleDeviceResourceName), pod)
+
+			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(ctx, f.ClientSet, pod), "start pod")
+
+			pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			// Device plugin wins: no special claim created.
+			gomega.Expect(pod.Status.ExtendedResourceClaimStatus).To(gomega.BeNil(),
+				"when both DP and DRA advertise the same resource on a node, DP must win and no special claim should be created")
 		})
 	})
 

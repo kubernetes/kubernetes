@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
@@ -554,7 +553,6 @@ func TestWaitUntilFreshAndGetList(t *testing.T) {
 }
 
 func TestWaitUntilFreshAndListFromCache(t *testing.T) {
-	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, true)
 	forceRequestWatchProgressSupport(t)
 	ctx := context.Background()
 	store := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
@@ -609,54 +607,33 @@ func TestWaitUntilFreshAndGet(t *testing.T) {
 }
 
 func TestWaitUntilFreshAndListTimeout(t *testing.T) {
-	tcs := []struct {
-		name                    string
-		ConsistentListFromCache bool
-	}{
-		{
-			name:                    "FromStorage",
-			ConsistentListFromCache: false,
-		},
-		{
-			name:                    "FromCache",
-			ConsistentListFromCache: true,
-		},
+	ctx := context.Background()
+	store := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
+	defer store.Stop()
+	fc := store.clock.(*testingclock.FakeClock)
+
+	// In background, step clock after the below call starts the timer.
+	go func() {
+		for !fc.HasWaiters() {
+			time.Sleep(time.Millisecond)
+		}
+		store.Add(makeTestPod("foo", 2))
+		store.bookmarkRevision <- 3
+		fc.Step(blockTimeout)
+
+		// Add an object to make sure the test would
+		// eventually fail instead of just waiting
+		// forever.
+		time.Sleep(30 * time.Second)
+		store.Add(makeTestPod("bar", 4))
+	}()
+
+	_, _, err := store.WaitUntilFreshAndGetList(ctx, "", storage.ListOptions{ResourceVersion: "4", Predicate: storage.Everything})
+	if !errors.IsTimeout(err) {
+		t.Errorf("expected timeout error but got: %v", err)
 	}
-	for _, tc := range tcs {
-		t.Run(tc.name, func(t *testing.T) {
-			if !tc.ConsistentListFromCache {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ConsistentListFromCache, tc.ConsistentListFromCache)
-			}
-			ctx := context.Background()
-			store := newTestWatchCache(3, DefaultEventFreshDuration, &cache.Indexers{})
-			defer store.Stop()
-			fc := store.clock.(*testingclock.FakeClock)
-
-			// In background, step clock after the below call starts the timer.
-			go func() {
-				for !fc.HasWaiters() {
-					time.Sleep(time.Millisecond)
-				}
-				store.Add(makeTestPod("foo", 2))
-				store.bookmarkRevision <- 3
-				fc.Step(blockTimeout)
-
-				// Add an object to make sure the test would
-				// eventually fail instead of just waiting
-				// forever.
-				time.Sleep(30 * time.Second)
-				store.Add(makeTestPod("bar", 4))
-			}()
-
-			_, _, err := store.WaitUntilFreshAndGetList(ctx, "", storage.ListOptions{ResourceVersion: "4", Predicate: storage.Everything})
-			if !errors.IsTimeout(err) {
-				t.Errorf("expected timeout error but got: %v", err)
-			}
-			if !storage.IsTooLargeResourceVersion(err) {
-				t.Errorf("expected 'Too large resource version' cause in error but got: %v", err)
-			}
-		})
+	if !storage.IsTooLargeResourceVersion(err) {
+		t.Errorf("expected 'Too large resource version' cause in error but got: %v", err)
 	}
 }
 

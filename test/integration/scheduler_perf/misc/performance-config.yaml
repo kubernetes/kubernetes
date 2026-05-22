@@ -65,7 +65,7 @@
     featureGates:
       SchedulerAsyncAPICalls: false
     labels: [performance]
-    threshold: 810
+    threshold: 790
     params:
       initNodes: 5000
       initPods: 5000
@@ -74,14 +74,14 @@
     featureGates:
       SchedulerAsyncAPICalls: true
     labels: [performance]
-    threshold: 810
+    threshold: 790
     params:
       initNodes: 5000
       initPods: 5000
       measurePods: 50000
   - name: 5000Nodes_50000Pods_NodeDeclaredFeaturesDisabled
     labels: [performance]
-    threshold: 810
+    threshold: 790
     featureGates:
       NodeDeclaredFeatures: false
     params:

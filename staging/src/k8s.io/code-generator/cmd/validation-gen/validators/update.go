@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/validate"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
@@ -33,7 +34,6 @@ const (
 
 func init() {
 	shared := map[string]*updateMetadata{}
-	RegisterFieldValidator(updateFieldValidator{byFieldPath: shared, listByPath: globalListMeta})
 	RegisterTagValidator(updateTagCollector{byFieldPath: shared, listByPath: globalListMeta})
 }
 
@@ -123,8 +123,13 @@ func (utc updateTagCollector) GetValidations(context Context, tag codetags.Tag) 
 		return Validations{}, err
 	}
 
-	// Don't generate validations here, just collect
-	return Validations{}, nil
+	return Validations{
+		Deferred: []DeferredGen{
+			Deferred(ThisContext, func() (Validations, error) {
+				return getUpdateValidations(utc.byFieldPath, utc.listByPath, context)
+			}),
+		},
+	}, nil
 }
 
 func (utc updateTagCollector) validateConstraintsForType(context Context, constraints []validate.UpdateConstraint) error {
@@ -193,18 +198,6 @@ func (utc updateTagCollector) Docs() TagDoc {
 	}
 }
 
-// updateFieldValidator processes all collected update tags and generates validations
-type updateFieldValidator struct {
-	byFieldPath map[string]*updateMetadata
-	listByPath  map[string]*listMetadata
-}
-
-func (updateFieldValidator) Init(_ Config) {}
-
-func (updateFieldValidator) Name() string {
-	return "updateFieldValidator"
-}
-
 var (
 	updateValueValidator          = types.Name{Package: libValidationPkg, Name: "UpdateValueByCompare"}
 	updatePointerValidator        = types.Name{Package: libValidationPkg, Name: "UpdatePointer"}
@@ -221,16 +214,18 @@ var (
 	noRemoveItemConstraint = types.Name{Package: libValidationPkg, Name: "NoRemoveItem"}
 )
 
-func (ufv updateFieldValidator) GetValidations(context Context) (Validations, error) {
-	um := ufv.byFieldPath[context.Path.String()]
+func getUpdateValidations(byFieldPath map[string]*updateMetadata, listByPath map[string]*listMetadata, context Context) (Validations, error) {
+	um := byFieldPath[context.Path.String()]
 
 	if um == nil || um.constraints.Len() == 0 {
 		return Validations{}, nil
 	}
+	// Delete the entry from the map after processing to avoid reprocessing.
+	delete(byFieldPath, context.Path.String())
 
 	constraints := um.constraints.UnsortedList()
 
-	v, err := ufv.generateValidation(context, constraints)
+	v, err := generateUpdateValidation(listByPath, context, constraints)
 	if err != nil {
 		return Validations{}, err
 	}
@@ -244,14 +239,14 @@ func (ufv updateFieldValidator) GetValidations(context Context) (Validations, er
 	return v, nil
 }
 
-func (ufv updateFieldValidator) generateValidation(context Context, constraints []validate.UpdateConstraint) (Validations, error) {
+func generateUpdateValidation(listByPath map[string]*listMetadata, context Context, constraints []validate.UpdateConstraint) (Validations, error) {
 	// Sort constraints to ensure deterministic order
 	slices.Sort(constraints)
 
 	t := util.NonPointer(util.NativeType(context.Type))
 	switch t.Kind {
 	case types.Slice:
-		return ufv.generateSliceValidation(context, constraints)
+		return generateSliceValidation(listByPath, context, constraints)
 	case types.Map:
 		return generateMapValidation(constraints), nil
 	}
@@ -266,13 +261,13 @@ func (ufv updateFieldValidator) generateValidation(context Context, constraints 
 // Metadata lookup falls back from the field path to the type path so that
 // typedef-level list annotations apply, mirroring the pattern used by
 // listValidator.
-func (ufv updateFieldValidator) generateSliceValidation(context Context, constraints []validate.UpdateConstraint) (Validations, error) {
+func generateSliceValidation(listByPath map[string]*listMetadata, context Context, constraints []validate.UpdateConstraint) (Validations, error) {
 	var matchArg any = Literal("nil")
 	// NoAddItem/NoRemoveItem need a match function to pair items between old and new, NoSet/NoUnset only check len == 0.
 	if slices.Contains(constraints, validate.NoAddItem) || slices.Contains(constraints, validate.NoRemoveItem) {
-		lm := ufv.listByPath[context.Path.String()]
+		lm := listByPath[context.Path.String()]
 		if lm == nil {
-			lm = ufv.listByPath[context.Type.String()]
+			lm = listByPath[context.Type.String()]
 		}
 		if lm == nil {
 			return Validations{}, fmt.Errorf("+k8s:update=NoAddItem/+k8s:update=NoRemoveItem require list metadata (+k8s:listType with listMapKey, or +k8s:unique) to determine item identity")
@@ -298,7 +293,8 @@ func (ufv updateFieldValidator) generateSliceValidation(context Context, constra
 	args := append([]any{matchArg}, constraintIdentifierArgs(constraints)...)
 
 	// Use ShortCircuit flag so these run in the same group as +k8s:optional
-	fn := Function(updateTagName, ShortCircuit, updateSliceValidator, args...)
+	fn := Function(updateTagName, ShortCircuit, updateSliceValidator, args...).
+		WithEmits(Emission{field.ErrorTypeInvalid, "update", ""})
 	return Validations{Functions: []FunctionGen{fn}}, nil
 }
 
@@ -306,7 +302,8 @@ func (ufv updateFieldValidator) generateSliceValidation(context Context, constra
 // identity, so no list metadata or match function is needed.
 func generateMapValidation(constraints []validate.UpdateConstraint) Validations {
 	// Use ShortCircuit flag so these run in the same group as +k8s:optional
-	fn := Function(updateTagName, ShortCircuit, updateMapValidator, constraintIdentifierArgs(constraints)...)
+	fn := Function(updateTagName, ShortCircuit, updateMapValidator, constraintIdentifierArgs(constraints)...).
+		WithEmits(Emission{field.ErrorTypeInvalid, "update", ""})
 	return Validations{Functions: []FunctionGen{fn}}
 }
 
@@ -334,7 +331,8 @@ func emitScalarUpdate(context Context, constraints []validate.UpdateConstraint) 
 	}
 
 	// Use ShortCircuit flag so these run in the same group as +k8s:optional
-	fn := Function(updateTagName, ShortCircuit, validatorFunc, constraintIdentifierArgs(constraints)...)
+	fn := Function(updateTagName, ShortCircuit, validatorFunc, constraintIdentifierArgs(constraints)...).
+		WithEmits(Emission{field.ErrorTypeInvalid, "update", ""})
 	return Validations{Functions: []FunctionGen{fn}}
 }
 

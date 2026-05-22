@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
@@ -89,7 +90,8 @@ func getFormatValidationFunction(format string) (FunctionGen, error) {
 	switch format {
 	// Keep this sequence alphabetized.
 	case "k8s-extended-resource-name":
-		return Function(formatTagName, DefaultFlags, extendedResourceNameValidator), nil
+		return Function(formatTagName, DefaultFlags, extendedResourceNameValidator).
+			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-extended-resource-name", ""}), nil
 	// TODO: uncomment the following when we've done the homework
 	// to be sure it works the current state of IP manual-ratcheting
 	/*
@@ -97,23 +99,32 @@ func getFormatValidationFunction(format string) (FunctionGen, error) {
 			return Function(formatTagName, DefaultFlags, ipSloppyValidator), nil
 	*/
 	case "k8s-label-key":
-		return Function(formatTagName, DefaultFlags, labelKeyValidator), nil
+		return Function(formatTagName, DefaultFlags, labelKeyValidator).
+			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-label-key", ""}), nil
 	case "k8s-label-value":
-		return Function(formatTagName, DefaultFlags, labelValueValidator), nil
+		return Function(formatTagName, DefaultFlags, labelValueValidator).
+			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-label-value", ""}), nil
 	case "k8s-long-name":
-		return Function(formatTagName, DefaultFlags, longNameValidator), nil
+		return Function(formatTagName, DefaultFlags, longNameValidator).
+			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-long-name", ""}), nil
 	case "k8s-long-name-caseless":
-		return Function(formatTagName, DefaultFlags, longNameCaselessValidator), nil
+		return Function(formatTagName, DefaultFlags, longNameCaselessValidator).
+			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-long-name-caseless", ""}), nil
 	case "k8s-path-segment-name":
-		return Function(formatTagName, DefaultFlags, pathSegmentValidator), nil
+		return Function(formatTagName, DefaultFlags, pathSegmentValidator).
+			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-path-segment-name", ""}), nil
 	case "k8s-resource-fully-qualified-name":
-		return Function(formatTagName, DefaultFlags, resourceFullyQualifiedNameValidator), nil
+		return Function(formatTagName, DefaultFlags, resourceFullyQualifiedNameValidator).
+			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-resource-fully-qualified-name", ""}), nil
 	case "k8s-resource-pool-name":
-		return Function(formatTagName, DefaultFlags, resourcePoolNameValidator), nil
+		return Function(formatTagName, DefaultFlags, resourcePoolNameValidator).
+			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-resource-pool-name", ""}), nil
 	case "k8s-short-name":
-		return Function(formatTagName, DefaultFlags, shortNameValidator), nil
+		return Function(formatTagName, DefaultFlags, shortNameValidator).
+			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-short-name", ""}), nil
 	case "k8s-uuid":
-		return Function(formatTagName, DefaultFlags, uuidValidator), nil
+		return Function(formatTagName, DefaultFlags, uuidValidator).
+			WithEmits(Emission{field.ErrorTypeInvalid, "format=k8s-uuid", ""}), nil
 	}
 	// TODO: Flesh out the list of validation functions
 

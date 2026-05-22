@@ -25,7 +25,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -282,9 +282,11 @@ func (p *packageOwners) addOwner(name string) string {
 		dir = p.pkgs[name]
 	}
 
-	// Walk up starting from an absolute path until we cannot go up further.
-	for ; dir != "" && dir != "." && dir != "/"; dir = path.Dir(dir) {
-		data, err := os.ReadFile(path.Join(dir, "OWNERS"))
+	// Walk up starting from an absolute path until we hit the filesystem root.
+	// filepath.Dir returns dir itself at any root (/, C:\, \\server\share),
+	// so checking filepath.Dir(dir) != dir handles all path styles uniformly.
+	for ; dir != "" && filepath.Dir(dir) != dir; dir = filepath.Dir(dir) {
+		data, err := os.ReadFile(filepath.Join(dir, "OWNERS"))
 		if err != nil {
 			continue
 		}

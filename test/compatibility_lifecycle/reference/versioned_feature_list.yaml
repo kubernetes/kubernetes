@@ -67,20 +67,6 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.32"
-- name: AnonymousAuthConfigurableEndpoints
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.31"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.32"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.34"
 - name: APIResponseCompression
   versionedSpecs:
   - default: false
@@ -101,70 +87,18 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.26"
-- name: APIServerTracing
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.22"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.27"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.34"
 - name: APIServingWithRoutine
   versionedSpecs:
   - default: false
     lockToDefault: false
     preRelease: Alpha
     version: "1.30"
-- name: AuthorizeNodeWithSelectors
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.31"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.32"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.34"
 - name: AuthorizePodWebsocketUpgradeCreatePermission
   versionedSpecs:
   - default: true
     lockToDefault: false
     preRelease: Beta
     version: "1.35"
-- name: AuthorizeWithSelectors
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.31"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.32"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.34"
-- name: BtreeWatchCache
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.32"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.33"
 - name: CBORServingAndStorage
   versionedSpecs:
   - default: false
@@ -249,20 +183,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.31"
-- name: ConsistentListFromCache
+- name: ConsistentListFromCacheSkipTimeoutFallback
   versionedSpecs:
   - default: false
     lockToDefault: false
     preRelease: Alpha
-    version: "1.28"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.31"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.34"
+    version: "1.37"
 - name: ConstrainedImpersonation
   versionedSpecs:
   - default: false
@@ -325,16 +251,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
-- name: CPUCFSQuotaPeriod
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.12"
-  - default: true
-    lockToDefault: false
-    preRelease: GA
-    version: "1.36"
 - name: CPUManagerPolicyAlphaOptions
   versionedSpecs:
   - default: false
@@ -413,6 +329,16 @@
     lockToDefault: false
     preRelease: Alpha
     version: "1.21"
+- name: CustomCPUCFSQuotaPeriod
+  versionedSpecs:
+  - default: false
+    lockToDefault: false
+    preRelease: Alpha
+    version: "1.12"
+  - default: true
+    lockToDefault: false
+    preRelease: GA
+    version: "1.36"
 - name: CustomResourceFieldSelectors
   versionedSpecs:
   - default: false
@@ -453,6 +379,10 @@
     lockToDefault: false
     preRelease: Deprecated
     version: "1.36"
+  - default: false
+    lockToDefault: true
+    preRelease: Deprecated
+    version: "1.37"
 - name: DeploymentReplicaSetTerminatingReplicas
   versionedSpecs:
   - default: false
@@ -871,20 +801,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.36"
-- name: JobBackoffLimitPerIndex
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.28"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.29"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.33"
 - name: JobManagedBy
   versionedSpecs:
   - default: false
@@ -899,34 +815,6 @@
     lockToDefault: true
     preRelease: GA
     version: "1.35"
-- name: JobPodReplacementPolicy
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.28"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.29"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.34"
-- name: JobSuccessPolicy
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.30"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.31"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.33"
 - name: KMSv1
   versionedSpecs:
   - default: true
@@ -1111,20 +999,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.31"
-- name: LogarithmicScaleDown
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.21"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.22"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.31"
 - name: LoggingAlphaOptions
   versionedSpecs:
   - default: false
@@ -1285,6 +1159,12 @@
     lockToDefault: true
     preRelease: GA
     version: "1.33"
+- name: NodeControllerLeaseCircuitBreaker
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: NodeDeclaredFeatures
   versionedSpecs:
   - default: false
@@ -1367,20 +1247,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.35"
-- name: OrderedNamespaceDeletion
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.30"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.33"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.34"
 - name: PersistentVolumeClaimUnusedSinceTime
   versionedSpecs:
   - default: false
@@ -1671,16 +1537,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.33"
-- name: ResilientWatchCacheInitialization
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.31"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.34"
 - name: ResourceHealthStatus
   versionedSpecs:
   - default: false
@@ -1707,20 +1563,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.36"
-- name: RetryGenerateName
-  versionedSpecs:
-  - default: false
-    lockToDefault: false
-    preRelease: Alpha
-    version: "1.30"
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.31"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.32"
 - name: RotateKubeletServerCertificate
   versionedSpecs:
   - default: false
@@ -1731,7 +1573,7 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.12"
-- name: RuntimeClassInImageCriAPI
+- name: RuntimeClassInImageCriApi
   versionedSpecs:
   - default: false
     lockToDefault: false
@@ -1919,6 +1761,12 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.36"
+- name: StaleControllerConsistencyHPA
+  versionedSpecs:
+  - default: true
+    lockToDefault: false
+    preRelease: Beta
+    version: "1.37"
 - name: StaleControllerConsistencyJob
   versionedSpecs:
   - default: true
@@ -1985,26 +1833,6 @@
     lockToDefault: false
     preRelease: Beta
     version: "1.35"
-- name: StreamingCollectionEncodingToJSON
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.33"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.34"
-- name: StreamingCollectionEncodingToProtobuf
-  versionedSpecs:
-  - default: true
-    lockToDefault: false
-    preRelease: Beta
-    version: "1.33"
-  - default: true
-    lockToDefault: true
-    preRelease: GA
-    version: "1.34"
 - name: StrictIPCIDRValidation
   versionedSpecs:
   - default: false

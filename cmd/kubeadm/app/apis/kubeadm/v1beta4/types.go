@@ -28,7 +28,7 @@ import (
 // InitConfiguration contains a list of elements that is specific "kubeadm init"-only runtime
 // information.
 type InitConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// `kubeadm init`-only information. These fields are solely used the first time `kubeadm init` runs.
 	// After that, the information in the fields IS NOT uploaded to the `kubeadm-config` ConfigMap
@@ -82,7 +82,7 @@ type InitConfiguration struct {
 
 // ClusterConfiguration contains cluster-wide configuration for a kubeadm cluster
 type ClusterConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Etcd holds configuration for etcd.
 	// +optional
@@ -188,7 +188,7 @@ type ControlPlaneComponent struct {
 
 // APIServer holds settings necessary for API server deployments in the cluster
 type APIServer struct {
-	ControlPlaneComponent `json:",inline"`
+	ControlPlaneComponent `json:""`
 
 	// CertSANs sets extra Subject Alternative Names for the API Server signing cert.
 	// +optional
@@ -198,7 +198,7 @@ type APIServer struct {
 // DNS defines the DNS addon that should be used in the cluster
 type DNS struct {
 	// ImageMeta allows to customize the image used for the DNS addon
-	ImageMeta `json:",inline"`
+	ImageMeta `json:""`
 
 	// Disabled specifies whether to disable this addon in the cluster
 	// +optional
@@ -315,7 +315,7 @@ type Etcd struct {
 type LocalEtcd struct {
 	// ImageMeta allows to customize the container image used for etcd. Passing a custom etcd image
 	// tells kubeadm upgrade that this image is user-managed and that its upgrade must be skipped.
-	ImageMeta `json:",inline"`
+	ImageMeta `json:""`
 
 	// DataDir is the directory etcd will place its data.
 	// Defaults to "/var/lib/etcd".
@@ -380,7 +380,7 @@ type ExternalEtcd struct {
 
 // JoinConfiguration contains elements describing a particular node.
 type JoinConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// DryRun tells if the dry run mode is enabled, don't apply any change if it is and just output what would be done.
 	// +optional
@@ -520,7 +520,7 @@ type Patches struct {
 
 // ResetConfiguration contains a list of fields that are specifically "kubeadm reset"-only runtime information.
 type ResetConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// CleanupTmpDir specifies whether the "/etc/kubernetes/tmp" directory should be cleaned during the reset process.
 	// +optional
@@ -572,7 +572,7 @@ type Arg struct {
 
 // EnvVar represents an environment variable present in a Container.
 type EnvVar struct {
-	corev1.EnvVar `json:",inline"`
+	corev1.EnvVar `json:""`
 }
 
 // EncryptionAlgorithmType can define an asymmetric encryption algorithm type.
@@ -790,7 +790,7 @@ type UpgradePlanConfiguration struct {
 
 // UpgradeConfiguration contains a list of options that are specific to "kubeadm upgrade" subcommands.
 type UpgradeConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Apply holds a list of options that are specific to the "kubeadm upgrade apply" command.
 	// +optional
