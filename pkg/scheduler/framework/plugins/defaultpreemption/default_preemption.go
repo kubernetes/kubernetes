@@ -24,11 +24,11 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/listers/scheduling/v1alpha2"
+	"k8s.io/client-go/listers/scheduling/v1alpha3"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -71,7 +71,7 @@ type DefaultPreemption struct {
 
 	Executor          *preemption.Executor
 	Evaluator         *preemption.Evaluator
-	pgLister          v1alpha2.PodGroupLister
+	pgLister          v1alpha3.PodGroupLister
 	podGroupEvaluator *preemption.PodGroupEvaluator
 
 	// IsEligiblePod returns whether a victim pod is allowed to be preempted by a preemptor pod.
@@ -114,7 +114,7 @@ func New(_ context.Context, dpArgs runtime.Object, fh fwk.Handle, fts feature.Fe
 	pl.Evaluator = preemption.NewEvaluator(Name, fh, &pl, pl.Executor)
 
 	if pl.fts.EnableWorkloadAwarePreemption || pl.fts.EnableTopologyAwareWorkloadScheduling {
-		pl.pgLister = fh.SharedInformerFactory().Scheduling().V1alpha2().PodGroups().Lister()
+		pl.pgLister = fh.SharedInformerFactory().Scheduling().V1alpha3().PodGroups().Lister()
 	}
 	if pl.fts.EnableWorkloadAwarePreemption {
 		pl.podGroupEvaluator = preemption.NewPodGroupEvaluator(fh, pl.Executor)

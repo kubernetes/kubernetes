@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -196,7 +196,7 @@ func TestGeneratePlacements(t *testing.T) {
 				&v1.NodeList{Items: nodes},
 			)
 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
-			_ = informerFactory.Scheduling().V1alpha2().PodGroups().Informer()
+			_ = informerFactory.Scheduling().V1alpha3().PodGroups().Informer()
 			_ = informerFactory.Core().V1().Nodes().Informer()
 			informerFactory.StartWithContext(tCtx)
 			informerFactory.WaitForCacheSyncWithContext(tCtx)

@@ -22,10 +22,10 @@ import (
 	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha2"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha3"
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -96,9 +96,9 @@ func getPodGroup(p *v1.Pod, pgLister schedulinglisters.PodGroupLister) *scheduli
 	return pg
 }
 
-// isDisruptionModePodGroup checks if the PodGroup disruption mode is set to PodGroup.
-func isDisruptionModePodGroup(pg *schedulingapi.PodGroup) bool {
-	return pg != nil && pg.Spec.DisruptionMode != nil && *pg.Spec.DisruptionMode == schedulingapi.DisruptionModePodGroup
+// isDisruptionModeAll checks if the PodGroup disruption mode is set to All.
+func isDisruptionModeAll(pg *schedulingapi.PodGroup) bool {
+	return pg != nil && pg.Spec.DisruptionMode != nil && pg.Spec.DisruptionMode.All != nil
 }
 
 // newDomainForWorkloadPreemption creates a new domain for workload preemption.
@@ -120,7 +120,7 @@ func newDomainForWorkloadPreemption(nodes []fwk.NodeInfo, pgLister schedulinglis
 				victimMap[p.GetPod().UID] = newVictim([]fwk.PodInfo{p}, corev1helpers.PodPriority(p.GetPod()), []fwk.NodeInfo{node})
 				continue
 			}
-			if !isDisruptionModePodGroup(pg) {
+			if !isDisruptionModeAll(pg) {
 				victimMap[p.GetPod().UID] = newVictim([]fwk.PodInfo{p}, util.PodGroupPriority(pg), []fwk.NodeInfo{node})
 				continue
 			}

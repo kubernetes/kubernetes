@@ -29,7 +29,7 @@ import (
 
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -42,13 +42,13 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	batchinformers "k8s.io/client-go/informers/batch/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	schedulinginformers "k8s.io/client-go/informers/scheduling/v1alpha2"
+	schedulinginformers "k8s.io/client-go/informers/scheduling/v1alpha3"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	batchv1listers "k8s.io/client-go/listers/batch/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha2"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha3"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
@@ -174,7 +174,7 @@ type syncJobCtx struct {
 
 	// Set only when the Job is eligible for workload integration, as
 	// determined by shouldManageWorkloadForJob function.
-	podGroup *schedulingv1alpha2.PodGroup
+	podGroup *schedulingv1alpha3.PodGroup
 }
 
 type orphanPodKeyKind int
@@ -1021,7 +1021,7 @@ func (jm *Controller) syncJob(ctx context.Context, key string) (rErr error) {
 
 	// ensure Workload and PodGroup exist for eligible Jobs.
 	// This must happen before pod management so that pods can reference the PodGroup.
-	var podGroup *schedulingv1alpha2.PodGroup
+	var podGroup *schedulingv1alpha3.PodGroup
 	if shouldManageWorkloadForJob(&job) {
 		_, podGroup, err = jm.ensureWorkloadAndPodGroup(ctx, &job, pods)
 		if err != nil {
@@ -1867,7 +1867,7 @@ func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, jobCtx *syn
 				// PodGroup deletion is not blocked by surviving pods, because
 				// the Job's cascading GC already ensures proper cleanup ordering.
 				metav1.OwnerReference{
-					APIVersion: schedulingv1alpha2.SchemeGroupVersion.String(),
+					APIVersion: schedulingv1alpha3.SchemeGroupVersion.String(),
 					Kind:       "PodGroup",
 					Name:       pg.Name,
 					UID:        pg.UID,

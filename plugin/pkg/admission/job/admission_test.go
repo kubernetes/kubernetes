@@ -19,7 +19,7 @@ package job
 import (
 	"testing"
 
-	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,26 +38,26 @@ import (
 func TestGangSchedulingParallelism(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
 
-	gangPG := &schedulingv1alpha2.PodGroup{
+	gangPG := &schedulingv1alpha3.PodGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "gang-pg",
 			Namespace: metav1.NamespaceDefault,
 		},
-		Spec: schedulingv1alpha2.PodGroupSpec{
-			SchedulingPolicy: schedulingv1alpha2.PodGroupSchedulingPolicy{
-				Gang: &schedulingv1alpha2.GangSchedulingPolicy{MinCount: 4},
+		Spec: schedulingv1alpha3.PodGroupSpec{
+			SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{
+				Gang: &schedulingv1alpha3.GangSchedulingPolicy{MinCount: 4},
 			},
 		},
 	}
 
-	basicPG := &schedulingv1alpha2.PodGroup{
+	basicPG := &schedulingv1alpha3.PodGroup{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "basic-pg",
 			Namespace: metav1.NamespaceDefault,
 		},
-		Spec: schedulingv1alpha2.PodGroupSpec{
-			SchedulingPolicy: schedulingv1alpha2.PodGroupSchedulingPolicy{
-				Basic: &schedulingv1alpha2.BasicSchedulingPolicy{},
+		Spec: schedulingv1alpha3.PodGroupSpec{
+			SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{
+				Basic: &schedulingv1alpha3.BasicSchedulingPolicy{},
 			},
 		},
 	}
@@ -89,7 +89,7 @@ func TestGangSchedulingParallelism(t *testing.T) {
 		enableFeatureGate bool
 		oldJob            *batch.Job
 		newJob            *batch.Job
-		podGroups         []*schedulingv1alpha2.PodGroup
+		podGroups         []*schedulingv1alpha3.PodGroup
 		wantErr           bool
 	}{
 		"feature gate disabled: allows parallelism change": {
@@ -99,7 +99,7 @@ func TestGangSchedulingParallelism(t *testing.T) {
 				j.Spec.Parallelism = ptr.To[int32](2)
 				return j
 			}(),
-			podGroups: []*schedulingv1alpha2.PodGroup{gangPG},
+			podGroups: []*schedulingv1alpha3.PodGroup{gangPG},
 		},
 		"no schedulingGroup: skips check (handled by validation)": {
 			enableFeatureGate: true,
@@ -114,7 +114,7 @@ func TestGangSchedulingParallelism(t *testing.T) {
 			enableFeatureGate: true,
 			oldJob:            baseJob(ptr.To("gang-pg")),
 			newJob:            baseJob(ptr.To("gang-pg")),
-			podGroups:         []*schedulingv1alpha2.PodGroup{gangPG},
+			podGroups:         []*schedulingv1alpha3.PodGroup{gangPG},
 		},
 		"gang PodGroup: rejects parallelism change": {
 			enableFeatureGate: true,
@@ -124,7 +124,7 @@ func TestGangSchedulingParallelism(t *testing.T) {
 				j.Spec.Parallelism = ptr.To[int32](2)
 				return j
 			}(),
-			podGroups: []*schedulingv1alpha2.PodGroup{gangPG},
+			podGroups: []*schedulingv1alpha3.PodGroup{gangPG},
 			wantErr:   true,
 		},
 		"basic PodGroup: allows parallelism change": {
@@ -135,7 +135,7 @@ func TestGangSchedulingParallelism(t *testing.T) {
 				j.Spec.Parallelism = ptr.To[int32](2)
 				return j
 			}(),
-			podGroups: []*schedulingv1alpha2.PodGroup{basicPG},
+			podGroups: []*schedulingv1alpha3.PodGroup{basicPG},
 		},
 		"PodGroup not found: allows parallelism change": {
 			enableFeatureGate: true,
@@ -154,7 +154,7 @@ func TestGangSchedulingParallelism(t *testing.T) {
 				j.Spec.Parallelism = ptr.To[int32](2)
 				return j
 			}(),
-			podGroups: []*schedulingv1alpha2.PodGroup{
+			podGroups: []*schedulingv1alpha3.PodGroup{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "controller-created-pg",
@@ -169,9 +169,9 @@ func TestGangSchedulingParallelism(t *testing.T) {
 							},
 						},
 					},
-					Spec: schedulingv1alpha2.PodGroupSpec{
-						SchedulingPolicy: schedulingv1alpha2.PodGroupSchedulingPolicy{
-							Gang: &schedulingv1alpha2.GangSchedulingPolicy{MinCount: 4},
+					Spec: schedulingv1alpha3.PodGroupSpec{
+						SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{
+							Gang: &schedulingv1alpha3.GangSchedulingPolicy{MinCount: 4},
 						},
 					},
 				},
@@ -186,7 +186,7 @@ func TestGangSchedulingParallelism(t *testing.T) {
 				j.Spec.Parallelism = ptr.To[int32](2)
 				return j
 			}(),
-			podGroups: []*schedulingv1alpha2.PodGroup{
+			podGroups: []*schedulingv1alpha3.PodGroup{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "controller-created-pg",
@@ -201,9 +201,9 @@ func TestGangSchedulingParallelism(t *testing.T) {
 							},
 						},
 					},
-					Spec: schedulingv1alpha2.PodGroupSpec{
-						SchedulingPolicy: schedulingv1alpha2.PodGroupSchedulingPolicy{
-							Basic: &schedulingv1alpha2.BasicSchedulingPolicy{},
+					Spec: schedulingv1alpha3.PodGroupSpec{
+						SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{
+							Basic: &schedulingv1alpha3.BasicSchedulingPolicy{},
 						},
 					},
 				},
@@ -217,7 +217,7 @@ func TestGangSchedulingParallelism(t *testing.T) {
 				j.Spec.Parallelism = ptr.To[int32](2)
 				return j
 			}(),
-			podGroups: []*schedulingv1alpha2.PodGroup{
+			podGroups: []*schedulingv1alpha3.PodGroup{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "other-gang-pg",
@@ -232,9 +232,9 @@ func TestGangSchedulingParallelism(t *testing.T) {
 							},
 						},
 					},
-					Spec: schedulingv1alpha2.PodGroupSpec{
-						SchedulingPolicy: schedulingv1alpha2.PodGroupSchedulingPolicy{
-							Gang: &schedulingv1alpha2.GangSchedulingPolicy{MinCount: 4},
+					Spec: schedulingv1alpha3.PodGroupSpec{
+						SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{
+							Gang: &schedulingv1alpha3.GangSchedulingPolicy{MinCount: 4},
 						},
 					},
 				},
@@ -257,7 +257,7 @@ func TestGangSchedulingParallelism(t *testing.T) {
 			p.SetExternalKubeInformerFactory(informerFactory)
 
 			for _, pg := range tc.podGroups {
-				if err := informerFactory.Scheduling().V1alpha2().PodGroups().Informer().GetStore().Add(pg); err != nil {
+				if err := informerFactory.Scheduling().V1alpha3().PodGroups().Informer().GetStore().Add(pg); err != nil {
 					t.Fatalf("failed to add PodGroup: %v", err)
 				}
 			}

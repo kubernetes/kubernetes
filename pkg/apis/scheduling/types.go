@@ -214,7 +214,7 @@ type PodGroupTemplate struct {
 	ResourceClaims []PodGroupResourceClaim
 
 	// DisruptionMode defines the mode in which a given PodGroup can be disrupted.
-	// One of Pod, PodGroup.
+	// One of Single, All.
 	// This field is available only when the WorkloadAwarePreemption feature gate
 	// is enabled.
 	//
@@ -327,18 +327,31 @@ type PodGroupResourceClaim struct {
 	ResourceClaimTemplateName *string
 }
 
-// DisruptionMode describes the mode in which a PodGroup can be disrupted (e.g. preempted).
-// +enum
-type DisruptionMode string
+// DisruptionMode defines how individual entities within a group can be disrupted.
+// Exactly one mode can be set.
+//
+// +union
+type DisruptionMode struct {
+	// Single specifies that children can be disrupted independently from each other.
+	//
+	// +optional
+	Single *SingleDisruptionMode
 
-const (
-	// DisruptionModePod means that individual pods can be disrupted or preempted independently.
-	// It doesn't depend on exact set of pods currently running in this PodGroup.
-	DisruptionModePod DisruptionMode = "Pod"
-	// DisruptionModePodGroup means that the whole PodGroup needs to be disrupted
-	// or preempted together.
-	DisruptionModePodGroup DisruptionMode = "PodGroup"
-)
+	// All specifies that all children can only be disrupted together.
+	//
+	// +optional
+	All *AllDisruptionMode
+}
+
+// SingleDisruptionMode specifies that children can be disrupted independently.
+type SingleDisruptionMode struct {
+	// Intentionally empty now.
+}
+
+// AllDisruptionMode specifies that children can only be disrupted together.
+type AllDisruptionMode struct {
+	// Intentionally empty now.
+}
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -422,7 +435,7 @@ type PodGroupSpec struct {
 
 	// DisruptionMode defines the mode in which a given PodGroup can be disrupted.
 	// Controllers are expected to fill this field by copying it from a PodGroupTemplate.
-	// One of Pod, PodGroup. Defaults to Pod if unset.
+	// One of Single, All. Defaults to Single if unset.
 	// This field is immutable.
 	// This field is available only when the WorkloadAwarePreemption feature gate
 	// is enabled.

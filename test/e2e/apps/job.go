@@ -27,7 +27,7 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
-	schedulingv1alpha2 "k8s.io/api/scheduling/v1alpha2"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1395,9 +1395,9 @@ done`}
 			framework.ExpectNoError(err, "failed to create job in namespace: %s/%s", job.Namespace, job.Name)
 
 			ginkgo.By("Waiting for Workload to be created")
-			var workload *schedulingv1alpha2.Workload
+			var workload *schedulingv1alpha3.Workload
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				workloads, listErr := f.ClientSet.SchedulingV1alpha2().Workloads(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+				workloads, listErr := f.ClientSet.SchedulingV1alpha3().Workloads(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 				if listErr != nil {
 					return listErr
 				}
@@ -1413,9 +1413,9 @@ done`}
 			}).WithTimeout(30 * time.Second).WithPolling(time.Second).Should(gomega.Succeed())
 
 			ginkgo.By("Waiting for PodGroup to be created")
-			var podGroup *schedulingv1alpha2.PodGroup
+			var podGroup *schedulingv1alpha3.PodGroup
 			gomega.Eventually(ctx, func(ctx context.Context) error {
-				podGroups, listErr := f.ClientSet.SchedulingV1alpha2().PodGroups(f.Namespace.Name).List(ctx, metav1.ListOptions{})
+				podGroups, listErr := f.ClientSet.SchedulingV1alpha3().PodGroups(f.Namespace.Name).List(ctx, metav1.ListOptions{})
 				if listErr != nil {
 					return listErr
 				}
