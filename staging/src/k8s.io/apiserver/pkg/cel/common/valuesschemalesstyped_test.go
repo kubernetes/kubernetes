@@ -60,6 +60,10 @@ type myFloat float64
 type myUint uint
 type myUint64 uint64
 
+type myBytes []byte
+type myCustomByte uint8
+type myCustomBytes []myCustomByte
+
 type TestStruct struct {
 	FieldA string `json:"fieldA,omitempty"`
 	FieldB int    `json:"fieldB"`
@@ -117,6 +121,8 @@ type EquivF struct {
 	H []bool            `json:"fh"`
 	I []float32         `json:"fi"`
 	J []byte            `json:"fj"`
+	K myBytes           `json:"fk"`
+	L myCustomBytes     `json:"fl"`
 }
 
 type EquivG struct {
@@ -320,6 +326,8 @@ func TestSchemalessTypedToVal_Equivalence(t *testing.T) {
 				H: []bool{true},
 				I: []float32{1.1},
 				J: []byte("hello"),
+				K: myBytes("hello"),
+				L: myCustomBytes{104, 101, 108, 108, 111},
 			},
 		},
 		{
@@ -532,7 +540,7 @@ func makePod() *corev1.Pod {
 		},
 	}
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{
 			Name:  fmt.Sprintf("c%d", i),
 			Image: "busybox@sha256:1234567890abcdef",

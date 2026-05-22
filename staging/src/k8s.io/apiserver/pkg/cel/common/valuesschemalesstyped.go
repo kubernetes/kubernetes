@@ -108,6 +108,9 @@ func SchemalessTypedToVal(val interface{}) ref.Val {
 		}
 		return SchemalessTypedToVal(v.Elem().Interface())
 	case reflect.Slice:
+		if v.Type().Elem().Kind() == reflect.Uint8 { // byte, relection return slice of Uint8 for bytes.
+			return types.String(base64.StdEncoding.EncodeToString(v.Bytes()))
+		}
 		return &reflectSchemalessTypedList{value: v}
 	case reflect.Map:
 		return &reflectSchemalessTypedMap{value: v}
