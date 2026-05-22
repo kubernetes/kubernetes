@@ -141,7 +141,7 @@ type WorkloadSpec struct {
 	ControllerRef *TypedLocalObjectReference
 
 	// PodGroupTemplates is the list of templates that make up the Workload.
-	// The maximum number of templates is 8. This field is immutable.
+	// The maximum number of templates is 8. This field cannot have added/removed items during updates.
 	//
 	// +required
 	// +listType=map
@@ -189,6 +189,7 @@ type PodGroupTemplate struct {
 
 	// SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroupTemplate.
 	// This field is only available when the TopologyAwareWorkloadScheduling feature gate is enabled.
+	// This field is immutable.
 	//
 	// +optional
 	// +featureGate=TopologyAwareWorkloadScheduling
@@ -216,7 +217,7 @@ type PodGroupTemplate struct {
 	// DisruptionMode defines the mode in which a given PodGroup can be disrupted.
 	// One of Single, All.
 	// This field is available only when the WorkloadAwarePreemption feature gate
-	// is enabled.
+	// is enabled. This field is immutable.
 	//
 	// +featureGate=WorkloadAwarePreemption
 	// +optional
@@ -227,7 +228,7 @@ type PodGroupTemplate struct {
 	// control can set this to the global default priority class if it exists. Otherwise,
 	// pod groups created from this template will have the priority set to zero.
 	// This field is available only when the WorkloadAwarePreemption feature gate
-	// is enabled.
+	// is enabled. This field is immutable.
 	//
 	// +featureGate=WorkloadAwarePreemption
 	// +optional
@@ -239,7 +240,7 @@ type PodGroupTemplate struct {
 	// The admission controller populates this field from PriorityClassName.
 	// The higher the value, the higher the priority.
 	// This field is available only when the WorkloadAwarePreemption feature gate
-	// is enabled.
+	// is enabled. This field is immutable.
 	//
 	// +featureGate=WorkloadAwarePreemption
 	// +optional
@@ -251,13 +252,13 @@ type PodGroupTemplate struct {
 // +union
 type PodGroupSchedulingPolicy struct {
 	// Basic specifies that the pods in this group should be scheduled using
-	// standard Kubernetes scheduling behavior.
+	// standard Kubernetes scheduling behavior. This field is immutable.
 	//
 	// +optional
 	Basic *BasicSchedulingPolicy
 
 	// Gang specifies that the pods in this group should be scheduled using
-	// all-or-nothing semantics.
+	// all-or-nothing semantics. This field cannot be set/unset during update.
 	//
 	// +optional
 	Gang *GangSchedulingPolicy
@@ -276,7 +277,15 @@ type BasicSchedulingPolicy struct {
 type GangSchedulingPolicy struct {
 	// MinCount is the minimum number of pods that must be schedulable or scheduled
 	// at the same time for the scheduler to admit the entire group.
-	// It must be a positive integer.
+	// It must be a positive integer. This field is mutable to support workload scaling.
+	//
+	// Note that the scheduler operates on an eventually consistent model. Updates
+	// to minCount may not be immediately reflected in scheduling decisions due to
+	// propagation delays. If minCount is updated while a scheduling cycle is in
+	// progress for that group, the new value may not take effect until the next
+	// cycle. Moreover, minCount is only enforced during scheduling, meaning that
+	// modifications to this field do not affect already-scheduled pods, applying
+	// only to those evaluated in future cycles.
 	//
 	// +required
 	MinCount int32
@@ -402,7 +411,6 @@ type PodGroupSpec struct {
 
 	// SchedulingPolicy defines the scheduling policy for this instance of the PodGroup.
 	// Controllers are expected to fill this field by copying it from a PodGroupTemplate.
-	// This field is immutable.
 	//
 	// +required
 	SchedulingPolicy PodGroupSchedulingPolicy

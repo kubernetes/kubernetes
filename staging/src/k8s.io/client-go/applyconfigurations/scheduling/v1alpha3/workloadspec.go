@@ -29,7 +29,8 @@ type WorkloadSpecApplyConfiguration struct {
 	// This field is immutable.
 	ControllerRef *TypedLocalObjectReferenceApplyConfiguration `json:"controllerRef,omitempty"`
 	// PodGroupTemplates is the list of templates that make up the Workload.
-	// The maximum number of templates is 8. This field is immutable.
+	// The maximum number of templates is 8. Templates cannot be added or removed after the workload is created.
+	// Existing templates may still be updated where their individual fields allow it.
 	PodGroupTemplates []PodGroupTemplateApplyConfiguration `json:"podGroupTemplates,omitempty"`
 }
 

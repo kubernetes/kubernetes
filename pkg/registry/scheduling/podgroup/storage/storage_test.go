@@ -128,10 +128,12 @@ func TestUpdate(t *testing.T) {
 			return pg
 		},
 		// invalid update
-		// Update MinCount
+		// Switch scheduling policy
 		func(obj runtime.Object) runtime.Object {
 			pg := obj.(*scheduling.PodGroup)
-			pg.Spec.SchedulingPolicy.Gang.MinCount = 4
+			pg.Spec.SchedulingPolicy = scheduling.PodGroupSchedulingPolicy{
+				Basic: &scheduling.BasicSchedulingPolicy{},
+			}
 			return pg
 		},
 		// invalid update

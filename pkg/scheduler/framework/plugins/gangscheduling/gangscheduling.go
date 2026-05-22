@@ -80,8 +80,9 @@ func (pl *GangScheduling) EventsToRegister(_ context.Context) ([]fwk.ClusterEven
 		{Event: fwk.ClusterEvent{Resource: fwk.UnscheduledPod, ActionType: fwk.Add}, QueueingHintFn: pl.isSchedulableAfterPodAdded},
 		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.Add}, QueueingHintFn: pl.isSchedulableAfterPodAdded},
 		// A PodGroup being added can be making a waiting gang schedulable.
-		// PodGroups are immutable, so there's no need to handle PodGroup/Update event.
 		{Event: fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Add}, QueueingHintFn: pl.isSchedulableAfterPodGroupAdded},
+		// A PodGroup update to MinCount may make it schedulable
+		{Event: fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.Update}, QueueingHintFn: pl.isSchedulableAfterPodGroupUpdated},
 	}, nil
 }
 
@@ -101,6 +102,39 @@ func (pl *GangScheduling) isSchedulableAfterPodAdded(logger klog.Logger, pod *v1
 
 	logger.V(5).Info("another pod was added and it matches the target pod's scheduling group, which may make the pod schedulable",
 		"pod", klog.KObj(pod), "schedulingGroup", pod.Spec.SchedulingGroup, "addedPod", klog.KObj(addedPod), "addedPodSchedulingGroup", addedPod.Spec.SchedulingGroup)
+	return fwk.Queue, nil
+}
+
+// isSchedulableAfterPodGroupUpdated triggers re-enqueueing of the group's pods if the minCount requirement has decreased.
+func (pl *GangScheduling) isSchedulableAfterPodGroupUpdated(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+	oldPodGroup, newPodGroup, err := util.As[*schedulingapi.PodGroup](oldObj, newObj)
+	if err != nil {
+		return fwk.Queue, err
+	}
+
+	// Only consider updates for the PodGroup this pod belongs to
+	if pod.Spec.SchedulingGroup == nil || pod.Namespace != newPodGroup.Namespace || *pod.Spec.SchedulingGroup.PodGroupName != newPodGroup.Name {
+		logger.V(5).Info("pod group was updated but it doesn't match the target pod's scheduling group",
+			"pod", klog.KObj(pod), "schedulingGroup", pod.Spec.SchedulingGroup, "updatedPodGroup", klog.KObj(newPodGroup))
+		return fwk.QueueSkip, nil
+	}
+
+	oldPolicy := oldPodGroup.Spec.SchedulingPolicy
+	newPolicy := newPodGroup.Spec.SchedulingPolicy
+
+	// Non-gang policies should not be updated.
+	if newPolicy.Gang == nil || oldPolicy.Gang == nil {
+		logger.V(5).Info("pod group was updated but it's not a gang policy, this is unexpected, enqueuing pod", "pod", klog.KObj(pod), "podGroup", klog.KObj(newPodGroup))
+		return fwk.Queue, nil
+	}
+
+	// If the gang scheduling policy minCount did not decrease, it will not make the waiting pods schedulable.
+	if newPolicy.Gang.MinCount >= oldPolicy.Gang.MinCount {
+		logger.V(5).Info("PodGroup minCount did not decrease, skipping", "pod", klog.KObj(pod), "podGroup", klog.KObj(newPodGroup), "oldMinCount", oldPolicy.Gang.MinCount, "newMinCount", newPolicy.Gang.MinCount)
+		return fwk.QueueSkip, nil
+	}
+
+	logger.V(5).Info("pod group was updated and minCount decreased, enqueuing pod", "pod", klog.KObj(pod), "podGroup", klog.KObj(newPodGroup), "oldMinCount", oldPolicy.Gang.MinCount, "newMinCount", newPolicy.Gang.MinCount)
 	return fwk.Queue, nil
 }
 

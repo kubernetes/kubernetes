@@ -157,6 +157,98 @@ func Test_isSchedulableAfterPodGroupAdded(t *testing.T) {
 	}
 }
 
+func Test_isSchedulableAfterPodGroupUpdated(t *testing.T) {
+	tests := []struct {
+		name         string
+		pod          *v1.Pod
+		oldPodGroup  *schedulingapi.PodGroup
+		newPodGroup  *schedulingapi.PodGroup
+		expectedHint fwk.QueueingHint
+		expectErr    bool
+	}{
+		{
+			name:         "minCount decreased matches target pod",
+			pod:          st.MakePod().Namespace("ns1").Name("p").PodGroupName("pg").Obj(),
+			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(4).TemplateRef("t", "w").Obj(),
+			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).TemplateRef("t", "w").Obj(),
+			expectedHint: fwk.Queue,
+		},
+		{
+			name:         "update Basic policy",
+			pod:          st.MakePod().Namespace("ns1").Name("p").PodGroupName("pg").Obj(),
+			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").BasicPolicy().TemplateRef("t", "w").Obj(),
+			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").BasicPolicy().Obj(),
+			expectedHint: fwk.Queue,
+		},
+		{
+			name:         "minCount increased matches target pod",
+			pod:          st.MakePod().Namespace("ns1").Name("p").PodGroupName("pg").Obj(),
+			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).TemplateRef("t", "w").Obj(),
+			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(4).TemplateRef("t", "w").Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		{
+			name:         "minCount unchanged matches target pod",
+			pod:          st.MakePod().Namespace("ns1").Name("p").PodGroupName("pg").Obj(),
+			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).TemplateRef("t", "w").Obj(),
+			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).TemplateRef("t", "w").Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		{
+			name:         "minCount decreased but pod group name doesn't match target pod",
+			pod:          st.MakePod().Namespace("ns1").Name("p").PodGroupName("pg-other").Obj(),
+			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(4).TemplateRef("t", "w").Obj(),
+			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).TemplateRef("t", "w").Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		{
+			name:         "minCount decreased but pod group namespace doesn't match target pod",
+			pod:          st.MakePod().Namespace("ns-other").Name("p").PodGroupName("pg").Obj(),
+			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(4).TemplateRef("t", "w").Obj(),
+			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).TemplateRef("t", "w").Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+		{
+			name:         "pod without a scheduling group is skipped",
+			pod:          st.MakePod().Namespace("ns1").Name("p").Obj(),
+			oldPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(4).TemplateRef("t", "w").Obj(),
+			newPodGroup:  st.MakePodGroup().Namespace("ns1").Name("pg").MinCount(3).TemplateRef("t", "w").Obj(),
+			expectedHint: fwk.QueueSkip,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+
+			informerFactory := informers.NewSharedInformerFactory(fake.NewClientset(), 0)
+			fh, err := frameworkruntime.NewFramework(ctx, nil, nil,
+				frameworkruntime.WithInformerFactory(informerFactory),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+
+			p, err := New(ctx, nil, fh, feature.Features{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			actualHint, err := p.(*GangScheduling).isSchedulableAfterPodGroupUpdated(logger, tc.pod, tc.oldPodGroup, tc.newPodGroup)
+			if tc.expectErr {
+				if err == nil {
+					t.Errorf("Expected error but got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tc.expectedHint, actualHint); diff != "" {
+				t.Errorf("Expected QueuingHint doesn't match (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 type podActivatorMock struct {
 	activatedPods []*v1.Pod
 }

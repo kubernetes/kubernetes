@@ -28,7 +28,6 @@ type PodGroupSpecApplyConfiguration struct {
 	PodGroupTemplateRef *PodGroupTemplateReferenceApplyConfiguration `json:"podGroupTemplateRef,omitempty"`
 	// SchedulingPolicy defines the scheduling policy for this instance of the PodGroup.
 	// Controllers are expected to fill this field by copying it from a PodGroupTemplate.
-	// This field is immutable.
 	SchedulingPolicy *PodGroupSchedulingPolicyApplyConfiguration `json:"schedulingPolicy,omitempty"`
 	// SchedulingConstraints defines optional scheduling constraints (e.g. topology) for this PodGroup.
 	// Controllers are expected to fill this field by copying it from a PodGroupTemplate.
