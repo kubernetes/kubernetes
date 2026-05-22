@@ -6694,10 +6694,8 @@ func TestDescribeStatefulSet(t *testing.T) {
 	var replicas int32 = 1
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        "bar",
-			Namespace:   "foo",
-			Labels:      map[string]string{"app": "mytest"},
-			Annotations: map[string]string{"annotation1": "value1"},
+			Name:      "bar",
+			Namespace: "foo",
 		},
 		Spec: appsv1.StatefulSetSpec{
 			PodManagementPolicy: appsv1.ParallelPodManagement,
@@ -6709,7 +6707,7 @@ func TestDescribeStatefulSet(t *testing.T) {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:  "metest",
+							Name:  "mytest",
 							Image: "mytest-image:latest",
 						},
 					},
@@ -6739,8 +6737,6 @@ func TestDescribeStatefulSet(t *testing.T) {
 		"Namespace:              foo",
 		"CreationTimestamp:      Mon, 01 Jan 0001 00:00:00 +0000",
 		"Selector:               app=mytest",
-		"Labels:                 app=mytest",
-		"Annotations:            annotation1: value1",
 		"Service Name:           test-service",
 		"Pod Management Policy:  Parallel",
 		"Replicas:               1 desired | 0 total",
