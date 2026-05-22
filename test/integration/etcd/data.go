@@ -25,7 +25,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/version"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/util/compatibility"
+	basecompatibility "k8s.io/component-base/compatibility"
 	utilversion "k8s.io/component-base/version"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 
@@ -511,13 +513,13 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		gvr("admissionregistration.k8s.io", "v1", "mutatingadmissionpolicies"): {
 			Stub:              `{"metadata":{"name":"map1v1"},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"reinvocationPolicy": "IfNeeded","mutations":[{"applyConfiguration": {"expression":"Object{metadata: Object.metadata{labels: {'example':'true'}}}"}, "patchType":"ApplyConfiguration"}]}}`,
 			ExpectedEtcdPath:  "/registry/mutatingadmissionpolicies/map1v1",
-			ExpectedGVK:       gvkP("admissionregistration.k8s.io", "v1beta1", "MutatingAdmissionPolicy"),
+			ExpectedGVK:       gvkP("admissionregistration.k8s.io", "v1", "MutatingAdmissionPolicy"),
 			IntroducedVersion: "1.36",
 		},
 		gvr("admissionregistration.k8s.io", "v1", "mutatingadmissionpolicybindings"): {
 			Stub:              `{"metadata":{"name":"mpb1v1"},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com", "parameterNotFoundAction": "Allow"}}}`,
 			ExpectedEtcdPath:  "/registry/mutatingadmissionpolicybindings/mpb1v1",
-			ExpectedGVK:       gvkP("admissionregistration.k8s.io", "v1beta1", "MutatingAdmissionPolicyBinding"),
+			ExpectedGVK:       gvkP("admissionregistration.k8s.io", "v1", "MutatingAdmissionPolicyBinding"),
 			IntroducedVersion: "1.36",
 		},
 		// --
@@ -540,12 +542,14 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingadmissionpolicies"): {
 			Stub:              `{"metadata":{"name":"map1b1"},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"reinvocationPolicy": "IfNeeded","mutations":[{"applyConfiguration": {"expression":"Object{metadata: Object.metadata{labels: {'example':'true'}}}"}, "patchType":"ApplyConfiguration"}]}}`,
 			ExpectedEtcdPath:  "/registry/mutatingadmissionpolicies/map1b1",
+			ExpectedGVK:       gvkP("admissionregistration.k8s.io", "v1", "MutatingAdmissionPolicy"),
 			IntroducedVersion: "1.34",
 			RemovedVersion:    "1.40",
 		},
 		gvr("admissionregistration.k8s.io", "v1beta1", "mutatingadmissionpolicybindings"): {
 			Stub:              `{"metadata":{"name":"mpb1b1"},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com", "parameterNotFoundAction": "Allow"}}}`,
 			ExpectedEtcdPath:  "/registry/mutatingadmissionpolicybindings/mpb1b1",
+			ExpectedGVK:       gvkP("admissionregistration.k8s.io", "v1", "MutatingAdmissionPolicyBinding"),
 			IntroducedVersion: "1.34",
 			RemovedVersion:    "1.40",
 		},
@@ -555,14 +559,14 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 		gvr("admissionregistration.k8s.io", "v1alpha1", "mutatingadmissionpolicies"): {
 			Stub:              `{"metadata":{"name":"map1"},"spec":{"paramKind":{"apiVersion":"test.example.com/v1","kind":"Example"},"matchConstraints":{"resourceRules": [{"resourceNames": ["fakeName"], "apiGroups":["apps"],"apiVersions":["v1"],"operations":["CREATE", "UPDATE"], "resources":["deployments"]}]},"reinvocationPolicy": "IfNeeded","mutations":[{"applyConfiguration": {"expression":"Object{metadata: Object.metadata{labels: {'example':'true'}}}"}, "patchType":"ApplyConfiguration"}]}}`,
 			ExpectedEtcdPath:  "/registry/mutatingadmissionpolicies/map1",
-			ExpectedGVK:       gvkP("admissionregistration.k8s.io", "v1beta1", "MutatingAdmissionPolicy"),
+			ExpectedGVK:       gvkP("admissionregistration.k8s.io", "v1", "MutatingAdmissionPolicy"),
 			IntroducedVersion: "1.32",
 			RemovedVersion:    "1.38",
 		},
 		gvr("admissionregistration.k8s.io", "v1alpha1", "mutatingadmissionpolicybindings"): {
 			Stub:              `{"metadata":{"name":"mpb1"},"spec":{"policyName":"replicalimit-policy.example.com","paramRef":{"name":"replica-limit-test.example.com", "parameterNotFoundAction": "Allow"}}}`,
 			ExpectedEtcdPath:  "/registry/mutatingadmissionpolicybindings/mpb1",
-			ExpectedGVK:       gvkP("admissionregistration.k8s.io", "v1beta1", "MutatingAdmissionPolicyBinding"),
+			ExpectedGVK:       gvkP("admissionregistration.k8s.io", "v1", "MutatingAdmissionPolicyBinding"),
 			IntroducedVersion: "1.32",
 			RemovedVersion:    "1.38",
 		},
@@ -655,6 +659,7 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			Stub:              `{"metadata": {"name": "taint1name"}, "spec": {"taint": {"key": "example.com/taintkey", "value": "taintvalue", "effect": "NoSchedule"}}}`,
 			MutatedStub:       `{"spec": {"taint": {"effect": "NoExecute"}}}`,
 			ExpectedEtcdPath:  "/registry/devicetaintrules/taint1name",
+			ExpectedGVK:       gvkP("resource.k8s.io", "v1beta2", "DeviceTaintRule"),
 			IntroducedVersion: "1.33",
 			RemovedVersion:    "1.39",
 		},
@@ -720,7 +725,6 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 			Stub:              `{"metadata": {"name": "taint2name"}, "spec": {"taint": {"key": "example.com/taintkey", "value": "taintvalue", "effect": "NoSchedule"}}}`,
 			MutatedStub:       `{"spec": {"taint": {"effect": "NoExecute"}}}`,
 			ExpectedEtcdPath:  "/registry/devicetaintrules/taint2name",
-			ExpectedGVK:       gvkP("resource.k8s.io", "v1alpha3", "DeviceTaintRule"), // v1beta2 has higher priority, but to support downgrades v1alpha3 is picked automatically.
 			IntroducedVersion: "1.36",
 			RemovedVersion:    "1.42",
 		},
@@ -847,15 +851,26 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 				delete(etcdStorageData, key)
 			}
 		}
-	}
-	// match the resource to the correct storage version for emulated version
-	if isEmulation {
+
+		// Use the production storage version calculation to determine the expected
+		// storage version at this emulation version, avoiding logic duplication.
+		effectiveVersion := basecompatibility.NewEffectiveVersionFromString(v, "", "")
+		encodingConfig := serverstorage.NewDefaultResourceEncodingConfigForEffectiveVersion(legacyscheme.Scheme, effectiveVersion)
 		for key, data := range etcdStorageData {
-			storageVersion := storageVersionAtEmulationVersion(key, data.ExpectedGVK, v, etcdStorageData)
-			if storageVersion == "" {
+			if data.ExpectedGVK == nil {
 				continue
 			}
-			data.ExpectedGVK.Version = storageVersion
+			// Use the key (served GVR) to find an example object, not the
+			// ExpectedGVK, so we don't feed the expected answer as input.
+			example, err := legacyscheme.Scheme.New(key.GroupVersion().WithKind(data.ExpectedGVK.Kind))
+			if err != nil {
+				continue
+			}
+			storageGV, err := encodingConfig.BackwardCompatibileStorageEncodingFor(key.GroupResource(), example)
+			if err != nil {
+				continue
+			}
+			data.ExpectedGVK.Version = storageGV.Version
 		}
 	}
 	validateStorageData(etcdStorageData)
@@ -881,33 +896,6 @@ func validateStorageData(etcdStorageData map[schema.GroupVersionResource]Storage
 			panic(fmt.Sprintf("Error. Non-GA resource %s must have an introduced version", key.String()))
 		}
 	}
-}
-
-// storageVersionAtEmulationVersion tries to find the correct storage version at an emulation version.
-// If a GVK is introduced after the min compatibility version, we need to use an earlier version in storage.
-func storageVersionAtEmulationVersion(key schema.GroupVersionResource, expectedGVK *schema.GroupVersionKind, emuVer string, etcdStorageData map[schema.GroupVersionResource]StorageData) string {
-	// expectedGVK is needed to find the correct GVK with the correct storage version.
-	if expectedGVK == nil {
-		return ""
-	}
-	minCompatVer := version.MustParse(emuVer).SubtractMinor(1)
-	expectedGVR := gvr(expectedGVK.Group, expectedGVK.Version, key.Resource)
-	expectedGVRData, ok := etcdStorageData[expectedGVR]
-	// expectedGVK is introduced before the emulation version, no need to change.
-	if !ok || minCompatVer.AtLeast(version.MustParse(expectedGVRData.IntroducedVersion)) {
-		return ""
-	}
-	// go through the prioritized version list to find the first version introduced before the emulation version.
-	gvs := legacyscheme.Scheme.PrioritizedVersionsForGroup(key.Group)
-	for _, gv := range gvs {
-		expectedGVR := gv.WithResource(key.Resource)
-		if expectedGVRData, ok := etcdStorageData[expectedGVR]; ok {
-			if minCompatVer.AtLeast(version.MustParse(expectedGVRData.IntroducedVersion)) {
-				return gv.Version
-			}
-		}
-	}
-	return ""
 }
 
 // StorageData contains information required to create an object and verify its storage in etcd

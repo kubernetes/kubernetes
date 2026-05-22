@@ -19,11 +19,14 @@ package registrytest
 import (
 	"testing"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/server/options"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	legacyscheme "k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 )
 
@@ -44,9 +47,33 @@ func NewEtcdStorageForResource(t *testing.T, resource schema.GroupResource) (*st
 	if err != nil {
 		t.Fatalf("Error while making storage factory: %v", err)
 	}
-	resourceConfig, err := factory.NewConfig(resource, nil)
+	example := exampleForResource(legacyscheme.Scheme, resource)
+	resourceConfig, err := factory.NewConfig(resource, example)
 	if err != nil {
 		t.Fatalf("Error while finding storage destination: %v", err)
 	}
 	return resourceConfig, server
+}
+
+// exampleForResource finds an example object for the given resource by searching
+// the scheme for a kind whose plural resource name matches. This lets the storage
+// factory auto-calculate the correct storage version for resources that don't
+// exist in their group's top priority version (e.g. ClusterTrustBundle is in
+// v1alpha1/v1beta1 but not v1).
+func exampleForResource(scheme *runtime.Scheme, resource schema.GroupResource) runtime.Object {
+	for gvk := range scheme.AllKnownTypes() {
+		if gvk.Group != resource.Group || gvk.Version == runtime.APIVersionInternal {
+			continue
+		}
+		plural, _ := meta.UnsafeGuessKindToResource(gvk)
+		if plural.Resource == resource.Resource {
+			// The version doesn't matter: emulatedStorageVersion only
+			// extracts the Kind name, then looks up all versions independently.
+			obj, err := scheme.New(gvk)
+			if err == nil {
+				return obj
+			}
+		}
+	}
+	return nil
 }
