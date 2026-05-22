@@ -465,6 +465,11 @@ const (
 	// Allow in-place pod resize of running non-sidecar init containers.
 	InPlacePodVerticalScalingInitContainers featuregate.Feature = "InPlacePodVerticalScalingInitContainers"
 
+	// owner: @natasha41575
+	//
+	// Allow in-place pod update of memory-backed volume size limit.
+	InPlacePodVerticalScalingMemoryBackedVolumes featuregate.Feature = "InPlacePodVerticalScalingMemoryBackedVolumes"
+
 	// owner: @mimowo
 	// kep: https://kep.k8s.io/4368
 	//
@@ -1488,6 +1493,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	InPlacePodVerticalScalingMemoryBackedVolumes: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	JobManagedBy: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
@@ -2369,6 +2378,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	InPlacePodVerticalScalingExclusiveMemory: {InPlacePodVerticalScaling},
 
 	InPlacePodVerticalScalingInitContainers: {InPlacePodVerticalScaling, NodeDeclaredFeatures},
+
+	InPlacePodVerticalScalingMemoryBackedVolumes: {InPlacePodVerticalScaling, NodeDeclaredFeatures},
 
 	JobManagedBy: {},
 
