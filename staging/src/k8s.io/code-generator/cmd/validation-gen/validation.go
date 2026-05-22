@@ -86,15 +86,6 @@ func NewGenValidations(outputFilename, outputPackage string, rootTypes []*types.
 	}
 }
 
-func (g *genValidations) hasRootTypesWithValidations() bool {
-	for _, rootType := range g.rootTypes {
-		if g.hasValidations(g.discovered.typeNodes[rootType]) {
-			return true
-		}
-	}
-	return false
-}
-
 func (g *genValidations) Namers(_ *generator.Context) namer.NameSystems {
 	// Have the raw namer for this file track what it imports.
 	return namer.NameSystems{
@@ -134,9 +125,6 @@ func (g *genValidations) isOtherPackage(pkg string) bool {
 }
 
 func (g *genValidations) Init(c *generator.Context, w io.Writer) error {
-	if !g.hasRootTypesWithValidations() {
-		return nil
-	}
 	klog.V(5).Infof("emitting registration code")
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	g.emitRegisterFunction(c, g.schemeRegistry, sw)
@@ -995,6 +983,16 @@ func (g *genValidations) hasValidationsImpl(n *typeNode, seen map[*typeNode]bool
 // emitRegisterFunction emits the type-registration logic for validation
 // functions.
 func (g *genValidations) emitRegisterFunction(c *generator.Context, schemeRegistry types.Name, sw *generator.SnippetWriter) {
+	var targetTypes []*types.Type
+	for _, rootType := range g.rootTypes {
+		if g.hasValidations(g.discovered.typeNodes[rootType]) {
+			targetTypes = append(targetTypes, rootType)
+		}
+	}
+	if len(targetTypes) == 0 {
+		return
+	}
+
 	scheme := c.Universe.Type(schemeRegistry)
 	schemePtr := &types.Type{
 		Kind: types.Pointer,
@@ -1006,11 +1004,7 @@ func (g *genValidations) emitRegisterFunction(c *generator.Context, schemeRegist
 	sw.Do("// RegisterValidations adds validation functions to the given scheme.\n", nil)
 	sw.Do("// Public to allow building arbitrary schemes.\n", nil)
 	sw.Do("func RegisterValidations(scheme $.|raw$) error {\n", schemePtr)
-	for _, rootType := range g.rootTypes {
-		if !g.hasValidations(g.discovered.typeNodes[rootType]) {
-			continue
-		}
-
+	for _, rootType := range targetTypes {
 		node := g.discovered.typeNodes[rootType]
 		if node == nil {
 			panic(fmt.Sprintf("found nil node for root-type %v", rootType))
