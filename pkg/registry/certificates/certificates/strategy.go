@@ -68,7 +68,7 @@ func (csrStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 }
 
 // AllowCreateOnUpdate is false for CSRs.
-func (csrStrategy) AllowCreateOnUpdate() bool {
+func (csrStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -139,7 +139,7 @@ func (csrStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object
 // populates it with the latest version. Else, it checks that the
 // version specified by the user matches the version of latest etcd
 // object.
-func (csrStrategy) AllowUnconditionalUpdate() bool {
+func (csrStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

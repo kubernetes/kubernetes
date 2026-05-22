@@ -128,7 +128,7 @@ func (evtv eachValTagValidator) GetValidations(context Context, tag codetags.Tag
 		return Validations{}, fmt.Errorf("nested deferred validations are not supported for eachVal value")
 	}
 
-	if result.Empty() && !result.OpaqueValType {
+	if result.Empty() {
 		return Validations{}, fmt.Errorf("no validation functions found")
 	}
 
@@ -210,7 +210,7 @@ func (evtv eachValTagValidator) getListValidations(fldPath *field.Path, t *types
 	for _, vfn := range validations.Functions {
 		comm := vfn.Comments
 		vfn.Comments = nil
-		vfn = Function(eachValTagName, vfn.Flags, validateEachSliceVal, matchArg, equivArg, WrapperFunction{Function: vfn, ObjType: nt.Elem}).WithComments(comm...)
+		vfn = Function(eachValTagName, vfn.Flags, validateEachSliceVal, matchArg, equivArg, WrapperFunction{Function: vfn, ObjType: nt.Elem, PathFragment: "[*]"}).WithComments(comm...)
 		result.AddFunction(vfn)
 	}
 
@@ -231,7 +231,7 @@ func (evtv eachValTagValidator) getMapValidations(t *types.Type, validations Val
 	for _, vfn := range validations.Functions {
 		comm := vfn.Comments
 		vfn.Comments = nil
-		vfn = Function(eachValTagName, vfn.Flags, validateEachMapVal, equivArg, WrapperFunction{Function: vfn, ObjType: nt.Elem}).WithComments(comm...)
+		vfn = Function(eachValTagName, vfn.Flags, validateEachMapVal, equivArg, WrapperFunction{Function: vfn, ObjType: nt.Elem, PathFragment: "[*]"}).WithComments(comm...)
 		result.AddFunction(vfn)
 	}
 
@@ -310,7 +310,7 @@ func (ektv eachKeyTagValidator) getValidations(t *types.Type, validations Valida
 	for _, vfn := range validations.Functions {
 		comm := vfn.Comments
 		vfn.Comments = nil
-		f := Function(eachKeyTagName, vfn.Flags, validateEachMapKey, WrapperFunction{vfn, nt.Key}).WithComments(comm...)
+		f := Function(eachKeyTagName, vfn.Flags, validateEachMapKey, WrapperFunction{Function: vfn, ObjType: nt.Key}).WithComments(comm...)
 		result.AddFunction(f)
 	}
 	return result, nil

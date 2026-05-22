@@ -55,7 +55,7 @@ func (*podGroupStrategy) NamespaceScoped() bool {
 // should not be modified by the user. For a new PodGroup that is the status.
 func (*podGroupStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
-		"scheduling.k8s.io/v1alpha2": fieldpath.NewSet(
+		"scheduling.k8s.io/v1alpha3": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("status"),
 		),
 	}
@@ -86,7 +86,7 @@ func (*podGroupStrategy) DeclarativeValidationConfig(ctx context.Context, obj, o
 	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
 		opts = append(opts, string(features.WorkloadAwarePreemption))
 	}
-	return rest.DeclarativeValidationConfig{Options: opts, DeclarativeEnforcement: true}
+	return rest.DeclarativeValidationConfig{Options: opts}
 }
 
 func (*podGroupStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
@@ -95,7 +95,7 @@ func (*podGroupStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Objec
 
 func (*podGroupStrategy) Canonicalize(obj runtime.Object) {}
 
-func (*podGroupStrategy) AllowCreateOnUpdate() bool {
+func (*podGroupStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -116,7 +116,7 @@ func (*podGroupStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.
 	return nil
 }
 
-func (*podGroupStrategy) AllowUnconditionalUpdate() bool {
+func (*podGroupStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 
@@ -133,7 +133,7 @@ func NewStatusStrategy(podGroupStrategy *podGroupStrategy) *podGroupStatusStrate
 // should not be modified by the user. For a status update that is the spec.
 func (*podGroupStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
-		"scheduling.k8s.io/v1alpha2": fieldpath.NewSet(
+		"scheduling.k8s.io/v1alpha3": fieldpath.NewSet(
 			fieldpath.MakePathOrDie("metadata"),
 			fieldpath.MakePathOrDie("spec"),
 		),

@@ -46,6 +46,7 @@ limitations under the License.
 // +k8s:conversion-gen-external-types=k8s.io/kube-controller-manager/config/v1alpha1
 // +k8s:defaulter-gen=TypeMeta
 // +k8s:defaulter-gen-input=k8s.io/kube-controller-manager/config/v1alpha1
+// +k8s:validation-gen=false
 // +groupName=kubecontrollermanager.config.k8s.io
 
 package v1alpha1

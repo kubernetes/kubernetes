@@ -299,6 +299,10 @@ type createPodsOp struct {
 	Count int
 	// Template parameter for Count.
 	CountParam string
+	// Template parameter for multiplying CountParam. It is used when total number of pods
+	// is defined by number of pods per podgroup for multiple podgroups.
+	// Optional.
+	CountMultiplierParam string
 	// If false, Count pods get created rapidly. This can be used to
 	// measure how quickly the scheduler can fill up a cluster.
 	//
@@ -345,11 +349,24 @@ type createPodsOp struct {
 	// Params to be passed to the template.
 	// Values with `$` prefix will be resolved to the workload parameters.
 	TemplateParams map[string]any
+	// SignatureBatchSize defines how many subsequent pods have the same "signature" label.
+	// If positive, every SignatureBatchSize pods will have a "signature" label with value "signature-label-<index/batchSize>".
+	// If not specified, it defaults to 1 (each pod has a unique signature).
+	// Optional
+	SignatureBatchSize int
+	// Template parameter for SignatureBatchSize.
+	SignatureBatchSizeParam string
 }
 
 func (cpo *createPodsOp) isValid(allowParameterization bool) error {
+	if !isValidCount(allowParameterization, cpo.SignatureBatchSize, cpo.SignatureBatchSizeParam) {
+		return fmt.Errorf("invalid SignatureBatchSize=%d / SignatureBatchSizeParam=%q", cpo.SignatureBatchSize, cpo.SignatureBatchSizeParam)
+	}
 	if !isValidCount(allowParameterization, cpo.Count, cpo.CountParam) {
 		return fmt.Errorf("invalid Count=%d / CountParam=%q", cpo.Count, cpo.CountParam)
+	}
+	if cpo.CountMultiplierParam != "" && !isValidParameterizable(cpo.CountMultiplierParam) {
+		return fmt.Errorf("invalid CountMultiplierParam=%q", cpo.CountMultiplierParam)
 	}
 	if cpo.CollectMetrics && cpo.SkipWaitToCompletion {
 		// While it's technically possible to achieve this, the additional
@@ -377,6 +394,24 @@ func (cpo createPodsOp) patchParams(w *Workload) (realOp, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+	if cpo.CountMultiplierParam != "" {
+		multiplier, err := w.Params.get(cpo.CountMultiplierParam[1:])
+		if err != nil {
+			return nil, err
+		}
+		cpo.Count *= multiplier
+	}
+	if cpo.SignatureBatchSizeParam != "" {
+		paramKey := cpo.SignatureBatchSizeParam[1:]
+		signatureBatchSize, err := w.Params.get(paramKey)
+		if err != nil {
+			return nil, err
+		}
+		cpo.SignatureBatchSize = signatureBatchSize
+	}
+	if cpo.SignatureBatchSize == 0 {
+		cpo.SignatureBatchSize = 1
 	}
 	if cpo.DurationParam != "" {
 		durationStr, err := getParam[string](w.Params, cpo.DurationParam[1:])
@@ -602,6 +637,40 @@ func (so sleepOp) patchParams(w *Workload) (realOp, error) {
 	return &so, nil
 }
 
+// waitForPodGroups defines an op that waits for a specific number of PodGroup objects to be visible in the scheduler's cache.
+type waitForPodGroups struct {
+	// Must be waitForPodGroupsOpcode.
+	Opcode operationCode
+	// Namespace the objects should be in.
+	Namespace string
+	// Count determines how many objects to wait for.
+	Count int
+	// CountParam is the name of the parameter that determines the count.
+	CountParam string
+}
+
+func (w *waitForPodGroups) isValid(allowParameterization bool) error {
+	if !isValidCount(allowParameterization, w.Count, w.CountParam) {
+		return fmt.Errorf("invalid Count=%d / CountParam=%q", w.Count, w.CountParam)
+	}
+	return nil
+}
+
+func (w *waitForPodGroups) collectsMetrics() bool {
+	return false
+}
+
+func (w waitForPodGroups) patchParams(workload *Workload) (realOp, error) {
+	if w.CountParam != "" {
+		var err error
+		w.Count, err = workload.Params.get(w.CountParam[1:])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return &w, (&w).isValid(false)
+}
+
 // startCollectingMetricsOp defines an op that starts metrics collectors.
 // stopCollectingMetricsOp has to be used after this op to finish collecting.
 type startCollectingMetricsOp struct {
@@ -650,6 +719,59 @@ func (*stopCollectingMetricsOp) collectsMetrics() bool {
 
 func (scm stopCollectingMetricsOp) patchParams(_ *Workload) (realOp, error) {
 	return &scm, nil
+}
+
+// startCollectingProfileOp defines an op that starts profile collection.
+// stopCollectingProfileOp has to be used after this op to finish collecting.
+type startCollectingProfileOp struct {
+	// Must be "startCollectingProfile".
+	Opcode operationCode
+	// Type is the profile type to collect (currently only "CPU" is supported).
+	Type string
+	// FilePath is the path to the output profile file. If dataItemsDir is set,
+	// the file will be created relative to dataItemsDir.
+	FilePath string
+}
+
+func (scp *startCollectingProfileOp) isValid(_ bool) error {
+	if scp.FilePath == "" {
+		return fmt.Errorf("filePath cannot be empty")
+	}
+	if strings.ToUpper(scp.Type) != "CPU" {
+		return fmt.Errorf("only CPU profile type is supported, got %q", scp.Type)
+	}
+	return nil
+}
+
+func (*startCollectingProfileOp) collectsMetrics() bool {
+	return false
+}
+
+func (scp startCollectingProfileOp) patchParams(_ *Workload) (realOp, error) {
+	return &scp, nil
+}
+
+// stopCollectingProfileOp defines an op that stops profile collection.
+type stopCollectingProfileOp struct {
+	// Must be "stopCollectingProfile".
+	Opcode operationCode
+	// Type is the profile type to stop (currently only "CPU" is supported).
+	Type string
+}
+
+func (scp *stopCollectingProfileOp) isValid(_ bool) error {
+	if strings.ToUpper(scp.Type) != "CPU" {
+		return fmt.Errorf("only CPU profile type is supported, got %q", scp.Type)
+	}
+	return nil
+}
+
+func (*stopCollectingProfileOp) collectsMetrics() bool {
+	return false
+}
+
+func (scp stopCollectingProfileOp) patchParams(_ *Workload) (realOp, error) {
+	return &scp, nil
 }
 
 // resolveTemplateParams resolves the template parameters using the workload parameters.

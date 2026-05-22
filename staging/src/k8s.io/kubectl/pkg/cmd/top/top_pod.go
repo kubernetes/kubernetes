@@ -197,9 +197,16 @@ func (o TopPodOptions) RunTopPod() error {
 	if !metricsAPIAvailable {
 		return errors.New("Metrics API not available")
 	}
-	metrics, err := getMetricsFromMetricsAPI(o.MetricsClient, o.Namespace, o.ResourceName, o.AllNamespaces, labelSelector, fieldSelector)
+	metrics, err := getMetricsFromMetricsAPI(o.MetricsClient, o.Namespace, o.ResourceName, o.AllNamespaces, labelSelector)
 	if err != nil {
 		return err
+	}
+
+	if len(metrics.Items) != 0 && len(o.FieldSelector) > 0 {
+		metrics, err = filterPodMetricsByFieldSelector(o, metrics, labelSelector, fieldSelector)
+		if err != nil {
+			return err
+		}
 	}
 
 	// First we check why no metrics have been received.
@@ -222,7 +229,7 @@ func (o TopPodOptions) RunTopPod() error {
 	return o.Printer.PrintPodMetrics(metrics.Items, o.PrintContainers, o.AllNamespaces, o.NoHeaders, o.SortBy, o.Sum)
 }
 
-func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespace, resourceName string, allNamespaces bool, labelSelector labels.Selector, fieldSelector fields.Selector) (*metricsapi.PodMetricsList, error) {
+func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespace, resourceName string, allNamespaces bool, labelSelector labels.Selector) (*metricsapi.PodMetricsList, error) {
 	var err error
 	ns := metav1.NamespaceAll
 	if !allNamespaces {
@@ -236,7 +243,7 @@ func getMetricsFromMetricsAPI(metricsClient metricsclientset.Interface, namespac
 		}
 		versionedMetrics.Items = []metricsv1beta1api.PodMetrics{*m}
 	} else {
-		versionedMetrics, err = metricsClient.MetricsV1beta1().PodMetricses(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector.String(), FieldSelector: fieldSelector.String()})
+		versionedMetrics, err = metricsClient.MetricsV1beta1().PodMetricses(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector.String()})
 		if err != nil {
 			return nil, err
 		}
@@ -287,4 +294,34 @@ func checkPodAge(pod *corev1.Pod) error {
 		klog.V(2).Infof("Metrics not yet available for pod %s/%s, age: %s", pod.Namespace, pod.Name, age.String())
 		return nil
 	}
+}
+
+func filterPodMetricsByFieldSelector(o TopPodOptions, metrics *metricsapi.PodMetricsList, labelSelector labels.Selector, fieldSelector fields.Selector) (*metricsapi.PodMetricsList, error) {
+	ns := metav1.NamespaceAll
+	if !o.AllNamespaces {
+		ns = o.Namespace
+	}
+
+	pods, err := o.PodClient.Pods(ns).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: labelSelector.String(),
+		FieldSelector: fieldSelector.String(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	selectedPods := make(map[string]struct{}, len(pods.Items))
+	for _, pod := range pods.Items {
+		selectedPods[pod.Namespace+"/"+pod.Name] = struct{}{}
+	}
+
+	filtered := make([]metricsapi.PodMetrics, 0, len(metrics.Items))
+	for _, metric := range metrics.Items {
+		if _, ok := selectedPods[metric.Namespace+"/"+metric.Name]; ok {
+			filtered = append(filtered, metric)
+		}
+	}
+
+	metrics.Items = filtered
+	return metrics, nil
 }

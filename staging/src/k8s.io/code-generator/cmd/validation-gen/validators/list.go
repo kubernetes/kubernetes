@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
@@ -492,7 +493,8 @@ func getListValidations(byPath map[string]*listMetadata, context Context) (Valid
 		}
 		comment := "lists with set semantics require unique values"
 		f := Function("listValidator", DefaultFlags, validateUnique, Identifier(matchArg)).
-			WithComment(comment)
+			WithComment(comment).
+			WithEmits(Emission{field.ErrorTypeDuplicate, "", "[*]"})
 		if lm.stabilityLevel != "" {
 			f = f.WithStabilityLevel(lm.stabilityLevel)
 		}
@@ -507,7 +509,9 @@ func getListValidations(byPath map[string]*listMetadata, context Context) (Valid
 		comment := "lists with map semantics require unique keys"
 
 		f := Function("listValidator", DefaultFlags, validateUnique, matchArg).
-			WithComment(comment).WithStabilityLevel(lm.stabilityLevel)
+			WithComment(comment).
+			WithStabilityLevel(lm.stabilityLevel).
+			WithEmits(Emission{field.ErrorTypeDuplicate, "", "[*]"})
 		result.AddFunction(f)
 	}
 

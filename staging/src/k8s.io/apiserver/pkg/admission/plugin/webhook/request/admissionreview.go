@@ -204,10 +204,10 @@ func CreateV1AdmissionReview(uid types.UID, versionedAttributes *admission.Versi
 			Operation:          admissionv1.Operation(attr.GetOperation()),
 			UserInfo:           userInfo,
 			Object: runtime.RawExtension{
-				Object: versionedAttributes.VersionedObject,
+				Object: versionedAttributes.VersionedObject.Object(),
 			},
 			OldObject: runtime.RawExtension{
-				Object: versionedAttributes.VersionedOldObject,
+				Object: versionedAttributes.VersionedOldObject.Object(),
 			},
 			DryRun: &dryRun,
 			Options: runtime.RawExtension{
@@ -270,10 +270,10 @@ func CreateV1beta1AdmissionReview(uid types.UID, versionedAttributes *admission.
 			Operation:          admissionv1beta1.Operation(attr.GetOperation()),
 			UserInfo:           userInfo,
 			Object: runtime.RawExtension{
-				Object: versionedAttributes.VersionedObject,
+				Object: versionedAttributes.VersionedObject.Object(),
 			},
 			OldObject: runtime.RawExtension{
-				Object: versionedAttributes.VersionedOldObject,
+				Object: versionedAttributes.VersionedOldObject.Object(),
 			},
 			DryRun: &dryRun,
 			Options: runtime.RawExtension{

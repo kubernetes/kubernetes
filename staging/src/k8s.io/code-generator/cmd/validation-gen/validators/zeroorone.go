@@ -18,6 +18,7 @@ package validators
 
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/code-generator/cmd/validation-gen/util"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
@@ -53,7 +54,8 @@ func getZeroOrOneOfValidations(shared map[string]unions, context Context) (Valid
 	delete(shared, structPath)
 
 	result, err := processUnionValidations(context.ParentPath, context.ParentType, unions, zeroOrOneOfVariablePrefix,
-		zeroOrOneOfMemberTagName, zeroOrOneOfUnionValidator, types.Name{})
+		zeroOrOneOfMemberTagName, zeroOrOneOfUnionValidator, types.Name{},
+		Emission{field.ErrorTypeInvalid, "zeroOrOneOf", ""})
 	return result, err
 }
 

@@ -66,7 +66,7 @@ func (csiStorageCapacityStrategy) WarningsOnCreate(ctx context.Context, obj runt
 func (csiStorageCapacityStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (csiStorageCapacityStrategy) AllowCreateOnUpdate() bool {
+func (csiStorageCapacityStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -89,7 +89,7 @@ func (csiStorageCapacityStrategy) WarningsOnUpdate(ctx context.Context, obj, old
 	return storageutil.GetWarningsForCSIStorageCapacity(obj.(*storage.CSIStorageCapacity))
 }
 
-func (csiStorageCapacityStrategy) AllowUnconditionalUpdate() bool {
+func (csiStorageCapacityStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 

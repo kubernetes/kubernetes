@@ -31,10 +31,10 @@ import (
 
 	"k8s.io/component-helpers/node/util/sysctl"
 	"k8s.io/klog/v2"
-	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 )
 
-func SetSysctls(ctx context.Context, config *proxyconfigapi.KubeProxyConntrackConfiguration) error {
+func SetSysctls(ctx context.Context, config *kubeproxyconfig.KubeProxyConntrackConfiguration) error {
 	return setSysctls(ctx, realConntrackConfigurer{}, config)
 }
 
@@ -57,7 +57,7 @@ type conntrackConfigurer interface {
 	SetUDPStreamTimeout(ctx context.Context, seconds int) error
 }
 
-func setSysctls(ctx context.Context, ct conntrackConfigurer, config *proxyconfigapi.KubeProxyConntrackConfiguration) error {
+func setSysctls(ctx context.Context, ct conntrackConfigurer, config *kubeproxyconfig.KubeProxyConntrackConfiguration) error {
 	max, err := getConntrackMax(ctx, config, detectNumCPU())
 	if err != nil {
 		return err
@@ -106,7 +106,7 @@ func setSysctls(ctx context.Context, ct conntrackConfigurer, config *proxyconfig
 	return nil
 }
 
-func getConntrackMax(ctx context.Context, config *proxyconfigapi.KubeProxyConntrackConfiguration, numCPU int) (int, error) {
+func getConntrackMax(ctx context.Context, config *kubeproxyconfig.KubeProxyConntrackConfiguration, numCPU int) (int, error) {
 	logger := klog.FromContext(ctx)
 	if config.MaxPerCore != nil && *config.MaxPerCore > 0 {
 		floor := 0

@@ -92,7 +92,7 @@ func newResourceClaimController(ctx context.Context, controllerContext Controlle
 		},
 		client,
 		controllerContext.InformerFactory.Core().V1().Pods(),
-		controllerContext.InformerFactory.Scheduling().V1alpha2().PodGroups(),
+		controllerContext.InformerFactory.Scheduling().V1alpha3().PodGroups(),
 		controllerContext.InformerFactory.Resource().V1().ResourceClaims(),
 		controllerContext.InformerFactory.Resource().V1().ResourceClaimTemplates())
 	if err != nil {

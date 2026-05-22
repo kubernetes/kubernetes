@@ -69,7 +69,7 @@ func (strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []stri
 func (strategy) Canonicalize(obj runtime.Object) {
 }
 
-func (strategy) AllowCreateOnUpdate() bool {
+func (strategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -97,7 +97,7 @@ func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) [
 func dropDisabledFields(secret *api.Secret, oldSecret *api.Secret) {
 }
 
-func (strategy) AllowUnconditionalUpdate() bool {
+func (strategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

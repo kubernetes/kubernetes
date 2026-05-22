@@ -28,6 +28,10 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+
+	// Side-effect import: registers Workload with legacyscheme.Scheme so
+	// the ConvertToVersion calls below resolve the type.
+	_ "k8s.io/kubernetes/pkg/apis/scheduling/install"
 	"k8s.io/kubernetes/pkg/features"
 )
 
@@ -51,23 +55,18 @@ var (
 		},
 	}
 
-	podDisruptionMode      = scheduling.DisruptionModePod
-	podGroupDisruptionMode = scheduling.DisruptionModePodGroup
-	invalidDisruptionMode  = scheduling.DisruptionMode("Invalid")
-
 	fieldImmutableError = "field is immutable"
 	minCountError       = "must be greater than or equal to 1"
 	tooManyItemsError   = "must have at most 1 item"
 	requiredError       = "Required value"
 	subdomainNameError  = "lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"
-	supportedModesError = `supported values: "Pod", "PodGroup"`
 )
 
 func TestWorkloadStrategy(t *testing.T) {
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("Workload must be namespace scoped")
 	}
-	if Strategy.AllowCreateOnUpdate() {
+	if Strategy.AllowCreateOnUpdate(context.Background()) {
 		t.Errorf("Workload should not allow create on update")
 	}
 }
@@ -75,7 +74,7 @@ func TestWorkloadStrategy(t *testing.T) {
 func ctxWithRequestInfo() context.Context {
 	return genericapirequest.WithRequestInfo(genericapirequest.NewDefaultContext(), &genericapirequest.RequestInfo{
 		APIGroup:          "scheduling.k8s.io",
-		APIVersion:        "v1alpha2",
+		APIVersion:        "v1alpha3",
 		Resource:          "workloads",
 		IsResourceRequest: true,
 	})
@@ -160,7 +159,7 @@ func TestStrategyCreate(t *testing.T) {
 		"workload aware preemption disabled - drop disruption mode": {
 			obj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates[0].DisruptionMode = &podDisruptionMode
+				w.Spec.PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{Single: &scheduling.SingleDisruptionMode{}}
 				return w
 			}(),
 			expectObj: workload,
@@ -168,37 +167,40 @@ func TestStrategyCreate(t *testing.T) {
 		"workload aware preemption enabled - preserve disruption mode (pod)": {
 			obj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates[0].DisruptionMode = &podDisruptionMode
+				w.Spec.PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{Single: &scheduling.SingleDisruptionMode{}}
 				return w
 			}(),
 			enableWorkloadAwarePreemption: true,
 			expectObj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates[0].DisruptionMode = &podDisruptionMode
+				w.Spec.PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{Single: &scheduling.SingleDisruptionMode{}}
 				return w
 			}(),
 		},
 		"workload aware preemption enabled - preserve disruption mode (pod group)": {
 			obj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates[0].DisruptionMode = &podGroupDisruptionMode
+				w.Spec.PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{All: &scheduling.AllDisruptionMode{}}
 				return w
 			}(),
 			enableWorkloadAwarePreemption: true,
 			expectObj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates[0].DisruptionMode = &podGroupDisruptionMode
+				w.Spec.PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{All: &scheduling.AllDisruptionMode{}}
 				return w
 			}(),
 		},
-		"workload aware preemption enabled - unknown disruption mode": {
+		"workload aware preemption enabled - both disruption modes set": {
 			obj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates[0].DisruptionMode = &invalidDisruptionMode
+				w.Spec.PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{
+					Single: &scheduling.SingleDisruptionMode{},
+					All:    &scheduling.AllDisruptionMode{},
+				}
 				return w
 			}(),
 			enableWorkloadAwarePreemption: true,
-			expectValidationError:         supportedModesError,
+			expectValidationError:         "must specify exactly one of",
 		},
 		"workload aware preemption enabled - preserve priorityClassName": {
 			obj: func() *scheduling.Workload {
@@ -480,12 +482,12 @@ func TestStrategyUpdate(t *testing.T) {
 		"disruption mode update, workload aware preemption disabled": {
 			oldObj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates[0].DisruptionMode = &podGroupDisruptionMode
+				w.Spec.PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{All: &scheduling.AllDisruptionMode{}}
 				return w
 			}(),
 			newObj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates[0].DisruptionMode = &podDisruptionMode
+				w.Spec.PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{Single: &scheduling.SingleDisruptionMode{}}
 				return w
 			}(),
 			expectValidationError: fieldImmutableError,
@@ -494,7 +496,7 @@ func TestStrategyUpdate(t *testing.T) {
 			oldObj: workload,
 			newObj: func() *scheduling.Workload {
 				w := workload.DeepCopy()
-				w.Spec.PodGroupTemplates[0].DisruptionMode = &podDisruptionMode
+				w.Spec.PodGroupTemplates[0].DisruptionMode = &scheduling.DisruptionMode{Single: &scheduling.SingleDisruptionMode{}}
 				return w
 			}(),
 			enableWorkloadAwarePreemption: true,

@@ -32,7 +32,7 @@ import (
 // For a given service there may be multiple EndpointSlice objects, selected by
 // labels, which must be joined to produce the full set of endpoints.
 type EndpointSlice struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard object's metadata.
 	// +optional
@@ -228,7 +228,7 @@ type EndpointPort struct {
 
 // EndpointSliceList represents a list of endpoint slices
 type EndpointSliceList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard list metadata.
 	// +optional

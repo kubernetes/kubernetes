@@ -130,12 +130,12 @@ func (cronJobStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object)
 func (cronJobStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (cronJobStrategy) AllowUnconditionalUpdate() bool {
+func (cronJobStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 
 // AllowCreateOnUpdate is false for scheduled jobs; this means a POST is needed to create one.
-func (cronJobStrategy) AllowCreateOnUpdate() bool {
+func (cronJobStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 

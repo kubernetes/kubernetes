@@ -28,7 +28,7 @@ package v1
 // key-value pairs as environment variables.
 type SecretEnvSourceApplyConfiguration struct {
 	// The Secret to select from.
-	LocalObjectReferenceApplyConfiguration `json:",inline"`
+	LocalObjectReferenceApplyConfiguration `json:""`
 	// Specify whether the Secret must be defined
 	Optional *bool `json:"optional,omitempty"`
 }

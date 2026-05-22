@@ -34,6 +34,8 @@ import (
 
 	"github.com/onsi/gomega"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
@@ -85,6 +87,10 @@ func waitForSlices(tCtx ktesting.TContext, name string, b *drautils.Builder, dri
 }
 
 var repoRoot = repoRootDefault()
+
+const (
+	localUpClusterRuntimeConfig = "resource.k8s.io/v1beta1,resource.k8s.io/v1beta2,resource.k8s.io/v1alpha3"
+)
 
 func currentBinDir() (envName, content string) {
 	envName = "KUBERNETES_SERVER_BIN_DIR"
@@ -214,11 +220,11 @@ func testUpgradeDowngrade(tCtx ktesting.TContext) {
 	})
 	tCtx.Step(fmt.Sprintf("bring up v%d.%d", major, previousMinor), func(tCtx ktesting.TContext) {
 		localUpClusterEnv := map[string]string{
-			"RUNTIME_CONFIG": "resource.k8s.io/v1beta1,resource.k8s.io/v1beta2,resource.k8s.io/v1alpha3",
+			"RUNTIME_CONFIG": localUpClusterRuntimeConfig,
 			"FEATURE_GATES":  "DynamicResourceAllocation=true,DRADeviceTaintRules=true,DRADeviceTaints=true,DRAExtendedResource=true,DRAPartitionableDevices=true",
 			// *not* needed because driver will run in "local filesystem" mode (= driver.IsLocal): "ALLOW_PRIVILEGED": "1",
 		}
-		cluster.Start(tCtx, fmt.Sprintf("0-initial-%d.%d", major, previousMinor), binDir, localUpClusterEnv)
+		cluster.Start(tCtx, fmt.Sprintf("0-initial-%d.%d", major, previousMinor), binDir, localUpClusterEnv, "")
 	})
 
 	restConfig := cluster.LoadConfig(tCtx)
@@ -436,4 +442,27 @@ func serverDownloadURL(tCtx ktesting.TContext, prefix string, major, minor uint)
 		return "", "", fmt.Errorf("reading response body for %s failed: %w", url, err)
 	}
 	return fmt.Sprintf("https://dl.k8s.io/release/%s/kubernetes-server-%s-%s.tar.gz", string(version), runtime.GOOS, runtime.GOARCH), string(version), nil
+}
+
+// eventuallyClaimsGone polls until all named ResourceClaims are gone (404).
+func eventuallyClaimsGone(tCtx ktesting.TContext, claimNames []string, timeout time.Duration) {
+	tCtx.Helper()
+	ns := tCtx.Namespace()
+	remaining := make([]string, len(claimNames))
+	copy(remaining, claimNames)
+	tCtx.WithStep("wait for ResourceClaims GC").
+		Eventually(func(tCtx ktesting.TContext) int {
+			still := remaining[:0]
+			for _, name := range remaining {
+				_, err := tCtx.Client().ResourceV1().ResourceClaims(ns).Get(tCtx, name, metav1.GetOptions{})
+				if err == nil {
+					still = append(still, name)
+				} else if !apierrors.IsNotFound(err) {
+					tCtx.ExpectNoError(err, "check ResourceClaim %s", name)
+				}
+			}
+			remaining = still
+			return len(remaining)
+		}).WithTimeout(timeout).Should(gomega.Equal(0), "ResourceClaims should be GC'd")
+	tCtx.Logf("Verified ResourceClaims %s were garbage collected", claimNames)
 }

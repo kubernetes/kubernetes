@@ -99,7 +99,7 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 					"CPU": ptrMatchAllFields(gstruct.Fields{
 						"Time": recent(maxStatsAge),
 						// CRI stats provider tries to estimate the value of UsageNanoCores. This value can be
-						// either 0 or between 10000 and 2e10.
+						// either 0 or between 10000 and 2e10 ( upper limit seen during test execution ).
 						// Please refer, https://github.com/kubernetes/kubernetes/pull/95345#discussion_r501630942
 						// for more information.
 						"UsageNanoCores":       gomega.SatisfyAny(gstruct.PointTo(gomega.BeZero()), bounded(10000, 2e10)),
@@ -181,8 +181,8 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 						"StartTime": recent(maxStartAge),
 						"CPU": ptrMatchAllFields(gstruct.Fields{
 							"Time":                 recent(maxStatsAge),
-							"UsageNanoCores":       bounded(10000, 2e10),
-							"UsageCoreNanoSeconds": bounded(10000000, 1e15),
+							"UsageNanoCores":       bounded(10000, 1e9),
+							"UsageCoreNanoSeconds": bounded(10000000, 1e12),
 							"PSI":                  psiExpectation(),
 						}),
 						"Memory": ptrMatchAllFields(gstruct.Fields{
@@ -232,8 +232,8 @@ var _ = SIGDescribe("Summary API", framework.WithNodeConformance(), func() {
 				}),
 				"CPU": ptrMatchAllFields(gstruct.Fields{
 					"Time":                 recent(maxStatsAge),
-					"UsageNanoCores":       bounded(10000, 2e10),
-					"UsageCoreNanoSeconds": bounded(10000000, 1e15),
+					"UsageNanoCores":       bounded(10000, 1e9),
+					"UsageCoreNanoSeconds": bounded(10000000, 1e12),
 					"PSI":                  psiExpectation(),
 				}),
 				"Memory": ptrMatchAllFields(gstruct.Fields{
@@ -510,7 +510,7 @@ func getSummaryTestPods(f *framework.Framework, numRestarts int32, names ...stri
 								Add: []v1.Capability{"NET_RAW"},
 							},
 						},
-						Command: getRestartingContainerCommand("/test-empty-dir-mnt", 0, numRestarts, "echo 'some bytes' >/outside_the_volume.txt; ping -c 10 -s 100 -v google.com; echo 'hello world' >> /test-empty-dir-mnt/file; echo 720;openssl speed -multi $(grep -ci processor /proc/cpuinfo)"),
+						Command: getRestartingContainerCommand("/test-empty-dir-mnt", 0, numRestarts, "dd if=/dev/zero of=/outside_the_volume.txt oflag=direct bs=4096 count=2 2>/dev/null; dd if=/outside_the_volume.txt of=/dev/null iflag=direct bs=4096 count=2 2>/dev/null; ping -c 1 google.com; echo 'hello world' >> /test-empty-dir-mnt/file; dd if=/dev/zero of=/dev/null bs=1 count=10000000;"),
 						Resources: v1.ResourceRequirements{
 							Limits: v1.ResourceList{
 								// Must set memory limit to get MemoryStats.AvailableBytes

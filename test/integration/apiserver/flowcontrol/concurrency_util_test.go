@@ -122,7 +122,7 @@ func intervalMetricAvg(snapshot0, snapshot1 metricSnapshot, plLabel string) plMe
 }
 
 type noxuDelayingAuthorizer struct {
-	Authorizer authorizer.Authorizer
+	Authorizer authorizer.UnconditionalAuthorizer
 }
 
 func (d *noxuDelayingAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {

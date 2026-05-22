@@ -1058,6 +1058,120 @@ func TestNodeAuthorizerAddEphemeralContainers(t *testing.T) {
 	}
 }
 
+// TestNodeAuthorizerUpdateExtendedResourceClaim checks that a node gains
+// authorization to read its pod's synthesized ResourceClaim once the scheduler
+// writes ExtendedResourceClaimStatus into the pod — even when the pod carries
+// no standard Spec.ResourceClaims entries.
+//
+// Background: the graph populator's updatePod has a fast-path that skips
+// AddPod when the pod's node assignment, UID, ephemeral containers, and
+// ResourceClaimStatuses are all unchanged. For pods that use the
+// DRAExtendedResource path (e.g. a plain nvidia.com/gpu request),
+// ResourceClaimStatuses is nil both before and after the scheduler writes
+// the synthesized claim name, and ExtendedResourceClaimStatus may change
+// under rare condition after a pod is bound to a node, so the fast-path
+// would fire prematurely and the claim→pod→node edge would never be added
+// to the authorization graph.
+func TestNodeAuthorizerUpdateExtendedResourceClaim(t *testing.T) {
+	g := NewGraph()
+	identifier := nodeidentifier.NewDefaultNodeIdentifier()
+	authz := NewAuthorizer(g, identifier, bootstrappolicy.NodeRules())
+
+	node1 := &user.DefaultInfo{Name: "system:node:node1", Groups: []string{"system:nodes"}}
+
+	// The pod has been bound to node1, but the scheduler has written
+	// extended-claim-0, not extended-claim-1, to ExtendedResourceClaimStatus.
+	// There are no standard Spec.ResourceClaims, so ResourceClaimStatuses
+	// stays nil throughout.
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pod1",
+			Namespace: "ns1",
+			UID:       "pod1uid",
+		},
+		Spec: corev1.PodSpec{
+			NodeName: "node1",
+		},
+		Status: corev1.PodStatus{
+			ExtendedResourceClaimStatus: &corev1.PodExtendedResourceClaimStatus{
+				ResourceClaimName: "extended-claim-0",
+				RequestMappings: []corev1.ContainerExtendedResourceRequest{
+					{
+						ContainerName: "container0",
+						ResourceName:  "example.com/gpu",
+						RequestName:   "request",
+					},
+				},
+			},
+		},
+	}
+
+	p := &graphPopulator{}
+	p.graph = g
+	p.addPod(pod)
+
+	// Before the scheduler swaps the synthesized claim name, extended-claim-1
+	// is not in the graph and node1 should have no opinion on it.
+	decision, _, err := authz.Authorize(context.Background(), authorizer.AttributesRecord{
+		User:            node1,
+		ResourceRequest: true,
+		Verb:            "get",
+		Resource:        "resourceclaims",
+		APIGroup:        "resource.k8s.io",
+		Namespace:       "ns1",
+		Name:            "extended-claim-1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if decision != authorizer.DecisionNoOpinion {
+		t.Errorf("before ExtendedResourceClaimStatus is updated to extended-claim-1: want NoOpinion, got %v", decision)
+	}
+
+	// The scheduler swaps the synthesized ResourceClaim from extended-claim-0
+	// to extended-claim-1. updatePod must recognize that ExtendedResourceClaimStatus
+	// changed and rebuild the graph edge rather than taking the fast-path early
+	// exit.
+	updatedPod := pod.DeepCopy()
+	updatedPod.Status.ExtendedResourceClaimStatus.ResourceClaimName = "extended-claim-1"
+	p.updatePod(pod, updatedPod)
+
+	// The node that hosts the pod should now be permitted to read the claim.
+	decision, _, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{
+		User:            node1,
+		ResourceRequest: true,
+		Verb:            "get",
+		Resource:        "resourceclaims",
+		APIGroup:        "resource.k8s.io",
+		Namespace:       "ns1",
+		Name:            "extended-claim-1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if decision != authorizer.DecisionAllow {
+		t.Errorf("after ExtendedResourceClaimStatus is updated to extended-claim-1: want Allow, got %v", decision)
+	}
+
+	// A node that does not host the pod must not gain access to the claim.
+	node2 := &user.DefaultInfo{Name: "system:node:node2", Groups: []string{"system:nodes"}}
+	decision, _, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{
+		User:            node2,
+		ResourceRequest: true,
+		Verb:            "get",
+		Resource:        "resourceclaims",
+		APIGroup:        "resource.k8s.io",
+		Namespace:       "ns1",
+		Name:            "extended-claim-1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if decision != authorizer.DecisionNoOpinion {
+		t.Errorf("node2 should not access a claim belonging to node1's pod: want NoOpinion, got %v", decision)
+	}
+}
+
 type sampleDataOpts struct {
 	nodes       int
 	namespaces  int

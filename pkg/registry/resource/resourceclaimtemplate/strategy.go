@@ -81,7 +81,7 @@ func (*resourceClaimTemplateStrategy) WarningsOnCreate(ctx context.Context, obj 
 func (*resourceClaimTemplateStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (*resourceClaimTemplateStrategy) AllowCreateOnUpdate() bool {
+func (*resourceClaimTemplateStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -100,7 +100,7 @@ func (*resourceClaimTemplateStrategy) WarningsOnUpdate(ctx context.Context, obj,
 	return nil
 }
 
-func (*resourceClaimTemplateStrategy) AllowUnconditionalUpdate() bool {
+func (*resourceClaimTemplateStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

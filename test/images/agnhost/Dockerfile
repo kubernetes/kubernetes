@@ -17,10 +17,11 @@
 # is linked against musl libc.
 ARG BASEIMAGE=alpine
 
+# latest as of 2026-05-08
+FROM golang@sha256:efaccb5b497e90df3ebe5216cc25cd9f98e73874e2d638b56e38d4a3f098c41c AS preparer
+
 ARG GOLANG_VERSION
-
-FROM golang:$GOLANG_VERSION AS preparer
-
+ARG GOTOOLCHAIN=go${GOLANG_VERSION}
 RUN go install github.com/google/go-containerregistry/cmd/crane@latest && \
     apt-get update && apt-get install -y jq
 

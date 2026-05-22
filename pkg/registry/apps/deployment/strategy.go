@@ -102,7 +102,7 @@ func (deploymentStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for deployments.
-func (deploymentStrategy) AllowCreateOnUpdate() bool {
+func (deploymentStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -145,7 +145,7 @@ func (deploymentStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime
 	return warnings
 }
 
-func (deploymentStrategy) AllowUnconditionalUpdate() bool {
+func (deploymentStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

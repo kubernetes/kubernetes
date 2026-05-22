@@ -84,7 +84,7 @@ func (resourceSliceStrategy) WarningsOnCreate(ctx context.Context, obj runtime.O
 func (resourceSliceStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (resourceSliceStrategy) AllowCreateOnUpdate() bool {
+func (resourceSliceStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -117,7 +117,7 @@ func (resourceSliceStrategy) WarningsOnUpdate(ctx context.Context, obj, old runt
 	return warnings
 }
 
-func (resourceSliceStrategy) AllowUnconditionalUpdate() bool {
+func (resourceSliceStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

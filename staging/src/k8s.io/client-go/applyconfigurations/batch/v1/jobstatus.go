@@ -69,9 +69,6 @@ type JobStatusApplyConfiguration struct {
 	Failed *int32 `json:"failed,omitempty"`
 	// The number of pods which are terminating (in phase Pending or Running
 	// and have a deletionTimestamp).
-	//
-	// This field is beta-level. The job controller populates the field when
-	// the feature gate JobPodReplacementPolicy is enabled (enabled by default).
 	Terminating *int32 `json:"terminating,omitempty"`
 	// completedIndexes holds the completed indexes when .spec.completionMode =
 	// "Indexed" in a text format. The indexes are represented as decimal integers

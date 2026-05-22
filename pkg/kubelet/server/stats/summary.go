@@ -77,7 +77,7 @@ func (sp *summaryProviderImpl) Get(ctx context.Context, updateStats bool) (*stat
 		return nil, fmt.Errorf("failed to get node info: %v", err)
 	}
 	nodeConfig := sp.provider.GetNodeConfig()
-	rootStats, networkStats, err := sp.provider.GetCgroupStats("/", updateStats)
+	rootStats, networkStats, err := sp.provider.GetCgroupStats(ctx, "/", updateStats)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get root cgroup stats: %v", err)
 	}

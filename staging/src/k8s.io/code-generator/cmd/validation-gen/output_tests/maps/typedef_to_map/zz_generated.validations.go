@@ -90,6 +90,7 @@ func Validate_MapTypedefType(
 		}); len(e) != 0 {
 		errs = append(errs, e...)
 	}
+
 	// iterate the map and call the value type's validation function
 	if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, Validate_StringType); len(e) != 0 {
 		errs = append(errs, e...)

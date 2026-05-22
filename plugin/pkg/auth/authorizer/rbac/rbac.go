@@ -47,6 +47,9 @@ type RequestToRuleMapper interface {
 	VisitRulesFor(ctx context.Context, user user.Info, namespace string, visitor func(source fmt.Stringer, rule *rbacv1.PolicyRule, err error) bool)
 }
 
+var _ = authorizer.Authorizer(&RBACAuthorizer{})
+var _ = authorizer.RuleResolver(&RBACAuthorizer{})
+
 type RBACAuthorizer struct {
 	authorizationRuleResolver RequestToRuleMapper
 }

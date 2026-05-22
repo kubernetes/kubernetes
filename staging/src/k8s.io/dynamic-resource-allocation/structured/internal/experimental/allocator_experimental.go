@@ -127,7 +127,7 @@ func NewAllocator(ctx context.Context,
 	slicesShared := make([]*resourceapi.ResourceSlice, 0)
 	for _, slice := range slices {
 		nodeName := ptr.Deref(slice.Spec.NodeName, "")
-		if nodeName == "" || len(slice.Spec.SharedCounters) > 0 {
+		if nodeName == "" {
 			slicesShared = append(slicesShared, slice)
 		} else {
 			slicesOnNode[nodeName] = append(slicesOnNode[nodeName], slice)
@@ -568,6 +568,7 @@ func (alloc *allocator) validateDeviceRequest(request requestAccessor, parentReq
 							id:     DeviceID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name, Device: slice.Spec.Devices[deviceIndex].Name},
 							Device: &slice.Spec.Devices[deviceIndex],
 							slice:  slice,
+							pool:   pool,
 						}
 						if alloc.features.ConsumableCapacity {
 							// Next validate whether resource request over capacity
@@ -1649,7 +1650,7 @@ func (alloc *allocator) checkAvailableCounters(device deviceWithID) (bool, error
 					}
 					// Devices that aren't allocated doesn't consume any counters, so we don't
 					// need to consider them.
-					if !alloc.allocatedState.AllocatedDevices.Has(deviceID) {
+					if !internal.IsDeviceAllocated(deviceID, &alloc.allocatedState) {
 						continue
 					}
 					for _, deviceCounterConsumption := range device.ConsumesCounters {

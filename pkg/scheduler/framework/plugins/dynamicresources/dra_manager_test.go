@@ -60,6 +60,16 @@ func testSignalClaimPendingAllocation(tCtx ktesting.TContext) {
 				otherClaimUID: {claim: allocatedClaim2, sharers: 10},
 			},
 		},
+		"already-exists-ignores-different-claim-argument": {
+			inFlightAllocations: map[types.UID]inFlightAllocation{
+				claimUID: {claim: allocatedClaim, sharers: 1},
+			},
+			claimUID:       claimUID,
+			allocatedClaim: allocatedClaim2,
+			expectedInFlightAllocations: map[types.UID]inFlightAllocation{
+				claimUID: {claim: allocatedClaim, sharers: 2},
+			},
+		},
 	}
 
 	for name, test := range tests {

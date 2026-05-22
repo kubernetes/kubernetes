@@ -35,7 +35,7 @@ import (
 //
 // VolumeAttachment objects are non-namespaced.
 type VolumeAttachment struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -62,7 +62,7 @@ type VolumeAttachment struct {
 
 // VolumeAttachmentList is a collection of VolumeAttachment objects.
 type VolumeAttachmentList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard list metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -189,7 +189,7 @@ type VolumeError struct {
 // the scheduler assumes that capacity is insufficient and tries some other
 // node.
 type CSIStorageCapacity struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard object's metadata. The name has no particular meaning. It must be
 	// be a DNS subdomain (dots allowed, 253 characters). To ensure that
@@ -254,7 +254,7 @@ type CSIStorageCapacity struct {
 
 // CSIStorageCapacityList is a collection of CSIStorageCapacity objects.
 type CSIStorageCapacityList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard list metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -276,7 +276,7 @@ type CSIStorageCapacityList struct {
 // defined by the CSI driver. The class can be specified during dynamic provisioning
 // of PersistentVolumeClaims, and changed in the PersistentVolumeClaim spec after provisioning.
 type VolumeAttributesClass struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -310,7 +310,7 @@ type VolumeAttributesClass struct {
 
 // VolumeAttributesClassList is a collection of VolumeAttributesClass objects.
 type VolumeAttributesClassList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard list metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata

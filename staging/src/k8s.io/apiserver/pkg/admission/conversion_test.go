@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
@@ -193,8 +194,8 @@ func TestConvertVersionedAttributes(t *testing.T) {
 					&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "newpod"}},
 					&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "oldpod"}},
 				),
-				VersionedObject:    &examplev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "newpodversioned"}},
-				VersionedOldObject: &examplev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "oldpodversioned"}},
+				VersionedObject:    NewLazyObject(&examplev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "newpodversioned"}}),
+				VersionedOldObject: NewLazyObject(&examplev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "oldpodversioned"}}),
 				VersionedKind:      examplev1.SchemeGroupVersion.WithKind("Pod"),
 				Dirty:              true,
 			},
@@ -204,8 +205,8 @@ func TestConvertVersionedAttributes(t *testing.T) {
 					&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "newpod"}},
 					&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "oldpod"}},
 				),
-				VersionedObject:    &examplev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "newpodversioned"}},
-				VersionedOldObject: &examplev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "oldpodversioned"}},
+				VersionedObject:    NewLazyObject(&examplev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "newpodversioned"}}),
+				VersionedOldObject: NewLazyObject(&examplev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "oldpodversioned"}}),
 				VersionedKind:      examplev1.SchemeGroupVersion.WithKind("Pod"),
 				Dirty:              true,
 			},
@@ -217,8 +218,8 @@ func TestConvertVersionedAttributes(t *testing.T) {
 					&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "newpod"}},
 					&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "oldpod"}},
 				),
-				VersionedObject:    &examplev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "newpodversioned"}},
-				VersionedOldObject: &examplev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "oldpodversioned"}},
+				VersionedObject:    NewLazyObject(&examplev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "newpodversioned"}}),
+				VersionedOldObject: NewLazyObject(&examplev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "oldpodversioned"}}),
 				VersionedKind:      gvk("g", "v", "k"),
 			},
 			GVK: examplev1.SchemeGroupVersion.WithKind("Pod"),
@@ -228,8 +229,8 @@ func TestConvertVersionedAttributes(t *testing.T) {
 					&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "oldpod"}},
 				),
 				// name gets overwritten from converted attributes, type gets set explicitly
-				VersionedObject:    &examplev1.Pod{TypeMeta: metav1.TypeMeta{APIVersion: "example.apiserver.k8s.io/v1", Kind: "Pod"}, ObjectMeta: metav1.ObjectMeta{Name: "newpod"}},
-				VersionedOldObject: &examplev1.Pod{TypeMeta: metav1.TypeMeta{APIVersion: "example.apiserver.k8s.io/v1", Kind: "Pod"}, ObjectMeta: metav1.ObjectMeta{Name: "oldpod"}},
+				VersionedObject:    NewLazyObject(&examplev1.Pod{TypeMeta: metav1.TypeMeta{APIVersion: "example.apiserver.k8s.io/v1", Kind: "Pod"}, ObjectMeta: metav1.ObjectMeta{Name: "newpod"}}),
+				VersionedOldObject: NewLazyObject(&examplev1.Pod{TypeMeta: metav1.TypeMeta{APIVersion: "example.apiserver.k8s.io/v1", Kind: "Pod"}, ObjectMeta: metav1.ObjectMeta{Name: "oldpod"}}),
 				VersionedKind:      examplev1.SchemeGroupVersion.WithKind("Pod"),
 			},
 		},
@@ -240,8 +241,8 @@ func TestConvertVersionedAttributes(t *testing.T) {
 					u(`{"apiVersion": "mygroup.k8s.io/v1","kind": "Flunder","metadata":{"name":"newobj"}}`),
 					u(`{"apiVersion": "mygroup.k8s.io/v1","kind": "Flunder","metadata":{"name":"oldobj"}}`),
 				),
-				VersionedObject:    u(`{"apiVersion": "mygroup.k8s.io/v1","kind": "Flunder","metadata":{"name":"newobjversioned"}}`),
-				VersionedOldObject: u(`{"apiVersion": "mygroup.k8s.io/v1","kind": "Flunder","metadata":{"name":"oldobjversioned"}}`),
+				VersionedObject:    NewLazyObject(u(`{"apiVersion": "mygroup.k8s.io/v1","kind": "Flunder","metadata":{"name":"newobjversioned"}}`)),
+				VersionedOldObject: NewLazyObject(u(`{"apiVersion": "mygroup.k8s.io/v1","kind": "Flunder","metadata":{"name":"oldobjversioned"}}`)),
 				VersionedKind:      gvk("g", "v", "k"), // claim a different current version to trigger conversion
 			},
 			GVK: gvk("mygroup.k8s.io", "v1", "Flunder"),
@@ -250,8 +251,8 @@ func TestConvertVersionedAttributes(t *testing.T) {
 					u(`{"apiVersion": "mygroup.k8s.io/v1","kind": "Flunder","metadata":{"name":"newobj"}}`),
 					u(`{"apiVersion": "mygroup.k8s.io/v1","kind": "Flunder","metadata":{"name":"oldobj"}}`),
 				),
-				VersionedObject:    u(`{"apiVersion": "mygroup.k8s.io/v1","kind": "Flunder","metadata":{"name":"newobj"}}`),
-				VersionedOldObject: u(`{"apiVersion": "mygroup.k8s.io/v1","kind": "Flunder","metadata":{"name":"oldobj"}}`),
+				VersionedObject:    NewLazyObject(u(`{"apiVersion": "mygroup.k8s.io/v1","kind": "Flunder","metadata":{"name":"newobj"}}`)),
+				VersionedOldObject: NewLazyObject(u(`{"apiVersion": "mygroup.k8s.io/v1","kind": "Flunder","metadata":{"name":"oldobj"}}`)),
 				VersionedKind:      gvk("mygroup.k8s.io", "v1", "Flunder"),
 			},
 		},
@@ -262,8 +263,8 @@ func TestConvertVersionedAttributes(t *testing.T) {
 					&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "newpod"}},
 					&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "oldpod"}},
 				),
-				VersionedObject:    &examplev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "newpodversioned"}},
-				VersionedOldObject: &examplev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "oldpodversioned"}},
+				VersionedObject:    NewLazyObject(&examplev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "newpodversioned"}}),
+				VersionedOldObject: NewLazyObject(&examplev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "oldpodversioned"}}),
 				VersionedKind:      gvk("g", "v", "k"), // claim a different current version to trigger conversion
 				Dirty:              true,
 			},
@@ -274,9 +275,9 @@ func TestConvertVersionedAttributes(t *testing.T) {
 					&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "oldpod"}},
 				),
 				// new name gets preserved from versioned object, type gets set explicitly
-				VersionedObject: &examplev1.Pod{TypeMeta: metav1.TypeMeta{APIVersion: "example.apiserver.k8s.io/v1", Kind: "Pod"}, ObjectMeta: metav1.ObjectMeta{Name: "newpodversioned"}},
+				VersionedObject: NewLazyObject(&examplev1.Pod{TypeMeta: metav1.TypeMeta{APIVersion: "example.apiserver.k8s.io/v1", Kind: "Pod"}, ObjectMeta: metav1.ObjectMeta{Name: "newpodversioned"}}),
 				// old name gets overwritten from converted attributes, type gets set explicitly
-				VersionedOldObject: &examplev1.Pod{TypeMeta: metav1.TypeMeta{APIVersion: "example.apiserver.k8s.io/v1", Kind: "Pod"}, ObjectMeta: metav1.ObjectMeta{Name: "oldpod"}},
+				VersionedOldObject: NewLazyObject(&examplev1.Pod{TypeMeta: metav1.TypeMeta{APIVersion: "example.apiserver.k8s.io/v1", Kind: "Pod"}, ObjectMeta: metav1.ObjectMeta{Name: "oldpod"}}),
 				VersionedKind:      examplev1.SchemeGroupVersion.WithKind("Pod"),
 				Dirty:              false,
 			},
@@ -288,8 +289,8 @@ func TestConvertVersionedAttributes(t *testing.T) {
 					u(`{"apiVersion": "mygroup.k8s.io/v1","kind": "Flunder","metadata":{"name":"newobj"}}`),
 					u(`{"apiVersion": "mygroup.k8s.io/v1","kind": "Flunder","metadata":{"name":"oldobj"}}`),
 				),
-				VersionedObject:    u(`{"apiVersion": "mygroup.k8s.io/v1","kind": "Flunder","metadata":{"name":"newobjversioned"}}`),
-				VersionedOldObject: u(`{"apiVersion": "mygroup.k8s.io/v1","kind": "Flunder","metadata":{"name":"oldobjversioned"}}`),
+				VersionedObject:    NewLazyObject(u(`{"apiVersion": "mygroup.k8s.io/v1","kind": "Flunder","metadata":{"name":"newobjversioned"}}`)),
+				VersionedOldObject: NewLazyObject(u(`{"apiVersion": "mygroup.k8s.io/v1","kind": "Flunder","metadata":{"name":"oldobjversioned"}}`)),
 				VersionedKind:      gvk("g", "v", "k"), // claim a different current version to trigger conversion
 				Dirty:              true,
 			},
@@ -300,9 +301,9 @@ func TestConvertVersionedAttributes(t *testing.T) {
 					u(`{"apiVersion": "mygroup.k8s.io/v1","kind": "Flunder","metadata":{"name":"oldobj"}}`),
 				),
 				// new name gets preserved from versioned object, type gets set explicitly
-				VersionedObject: u(`{"apiVersion": "mygroup.k8s.io/v1","kind": "Flunder","metadata":{"name":"newobjversioned"}}`),
+				VersionedObject: NewLazyObject(u(`{"apiVersion": "mygroup.k8s.io/v1","kind": "Flunder","metadata":{"name":"newobjversioned"}}`)),
 				// old name gets overwritten from converted attributes, type gets set explicitly
-				VersionedOldObject: u(`{"apiVersion": "mygroup.k8s.io/v1","kind": "Flunder","metadata":{"name":"oldobj"}}`),
+				VersionedOldObject: NewLazyObject(u(`{"apiVersion": "mygroup.k8s.io/v1","kind": "Flunder","metadata":{"name":"oldobj"}}`)),
 				VersionedKind:      gvk("mygroup.k8s.io", "v1", "Flunder"),
 				Dirty:              false,
 			},
@@ -314,8 +315,8 @@ func TestConvertVersionedAttributes(t *testing.T) {
 					&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "newpod"}},
 					nil,
 				),
-				VersionedObject:    &examplev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "newpodversioned"}},
-				VersionedOldObject: nil,
+				VersionedObject:    NewLazyObject(&examplev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "newpodversioned"}}),
+				VersionedOldObject: NewLazyObject(nil),
 				VersionedKind:      gvk("g", "v", "k"), // claim a different current version to trigger conversion
 				Dirty:              true,
 			},
@@ -326,8 +327,8 @@ func TestConvertVersionedAttributes(t *testing.T) {
 					nil,
 				),
 				// new name gets preserved from versioned object, type gets set explicitly
-				VersionedObject:    &examplev1.Pod{TypeMeta: metav1.TypeMeta{APIVersion: "example.apiserver.k8s.io/v1", Kind: "Pod"}, ObjectMeta: metav1.ObjectMeta{Name: "newpodversioned"}},
-				VersionedOldObject: nil,
+				VersionedObject:    NewLazyObject(&examplev1.Pod{TypeMeta: metav1.TypeMeta{APIVersion: "example.apiserver.k8s.io/v1", Kind: "Pod"}, ObjectMeta: metav1.ObjectMeta{Name: "newpodversioned"}}),
+				VersionedOldObject: NewLazyObject(nil),
 				VersionedKind:      examplev1.SchemeGroupVersion.WithKind("Pod"),
 				Dirty:              false,
 			},
@@ -360,4 +361,89 @@ func TestConvertVersionedAttributes(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestVersionedAttributesCELObjectsCaching(t *testing.T) {
+	scheme := initiateScheme(t)
+	o := NewObjectInterfacesFromScheme(scheme)
+
+	oldRS := &example.ReplicaSet{ObjectMeta: metav1.ObjectMeta{Name: "old-rs"}}
+	newRS := &example.ReplicaSet{ObjectMeta: metav1.ObjectMeta{Name: "new-rs"}}
+	attrs := NewAttributesRecord(newRS, oldRS, schema.GroupVersionKind{}, "", "", schema.GroupVersionResource{}, "", "", nil, false, nil)
+
+	t.Run("lazy evaluation and cache clear on update", func(t *testing.T) {
+		vAttrs, err := NewVersionedAttributes(attrs, example2v1.SchemeGroupVersion.WithKind("ReplicaSet"), o)
+		require.NoError(t, err)
+		require.Nil(t, vAttrs.VersionedObject.celVal)
+		require.Nil(t, vAttrs.VersionedOldObject.celVal)
+
+		uObj, err := vAttrs.VersionedObject.CELValue()
+		require.NoError(t, err)
+		require.NotNil(t, uObj)
+		require.Equal(t, "new-rs", getMetaName(uObj))
+
+		uOldObj, err := vAttrs.VersionedOldObject.CELValue()
+		require.NoError(t, err)
+		require.NotNil(t, uOldObj)
+		require.Equal(t, "old-rs", getMetaName(uOldObj))
+
+		// 1. Update object
+		updateRS := &example2v1.ReplicaSet{
+			TypeMeta:   metav1.TypeMeta{APIVersion: "example2.apiserver.k8s.io/v1", Kind: "ReplicaSet"},
+			ObjectMeta: metav1.ObjectMeta{Name: "updated-rs"},
+		}
+		vAttrs.UpdateObject(updateRS)
+		// Cache is cleared on update
+		require.Nil(t, vAttrs.VersionedObject.celVal)
+
+		uObj, err = vAttrs.VersionedObject.CELValue()
+		require.NoError(t, err)
+		require.Equal(t, "updated-rs", getMetaName(uObj))
+
+		// 2. Convert GVK
+		targetGVK := example2v1.SchemeGroupVersion.WithKind("ReplicaSet")
+		vAttrs.VersionedKind = schema.GroupVersionKind{Group: "dummy", Version: "v1", Kind: "ReplicaSet"}
+		err = ConvertVersionedAttributes(vAttrs, targetGVK, o)
+		require.NoError(t, err)
+
+		uObj, err = vAttrs.VersionedObject.CELValue()
+		require.NoError(t, err)
+		uOldObj, err = vAttrs.VersionedOldObject.CELValue()
+		require.NoError(t, err)
+
+		require.Equal(t, "updated-rs", getMetaName(uObj))
+		require.Equal(t, "example2.apiserver.k8s.io/v1", getAPIVersion(uObj))
+		require.Equal(t, "old-rs", getMetaName(uOldObj))
+		require.Equal(t, "example2.apiserver.k8s.io/v1", getAPIVersion(uOldObj))
+	})
+}
+
+func getMetaName(val ref.Val) string {
+	if val == nil {
+		return ""
+	}
+	m, ok := val.Value().(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	metadata, ok := m["metadata"].(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	return metadata["name"].(string)
+}
+
+func getAPIVersion(val ref.Val) string {
+	if val == nil {
+		return ""
+	}
+	m, ok := val.Value().(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	apiVersion, ok := m["apiVersion"].(string)
+	if !ok {
+		return ""
+	}
+	return apiVersion
 }

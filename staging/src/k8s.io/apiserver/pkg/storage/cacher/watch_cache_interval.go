@@ -168,7 +168,9 @@ func newCacheIntervalFromStore(resourceVersion uint64, indexer store.Indexer, ke
 		}
 		buffer.endIndex++
 	}
-	sort.Sort(sortableWatchCacheEvents(buffer.buffer))
+	if _, ordered := indexer.(store.OrderedLister); !ordered {
+		sort.Sort(sortableWatchCacheEvents(buffer.buffer))
+	}
 	ci := &watchCacheInterval{
 		startIndex: 0,
 		// Simulate that we already have all the events we're looking for.

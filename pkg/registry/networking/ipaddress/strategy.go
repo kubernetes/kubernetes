@@ -80,7 +80,7 @@ func (ipAddressStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for IPAddress; this means POST is needed to create one.
-func (ipAddressStrategy) AllowCreateOnUpdate() bool {
+func (ipAddressStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -94,7 +94,7 @@ func (ipAddressStrategy) ValidateUpdate(ctx context.Context, new, old runtime.Ob
 }
 
 // AllowUnconditionalUpdate is the default update policy for IPAddress objects.
-func (ipAddressStrategy) AllowUnconditionalUpdate() bool {
+func (ipAddressStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

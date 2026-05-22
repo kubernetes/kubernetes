@@ -31,7 +31,7 @@ type PersistentVolumeSpecApplyConfiguration struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#capacity
 	Capacity *corev1.ResourceList `json:"capacity,omitempty"`
 	// persistentVolumeSource is the actual volume backing the persistent volume.
-	PersistentVolumeSourceApplyConfiguration `json:",inline"`
+	PersistentVolumeSourceApplyConfiguration `json:""`
 	// accessModes contains all ways the volume can be mounted.
 	// More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes
 	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`

@@ -61,7 +61,7 @@ func (deviceClassStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Obj
 func (deviceClassStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (deviceClassStrategy) AllowCreateOnUpdate() bool {
+func (deviceClassStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -87,7 +87,7 @@ func (deviceClassStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtim
 	return nil
 }
 
-func (deviceClassStrategy) AllowUnconditionalUpdate() bool {
+func (deviceClassStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

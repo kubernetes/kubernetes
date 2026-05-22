@@ -34,7 +34,7 @@ import (
 // SubjectAccessReview checks whether or not a user or group can perform an action.
 // +k8s:supportsSubresource="/status"
 type SubjectAccessReview struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -61,7 +61,7 @@ type SubjectAccessReview struct {
 // to check whether they can perform an action
 // +k8s:supportsSubresource="/status"
 type SelfSubjectAccessReview struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -87,7 +87,7 @@ type SelfSubjectAccessReview struct {
 // checking.
 // +k8s:supportsSubresource="/status"
 type LocalSubjectAccessReview struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -229,7 +229,7 @@ type SubjectAccessReviewStatus struct {
 // SubjectAccessReview, and LocalAccessReview are the correct way to defer authorization decisions to the API server.
 // +k8s:supportsSubresource="/status"
 type SelfSubjectRulesReview struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional

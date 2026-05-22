@@ -88,8 +88,8 @@ func NewStorageFactoryConfigEffectiveVersion(effectiveVersion basecompatibility.
 		storagemigration.Resource("storagemigrations").WithVersion("v1beta1"),
 		resource.Resource("devicetaintrules").WithVersion("v1alpha3"),
 		resource.Resource("resourcepoolstatusrequests").WithVersion("v1alpha3"),
-		scheduling.Resource("workloads").WithVersion("v1alpha2"),
-		scheduling.Resource("podgroups").WithVersion("v1alpha2"),
+		scheduling.Resource("workloads").WithVersion("v1alpha3"),
+		scheduling.Resource("podgroups").WithVersion("v1alpha3"),
 	}
 	return &StorageFactoryConfig{
 		Serializer:                legacyscheme.Codecs,

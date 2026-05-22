@@ -1,3 +1,17 @@
+## 2.28.3
+
+### Maintenance
+Bump all dependencies
+
+## 2.28.2
+
+- Add ArtifactDir() to support Go 1.26 testing.TB interface [f3a36b6]
+- Implement shell completion [94151c8]
+- Add asan CLI option mirroring msan implementation [4d21dbb]
+- Bump uri from 1.0.3 to 1.0.4 in /docs (#1630) [c102161]
+- fix aspect ratio [9619647]
+- update logos [5779304]
+
 ## 2.28.1
 
 Update all dependencies.  This auto-updated the required version of Go to 1.24, consistent with the fact that Go 1.23 has been out of support for almost six months.

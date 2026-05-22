@@ -57,7 +57,10 @@ type featureSpec struct {
 }
 
 type featureInfo struct {
-	Name           string        `yaml:"name" json:"name"`
+	Name string `yaml:"name" json:"name"`
+	// FullName is the full name of the feature, including the package name,
+	// used for ensuring that features are grouped by their package prefix first,
+	// and then sorted alphabetically within that group.
 	FullName       string        `yaml:"-" json:"-"`
 	VersionedSpecs []featureSpec `yaml:"versionedSpecs" json:"versionedSpecs"`
 }
@@ -423,9 +426,20 @@ func isFeatureSpecType(v ast.Expr, aliasMap map[string]string) bool {
 }
 
 func parseFeatureInfo(variables map[string]ast.Expr, kv *ast.KeyValueExpr) (featureInfo, error) {
+	name := identifierName(kv.Key, true)
+	fullName := identifierName(kv.Key, false)
+
+	if id, ok := kv.Key.(*ast.Ident); ok {
+		if varVal, ok := variables[id.Name]; ok {
+			if strVal, err := basicStringLiteral(varVal); err == nil {
+				name = strVal
+			}
+		}
+	}
+
 	info := featureInfo{
-		Name:           identifierName(kv.Key, true),
-		FullName:       identifierName(kv.Key, false),
+		Name:           name,
+		FullName:       fullName,
 		VersionedSpecs: []featureSpec{},
 	}
 	specExps := []ast.Expr{}

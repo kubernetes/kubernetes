@@ -54,6 +54,21 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
 			}
 		})
+	// type ClusterTrustBundle
+	scheme.AddValidationFunc(
+		(*certificatesv1beta1.ClusterTrustBundle)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/":
+				return Validate_ClusterTrustBundle(
+					ctx, op, nil, /* fldPath */
+					obj.(*certificatesv1beta1.ClusterTrustBundle),
+					safe.Cast[*certificatesv1beta1.ClusterTrustBundle](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
 }
 
@@ -149,5 +164,81 @@ func Validate_CertificateSigningRequestStatus(
 	}
 
 	// field certificatesv1beta1.CertificateSigningRequestStatus.Certificate has no validation
+	return errs
+}
+
+// Validate_ClusterTrustBundle validates an instance of ClusterTrustBundle according
+// to declarative validation rules in the API schema.
+func Validate_ClusterTrustBundle(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *certificatesv1beta1.ClusterTrustBundle) (errs field.ErrorList) {
+
+	// field certificatesv1beta1.ClusterTrustBundle.TypeMeta has no validation
+	// field certificatesv1beta1.ClusterTrustBundle.ObjectMeta has no validation
+
+	{ // field certificatesv1beta1.ClusterTrustBundle.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *certificatesv1beta1.ClusterTrustBundleSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_ClusterTrustBundleSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *certificatesv1beta1.ClusterTrustBundle) *certificatesv1beta1.ClusterTrustBundleSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
+
+	return errs
+}
+
+// Validate_ClusterTrustBundleSpec validates an instance of ClusterTrustBundleSpec according
+// to declarative validation rules in the API schema.
+func Validate_ClusterTrustBundleSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *certificatesv1beta1.ClusterTrustBundleSpec) (errs field.ErrorList) {
+
+	{ // field certificatesv1beta1.ClusterTrustBundleSpec.SignerName
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *string,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if obj == oldObj || (obj != nil && oldObj != nil && *obj == *oldObj) {
+					return nil
+				}
+			}
+			// call field-attached validations
+			earlyReturn := false
+			if e := validate.OptionalValue(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				earlyReturn = true
+			}
+			if e := validate.Immutable(ctx, op, fldPath, obj, oldObj).MarkAlpha().MarkShortCircuit(); len(e) != 0 {
+				errs = append(errs, e...)
+				earlyReturn = true
+			}
+			if earlyReturn {
+				return // do not proceed
+			}
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *certificatesv1beta1.ClusterTrustBundleSpec) *string {
+				return &oldObj.SignerName
+			})
+		errs = append(errs, fn(fldPath.Child("signerName"), &obj.SignerName, oldVal, oldObj != nil)...)
+	}
+
+	// field certificatesv1beta1.ClusterTrustBundleSpec.TrustBundle has no validation
 	return errs
 }

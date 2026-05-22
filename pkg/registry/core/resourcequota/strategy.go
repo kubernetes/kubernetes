@@ -113,7 +113,7 @@ func (resourcequotaStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for resourcequotas.
-func (resourcequotaStrategy) AllowCreateOnUpdate() bool {
+func (resourcequotaStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -128,7 +128,7 @@ func (resourcequotaStrategy) WarningsOnUpdate(ctx context.Context, obj, old runt
 	return nil
 }
 
-func (resourcequotaStrategy) AllowUnconditionalUpdate() bool {
+func (resourcequotaStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 

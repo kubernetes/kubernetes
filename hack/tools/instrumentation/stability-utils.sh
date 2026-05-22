@@ -31,6 +31,7 @@ stability_check_setup() {
   GOTOOLCHAIN="$(kube::golang::hack_tools_gotoolchain)" go -C "${KUBE_ROOT}/hack/tools/instrumentation" install . ./sort ./documentation
 }
 
+# shellcheck disable=SC2120
 function find_files_to_check() {
     # Similar to find but faster and easier to understand.  We want to include
     # modified and untracked files because this might be running against code
@@ -43,46 +44,38 @@ function find_files_to_check() {
         ':!:*/third_party/*' `# catches third_party/...` \
         ':!:hack/*'          `# catches hack/...` \
         ':!:*/hack/*'        `# catches any subdir/hack/...` \
+        ':!:test/*'          `# catches test/...` \
+        ':!:*/test/*'        `# catches any subdir/test/...` \
         ':!:*/*_test.go' \
         ':!:hack/tools/instrumentation' \
         ':(glob)**/*.go' \
         "$@"
 }
 
+# shellcheck disable=SC2120
 function find_test_files() {
   git ls-files -cmo --exclude-standard \
       "$@"
 }
 
-red=$(tput setaf 1)
-green=$(tput setaf 2)
-reset=$(tput sgr0)
 
 function kube::validate::stablemetrics() {
   stability_check_setup
   temp_file=$(mktemp)
-  temp_file2=$(mktemp)
-  doValidate=$(find_files_to_check -z \
-      | sort -z \
-      | KUBE_ROOT=${KUBE_ROOT} xargs -0 -L 200 \
-        "${GOBIN}/instrumentation" \
+  
+  find_files_to_check \
+      | KUBE_ROOT=${KUBE_ROOT} "${GOBIN}/instrumentation" \
             -- \
-            1>"${temp_file}")
+            - \
+            1>"${temp_file}"
 
-  if $doValidate; then
-    echo -e "${green}Diffing hack/tools/instrumentation/testdata/stable-metrics-list.yaml\n${reset}"
-  fi
-  doSort=$(KUBE_ROOT=${KUBE_ROOT} "${GOBIN}/sort" --sort-file="${temp_file}" 1>"${temp_file2}")
-  if ! $doSort; then
-    echo "${red}!!! sorting metrics has failed! ${reset}" >&2
-    exit 1
-  fi
-  if diff -u "$KUBE_ROOT/hack/tools/instrumentation/testdata/stable-metrics-list.yaml" "$temp_file2"; then
-    echo -e "${green}\nPASS metrics stability verification ${reset}"
+  echo -e "Diffing hack/tools/instrumentation/testdata/stable-metrics-list.yaml\n"
+  if diff -u "$KUBE_ROOT/hack/tools/instrumentation/testdata/stable-metrics-list.yaml" "$temp_file"; then
+    echo -e "\nPASS metrics stability verification "
     return 0
   fi
-  echo "${red}!!! Metrics Stability static analysis has failed!${reset}" >&2
-  echo "${red}!!! Please run ./hack/update-generated-stable-metrics.sh to update the golden list.${reset}" >&2
+  echo "!!! Metrics Stability static analysis has failed!" >&2
+  echo "!!! Please run ./hack/update-generated-stable-metrics.sh to update the golden list." >&2
   exit 1
 }
 
@@ -90,69 +83,74 @@ function kube::validate::test::stablemetrics() {
   stability_check_setup
   temp_file=$(mktemp)
   cd "${KUBE_ROOT}/hack/tools/instrumentation"
-  doValidate=$(find_test_files -z \
-      | sort -z \
-      | KUBE_ROOT=${KUBE_ROOT} xargs -0 -L 200 \
-        "${GOBIN}/instrumentation" \
+  
+  find_test_files \
+      | KUBE_ROOT=${KUBE_ROOT} "${GOBIN}/instrumentation" \
             -- \
-            1>"${temp_file}")
+            - \
+            1>"${temp_file}"
 
-  if $doValidate; then
-    echo -e "${green}Diffing hack/tools/instrumentation/testdata/test-stable-metrics-list.yaml\n${reset}"
-    if diff -u "$KUBE_ROOT/hack/tools/instrumentation/testdata/test-stable-metrics-list.yaml" "$temp_file"; then
-      echo -e "${green}\nPASS metrics stability verification ${reset}"
-      return 0
-    fi
+  echo -e "Diffing hack/tools/instrumentation/testdata/test-stable-metrics-list.yaml\n"
+  if diff -u "$KUBE_ROOT/hack/tools/instrumentation/testdata/test-stable-metrics-list.yaml" "$temp_file"; then
+    echo -e "\nPASS metrics stability verification "
+    return 0
   fi
 
-  echo "${red}!!! Metrics stability static analysis test has failed!${reset}" >&2
-  echo "${red}!!! Please run './hack/tools/instrumentation/test-update.sh' to update the golden list.${reset}" >&2
+  echo "!!! Metrics stability static analysis test has failed!" >&2
+  echo "!!! Please run './hack/tools/instrumentation/test-update.sh' to update the golden list." >&2
   exit 1
 }
 
 function kube::update::stablemetrics() {
   stability_check_setup
   temp_file=$(mktemp)
-  temp_file2=$(mktemp)
-  doCheckStability=$(find_files_to_check -z \
-      | sort -z \
-      | KUBE_ROOT=${KUBE_ROOT} xargs -0 -L 200 \
-        "${GOBIN}/instrumentation" \
+  
+  find_files_to_check \
+      | KUBE_ROOT=${KUBE_ROOT} "${GOBIN}/instrumentation" \
             -- \
-            1>"${temp_file}")
+            - \
+            1>"${temp_file}"
 
-  if ! $doCheckStability; then
-    echo "${red}!!! updating golden list of metrics has failed! ${reset}" >&2
-    exit 1
-  fi
   mv -f "$temp_file" "${KUBE_ROOT}/hack/tools/instrumentation/testdata/stable-metrics-list.yaml"
-  doSort=$("${GOBIN}/sort" --sort-file="${KUBE_ROOT}/hack/tools/instrumentation/testdata/stable-metrics-list.yaml" 1>"${temp_file2}")
-  if ! $doSort; then
-    echo "${red}!!! sorting metrics has failed! ${reset}" >&2
-    exit 1
+  echo "Updated golden list of stable metrics."
+}
+
+function kube::validate::documentation::list() {
+  stability_check_setup
+  temp_file=$(mktemp)
+  
+  find_files_to_check \
+      | KUBE_ROOT=${KUBE_ROOT} "${GOBIN}/instrumentation" \
+            --allstabilityclasses \
+            --endpoint-mappings="hack/tools/instrumentation/endpoint-mappings.yaml" \
+            -- \
+            - \
+            1>"${temp_file}"
+
+  echo -e "Diffing hack/tools/instrumentation/documentation/documentation-list.yaml\n"
+  if diff -u "$KUBE_ROOT/hack/tools/instrumentation/documentation/documentation-list.yaml" "$temp_file"; then
+    echo -e "\nPASS metrics documentation list verification "
+    return 0
   fi
-  mv -f "$temp_file2" "${KUBE_ROOT}/hack/tools/instrumentation/testdata/stable-metrics-list.yaml"
-  echo "${green}Updated golden list of stable metrics.${reset}"
+  echo "!!! Metrics documentation list static analysis has failed!" >&2
+  echo "!!! Please run ./hack/update-metrics-documentation-list.sh to update the documentation list." >&2
+  exit 1
 }
 
 function kube::update::documentation::list() {
   stability_check_setup
   temp_file=$(mktemp)
-  doCheckStability=$(find_files_to_check -z \
-      | sort -z \
-      | KUBE_ROOT=${KUBE_ROOT} xargs -0 -L 200 \
-        "${GOBIN}/instrumentation" \
+  
+  find_files_to_check \
+      | KUBE_ROOT=${KUBE_ROOT} "${GOBIN}/instrumentation" \
             --allstabilityclasses \
             --endpoint-mappings="hack/tools/instrumentation/endpoint-mappings.yaml" \
             -- \
-            1>"${temp_file}")
+            - \
+            1>"${temp_file}"
 
-  if ! $doCheckStability; then
-    echo "${red}!!! updating golden list of metrics has failed! ${reset}" >&2
-    exit 1
-  fi
   mv -f "$temp_file" "${KUBE_ROOT}/hack/tools/instrumentation/documentation/documentation-list.yaml"
-  echo "${green}Updated list of metrics for documentation ${reset}"
+  echo "Updated list of metrics for documentation "
 }
 
 function kube::update::documentation() {
@@ -162,28 +160,24 @@ function kube::update::documentation() {
   arg2=$2
   doUpdateDocs=$("${GOBIN}/documentation" --major "$arg1" --minor "$arg2" -- 1>"${temp_file}")
   if ! $doUpdateDocs; then
-    echo "${red}!!! updating documentation has failed! ${reset}" >&2
+    echo "!!! updating documentation has failed! " >&2
     exit 1
   fi
   mv -f "$temp_file" "${KUBE_ROOT}/hack/tools/instrumentation/documentation/documentation.md"
-  echo "${green}Updated documentation of metrics.${reset}"
+  echo "Updated documentation of metrics."
 }
 
 function kube::update::test::stablemetrics() {
   stability_check_setup
   temp_file=$(mktemp)
   cd "${KUBE_ROOT}/hack/tools/instrumentation"
-  doCheckStability=$(find_test_files -z \
-      | sort -z \
-      | KUBE_ROOT=${KUBE_ROOT} xargs -0 -L 200 \
-        "${GOBIN}/instrumentation" \
+  
+  find_test_files \
+      | KUBE_ROOT=${KUBE_ROOT} "${GOBIN}/instrumentation" \
             -- \
-            1>"${temp_file}")
+            - \
+            1>"${temp_file}"
 
-  if ! $doCheckStability; then
-    echo "${red}!!! updating golden list of test metrics has failed! ${reset}" >&2
-    exit 1
-  fi
   mv -f "$temp_file" "${KUBE_ROOT}/hack/tools/instrumentation/testdata/test-stable-metrics-list.yaml"
-  echo "${green}Updated test list of stable metrics.${reset}"
+  echo "Updated test list of stable metrics."
 }

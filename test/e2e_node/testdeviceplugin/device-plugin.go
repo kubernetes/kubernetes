@@ -18,10 +18,8 @@ package testdeviceplugin
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -30,10 +28,10 @@ import (
 	"github.com/onsi/gomega"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"k8s.io/klog/v2"
 	kubeletdevicepluginv1beta1 "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 )
 
 var (
@@ -157,27 +155,6 @@ func (dp *DevicePlugin) GetPreferredAllocation(ctx context.Context, request *kub
 	return nil, nil
 }
 
-func kubeletHealthCheck(url string) bool {
-	insecureTransport := http.DefaultTransport.(*http.Transport).Clone()
-	insecureTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	insecureHTTPClient := &http.Client{
-		Transport: insecureTransport,
-	}
-
-	req, err := http.NewRequest(http.MethodHead, url, nil)
-	if err != nil {
-		return false
-	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", framework.TestContext.BearerToken))
-	resp, err := insecureHTTPClient.Do(req)
-	if err != nil {
-		klog.Warningf("Health check on %q failed, error=%v", url, err)
-	} else if resp.StatusCode != http.StatusOK {
-		klog.Warningf("Health check on %q failed, status=%d", url, resp.StatusCode)
-	}
-	return err == nil && resp.StatusCode == http.StatusOK
-}
-
 func (dp *DevicePlugin) RegisterDevicePlugin(ctx context.Context, uniqueName, resourceName string, devices []*kubeletdevicepluginv1beta1.Device) error {
 	ginkgo.GinkgoHelper()
 
@@ -190,7 +167,7 @@ func (dp *DevicePlugin) RegisterDevicePlugin(ctx context.Context, uniqueName, re
 
 	ginkgo.By("Ensuring kubelet is healthy")
 	gomega.Eventually(ctx, func() bool {
-		ok := kubeletHealthCheck(kubeletHealthCheckURL)
+		ok := e2enode.HealthCheck(kubeletHealthCheckURL)
 		framework.Logf("kubelet health check at %q value=%v", kubeletHealthCheckURL, ok)
 		return ok
 	}, framework.PodStartTimeout, framework.Poll).Should(gomega.BeTrueBecause("expected kubelet health check to be successful"))

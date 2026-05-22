@@ -22,6 +22,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"k8s.io/kubernetes/test/e2e_node/testdeviceplugin"
+
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
@@ -203,11 +205,19 @@ func testDevicePluginMultiple(f *framework.Framework, pluginSockDir string) {
 			framework.ExpectNoError(err)
 			gomega.Expect(pod1.Status.Phase).To(gomega.Equal(v1.PodRunning))
 
-			ginkgo.By("Scheduling DP2 with a delay")
-			dp2 := getSampleDevicePluginPodMultiple(pluginSockDir, "dp2")
-			dp2.Spec.Containers[0].Command = []string{"/bin/sh", "-c"}
-			dp2.Spec.Containers[0].Args = []string{"sleep 30 && exec /sampledeviceplugin -alsologtostderr"}
-			devicePluginPod2 = e2epod.NewPodClient(f).CreateSync(ctx, dp2)
+			ginkgo.By("Creating DP2 but struggle to register for 30s")
+			expectedErr := fmt.Errorf("GetDevicePluginOptions failed")
+
+			plugin2 := testdeviceplugin.NewDevicePlugin(func(name string) error {
+				if name == "GetDevicePluginOptions" {
+					return expectedErr
+				}
+				return nil
+			})
+			err = plugin2.RegisterDevicePlugin(ctx, f.UniqueName, e2enode.SampleDeviceResourceName, []*kubeletdevicepluginv1beta1.Device{{ID: "testdevice", Health: kubeletdevicepluginv1beta1.Healthy}})
+			defer plugin2.Stop()
+			gomega.Expect(err).To(gomega.MatchError(gomega.ContainSubstring("failed to get device plugin options")))
+			gomega.Expect(err).To(gomega.MatchError(gomega.ContainSubstring(expectedErr.Error())))
 
 			ginkgo.By("Scheduling Pod2 successfully")
 			pod2 := e2epod.NewPodClient(f).CreateSync(ctx, makeBusyboxPod(e2enode.SampleDeviceResourceName, podRECMD))
@@ -217,21 +227,37 @@ func testDevicePluginMultiple(f *framework.Framework, pluginSockDir string) {
 			framework.ExpectNoError(err)
 			gomega.Expect(pod2.Status.Phase).To(gomega.Equal(v1.PodRunning))
 
-			ginkgo.By("Waiting for DP2 to register for 30s, and number of devices to remain unchanged")
+			// Device Plugin's 'take over' implementation will create a new endpoint on every registration attempt.
+			// DP3 represents re-registration of the second DP that failed to register first time.
+			ginkgo.By("Scheduling DP3")
+			dp3 := getSampleDevicePluginPodMultiple(pluginSockDir, "dp3")
+			devicePluginPod2 = e2epod.NewPodClient(f).CreateSync(ctx, dp3)
+
+			ginkgo.By("Waiting for DP3 to register for 30s, and number of devices to remain unchanged")
 			gomega.Consistently(ctx, func(ctx context.Context) bool {
 				node, ready := getLocalTestNode(ctx, f)
 				return ready && e2enode.CountSampleDeviceCapacity(node) == e2enode.SampleDevsAmount && e2enode.CountSampleDeviceAllocatable(node) == e2enode.SampleDevsAmount
 			}, 30*time.Second, framework.Poll).Should(gomega.BeTrueBecause("expected devices after DP2 appears"))
 
-			ginkgo.By("Verifying DP2 is running")
+			ginkgo.By("Verifying DP3 is running")
 			dp2Pod, err := e2epod.NewPodClient(f).Get(ctx, devicePluginPod2.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			gomega.Expect(dp2Pod.Status.Phase).To(gomega.Equal(v1.PodRunning))
 
+			ginkgo.By("Deleting DP1")
+			e2epod.NewPodClient(f).DeleteSync(ctx, devicePluginPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
+			waitForContainerRemoval(ctx, devicePluginPod.Spec.Containers[0].Name, devicePluginPod.Name, devicePluginPod.Namespace)
+
+			ginkgo.By("Waiting for DP1 to unregister, and number of devices to remain unchanged")
+			gomega.Consistently(ctx, func(ctx context.Context) bool {
+				node, ready := getLocalTestNode(ctx, f)
+				return ready && e2enode.CountSampleDeviceCapacity(node) == e2enode.SampleDevsAmount && e2enode.CountSampleDeviceAllocatable(node) == e2enode.SampleDevsAmount
+			}, 30*time.Second, framework.Poll).Should(gomega.BeTrueBecause("expected devices after DP1 disappears"))
+
 			ginkgo.By("Deleting Pod1 to free up resources")
 			e2epod.NewPodClient(f).DeleteSync(ctx, pod1.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 
-			ginkgo.By("Scheduling Pod3 after DP2 registration succeeds")
+			ginkgo.By("Scheduling Pod3 after DP3 registration succeeds")
 			pod3 := e2epod.NewPodClient(f).CreateSync(ctx, makeBusyboxPod(e2enode.SampleDeviceResourceName, podRECMD))
 
 			ginkgo.By("Verifying Pod3 is running")

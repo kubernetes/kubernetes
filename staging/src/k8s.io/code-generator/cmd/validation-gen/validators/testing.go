@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/types"
 )
@@ -87,7 +88,9 @@ func (frtv fixedResultTagValidator) GetValidations(context Context, tag codetags
 	if err != nil {
 		return result, fmt.Errorf("can't decode tag payload: %w", err)
 	}
-	fn := Function(frtv.TagName(), args.flags, fixedResultValidator, frtv.result, args.msg).WithTypeArgs(args.typeArgs...)
+	fn := Function(frtv.TagName(), args.flags, fixedResultValidator, frtv.result, args.msg).
+		WithTypeArgs(args.typeArgs...).
+		WithEmits(Emission{field.ErrorTypeInvalid, "validateFalse", ""})
 	fn.Cohort = args.cohort
 	result.AddFunction(fn)
 

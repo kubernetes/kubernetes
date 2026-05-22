@@ -24,7 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/api/scheduling/v1alpha2"
+	"k8s.io/api/scheduling/v1alpha3"
 	"k8s.io/apimachinery/pkg/util/sets"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -161,6 +161,10 @@ type SortedScoredNodes interface {
 	Len() int
 }
 
+// PodGroupSchedulingFunc is a function that will be run to check feasibility of a pod group
+// scheduling during workload-aware preemption algorithm.
+type PodGroupSchedulingFunc func(ctx context.Context) (*fwk.PodGroupAssignments, *fwk.Status)
+
 // PodGroupPostFilterPlugin is an interface for plugins that are called
 // after a PodGroup cannot be scheduled.
 // It should not be used by any other plugin but DefaultPreemption.
@@ -168,7 +172,7 @@ type PodGroupPostFilterPlugin interface {
 	fwk.Plugin
 
 	// PodGroupPostFilter is called after a PodGroup cannot be scheduled.
-	PodGroupPostFilter(ctx context.Context, pg *v1alpha2.PodGroup, pods []*v1.Pod, pgSchedulingFunc func(ctx context.Context) *fwk.Status) *fwk.Status
+	PodGroupPostFilter(ctx context.Context, pg *v1alpha3.PodGroup, pods []*v1.Pod, pgSchedulingFunc PodGroupSchedulingFunc) *fwk.Status
 }
 
 // Framework manages the set of plugins in use by the scheduling framework.

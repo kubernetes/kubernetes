@@ -42,7 +42,7 @@ import (
 	"k8s.io/klog/v2"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
-	"k8s.io/kubernetes/pkg/proxy/apis/config"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
@@ -641,23 +641,20 @@ var _ proxy.Provider = &Proxier{}
 
 // NewProxier returns a new single-stack winkernel proxier.
 func NewProxier(
+	config *kubeproxyconfig.KubeProxyConfiguration,
 	ipFamily v1.IPFamily,
-	syncPeriod time.Duration,
-	minSyncPeriod time.Duration,
 	nodeName string,
 	nodeIP net.IP,
 	recorder events.EventRecorder,
 	healthzServer *healthcheck.ProxyHealthServer,
-	healthzBindAddress string,
-	config config.KubeProxyWinkernelConfiguration,
 ) (*Proxier, error) {
 	// windows listens to all node addresses
 	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nil)
 	serviceHealthServer := healthcheck.NewServiceHealthServer(nodeName, recorder, nodePortAddresses, healthzServer, ipFamily)
 
 	var healthzPort int
-	if len(healthzBindAddress) > 0 {
-		_, port, _ := net.SplitHostPort(healthzBindAddress)
+	if len(config.HealthzBindAddress) > 0 {
+		_, port, _ := net.SplitHostPort(config.HealthzBindAddress)
 		healthzPort, _ = strconv.Atoi(port)
 	}
 
@@ -671,12 +668,15 @@ func NewProxier(
 		healthzPort,
 		hcnImpl,
 		&localHostMacProvider{},
-		config,
+		config.Winkernel,
 		true, // waitForHNSOverlay
 	)
 	if err != nil {
 		return nil, err
 	}
+
+	syncPeriod := config.SyncPeriod.Duration
+	minSyncPeriod := config.MinSyncPeriod.Duration
 
 	klog.V(3).Info("Record sync params", "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "maxSyncPeriod", syncPeriod)
 	proxier.syncRunner = runner.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, syncPeriod)
@@ -694,7 +694,7 @@ func newProxierInternal(
 	healthzPort int,
 	hcnImpl HcnService,
 	hostMacProvider HostMacProvider,
-	config config.KubeProxyWinkernelConfiguration,
+	config kubeproxyconfig.KubeProxyWinkernelConfiguration,
 	waitForHNSOverlay bool,
 ) (*Proxier, error) {
 	hns, supportedFeatures := newHostNetworkService(hcnImpl)
@@ -799,28 +799,22 @@ func newProxierInternal(
 }
 
 func NewDualStackProxier(
-	syncPeriod time.Duration,
-	minSyncPeriod time.Duration,
+	config *kubeproxyconfig.KubeProxyConfiguration,
 	nodeName string,
 	nodeIPs map[v1.IPFamily]net.IP,
 	recorder events.EventRecorder,
 	healthzServer *healthcheck.ProxyHealthServer,
-	healthzBindAddress string,
-	config config.KubeProxyWinkernelConfiguration,
 ) (proxy.Provider, error) {
 
 	// Create an ipv4 instance of the single-stack proxier
-	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, syncPeriod, minSyncPeriod,
-		nodeName, nodeIPs[v1.IPv4Protocol], recorder, healthzServer,
-		healthzBindAddress, config)
-
+	ipv4Proxier, err := NewProxier(config, v1.IPv4Protocol,
+		nodeName, nodeIPs[v1.IPv4Protocol], recorder, healthzServer)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v, nodeName: %s, nodeIP:%v", err, nodeName, nodeIPs[v1.IPv4Protocol])
 	}
 
-	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, syncPeriod, minSyncPeriod,
-		nodeName, nodeIPs[v1.IPv6Protocol], recorder, healthzServer,
-		healthzBindAddress, config)
+	ipv6Proxier, err := NewProxier(config, v1.IPv6Protocol,
+		nodeName, nodeIPs[v1.IPv6Protocol], recorder, healthzServer)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v, nodeName: %s, nodeIP:%v", err, nodeName, nodeIPs[v1.IPv6Protocol])
 	}

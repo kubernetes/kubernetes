@@ -88,7 +88,7 @@ func (mutatingWebhookConfigurationStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for mutatingWebhookConfiguration; this means you may not create one with a PUT request.
-func (mutatingWebhookConfigurationStrategy) AllowCreateOnUpdate() bool {
+func (mutatingWebhookConfigurationStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -108,6 +108,6 @@ func (mutatingWebhookConfigurationStrategy) WarningsOnUpdate(ctx context.Context
 
 // AllowUnconditionalUpdate is the default update policy for mutatingWebhookConfiguration objects. Status update should
 // only be allowed if version match.
-func (mutatingWebhookConfigurationStrategy) AllowUnconditionalUpdate() bool {
+func (mutatingWebhookConfigurationStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }

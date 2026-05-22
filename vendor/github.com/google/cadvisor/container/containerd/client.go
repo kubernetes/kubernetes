@@ -168,12 +168,16 @@ func (c *client) Version(ctx context.Context) (string, error) {
 
 func containerFromProto(containerpb *containersapi.Container) *containers.Container {
 	var runtime containers.RuntimeInfo
+	var createdAt time.Time
 	// TODO: is nil check required for containerpb
 	if containerpb.Runtime != nil {
 		runtime = containers.RuntimeInfo{
 			Name:    containerpb.Runtime.Name,
 			Options: containerpb.Runtime.Options,
 		}
+	}
+	if containerpb.GetCreatedAt() != nil {
+		createdAt = containerpb.GetCreatedAt().AsTime()
 	}
 	return &containers.Container{
 		ID:          containerpb.ID,
@@ -184,5 +188,6 @@ func containerFromProto(containerpb *containersapi.Container) *containers.Contai
 		Snapshotter: containerpb.Snapshotter,
 		SnapshotKey: containerpb.SnapshotKey,
 		Extensions:  containerpb.Extensions,
+		CreatedAt:   createdAt,
 	}
 }

@@ -661,6 +661,7 @@ func teardownSRIOVConfigOrFail(ctx context.Context, f *framework.Framework, sd *
 func runTMScopeResourceAlignmentTestSuite(ctx context.Context, f *framework.Framework, configMap *v1.ConfigMap, reservedSystemCPUs, policy string, numaNodes, coreCount int) {
 	smtLevel := smtLevelFromSysFS()
 	sd := setupSRIOVConfigOrFail(ctx, f, configMap)
+	ginkgo.DeferCleanup(teardownSRIOVConfigOrFail, f, sd)
 	var ctnAttrs, initCtnAttrs []tmCtnAttribute
 
 	waitForSRIOVResources(ctx, f, sd)
@@ -842,8 +843,6 @@ func runTMScopeResourceAlignmentTestSuite(ctx context.Context, f *framework.Fram
 		},
 	}
 	runTopologyManagerNegativeTest(ctx, f, ctnAttrs, initCtnAttrs, envInfo)
-
-	teardownSRIOVConfigOrFail(ctx, f, sd)
 }
 
 func runTopologyManagerNodeAlignmentSuiteTests(ctx context.Context, f *framework.Framework, sd *sriovData, reservedSystemCPUs, policy string, numaNodes, coreCount int) {

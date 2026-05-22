@@ -24,10 +24,14 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
-	schedulingapi "k8s.io/api/scheduling/v1alpha2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
+	"k8s.io/apimachinery/pkg/util/sets"
 	policylisters "k8s.io/client-go/listers/policy/v1"
-	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha2"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha3"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/scheduler/util"
 
 	"k8s.io/klog/v2"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
@@ -49,7 +53,7 @@ func NewPodGroupEvaluator(fh fwk.Handle, executor *Executor) *PodGroupEvaluator 
 	return &PodGroupEvaluator{
 		Handle:         fh,
 		pdbLister:      fh.SharedInformerFactory().Policy().V1().PodDisruptionBudgets().Lister(),
-		podGroupLister: fh.SharedInformerFactory().Scheduling().V1alpha2().PodGroups().Lister(),
+		podGroupLister: fh.SharedInformerFactory().Scheduling().V1alpha3().PodGroups().Lister(),
 		Executor:       executor,
 	}
 }
@@ -63,7 +67,7 @@ func NewPodGroupEvaluator(fh fwk.Handle, executor *Executor) *PodGroupEvaluator 
 // scheduling after modifying the node state.
 // The caller is expected to backup the NodeInfo before calling this function
 // And rollback the state to the backup after function is finished.
-func (ev *PodGroupEvaluator) Preempt(ctx context.Context, pg *schedulingapi.PodGroup, pods []*v1.Pod, podGroupSchedulingFunc func(context.Context) *fwk.Status) *fwk.Status {
+func (ev *PodGroupEvaluator) Preempt(ctx context.Context, pg *schedulingapi.PodGroup, pods []*v1.Pod, podGroupSchedulingFunc framework.PodGroupSchedulingFunc) *fwk.Status {
 	// In case of workload-aware preemption, the domain is whole cluster.
 	// We do not make a snapshot of node info. Those nodes will be shared
 	// with the PodGroup scheduling algorithm passed as podGroupSchedulingFunc.
@@ -93,18 +97,18 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 	preemptor *podGroupPreemptor,
 	domain *domain,
 	pdbs []*policy.PodDisruptionBudget,
-	podGroupSchedulingFunc func(context.Context) *fwk.Status) (*extenderv1.Victims, *fwk.Status) {
+	podGroupSchedulingFunc framework.PodGroupSchedulingFunc) (*extenderv1.Victims, *fwk.Status) {
 	logger := klog.FromContext(ctx)
-
-	// Ensure the preemptor is eligible to preempt other pods.
-	if ok, msg := ev.preemptorEligibleToPreemptOthers(ctx, preemptor); !ok {
-		logger.V(5).Info("Preemptor is not eligible for preemption", "preemptor", klog.KObj(preemptor.podGroup), "reason", msg)
-		return nil, fwk.NewStatus(fwk.Unschedulable, msg)
-	}
 
 	nameToNode := make(map[string]fwk.NodeInfo)
 	for _, nodeInfo := range domain.Nodes() {
 		nameToNode[nodeInfo.Node().Name] = nodeInfo
+	}
+
+	// Ensure the preemptor is eligible to preempt other pods.
+	if ok, msg := ev.preemptorEligibleToPreemptOthers(ctx, preemptor, nameToNode); !ok {
+		logger.V(5).Info("Preemptor is not eligible for preemption", "preemptor", klog.KObj(preemptor.podGroup), "reason", msg)
+		return nil, fwk.NewStatus(fwk.Unschedulable, msg)
 	}
 
 	// Compared to the default preemption algorithm do not run the runPreFilterExtensionRemovePod
@@ -158,9 +162,11 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 	}
 
 	// If the scheduling failed after removing all potential victims, return the status.
-	if status := podGroupSchedulingFunc(ctx); !status.IsSuccess() {
+	assignments, status := podGroupSchedulingFunc(ctx)
+	if !status.IsSuccess() {
 		return nil, status
 	}
+	maxScheduledCount := len(assignments.ProposedAssignments)
 
 	sort.Slice(potentialVictims, func(i, j int) bool {
 		return moreImportantVictim(potentialVictims[i], potentialVictims[j])
@@ -174,8 +180,22 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 			return false, err
 		}
 
-		status := podGroupSchedulingFunc(ctx)
+		assignments, status := podGroupSchedulingFunc(ctx)
 		fits := status.IsSuccess()
+		scheduledCount := 0
+		if assignments != nil {
+			scheduledCount = len(assignments.ProposedAssignments)
+		}
+
+		// For a PodGroup using default scheduling algorithm it's possible to schedule more pods after reprieving.
+		// More in: https://github.com/kubernetes/kubernetes/pull/138757#discussion_r3199360621
+		maxScheduledCount = max(maxScheduledCount, scheduledCount)
+
+		// Do not reprieve the victim if it reduces the number of scheduled Pods for a PodGroup.
+		if scheduledCount < maxScheduledCount {
+			fits = false
+		}
+
 		if !fits {
 			if err := removePods(v); err != nil {
 				return false, err
@@ -237,11 +257,39 @@ func (ev *PodGroupEvaluator) isPreemptionAllowed(victim *victim, preemptor *podG
 // preemptorEligibleToPreemptOthers returns one bool and one string. The bool
 // indicates whether this preemptor should be considered for preempting other pods or
 // not. The string includes the reason if this preemptor isn't eligible.
-func (ev *PodGroupEvaluator) preemptorEligibleToPreemptOthers(_ context.Context, preemptor *podGroupPreemptor) (bool, string) {
+func (ev *PodGroupEvaluator) preemptorEligibleToPreemptOthers(_ context.Context, preemptor *podGroupPreemptor, nameToNode map[string]fwk.NodeInfo) (bool, string) {
 	if preemptor.PreemptionPolicy() == v1.PreemptNever {
 		return false, "not eligible due to preemptionPolicy=Never."
 	}
+
+	nominatedNodes := sets.New[string]()
+	for _, pod := range preemptor.Members() {
+		if len(pod.Status.NominatedNodeName) > 0 {
+			nominatedNodes.Insert(pod.Status.NominatedNodeName)
+		}
+	}
+
+	for nomNodeName := range nominatedNodes {
+		if nodeInfo, exists := nameToNode[nomNodeName]; exists {
+			for _, p := range nodeInfo.GetPods() {
+				if ev.getPodPriority(p.GetPod()) < preemptor.Priority() && PodTerminatingByPreemption(p.GetPod()) {
+					return false, "not eligible due to a terminating pod on the nominated node."
+				}
+			}
+		}
+	}
+
 	return true, ""
+}
+
+// getPodPriority returns the effective preemption priority of a pod. If the pod belongs to
+// a pod group, it returns the priority of the pod group.
+// Otherwise, it returns the pod's own priority.
+func (ev *PodGroupEvaluator) getPodPriority(p *v1.Pod) int32 {
+	if pg := getPodGroup(p, ev.podGroupLister); pg != nil {
+		return util.PodGroupPriority(pg)
+	}
+	return corev1helpers.PodPriority(p)
 }
 
 // moreImportantVictim decides which of two preemption units is considered more critical.

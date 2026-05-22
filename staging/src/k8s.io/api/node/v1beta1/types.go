@@ -35,7 +35,7 @@ import (
 // pod.  For more details, see
 // https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class
 type RuntimeClass struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -104,7 +104,7 @@ type Scheduling struct {
 
 // RuntimeClassList is a list of RuntimeClass objects.
 type RuntimeClassList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata

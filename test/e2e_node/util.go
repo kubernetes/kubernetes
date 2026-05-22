@@ -18,7 +18,6 @@ package e2enode
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -197,7 +196,7 @@ func addBeforeEachForCleaningUpPods(f *framework.Framework) {
 func waitForKubeletToStart(ctx context.Context, f *framework.Framework) {
 	// wait until the kubelet health check will succeed
 	gomega.Eventually(ctx, func() bool {
-		return kubeletHealthCheck(kubeletHealthCheckURL)
+		return e2enode.HealthCheck(kubeletHealthCheckURL)
 	}, 2*time.Minute, 5*time.Second).Should(gomega.BeTrueBecause("expected kubelet to be in healthy state"))
 
 	// Wait for the Kubelet to be ready.
@@ -434,7 +433,7 @@ func mustStopKubelet(ctx context.Context, f *framework.Framework) func(ctx conte
 
 	// wait until the kubelet health check fail
 	gomega.Eventually(ctx, func() bool {
-		return kubeletHealthCheck(kubeletHealthCheckURL)
+		return e2enode.HealthCheck(kubeletHealthCheckURL)
 	}, f.Timeouts.PodStart, f.Timeouts.Poll).Should(gomega.BeFalseBecause("kubelet was expected to be stopped but it is still running"))
 
 	return func(ctx context.Context) {
@@ -443,27 +442,6 @@ func mustStopKubelet(ctx context.Context, f *framework.Framework) func(ctx conte
 		framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
 		waitForKubeletToStart(ctx, f)
 	}
-}
-
-func kubeletHealthCheck(url string) bool {
-	insecureTransport := http.DefaultTransport.(*http.Transport).Clone()
-	insecureTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	insecureHTTPClient := &http.Client{
-		Transport: insecureTransport,
-	}
-
-	req, err := http.NewRequest("HEAD", url, nil)
-	if err != nil {
-		return false
-	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", framework.TestContext.BearerToken))
-	resp, err := insecureHTTPClient.Do(req)
-	if err != nil {
-		klog.Warningf("Health check on %q failed, error=%v", url, err)
-	} else if resp.StatusCode != http.StatusOK {
-		klog.Warningf("Health check on %q failed, status=%d", url, resp.StatusCode)
-	}
-	return err == nil && resp.StatusCode == http.StatusOK
 }
 
 func toCgroupFsName(cgroupName cm.CgroupName) string {

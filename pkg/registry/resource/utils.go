@@ -116,7 +116,7 @@ func adminRequested(deviceRequestResults []resource.DeviceRequestAllocationResul
 // AuthorizedForBinding checks if the caller is authorized to update
 // status.allocation and status.reservedFor by verifying permission on the
 // synthetic resourceclaims/binding subresource.
-func AuthorizedForBinding(ctx context.Context, fieldPath *field.Path, authz authorizer.Authorizer, newStatus, oldStatus resource.ResourceClaimStatus) field.ErrorList {
+func AuthorizedForBinding(ctx context.Context, fieldPath *field.Path, authz authorizer.UnconditionalAuthorizer, newStatus, oldStatus resource.ResourceClaimStatus) field.ErrorList {
 	var allErrs field.ErrorList
 
 	if equality.Semantic.DeepEqual(newStatus.Allocation, oldStatus.Allocation) &&
@@ -147,7 +147,7 @@ func AuthorizedForBinding(ctx context.Context, fieldPath *field.Path, authz auth
 // status.devices by performing per-driver authorization checks using the
 // associated-node / arbitrary-node verb prefix pattern on the synthetic
 // resourceclaims/driver subresource.
-func AuthorizedForDeviceStatus(ctx context.Context, fieldPath *field.Path, a authorizer.Authorizer, newStatus, oldStatus resource.ResourceClaimStatus) field.ErrorList {
+func AuthorizedForDeviceStatus(ctx context.Context, fieldPath *field.Path, a authorizer.UnconditionalAuthorizer, newStatus, oldStatus resource.ResourceClaimStatus) field.ErrorList {
 	var allErrs field.ErrorList
 
 	driversToAuthz := getModifiedDrivers(newStatus, oldStatus)
@@ -180,7 +180,7 @@ func AuthorizedForDeviceStatus(ctx context.Context, fieldPath *field.Path, a aut
 	return allErrs
 }
 
-func checkDriverAuthorization(ctx context.Context, baseAttrs authorizer.Attributes, verbs []string, driverName string, a authorizer.Authorizer) error {
+func checkDriverAuthorization(ctx context.Context, baseAttrs authorizer.Attributes, verbs []string, driverName string, a authorizer.UnconditionalAuthorizer) error {
 	if len(verbs) == 0 {
 		return fmt.Errorf("no verbs set for driver %s", driverName) // impossible for all inputs today
 	}
@@ -299,7 +299,7 @@ func saAssociatedWithAllocatedNode(u user.Info, allocatedNodeName string) bool {
 	return nodeName == allocatedNodeName
 }
 
-func checkAuthorization(ctx context.Context, a authorizer.Authorizer, attributes authorizer.Attributes) error {
+func checkAuthorization(ctx context.Context, a authorizer.UnconditionalAuthorizer, attributes authorizer.Attributes) error {
 	authorized, reason, err := a.Authorize(ctx, attributes)
 
 	// an authorizer like RBAC could encounter evaluation errors and still allow the request, so authorizer decision is checked before error here.

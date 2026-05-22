@@ -98,12 +98,12 @@ func (flowSchemaStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Obje
 func (flowSchemaStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (flowSchemaStrategy) AllowUnconditionalUpdate() bool {
+func (flowSchemaStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 
 // AllowCreateOnUpdate is false for flow-schemas; this means a POST is needed to create one.
-func (flowSchemaStrategy) AllowCreateOnUpdate() bool {
+func (flowSchemaStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 

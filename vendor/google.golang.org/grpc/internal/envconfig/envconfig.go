@@ -126,6 +126,16 @@ var (
 	// enabled by setting the env variable
 	// GRPC_EXPERIMENTAL_ENABLE_PRIORITY_LB_CHILD_POLICY_CACHE to true.
 	EnablePriorityLBChildPolicyCache = boolFromEnv("GRPC_EXPERIMENTAL_ENABLE_PRIORITY_LB_CHILD_POLICY_CACHE", false)
+
+	// EnableHTTPFramerReadBufferPooling enables the use of the
+	// readyreader.Reader interface to perform non-memory-pinning reads,
+	// provided the underlying net.Conn supports it. This reduces memory usage
+	// when subchannels are idle.
+	//
+	// This environment variable serves as an escape hatch to disable the
+	// feature if unforeseen issues arise, and it will be removed in a future
+	// release.
+	EnableHTTPFramerReadBufferPooling = boolFromEnv("GRPC_GO_EXPERIMENTAL_HTTP_FRAMER_READ_BUFFER_POOLING", true)
 )
 
 func boolFromEnv(envVar string, def bool) bool {

@@ -52,7 +52,7 @@
       measurePods: 2000
   - name: 5000Nodes_5000Pods
     labels: [performance]
-    threshold: 480
+    threshold: 460
     params:
       initNodes: 5000
       initPods: 5000

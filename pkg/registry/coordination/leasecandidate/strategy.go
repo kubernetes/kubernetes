@@ -71,7 +71,7 @@ func (LeaseCandidateStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is true for leasecandidate; this means you may create one with a PUT request.
-func (LeaseCandidateStrategy) AllowCreateOnUpdate() bool {
+func (LeaseCandidateStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return true
 }
 
@@ -86,7 +86,7 @@ func (LeaseCandidateStrategy) WarningsOnUpdate(ctx context.Context, obj, old run
 }
 
 // AllowUnconditionalUpdate is the default update policy for leasecandidate objects.
-func (LeaseCandidateStrategy) AllowUnconditionalUpdate() bool {
+func (LeaseCandidateStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 

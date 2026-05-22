@@ -140,6 +140,7 @@ func Validate_AliasMapKeyType(
 	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type MapKeyType"); len(e) != 0 {
 		errs = append(errs, e...)
 	}
+
 	// iterate the map and call the key type's validation function
 	if e := validate.EachMapKey(ctx, op, fldPath, obj, oldObj, Validate_S); len(e) != 0 {
 		errs = append(errs, e...)
@@ -157,6 +158,7 @@ func Validate_AliasMapValueType(
 	if e := validate.FixedResult(ctx, op, fldPath, obj, oldObj, false, "type MapValueType"); len(e) != 0 {
 		errs = append(errs, e...)
 	}
+
 	// iterate the map and call the value type's validation function
 	if e := validate.EachMapVal(ctx, op, fldPath, obj, oldObj, validate.DirectEqual, Validate_S); len(e) != 0 {
 		errs = append(errs, e...)

@@ -4,6 +4,10 @@
       "github.com/google/cel-go": {
         "version": "v0.27.0",
         "reason": "pin to v0.27.0 to fix context cancellation test failures, see #138334"
+      },
+      "github.com/fsnotify/fsnotify": {
+        "version": "v1.9.0",
+        "reason": "pin to v1.9.0 until we figure out what the future of fsnotify library is, see #138812"
       }
     },
     "unwantedModules": {
@@ -155,7 +159,6 @@
       ],
       "github.com/golang/protobuf": [
         "github.com/container-storage-interface/spec",
-        "github.com/containerd/containerd/api",
         "github.com/containerd/ttrpc",
         "github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus",
         "go.etcd.io/etcd/api/v3",
@@ -174,7 +177,6 @@
       ],
       "github.com/json-iterator/go": [
         "github.com/prometheus/client_golang",
-        "k8s.io/kube-openapi",
         "sigs.k8s.io/structured-merge-diff/v6"
       ],
       "github.com/klauspost/compress": [
@@ -190,13 +192,11 @@
       "github.com/modern-go/concurrent": [
         "github.com/json-iterator/go",
         "github.com/prometheus/client_golang",
-        "k8s.io/kube-openapi",
         "sigs.k8s.io/structured-merge-diff/v6"
       ],
       "github.com/modern-go/reflect2": [
         "github.com/json-iterator/go",
         "github.com/prometheus/client_golang",
-        "k8s.io/kube-openapi",
         "sigs.k8s.io/structured-merge-diff/v6"
       ],
       "github.com/planetscale/vtprotobuf": [

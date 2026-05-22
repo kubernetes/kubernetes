@@ -238,6 +238,8 @@ type CommonLanguageSettings struct {
 	// The destination where API teams want this client library to be published.
 	Destinations []ClientLibraryDestination `protobuf:"varint,2,rep,packed,name=destinations,proto3,enum=google.api.ClientLibraryDestination" json:"destinations,omitempty"`
 	// Configuration for which RPCs should be generated in the GAPIC client.
+	//
+	// Note: This field should not be used in most cases.
 	SelectiveGapicGeneration *SelectiveGapicGeneration `protobuf:"bytes,3,opt,name=selective_gapic_generation,json=selectiveGapicGeneration,proto3" json:"selective_gapic_generation,omitempty"`
 }
 
@@ -1249,6 +1251,8 @@ func (x *MethodSettings) GetBatching() *BatchingConfigProto {
 
 // This message is used to configure the generation of a subset of the RPCs in
 // a service for client libraries.
+//
+// Note: This feature should not be used in most cases.
 type SelectiveGapicGeneration struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

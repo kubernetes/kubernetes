@@ -62,7 +62,7 @@ func (storageClassStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Ob
 func (storageClassStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (storageClassStrategy) AllowCreateOnUpdate() bool {
+func (storageClassStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -81,6 +81,6 @@ func (storageClassStrategy) WarningsOnUpdate(ctx context.Context, obj, old runti
 	return storageutil.GetWarningsForStorageClass(obj.(*storage.StorageClass))
 }
 
-func (storageClassStrategy) AllowUnconditionalUpdate() bool {
+func (storageClassStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }

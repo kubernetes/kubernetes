@@ -70,7 +70,7 @@ func (podTemplateStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for pod templates.
-func (podTemplateStrategy) AllowCreateOnUpdate() bool {
+func (podTemplateStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -110,6 +110,6 @@ func (podTemplateStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtim
 	return warnings
 }
 
-func (podTemplateStrategy) AllowUnconditionalUpdate() bool {
+func (podTemplateStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }

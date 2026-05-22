@@ -40,12 +40,12 @@ import (
 type validatingAdmissionPolicyStrategy struct {
 	rest.DeclarativeValidation
 	names.NameGenerator
-	authorizer       authorizer.Authorizer
+	authorizer       authorizer.UnconditionalAuthorizer
 	resourceResolver resolver.ResourceResolver
 }
 
 // NewStrategy is the default logic that applies when creating and updating validatingAdmissionPolicy objects.
-func NewStrategy(authorizer authorizer.Authorizer, resourceResolver resolver.ResourceResolver) *validatingAdmissionPolicyStrategy {
+func NewStrategy(authorizer authorizer.UnconditionalAuthorizer, resourceResolver resolver.ResourceResolver) *validatingAdmissionPolicyStrategy {
 	return &validatingAdmissionPolicyStrategy{
 		DeclarativeValidation: rest.DeclarativeValidation{Scheme: legacyscheme.Scheme},
 		NameGenerator:         names.SimpleNameGenerator,
@@ -112,7 +112,7 @@ func (v *validatingAdmissionPolicyStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for validatingAdmissionPolicy; this means you may not create one with a PUT request.
-func (v *validatingAdmissionPolicyStrategy) AllowCreateOnUpdate() bool {
+func (v *validatingAdmissionPolicyStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -138,7 +138,7 @@ func (v *validatingAdmissionPolicyStrategy) WarningsOnUpdate(ctx context.Context
 
 // AllowUnconditionalUpdate is the default update policy for validatingAdmissionPolicy objects. Status update should
 // only be allowed if version match.
-func (v *validatingAdmissionPolicyStrategy) AllowUnconditionalUpdate() bool {
+func (v *validatingAdmissionPolicyStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 

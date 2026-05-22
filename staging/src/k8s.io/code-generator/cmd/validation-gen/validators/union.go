@@ -72,7 +72,8 @@ func getUnionValidations(shared map[string]unions, context Context) (Validations
 	delete(shared, structPath.String())
 
 	result, err := processUnionValidations(structPath, parentType, unions, unionVariablePrefix,
-		unionMemberTagName, unionValidator, discriminatedUnionValidator)
+		unionMemberTagName, unionValidator, discriminatedUnionValidator,
+		Emission{field.ErrorTypeInvalid, "union", ""})
 	return result, err
 }
 
@@ -226,7 +227,7 @@ func (us unions) getOrCreate(name string) *union {
 }
 
 func processUnionValidations(structPath *field.Path, parentType *types.Type, unions unions, varPrefix string,
-	tagName string, undiscriminatedValidator types.Name, discriminatedValidator types.Name,
+	tagName string, undiscriminatedValidator types.Name, discriminatedValidator types.Name, emits Emission,
 ) (Validations, error) {
 	result := Validations{}
 
@@ -299,14 +300,16 @@ func processUnionValidations(structPath *field.Path, parentType *types.Type, uni
 				}
 
 				extraArgs := append([]any{supportVarName, discriminatorExtractor}, extractorArgs...)
-				fn := Function(tagName, DefaultFlags, discriminatedValidator, extraArgs...)
+				fn := Function(tagName, DefaultFlags, discriminatedValidator, extraArgs...).
+					WithEmits(emits)
 				result.Functions = append(result.Functions, fn)
 			} else {
 				supportVar := Variable(supportVarName, Function(tagName, DefaultFlags, newUnionMembership, getMemberArgs(u, parentType, false)...))
 				result.Variables = append(result.Variables, supportVar)
 
 				extraArgs := append([]any{supportVarName}, extractorArgs...)
-				fn := Function(tagName, DefaultFlags, undiscriminatedValidator, extraArgs...)
+				fn := Function(tagName, DefaultFlags, undiscriminatedValidator, extraArgs...).
+					WithEmits(emits)
 				result.Functions = append(result.Functions, fn)
 			}
 		}

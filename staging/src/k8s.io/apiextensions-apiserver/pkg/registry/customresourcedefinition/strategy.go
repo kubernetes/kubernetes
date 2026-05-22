@@ -143,12 +143,12 @@ func (strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []stri
 
 // AllowCreateOnUpdate is false for CustomResourceDefinition; this means a POST is
 // needed to create one.
-func (strategy) AllowCreateOnUpdate() bool {
+func (strategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
 // AllowUnconditionalUpdate is the default update policy for CustomResourceDefinition objects.
-func (strategy) AllowUnconditionalUpdate() bool {
+func (strategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -279,11 +279,11 @@ func (statusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Obj
 	metav1.ResetObjectMetaForStatus(&newObj.ObjectMeta, &newObj.ObjectMeta)
 }
 
-func (statusStrategy) AllowCreateOnUpdate() bool {
+func (statusStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
-func (statusStrategy) AllowUnconditionalUpdate() bool {
+func (statusStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 

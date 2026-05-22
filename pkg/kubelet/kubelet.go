@@ -697,7 +697,7 @@ func NewMainKubelet(ctx context.Context,
 	klet.statusManager = status.NewManager(klet.kubeClient, klet.podManager, klet, kubeDeps.PodStartupLatencyTracker)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodsAPI) {
-		broadcaster := pods.NewBroadcaster()
+		broadcaster := pods.NewBroadcaster(ctx)
 		klet.podsServer = pods.NewPodsServer(broadcaster, klet.podManager, klet.statusManager)
 		klet.statusManager.AddPodUpdateNotifier(klet.podsServer)
 	}
@@ -1619,8 +1619,8 @@ func (kl *Kubelet) ImageFsStats(ctx context.Context) (*statsapi.FsStats, *statsa
 }
 
 // GetCgroupStats is delegated to StatsProvider, which implements stats.Provider interface
-func (kl *Kubelet) GetCgroupStats(cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
-	return kl.StatsProvider.GetCgroupStats(cgroupName, updateStats)
+func (kl *Kubelet) GetCgroupStats(ctx context.Context, cgroupName string, updateStats bool) (*statsapi.ContainerStats, *statsapi.NetworkStats, error) {
+	return kl.StatsProvider.GetCgroupStats(ctx, cgroupName, updateStats)
 }
 
 // GetCgroupCPUAndMemoryStats is delegated to StatsProvider, which implements stats.Provider interface
@@ -1694,7 +1694,7 @@ func (kl *Kubelet) setupDataDirs(logger klog.Logger) error {
 func (kl *Kubelet) StartGarbageCollection(ctx context.Context) {
 	logger := klog.FromContext(ctx)
 	loggedContainerGCFailure := false
-	go wait.Until(func() {
+	go wait.UntilWithContext(ctx, func(ctx context.Context) {
 		if err := kl.containerGC.GarbageCollect(ctx); err != nil {
 			logger.Error(err, "Container garbage collection failed")
 			kl.recorder.WithLogger(logger).Eventf(kl.nodeRef, v1.EventTypeWarning, events.ContainerGCFailed, "%s", err.Error())
@@ -1708,7 +1708,7 @@ func (kl *Kubelet) StartGarbageCollection(ctx context.Context) {
 
 			logger.V(int(vLevel)).Info("Container garbage collection succeeded")
 		}
-	}, ContainerGCPeriod, wait.NeverStop)
+	}, ContainerGCPeriod)
 
 	// when the high threshold is set to 100, and the max age is 0 (or the max age feature is disabled)
 	// stub the image GC manager
@@ -1719,7 +1719,7 @@ func (kl *Kubelet) StartGarbageCollection(ctx context.Context) {
 
 	prevImageGCFailed := false
 	beganGC := time.Now()
-	go wait.Until(func() {
+	go wait.UntilWithContext(ctx, func(ctx context.Context) {
 		if err := kl.imageManager.GarbageCollect(ctx, beganGC); err != nil {
 			if prevImageGCFailed {
 				logger.Error(err, "Image garbage collection failed multiple times in a row")
@@ -1738,7 +1738,7 @@ func (kl *Kubelet) StartGarbageCollection(ctx context.Context) {
 
 			logger.V(int(vLevel)).Info("Image garbage collection succeeded")
 		}
-	}, ImageGCPeriod, wait.NeverStop)
+	}, ImageGCPeriod)
 }
 
 // initializeModules will initialize internal modules that do not require the container runtime to be up.
@@ -1811,7 +1811,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules(ctx context.Context) {
 
 	// trigger on-demand stats collection once so that we have capacity information for ephemeral storage.
 	// ignore any errors, since if stats collection is not successful, the container manager will fail to start below.
-	kl.StatsProvider.GetCgroupStats("/", true)
+	_, _, _ = kl.StatsProvider.GetCgroupStats(ctx, "/", true)
 	// Start container manager.
 	node, err := kl.getNodeAnyWay(ctx)
 	if err != nil {

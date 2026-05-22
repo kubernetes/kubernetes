@@ -28,7 +28,7 @@ package v1
 // the items element is populated with specific mappings of keys to paths.
 // ConfigMap volumes support ownership management and SELinux relabeling.
 type ConfigMapVolumeSourceApplyConfiguration struct {
-	LocalObjectReferenceApplyConfiguration `json:",inline"`
+	LocalObjectReferenceApplyConfiguration `json:""`
 	// items if unspecified, each key-value pair in the Data field of the referenced
 	// ConfigMap will be projected into the volume as a file whose name is the
 	// key and content is the value. If specified, the listed keys will be

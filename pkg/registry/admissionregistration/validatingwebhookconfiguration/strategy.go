@@ -88,7 +88,7 @@ func (validatingWebhookConfigurationStrategy) Canonicalize(obj runtime.Object) {
 }
 
 // AllowCreateOnUpdate is false for validatingWebhookConfiguration; this means you may not create one with a PUT request.
-func (validatingWebhookConfigurationStrategy) AllowCreateOnUpdate() bool {
+func (validatingWebhookConfigurationStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -108,6 +108,6 @@ func (validatingWebhookConfigurationStrategy) WarningsOnUpdate(ctx context.Conte
 
 // AllowUnconditionalUpdate is the default update policy for validatingWebhookConfiguration objects. Status update should
 // only be allowed if version match.
-func (validatingWebhookConfigurationStrategy) AllowUnconditionalUpdate() bool {
+func (validatingWebhookConfigurationStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }

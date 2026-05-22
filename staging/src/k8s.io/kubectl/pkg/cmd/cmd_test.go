@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -165,6 +167,10 @@ func TestKubectlSubcommandShadowPlugin(t *testing.T) {
 			if !cmp.Equal(pluginsHandler.withArgs, test.expectPluginArgs, cmpopts.EquateEmpty()) {
 				t.Fatalf("unexpected plugin execution args: expected %q, got %q", test.expectPluginArgs, pluginsHandler.withArgs)
 			}
+
+			if pluginsHandler.executed {
+				expectKubectlPathEnvironmentVariable(t, pluginsHandler.withEnv)
+			}
 		})
 	}
 }
@@ -297,7 +303,38 @@ func TestKubectlCommandHandlesPlugins(t *testing.T) {
 			if !cmp.Equal(pluginsHandler.withArgs, test.expectPluginArgs, cmpopts.EquateEmpty()) {
 				t.Fatalf("unexpected plugin execution args: expected %q, got %q", test.expectPluginArgs, pluginsHandler.withArgs)
 			}
+
+			if pluginsHandler.executed {
+				expectKubectlPathEnvironmentVariable(t, pluginsHandler.withEnv)
+			}
 		})
+	}
+}
+
+func TestPluginEnvironmentReplacesKubectlPath(t *testing.T) {
+	t.Setenv("KUBECTL_PATH", "some-other-value")
+	env, err := pluginEnvironment()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	expectKubectlPathEnvironmentVariable(t, env)
+}
+
+func expectKubectlPathEnvironmentVariable(t *testing.T, env []string) {
+	t.Helper()
+	kubectlPaths := slices.DeleteFunc(env, func(e string) bool {
+		return !strings.HasPrefix(e, "KUBECTL_PATH=")
+	})
+	if len(kubectlPaths) > 1 {
+		t.Fatalf("unexpected multiple KUBECTL_PATH environment variables: got %q", kubectlPaths)
+	}
+	if len(kubectlPaths) == 0 {
+		t.Fatalf("unexpected missing KUBECTL_PATH environment variable")
+	}
+	if executable, err := os.Executable(); err != nil {
+		t.Fatalf("unexpected error when getting executable path: %v", err)
+	} else if kubectlPaths[0] != fmt.Sprintf("KUBECTL_PATH=%s", executable) {
+		t.Fatalf("unexpected KUBECTL_PATH environment variable value: expected %q, got %q", fmt.Sprintf("KUBECTL_PATH=%s", executable), kubectlPaths[0])
 	}
 }
 

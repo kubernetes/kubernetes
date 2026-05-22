@@ -46,7 +46,7 @@ import (
 // anchors for that signer. Admission control is used to enforce that only users
 // with permissions on the signer can create or modify the corresponding bundle.
 type ClusterTrustBundleApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:""`
 	// metadata contains the object metadata.
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// spec contains the signer (if any) and trust anchors.

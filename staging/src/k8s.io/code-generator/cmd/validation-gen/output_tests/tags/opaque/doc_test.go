@@ -24,7 +24,9 @@ func Test(t *testing.T) {
 	st := localSchemeBuilder.Test(t)
 
 	st.Value(&Struct{
+		StructField:                    OtherStruct{},
 		StructPtrField:                 &OtherStruct{},
+		OpaqueStructField:              OtherStruct{},
 		OpaqueStructPtrField:           &OtherStruct{},
 		SliceOfStructField:             []OtherStruct{{}, {}},
 		SliceOfOpaqueStructField:       []OtherStruct{{}, {}},
@@ -74,4 +76,21 @@ func Test(t *testing.T) {
 		"mapOfStringToOpaqueStructField[a]": {"field Struct.MapOfStringToOpaqueStructField vals"},
 		"mapOfStringToOpaqueStructField[b]": {"field Struct.MapOfStringToOpaqueStructField vals"},
 	})
+
+	st.Value(&OpaqueFieldsStruct{
+		OtherStruct:               OtherStruct{"foo"},
+		OpaqueSliceField:          []OtherStruct{{"foo"}},
+		OpaqueMapField:            map[OtherString]OtherStruct{"a": {"foo"}},
+		TypedefOpaqueStructField:  TypedefOpaqueStruct{"foo"},
+		TypedefOpaqueSliceField:   []OtherStruct{{"foo"}},
+		TypedefOpaqueMapField:     map[OtherString]OtherStruct{"a": {"foo"}},
+		IsolatedOpaqueStructField: OtherStruct{"foo"},
+	}).ExpectValid()
+
+	st.Value(&OpaqueNoValidationFieldsStruct{
+		NoValidationStruct:        NoValidationStruct{"foo"},
+		OpaqueSliceField:          []NoValidationStruct{{"foo"}},
+		OpaqueMapField:            map[NoValidationString]NoValidationStruct{"a": {"foo"}},
+		IsolatedOpaqueStructField: NoValidationStruct{"foo"},
+	}).ExpectValid()
 }

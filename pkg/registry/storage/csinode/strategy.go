@@ -58,7 +58,7 @@ func (csiNodeStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object)
 func (csiNodeStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (csiNodeStrategy) AllowCreateOnUpdate() bool {
+func (csiNodeStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -77,6 +77,6 @@ func (csiNodeStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Ob
 	return nil
 }
 
-func (csiNodeStrategy) AllowUnconditionalUpdate() bool {
+func (csiNodeStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }

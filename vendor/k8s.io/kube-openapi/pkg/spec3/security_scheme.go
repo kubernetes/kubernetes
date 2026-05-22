@@ -22,6 +22,7 @@ import (
 	"github.com/go-openapi/swag"
 	"k8s.io/kube-openapi/pkg/internal"
 	jsonv2 "k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json"
+	"k8s.io/kube-openapi/pkg/internal/third_party/go-json-experiment/json/jsontext"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
@@ -52,16 +53,16 @@ func (s *SecurityScheme) MarshalJSON() ([]byte, error) {
 	return swag.ConcatJSON(b1, b2, b3), nil
 }
 
-func (s *SecurityScheme) MarshalNextJSON(opts jsonv2.MarshalOptions, enc *jsonv2.Encoder) error {
+func (s *SecurityScheme) MarshalJSONTo(enc *jsontext.Encoder) error {
 	var x struct {
 		Ref                 string `json:"$ref,omitempty"`
 		SecuritySchemeProps `json:",inline"`
-		spec.Extensions
+		Extensions          spec.Extensions `json:",inline"`
 	}
 	x.Ref = s.Refable.Ref.String()
 	x.Extensions = internal.SanitizeExtensions(s.Extensions)
 	x.SecuritySchemeProps = s.SecuritySchemeProps
-	return opts.MarshalNext(enc, x)
+	return jsonv2.MarshalEncode(enc, x)
 }
 
 // UnmarshalJSON hydrates this items instance with the data from JSON

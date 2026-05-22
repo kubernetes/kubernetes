@@ -76,7 +76,7 @@ func (s *Strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []s
 
 func (s *Strategy) Canonicalize(obj runtime.Object) {}
 
-func (s *Strategy) AllowCreateOnUpdate() bool {
+func (s *Strategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -96,18 +96,18 @@ func (s *Strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object
 	return nil
 }
 
-func (s *Strategy) AllowUnconditionalUpdate() bool {
+func (s *Strategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 
 // StatusStrategy is the strategy for the status subresource.
 type StatusStrategy struct {
 	*Strategy
-	authorizer authorizer.Authorizer
+	authorizer authorizer.UnconditionalAuthorizer
 	clock      clock.PassiveClock
 }
 
-func NewStatusStrategy(strategy *Strategy, authorizer authorizer.Authorizer, clock clock.PassiveClock) *StatusStrategy {
+func NewStatusStrategy(strategy *Strategy, authorizer authorizer.UnconditionalAuthorizer, clock clock.PassiveClock) *StatusStrategy {
 	return &StatusStrategy{
 		Strategy:   strategy,
 		authorizer: authorizer,
@@ -120,6 +120,7 @@ func NewStatusStrategy(strategy *Strategy, authorizer authorizer.Authorizer, clo
 func (s *StatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 	fields := map[fieldpath.APIVersion]*fieldpath.Set{
 		"certificates.k8s.io/v1beta1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("metadata"),
 			fieldpath.MakePathOrDie("spec"),
 		),
 	}

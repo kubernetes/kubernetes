@@ -307,6 +307,66 @@ func NoNamespaceKeyFunc(ctx context.Context, prefix string, name string) (string
 	return key, nil
 }
 
+type storeKeyFuncs struct {
+	// storageRootKeyFunc returns the resource-relative storage path prefix for
+	// list and watch requests, for example "/pods" or "/pods/<namespace>".
+	storageRootKeyFunc func(ctx context.Context) string
+	// storageKeyFunc returns the resource-relative storage path for one object,
+	// for example "/pods/<namespace>/<name>" or "/pods/<name>".
+	storageKeyFunc func(ctx context.Context, name string) (string, error)
+	// cacheKeyFunc returns the resource-relative storage path for one object.
+	// It is passed to cache layers that receive objects instead of request
+	// contexts, so it derives the namespace and name from object metadata.
+	cacheKeyFunc func(obj runtime.Object) (string, error)
+}
+
+func defaultStoreKeyFuncs(prefix string, isNamespaced bool) storeKeyFuncs {
+	if isNamespaced {
+		return newStoreKeyFuncs(
+			isNamespaced,
+			func(ctx context.Context) string {
+				return NamespaceKeyRootFunc(ctx, prefix)
+			},
+			func(ctx context.Context, name string) (string, error) {
+				return NamespaceKeyFunc(ctx, prefix, name)
+			},
+		)
+	}
+
+	return newStoreKeyFuncs(
+		isNamespaced,
+		func(ctx context.Context) string {
+			return prefix
+		},
+		func(ctx context.Context, name string) (string, error) {
+			return NoNamespaceKeyFunc(ctx, prefix, name)
+		},
+	)
+}
+
+func newStoreKeyFuncs(
+	isNamespaced bool,
+	storageRootKeyFunc func(ctx context.Context) string,
+	storageKeyFunc func(ctx context.Context, name string) (string, error),
+) storeKeyFuncs {
+	return storeKeyFuncs{
+		storageRootKeyFunc: storageRootKeyFunc,
+		storageKeyFunc:     storageKeyFunc,
+		cacheKeyFunc: func(obj runtime.Object) (string, error) {
+			accessor, err := meta.Accessor(obj)
+			if err != nil {
+				return "", err
+			}
+
+			ctx := genericapirequest.NewContext()
+			if isNamespaced {
+				ctx = genericapirequest.WithNamespace(ctx, accessor.GetNamespace())
+			}
+			return storageKeyFunc(ctx, accessor.GetName())
+		},
+	}
+}
+
 // New implements RESTStorage.New.
 func (e *Store) New() runtime.Object {
 	return e.NewFunc()
@@ -452,7 +512,7 @@ const maxNameGenerationCreateAttempts = 8
 // hooks).  Tests which call this might want to call DeepCopy if they expect to
 // be able to examine the input and output objects for differences.
 func (e *Store) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.RetryGenerateName) && needsNameGeneration(obj) {
+	if needsNameGeneration(obj) {
 		return e.createWithGenerateNameRetry(ctx, obj, createValidation, options)
 	}
 
@@ -643,7 +703,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 	out := e.NewFunc()
 
 	// only ignore a not found error if this type allows creating on update, or we're forcing allowing create (like for server-side-apply)
-	ignoreNotFound := e.UpdateStrategy.AllowCreateOnUpdate() || forceAllowCreate
+	ignoreNotFound := e.UpdateStrategy.AllowCreateOnUpdate(ctx) || forceAllowCreate
 	// deleteObj is only used in case a deletion is carried out
 	var deleteObj runtime.Object
 	err = e.Storage.GuaranteedUpdate(ctx, key, out, ignoreNotFound, storagePreconditions, func(existing runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
@@ -652,7 +712,7 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 			return nil, nil, err
 		}
 		if existingResourceVersion == 0 {
-			if !e.UpdateStrategy.AllowCreateOnUpdate() && !forceAllowCreate {
+			if !e.UpdateStrategy.AllowCreateOnUpdate(ctx) && !forceAllowCreate {
 				return nil, nil, apierrors.NewNotFound(qualifiedResource, name)
 			}
 		}
@@ -671,13 +731,17 @@ func (e *Store) Update(ctx context.Context, name string, objInfo rest.UpdatedObj
 		if err != nil {
 			return nil, nil, err
 		}
-		doUnconditionalUpdate := newResourceVersion == 0 && e.UpdateStrategy.AllowUnconditionalUpdate()
+		doUnconditionalUpdate := newResourceVersion == 0 && e.UpdateStrategy.AllowUnconditionalUpdate(ctx)
 
 		if existingResourceVersion == 0 {
 			// Init metadata as early as possible.
 			if objectMeta, err := meta.Accessor(obj); err != nil {
 				return nil, nil, err
 			} else {
+				// Wipe metadata on create-via-update and create-via-apply
+				// requests to match create behavior. Note that this happens
+				// AFTER preconditions are checked.
+				rest.WipeObjectMetaSystemFields(objectMeta)
 				rest.FillObjectMetaSystemFields(objectMeta)
 			}
 
@@ -1586,39 +1650,14 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		return fmt.Errorf("store for %s has an invalid prefix %q", e.DefaultQualifiedResource.String(), opts.ResourcePrefix)
 	}
 
-	// Set the default behavior for storage key generation
+	var keyFuncs storeKeyFuncs
 	if e.KeyRootFunc == nil && e.KeyFunc == nil {
-		if isNamespaced {
-			e.KeyRootFunc = func(ctx context.Context) string {
-				return NamespaceKeyRootFunc(ctx, prefix)
-			}
-			e.KeyFunc = func(ctx context.Context, name string) (string, error) {
-				return NamespaceKeyFunc(ctx, prefix, name)
-			}
-		} else {
-			e.KeyRootFunc = func(ctx context.Context) string {
-				return prefix
-			}
-			e.KeyFunc = func(ctx context.Context, name string) (string, error) {
-				return NoNamespaceKeyFunc(ctx, prefix, name)
-			}
-		}
+		keyFuncs = defaultStoreKeyFuncs(prefix, isNamespaced)
+	} else {
+		keyFuncs = newStoreKeyFuncs(isNamespaced, e.KeyRootFunc, e.KeyFunc)
 	}
-
-	// We adapt the store's keyFunc so that we can use it with the StorageDecorator
-	// without making any assumptions about where objects are stored in etcd
-	keyFunc := func(obj runtime.Object) (string, error) {
-		accessor, err := meta.Accessor(obj)
-		if err != nil {
-			return "", err
-		}
-
-		if isNamespaced {
-			return e.KeyFunc(genericapirequest.WithNamespace(genericapirequest.NewContext(), accessor.GetNamespace()), accessor.GetName())
-		}
-
-		return e.KeyFunc(genericapirequest.NewContext(), accessor.GetName())
-	}
+	e.KeyRootFunc = keyFuncs.storageRootKeyFunc
+	e.KeyFunc = keyFuncs.storageKeyFunc
 
 	if e.DeleteCollectionWorkers == 0 {
 		e.DeleteCollectionWorkers = opts.DeleteCollectionWorkers
@@ -1642,7 +1681,7 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 		e.Storage.Storage, e.DestroyFunc, err = opts.Decorator(
 			opts.StorageConfig,
 			prefix,
-			keyFunc,
+			keyFuncs.cacheKeyFunc,
 			e.NewFunc,
 			e.NewListFunc,
 			attrFunc,

@@ -78,7 +78,7 @@ const (
 // This is an alpha type and requires enabling the DynamicResourceAllocation
 // feature gate.
 type ResourceSlice struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -855,7 +855,7 @@ const (
 // in the ResourceSlice by the DRA driver.
 // +k8s:supportsSubresource="/status"
 type DeviceTaintRule struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -987,7 +987,7 @@ const DeviceTaintConditionEvictionInProgress = "EvictionInProgress"
 
 // DeviceTaintRuleList is a collection of DeviceTaintRules.
 type DeviceTaintRuleList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard list metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -1001,7 +1001,7 @@ type DeviceTaintRuleList struct {
 
 // ResourceSliceList is a collection of ResourceSlices.
 type ResourceSliceList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard list metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -1024,7 +1024,7 @@ type ResourceSliceList struct {
 // This is an alpha type and requires enabling the DynamicResourceAllocation
 // feature gate.
 type ResourceClaim struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -1645,7 +1645,7 @@ type DeviceClaimConfiguration struct {
 	// +k8s:alpha(since: "1.36")=+k8s:maxItems=32
 	Requests []string `json:"requests,omitempty" protobuf:"bytes,1,opt,name=requests"`
 
-	DeviceConfiguration `json:",inline" protobuf:"bytes,2,name=deviceConfiguration"`
+	DeviceConfiguration `json:"" protobuf:"bytes,2,name=deviceConfiguration"`
 }
 
 // DeviceConfiguration must have exactly one field set. It gets embedded
@@ -2044,7 +2044,7 @@ type DeviceAllocationConfiguration struct {
 	// +k8s:alpha(since: "1.36")=+k8s:maxItems=32
 	Requests []string `json:"requests,omitempty" protobuf:"bytes,2,opt,name=requests"`
 
-	DeviceConfiguration `json:",inline" protobuf:"bytes,3,name=deviceConfiguration"`
+	DeviceConfiguration `json:"" protobuf:"bytes,3,name=deviceConfiguration"`
 }
 
 // +enum
@@ -2062,7 +2062,7 @@ const (
 
 // ResourceClaimList is a collection of claims.
 type ResourceClaimList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard list metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -2084,7 +2084,7 @@ type ResourceClaimList struct {
 // This is an alpha type and requires enabling the DynamicResourceAllocation
 // feature gate.
 type DeviceClass struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object metadata
 	// +optional
 	// +k8s:alpha(since: "1.36")=+k8s:subfield(name)=+k8s:optional
@@ -2150,7 +2150,7 @@ type DeviceClassSpec struct {
 
 // DeviceClassConfiguration is used in DeviceClass.
 type DeviceClassConfiguration struct {
-	DeviceConfiguration `json:",inline" protobuf:"bytes,1,opt,name=deviceConfiguration"`
+	DeviceConfiguration `json:"" protobuf:"bytes,1,opt,name=deviceConfiguration"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -2158,7 +2158,7 @@ type DeviceClassConfiguration struct {
 
 // DeviceClassList is a collection of classes.
 type DeviceClassList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard list metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -2176,7 +2176,7 @@ type DeviceClassList struct {
 // This is an alpha type and requires enabling the DynamicResourceAllocation
 // feature gate.
 type ResourceClaimTemplate struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -2210,7 +2210,7 @@ type ResourceClaimTemplateSpec struct {
 
 // ResourceClaimTemplateList is a collection of claim templates.
 type ResourceClaimTemplateList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard list metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`

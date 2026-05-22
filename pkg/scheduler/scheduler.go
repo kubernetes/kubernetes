@@ -31,7 +31,7 @@ import (
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha2"
+	schedulinglisters "k8s.io/client-go/listers/scheduling/v1alpha3"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
@@ -315,7 +315,7 @@ func New(ctx context.Context,
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	var podGroupLister schedulinglisters.PodGroupLister
 	if feature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-		podGroupLister = informerFactory.Scheduling().V1alpha2().PodGroups().Lister()
+		podGroupLister = informerFactory.Scheduling().V1alpha3().PodGroups().Lister()
 	}
 
 	snapshot := internalcache.NewEmptySnapshot()

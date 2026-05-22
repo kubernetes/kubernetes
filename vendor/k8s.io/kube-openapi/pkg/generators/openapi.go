@@ -32,7 +32,6 @@ import (
 	"k8s.io/gengo/v2/namer"
 	"k8s.io/gengo/v2/types"
 	openapi "k8s.io/kube-openapi/pkg/common"
-	"k8s.io/kube-openapi/pkg/generators/apidefinitions"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 
 	"k8s.io/klog/v2"
@@ -101,7 +100,7 @@ func isOptional(m *types.Member) (bool, error) {
 
 	// If neither +optional nor +required is present in the comments,
 	// infer optional from the json tags.
-	return strings.Contains(reflect.StructTag(m.Tags).Get("json"), "omitempty"), nil
+	return hasOmitemptyTag(m), nil
 }
 
 func apiTypeFilterFunc(c *generator.Context, t *types.Type) bool {
@@ -110,31 +109,13 @@ func apiTypeFilterFunc(c *generator.Context, t *types.Type) bool {
 		return false
 	}
 	pkg := c.Universe.Package(t.Name.Package)
-	if isOpenAPIEnabledForPackage(pkg) {
+	if hasOpenAPITagValue(pkg.Comments, tagValueTrue) {
 		return !hasOpenAPITagValue(t.CommentLines, tagValueFalse)
 	}
 	if hasOpenAPITagValue(t.CommentLines, tagValueTrue) {
 		return true
 	}
 	return false
-}
-
-// isOpenAPIEnabledForPackage reports whether openapi generation is
-// requested for pkg. apiversion.yaml is authoritative when present;
-// the legacy +k8s:openapi-gen=true tag is consulted only when the yaml
-// is absent.
-func isOpenAPIEnabledForPackage(pkg *types.Package) bool {
-	if pkg == nil {
-		return false
-	}
-	av, err := apidefinitions.LoadAPIVersion(pkg.Dir)
-	if err != nil {
-		klog.Fatalf("Package %v: %v", pkg.Path, err)
-	}
-	if av != nil {
-		return true
-	}
-	return hasOpenAPITagValue(pkg.Comments, tagValueTrue)
 }
 
 const (
@@ -241,6 +222,11 @@ func getReferableName(m *types.Member) string {
 	}
 }
 
+func hasOmitemptyTag(m *types.Member) bool {
+	jsonTag, _ := reflect.StructTag(m.Tags).Lookup("json")
+	return strings.HasSuffix(jsonTag, ",omitempty") || strings.Contains(jsonTag, ",omitempty,")
+}
+
 func shouldInlineMembers(m *types.Member) bool {
 	jsonTag, jsonTagExists := reflect.StructTag(m.Tags).Lookup("json")
 	return m.Embedded && jsonTagExists && (jsonTag == "" || strings.HasPrefix(jsonTag, ","))
@@ -341,7 +327,7 @@ func (g openAPITypeWriter) shouldUseOpenAPIModelName(t *types.Type) bool {
 		return true
 	}
 	pkg := g.context.Universe.Package(t.Name.Package)
-	value, err = resolvePackageModelPackage(pkg)
+	value, err = extractOpenAPISchemaNamePackage(pkg.Comments)
 	if err != nil {
 		klog.Fatalf("Package %v: invalid %s:%v", pkg, tagModelPackage, err)
 	}
@@ -1051,7 +1037,7 @@ func (g openAPITypeWriter) generateProperty(m *types.Member, parent *types.Type)
 		g.Do("},\n},\n", nil)
 		return nil
 	}
-	omitEmpty := strings.Contains(reflect.StructTag(m.Tags).Get("json"), "omitempty")
+	omitEmpty := hasOmitemptyTag(m)
 	if err := g.generateDefault(m.CommentLines, m.Type, omitEmpty, parent); err != nil {
 		return fmt.Errorf("failed to generate default in %v: %v: %v", parent, m.Name, err)
 	}
@@ -1143,9 +1129,6 @@ func (g openAPITypeWriter) generateMapProperty(t *types.Type) error {
 
 	g.Do("Type: []string{\"object\"},\n", nil)
 	g.Do("AdditionalProperties: &spec.SchemaOrBool{\nAllows: true,\nSchema: &spec.Schema{\nSchemaProps: spec.SchemaProps{\n", nil)
-	if err := g.generateDefault(t.Elem.CommentLines, t.Elem, false, t.Elem); err != nil {
-		return err
-	}
 	typeString, format := openapi.OpenAPITypeFormat(elemType.String())
 	if typeString != "" {
 		g.generateSimpleProperty(typeString, format)
@@ -1180,9 +1163,6 @@ func (g openAPITypeWriter) generateSliceProperty(t *types.Type) error {
 	elemType := resolveAliasAndPtrType(t.Elem)
 	g.Do("Type: []string{\"array\"},\n", nil)
 	g.Do("Items: &spec.SchemaOrArray{\nSchema: &spec.Schema{\nSchemaProps: spec.SchemaProps{\n", nil)
-	if err := g.generateDefault(t.Elem.CommentLines, t.Elem, false, t.Elem); err != nil {
-		return err
-	}
 	typeString, format := openapi.OpenAPITypeFormat(elemType.String())
 	if typeString != "" {
 		g.generateSimpleProperty(typeString, format)

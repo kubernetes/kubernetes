@@ -23,7 +23,9 @@ import (
 	"maps"
 	"math"
 	"os"
+	"path/filepath"
 	"runtime"
+	"runtime/pprof"
 	"strings"
 	"sync"
 	"testing"
@@ -40,6 +42,7 @@ import (
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	schedulinginformers "k8s.io/client-go/informers/scheduling/v1alpha3"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
@@ -61,12 +64,14 @@ type WorkloadExecutor struct {
 	dataItems                    []DataItem
 	numPodsScheduledPerNamespace map[string]int
 	podInformer                  coreinformers.PodInformer
+	podGroupInformer             schedulinginformers.PodGroupInformer
 	throughputErrorMargin        float64
 	testCase                     *testCase
 	workload                     *Workload
 	topicName                    string
 	nextNodeIndex                int
 	opts                         *schedulerPerfOptions
+	cpuProfileFile               *os.File
 }
 
 func (e *WorkloadExecutor) wait() {
@@ -90,10 +95,16 @@ func (e *WorkloadExecutor) runOp(tCtx ktesting.TContext, op realOp, opIndex int)
 		return e.runBarrierOp(tCtx, opIndex, concreteOp)
 	case *sleepOp:
 		return e.runSleepOp(tCtx, concreteOp)
+	case *waitForPodGroups:
+		return e.runWaitForPodGroupsOp(tCtx, concreteOp)
 	case *startCollectingMetricsOp:
 		return e.runStartCollectingMetricsOp(tCtx, opIndex, concreteOp)
 	case *stopCollectingMetricsOp:
 		return e.runStopCollectingMetrics(tCtx, opIndex)
+	case *startCollectingProfileOp:
+		return e.runStartCollectingProfileOp(tCtx, opIndex, concreteOp)
+	case *stopCollectingProfileOp:
+		return e.runStopCollectingProfileOp(tCtx, opIndex, concreteOp)
 	case *createResourceDriverOp:
 		concreteOp.run(tCtx, e.scheduler.Profiles["default-scheduler"].SharedDRAManager())
 		return nil
@@ -184,6 +195,29 @@ func (e *WorkloadExecutor) runSleepOp(tCtx ktesting.TContext, op *sleepOp) error
 	return nil
 }
 
+// runWaitForPodGroupsOp executes the waitForPodGroups operation.
+// It polls the scheduler's informer cache until the expected number of pod groups
+// are visible in the given namespace. This ensures that subsequent operations
+// (like creating pods that reference these pod groups) won't fail due to cache lag.
+// It timeouts after 10 seconds if the condition is not met.
+func (e *WorkloadExecutor) runWaitForPodGroupsOp(tCtx ktesting.TContext, op *waitForPodGroups) error {
+	tCtx.Logf("waiting for %d PodGroups in namespace %q", op.Count, op.Namespace)
+	err := wait.PollUntilContextTimeout(tCtx, 100*time.Millisecond, 10*time.Second, true, func(ctx context.Context) (bool, error) {
+		podGroups, err := e.podGroupInformer.Lister().PodGroups(op.Namespace).List(labels.Everything())
+		if err != nil {
+			return false, err
+		}
+		if len(podGroups) >= op.Count {
+			return true, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		return fmt.Errorf("timed out waiting for PodGroups: %w", err)
+	}
+	return nil
+}
+
 func (e *WorkloadExecutor) runStopCollectingMetrics(tCtx ktesting.TContext, opIndex int) error {
 	items, err := stopCollectingMetrics(tCtx, e.collectorCancel, &e.collectorWG, e.workload.Threshold.Get(e.topicName), *e.workload.ThresholdMetricSelector, opIndex, e.collectors)
 	if err != nil {
@@ -231,7 +265,14 @@ func (e *WorkloadExecutor) runCreatePodsOp(tCtx ktesting.TContext, opIndex int, 
 			return err
 		}
 	default:
-		if err := waitUntilPodsScheduledInNamespace(tCtx, e.podInformer, nil, namespace, op.Count); err != nil {
+		// Default timeout is 10 minutes because even at the lowest observed QPS of ~10 pods/sec,
+		// a standard 5000-node test completes. Heavy test suites (e.g. TAS) can configure a custom
+		// podsSchedulingTimeout option to avoid meeting this strict default ceiling.
+		timeout := 10 * time.Minute
+		if e.opts != nil && e.opts.podsSchedulingTimeout > 0 {
+			timeout = e.opts.podsSchedulingTimeout
+		}
+		if err := waitUntilPodsScheduledInNamespace(tCtx, e.podInformer, nil, namespace, op.Count, timeout); err != nil {
 			return fmt.Errorf("error in waiting for pods to get scheduled: %w", err)
 		}
 	}
@@ -432,6 +473,58 @@ func (e *WorkloadExecutor) runStartCollectingMetricsOp(tCtx ktesting.TContext, o
 		return err
 	}
 	return nil
+}
+
+// runStartCollectingProfileOp starts profile collection.
+// The output file is created relative to dataItemsDir if it is set.
+func (e *WorkloadExecutor) runStartCollectingProfileOp(tCtx ktesting.TContext, _ int, op *startCollectingProfileOp) error {
+	switch strings.ToUpper(op.Type) {
+	case "CPU":
+		if e.cpuProfileFile != nil {
+			return fmt.Errorf("cpu profile collection is already ongoing")
+		}
+		filePath := op.FilePath
+		if dataItemsDir != nil && *dataItemsDir != "" {
+			filePath = filepath.Join(*dataItemsDir, filePath)
+		}
+		if err := os.MkdirAll(filepath.Dir(filePath), 0750); err != nil {
+			return fmt.Errorf("failed to create directory for cpu profile: %w", err)
+		}
+		f, err := os.Create(filePath)
+		if err != nil {
+			return fmt.Errorf("failed to create file %q for cpu profile: %w", filePath, err)
+		}
+		if err := pprof.StartCPUProfile(f); err != nil {
+			if closeErr := f.Close(); closeErr != nil {
+				err = errors.Join(err, closeErr)
+			}
+			return fmt.Errorf("failed to start cpu profile: %w", err)
+		}
+		e.cpuProfileFile = f
+		tCtx.Logf("Started CPU profile collection into %q", filePath)
+		return nil
+	default:
+		return fmt.Errorf("unsupported profile type %q", op.Type)
+	}
+}
+
+func (e *WorkloadExecutor) runStopCollectingProfileOp(tCtx ktesting.TContext, _ int, op *stopCollectingProfileOp) error {
+	switch strings.ToUpper(op.Type) {
+	case "CPU":
+		if e.cpuProfileFile == nil {
+			return fmt.Errorf("missing startCollectingProfile operation before stopping")
+		}
+		pprof.StopCPUProfile()
+		err := e.cpuProfileFile.Close()
+		e.cpuProfileFile = nil
+		if err != nil {
+			return fmt.Errorf("failed to close cpu profile file: %w", err)
+		}
+		tCtx.Log("Stopped CPU profile collection")
+		return nil
+	default:
+		return fmt.Errorf("unsupported profile type %q", op.Type)
+	}
 }
 
 func startCollectingMetrics(tCtx ktesting.TContext, collectorWG *sync.WaitGroup, podInformer coreinformers.PodInformer, mcc *metricsCollectorConfig, throughputErrorMargin float64, opIndex int, name string, namespaces []string, labelSelector map[string]string) ([]testDataCollector, func(string), error) {
@@ -723,7 +816,7 @@ func waitUntilPodsScheduled(tCtx ktesting.TContext, podInformer coreinformers.Po
 		if !ok {
 			return fmt.Errorf("unknown namespace %s", namespace)
 		}
-		if err := waitUntilPodsScheduledInNamespace(tCtx, podInformer, labelSelector, namespace, wantCount); err != nil {
+		if err := waitUntilPodsScheduledInNamespace(tCtx, podInformer, labelSelector, namespace, wantCount, 10*time.Minute); err != nil {
 			return fmt.Errorf("error waiting for pods in namespace %q: %w", namespace, err)
 		}
 	}
@@ -814,12 +907,14 @@ func getNodePreparer(prefix string, cno *createNodesOp, clientset clientset.Inte
 }
 
 // waitUntilPodsScheduledInNamespace blocks until all pods in the given
-// namespace are scheduled. Times out after 10 minutes because even at the
+// namespace are scheduled. Times out after 10 minutes by default because even at the
 // lowest observed QPS of ~10 pods/sec, a 5000-node test should complete.
-func waitUntilPodsScheduledInNamespace(tCtx ktesting.TContext, podInformer coreinformers.PodInformer, labelSelector map[string]string, namespace string, wantCount int) error {
+// Complex test suites (e.g. TAS where each pod gets scheduled multiple times for placements)
+// may override this timeout via schedulerPerfOptions.
+func waitUntilPodsScheduledInNamespace(tCtx ktesting.TContext, podInformer coreinformers.PodInformer, labelSelector map[string]string, namespace string, wantCount int, timeout time.Duration) error {
 	var pendingPod *v1.Pod
 
-	err := wait.PollUntilContextTimeout(tCtx, 1*time.Second, 10*time.Minute, true, func(ctx context.Context) (bool, error) {
+	err := wait.PollUntilContextTimeout(tCtx, 1*time.Second, timeout, true, func(ctx context.Context) (bool, error) {
 		select {
 		case <-ctx.Done():
 			return true, ctx.Err()
@@ -853,7 +948,7 @@ func waitUntilPodsScheduledInNamespace(tCtx ktesting.TContext, podInformer corei
 func getPodStrategy(cpo *createPodsOp) (testutils.TestPodCreateStrategy, error) {
 	podTemplate := testutils.StaticPodTemplate(makeBasePod())
 	if cpo.PodTemplatePath != nil {
-		podTemplate = podTemplateWithParams{path: *cpo.PodTemplatePath, params: cpo.TemplateParams}
+		podTemplate = podTemplateWithParams{path: *cpo.PodTemplatePath, params: cpo.TemplateParams, batchSize: cpo.SignatureBatchSize}
 	}
 	if cpo.PersistentVolumeClaimTemplatePath == nil {
 		return testutils.NewCustomCreatePodStrategy(podTemplate), nil
@@ -888,8 +983,9 @@ func (n nodeTemplateWithParams) GetNodeTemplate(index, count int) (*v1.Node, err
 }
 
 type podTemplateWithParams struct {
-	path   string
-	params map[string]any
+	path      string
+	params    map[string]any
+	batchSize int
 }
 
 func (p podTemplateWithParams) GetPodTemplate(index, count int) (*v1.Pod, error) {
@@ -901,6 +997,12 @@ func (p podTemplateWithParams) GetPodTemplate(index, count int) (*v1.Pod, error)
 	if err := getSpecFromTextTemplateFile(p.path, env, podSpec); err != nil {
 		return nil, fmt.Errorf("parsing Pod: %w", err)
 	}
+
+	if podSpec.Labels == nil {
+		podSpec.Labels = make(map[string]string)
+	}
+	podSpec.Labels["signature"] = fmt.Sprintf("signature-label-%d", index/p.batchSize)
+
 	return podSpec, nil
 }
 

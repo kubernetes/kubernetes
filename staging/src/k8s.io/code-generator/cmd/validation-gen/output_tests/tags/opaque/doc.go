@@ -87,6 +87,30 @@ type OtherStruct struct {
 	StringField string `json:"stringField"`
 }
 
+// OpaqueFieldsStruct contains fields with the opaque markers, contains no field validations.
+// Validations should not be generated for these fields.
+// +k8s:validateTrue="type OpaqueFieldsStruct"
+type OpaqueFieldsStruct struct {
+	// +k8s:opaqueType
+	OtherStruct
+
+	// +k8s:eachVal=+k8s:opaqueType
+	OpaqueSliceField []OtherStruct `json:"opaqueSliceField"`
+
+	// +k8s:eachKey=+k8s:opaqueType
+	// +k8s:eachVal=+k8s:opaqueType
+	OpaqueMapField map[OtherString]OtherStruct `json:"opaqueMapField"`
+
+	TypedefOpaqueStructField TypedefOpaqueStruct `json:"typedefOpaqueStructField"`
+
+	TypedefOpaqueSliceField TypedefOpaqueSlice `json:"typedefOpaqueSliceField"`
+
+	TypedefOpaqueMapField TypedefOpaqueMap `json:"typedefOpaqueMapField"`
+
+	// +k8s:opaqueType
+	IsolatedOpaqueStructField OtherStruct `json:"isolatedOpaqueStructField"`
+}
+
 // +k8s:validateFalse="type OtherString"
 type OtherString string
 
@@ -94,6 +118,18 @@ type OtherString string
 // fixing it requires fixing randfill.  That is a tomorrow problem.  For now, the
 // following types have been tested to generate correct code with
 // +k8s:opaqueType.
+
+// +k8s:opaqueType
+type TypedefOpaqueStruct struct {
+	StringField string `json:"stringField"`
+}
+
+// +k8s:eachVal=+k8s:opaqueType
+type TypedefOpaqueSlice []OtherStruct
+
+// +k8s:eachKey=+k8s:opaqueType
+// +k8s:eachVal=+k8s:opaqueType
+type TypedefOpaqueMap map[OtherString]OtherStruct
 
 // +k8s:validateTrue="type TypedefSliceOther"
 // +k8s:eachVal=+k8s:opaqueType
@@ -103,3 +139,27 @@ type TypedefSliceOther []OtherStruct
 // +k8s:eachKey=+k8s:opaqueType
 // +k8s:eachVal=+k8s:opaqueType
 type TypedefMapOther map[OtherString]OtherStruct
+
+type NoValidationStruct struct {
+	StringField string `json:"stringField"`
+}
+
+type NoValidationString string
+
+// OpaqueNoValidationFieldsStruct tests that when a type/key/val is opaque but the opaque type
+// does not have any validation, we correctly do not emit any validation calls.
+// +k8s:validateTrue="type OpaqueNoValidationFieldsStruct"
+type OpaqueNoValidationFieldsStruct struct {
+	// +k8s:opaqueType
+	NoValidationStruct
+
+	// +k8s:eachVal=+k8s:opaqueType
+	OpaqueSliceField []NoValidationStruct `json:"opaqueSliceField"`
+
+	// +k8s:eachKey=+k8s:opaqueType
+	// +k8s:eachVal=+k8s:opaqueType
+	OpaqueMapField map[NoValidationString]NoValidationStruct `json:"opaqueMapField"`
+
+	// +k8s:opaqueType
+	IsolatedOpaqueStructField NoValidationStruct `json:"isolatedOpaqueStructField"`
+}

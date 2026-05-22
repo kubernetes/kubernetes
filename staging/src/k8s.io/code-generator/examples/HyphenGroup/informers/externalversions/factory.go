@@ -311,7 +311,7 @@ type SharedInformerFactory interface {
 	// WaitForCacheSync blocks until all started informers' caches were synced
 	// or the stop channel gets closed.
 	//
-	// Contextual logging: WaitForCacheSync should be used instead of WaitForCacheSync in code which supports contextual logging. It also returns a more useful result.
+	// Contextual logging: WaitForCacheSyncWithContext should be used instead of WaitForCacheSync in code which supports contextual logging. It also returns a more useful result.
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
 	// WaitForCacheSyncWithContext blocks until all started informers' caches were synced

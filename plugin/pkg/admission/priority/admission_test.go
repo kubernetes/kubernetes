@@ -799,10 +799,10 @@ func TestAdmitPodGroup(t *testing.T) {
 		return admission.NewAttributesRecord(
 			podGroup,
 			oldPodGroup,
-			scheduling.Kind("PodGroup").WithVersion("v1alpha2"),
+			scheduling.Kind("PodGroup").WithVersion("v1alpha3"),
 			podGroup.ObjectMeta.Namespace,
 			"",
-			scheduling.Resource("podgroups").WithVersion("v1alpha2"),
+			scheduling.Resource("podgroups").WithVersion("v1alpha3"),
 			"",
 			operation,
 			options,

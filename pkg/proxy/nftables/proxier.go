@@ -41,6 +41,7 @@ import (
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/conntrack"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
@@ -100,31 +101,25 @@ const (
 // NewDualStackProxier creates a MetaProxier instance, with IPv4 and IPv6 proxies.
 func NewDualStackProxier(
 	ctx context.Context,
-	syncPeriod time.Duration,
-	minSyncPeriod time.Duration,
-	masqueradeAll bool,
-	masqueradeBit int,
+	config *kubeproxyconfig.KubeProxyConfiguration,
 	localDetectors map[v1.IPFamily]proxyutil.LocalTrafficDetector,
 	nodeName string,
 	nodeIPs map[v1.IPFamily]net.IP,
 	recorder events.EventRecorder,
 	healthzServer *healthcheck.ProxyHealthServer,
-	nodePortAddresses []string,
 	initOnly bool,
 ) (proxy.Provider, error) {
 	// Create an ipv4 instance of the single-stack proxier
-	ipv4Proxier, err := NewProxier(ctx, v1.IPv4Protocol,
-		syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit,
+	ipv4Proxier, err := NewProxier(ctx, config, v1.IPv4Protocol,
 		localDetectors[v1.IPv4Protocol], nodeName, nodeIPs[v1.IPv4Protocol],
-		recorder, healthzServer, nodePortAddresses, initOnly)
+		recorder, healthzServer, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
-	ipv6Proxier, err := NewProxier(ctx, v1.IPv6Protocol,
-		syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit,
+	ipv6Proxier, err := NewProxier(ctx, config, v1.IPv6Protocol,
 		localDetectors[v1.IPv6Protocol], nodeName, nodeIPs[v1.IPv6Protocol],
-		recorder, healthzServer, nodePortAddresses, initOnly)
+		recorder, healthzServer, initOnly)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
 	}
@@ -205,17 +200,13 @@ var _ proxy.Provider = &Proxier{}
 
 // NewProxier returns a new single-stack NFTables proxier.
 func NewProxier(ctx context.Context,
+	config *kubeproxyconfig.KubeProxyConfiguration,
 	ipFamily v1.IPFamily,
-	syncPeriod time.Duration,
-	minSyncPeriod time.Duration,
-	masqueradeAll bool,
-	masqueradeBit int,
 	localDetector proxyutil.LocalTrafficDetector,
 	nodeName string,
 	nodeIP net.IP,
 	recorder events.EventRecorder,
 	healthzServer *healthcheck.ProxyHealthServer,
-	nodePortAddressStrings []string,
 	initOnly bool,
 ) (*Proxier, error) {
 	logger := klog.LoggerWithValues(klog.FromContext(ctx), "ipFamily", ipFamily)
@@ -231,13 +222,16 @@ func NewProxier(ctx context.Context,
 	}
 
 	// Generate the masquerade mark to use for SNAT rules.
-	masqueradeValue := 1 << uint(masqueradeBit)
+	masqueradeValue := 1 << uint(*config.NFTables.MasqueradeBit)
 	masqueradeMark := fmt.Sprintf("%#08x", masqueradeValue)
 	logger.V(2).Info("Using nftables mark for masquerade", "mark", masqueradeMark)
 
-	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nodePortAddressStrings)
+	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, config.NodePortAddresses)
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(nodeName, recorder, nodePortAddresses, healthzServer, ipFamily)
+
+	syncPeriod := config.SyncPeriod.Duration
+	minSyncPeriod := config.MinSyncPeriod.Duration
 
 	proxier := &Proxier{
 		ipFamily:            ipFamily,
@@ -248,7 +242,7 @@ func NewProxier(ctx context.Context,
 		needFullSync:        true,
 		syncPeriod:          syncPeriod,
 		nftables:            nft,
-		masqueradeAll:       masqueradeAll,
+		masqueradeAll:       config.Linux.MasqueradeAll,
 		masqueradeMark:      masqueradeMark,
 		masqueradeRule:      fmt.Sprintf("mark set mark or %s", masqueradeMark),
 		conntrack:           conntrack.New(),

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 
 	resourcev1alpha3 "k8s.io/api/resource/v1alpha3"
@@ -128,10 +129,16 @@ func NewController(
 // Run starts the controller workers.
 func (c *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
-	defer c.workqueue.ShutDown()
 
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting ResourcePoolStatusRequest controller")
+
+	var wg sync.WaitGroup
+	defer func() {
+		logger.Info("Shutting down ResourcePoolStatusRequest controller")
+		c.workqueue.ShutDown()
+		wg.Wait()
+	}()
 
 	// Wait for the caches to be synced before starting workers
 	logger.Info("Waiting for informer caches to sync")
@@ -142,14 +149,17 @@ func (c *Controller) Run(ctx context.Context, workers int) {
 
 	logger.Info("Starting workers", "count", workers)
 	for range workers {
-		go wait.UntilWithContext(ctx, c.runWorker, time.Second)
+		wg.Go(func() {
+			wait.UntilWithContext(ctx, c.runWorker, time.Second)
+		})
 	}
 
 	// Start the cleanup goroutine for TTL-based garbage collection
-	go wait.UntilWithContext(ctx, c.cleanupExpiredRequests, cleanupPollingInterval)
+	wg.Go(func() {
+		wait.UntilWithContext(ctx, c.cleanupExpiredRequests, cleanupPollingInterval)
+	})
 
 	<-ctx.Done()
-	logger.Info("Shutting down ResourcePoolStatusRequest controller")
 }
 
 // runWorker is a long-running function that will continually call the

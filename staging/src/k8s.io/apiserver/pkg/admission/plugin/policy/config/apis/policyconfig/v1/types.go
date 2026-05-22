@@ -22,7 +22,7 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // ValidatingAdmissionPolicyConfiguration provides configuration for the validating admission policy controller.
 type ValidatingAdmissionPolicyConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// StaticManifestsDir is the path to a directory containing static
 	// ValidatingAdmissionPolicy and ValidatingAdmissionPolicyBinding
@@ -39,7 +39,7 @@ type ValidatingAdmissionPolicyConfiguration struct {
 
 // MutatingAdmissionPolicyConfiguration provides configuration for the mutating admission policy controller.
 type MutatingAdmissionPolicyConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// StaticManifestsDir is the path to a directory containing static
 	// MutatingAdmissionPolicy and MutatingAdmissionPolicyBinding

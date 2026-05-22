@@ -32,6 +32,7 @@ import (
 
 	"github.com/opencontainers/cgroups"
 	"github.com/opencontainers/cgroups/fs2"
+	"github.com/opencontainers/cgroups/fscommon"
 	"k8s.io/klog/v2"
 
 	"github.com/google/cadvisor/container"
@@ -91,6 +92,10 @@ func (h *Handler) GetStats() (*info.ContainerStats, error) {
 		klog.V(4).Infof("Ignoring errors when gathering stats for root cgroup since some controllers don't have stats on the root cgroup: %v", err)
 	}
 	stats := newContainerStats(cgroupStats, h.includedMetrics)
+
+	if cgroups.IsCgroup2UnifiedMode() {
+		setMemoryEvents(h.cgroupManager.Path(""), stats)
+	}
 
 	if h.includedMetrics.Has(container.ProcessSchedulerMetrics) {
 		stats.Cpu.Schedstat, err = h.schedulerStatsFromProcs()
@@ -860,6 +865,15 @@ func setMemoryStats(s *cgroups.Stats, ret *info.ContainerStats) {
 		}
 	}
 	ret.Memory.WorkingSet = workingSet
+}
+
+func setMemoryEvents(cgroupPath string, ret *info.ContainerStats) {
+	if val, err := fscommon.GetValueByKey(cgroupPath, "memory.events", "high"); err == nil {
+		ret.Memory.Events.High = val
+	}
+	if val, err := fscommon.GetValueByKey(cgroupPath, "memory.events", "max"); err == nil {
+		ret.Memory.Events.Max = val
+	}
 }
 
 func setCPUSetStats(s *cgroups.Stats, ret *info.ContainerStats) {
