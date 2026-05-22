@@ -18,7 +18,6 @@ package common
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"reflect"
 
@@ -30,14 +29,15 @@ import (
 	"sigs.k8s.io/structured-merge-diff/v6/value"
 )
 
-type unstructuredWrapper interface {
-	ToUnstructured() interface{}
-}
-
 // SchemalessTypedToVal wraps a Go value as a CEL ref.Val.
 // It mimics how the value would look if it were converted to an unstructured
 // map using JSON serialization, but avoids the full allocation by lazily
 // traversing the value via reflection and structured-merge-diff value package.
+//
+// It provides full functional equivalence to runtime.DefaultUnstructuredConverter.ToUnstructured.
+// Any behavioral difference is a bug. The returned ref.Val utilizes internal caching
+// for lazy reflection, which is not thread-safe and must only be used synchronously within a
+// single CEL evaluation.
 func SchemalessTypedToVal(val interface{}) ref.Val {
 	if val == nil {
 		return types.NullValue
@@ -59,6 +59,18 @@ func SchemalessTypedToVal(val interface{}) ref.Val {
 		return types.Double(typedVal)
 	case float64:
 		return types.Double(typedVal)
+	case []byte:
+		if typedVal == nil {
+			return types.NullValue
+		}
+		return types.String(base64.StdEncoding.EncodeToString(typedVal))
+	case intstr.IntOrString:
+		switch typedVal.Type {
+		case intstr.Int:
+			return types.Int(typedVal.IntVal)
+		case intstr.String:
+			return types.String(typedVal.StrVal)
+		}
 	}
 
 	v := reflect.ValueOf(val)
@@ -73,22 +85,21 @@ func SchemalessTypedToVal(val interface{}) ref.Val {
 		}
 	}
 
-	// Handle special wrapper types like wrappedParam that provide a custom ToUnstructured() method.
-	if unstrObj, ok := val.(unstructuredWrapper); ok {
-		return SchemalessTypedToVal(unstrObj.ToUnstructured())
-	}
-	// Custom JSON marshaling logic must be run to ensure parity with standard unstructured conversion
-	// for types implementing custom marshaling (e.g., runtime.RawExtension).
-	// Well-known Kubernetes type intstr.IntOrString is skipped here because its JSON
-	// marshaling would produce a numeric JSON value that gets unmarshaled to float64,
-	// incorrectly turning an integer IntOrString into a CEL Double instead of a CEL Int.
-	// We skip it here to handle it explicitly downstream and preserve correct types.
-	if marshaler, ok := val.(json.Marshaler); ok {
-		switch val.(type) {
-		case intstr.IntOrString:
-		default:
-			return marshalToVal(marshaler)
+	cacheEntry := value.TypeReflectEntryOf(v.Type())
+	if cacheEntry.CanConvertToUnstructured() {
+		if !v.CanAddr() {
+			ptr := reflect.New(v.Type())
+			ptr.Elem().Set(v)
+			v = ptr.Elem()
 		}
+		unstr, err := cacheEntry.ToUnstructured(v)
+		if err != nil {
+			return types.NewErr("failed to convert to unstructured: %v", err)
+		}
+		if unstr == nil {
+			return types.NullValue
+		}
+		return types.DefaultTypeAdapter.NativeToValue(unstr)
 	}
 	switch v.Kind() {
 	case reflect.Pointer:
@@ -97,64 +108,29 @@ func SchemalessTypedToVal(val interface{}) ref.Val {
 		}
 		return SchemalessTypedToVal(v.Elem().Interface())
 	case reflect.Slice:
-		if v.Type().Elem().Kind() == reflect.Uint8 {
-			if v.IsNil() {
-				return types.NullValue
-			}
-			// In unstructured conversion, []byte is base64 encoded. We directly use base64.StdEncoding
-			// to avoid the high overhead of json serialization/deserialization.
-			return types.String(base64.StdEncoding.EncodeToString(v.Bytes()))
-		}
 		return &reflectSchemalessTypedList{value: v}
 	case reflect.Map:
 		return &reflectSchemalessTypedMap{value: v}
 	case reflect.Struct:
-		if typedVal, ok := val.(intstr.IntOrString); ok {
-			switch typedVal.Type {
-			case intstr.Int:
-				return types.Int(typedVal.IntVal)
-			case intstr.String:
-				return types.String(typedVal.StrVal)
-			}
-		}
-		// Check if pointer to struct implements ToUnstructured
-		ptrType := reflect.PointerTo(v.Type())
-		if ptrType.Implements(reflect.TypeFor[unstructuredWrapper]()) {
-			ptr := reflect.New(v.Type())
-			ptr.Elem().Set(v)
-			return SchemalessTypedToVal(ptr.Interface().(unstructuredWrapper).ToUnstructured())
-		}
-		// Check if pointer to struct implements json.Marshaler
-		if ptrType.Implements(reflect.TypeFor[json.Marshaler]()) {
-			ptr := reflect.New(v.Type())
-			ptr.Elem().Set(v)
-			return marshalToVal(ptr.Interface().(json.Marshaler))
-		}
 		return &reflectSchemalessTypedStruct{value: v}
 	// Match type aliases to primitives by kind
 	case reflect.Bool:
 		return types.Bool(v.Bool())
 	case reflect.String:
 		return types.String(v.String())
-	case reflect.Int, reflect.Int32, reflect.Int64:
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return types.Int(v.Int())
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		uVal := v.Uint()
+		if uVal > 9223372036854775807 { // math.MaxInt64
+			return types.NewErr("unsigned value %d does not fit into int64 (overflow)", uVal)
+		}
+		return types.Int(uVal)
 	case reflect.Float32, reflect.Float64:
 		return types.Double(v.Float())
 	default:
 		return types.NewErr("unsupported Go type for CEL: %v", v.Type())
 	}
-}
-
-func marshalToVal(marshaler json.Marshaler) ref.Val {
-	b, err := json.Marshal(marshaler)
-	if err != nil {
-		return types.NewErr("failed to marshal type %T: %v", marshaler, err)
-	}
-	var unmarshaled interface{}
-	if err := json.Unmarshal(b, &unmarshaled); err != nil {
-		return types.NewErr("failed to unmarshal type %T: %v", marshaler, err)
-	}
-	return types.DefaultTypeAdapter.NativeToValue(unmarshaled)
 }
 
 var _ traits.Lister = &reflectSchemalessTypedList{}
@@ -192,15 +168,13 @@ func (l *reflectSchemalessTypedList) Equal(other ref.Val) ref.Val {
 		return types.MaybeNoSuchOverloadErr(other)
 	}
 	sz := l.Size().(types.Int)
-	otherSz := otherList.Size().(types.Int)
-	if sz != otherSz {
+	if sz != otherList.Size().(types.Int) {
 		return types.False
 	}
 	for i := range sz {
 		v1 := l.Get(i)
 		v2 := otherList.Get(i)
-		eq := v1.Equal(v2)
-		if eq != types.True {
+		if v1.Equal(v2) != types.True {
 			return types.False
 		}
 	}
@@ -219,8 +193,7 @@ func (l *reflectSchemalessTypedList) Contains(val ref.Val) ref.Val {
 	sz := l.Size().(types.Int)
 	for i := range sz {
 		v := l.Get(i)
-		eq := v.Equal(val)
-		if eq == types.True {
+		if v.Equal(val) == types.True {
 			return types.True
 		}
 	}
@@ -328,10 +301,9 @@ func (m *reflectSchemalessTypedMap) Equal(other ref.Val) ref.Val {
 	it := m.Iterator()
 	for it.HasNext() == types.True {
 		key := it.Next()
-		v1 := m.Get(key)
-		v2 := otherMap.Get(key)
-		eq := v1.Equal(v2)
-		if eq != types.True {
+		v1, _ := m.Find(key)
+		v2, found := otherMap.Find(key)
+		if !found || v1.Equal(v2) != types.True {
 			return types.False
 		}
 	}
@@ -347,17 +319,11 @@ func (m *reflectSchemalessTypedMap) Value() interface{} {
 }
 
 func (m *reflectSchemalessTypedMap) Contains(key ref.Val) ref.Val {
-	keyVal, ok := key.(types.String)
-	if !ok {
-		return types.ValOrErr(key, "unsupported map key type: %T", key)
+	v, found := m.Find(key)
+	if v != nil && types.IsError(v) {
+		return v
 	}
-	mapKeys := m.value.MapKeys()
-	for _, mk := range mapKeys {
-		if mk.String() == string(keyVal) {
-			return types.True
-		}
-	}
-	return types.False
+	return types.Bool(found)
 }
 
 func (m *reflectSchemalessTypedMap) Find(key ref.Val) (ref.Val, bool) {
@@ -472,11 +438,14 @@ func (s *reflectSchemalessTypedStruct) Equal(other ref.Val) ref.Val {
 	it := s.Iterator()
 	for it.HasNext() == types.True {
 		key := it.Next()
-		v1 := s.Get(key)
-		v2 := otherMap.Get(key)
+		v1, _ := s.Find(key)
+		v2, found := otherMap.Find(key)
+		if !found {
+			return types.False
+		}
 		eq := v1.Equal(v2)
 		if eq != types.True {
-			return types.False
+			return eq
 		}
 	}
 	return types.True
@@ -511,14 +480,17 @@ func (s *reflectSchemalessTypedStruct) Get(key ref.Val) ref.Val {
 }
 
 func (s *reflectSchemalessTypedStruct) Contains(key ref.Val) ref.Val {
-	_, found := s.lookupField(key)
+	v, found := s.Find(key)
+	if v != nil && types.IsError(v) {
+		return v
+	}
 	return types.Bool(found)
 }
 
 func (s *reflectSchemalessTypedStruct) lookupField(key ref.Val) (ref.Val, bool) {
 	keyStr, ok := key.(types.String)
 	if !ok {
-		return types.MaybeNoSuchOverloadErr(key), true
+		return types.ValOrErr(key, "unsupported map key type: %T", key), true
 	}
 	fieldName := keyStr.Value().(string)
 
