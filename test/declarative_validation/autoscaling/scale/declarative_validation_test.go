@@ -36,6 +36,8 @@ import (
 	rcstorage "k8s.io/kubernetes/pkg/registry/core/replicationcontroller/storage"
 )
 
+var apiVersions = []string{"v1"}
+
 func TestDeclarativeValidateUpdate(t *testing.T) {
 	testCases := map[string]struct {
 		old          autoscaling.Scale
