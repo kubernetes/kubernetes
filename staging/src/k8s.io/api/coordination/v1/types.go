@@ -39,6 +39,7 @@ const (
 // Lease defines a lease concept.
 type Lease struct {
 	metav1.TypeMeta `json:""`
+	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -72,13 +73,13 @@ type LeaseSpec struct {
 	// holders.
 	// +optional
 	LeaseTransitions *int32 `json:"leaseTransitions,omitempty" protobuf:"varint,5,opt,name=leaseTransitions"`
-	// Strategy indicates the strategy for picking the leader for coordinated leader election.
+	// strategy indicates the strategy for picking the leader for coordinated leader election.
 	// If the field is not specified, there is no active coordination for this lease.
 	// (Alpha) Using this field requires the CoordinatedLeaderElection feature gate to be enabled.
 	// +featureGate=CoordinatedLeaderElection
 	// +optional
 	Strategy *CoordinatedLeaseStrategy `json:"strategy,omitempty" protobuf:"bytes,6,opt,name=strategy"`
-	// PreferredHolder signals to a lease holder that the lease has a
+	// preferredHolder signals to a lease holder that the lease has a
 	// more optimal holder and should be given up.
 	// This field can only be set if Strategy is also set.
 	// +featureGate=CoordinatedLeaderElection
