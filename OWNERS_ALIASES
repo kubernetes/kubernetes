@@ -325,13 +325,14 @@ aliases:
 
   sig-autoscaling-maintainers:
     - adrianmoisey
-    - gjtempleton
     - jackfrancis
+    - omerap12
     - towca
   # emeritus
   # - maciekpytel
   # - mwielgus
   # - raywainman
+  # - gjtempleton
   sig-instrumentation-approvers:
     - dashpole
     - RainbowMango
@@ -562,7 +563,6 @@ aliases:
     - eddiezane # CLI
     - elmiko # Cloud Provider
     - enj # Auth
-    - gjtempleton # Autoscaling
     - jackfrancis # Autoscaling
     - janetkuo # Apps
     - jayunit100 # Windows
@@ -579,6 +579,7 @@ aliases:
     - mikezappa87 # Network
     - mrunalp # Node
     - msau42 # Storage
+    - omerap12 # Autoscaling
     - pohly # Instrumentation
     - rexagod # Instrumentation
     - richabanker # Instrumentation
