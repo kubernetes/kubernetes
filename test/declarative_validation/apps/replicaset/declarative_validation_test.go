@@ -87,7 +87,8 @@ func TestDeclarativeValidate(t *testing.T) {
 						verifyDeclarativeValidateAllRules(t, ctx, apiVersion, &tc.input, tc.expectedErrs)
 						return
 					}
-					apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs)
+					apitesting.VerifyValidationEquivalence(t, ctx, &tc.input, registry.Strategy, tc.expectedErrs,
+						apitesting.WithSkipGroupVersions("extensions/v1beta1"))
 				})
 			}
 		})
@@ -185,7 +186,8 @@ func TestDeclarativeValidateUpdate(t *testing.T) {
 						verifyDeclarativeValidateUpdateAllRules(t, ctx, apiVersion, &tc.updateObj, &tc.oldObj, tc.expectedErrs)
 						return
 					}
-					apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, registry.Strategy, tc.expectedErrs)
+					apitesting.VerifyUpdateValidationEquivalence(t, ctx, &tc.updateObj, &tc.oldObj, registry.Strategy, tc.expectedErrs,
+						apitesting.WithSkipGroupVersions("extensions/v1beta1"))
 				})
 			}
 		})

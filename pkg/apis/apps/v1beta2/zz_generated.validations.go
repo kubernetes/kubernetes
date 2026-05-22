@@ -26,13 +26,15 @@ import (
 	fmt "fmt"
 
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
+	corev1 "k8s.io/api/core/v1"
 	equality "k8s.io/apimachinery/pkg/api/equality"
 	operation "k8s.io/apimachinery/pkg/api/operation"
 	safe "k8s.io/apimachinery/pkg/api/safe"
 	validate "k8s.io/apimachinery/pkg/api/validate"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	field "k8s.io/apimachinery/pkg/util/validation/field"
+	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 )
 
 func init() { localSchemeBuilder.Register(RegisterValidations) }
@@ -40,6 +42,21 @@ func init() { localSchemeBuilder.Register(RegisterValidations) }
 // RegisterValidations adds validation functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterValidations(scheme *runtime.Scheme) error {
+	// type DaemonSet
+	scheme.AddValidationFunc(
+		(*appsv1beta2.DaemonSet)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/", "/status":
+				return Validate_DaemonSet(
+					ctx, op, nil, /* fldPath */
+					obj.(*appsv1beta2.DaemonSet),
+					safe.Cast[*appsv1beta2.DaemonSet](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	// type Deployment
 	scheme.AddValidationFunc(
 		(*appsv1beta2.Deployment)(nil),
@@ -85,7 +102,93 @@ func RegisterValidations(scheme *runtime.Scheme) error {
 				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
 			}
 		})
+	// type StatefulSet
+	scheme.AddValidationFunc(
+		(*appsv1beta2.StatefulSet)(nil),
+		func(ctx context.Context, op operation.Operation, obj, oldObj interface{}) field.ErrorList {
+			switch op.Request.SubresourcePath() {
+			case "/", "/scale", "/status":
+				return Validate_StatefulSet(
+					ctx, op, nil, /* fldPath */
+					obj.(*appsv1beta2.StatefulSet),
+					safe.Cast[*appsv1beta2.StatefulSet](oldObj))
+			}
+			return field.ErrorList{
+				field.InternalError(nil, fmt.Errorf("no validation found for %T, subresource: %v", obj, op.Request.SubresourcePath())),
+			}
+		})
 	return nil
+}
+
+// Validate_DaemonSet validates an instance of DaemonSet according
+// to declarative validation rules in the API schema.
+func Validate_DaemonSet(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *appsv1beta2.DaemonSet) (errs field.ErrorList) {
+
+	// field appsv1beta2.DaemonSet.TypeMeta has no validation
+	// field appsv1beta2.DaemonSet.ObjectMeta has no validation
+
+	{ // field appsv1beta2.DaemonSet.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *appsv1beta2.DaemonSetSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_DaemonSetSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *appsv1beta2.DaemonSet) *appsv1beta2.DaemonSetSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
+
+	// field appsv1beta2.DaemonSet.Status has no validation
+	return errs
+}
+
+// Validate_DaemonSetSpec validates an instance of DaemonSetSpec according
+// to declarative validation rules in the API schema.
+func Validate_DaemonSetSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *appsv1beta2.DaemonSetSpec) (errs field.ErrorList) {
+
+	// field appsv1beta2.DaemonSetSpec.Selector has no validation
+
+	{ // field appsv1beta2.DaemonSetSpec.Template
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.PodTemplateSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, v1.Validate_PodTemplateSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *appsv1beta2.DaemonSetSpec) *corev1.PodTemplateSpec {
+				return &oldObj.Template
+			})
+		errs = append(errs, fn(fldPath.Child("template"), &obj.Template, oldVal, oldObj != nil)...)
+	}
+
+	// field appsv1beta2.DaemonSetSpec.UpdateStrategy has no validation
+	// field appsv1beta2.DaemonSetSpec.MinReadySeconds has no validation
+	// field appsv1beta2.DaemonSetSpec.RevisionHistoryLimit has no validation
+	return errs
 }
 
 // Validate_Deployment validates an instance of Deployment according
@@ -134,7 +237,7 @@ func Validate_DeploymentSpec(
 	{ // field appsv1beta2.DeploymentSpec.Selector
 		fn := func(
 			fldPath *field.Path,
-			obj, oldObj *v1.LabelSelector,
+			obj, oldObj *metav1.LabelSelector,
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
@@ -158,13 +261,34 @@ func Validate_DeploymentSpec(
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *appsv1beta2.DeploymentSpec) *v1.LabelSelector {
+			func(oldObj *appsv1beta2.DeploymentSpec) *metav1.LabelSelector {
 				return oldObj.Selector
 			})
 		errs = append(errs, fn(fldPath.Child("selector"), obj.Selector, oldVal, oldObj != nil)...)
 	}
 
-	// field appsv1beta2.DeploymentSpec.Template has no validation
+	{ // field appsv1beta2.DeploymentSpec.Template
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.PodTemplateSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, v1.Validate_PodTemplateSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *appsv1beta2.DeploymentSpec) *corev1.PodTemplateSpec {
+				return &oldObj.Template
+			})
+		errs = append(errs, fn(fldPath.Child("template"), &obj.Template, oldVal, oldObj != nil)...)
+	}
+
 	// field appsv1beta2.DeploymentSpec.Strategy has no validation
 	// field appsv1beta2.DeploymentSpec.MinReadySeconds has no validation
 	// field appsv1beta2.DeploymentSpec.RevisionHistoryLimit has no validation
@@ -220,7 +344,7 @@ func Validate_ReplicaSetSpec(
 	{ // field appsv1beta2.ReplicaSetSpec.Selector
 		fn := func(
 			fldPath *field.Path,
-			obj, oldObj *v1.LabelSelector,
+			obj, oldObj *metav1.LabelSelector,
 			oldValueCorrelated bool) (errs field.ErrorList) {
 			// don't revalidate unchanged data
 			if oldValueCorrelated && op.Type == operation.Update {
@@ -244,13 +368,34 @@ func Validate_ReplicaSetSpec(
 			return
 		}
 		oldVal := safe.Field(oldObj,
-			func(oldObj *appsv1beta2.ReplicaSetSpec) *v1.LabelSelector {
+			func(oldObj *appsv1beta2.ReplicaSetSpec) *metav1.LabelSelector {
 				return oldObj.Selector
 			})
 		errs = append(errs, fn(fldPath.Child("selector"), obj.Selector, oldVal, oldObj != nil)...)
 	}
 
-	// field appsv1beta2.ReplicaSetSpec.Template has no validation
+	{ // field appsv1beta2.ReplicaSetSpec.Template
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.PodTemplateSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, v1.Validate_PodTemplateSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *appsv1beta2.ReplicaSetSpec) *corev1.PodTemplateSpec {
+				return &oldObj.Template
+			})
+		errs = append(errs, fn(fldPath.Child("template"), &obj.Template, oldVal, oldObj != nil)...)
+	}
+
 	return errs
 }
 
@@ -320,5 +465,82 @@ func Validate_ScaleSpec(
 		errs = append(errs, fn(fldPath.Child("replicas"), &obj.Replicas, oldVal, oldObj != nil)...)
 	}
 
+	return errs
+}
+
+// Validate_StatefulSet validates an instance of StatefulSet according
+// to declarative validation rules in the API schema.
+func Validate_StatefulSet(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *appsv1beta2.StatefulSet) (errs field.ErrorList) {
+
+	// field appsv1beta2.StatefulSet.TypeMeta has no validation
+	// field appsv1beta2.StatefulSet.ObjectMeta has no validation
+
+	{ // field appsv1beta2.StatefulSet.Spec
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *appsv1beta2.StatefulSetSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, Validate_StatefulSetSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *appsv1beta2.StatefulSet) *appsv1beta2.StatefulSetSpec {
+				return &oldObj.Spec
+			})
+		errs = append(errs, fn(fldPath.Child("spec"), &obj.Spec, oldVal, oldObj != nil)...)
+	}
+
+	// field appsv1beta2.StatefulSet.Status has no validation
+	return errs
+}
+
+// Validate_StatefulSetSpec validates an instance of StatefulSetSpec according
+// to declarative validation rules in the API schema.
+func Validate_StatefulSetSpec(
+	ctx context.Context, op operation.Operation, fldPath *field.Path,
+	obj, oldObj *appsv1beta2.StatefulSetSpec) (errs field.ErrorList) {
+
+	// field appsv1beta2.StatefulSetSpec.Replicas has no validation
+	// field appsv1beta2.StatefulSetSpec.Selector has no validation
+
+	{ // field appsv1beta2.StatefulSetSpec.Template
+		fn := func(
+			fldPath *field.Path,
+			obj, oldObj *corev1.PodTemplateSpec,
+			oldValueCorrelated bool) (errs field.ErrorList) {
+			// don't revalidate unchanged data
+			if oldValueCorrelated && op.Type == operation.Update {
+				if equality.Semantic.DeepEqual(obj, oldObj) {
+					return nil
+				}
+			}
+			// call the type's validation function
+			errs = append(errs, v1.Validate_PodTemplateSpec(ctx, op, fldPath, obj, oldObj)...)
+			return
+		}
+		oldVal := safe.Field(oldObj,
+			func(oldObj *appsv1beta2.StatefulSetSpec) *corev1.PodTemplateSpec {
+				return &oldObj.Template
+			})
+		errs = append(errs, fn(fldPath.Child("template"), &obj.Template, oldVal, oldObj != nil)...)
+	}
+
+	// field appsv1beta2.StatefulSetSpec.VolumeClaimTemplates has no validation
+	// field appsv1beta2.StatefulSetSpec.ServiceName has no validation
+	// field appsv1beta2.StatefulSetSpec.PodManagementPolicy has no validation
+	// field appsv1beta2.StatefulSetSpec.UpdateStrategy has no validation
+	// field appsv1beta2.StatefulSetSpec.RevisionHistoryLimit has no validation
+	// field appsv1beta2.StatefulSetSpec.MinReadySeconds has no validation
+	// field appsv1beta2.StatefulSetSpec.PersistentVolumeClaimRetentionPolicy has no validation
+	// field appsv1beta2.StatefulSetSpec.Ordinals has no validation
 	return errs
 }
