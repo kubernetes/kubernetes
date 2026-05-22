@@ -1,5 +1,6 @@
 {
   "kind": "GetOptions",
   "apiVersion": "v1",
-  "resourceVersion": "resourceVersionValue"
+  "resourceVersion": "resourceVersionValue",
+  "omitManagedFields": true
 }

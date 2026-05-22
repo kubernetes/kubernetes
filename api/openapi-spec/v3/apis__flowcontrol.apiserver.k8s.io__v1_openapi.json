@@ -1374,6 +1374,14 @@
             }
           },
           {
+            "in": "query",
+            "name": "omitManagedFields",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
+          },
+          {
             "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
             "in": "query",
             "name": "orphanDependents",
@@ -1532,6 +1540,14 @@
             "name": "limit",
             "schema": {
               "type": "integer",
+              "uniqueItems": true
+            }
+          },
+          {
+            "in": "query",
+            "name": "omitManagedFields",
+            "schema": {
+              "type": "boolean",
               "uniqueItems": true
             }
           },
@@ -2600,6 +2616,14 @@
             }
           },
           {
+            "in": "query",
+            "name": "omitManagedFields",
+            "schema": {
+              "type": "boolean",
+              "uniqueItems": true
+            }
+          },
+          {
             "description": "Deprecated: please use the PropagationPolicy, this field will be deprecated in 1.7. Should the dependent objects be orphaned. If true/false, the \"orphan\" finalizer will be added to/removed from the object's finalizers list. Either this field or PropagationPolicy may be set, but not both.",
             "in": "query",
             "name": "orphanDependents",
@@ -2758,6 +2782,14 @@
             "name": "limit",
             "schema": {
               "type": "integer",
+              "uniqueItems": true
+            }
+          },
+          {
+            "in": "query",
+            "name": "omitManagedFields",
+            "schema": {
+              "type": "boolean",
               "uniqueItems": true
             }
           },
@@ -3863,6 +3895,14 @@
           }
         },
         {
+          "in": "query",
+          "name": "omitManagedFields",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
           "description": "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).",
           "in": "query",
           "name": "pretty",
@@ -4043,6 +4083,14 @@
           }
         },
         {
+          "in": "query",
+          "name": "omitManagedFields",
+          "schema": {
+            "type": "boolean",
+            "uniqueItems": true
+          }
+        },
+        {
           "description": "If 'true', then the output is pretty printed. Defaults to 'false' unless the user-agent indicates a browser or command-line HTTP tool (curl and wget).",
           "in": "query",
           "name": "pretty",
@@ -4209,6 +4257,14 @@
           "name": "limit",
           "schema": {
             "type": "integer",
+            "uniqueItems": true
+          }
+        },
+        {
+          "in": "query",
+          "name": "omitManagedFields",
+          "schema": {
+            "type": "boolean",
             "uniqueItems": true
           }
         },
@@ -4389,6 +4445,14 @@
           "required": true,
           "schema": {
             "type": "string",
+            "uniqueItems": true
+          }
+        },
+        {
+          "in": "query",
+          "name": "omitManagedFields",
+          "schema": {
+            "type": "boolean",
             "uniqueItems": true
           }
         },
