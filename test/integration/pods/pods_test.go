@@ -1478,9 +1478,10 @@ func TestDNSSearchValidation(t *testing.T) {
 
 func TestNodeDeclaredFeatureAdmission(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
-		features.NodeDeclaredFeatures:                    true,
-		features.PodLevelResources:                       true,
-		features.InPlacePodLevelResourcesVerticalScaling: true,
+		features.NodeDeclaredFeatures:                         true,
+		features.PodLevelResources:                            true,
+		features.InPlacePodLevelResourcesVerticalScaling:      true,
+		features.InPlacePodVerticalScalingMemoryBackedVolumes: true,
 	})
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
@@ -1488,6 +1489,7 @@ func TestNodeDeclaredFeatureAdmission(t *testing.T) {
 	ns := framework.CreateNamespaceOrDie(client, "pod-resize-feature-admission", t)
 	defer framework.DeleteNamespaceOrDie(client, ns, t)
 
+	limit100 := resource.MustParse("100Mi")
 	nodeName := "test-node"
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1506,6 +1508,26 @@ func TestNodeDeclaredFeatureAdmission(t *testing.T) {
 				},
 			},
 			RestartPolicy: v1.RestartPolicyAlways,
+			Volumes: []v1.Volume{
+				{
+					Name: "vol-memory",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:    v1.StorageMediumMemory,
+							SizeLimit: &limit100,
+						},
+					},
+				},
+				{
+					Name: "vol-default",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{
+							Medium:    v1.StorageMediumDefault,
+							SizeLimit: &limit100,
+						},
+					},
+				},
+			},
 		},
 		Status: v1.PodStatus{
 			Phase: v1.PodRunning,
@@ -1549,6 +1571,40 @@ func TestNodeDeclaredFeatureAdmission(t *testing.T) {
 				pod.ObjectMeta.Labels = map[string]string{"foo": "bar"}
 			},
 			expectError: "",
+		},
+
+		{
+			name:                 "memory backed volume resize admission fails when required feature is not declared on node",
+			nodeDeclaredFeatures: []string{"SomeOtherFeature"},
+			nodeVersion:          "1.35.0",
+			podUpdateFn: func(pod *v1.Pod) {
+				limit200 := resource.MustParse("200Mi")
+				pod.Spec.Volumes[0].EmptyDir.SizeLimit = &limit200
+			},
+			expectError: "pod update requires features InPlacePodVerticalScalingMemoryBackedVolumes which are not available on node",
+		},
+
+		{
+			name:                 "memory backed volume resize admission succeeds when required feature is declared on node",
+			nodeDeclaredFeatures: []string{ipprfeature.MemoryBackedVolumesResizeFeature.Name()},
+			nodeVersion:          "1.35.0",
+			podUpdateFn: func(pod *v1.Pod) {
+				limit200 := resource.MustParse("200Mi")
+				pod.Spec.Volumes[0].EmptyDir.SizeLimit = &limit200
+			},
+			expectError: "",
+		},
+
+		{
+			name:                 "non-memory backed volume resize admission passes NDF but fails regular validation",
+			nodeDeclaredFeatures: []string{"SomeOtherFeature"},
+			nodeVersion:          "1.35.0",
+			podUpdateFn: func(pod *v1.Pod) {
+				limit200 := resource.MustParse("200Mi")
+				pod.Spec.Volumes[1].EmptyDir.SizeLimit = &limit200
+			},
+			// Regular validation will throw an error for this case, but NDF should not.
+			expectError: "Forbidden: sizeLimit is only mutable for memory-backed emptyDir volumes",
 		},
 	}
 
