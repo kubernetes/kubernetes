@@ -413,8 +413,17 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 				continue
 			}
 
+			// Multi-level owner UID resolution (KEP-5936)
+			fsUser := mounterArgs.FsUser
+			if s.source.DefaultUser != nil {
+				fsUser = s.source.DefaultUser
+			}
+			if source.PodCertificate.User != nil {
+				fsUser = source.PodCertificate.User
+			}
+
 			mode := *s.source.DefaultMode
-			if mounterArgs.FsUser != nil || mounterArgs.FsGroup != nil {
+			if fsUser != nil || mounterArgs.FsGroup != nil {
 				mode = 0600
 			}
 
@@ -425,21 +434,21 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 				payload[source.PodCertificate.CredentialBundlePath] = volumeutil.FileProjection{
 					Data:   credentialBundle.Bytes(),
 					Mode:   mode,
-					FsUser: mounterArgs.FsUser,
+					FsUser: fsUser,
 				}
 			}
 			if source.PodCertificate.KeyPath != "" {
 				payload[source.PodCertificate.KeyPath] = volumeutil.FileProjection{
 					Data:   key,
 					Mode:   mode,
-					FsUser: mounterArgs.FsUser,
+					FsUser: fsUser,
 				}
 			}
 			if source.PodCertificate.CertificateChainPath != "" {
 				payload[source.PodCertificate.CertificateChainPath] = volumeutil.FileProjection{
 					Data:   certificates,
 					Mode:   mode,
-					FsUser: mounterArgs.FsUser,
+					FsUser: fsUser,
 				}
 			}
 

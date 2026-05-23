@@ -1618,6 +1618,222 @@ func TestCollectDataWithPodCertificate(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "pod certificates with fsUser",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						PodCertificate: &v1.PodCertificateProjection{
+							SignerName:           "example.com/foo",
+							KeyType:              "ED25519",
+							CredentialBundlePath: "credbundle.pem",
+							KeyPath:              "key.pem",
+							CertificateChainPath: "certificates.pem",
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+			},
+			bundles: []runtime.Object{},
+			fsUser:  ptr.To[int64](1000),
+			wantPayload: map[string]util.FileProjection{
+				"credbundle.pem": {
+					Data:   []byte("key\ncert\n"),
+					FsUser: ptr.To[int64](1000),
+					Mode:   0600,
+				},
+				"key.pem": {
+					Data:   []byte("key\n"),
+					FsUser: ptr.To[int64](1000),
+					Mode:   0600,
+				},
+				"certificates.pem": {
+					Data:   []byte("cert\n"),
+					FsUser: ptr.To[int64](1000),
+					Mode:   0600,
+				},
+			},
+		},
+		{
+			name: "pod certificates with defaultUser",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						PodCertificate: &v1.PodCertificateProjection{
+							SignerName:           "example.com/foo",
+							KeyType:              "ED25519",
+							CredentialBundlePath: "credbundle.pem",
+							KeyPath:              "key.pem",
+							CertificateChainPath: "certificates.pem",
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+				DefaultUser: ptr.To[int64](1000),
+			},
+			bundles: []runtime.Object{},
+			wantPayload: map[string]util.FileProjection{
+				"credbundle.pem": {
+					Data:   []byte("key\ncert\n"),
+					FsUser: ptr.To[int64](1000),
+					Mode:   0600,
+				},
+				"key.pem": {
+					Data:   []byte("key\n"),
+					FsUser: ptr.To[int64](1000),
+					Mode:   0600,
+				},
+				"certificates.pem": {
+					Data:   []byte("cert\n"),
+					FsUser: ptr.To[int64](1000),
+					Mode:   0600,
+				},
+			},
+		},
+		{
+			name: "pod certificates with user",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						PodCertificate: &v1.PodCertificateProjection{
+							SignerName:           "example.com/foo",
+							KeyType:              "ED25519",
+							CredentialBundlePath: "credbundle.pem",
+							KeyPath:              "key.pem",
+							CertificateChainPath: "certificates.pem",
+							User:                 ptr.To[int64](1000),
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+			},
+			bundles: []runtime.Object{},
+			wantPayload: map[string]util.FileProjection{
+				"credbundle.pem": {
+					Data:   []byte("key\ncert\n"),
+					FsUser: ptr.To[int64](1000),
+					Mode:   0600,
+				},
+				"key.pem": {
+					Data:   []byte("key\n"),
+					FsUser: ptr.To[int64](1000),
+					Mode:   0600,
+				},
+				"certificates.pem": {
+					Data:   []byte("cert\n"),
+					FsUser: ptr.To[int64](1000),
+					Mode:   0600,
+				},
+			},
+		},
+		{
+			name: "pod certificates with fsUser and defaultUser",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						PodCertificate: &v1.PodCertificateProjection{
+							SignerName:           "example.com/foo",
+							KeyType:              "ED25519",
+							CredentialBundlePath: "credbundle.pem",
+							KeyPath:              "key.pem",
+							CertificateChainPath: "certificates.pem",
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+				DefaultUser: ptr.To[int64](1001),
+			},
+			bundles: []runtime.Object{},
+			fsUser:  ptr.To[int64](1000),
+			wantPayload: map[string]util.FileProjection{
+				"credbundle.pem": {
+					Data:   []byte("key\ncert\n"),
+					FsUser: ptr.To[int64](1001),
+					Mode:   0600,
+				},
+				"key.pem": {
+					Data:   []byte("key\n"),
+					FsUser: ptr.To[int64](1001),
+					Mode:   0600,
+				},
+				"certificates.pem": {
+					Data:   []byte("cert\n"),
+					FsUser: ptr.To[int64](1001),
+					Mode:   0600,
+				},
+			},
+		},
+		{
+			name: "pod certificates with fsUser, defaultUser and user",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						PodCertificate: &v1.PodCertificateProjection{
+							SignerName:           "example.com/foo",
+							KeyType:              "ED25519",
+							CredentialBundlePath: "credbundle.pem",
+							KeyPath:              "key.pem",
+							CertificateChainPath: "certificates.pem",
+							User:                 ptr.To[int64](1002),
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+				DefaultUser: ptr.To[int64](1001),
+			},
+			bundles: []runtime.Object{},
+			fsUser:  ptr.To[int64](1000),
+			wantPayload: map[string]util.FileProjection{
+				"credbundle.pem": {
+					Data:   []byte("key\ncert\n"),
+					FsUser: ptr.To[int64](1002),
+					Mode:   0600,
+				},
+				"key.pem": {
+					Data:   []byte("key\n"),
+					FsUser: ptr.To[int64](1002),
+					Mode:   0600,
+				},
+				"certificates.pem": {
+					Data:   []byte("cert\n"),
+					FsUser: ptr.To[int64](1002),
+					Mode:   0600,
+				},
+			},
+		},
+		{
+			name: "pod certificates with fsGroup",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						PodCertificate: &v1.PodCertificateProjection{
+							SignerName:           "example.com/foo",
+							KeyType:              "ED25519",
+							CredentialBundlePath: "credbundle.pem",
+							KeyPath:              "key.pem",
+							CertificateChainPath: "certificates.pem",
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+			},
+			bundles: []runtime.Object{},
+			fsGroup: ptr.To[int64](1000),
+			wantPayload: map[string]util.FileProjection{
+				"credbundle.pem": {
+					Data: []byte("key\ncert\n"),
+					Mode: 0600,
+				},
+				"key.pem": {
+					Data: []byte("key\n"),
+					Mode: 0600,
+				},
+				"certificates.pem": {
+					Data: []byte("cert\n"),
+					Mode: 0600,
+				},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
