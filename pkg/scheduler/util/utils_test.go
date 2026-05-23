@@ -167,6 +167,90 @@ func TestMoreImportantPod(t *testing.T) {
 	}
 }
 
+func TestMoreImportantPodCreationTimestamp(t *testing.T) {
+	var priority int32 = 1
+	baseTime := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+
+	newPod := func(name string, creationTimestamp time.Time) *v1.Pod {
+		return &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              name,
+				CreationTimestamp: metav1.NewTime(creationTimestamp),
+			},
+			Spec: v1.PodSpec{
+				Priority: &priority,
+			},
+		}
+	}
+
+	olderPod := newPod("older-pod", baseTime)
+	newerPod := newPod("newer-pod", baseTime.Add(time.Second))
+	sameTimePod := newPod("same-time-pod", baseTime)
+
+	tests := []struct {
+		name     string
+		pod1     *v1.Pod
+		pod2     *v1.Pod
+		expected bool
+	}{
+		{
+			name:     "older creation timestamp is more important",
+			pod1:     olderPod,
+			pod2:     newerPod,
+			expected: true,
+		},
+		{
+			name:     "newer creation timestamp is less important",
+			pod1:     newerPod,
+			pod2:     olderPod,
+			expected: false,
+		},
+		{
+			name:     "same creation timestamp does not order pods",
+			pod1:     olderPod,
+			pod2:     sameTimePod,
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := MoreImportantPod(test.pod1, test.pod2)
+			if got != test.expected {
+				t.Errorf("expected %t but got %t", test.expected, got)
+			}
+		})
+	}
+}
+
+func BenchmarkMoreImportantPodWithoutStartTime(b *testing.B) {
+	var priority int32 = 1
+	baseTime := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	pod1 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "pod1",
+			CreationTimestamp: metav1.NewTime(baseTime),
+		},
+		Spec: v1.PodSpec{
+			Priority: &priority,
+		},
+	}
+	pod2 := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "pod2",
+			CreationTimestamp: metav1.NewTime(baseTime.Add(time.Second)),
+		},
+		Spec: v1.PodSpec{
+			Priority: &priority,
+		},
+	}
+
+	b.ReportAllocs()
+	for b.Loop() {
+		MoreImportantPod(pod1, pod2)
+	}
+}
+
 func TestPatchPodStatus(t *testing.T) {
 	tests := []struct {
 		name   string
