@@ -1429,6 +1429,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		configv1.ExtenderTLSConfig{}.OpenAPIModelName():                                                                 schema_k8sio_kube_scheduler_config_v1_ExtenderTLSConfig(ref),
 		configv1.InterPodAffinityArgs{}.OpenAPIModelName():                                                              schema_k8sio_kube_scheduler_config_v1_InterPodAffinityArgs(ref),
 		configv1.KubeSchedulerConfiguration{}.OpenAPIModelName():                                                        schema_k8sio_kube_scheduler_config_v1_KubeSchedulerConfiguration(ref),
+		configv1.KubeSchedulerMetricConfiguration{}.OpenAPIModelName():                                                  schema_k8sio_kube_scheduler_config_v1_KubeSchedulerMetricConfiguration(ref),
 		configv1.KubeSchedulerProfile{}.OpenAPIModelName():                                                              schema_k8sio_kube_scheduler_config_v1_KubeSchedulerProfile(ref),
 		configv1.NodeAffinityArgs{}.OpenAPIModelName():                                                                  schema_k8sio_kube_scheduler_config_v1_NodeAffinityArgs(ref),
 		configv1.NodeResourcesBalancedAllocationArgs{}.OpenAPIModelName():                                               schema_k8sio_kube_scheduler_config_v1_NodeResourcesBalancedAllocationArgs(ref),
@@ -68752,12 +68753,53 @@ func schema_k8sio_kube_scheduler_config_v1_KubeSchedulerConfiguration(ref common
 							Format:      "",
 						},
 					},
+					"metric": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Metric defines the configuration of metrics.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(configv1.KubeSchedulerMetricConfiguration{}.OpenAPIModelName()),
+						},
+					},
 				},
 				Required: []string{"leaderElection", "clientConnection"},
 			},
 		},
 		Dependencies: []string{
-			componentbaseconfigv1alpha1.ClientConnectionConfiguration{}.OpenAPIModelName(), componentbaseconfigv1alpha1.LeaderElectionConfiguration{}.OpenAPIModelName(), configv1.Extender{}.OpenAPIModelName(), configv1.KubeSchedulerProfile{}.OpenAPIModelName()},
+			componentbaseconfigv1alpha1.ClientConnectionConfiguration{}.OpenAPIModelName(), componentbaseconfigv1alpha1.LeaderElectionConfiguration{}.OpenAPIModelName(), configv1.Extender{}.OpenAPIModelName(), configv1.KubeSchedulerMetricConfiguration{}.OpenAPIModelName(), configv1.KubeSchedulerProfile{}.OpenAPIModelName()},
+	}
+}
+
+func schema_k8sio_kube_scheduler_config_v1_KubeSchedulerMetricConfiguration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type: []string{"object"},
+				Properties: map[string]spec.Schema{
+					"samplingRatePercent": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SamplingRatePercent controls how often the scheduler tries to record metrics that might be too frequent if we record always. It only impacts a plugin_execution_duration_seconds metric for now. Note that setting a bigger value would allow you to record more metric values, but with the trade-off of slower scheduling latency. Defaults to 10",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"bufferSize": {
+						SchemaProps: spec.SchemaProps{
+							Description: "BufferSize defines the buffer size for the MetricsAsyncRecorder, i.e., how many metric values the buffer can hold. Incoming metrics are dropped when the buffer is full. Increasing the buffer size (with the trade-off of higher memory consumption) may be necessary to avoid metric events being dropped due to buffer overflow, particularly in large clusters. Defaults to 1000",
+							Type:        []string{"integer"},
+							Format:      "int64",
+						},
+					},
+					"flushInterval": {
+						SchemaProps: spec.SchemaProps{
+							Description: "FlushInterval defines the flushing interval for the MetricsAsyncRecorder. Defines how frequently buffered metrics are pushed to the underlying sink. Reducing the buffer flush interval (with the trade-off of higher CPU consumption) may be necessary to avoid metric events being dropped due to buffer overflow, particularly in large clusters. Defaults to 1s",
+							Ref:         ref(metav1.Duration{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			metav1.Duration{}.OpenAPIModelName()},
 	}
 }
 

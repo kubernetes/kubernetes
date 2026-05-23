@@ -195,6 +195,9 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 	invalidPlugins.Profiles[0].Plugins.Score.Enabled = append(invalidPlugins.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "EBSLimits"})
 	invalidPlugins.Profiles[0].Plugins.Score.Enabled = append(invalidPlugins.Profiles[0].Plugins.Score.Enabled, config.Plugin{Name: "GCEPDLimits"})
 
+	invalidMetricSamplePercent := validConfig.DeepCopy()
+	invalidMetricSamplePercent.Metric.SamplingRatePercent = 101
+
 	scenarios := map[string]struct {
 		config   *config.KubeSchedulerConfiguration
 		wantErrs field.ErrorList
@@ -391,6 +394,15 @@ func TestValidateKubeSchedulerConfigurationV1(t *testing.T) {
 				&field.Error{
 					Type:  field.ErrorTypeInvalid,
 					Field: "profiles[0].plugins.score.enabled[3]",
+				},
+			},
+		},
+		"invalid-metric-sample-percent": {
+			config: invalidMetricSamplePercent,
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "metric.samplingRatePercent",
 				},
 			},
 		},

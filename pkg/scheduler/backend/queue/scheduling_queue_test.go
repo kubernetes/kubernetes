@@ -3968,7 +3968,7 @@ scheduler_pending_pods{queue="unschedulable"} 0
 				},
 			}
 			preenq := map[string]map[string]fwk.PreEnqueuePlugin{"": {(&preEnqueuePlugin{}).Name(): &preEnqueuePlugin{allowlists: []string{queueable}}}}
-			recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, tCtx.Done())
+			recorder := metrics.NewMetricsAsyncRecorder(tCtx, 3, 20*time.Microsecond)
 			queue := NewTestQueue(tCtx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)), WithPreEnqueuePluginMap(preenq), WithPluginMetricsSamplePercent(test.pluginMetricsSamplePercent), WithMetricsRecorder(recorder), WithQueueingHintMapPerProfile(m))
 			queue.isPopFromBackoffQEnabled = !test.disablePopFromBackoffQ
 			for i, op := range test.operations {
@@ -4975,7 +4975,7 @@ func TestUnschedulablePodsMetric(t *testing.T) {
 			plugin2 := preEnqueuePlugin{name: pluginName2, allowlists: []string{queueable}}
 
 			preenq := map[string]map[string]fwk.PreEnqueuePlugin{"": {pluginName1: &plugin1, pluginName2: &plugin2}}
-			recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, tCtx.Done())
+			recorder := metrics.NewMetricsAsyncRecorder(tCtx, 3, 20*time.Microsecond)
 			q := NewTestQueue(tCtx, newDefaultQueueSort(), WithClock(testingclock.NewFakeClock(timestamp)), WithPreEnqueuePluginMap(preenq), WithMetricsRecorder(recorder), WithQueueingHintMapPerProfile(m))
 
 			for _, step := range tt.steps {

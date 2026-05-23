@@ -96,6 +96,35 @@ type KubeSchedulerConfiguration struct {
 	// failover with the benefit of lower memory overhead while waiting to become leader.
 	// Defaults to false.
 	DelayCacheUntilActive bool `json:"delayCacheUntilActive,omitempty"`
+
+	// Metric defines the configuration of metrics.
+	// +optional
+	Metric KubeSchedulerMetricConfiguration `json:"metric,omitempty"`
+}
+
+type KubeSchedulerMetricConfiguration struct {
+	// SamplingRatePercent controls how often the scheduler tries to record metrics
+	// that might be too frequent if we record always.
+	// It only impacts a plugin_execution_duration_seconds metric for now.
+	// Note that setting a bigger value would allow you to record more metric values,
+	// but with the trade-off of slower scheduling latency.
+	// Defaults to 10
+	SamplingRatePercent *int64 `json:"samplingRatePercent,omitempty"`
+
+	// BufferSize defines the buffer size for the MetricsAsyncRecorder,
+	// i.e., how many metric values the buffer can hold.
+	// Incoming metrics are dropped when the buffer is full.
+	// Increasing the buffer size (with the trade-off of higher memory consumption) may be necessary
+	// to avoid metric events being dropped due to buffer overflow, particularly in large clusters.
+	// Defaults to 1000
+	BufferSize *int64 `json:"bufferSize,omitempty"`
+
+	// FlushInterval defines the flushing interval for the MetricsAsyncRecorder.
+	// Defines how frequently buffered metrics are pushed to the underlying sink.
+	// Reducing the buffer flush interval (with the trade-off of higher CPU consumption) may be necessary
+	// to avoid metric events being dropped due to buffer overflow, particularly in large clusters.
+	// Defaults to 1s
+	FlushInterval *metav1.Duration `json:"flushInterval,omitempty"`
 }
 
 // DecodeNestedObjects decodes plugin args for known types.
