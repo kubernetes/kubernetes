@@ -27,7 +27,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/configmap"
 	"k8s.io/kubernetes/pkg/volume/downwardapi"
@@ -319,11 +321,12 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 			}
 		case source.ServiceAccountToken != nil:
 			tp := source.ServiceAccountToken
+			fsUser := resolveFsUser(mounterArgs, s.source.DefaultUser, tp.User)
 
 			// When FsGroup is set, we depend on SetVolumeOwnership to
 			// change from 0600 to 0640.
 			mode := *s.source.DefaultMode
-			if mounterArgs.FsUser != nil || mounterArgs.FsGroup != nil {
+			if fsUser != nil || mounterArgs.FsGroup != nil {
 				mode = 0600
 			}
 
@@ -350,7 +353,7 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 			payload[tp.Path] = volumeutil.FileProjection{
 				Data:   []byte(tr.Status.Token),
 				Mode:   mode,
-				FsUser: mounterArgs.FsUser,
+				FsUser: fsUser,
 			}
 		case source.ClusterTrustBundle != nil:
 			allowEmpty := false
@@ -462,4 +465,20 @@ func getVolumeSource(spec *volume.Spec) (*v1.ProjectedVolumeSource, bool, error)
 	}
 
 	return nil, false, fmt.Errorf("spec does not reference a projected volume type")
+}
+
+// resolvesFsUser resolves file owner UID using a fallback mechanism described in KEP-5936.
+// Returns nil when the feature gate is disabled.
+func resolveFsUser(mounterArgs volume.MounterArgs, defaultUser, itemUser *int64) *int64 {
+	fsUser := mounterArgs.FsUser
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.AtomicWriteVolumeUserFields) {
+		if defaultUser != nil {
+			fsUser = defaultUser
+		}
+		if itemUser != nil {
+			fsUser = itemUser
+		}
+	}
+	return fsUser
 }
