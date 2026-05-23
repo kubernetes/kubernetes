@@ -450,6 +450,51 @@ func TestWithPercentageOfNodesToScore(t *testing.T) {
 	}
 }
 
+// TestWithPercentageOfPlacementsToScore tests scheduler's PercentageOfPlacementsToScore is set correctly.
+func TestWithPercentageOfPlacementsToScore(t *testing.T) {
+	tests := []struct {
+		name                                string
+		percentageOfPlacementsToScoreConfig *int32
+		wantedPercentageOfPlacementsToScore int32
+	}{
+		{
+			name:                                "percentageOfPlacementsScore is nil",
+			percentageOfPlacementsToScoreConfig: nil,
+			wantedPercentageOfPlacementsToScore: schedulerapi.DefaultPercentageOfPlacementsToScore,
+		},
+		{
+			name:                                "percentageOfPlacementsScore is not nil",
+			percentageOfPlacementsToScoreConfig: ptr.To[int32](10),
+			wantedPercentageOfPlacementsToScore: 10,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := fake.NewClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			sched, err := New(
+				ctx,
+				client,
+				informerFactory,
+				nil,
+				profile.NewRecorderFactory(eventBroadcaster),
+				WithPercentageOfPlacementsToScore(tt.percentageOfPlacementsToScoreConfig),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create scheduler: %v", err)
+			}
+			if sched.percentageOfPlacementsToScore != tt.wantedPercentageOfPlacementsToScore {
+				t.Errorf("scheduler.percentageOfPlacementsToScore = %v, want %v", sched.percentageOfPlacementsToScore, tt.wantedPercentageOfPlacementsToScore)
+			}
+		})
+	}
+}
+
 // getPodFromPriorityQueue is the function used in the TestDefaultErrorFunc test to get
 // the specific pod from the given priority queue. It returns the found pod in the priority queue.
 func getPodFromPriorityQueue(queue *internalqueue.PriorityQueue, pod *v1.Pod) *v1.Pod {

@@ -70,9 +70,10 @@ const (
 	placementGeneratePlugin           = "placement-generate-plugin"
 	defaultPreemptionPlugin           = names.DefaultPreemption
 
-	testProfileName              = "test-profile"
-	testPercentageOfNodesToScore = 35
-	nodeName                     = "testNode"
+	testProfileName                   = "test-profile"
+	testPercentageOfNodesToScore      = 35
+	testPercentageOfPlacementsToScore = 10
+	nodeName                          = "testNode"
 
 	injectReason       = "injected status"
 	injectFilterReason = "injected filter status"
@@ -3666,9 +3667,10 @@ func TestRecordingMetrics(t *testing.T) {
 
 			recorder := metrics.NewMetricsAsyncRecorder(100, time.Nanosecond, ctx.Done())
 			profile := config.KubeSchedulerProfile{
-				PercentageOfNodesToScore: ptr.To[int32](testPercentageOfNodesToScore),
-				SchedulerName:            testProfileName,
-				Plugins:                  plugins,
+				PercentageOfNodesToScore:      ptr.To[int32](testPercentageOfNodesToScore),
+				PercentageOfPlacementsToScore: ptr.To[int32](testPercentageOfPlacementsToScore),
+				SchedulerName:                 testProfileName,
+				Plugins:                       plugins,
 			}
 			f, err := newFrameworkWithQueueSortAndBind(ctx, r, profile,
 				withMetricsRecorder(recorder),
@@ -3785,9 +3787,10 @@ func TestRunBindPlugins(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			recorder := metrics.NewMetricsAsyncRecorder(100, time.Nanosecond, ctx.Done())
 			profile := config.KubeSchedulerProfile{
-				SchedulerName:            testProfileName,
-				PercentageOfNodesToScore: ptr.To[int32](testPercentageOfNodesToScore),
-				Plugins:                  plugins,
+				SchedulerName:                 testProfileName,
+				PercentageOfNodesToScore:      ptr.To[int32](testPercentageOfNodesToScore),
+				PercentageOfPlacementsToScore: ptr.To[int32](testPercentageOfPlacementsToScore),
+				Plugins:                       plugins,
 			}
 			fwk, err := newFrameworkWithQueueSortAndBind(ctx, r, profile, withMetricsRecorder(recorder))
 			if err != nil {
