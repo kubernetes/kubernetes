@@ -96,14 +96,11 @@ type CycleState interface {
 	// IsPodGroupSchedulingCycle returns true if this cycle is a pod group scheduling cycle.
 	// If set to false, it means that the pod referencing this CycleState either passed the pod group cycle
 	// or doesn't belong to any pod group.
-	// This field can only be set to true when GenericWorkload feature flag is enabled.
+	// This field can only be true when GenericWorkload feature flag is enabled.
 	IsPodGroupSchedulingCycle() bool
 	// GetPodGroupSchedulingCycle gets the cycle state of the PodGroup for a Pod.
 	// This should be only used when GenericWorkload feature flag is enabled.
 	GetPodGroupSchedulingCycle() PodGroupCycleState
-	// SetPodGroupSchedulingCycle sets the cycle state of the PodGroup for a Pod.
-	// This should be only used when GenericWorkload feature flag is enabled.
-	SetPodGroupSchedulingCycle(PodGroupCycleState)
 	// GetPlacementCycleState gets the cycle state of the current Placement for a Pod.
 	// Returns nil if this pod is not being scheduled within a placement context.
 	// This should be only used when GenericWorkload feature flag is enabled.
