@@ -308,8 +308,8 @@ type Framework interface {
 	// It returns a list that stores scores from each plugin and total score for each Placement.
 	// It also returns *Status, which is set to non-success if any of the plugins returns
 	// a non-success status.
-	// Each PodGroupAssignments carries the PlacementCycleState passed to ScorePlacement for that Placement.
-	RunPlacementScorePlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo, placements []*fwk.PodGroupAssignments) (ns []fwk.PlacementPluginScores, status *fwk.Status)
+	// Each PlacementCycleState is passed to ScorePlacement for the PodGroupAssignments at the same index.
+	RunPlacementScorePlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo, placements []*fwk.PodGroupAssignments, placementStates []fwk.PlacementCycleState) (ns []fwk.PlacementPluginScores, status *fwk.Status)
 
 	// HasFilterPlugins returns true if at least one Filter plugin is defined.
 	HasFilterPlugins() bool

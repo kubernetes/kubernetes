@@ -113,7 +113,7 @@ type CycleState interface {
 // PlacementCycleState provides a mechanism for plugins to store and retrieve arbitrary data
 // scoped to a single placement candidate within a pod group scheduling cycle.
 // Data stored in PlacementCycleState is shared across all pods scheduled within the same
-// placement iteration and is preserved through to the placement scoring phase via PodGroupAssignments.
+// placement iteration and is passed to ScorePlacement for that placement.
 // PlacementCycleState does not provide any data protection, as all plugins are assumed to be
 // trusted.
 type PlacementCycleState interface {

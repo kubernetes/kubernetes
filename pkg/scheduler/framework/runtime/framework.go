@@ -1483,11 +1483,24 @@ func (f *frameworkImpl) runScoreExtension(ctx context.Context, pl fwk.ScorePlugi
 // a non-success status.
 //
 // This function mostly duplicates RunScorePlugins. Any changes to it should likely be reflected in both places.
-func (f *frameworkImpl) RunPlacementScorePlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo, podGroupAssignments []*fwk.PodGroupAssignments) (ps []fwk.PlacementPluginScores, status *fwk.Status) {
+func (f *frameworkImpl) RunPlacementScorePlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo, podGroupAssignments []*fwk.PodGroupAssignments, placementStates []fwk.PlacementCycleState) (ps []fwk.PlacementPluginScores, status *fwk.Status) {
 	startTime := time.Now()
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PlacementScore, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
+
+	if len(podGroupAssignments) != len(placementStates) {
+		return nil, fwk.AsStatus(fmt.Errorf("expected one PlacementCycleState per PodGroupAssignments, got %d placement states for %d assignments", len(placementStates), len(podGroupAssignments)))
+	}
+	for i, placementState := range placementStates {
+		if placementState == nil {
+			placementName := ""
+			if podGroupAssignments[i] != nil && podGroupAssignments[i].Placement != nil {
+				placementName = podGroupAssignments[i].Placement.Name
+			}
+			return nil, fwk.AsStatus(fmt.Errorf("missing PlacementCycleState for placement %q", placementName))
+		}
+	}
 
 	allPlacementPluginScores := make([]fwk.PlacementPluginScores, len(podGroupAssignments))
 	numPlugins := len(f.placementScorePlugins)
@@ -1520,7 +1533,7 @@ func (f *frameworkImpl) RunPlacementScorePlugins(ctx context.Context, state fwk.
 					logger := klog.LoggerWithName(logger, pl.Name())
 					ctx = klog.NewContext(ctx, logger)
 				}
-				s, status := f.runPlacementScorePlugin(ctx, pl, pga.PlacementCycleState, podGroupInfo, pga)
+				s, status := f.runPlacementScorePlugin(ctx, pl, placementStates[index], podGroupInfo, pga)
 				if !status.IsSuccess() {
 					err := fmt.Errorf("plugin %q failed with: %w", pl.Name(), status.AsError())
 					errCh.SendWithCancel(err, cancel)

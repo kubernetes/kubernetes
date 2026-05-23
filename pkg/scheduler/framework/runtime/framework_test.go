@@ -3666,7 +3666,7 @@ func TestRecordingMetrics(t *testing.T) {
 		{
 			name: "PlacementScore - Success",
 			action: func(ctx context.Context, f framework.Framework) {
-				f.RunPlacementScorePlugins(ctx, state, nil, []*fwk.PodGroupAssignments{{Placement: &fwk.Placement{}, PlacementCycleState: state}})
+				f.RunPlacementScorePlugins(ctx, state, nil, []*fwk.PodGroupAssignments{{Placement: &fwk.Placement{}}}, []fwk.PlacementCycleState{state})
 			},
 			wantExtensionPoint: "PlacementScore",
 			wantStatus:         fwk.Success,
@@ -3750,7 +3750,7 @@ func TestRecordingMetrics(t *testing.T) {
 		{
 			name: "PlacementScore - Error",
 			action: func(ctx context.Context, f framework.Framework) {
-				f.RunPlacementScorePlugins(ctx, state, nil, []*fwk.PodGroupAssignments{{Placement: &fwk.Placement{}, PlacementCycleState: state}})
+				f.RunPlacementScorePlugins(ctx, state, nil, []*fwk.PodGroupAssignments{{Placement: &fwk.Placement{}}}, []fwk.PlacementCycleState{state})
 			},
 			inject:             injectedResult{PlacementScoreStatus: int(fwk.Error)},
 			wantExtensionPoint: "PlacementScore",
@@ -4682,11 +4682,13 @@ func TestRunPlacementScorePlugins(t *testing.T) {
 				t.Fatalf("Unexpected error during calling NewFramework, got %v", err)
 			}
 			assumedPlacements := make([]*fwk.PodGroupAssignments, len(placements))
+			placementStates := make([]fwk.PlacementCycleState, len(placements))
 			for i := range placements {
-				assumedPlacements[i] = &fwk.PodGroupAssignments{Placement: placements[i], PlacementCycleState: framework.NewCycleState()}
+				assumedPlacements[i] = &fwk.PodGroupAssignments{Placement: placements[i]}
+				placementStates[i] = framework.NewCycleState()
 			}
 
-			result, status := fw.RunPlacementScorePlugins(ctx, framework.NewCycleState(), nil, assumedPlacements)
+			result, status := fw.RunPlacementScorePlugins(ctx, framework.NewCycleState(), nil, assumedPlacements, placementStates)
 			if status.Code() != tt.wantStatusCode {
 				t.Errorf("got status code %s, want %s", status.Code(), tt.wantStatusCode)
 			}
