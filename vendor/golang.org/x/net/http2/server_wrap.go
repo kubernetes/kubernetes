@@ -159,3 +159,43 @@ type FrameWriteRequest struct {
 	// to avoid duplicating an exported symbol across two files,
 	// but the changes required to make this work are fairly large.
 }
+
+func (wr FrameWriteRequest) StreamID() uint32 {
+	return 0
+}
+
+func (wr FrameWriteRequest) DataSize() int {
+	return 0
+}
+
+func (wr FrameWriteRequest) Consume(n int32) (FrameWriteRequest, FrameWriteRequest, int) {
+	return FrameWriteRequest{}, FrameWriteRequest{}, 0
+}
+
+func (wr FrameWriteRequest) String() string {
+	return ""
+}
+
+// NewPriorityWriteScheduler is deprecated.
+//
+// Deprecated: User-provided write schedulers are deprecated.
+func NewPriorityWriteScheduler(cfg *PriorityWriteSchedulerConfig) WriteScheduler {
+	return unsupportedWriteScheduler{}
+}
+
+// NewRandomWriteScheduler is deprecated.
+//
+// Deprecated: User-provided write schedulers are deprecated.
+func NewRandomWriteScheduler() WriteScheduler {
+	return unsupportedWriteScheduler{}
+}
+
+type unsupportedWriteScheduler struct{}
+
+func (unsupportedWriteScheduler) OpenStream(streamID uint32, options OpenStreamOptions) {}
+func (unsupportedWriteScheduler) CloseStream(streamID uint32)                           {}
+func (unsupportedWriteScheduler) AdjustStream(streamID uint32, priority PriorityParam)  {}
+func (unsupportedWriteScheduler) Push(wr FrameWriteRequest)                             {}
+func (unsupportedWriteScheduler) Pop() (wr FrameWriteRequest, ok bool) {
+	return FrameWriteRequest{}, false
+}

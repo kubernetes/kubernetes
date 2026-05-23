@@ -156,6 +156,7 @@ type Tokenizer struct {
 	// incremented on each call to TagAttr.
 	pendingAttr   [2]span
 	attr          [][2]span
+	attrNames     map[string]bool
 	nAttrReturned int
 	// rawTag is the "script" in "</script>" that closes the next token. If
 	// non-empty, the subsequent call to Next will return a raw or RCDATA text
@@ -867,6 +868,7 @@ func (z *Tokenizer) readStartTag() TokenType {
 func (z *Tokenizer) readTag(saveAttr bool) {
 	z.attr = z.attr[:0]
 	z.nAttrReturned = 0
+	clear(z.attrNames)
 	// Read the tag name and attribute key/value pairs.
 	z.readTagName()
 	if z.skipWhiteSpace(); z.err != nil {
@@ -880,9 +882,11 @@ func (z *Tokenizer) readTag(saveAttr bool) {
 		z.raw.end--
 		z.readTagAttrKey()
 		z.readTagAttrVal()
-		// Save pendingAttr if saveAttr and that attribute has a non-empty key.
-		if saveAttr && z.pendingAttr[0].start != z.pendingAttr[0].end {
+		// Save pendingAttr if saveAttr and that attribute has a non-empty key, and the key hasn't been seen before.
+		key := strings.ToLower(string(z.buf[z.pendingAttr[0].start:z.pendingAttr[0].end]))
+		if saveAttr && z.pendingAttr[0].start != z.pendingAttr[0].end && !z.attrNames[key] {
 			z.attr = append(z.attr, z.pendingAttr)
+			z.attrNames[key] = true
 		}
 		if z.skipWhiteSpace(); z.err != nil {
 			break
@@ -1273,8 +1277,9 @@ func NewTokenizer(r io.Reader) *Tokenizer {
 // The input is assumed to be UTF-8 encoded.
 func NewTokenizerFragment(r io.Reader, contextTag string) *Tokenizer {
 	z := &Tokenizer{
-		r:   r,
-		buf: make([]byte, 0, 4096),
+		r:         r,
+		buf:       make([]byte, 0, 4096),
+		attrNames: make(map[string]bool),
 	}
 	if contextTag != "" {
 		switch s := strings.ToLower(contextTag); s {
