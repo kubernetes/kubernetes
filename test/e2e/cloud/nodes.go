@@ -24,7 +24,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/feature"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
@@ -34,7 +33,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe(feature.CloudProvider, framework.WithDisruptive(), "Nodes", func() {
+var _ = SIGDescribe(framework.WithDisruptive(), "Nodes", func() {
 	f := framework.NewDefaultFramework("cloudprovider")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
 	var c clientset.Interface
