@@ -21,6 +21,8 @@ package util
 import (
 	"fmt"
 	"time"
+
+	"k8s.io/klog/v2"
 )
 
 // LockAndCheckSubPath empty implementation
@@ -38,6 +40,6 @@ func LocalEndpoint(path, file string) (string, error) {
 }
 
 // GetBootTime empty implementation
-func GetBootTime() (time.Time, error) {
+func GetBootTime(klog.Logger) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("GetBootTime is unsupported in this build")
 }
