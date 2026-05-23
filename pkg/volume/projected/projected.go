@@ -320,10 +320,19 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 		case source.ServiceAccountToken != nil:
 			tp := source.ServiceAccountToken
 
+			// Multi-level owner UID resolution (KEP-5936)
+			fsUser := mounterArgs.FsUser
+			if s.source.DefaultUser != nil {
+				fsUser = s.source.DefaultUser
+			}
+			if tp.User != nil {
+				fsUser = tp.User
+			}
+
 			// When FsGroup is set, we depend on SetVolumeOwnership to
 			// change from 0600 to 0640.
 			mode := *s.source.DefaultMode
-			if mounterArgs.FsUser != nil || mounterArgs.FsGroup != nil {
+			if fsUser != nil || mounterArgs.FsGroup != nil {
 				mode = 0600
 			}
 
@@ -350,7 +359,7 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 			payload[tp.Path] = volumeutil.FileProjection{
 				Data:   []byte(tr.Status.Token),
 				Mode:   mode,
-				FsUser: mounterArgs.FsUser,
+				FsUser: fsUser,
 			}
 		case source.ClusterTrustBundle != nil:
 			allowEmpty := false
