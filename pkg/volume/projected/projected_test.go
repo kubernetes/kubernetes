@@ -1091,13 +1091,17 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 		svcacct     string
 		audience    string
 		defaultMode *int32
+		defaultUser *int64
 		fsUser      *int64
 		fsGroup     *int64
+		user        *int64
 		expiration  *int64
 		path        string
 
 		wantPayload map[string]util.FileProjection
 		wantErr     error
+
+		disableUserFieldsGate bool
 	}{
 		{
 			name:        "good service account",
@@ -1158,6 +1162,61 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 			},
 		},
 		{
+			name:        "defaultUser != nil",
+			defaultMode: ptr.To[int32](0644),
+			defaultUser: ptr.To[int64](1000),
+			path:        "token",
+			wantPayload: map[string]util.FileProjection{
+				"token": {
+					Data:   []byte("test_projected_namespace:foo:3600:[https://api]"),
+					Mode:   0600,
+					FsUser: ptr.To[int64](1000),
+				},
+			},
+		},
+		{
+			name:        "user != nil",
+			defaultMode: ptr.To[int32](0644),
+			user:        ptr.To[int64](1000),
+			path:        "token",
+			wantPayload: map[string]util.FileProjection{
+				"token": {
+					Data:   []byte("test_projected_namespace:foo:3600:[https://api]"),
+					Mode:   0600,
+					FsUser: ptr.To[int64](1000),
+				},
+			},
+		},
+		{
+			name:        "fsUser != nil && defaultUser != nil",
+			defaultMode: ptr.To[int32](0644),
+			defaultUser: ptr.To[int64](1001),
+			fsUser:      ptr.To[int64](1000),
+			path:        "token",
+			wantPayload: map[string]util.FileProjection{
+				"token": {
+					Data:   []byte("test_projected_namespace:foo:3600:[https://api]"),
+					Mode:   0600,
+					FsUser: ptr.To[int64](1001),
+				},
+			},
+		},
+		{
+			name:        "fsUser != nil && defaultUser != nil && user != nil",
+			defaultMode: ptr.To[int32](0644),
+			defaultUser: ptr.To[int64](1001),
+			fsUser:      ptr.To[int64](1000),
+			user:        ptr.To[int64](1002),
+			path:        "token",
+			wantPayload: map[string]util.FileProjection{
+				"token": {
+					Data:   []byte("test_projected_namespace:foo:3600:[https://api]"),
+					Mode:   0600,
+					FsUser: ptr.To[int64](1002),
+				},
+			},
+		},
+		{
 			name:        "fsGroup != nil",
 			defaultMode: ptr.To[int32](0644),
 			fsGroup:     ptr.To[int64](1000),
@@ -1183,14 +1242,36 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:        "user fields with disabled feature gate",
+			defaultMode: ptr.To[int32](0644),
+			defaultUser: ptr.To[int64](1001),
+			fsUser:      ptr.To[int64](1000),
+			user:        ptr.To[int64](1002),
+			path:        "token",
+			wantPayload: map[string]util.FileProjection{
+				"token": {
+					Data:   []byte("test_projected_namespace:foo:3600:[https://api]"),
+					Mode:   0600,
+					FsUser: ptr.To[int64](1000),
+				},
+			},
+			disableUserFieldsGate: true,
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.disableUserFieldsGate {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AtomicWriteVolumeUserFields, !tc.disableUserFieldsGate)
+
 			testNamespace := "test_projected_namespace"
-			source := makeProjection(tc.name, tc.defaultMode, nil, "serviceAccountToken")
+			source := makeProjection(tc.name, tc.defaultMode, tc.defaultUser, "serviceAccountToken")
 			source.Sources[0].ServiceAccountToken.Audience = tc.audience
 			source.Sources[0].ServiceAccountToken.ExpirationSeconds = tc.expiration
+			source.Sources[0].ServiceAccountToken.User = tc.user
 			source.Sources[0].ServiceAccountToken.Path = tc.path
 
 			testPodUID := types.UID("test_pod_uid")
