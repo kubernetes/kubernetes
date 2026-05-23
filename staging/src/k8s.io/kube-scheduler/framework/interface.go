@@ -785,8 +785,6 @@ type PlacementScoreExtensions interface {
 	// NormalizePlacementScore is called for all placement scores produced by the same plugin's "ScorePlacement"
 	// method. A successful run of NormalizePlacementScore will update the scores list and return
 	// a success status.
-	// It receives PodGroupCycleState because normalization operates across all candidate placements,
-	// not within a single PlacementCycleState.
 	NormalizePlacementScore(ctx context.Context, state PodGroupCycleState, podGroup PodGroupInfo, placementScores []PlacementScore) *Status
 }
 
