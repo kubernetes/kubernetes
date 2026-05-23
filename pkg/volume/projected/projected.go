@@ -381,15 +381,16 @@ func (s *projectedVolumeMounter) collectData(mounterArgs volume.MounterArgs) (ma
 				continue
 			}
 
+			fsUser := resolveFsUser(mounterArgs, s.source.DefaultUser, source.ClusterTrustBundle.User)
 			mode := *s.source.DefaultMode
-			if mounterArgs.FsUser != nil || mounterArgs.FsGroup != nil {
+			if fsUser != nil || mounterArgs.FsGroup != nil {
 				mode = 0600
 			}
 
 			payload[source.ClusterTrustBundle.Path] = volumeutil.FileProjection{
 				Data:   trustAnchors,
 				Mode:   mode,
-				FsUser: mounterArgs.FsUser,
+				FsUser: fsUser,
 			}
 		case source.PodCertificate != nil:
 			key, certificates, err := s.plugin.kvHost.GetPodCertificateCredentialBundle(context.TODO(), s.pod.ObjectMeta.Namespace, s.pod.ObjectMeta.Name, string(s.pod.ObjectMeta.UID), s.volName, sourceIndex)
