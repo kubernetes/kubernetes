@@ -399,27 +399,6 @@ func (sew stickyErrWriter) Write(p []byte) (n int, err error) {
 	return n, err
 }
 
-// noCachedConnError is the concrete type of ErrNoCachedConn, which
-// needs to be detected by net/http regardless of whether it's its
-// bundled version (in h2_bundle.go with a rewritten type name) or
-// from a user's x/net/http2. As such, as it has a unique method name
-// (IsHTTP2NoCachedConnError) that net/http sniffs for via func
-// isNoCachedConnError.
-type noCachedConnError struct{}
-
-func (noCachedConnError) IsHTTP2NoCachedConnError() {}
-func (noCachedConnError) Error() string             { return "http2: no cached connection was available" }
-
-// isNoCachedConnError reports whether err is of type noCachedConnError
-// or its equivalent renamed type in net/http2's h2_bundle.go. Both types
-// may coexist in the same running program.
-func isNoCachedConnError(err error) bool {
-	_, ok := err.(interface{ IsHTTP2NoCachedConnError() })
-	return ok
-}
-
-var ErrNoCachedConn error = noCachedConnError{}
-
 func (t *Transport) roundTripOpt(req *http.Request, opt RoundTripOpt) (*http.Response, error) {
 	switch req.URL.Scheme {
 	case "https":
@@ -1784,19 +1763,6 @@ func (cc *ClientConn) readLoop() {
 		cc.fr.WriteGoAway(0, ErrCode(ce), nil)
 		cc.wmu.Unlock()
 	}
-}
-
-// GoAwayError is returned by the Transport when the server closes the
-// TCP connection after sending a GOAWAY frame.
-type GoAwayError struct {
-	LastStreamID uint32
-	ErrCode      ErrCode
-	DebugData    string
-}
-
-func (e GoAwayError) Error() string {
-	return fmt.Sprintf("http2: server sent GOAWAY and closed the connection; LastStreamID=%v, ErrCode=%v, debug=%q",
-		e.LastStreamID, e.ErrCode, e.DebugData)
 }
 
 func isEOFOrNetReadError(err error) bool {

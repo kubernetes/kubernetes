@@ -113,14 +113,14 @@ func render1(w writer, n *Node) error {
 				if _, err := w.WriteString(" PUBLIC "); err != nil {
 					return err
 				}
-				if err := writeQuoted(w, p); err != nil {
+				if err := writeDoctypeQuoted(w, p); err != nil {
 					return err
 				}
 				if s != "" {
 					if err := w.WriteByte(' '); err != nil {
 						return err
 					}
-					if err := writeQuoted(w, s); err != nil {
+					if err := writeDoctypeQuoted(w, s); err != nil {
 						return err
 					}
 				}
@@ -128,7 +128,7 @@ func render1(w writer, n *Node) error {
 				if _, err := w.WriteString(" SYSTEM "); err != nil {
 					return err
 				}
-				if err := writeQuoted(w, s); err != nil {
+				if err := writeDoctypeQuoted(w, s); err != nil {
 					return err
 				}
 			}
@@ -243,27 +243,50 @@ func childTextNodesAreLiteral(n *Node) bool {
 	if n.Namespace != "" {
 		return false
 	}
+
 	switch n.Data {
 	case "iframe", "noembed", "noframes", "noscript", "plaintext", "script", "style", "xmp":
+		// We need to check if n is a node that was fostered from a HTML namespace
+		// into a non-HTML namespace (in which case, different rules apply to it).
+		// We do this by walking up the tree until we find a node with a non-empty
+		// namespace. If we find such a node, we also have to check if it's
+		// an HTML integration point. If it isn't, then the node we're currently
+		// looking at is foster-parented and we should return false.
+		for p := n.Parent; p != nil; p = p.Parent {
+			if p.Namespace != "" {
+				if !htmlIntegrationPoint(p) {
+					return false
+				}
+				break
+			}
+		}
+
 		return true
 	default:
 		return false
 	}
 }
 
-// writeQuoted writes s to w surrounded by quotes. Normally it will use double
+// writeDoctypeQuoted writes s to w surrounded by quotes. Normally it will use double
 // quotes, but if s contains a double quote, it will use single quotes.
+// If s contains any '>' characters, they are replaced with &gt; in order
+// to prevent triggering an abrupt-doctype-system-identifier parse error.
 // It is used for writing the identifiers in a doctype declaration.
 // In valid HTML, they can't contain both types of quotes.
-func writeQuoted(w writer, s string) error {
+func writeDoctypeQuoted(w writer, s string) error {
 	var q byte = '"'
 	if strings.Contains(s, `"`) {
+		// parseDoctype will never produce a Node with both quote types, but a user
+		// can construct their own Node that violates this assumption.
+		if strings.Contains(s, `'`) {
+			return errors.New("doctype contains both quote types, cannot be safely rendered")
+		}
 		q = '\''
 	}
 	if err := w.WriteByte(q); err != nil {
 		return err
 	}
-	if _, err := w.WriteString(s); err != nil {
+	if _, err := w.WriteString(strings.ReplaceAll(s, ">", "&gt;")); err != nil {
 		return err
 	}
 	if err := w.WriteByte(q); err != nil {
