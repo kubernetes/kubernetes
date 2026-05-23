@@ -1337,6 +1337,8 @@ func TestCollectDataWithClusterTrustBundle(t *testing.T) {
 
 		wantPayload map[string]util.FileProjection
 		wantErr     error
+
+		disableUserFieldsGate bool
 	}{
 		{
 			name: "single ClusterTrustBundle by name",
@@ -1437,10 +1439,244 @@ func TestCollectDataWithClusterTrustBundle(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "ClusterTrustBundle with fsUser",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
+							Name: ptr.To("foo"),
+							Path: "bundle.pem",
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+			},
+			bundles: []runtime.Object{
+				&certificatesv1beta1.ClusterTrustBundle{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "foo",
+					},
+					Spec: certificatesv1beta1.ClusterTrustBundleSpec{
+						TrustBundle: string(goodCert1),
+					},
+				},
+			},
+			fsUser: ptr.To[int64](1000),
+			wantPayload: map[string]util.FileProjection{
+				"bundle.pem": {
+					Data:   []byte(goodCert1),
+					Mode:   0600,
+					FsUser: ptr.To[int64](1000),
+				},
+			},
+		},
+		{
+			name: "ClusterTrustBundle with defaultUser",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
+							Name: ptr.To("foo"),
+							Path: "bundle.pem",
+						},
+					},
+				},
+				DefaultUser: ptr.To[int64](1000),
+				DefaultMode: ptr.To[int32](0644),
+			},
+			bundles: []runtime.Object{
+				&certificatesv1beta1.ClusterTrustBundle{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "foo",
+					},
+					Spec: certificatesv1beta1.ClusterTrustBundleSpec{
+						TrustBundle: string(goodCert1),
+					},
+				},
+			},
+			wantPayload: map[string]util.FileProjection{
+				"bundle.pem": {
+					Data:   []byte(goodCert1),
+					Mode:   0600,
+					FsUser: ptr.To[int64](1000),
+				},
+			},
+		},
+		{
+			name: "ClusterTrustBundle with user",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
+							Name: ptr.To("foo"),
+							Path: "bundle.pem",
+							User: ptr.To[int64](1000),
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+			},
+			bundles: []runtime.Object{
+				&certificatesv1beta1.ClusterTrustBundle{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "foo",
+					},
+					Spec: certificatesv1beta1.ClusterTrustBundleSpec{
+						TrustBundle: string(goodCert1),
+					},
+				},
+			},
+			wantPayload: map[string]util.FileProjection{
+				"bundle.pem": {
+					Data:   []byte(goodCert1),
+					Mode:   0600,
+					FsUser: ptr.To[int64](1000),
+				},
+			},
+		},
+		{
+			name: "ClusterTrustBundle with fsUser and defaultUser",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
+							Name: ptr.To("foo"),
+							Path: "bundle.pem",
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+				DefaultUser: ptr.To[int64](1001),
+			},
+			bundles: []runtime.Object{
+				&certificatesv1beta1.ClusterTrustBundle{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "foo",
+					},
+					Spec: certificatesv1beta1.ClusterTrustBundleSpec{
+						TrustBundle: string(goodCert1),
+					},
+				},
+			},
+			fsUser: ptr.To[int64](1000),
+			wantPayload: map[string]util.FileProjection{
+				"bundle.pem": {
+					Data:   []byte(goodCert1),
+					Mode:   0600,
+					FsUser: ptr.To[int64](1001),
+				},
+			},
+		},
+		{
+			name: "ClusterTrustBundle with fsUser, defaultUser and user",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
+							Name: ptr.To("foo"),
+							Path: "bundle.pem",
+							User: ptr.To[int64](1002),
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+				DefaultUser: ptr.To[int64](1001),
+			},
+			bundles: []runtime.Object{
+				&certificatesv1beta1.ClusterTrustBundle{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "foo",
+					},
+					Spec: certificatesv1beta1.ClusterTrustBundleSpec{
+						TrustBundle: string(goodCert1),
+					},
+				},
+			},
+			fsUser: ptr.To[int64](1000),
+			wantPayload: map[string]util.FileProjection{
+				"bundle.pem": {
+					Data:   []byte(goodCert1),
+					Mode:   0600,
+					FsUser: ptr.To[int64](1002),
+				},
+			},
+		},
+		{
+			name: "ClusterTrustBundle with fsGroup",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
+							Name: ptr.To("foo"),
+							Path: "bundle.pem",
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+			},
+			bundles: []runtime.Object{
+				&certificatesv1beta1.ClusterTrustBundle{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "foo",
+					},
+					Spec: certificatesv1beta1.ClusterTrustBundleSpec{
+						TrustBundle: string(goodCert1),
+					},
+				},
+			},
+			fsGroup: ptr.To[int64](1000),
+			wantPayload: map[string]util.FileProjection{
+				"bundle.pem": {
+					Data: []byte(goodCert1),
+					Mode: 0600,
+				},
+			},
+		},
+		{
+			name: "ClusterTrustBundle with user fields and disabled feature gate",
+			source: v1.ProjectedVolumeSource{
+				Sources: []v1.VolumeProjection{
+					{
+						ClusterTrustBundle: &v1.ClusterTrustBundleProjection{
+							Name: new("foo"),
+							Path: "bundle.pem",
+							User: ptr.To[int64](1002),
+						},
+					},
+				},
+				DefaultMode: ptr.To[int32](0644),
+				DefaultUser: ptr.To[int64](1001),
+			},
+			bundles: []runtime.Object{
+				&certificatesv1beta1.ClusterTrustBundle{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "foo",
+					},
+					Spec: certificatesv1beta1.ClusterTrustBundleSpec{
+						TrustBundle: string(goodCert1),
+					},
+				},
+			},
+			fsUser: ptr.To[int64](1000),
+			wantPayload: map[string]util.FileProjection{
+				"bundle.pem": {
+					Data:   []byte(goodCert1),
+					Mode:   0600,
+					FsUser: ptr.To[int64](1000),
+				},
+			},
+			disableUserFieldsGate: true,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.disableUserFieldsGate {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.37"))
+			}
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AtomicWriteVolumeUserFields, !tc.disableUserFieldsGate)
+
 			pod := &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "default",
@@ -1450,9 +1686,12 @@ func TestCollectDataWithClusterTrustBundle(t *testing.T) {
 			}
 
 			client := fake.NewSimpleClientset(tc.bundles...)
-
 			tempDir, host := newTestHost(t, client)
-			defer os.RemoveAll(tempDir)
+			defer func() {
+				if err := os.RemoveAll(tempDir); err != nil {
+					t.Fatal(err)
+				}
+			}()
 
 			var myVolumeMounter = projectedVolumeMounter{
 				projectedVolume: &projectedVolume{
