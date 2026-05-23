@@ -21,7 +21,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
+	"github.com/google/cel-go/common/types/traits"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
@@ -419,31 +421,30 @@ func TestVersionedAttributesCELObjectsCaching(t *testing.T) {
 }
 
 func getMetaName(val ref.Val) string {
-	if val == nil {
-		return ""
-	}
-	m, ok := val.Value().(map[string]interface{})
-	if !ok {
-		return ""
-	}
-	metadata, ok := m["metadata"].(map[string]interface{})
-	if !ok {
-		return ""
-	}
-	return metadata["name"].(string)
+	return getStringField(val, "metadata", "name")
 }
 
 func getAPIVersion(val ref.Val) string {
-	if val == nil {
+	return getStringField(val, "apiVersion")
+}
+
+func getStringField(val ref.Val, fields ...string) string {
+	for _, field := range fields {
+		if val == nil || types.IsError(val) {
+			return ""
+		}
+		mapper, ok := val.(traits.Mapper)
+		if !ok {
+			return ""
+		}
+		val = mapper.Get(types.String(field))
+	}
+	if val == nil || types.IsError(val) {
 		return ""
 	}
-	m, ok := val.Value().(map[string]interface{})
+	strVal, ok := val.(types.String)
 	if !ok {
 		return ""
 	}
-	apiVersion, ok := m["apiVersion"].(string)
-	if !ok {
-		return ""
-	}
-	return apiVersion
+	return string(strVal)
 }
