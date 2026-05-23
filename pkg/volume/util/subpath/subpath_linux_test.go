@@ -1057,6 +1057,148 @@ func TestSubpath_PrepareSafeSubpath(t *testing.T) {
 	}
 }
 
+func TestIsStaleMountFnNonExistentPath(t *testing.T) {
+	// A real directory on the local filesystem must not be considered stale.
+	dir, err := os.MkdirTemp("", "isstalemount-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+
+	if isStaleMountFn(dir) {
+		t.Errorf("expected isStaleMountFn(%q) = false for a live directory, got true", dir)
+	}
+
+	nonExistent := filepath.Join(os.TempDir(), "isstalemount-nonexistent-99999999")
+	// Guarantee the path does not exist.
+	os.RemoveAll(nonExistent)
+
+	// Statfs on a non-existent path returns ENOENT, which is not ESTALE/EIO.
+	// isStaleMountFn must return false, not true.
+	if isStaleMountFn(nonExistent) {
+		t.Errorf("expected isStaleMountFn(%q) = false for a non-existent path (ENOENT is not ESTALE/EIO), got true", nonExistent)
+	}
+}
+
+func TestPrepareSubpathTargetStaleRemount(t *testing.T) {
+	defaultPerm := os.FileMode(0750)
+
+	base, err := os.MkdirTemp("", "stale-remount-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(base)
+
+	volPath, subpathMount := getTestPaths(base)
+	subPath := filepath.Join(volPath, "dir0")
+
+	// Create a bind-mount target that already appears mounted
+	if err := os.MkdirAll(filepath.Dir(subpathMount), defaultPerm); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(subPath, defaultPerm); err != nil {
+		t.Fatal(err)
+	}
+	// Create the bind target as a file so we can hard-link it.
+	if err := os.WriteFile(subpathMount, []byte{}, 0640); err != nil {
+		t.Fatal(err)
+	}
+	// The subpath source is a hard link to the target,
+	// simulating a previously-mounted bind mount where the source and target
+	// share the same inode.
+	sourceFile := filepath.Join(volPath, "file0")
+	if err := os.Link(subpathMount, sourceFile); err != nil {
+		t.Fatal(err)
+	}
+
+	fm := setupFakeMounter([]string{subpathMount})
+
+	subpath := Subpath{
+		VolumeMountIndex: testSubpath,
+		Path:             sourceFile,
+		VolumeName:       testVol,
+		VolumePath:       volPath,
+		PodDir:           filepath.Join(base, "pod0"),
+		ContainerName:    testContainer,
+	}
+
+	// NOT stale case.
+	origIsStaleMountFn := isStaleMountFn
+	defer func() { isStaleMountFn = origIsStaleMountFn }()
+	isStaleMountFn = func(string) bool { return false }
+
+	alreadyMounted, gotTarget, err := prepareSubpathTarget(fm, subpath)
+	if err != nil {
+		t.Fatalf("case (not stale): unexpected error: %v", err)
+	}
+	if !alreadyMounted {
+		t.Errorf("case (not stale): expected alreadyMounted=true, got false")
+	}
+	if gotTarget != subpathMount {
+		t.Errorf("case (not stale): expected target %q, got %q", subpathMount, gotTarget)
+	}
+	if actions := fm.GetLog(); len(actions) != 0 {
+		t.Errorf("case (not stale): expected no unmount actions, got %v", actions)
+	}
+
+	// IS stale case.
+	fm = setupFakeMounter([]string{subpathMount})
+	isStaleMountFn = func(string) bool { return true }
+	lazyUnmountCalled := false
+	lazyUnmountFn = func(path string) error {
+		lazyUnmountCalled = true
+		return nil
+	}
+	defer func() { lazyUnmountFn = func(path string) error { return syscall.Unmount(path, syscall.MNT_DETACH) } }()
+
+	alreadyMounted, gotTarget, err = prepareSubpathTarget(fm, subpath)
+	if err != nil {
+		t.Fatalf("case (stale): unexpected error: %v", err)
+	}
+	if alreadyMounted {
+		t.Errorf("case (stale): expected alreadyMounted=false after stale remount, got true")
+	}
+	if gotTarget != subpathMount {
+		t.Errorf("case (stale): expected target %q, got %q", subpathMount, gotTarget)
+	}
+	if !lazyUnmountCalled {
+		t.Errorf("case (stale): expected lazyUnmountFn to be called for stale bind mount")
+	}
+
+	// ENOTCONN from IsNotMountPoint (zombie FUSE mount path) case.
+	enotconnMounter := &enotconnIsMountMounter{FakeMounter: setupFakeMounter([]string{subpathMount})}
+	isStaleMountFn = func(string) bool { return false } // should not be reached
+	lazyUnmountCalled = false
+	lazyUnmountFn = func(path string) error {
+		lazyUnmountCalled = true
+		return nil
+	}
+
+	alreadyMounted, gotTarget, err = prepareSubpathTarget(enotconnMounter, subpath)
+	if err != nil {
+		t.Fatalf("case (ENOTCONN from IsNotMountPoint): unexpected error: %v", err)
+	}
+	if alreadyMounted {
+		t.Errorf("case (ENOTCONN from IsNotMountPoint): expected alreadyMounted=false after zombie remount, got true")
+	}
+	if gotTarget != subpathMount {
+		t.Errorf("case (ENOTCONN from IsNotMountPoint): expected target %q, got %q", subpathMount, gotTarget)
+	}
+	if !lazyUnmountCalled {
+		t.Errorf("case (ENOTCONN from IsNotMountPoint): expected lazyUnmountFn to be called for zombie FUSE bind mount")
+	}
+}
+
+// enotconnIsMountMounter wraps FakeMounter and overrides IsMountPoint to
+// return ENOTCONN
+type enotconnIsMountMounter struct {
+	*mount.FakeMounter
+}
+
+func (e *enotconnIsMountMounter) IsMountPoint(file string) (bool, error) {
+	return false, &os.PathError{Op: "lstat", Path: file, Err: syscall.ENOTCONN}
+}
+
 func TestSafeOpen(t *testing.T) {
 	defaultPerm := os.FileMode(0750)
 

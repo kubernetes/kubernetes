@@ -19,6 +19,7 @@ limitations under the License.
 package subpath
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -96,27 +97,43 @@ func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, strin
 	bindPathTarget := getSubpathBindTarget(subpath)
 	notMount, err := mount.IsNotMountPoint(mounter, bindPathTarget)
 	if err != nil {
-		if !os.IsNotExist(err) {
+		if os.IsNotExist(err) {
+			notMount = true
+		} else if isStaleConnError(err) {
+			klog.V(4).Infof("Detected stale bind mount at subpath target %s (IsNotMountPoint error: %v), will lazy-unmount", bindPathTarget, err)
+			if err = lazyUnmountFn(bindPathTarget); err != nil {
+				return false, "", fmt.Errorf("error lazy-unmounting stale subpath mount %s: %w", bindPathTarget, err)
+			}
+			// Fall through to recreate the bind mount below.
+			notMount = true
+		} else {
 			return false, "", fmt.Errorf("error checking path %s for mount: %s", bindPathTarget, err)
 		}
-		// Ignore ErrorNotExist: the file/directory will be created below if it does not exist yet.
-		notMount = true
 	}
 	if !notMount {
-		// It's already mounted, so check if it's bind-mounted to the same path
-		samePath, err := checkSubPathFileEqual(subpath, bindPathTarget)
-		if err != nil {
-			return false, "", fmt.Errorf("error checking subpath mount info for %s: %s", bindPathTarget, err)
-		}
-		if !samePath {
-			// It's already mounted but not what we want, unmount it
-			if err = mounter.Unmount(bindPathTarget); err != nil {
-				return false, "", fmt.Errorf("error unmounting %s: %w", bindPathTarget, err)
+		if stale := isStaleMountFn(bindPathTarget); stale {
+			klog.V(4).Infof("Detected stale bind mount at subpath target %s, will remount", bindPathTarget)
+			// Lazy unmount detaches the mount point from the filesystem hierarchy immediately
+			// and cleans up when the path is no longer referenced.
+			if err = lazyUnmountFn(bindPathTarget); err != nil {
+				return false, "", fmt.Errorf("error lazy-unmounting stale subpath mount %s: %w", bindPathTarget, err)
 			}
 		} else {
-			// It's already mounted
-			klog.V(5).Infof("Skipping bind-mounting subpath %s: already mounted", bindPathTarget)
-			return true, bindPathTarget, nil
+			// It's already mounted, so check if it's bind-mounted to the same path
+			samePath, err := checkSubPathFileEqual(subpath, bindPathTarget)
+			if err != nil {
+				return false, "", fmt.Errorf("error checking subpath mount info for %s: %s", bindPathTarget, err)
+			}
+			if !samePath {
+				// It's already mounted but not what we want, unmount it
+				if err = mounter.Unmount(bindPathTarget); err != nil {
+					return false, "", fmt.Errorf("error unmounting %s: %w", bindPathTarget, err)
+				}
+			} else {
+				// It's already mounted
+				klog.V(5).Infof("Skipping bind-mounting subpath %s: already mounted", bindPathTarget)
+				return true, bindPathTarget, nil
+			}
 		}
 	}
 
@@ -164,6 +181,36 @@ func checkSubPathFileEqual(subpath Subpath, bindMountTarget string) (bool, error
 		return false, nil
 	}
 	return true, nil
+}
+
+// package-level variables so tests can replace them without forking the binary.
+var isStaleMountFn = func(path string) bool {
+	var stat syscall.Statfs_t
+	err := syscall.Statfs(path, &stat)
+	if err == nil {
+		return false
+	}
+	if err == syscall.ESTALE || err == syscall.EIO || err == syscall.ENOTCONN {
+		return true
+	}
+	return false
+}
+
+var lazyUnmountFn = func(path string) error {
+	return syscall.Unmount(path, syscall.MNT_DETACH)
+}
+
+// isStaleConnError reports whether err wraps a connection-lost errno that
+// indicates a zombie FUSE/NFS/GlusterFS mount.
+func isStaleConnError(err error) bool {
+	var errno syscall.Errno
+	if errors.As(err, &errno) {
+		switch errno {
+		case syscall.ENOTCONN, syscall.ESTALE, syscall.EIO:
+			return true
+		}
+	}
+	return false
 }
 
 func getSubpathBindTarget(subpath Subpath) string {
