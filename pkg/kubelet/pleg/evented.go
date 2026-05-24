@@ -27,25 +27,19 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
-	"k8s.io/utils/clock"
 )
 
-// The frequency with which global timestamp of the cache is to
-// is to be updated periodically. If pod workers get stuck at cache.GetNewerThan
-// call, after this period it will be unblocked.
-const globalCacheUpdatePeriod = 5 * time.Second
+const eventedPLEGContainerEventsChannelCapacity = 1000
 
 var (
 	eventedPLEGUsage   = false
 	eventedPLEGUsageMu = sync.RWMutex{}
 )
 
-// isEventedPLEGInUse indicates whether Evented PLEG is in use. Even after enabling
-// the Evented PLEG feature gate, there could be several reasons it may not be in use.
-// e.g. Streaming data issues from the runtime or the runtime does not implement the
-// container events stream.
+// isEventedPLEGInUse indicates whether EventedPLEG's CRI event stream is active.
+// Even after enabling the EventedPLEG feature gate the stream may be inactive due to
+// runtime errors or exhausted retries, in which case only GenericPLEG runs.
 func isEventedPLEGInUse() bool {
 	eventedPLEGUsageMu.RLock()
 	defer eventedPLEGUsageMu.RUnlock()
@@ -61,53 +55,35 @@ func setEventedPLEGUsage(enable bool) {
 }
 
 type EventedPLEG struct {
-	// The container runtime.
-	runtime kubecontainer.Runtime
 	// The runtime service.
 	runtimeService internalapi.RuntimeService
-	// The channel from which the subscriber listens events.
-	eventChannel chan *PodLifecycleEvent
-	// Cache for storing the runtime states required for syncing pods.
-	cache kubecontainer.Cache
-	// For testability.
-	clock clock.Clock
-	// GenericPLEG is used to force relist when required.
+	// GenericPLEG is used to request on-demand pod relists on crash detection.
 	genericPleg podLifecycleEventGeneratorHandler
 	// The maximum number of retries when getting container events from the runtime.
 	eventedPlegMaxStreamRetries int
-	// Indicates relisting related parameters
-	relistDuration *RelistDuration
 	// Stop the Evented PLEG by closing the channel.
 	stopCh chan struct{}
-	// Stops the periodic update of the cache global timestamp.
-	stopCacheUpdateCh chan struct{}
 	// Locks the start/stop operation of the Evented PLEG.
 	runningMu sync.Mutex
 }
 
 // NewEventedPLEG instantiates a new EventedPLEG object and return it.
-func NewEventedPLEG(runtime kubecontainer.Runtime, runtimeService internalapi.RuntimeService, eventChannel chan *PodLifecycleEvent,
-	cache kubecontainer.Cache, genericPleg PodLifecycleEventGenerator, eventedPlegMaxStreamRetries int,
-	relistDuration *RelistDuration, clock clock.Clock) (PodLifecycleEventGenerator, error) {
+func NewEventedPLEG(runtimeService internalapi.RuntimeService, genericPleg PodLifecycleEventGenerator,
+	eventedPlegMaxStreamRetries int) (PodLifecycleEventGenerator, error) {
 	handler, ok := genericPleg.(podLifecycleEventGeneratorHandler)
 	if !ok {
 		return nil, fmt.Errorf("%v doesn't implement podLifecycleEventGeneratorHandler interface", genericPleg)
 	}
 	return &EventedPLEG{
-		runtime:                     runtime,
 		runtimeService:              runtimeService,
-		eventChannel:                eventChannel,
-		cache:                       cache,
 		genericPleg:                 handler,
 		eventedPlegMaxStreamRetries: eventedPlegMaxStreamRetries,
-		relistDuration:              relistDuration,
-		clock:                       clock,
 	}, nil
 }
 
 // Watch returns a channel from which the subscriber can receive PodLifecycleEvent events.
 func (e *EventedPLEG) Watch() chan *PodLifecycleEvent {
-	return e.eventChannel
+	return e.genericPleg.Watch()
 }
 
 // Relist relists all containers using GenericPLEG
@@ -128,9 +104,7 @@ func (e *EventedPLEG) Start(ctx context.Context) {
 	}
 	setEventedPLEGUsage(true)
 	e.stopCh = make(chan struct{})
-	e.stopCacheUpdateCh = make(chan struct{})
 	go wait.Until(func() { e.watchEventsChannel(ctx) }, 0, e.stopCh)
-	go wait.Until(e.updateGlobalCache, globalCacheUpdatePeriod, e.stopCacheUpdateCh)
 }
 
 // Stop stops the Evented PLEG
@@ -142,44 +116,18 @@ func (e *EventedPLEG) Stop() {
 	}
 	setEventedPLEGUsage(false)
 	close(e.stopCh)
-	close(e.stopCacheUpdateCh)
 }
 
-// In case the Evented PLEG experiences undetectable issues in the underlying
-// GRPC connection there is a remote chance the pod might get stuck in a
-// given state while it has progressed in its life cycle. This function will be
-// called periodically to update the global timestamp of the cache so that those
-// pods stuck at GetNewerThan in pod workers will get unstuck.
-func (e *EventedPLEG) updateGlobalCache() {
-	e.cache.UpdateTime(time.Now())
-}
-
-// Update the relisting period and threshold
-func (e *EventedPLEG) Update(relistDuration *RelistDuration) {
-	e.genericPleg.Update(relistDuration)
-}
-
-// Healthy check if PLEG work properly.
+// Healthy returns true unconditionally. EventedPLEG is an auxiliary accelerator;
+// its failure does not degrade the node because GenericPLEG continues to handle all
+// lifecycle events at its normal relisting period.
 func (e *EventedPLEG) Healthy() (bool, error) {
-	// GenericPLEG is declared unhealthy when relisting time is more
-	// than the relistThreshold. In case EventedPLEG is turned on,
-	// relistingPeriod and relistingThreshold are adjusted to higher
-	// values. So the health check of Generic PLEG should check
-	// the adjusted values of relistingPeriod and relistingThreshold.
-
-	// EventedPLEG is declared unhealthy only if eventChannel is out of capacity.
-	if len(e.eventChannel) == cap(e.eventChannel) {
-		return false, fmt.Errorf("EventedPLEG: pleg event channel capacity is full with %v events", len(e.eventChannel))
-	}
-
-	timestamp := e.clock.Now()
-	metrics.PLEGLastSeen.Set(float64(timestamp.Unix()))
 	return true, nil
 }
 
 func (e *EventedPLEG) watchEventsChannel(ctx context.Context) {
 	logger := klog.FromContext(ctx)
-	containerEventsResponseCh := make(chan *runtimeapi.ContainerEventResponse, cap(e.eventChannel))
+	containerEventsResponseCh := make(chan *runtimeapi.ContainerEventResponse, eventedPLEGContainerEventsChannelCapacity)
 	defer close(containerEventsResponseCh)
 
 	// Get the container events from the runtime.
@@ -188,12 +136,10 @@ func (e *EventedPLEG) watchEventsChannel(ctx context.Context) {
 		for {
 			if numAttempts >= e.eventedPlegMaxStreamRetries {
 				if isEventedPLEGInUse() {
-					// Fall back to Generic PLEG relisting since Evented PLEG is not working.
-					logger.V(4).Info("Fall back to Generic PLEG relisting since Evented PLEG is not working")
+					// Disable the accelerator. GenericPLEG continues running at its
+					// normal period and handles all lifecycle events on its own.
+					logger.Error(nil, "Evented PLEG: disabling unexpected-termination fast path after exhausting event stream retries")
 					e.Stop()
-					e.genericPleg.Stop()       // Stop the existing Generic PLEG which runs with longer relisting period when Evented PLEG is in use.
-					e.Update(e.relistDuration) // Update the relisting period to the default value for the Generic PLEG.
-					e.genericPleg.Start(ctx)
 					break
 				}
 			}
@@ -204,8 +150,7 @@ func (e *EventedPLEG) watchEventsChannel(ctx context.Context) {
 			if err != nil {
 				metrics.EventedPLEGConnErr.Inc()
 				numAttempts++
-				e.Relist(ctx) // Force a relist to get the latest container and pods running metric.
-				logger.V(4).Info("Evented PLEG: Failed to get container events, retrying: ", "err", err)
+				logger.V(4).Info("Evented PLEG: failed to get container events, retrying", "err", err)
 			}
 		}
 	}()
@@ -214,6 +159,11 @@ func (e *EventedPLEG) watchEventsChannel(ctx context.Context) {
 		e.processCRIEvents(logger, containerEventsResponseCh)
 	}
 }
+
+// processCRIEvents processes the incoming CRI container events stream.
+// It acts as a fast-path hint: unexpected container terminations request an
+// immediate GenericPLEG relist. GenericPLEG remains the only component that
+// updates the pod cache and emits pod lifecycle events.
 func (e *EventedPLEG) processCRIEvents(logger klog.Logger, containerEventsResponseCh chan *runtimeapi.ContainerEventResponse) {
 	for event := range containerEventsResponseCh {
 		// Ignore the event if PodSandboxStatus is nil.
@@ -229,187 +179,65 @@ func (e *EventedPLEG) processCRIEvents(logger klog.Logger, containerEventsRespon
 			continue
 		}
 
-		podID := types.UID(event.PodSandboxStatus.Metadata.Uid)
-		shouldSendPLEGEvent := false
-
-		status := e.runtime.GeneratePodStatus(event)
-		if klogV := logger.V(6); klogV.Enabled() {
-			logger.Info("Evented PLEG: Generated pod status from the received event", "podUID", podID, "podStatus", status)
-		} else {
-			logger.V(4).Info("Evented PLEG: Generated pod status from the received event", "podUID", podID)
-		}
-		// Preserve the pod IP across cache updates if the new IP is empty.
-		// When a pod is torn down, kubelet may race with PLEG and retrieve
-		// a pod status after network teardown, but the kubernetes API expects
-		// the completed pod's IP to be available after the pod is dead.
-		status.IPs = e.getPodIPs(podID, status)
-
-		e.updateRunningPodMetric(logger, status)
-		e.updateRunningContainerMetric(logger, status)
 		e.updateLatencyMetric(event)
 
-		if event.ContainerEventType == runtimeapi.ContainerEventType_CONTAINER_DELETED_EVENT {
-			for _, sandbox := range status.SandboxStatuses {
-				if sandbox.Id == event.ContainerId {
-					// When the CONTAINER_DELETED_EVENT is received by the kubelet,
-					// the runtime has indicated that the container has been removed
-					// by the runtime and hence, it must be removed from the cache
-					// of kubelet too.
-					e.cache.Delete(podID)
-				}
-			}
-			shouldSendPLEGEvent = true
-		} else {
-			if e.cache.Set(podID, status, nil, time.Unix(0, event.GetCreatedAt())) {
-				shouldSendPLEGEvent = true
-			}
+		criStatus, unexpected := e.unexpectedTerminationStatusForEventContainer(logger, event)
+		if !unexpected {
+			// Not an unexpected termination; GenericPLEG handles this on its next relist.
+			continue
 		}
 
-		if shouldSendPLEGEvent {
-			e.processCRIEvent(logger, event)
-		}
+		podID := types.UID(event.PodSandboxStatus.Metadata.Uid)
+		e.genericPleg.RequestRelist(logger, podID)
+
+		logger.V(4).Info("Evented PLEG: requested pod relist after unexpected container termination",
+			"podUID", podID,
+			"containerID", event.ContainerId,
+			"exitCode", criStatus.ExitCode,
+			"reason", criStatus.Reason,
+			"eventType", event.ContainerEventType)
 	}
 }
 
-func (e *EventedPLEG) processCRIEvent(logger klog.Logger, event *runtimeapi.ContainerEventResponse) {
-	switch event.ContainerEventType {
-	case runtimeapi.ContainerEventType_CONTAINER_STOPPED_EVENT:
-		e.sendPodLifecycleEvent(logger, &PodLifecycleEvent{ID: types.UID(event.PodSandboxStatus.Metadata.Uid), Type: ContainerDied, Data: event.ContainerId})
-		logger.V(4).Info("Received Container Stopped Event", "event", event.String())
-	case runtimeapi.ContainerEventType_CONTAINER_CREATED_EVENT:
-		// We only need to update the pod status on container create.
-		// But we don't have to generate any PodLifeCycleEvent. Container creation related
-		// PodLifeCycleEvent is ignored by the existing Generic PLEG as well.
-		// https://github.com/kubernetes/kubernetes/blob/24753aa8a4df8d10bfd6330e0f29186000c018be/pkg/kubelet/pleg/generic.go#L88 and
-		// https://github.com/kubernetes/kubernetes/blob/24753aa8a4df8d10bfd6330e0f29186000c018be/pkg/kubelet/pleg/generic.go#L273
-		logger.V(4).Info("Received Container Created Event", "event", event.String())
-	case runtimeapi.ContainerEventType_CONTAINER_STARTED_EVENT:
-		e.sendPodLifecycleEvent(logger, &PodLifecycleEvent{ID: types.UID(event.PodSandboxStatus.Metadata.Uid), Type: ContainerStarted, Data: event.ContainerId})
-		logger.V(4).Info("Received Container Started Event", "event", event.String())
-	case runtimeapi.ContainerEventType_CONTAINER_DELETED_EVENT:
-		// In case the pod is deleted it is safe to generate both ContainerDied and ContainerRemoved events, just like in the case of
-		// Generic PLEG. https://github.com/kubernetes/kubernetes/blob/24753aa8a4df8d10bfd6330e0f29186000c018be/pkg/kubelet/pleg/generic.go#L169
-		e.sendPodLifecycleEvent(logger, &PodLifecycleEvent{ID: types.UID(event.PodSandboxStatus.Metadata.Uid), Type: ContainerDied, Data: event.ContainerId})
-		e.sendPodLifecycleEvent(logger, &PodLifecycleEvent{ID: types.UID(event.PodSandboxStatus.Metadata.Uid), Type: ContainerRemoved, Data: event.ContainerId})
-		logger.V(4).Info("Received Container Deleted Event", "event", event)
+// unexpectedTerminationStatusForEventContainer returns the CRI ContainerStatus
+// for the triggering container and true when that container unexpectedly
+// terminated. ContainersStatuses may contain older and newer instances of the
+// same named container, so event.ContainerId is the only safe match key.
+func (e *EventedPLEG) unexpectedTerminationStatusForEventContainer(logger klog.Logger, event *runtimeapi.ContainerEventResponse) (*runtimeapi.ContainerStatus, bool) {
+	if event.ContainerEventType != runtimeapi.ContainerEventType_CONTAINER_STOPPED_EVENT {
+		return nil, false
 	}
+
+	cs := eventContainerStatus(event)
+	if cs == nil {
+		logger.V(5).Info("Evented PLEG: no matching container status in STOPPED event; skipping fast path",
+			"containerID", event.ContainerId)
+		return nil, false
+	}
+
+	if isUnexpectedTermination(cs) {
+		return cs, true
+	}
+	return cs, false
 }
 
-func (e *EventedPLEG) getPodIPs(pid types.UID, status *kubecontainer.PodStatus) []string {
-	if len(status.IPs) != 0 {
-		return status.IPs
-	}
-
-	oldStatus, err := e.cache.Get(pid)
-	if err != nil || len(oldStatus.IPs) == 0 {
-		return nil
-	}
-
-	for _, sandboxStatus := range status.SandboxStatuses {
-		// If at least one sandbox is ready, then use this status update's pod IP
-		if sandboxStatus.State == runtimeapi.PodSandboxState_SANDBOX_READY {
-			return status.IPs
+func eventContainerStatus(event *runtimeapi.ContainerEventResponse) *runtimeapi.ContainerStatus {
+	for _, cs := range event.ContainersStatuses {
+		if cs == nil || cs.Id != event.ContainerId {
+			continue
 		}
+		return cs
 	}
-
-	// For pods with no ready containers or sandboxes (like exited pods)
-	// use the old status' pod IP
-	return oldStatus.IPs
+	return nil
 }
 
-func (e *EventedPLEG) sendPodLifecycleEvent(logger klog.Logger, event *PodLifecycleEvent) {
-	select {
-	case e.eventChannel <- event:
-	default:
-		// record how many events were discarded due to channel out of capacity
-		metrics.PLEGDiscardEvents.Inc()
-		logger.Error(nil, "Evented PLEG: Event channel is full, discarded pod lifecycle event")
+func isUnexpectedTermination(status *runtimeapi.ContainerStatus) bool {
+	// OOMKilled is always unexpected regardless of exit code.
+	if status.Reason == "OOMKilled" {
+		return true
 	}
-}
-
-func getPodSandboxState(podStatus *kubecontainer.PodStatus) kubecontainer.State {
-	// increase running pod count when cache doesn't contain podID
-	var sandboxId string
-	for _, sandbox := range podStatus.SandboxStatuses {
-		sandboxId = sandbox.Id
-		// pod must contain only one sandbox
-		break
-	}
-
-	for _, containerStatus := range podStatus.ContainerStatuses {
-		if containerStatus.ID.ID == sandboxId {
-			if containerStatus.State == kubecontainer.ContainerStateRunning {
-				return containerStatus.State
-			}
-		}
-	}
-	return kubecontainer.ContainerStateExited
-}
-
-func (e *EventedPLEG) updateRunningPodMetric(logger klog.Logger, podStatus *kubecontainer.PodStatus) {
-	cachedPodStatus, err := e.cache.Get(podStatus.ID)
-	if err != nil {
-		logger.Error(err, "Evented PLEG: Get cache", "podID", podStatus.ID)
-	}
-	// cache miss condition: The pod status object will have empty state if missed in cache
-	if len(cachedPodStatus.SandboxStatuses) < 1 {
-		sandboxState := getPodSandboxState(podStatus)
-		if sandboxState == kubecontainer.ContainerStateRunning {
-			metrics.RunningPodCount.Inc()
-		}
-	} else {
-		oldSandboxState := getPodSandboxState(cachedPodStatus)
-		currentSandboxState := getPodSandboxState(podStatus)
-
-		if oldSandboxState == kubecontainer.ContainerStateRunning && currentSandboxState != kubecontainer.ContainerStateRunning {
-			metrics.RunningPodCount.Dec()
-		} else if oldSandboxState != kubecontainer.ContainerStateRunning && currentSandboxState == kubecontainer.ContainerStateRunning {
-			metrics.RunningPodCount.Inc()
-		}
-	}
-}
-
-func getContainerStateCount(podStatus *kubecontainer.PodStatus) map[kubecontainer.State]int {
-	containerStateCount := make(map[kubecontainer.State]int)
-	for _, container := range podStatus.ContainerStatuses {
-		containerStateCount[container.State]++
-	}
-	return containerStateCount
-}
-
-func (e *EventedPLEG) updateRunningContainerMetric(logger klog.Logger, podStatus *kubecontainer.PodStatus) {
-	cachedPodStatus, err := e.cache.Get(podStatus.ID)
-	if err != nil {
-		logger.Error(err, "Evented PLEG: Get cache", "podID", podStatus.ID)
-	}
-
-	// cache miss condition: The pod status object will have empty state if missed in cache
-	if len(cachedPodStatus.SandboxStatuses) < 1 {
-		containerStateCount := getContainerStateCount(podStatus)
-		for state, count := range containerStateCount {
-			// add currently obtained count
-			metrics.RunningContainerCount.WithLabelValues(string(state)).Add(float64(count))
-		}
-	} else {
-		oldContainerStateCount := getContainerStateCount(cachedPodStatus)
-		currentContainerStateCount := getContainerStateCount(podStatus)
-
-		// old and new set of container states may vary;
-		// get a unique set of container states combining both
-		containerStates := make(map[kubecontainer.State]bool)
-		for state := range oldContainerStateCount {
-			containerStates[state] = true
-		}
-		for state := range currentContainerStateCount {
-			containerStates[state] = true
-		}
-
-		// update the metric via difference of old and current counts
-		for state := range containerStates {
-			diff := currentContainerStateCount[state] - oldContainerStateCount[state]
-			metrics.RunningContainerCount.WithLabelValues(string(state)).Add(float64(diff))
-		}
-	}
+	// Non-zero exit on an exited container means the process crashed or was killed.
+	return status.State == runtimeapi.ContainerState_CONTAINER_EXITED && status.ExitCode != 0
 }
 
 func (e *EventedPLEG) updateLatencyMetric(event *runtimeapi.ContainerEventResponse) {

@@ -215,9 +215,7 @@ const (
 	genericPlegRelistPeriod    = time.Second * 1
 	genericPlegRelistThreshold = time.Minute * 3
 
-	// Generic PLEG relist period and threshold when used with Evented PLEG.
-	eventedPlegRelistPeriod     = time.Second * 300
-	eventedPlegRelistThreshold  = time.Minute * 10
+	// Evented PLEG CRI stream retry limit.
 	eventedPlegMaxStreamRetries = 5
 
 	// backOffPeriod is the period to back off when pod syncing results in an
@@ -859,21 +857,15 @@ func NewMainKubelet(ctx context.Context,
 	eventChannel := make(chan *pleg.PodLifecycleEvent, plegChannelCapacity)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
-		// adjust Generic PLEG relisting period and threshold to higher value when Evented PLEG is turned on
+		// GenericPLEG runs at its normal period and handles all lifecycle events.
+		// EventedPLEG subscribes to the CRI event stream only to request an
+		// immediate relist after unexpected container terminations.
 		genericRelistDuration := &pleg.RelistDuration{
-			RelistPeriod:    eventedPlegRelistPeriod,
-			RelistThreshold: eventedPlegRelistThreshold,
-		}
-		klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, eventChannel, genericRelistDuration, podCache, clock.RealClock{})
-		// In case Evented PLEG has to fall back on Generic PLEG due to an error,
-		// Evented PLEG should be able to reset the Generic PLEG relisting duration
-		// to the default value.
-		eventedRelistDuration := &pleg.RelistDuration{
 			RelistPeriod:    genericPlegRelistPeriod,
 			RelistThreshold: genericPlegRelistThreshold,
 		}
-		klet.eventedPleg, err = pleg.NewEventedPLEG(klet.containerRuntime, klet.runtimeService, eventChannel,
-			podCache, klet.pleg, eventedPlegMaxStreamRetries, eventedRelistDuration, clock.RealClock{})
+		klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, eventChannel, genericRelistDuration, podCache, clock.RealClock{})
+		klet.eventedPleg, err = pleg.NewEventedPLEG(klet.runtimeService, klet.pleg, eventedPlegMaxStreamRetries)
 		if err != nil {
 			return nil, err
 		}
@@ -887,9 +879,6 @@ func NewMainKubelet(ctx context.Context,
 
 	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
 	klet.runtimeState.addHealthCheck("PLEG", klet.pleg.Healthy)
-	if utilfeature.DefaultFeatureGate.Enabled(features.EventedPLEG) {
-		klet.runtimeState.addHealthCheck("EventedPLEG", klet.eventedPleg.Healthy)
-	}
 	if _, err := klet.updatePodCIDR(ctx, kubeCfg.PodCIDR); err != nil {
 		logger.Error(err, "Pod CIDR update failed")
 	}
@@ -1457,7 +1446,7 @@ type Kubelet struct {
 	// be restarted).
 	pleg pleg.PodLifecycleEventGenerator
 
-	// eventedPleg supplements the pleg to deliver edge-driven container changes with low-latency.
+	// eventedPleg supplements the pleg by using CRI events to request low-latency relists.
 	eventedPleg pleg.PodLifecycleEventGenerator
 
 	// Store kubecontainer.PodStatus for all pods.
