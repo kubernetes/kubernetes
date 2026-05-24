@@ -1310,11 +1310,14 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 			if kubecontainer.ShouldContainerBeRestarted(logger, &container, pod, podStatus) {
 				logger.V(3).Info("Container of pod is not in the desired state and shall be started", "containerName", container.Name, "pod", klog.KObj(pod))
 				changes.ContainersToStart = append(changes.ContainersToStart, idx)
-				// for non-running containers with a pending in-place resize,
-				// we cannot call UpdateContainerResources via CRI. set UpdatePodResources as true so
-				// that doPodResizeAction updates the pod-level cgroup before the container restarts.
+				// kubelet manages the pod cgroups while CRI manages the container-level cgroups,
+				// so kubelet must explicitly adjust the pod cgroups first
+				// before making the CRI call to start the container
 				if containerStatus != nil && resizable {
-					actuatedPodResources, _ := m.actuatedState.GetPodLevelResources(pod.UID)
+					var actuatedPodResources *v1.ResourceRequirements
+					if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) {
+						actuatedPodResources, _ = m.actuatedState.GetPodLevelResources(pod.UID)
+					}
 					actuatedContainerResources, _ := m.actuatedState.GetContainerResources(pod.UID, container.Name)
 					desiredResources := containerResourcesFromRequirements(pod.Spec.Resources, &container.Resources)
 					currentResources := containerResourcesFromRequirements(actuatedPodResources, &actuatedContainerResources)
