@@ -17,6 +17,8 @@ limitations under the License.
 package responsewriters
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -63,12 +65,16 @@ func ErrorToAPIStatus(err error) *metav1.Status {
 		//TODO: replace me with NewConflictErr
 		case storage.IsConflict(err):
 			status = http.StatusConflict
+		case errors.Is(err, context.Canceled):
+			status = http.StatusRequestTimeout
 		}
 		// Log errors that were not converted to an error status
 		// by REST storage - these typically indicate programmer
 		// error by not using pkg/api/errors, or unexpected failure
 		// cases.
-		runtime.HandleError(fmt.Errorf("apiserver received an error that is not an metav1.Status: %#+v: %v", err, err))
+		if !errors.Is(err, context.Canceled) {
+			runtime.HandleError(fmt.Errorf("apiserver received an error that is not an metav1.Status: %#+v: %v", err, err))
+		}
 		return &metav1.Status{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "Status",
