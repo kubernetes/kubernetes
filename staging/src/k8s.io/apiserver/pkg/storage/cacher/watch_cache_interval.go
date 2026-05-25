@@ -245,6 +245,7 @@ func (wcib *watchCacheIntervalBuffer) next() (*watchCacheEvent, bool) {
 		return nil, false
 	}
 	next := wcib.buffer[wcib.startIndex]
+	wcib.buffer[wcib.startIndex] = nil
 	wcib.startIndex++
 	return next, true
 }
