@@ -244,9 +244,14 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 	// Run workload aware preemption if required. If the preemption is successful,
 	// we need to put the pods from pod group back into the scheduling queue.
 	if sched.workloadAwarePreemptionEnabled && result.status.Code() == fwk.Unschedulable {
-		status := sched.runWorkloadAwarePreemption(ctx, schedFwk, podGroupCycleState, podGroupInfo)
+		pgPostFilterResult, status := sched.runWorkloadAwarePreemption(ctx, schedFwk, podGroupCycleState, podGroupInfo)
 		if status.IsSuccess() {
 			result.waitingOnPreemption = true
+			for i := range result.podResults {
+				if nodeNameInfo, ok := pgPostFilterResult.NominatedNodeNames[result.podResults[i].pod]; ok {
+					result.podResults[i].scheduleResult.nominatingInfo = nodeNameInfo
+				}
+			}
 		} else if status.IsError() {
 			result.status = status
 		} else {
@@ -264,24 +269,24 @@ func (sched *Scheduler) podGroupCycle(ctx context.Context, schedFwk framework.Fr
 // original state.
 // The function used for evaluating feasibility of pod group scheduling is
 // scheduler.podGroupSchedulingAlgorithm run without any post filters.
-func (sched *Scheduler) runWorkloadAwarePreemption(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, podGroupInfo *framework.QueuedPodGroupInfo) *fwk.Status {
+func (sched *Scheduler) runWorkloadAwarePreemption(ctx context.Context, schedFwk framework.Framework, podGroupCycleState *framework.CycleState, podGroupInfo *framework.QueuedPodGroupInfo) (*framework.PodGroupPostFilterResult, *fwk.Status) {
 	// Default preemption should be the only pod group post filter registered plugin.
 	plugins := schedFwk.PodGroupPostFilterPlugins()
 	if len(plugins) == 0 {
-		return fwk.NewStatus(fwk.Unschedulable, "default preemption plugin is not registered, workload aware preemption is disabled")
+		return nil, fwk.NewStatus(fwk.Unschedulable, "default preemption plugin is not registered, workload aware preemption is disabled")
 	}
 
 	pg, err := schedFwk.SharedInformerFactory().Scheduling().V1alpha3().PodGroups().Lister().PodGroups(podGroupInfo.Namespace).Get(podGroupInfo.Name)
 	if err != nil {
-		return fwk.AsStatus(fmt.Errorf("failed to get pod group object: %w", err))
+		return nil, fwk.AsStatus(fmt.Errorf("failed to get pod group object: %w", err))
 	}
 	if pg.Spec.SchedulingConstraints != nil && len(pg.Spec.SchedulingConstraints.Topology) > 0 {
-		return fwk.NewStatus(fwk.Unschedulable, "workload aware preemption is not supported for pod groups with scheduling constraints")
+		return nil, fwk.NewStatus(fwk.Unschedulable, "workload aware preemption is not supported for pod groups with scheduling constraints")
 	}
 
 	restoreFn, err := sched.nodeInfoSnapshot.BackupSnapshot()
 	if err != nil {
-		return fwk.AsStatus(fmt.Errorf("failed to backup snapshot: %w", err))
+		return nil, fwk.AsStatus(fmt.Errorf("failed to backup snapshot: %w", err))
 	}
 	defer restoreFn()
 
