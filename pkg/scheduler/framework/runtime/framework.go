@@ -44,7 +44,6 @@ import (
 	apidispatcher "k8s.io/kubernetes/pkg/scheduler/backend/api_dispatcher"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/parallelize"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
 
@@ -474,16 +473,15 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 		f.computeBatchablePlugins()
 	}
 
-	// Put default preemption as the only PodGroupPostFilterPlugin
+	// Populate PodGroupPostFilterPlugins with any PostFilter plugins that implement the interface
 	if utilfeature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption) {
-		if dp, ok := f.pluginsMap[names.DefaultPreemption]; ok {
-			if _, ok := dp.(framework.PodGroupPostFilterPlugin); ok {
-				f.podGroupPostFilterPlugins = append(f.podGroupPostFilterPlugins, dp.(framework.PodGroupPostFilterPlugin))
-			} else {
-				logger.V(2).Info("Workload Aware Preemption is enabled, but default preemption plugin does not fulfill PodGroupPostFilterPlugin interface. Workload Aware Preemption will not be used.")
+		for _, pl := range f.postFilterPlugins {
+			if pgpf, ok := pl.(framework.PodGroupPostFilterPlugin); ok {
+				f.podGroupPostFilterPlugins = append(f.podGroupPostFilterPlugins, pgpf)
 			}
-		} else {
-			logger.V(2).Info("Workload Aware Preemption is enabled, but default preemption plugin is not set. Workload Aware Preemption will not be used.")
+		}
+		if len(f.podGroupPostFilterPlugins) == 0 {
+			logger.V(2).Info("Workload Aware Preemption is enabled, but no post filter plugin fulfills PodGroupPostFilterPlugin interface. Workload Aware Preemption will not be used.")
 		}
 	}
 
