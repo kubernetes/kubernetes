@@ -145,6 +145,29 @@ func TestMergeProcessStats(t *testing.T) {
 	}
 }
 
+// TestCadvisorMemoryEventsStruct checks the fields in cadvisor MemoryEvents structs. If cadvisor
+// MemoryEvents structs change, the conversion between cadvisor MemoryEvents and kubelet stats API
+// MemoryStats needs to be re-evaluated and updated.
+func TestCadvisorMemoryEventsStruct(t *testing.T) {
+	memoryEventsFields := map[string]reflect.Kind{
+		"High": reflect.Uint64,
+		"Max":  reflect.Uint64,
+	}
+
+	e := cadvisorapiv1.MemoryEvents{}
+	et := reflect.TypeOf(e)
+	for field := range et.Fields() {
+		wantKind, fieldExists := memoryEventsFields[field.Name]
+		if !fieldExists {
+			t.Errorf("cadvisorapiv1.MemoryEvents contains unknown field: %s. The conversion between cadvisor MemoryEvents and kubelet stats API MemoryStats needs to be re-evaluated and updated.", field.Name)
+			continue
+		}
+		if field.Type.Kind() != wantKind {
+			t.Errorf("unexpected cadvisorapiv1.MemoryEvents field %s type, want: %s, got: %s. The conversion between cadvisor MemoryEvents and kubelet stats API MemoryStats needs to be re-evaluated and updated.", field.Name, wantKind, field.Type.Kind())
+		}
+	}
+}
+
 // TestCadvisorPSIStruct checks the fields in cadvisor PSI structs. If cadvisor
 // PSI structs change, the conversion between cadvisor PSI structs and kubelet stats API structs needs to be re-evaluated and updated.
 func TestCadvisorPSIStructs(t *testing.T) {
