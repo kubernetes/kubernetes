@@ -6162,6 +6162,14 @@ const (
 	ResourceStorage ResourceName = "storage"
 	// Local ephemeral storage, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	ResourceEphemeralStorage ResourceName = "ephemeral-storage"
+	// PID limit for a pod (integer count of processes).
+	// ResourcePID is a pod-level PID limit set via spec.resources.limits.pids.
+	// Valid range: 128-16384. Only limits are accepted; requests.pids is
+	// forbidden. The effective limit enforced by the kubelet is
+	// min(node podPidsLimit, pod pid limit). Requires the PerPodPIDLimit
+	// feature gate and cgroupsv2.
+	// When omitted, the node-level --pod-pids-limit applies.
+	ResourcePID ResourceName = "pids"
 )
 
 const (
