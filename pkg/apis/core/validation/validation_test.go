@@ -22639,7 +22639,7 @@ func TestValidatePodResourceNames(t *testing.T) {
 		{"kubernetes.io/will/not/work/", true},
 	}
 	for _, item := range table {
-		errs := validatePodResourceName(item.input, field.NewPath("field"))
+		errs := validatePodResourceName(item.input, field.NewPath("field"), PodValidationOptions{})
 		if len(errs) != 0 && !item.expectedFailure {
 			t.Errorf("expected no failure for input %q, got: %v", item.input, errs)
 		}
@@ -22694,6 +22694,151 @@ func TestValidateResourceNames(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestValidateContainerResourceName_PID(t *testing.T) {
+	fldPath := field.NewPath("resources")
+
+	// ValidateContainerResourceName does not consult the PerPodPIDLimit
+	// feature gate: pids is rejected at the container level unconditionally.
+	tests := []struct {
+		name      string
+		resource  core.ResourceName
+		expectErr field.ErrorList
+	}{
+		{
+			name:      "pids rejected at container level",
+			resource:  core.ResourcePID,
+			expectErr: field.ErrorList{field.Invalid(fldPath, core.ResourcePID, "must be a standard resource for containers")},
+		},
+		{
+			name:     "cpu still works",
+			resource: core.ResourceCPU,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			errs := ValidateContainerResourceName(tc.resource, fldPath)
+			if len(tc.expectErr) > 0 && len(errs) == 0 {
+				t.Errorf("expected error, got none")
+			} else if len(tc.expectErr) == 0 && len(errs) != 0 {
+				t.Errorf("unexpected error(s): %v", errs)
+			} else if len(tc.expectErr) > 0 {
+				if tc.expectErr[0].Error() != errs[0].Error() {
+					t.Errorf("expected error %q, got %q", tc.expectErr[0], errs[0])
+				}
+			}
+		})
+	}
+}
+
+func TestValidateLimitRangeResourceName_PID(t *testing.T) {
+	fldPath := field.NewPath("spec", "limits").Index(0).Child("max")
+
+	for _, limitType := range []core.LimitType{core.LimitTypePod, core.LimitTypeContainer, core.LimitTypePersistentVolumeClaim} {
+		t.Run(string(limitType), func(t *testing.T) {
+			errs := validateLimitRangeResourceName(limitType, core.ResourcePID, fldPath)
+			if len(errs) == 0 {
+				t.Errorf("expected pids to be rejected for LimitRange type %q", limitType)
+			}
+		})
+	}
+}
+
+func TestValidatePodResourceRequirements_PID(t *testing.T) {
+	fldPath := field.NewPath("spec", "resources")
+	limPath := fldPath.Child("limits")
+	reqPath := fldPath.Child("requests")
+
+	tests := []struct {
+		name         string
+		requirements core.ResourceRequirements
+		expectErr    field.ErrorList
+	}{
+		{
+			name: "valid pid limit only",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{core.ResourcePID: resource.MustParse("2048")},
+			},
+		},
+		{
+			name: "requests.pid is forbidden even when equal to limits",
+			requirements: core.ResourceRequirements{
+				Limits:   core.ResourceList{core.ResourcePID: resource.MustParse("2048")},
+				Requests: core.ResourceList{core.ResourcePID: resource.MustParse("2048")},
+			},
+			expectErr: field.ErrorList{field.Forbidden(reqPath.Key("pids"), "pids may only be specified in limits, not requests")},
+		},
+		{
+			name: "requests.pid alone is forbidden",
+			requirements: core.ResourceRequirements{
+				Requests: core.ResourceList{core.ResourcePID: resource.MustParse("2048")},
+			},
+			expectErr: field.ErrorList{field.Forbidden(reqPath.Key("pids"), "pids may only be specified in limits, not requests")},
+		},
+		{
+			name: "pid below minimum (128) rejected",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{core.ResourcePID: resource.MustParse("64")},
+			},
+			expectErr: field.ErrorList{field.Invalid(limPath.Key("pids"), "64", fmt.Sprintf("pids limit must be between %d and %d", 128, 16384))},
+		},
+		{
+			name: "pid above maximum (16384) rejected",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{core.ResourcePID: resource.MustParse("32768")},
+			},
+			expectErr: field.ErrorList{field.Invalid(limPath.Key("pids"), "32768", fmt.Sprintf("pids limit must be between %d and %d", 128, 16384))},
+		},
+		{
+			name: "pid at minimum boundary (128) valid",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{core.ResourcePID: resource.MustParse("128")},
+			},
+		},
+		{
+			name: "pid at maximum boundary (16384) valid",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{core.ResourcePID: resource.MustParse("16384")},
+			},
+		},
+		{
+			name: "zero pid value rejected",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{core.ResourcePID: resource.MustParse("0")},
+			},
+			expectErr: field.ErrorList{field.Invalid(limPath.Key("pids"), "0", fmt.Sprintf("pids limit must be between %d and %d", 128, 16384))},
+		},
+		{
+			name: "negative pid value rejected",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{core.ResourcePID: resource.MustParse("-1")},
+			},
+			expectErr: field.ErrorList{field.Invalid(limPath.Key("pids"), "-1", "must be greater than or equal to 0")},
+		},
+		{
+			name: "fractional pid value rejected as non-integer",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{core.ResourcePID: resource.MustParse("2500m")},
+			},
+			expectErr: field.ErrorList{field.Invalid(limPath.Key("pids"), "2500m", "must be an integer")},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			reqs := tc.requirements
+			errs := validatePodResourceRequirements(&reqs, nil, fldPath, PodValidationOptions{AllowPodPIDLimit: true})
+			if len(tc.expectErr) > 0 && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			} else if len(tc.expectErr) == 0 && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			} else if len(tc.expectErr) > 0 {
+				if tc.expectErr[0].Error() != errs[0].Error() {
+					t.Errorf("Expected error %q, got %q", tc.expectErr[0], errs[0])
+				}
+			}
+		})
 	}
 }
 
@@ -31411,6 +31556,56 @@ func TestValidatePodResize(t *testing.T) {
 	}
 }
 
+// TestValidatePodResize_PIDOnlyPodDoesNotBlockContainerResize verifies that a
+// pod whose only pod-level resource is limits.pids is NOT treated as having
+// pod-level resources for resize purposes.  pids is a limit-only resource that
+// does not participate in QOS, scheduling, or cgroup cpu/memory accounting, so
+// its presence must not gate container-level resize behind the
+// InPlacePodLevelResourcesVerticalScaling feature gate.
+func TestValidatePodResize_PIDOnlyPodDoesNotBlockContainerResize(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScaling, true)
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerPodPIDLimit, true)
+
+	oldPod := podtest.MakePod("pod",
+		podtest.SetContainers(podtest.MakeContainer("container",
+			podtest.SetContainerResources(core.ResourceRequirements{
+				Requests: getResources("100m", "100Mi", "", ""),
+				Limits:   getResources("200m", "200Mi", "", ""),
+			}),
+			podtest.SetContainerResizePolicy(
+				core.ContainerResizePolicy{ResourceName: core.ResourceCPU, RestartPolicy: core.NotRequired},
+				core.ContainerResizePolicy{ResourceName: core.ResourceMemory, RestartPolicy: core.NotRequired},
+			),
+		)),
+		podtest.SetPodResources(&core.ResourceRequirements{
+			Limits: core.ResourceList{
+				core.ResourcePID: resource.MustParse("256"),
+			},
+		}),
+	)
+	oldPod.ObjectMeta.Name = "pod"
+	oldPod.ObjectMeta.Namespace = "ns"
+	oldPod.ObjectMeta.ResourceVersion = "1"
+	oldPod.Spec.DNSPolicy = core.DNSClusterFirst
+	oldPod.Spec.RestartPolicy = core.RestartPolicyAlways
+
+	newPod := oldPod.DeepCopy()
+	newPod.ObjectMeta.ResourceVersion = "2"
+	// Resize container CPU from 200m -> 300m.
+	newPod.Spec.Containers[0].Resources.Limits[core.ResourceCPU] = resource.MustParse("300m")
+
+	errs := ValidatePodResize(newPod, oldPod, PodValidationOptions{
+		AllowSidecarResizePolicy: true,
+		// Deliberately OFF — the bug was that pids-only pods hit this gate.
+		InPlacePodLevelResourcesVerticalScalingEnabled: false,
+		PodLevelResourcesEnabled:                       true,
+		AllowPodPIDLimit:                               true,
+	})
+	if len(errs) != 0 {
+		t.Errorf("container resize on a pids-only pod should be allowed when InPlacePodLevelResourcesVerticalScaling is off, got: %v", errs)
+	}
+}
+
 func TestValidateNodeSwapStatus(t *testing.T) {
 	makeNode := func(nodeSwapStatus *core.NodeSwapStatus) core.Node {
 		node := makeNode("test-node", nil)
@@ -33321,6 +33516,74 @@ func TestValidateBasicResource(t *testing.T) {
 				}
 				if got.Cmp(q) != 0 {
 					t.Errorf("%s: error reports %q, want a quantity equal to the one submitted", tc.quantity, reported)
+				}
+			}
+		})
+	}
+}
+
+func TestValidatePIDResource(t *testing.T) {
+	fldPath := field.NewPath("spec", "resources", "limits").Key("pids")
+
+	tests := []struct {
+		name      string
+		gateOn    bool
+		pidValue  string
+		expectErr field.ErrorList
+	}{
+		{
+			name:     "pid allowed when gate is on, valid value",
+			gateOn:   true,
+			pidValue: "2048",
+		},
+		{
+			name:      "pid rejected when gate is off",
+			gateOn:    false,
+			pidValue:  "2048",
+			expectErr: field.ErrorList{field.Invalid(fldPath, core.ResourcePID, "pids resource requires PerPodPIDLimit feature gate")},
+		},
+		{
+			name:     "pid at minimum boundary (128)",
+			gateOn:   true,
+			pidValue: "128",
+		},
+		{
+			name:     "pid at maximum boundary (16384)",
+			gateOn:   true,
+			pidValue: "16384",
+		},
+		{
+			name:      "pid below minimum rejected",
+			gateOn:    true,
+			pidValue:  "64",
+			expectErr: field.ErrorList{field.Invalid(fldPath, "64", fmt.Sprintf("pids limit must be between %d and %d", 128, 16384))},
+		},
+		{
+			name:      "pid above maximum rejected",
+			gateOn:    true,
+			pidValue:  "32768",
+			expectErr: field.ErrorList{field.Invalid(fldPath, "32768", fmt.Sprintf("pids limit must be between %d and %d", 128, 16384))},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var errs field.ErrorList
+			nameErrs := validatePodResourceName(core.ResourcePID, fldPath, PodValidationOptions{AllowPodPIDLimit: tt.gateOn})
+			if len(nameErrs) > 0 {
+				errs = nameErrs
+			} else {
+				q := resource.MustParse(tt.pidValue)
+				errs = validatePIDResourceValue(core.ResourcePID, q, fldPath)
+			}
+
+			if len(tt.expectErr) > 0 && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			} else if len(tt.expectErr) == 0 && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			} else if len(tt.expectErr) > 0 {
+				if tt.expectErr[0].Error() != errs[0].Error() {
+					t.Errorf("Expected error %q, got %q", tt.expectErr[0], errs[0])
 				}
 			}
 		})
