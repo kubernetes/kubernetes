@@ -36,6 +36,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
+	consistencyutil "k8s.io/kubernetes/pkg/controller/util/consistency"
 )
 
 const (
@@ -68,6 +69,10 @@ func NewReplicationManager(ctx context.Context, podInformer coreinformers.PodInf
 				// ReplicaSets do support this field, which is then propagated to Deployments for higher-level features.
 				EnableStatusTerminatingReplicas: false,
 			},
+			// TODO: Replication controller does not currently support stale controller consistency.
+			// In order to support stale controller consistency, we would need to parameterize the metrics
+			// and resource types passed to the consistency store.
+			consistencyutil.NewNoopConsistencyStore(),
 		),
 	}
 }

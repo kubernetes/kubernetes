@@ -298,12 +298,12 @@ type ExecConfig struct {
 // the logical AND of all checks corresponding to the specified fields within
 // the entry.
 type AllowlistEntry struct {
-	// Name matching is performed by first resolving the absolute path of both
+	// Command matching is performed by first resolving the absolute path of both
 	// the plugin and the name in the allowlist entry using `exec.LookPath`. It
 	// will be called on both, and the resulting strings must be equal. If
-	// either call to `exec.LookPath` results in an error, the `Name` check
+	// either call to `exec.LookPath` results in an error, the `Command` check
 	// will be considered a failure.
-	Name string `json:"-"`
+	Command string `json:"-"`
 }
 
 // PluginPolicy describes the policy type and allowlist (if any) for client-go

@@ -18,7 +18,6 @@ package scheduler
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -29,8 +28,8 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
-	resourcealphaapi "k8s.io/api/resource/v1alpha3"
-	schedulingapi "k8s.io/api/scheduling/v1alpha1"
+	resourcebetaapi "k8s.io/api/resource/v1beta2"
+	schedulingapi "k8s.io/api/scheduling/v1alpha3"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -84,7 +83,7 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 
 	unschedulablePods := []*v1.Pod{highPriorityPod, medNominatedPriorityPod, medPriorityPod, lowPriorityPod}
 
-	// Make pods schedulable on Delete event when QHints are enabled, but not when nominated node appears.
+	// Make pods schedulable on Delete event, but not when nominated node appears.
 	queueHintForPodDelete := func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
 		oldPod, _, err := util.As[*v1.Pod](oldObj, newObj)
 		if err != nil {
@@ -151,76 +150,69 @@ func TestEventHandlers_MoveToActiveOnNominatedNodeUpdate(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		for _, qHintEnabled := range []bool{false, true} {
-			t.Run(fmt.Sprintf("%s, with queuehint(%v)", tt.name, qHintEnabled), func(t *testing.T) {
-				if !qHintEnabled {
-					featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
-					featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, false)
-				}
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 
-				logger, ctx := ktesting.NewTestContext(t)
-				ctx, cancel := context.WithCancel(ctx)
-				defer cancel()
+			var objs []runtime.Object
+			for _, pod := range unschedulablePods {
+				objs = append(objs, pod)
+			}
+			client := fake.NewClientset(objs...)
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-				var objs []runtime.Object
-				for _, pod := range unschedulablePods {
-					objs = append(objs, pod)
-				}
-				client := fake.NewClientset(objs...)
-				informerFactory := informers.NewSharedInformerFactory(client, 0)
+			// apiDispatcher is unused in the test, but intializing it anyway.
+			apiDispatcher := apidispatcher.New(client, 16, apicalls.Relevances)
+			apiDispatcher.Run(logger)
+			defer apiDispatcher.Close()
 
-				// apiDispatcher is unused in the test, but intializing it anyway.
-				apiDispatcher := apidispatcher.New(client, 16, apicalls.Relevances)
-				apiDispatcher.Run(logger)
-				defer apiDispatcher.Close()
+			recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
+			queue := internalqueue.NewPriorityQueue(
+				newDefaultQueueSort(),
+				informerFactory,
+				internalqueue.WithMetricsRecorder(recorder),
+				internalqueue.WithQueueingHintMapPerProfile(queueingHintMap),
+				internalqueue.WithAPIDispatcher(apiDispatcher),
+				// disable backoff queue
+				internalqueue.WithPodInitialBackoffDuration(0),
+				internalqueue.WithPodMaxBackoffDuration(0))
+			schedulerCache := internalcache.New(ctx, nil, false)
 
-				recorder := metrics.NewMetricsAsyncRecorder(3, 20*time.Microsecond, ctx.Done())
-				queue := internalqueue.NewPriorityQueue(
-					newDefaultQueueSort(),
-					informerFactory,
-					internalqueue.WithMetricsRecorder(recorder),
-					internalqueue.WithQueueingHintMapPerProfile(queueingHintMap),
-					internalqueue.WithAPIDispatcher(apiDispatcher),
-					// disable backoff queue
-					internalqueue.WithPodInitialBackoffDuration(0),
-					internalqueue.WithPodMaxBackoffDuration(0))
-				schedulerCache := internalcache.New(ctx, nil)
-
-				// Put test pods into unschedulable queue
-				for _, pod := range unschedulablePods {
-					queue.Add(logger, pod)
-					poppedPod, err := queue.Pop(logger)
-					if err != nil {
-						t.Fatalf("Pop failed: %v", err)
-					}
-					poppedPod.UnschedulablePlugins = sets.New("fooPlugin1")
-					if err := queue.AddUnschedulableIfNotPresent(logger, poppedPod, queue.SchedulingCycle()); err != nil {
-						t.Errorf("Unexpected error from AddUnschedulableIfNotPresent: %v", err)
-					}
-				}
-
-				s, _, err := initScheduler(ctx, schedulerCache, queue, apiDispatcher, client, informerFactory)
+			// Put test pods into unschedulable queue
+			for _, pod := range unschedulablePods {
+				queue.Add(ctx, pod)
+				poppedPod, err := queue.Pop(logger)
 				if err != nil {
-					t.Fatalf("Failed to initialize test scheduler: %v", err)
+					t.Fatalf("Pop failed: %v", err)
 				}
+				poppedPod.UnschedulablePlugins = sets.New("fooPlugin1")
+				if err := queue.AddUnschedulableIfNotPresent(logger, poppedPod, queue.SchedulingCycle()); err != nil {
+					t.Errorf("Unexpected error from AddUnschedulableIfNotPresent: %v", err)
+				}
+			}
 
-				if len(s.SchedulingQueue.PodsInActiveQ()) > 0 {
-					t.Errorf("No pods were expected to be in the activeQ before the update, but there were %v", s.SchedulingQueue.PodsInActiveQ())
-				}
-				tt.updateFunc(s)
+			s, _, err := initScheduler(ctx, schedulerCache, queue, apiDispatcher, client, informerFactory)
+			if err != nil {
+				t.Fatalf("Failed to initialize test scheduler: %v", err)
+			}
 
-				podsInActiveOrBackoff := s.SchedulingQueue.PodsInActiveQ()
-				podsInActiveOrBackoff = append(podsInActiveOrBackoff, s.SchedulingQueue.PodsInBackoffQ()...)
-				if len(podsInActiveOrBackoff) != len(tt.wantInActiveOrBackoff) {
-					t.Errorf("Different number of pods were expected to be in the activeQ or backoffQ, but found actual %v vs. expected %v", podsInActiveOrBackoff, tt.wantInActiveOrBackoff)
+			if len(s.SchedulingQueue.PodsInActiveQ()) > 0 {
+				t.Errorf("No pods were expected to be in the activeQ before the update, but there were %v", s.SchedulingQueue.PodsInActiveQ())
+			}
+			tt.updateFunc(s)
+
+			podsInActiveOrBackoff := s.SchedulingQueue.PodsInActiveQ()
+			podsInActiveOrBackoff = append(podsInActiveOrBackoff, s.SchedulingQueue.PodsInBackoffQ()...)
+			if len(podsInActiveOrBackoff) != len(tt.wantInActiveOrBackoff) {
+				t.Errorf("Different number of pods were expected to be in the activeQ or backoffQ, but found actual %v vs. expected %v", podsInActiveOrBackoff, tt.wantInActiveOrBackoff)
+			}
+			for _, pod := range podsInActiveOrBackoff {
+				if !tt.wantInActiveOrBackoff.Has(pod.Name) {
+					t.Errorf("Found unexpected pod in activeQ or backoffQ: %s", pod.Name)
 				}
-				for _, pod := range podsInActiveOrBackoff {
-					if !tt.wantInActiveOrBackoff.Has(pod.Name) {
-						t.Errorf("Found unexpected pod in activeQ or backoffQ: %s", pod.Name)
-					}
-				}
-			})
-		}
+			}
+		})
 	}
 }
 
@@ -254,7 +246,7 @@ func TestUpdateAssignedPodInCache(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			defer cancel()
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, nil),
+				Cache:           internalcache.New(ctx, nil, false),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 			}
@@ -280,160 +272,6 @@ func TestUpdateAssignedPodInCache(t *testing.T) {
 func withPodName(pod *v1.Pod, name string) *v1.Pod {
 	pod.Name = name
 	return pod
-}
-
-func TestPreCheckForNode(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
-
-	cpu4 := map[v1.ResourceName]string{v1.ResourceCPU: "4"}
-	cpu8 := map[v1.ResourceName]string{v1.ResourceCPU: "8"}
-	cpu16 := map[v1.ResourceName]string{v1.ResourceCPU: "16"}
-	tests := []struct {
-		name               string
-		nodeFn             func() *v1.Node
-		existingPods, pods []*v1.Pod
-		want               []bool
-		qHintEnabled       bool
-	}{
-		{
-			name: "regular node, pods with a single constraint",
-			nodeFn: func() *v1.Node {
-				return st.MakeNode().Name("fake-node").Label("hostname", "fake-node").Capacity(cpu8).Obj()
-			},
-			existingPods: []*v1.Pod{
-				st.MakePod().Name("p").HostPort(80).Obj(),
-			},
-			pods: []*v1.Pod{
-				st.MakePod().Name("p1").Req(cpu4).Obj(),
-				st.MakePod().Name("p2").Req(cpu16).Obj(),
-				st.MakePod().Name("p3").Req(cpu4).Req(cpu8).Obj(),
-				st.MakePod().Name("p4").NodeAffinityIn("hostname", []string{"fake-node"}, st.NodeSelectorTypeMatchExpressions).Obj(),
-				st.MakePod().Name("p5").NodeAffinityNotIn("hostname", []string{"fake-node"}).Obj(),
-				st.MakePod().Name("p6").Obj(),
-				st.MakePod().Name("p7").Node("invalid-node").Obj(),
-				st.MakePod().Name("p8").HostPort(8080).Obj(),
-				st.MakePod().Name("p9").HostPort(80).Obj(),
-			},
-			want: []bool{true, false, false, true, false, true, false, true, false},
-		},
-		{
-			name: "no filtering when QHint is enabled",
-			nodeFn: func() *v1.Node {
-				return st.MakeNode().Name("fake-node").Label("hostname", "fake-node").Capacity(cpu8).Obj()
-			},
-			existingPods: []*v1.Pod{
-				st.MakePod().Name("p").HostPort(80).Obj(),
-			},
-			pods: []*v1.Pod{
-				st.MakePod().Name("p1").Req(cpu4).Obj(),
-				st.MakePod().Name("p2").Req(cpu16).Obj(),
-				st.MakePod().Name("p3").Req(cpu4).Req(cpu8).Obj(),
-				st.MakePod().Name("p4").NodeAffinityIn("hostname", []string{"fake-node"}, st.NodeSelectorTypeMatchExpressions).Obj(),
-				st.MakePod().Name("p5").NodeAffinityNotIn("hostname", []string{"fake-node"}).Obj(),
-				st.MakePod().Name("p6").Obj(),
-				st.MakePod().Name("p7").Node("invalid-node").Obj(),
-				st.MakePod().Name("p8").HostPort(8080).Obj(),
-				st.MakePod().Name("p9").HostPort(80).Obj(),
-			},
-			qHintEnabled: true,
-			want:         []bool{true, true, true, true, true, true, true, true, true},
-		},
-		{
-			name: "tainted node, pods with a single constraint",
-			nodeFn: func() *v1.Node {
-				node := st.MakeNode().Name("fake-node").Obj()
-				node.Spec.Taints = []v1.Taint{
-					{Key: "foo", Effect: v1.TaintEffectNoSchedule},
-					{Key: "bar", Effect: v1.TaintEffectPreferNoSchedule},
-				}
-				return node
-			},
-			pods: []*v1.Pod{
-				st.MakePod().Name("p1").Obj(),
-				st.MakePod().Name("p2").Toleration("foo").Obj(),
-				st.MakePod().Name("p3").Toleration("bar").Obj(),
-				st.MakePod().Name("p4").Toleration("bar").Toleration("foo").Obj(),
-			},
-			want: []bool{false, true, false, true},
-		},
-		{
-			name: "regular node, pods with multiple constraints",
-			nodeFn: func() *v1.Node {
-				return st.MakeNode().Name("fake-node").Label("hostname", "fake-node").Capacity(cpu8).Obj()
-			},
-			existingPods: []*v1.Pod{
-				st.MakePod().Name("p").HostPort(80).Obj(),
-			},
-			pods: []*v1.Pod{
-				st.MakePod().Name("p1").Req(cpu4).NodeAffinityNotIn("hostname", []string{"fake-node"}).Obj(),
-				st.MakePod().Name("p2").Req(cpu16).NodeAffinityIn("hostname", []string{"fake-node"}, st.NodeSelectorTypeMatchExpressions).Obj(),
-				st.MakePod().Name("p3").Req(cpu8).NodeAffinityIn("hostname", []string{"fake-node"}, st.NodeSelectorTypeMatchExpressions).Obj(),
-				st.MakePod().Name("p4").HostPort(8080).Node("invalid-node").Obj(),
-				st.MakePod().Name("p5").Req(cpu4).NodeAffinityIn("hostname", []string{"fake-node"}, st.NodeSelectorTypeMatchExpressions).HostPort(80).Obj(),
-			},
-			want: []bool{false, false, true, false, false},
-		},
-		{
-			name: "tainted node, pods with multiple constraints",
-			nodeFn: func() *v1.Node {
-				node := st.MakeNode().Name("fake-node").Label("hostname", "fake-node").Capacity(cpu8).Obj()
-				node.Spec.Taints = []v1.Taint{
-					{Key: "foo", Effect: v1.TaintEffectNoSchedule},
-					{Key: "bar", Effect: v1.TaintEffectPreferNoSchedule},
-				}
-				return node
-			},
-			pods: []*v1.Pod{
-				st.MakePod().Name("p1").Req(cpu4).Toleration("bar").Obj(),
-				st.MakePod().Name("p2").Req(cpu4).Toleration("bar").Toleration("foo").Obj(),
-				st.MakePod().Name("p3").Req(cpu16).Toleration("foo").Obj(),
-				st.MakePod().Name("p3").Req(cpu16).Toleration("bar").Obj(),
-			},
-			want: []bool{false, true, false, false},
-		},
-		{
-			name: "tainted node with NoExecute effect, pods with tolerations",
-			nodeFn: func() *v1.Node {
-				node := st.MakeNode().Name("fake-node").Label("hostname", "fake-node").Capacity(cpu8).Obj()
-				node.Spec.Taints = []v1.Taint{
-					{Key: "foo", Effect: v1.TaintEffectPreferNoSchedule},
-					{Key: "baz", Effect: v1.TaintEffectNoExecute},
-				}
-				return node
-			},
-			pods: []*v1.Pod{
-				st.MakePod().Name("p1").Obj(),
-				st.MakePod().Name("p2").Obj(),
-				st.MakePod().Name("p3").Toleration("foo").Obj(),
-				st.MakePod().Name("p4").Toleration("baz").Obj(),
-				st.MakePod().Name("p5").Obj(),
-				st.MakePod().Name("p6").Toleration("bar").Toleration("baz").Obj(),
-			},
-			want: []bool{false, false, false, true, false, true},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if !tt.qHintEnabled {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SchedulerQueueingHints, false)
-			}
-
-			nodeInfo := framework.NewNodeInfo(tt.existingPods...)
-			nodeInfo.SetNode(tt.nodeFn())
-			preCheckFn := preCheckForNode(logger, nodeInfo)
-
-			got := make([]bool, 0, len(tt.pods))
-			for _, pod := range tt.pods {
-				got = append(got, preCheckFn == nil || preCheckFn(pod))
-			}
-
-			if diff := cmp.Diff(tt.want, got); diff != "" {
-				t.Errorf("Unexpected diff (-want, +got):\n%s", diff)
-			}
-		})
-	}
 }
 
 // test for informers of resources we care about is registered
@@ -521,20 +359,20 @@ func TestAddAllEventHandlers(t *testing.T) {
 			enableDRADeviceTaints:     true,
 			enableDRADeviceTaintRules: true,
 			expectStaticInformers: map[reflect.Type]bool{
-				reflect.TypeOf(&v1.Pod{}):                           true,
-				reflect.TypeOf(&v1.Node{}):                          true,
-				reflect.TypeOf(&v1.Namespace{}):                     true,
-				reflect.TypeOf(&resourceapi.ResourceClaim{}):        true,
-				reflect.TypeOf(&resourceapi.ResourceSlice{}):        true,
-				reflect.TypeOf(&resourcealphaapi.DeviceTaintRule{}): true,
-				reflect.TypeOf(&resourceapi.DeviceClass{}):          true,
+				reflect.TypeOf(&v1.Pod{}):                          true,
+				reflect.TypeOf(&v1.Node{}):                         true,
+				reflect.TypeOf(&v1.Namespace{}):                    true,
+				reflect.TypeOf(&resourceapi.ResourceClaim{}):       true,
+				reflect.TypeOf(&resourceapi.ResourceSlice{}):       true,
+				reflect.TypeOf(&resourcebetaapi.DeviceTaintRule{}): true,
+				reflect.TypeOf(&resourceapi.DeviceClass{}):         true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
 		{
-			name: "Workload events disabled",
+			name: "PodGroup events disabled",
 			gvkMap: map[fwk.EventResource]fwk.ActionType{
-				fwk.Workload: fwk.Add,
+				fwk.PodGroup: fwk.Add,
 			},
 			expectStaticInformers: map[reflect.Type]bool{
 				reflect.TypeOf(&v1.Pod{}):       true,
@@ -544,9 +382,9 @@ func TestAddAllEventHandlers(t *testing.T) {
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
 		{
-			name: "Workload events enabled",
+			name: "PodGroup events enabled",
 			gvkMap: map[fwk.EventResource]fwk.ActionType{
-				fwk.Workload: fwk.Add,
+				fwk.PodGroup: fwk.Add,
 			},
 			enableDRA:             true,
 			enableGenericWorkload: true,
@@ -556,7 +394,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 				reflect.TypeOf(&v1.Namespace{}):              true,
 				reflect.TypeOf(&resourceapi.ResourceClaim{}): true,
 				reflect.TypeOf(&resourceapi.ResourceSlice{}): true,
-				reflect.TypeOf(&schedulingapi.Workload{}):    true,
+				reflect.TypeOf(&schedulingapi.PodGroup{}):    true,
 			},
 			expectDynamicInformers: map[schema.GroupVersionResource]bool{},
 		},
@@ -658,7 +496,7 @@ func TestAddAllEventHandlers(t *testing.T) {
 					SliceInformer:          informerFactory.Resource().V1().ResourceSlices(),
 				}
 				if opts.EnableDeviceTaintRules {
-					opts.TaintInformer = informerFactory.Resource().V1alpha3().DeviceTaintRules()
+					opts.TaintInformer = informerFactory.Resource().V1beta2().DeviceTaintRules()
 					opts.ClassInformer = informerFactory.Resource().V1().DeviceClasses()
 
 				}
@@ -697,15 +535,17 @@ func TestAdmissionCheck(t *testing.T) {
 	nodeportsError := AdmissionResult{Name: nodeports.Name, Reason: nodeports.ErrReason}
 	podOverheadError := AdmissionResult{InsufficientResource: &noderesources.InsufficientResource{ResourceName: v1.ResourceCPU, Reason: "Insufficient cpu", Requested: 2000, Used: 7000, Capacity: 8000}}
 	extendedResourceError := AdmissionResult{InsufficientResource: &noderesources.InsufficientResource{ResourceName: "foo.com/bar", Reason: "Insufficient foo.com/bar", Requested: 1, Unresolvable: true}}
-	cpu := map[v1.ResourceName]string{v1.ResourceCPU: "8"}
+	nodeCPUCapacity := map[v1.ResourceName]string{v1.ResourceCPU: "8"}
 	extendedResource := map[v1.ResourceName]string{"foo.com/bar": "1"}
+	nodeAllocatableResourceError := AdmissionResult{InsufficientResource: &noderesources.InsufficientResource{ResourceName: v1.ResourceCPU, Reason: "Insufficient cpu", Requested: 9000, Used: 0, Capacity: 8000, Unresolvable: true}}
 	tests := []struct {
-		name                      string
-		node                      *v1.Node
-		existingPods              []*v1.Pod
-		pod                       *v1.Pod
-		wantAdmissionResults      [][]AdmissionResult
-		enableDRAExtendedResource bool
+		name                              string
+		node                              *v1.Node
+		existingPods                      []*v1.Pod
+		pod                               *v1.Pod
+		wantAdmissionResults              [][]AdmissionResult
+		enableDRAExtendedResource         bool
+		enableDRANodeAllocatableResources bool
 	}{
 		{
 			name: "check nodeAffinity and nodeports, nodeAffinity need fail quickly if includeAllFailures is false",
@@ -718,7 +558,7 @@ func TestAdmissionCheck(t *testing.T) {
 		},
 		{
 			name: "check PodOverhead and nodeAffinity, PodOverhead need fail quickly if includeAllFailures is false",
-			node: st.MakeNode().Name("fake-node").Label("foo", "bar").Capacity(cpu).Obj(),
+			node: st.MakeNode().Name("fake-node").Label("foo", "bar").Capacity(nodeCPUCapacity).Obj(),
 			pod:  st.MakePod().Name("pod2").Container("c").Overhead(v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")}).Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).NodeSelector(map[string]string{"foo": "bar1"}).Obj(),
 			existingPods: []*v1.Pod{
 				st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "7"}).Node("fake-node").Obj(),
@@ -747,10 +587,69 @@ func TestAdmissionCheck(t *testing.T) {
 			wantAdmissionResults:      [][]AdmissionResult{{extendedResourceError}, {extendedResourceError}},
 			enableDRAExtendedResource: true,
 		},
+		{
+			name: "pod not rejected when DRANodeAllocatableResources flag is disabled",
+			node: st.MakeNode().Name("fake-node").Capacity(nodeCPUCapacity).Obj(),
+			pod: func() *v1.Pod {
+				p := st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "node-allocatable-claim",
+						Resources: map[v1.ResourceName]resource.Quantity{
+							v1.ResourceCPU: resource.MustParse("8"),
+						},
+					},
+				}
+				return p
+			}(),
+			wantAdmissionResults:              [][]AdmissionResult{nil, nil},
+			enableDRANodeAllocatableResources: false,
+		},
+		{
+			name: "pod rejected when DRANodeAllocatableResources flag is enabled and pod's resource request exceeds node capacity",
+			node: st.MakeNode().Name("fake-node").Capacity(nodeCPUCapacity).Obj(),
+			pod: func() *v1.Pod {
+				p := st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "node-allocatable-claim",
+						Resources: map[v1.ResourceName]resource.Quantity{
+							v1.ResourceCPU: resource.MustParse(nodeCPUCapacity[v1.ResourceCPU]), // We should exceed node capacity since we also request 1 CPU in standard request.
+						},
+					},
+				}
+				return p
+			}(),
+			wantAdmissionResults:              [][]AdmissionResult{{nodeAllocatableResourceError}, {nodeAllocatableResourceError}},
+			enableDRANodeAllocatableResources: true,
+		},
+		{
+			name: "pod not rejected when DRANodeAllocatableResources flag is enabled and pod's resource request fits within node capacity",
+			node: st.MakeNode().Name("fake-node").Capacity(nodeCPUCapacity).Obj(),
+			pod: func() *v1.Pod {
+				p := st.MakePod().Name("pod1").Req(map[v1.ResourceName]string{v1.ResourceCPU: "1"}).Obj()
+				cpuQty := resource.MustParse(nodeCPUCapacity[v1.ResourceCPU])
+				cpuQty.Sub(resource.MustParse("1"))
+				p.Status.NodeAllocatableResourceClaimStatuses = []v1.NodeAllocatableResourceClaimStatus{
+					{
+						ResourceClaimName: "node-allocatable-claim",
+						Resources: map[v1.ResourceName]resource.Quantity{
+							v1.ResourceCPU: cpuQty,
+						},
+					},
+				}
+				return p
+			}(),
+			wantAdmissionResults:              [][]AdmissionResult{nil, nil},
+			enableDRANodeAllocatableResources: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tt.enableDRAExtendedResource)
+			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+				features.DRAExtendedResource:         tt.enableDRAExtendedResource,
+				features.DRANodeAllocatableResources: tt.enableDRANodeAllocatableResources,
+			})
 			nodeInfo := framework.NewNodeInfo(tt.existingPods...)
 			nodeInfo.SetNode(tt.node)
 
@@ -767,25 +666,51 @@ func TestAdmissionCheck(t *testing.T) {
 }
 
 func TestAddPod(t *testing.T) {
+	basePod := func() *st.PodWrapper {
+		return st.MakePod().Name("pod1").SchedulerName("supported-scheduler").Namespace("ns1").UID("pod1")
+	}
+
 	tests := []struct {
-		name          string
-		pod           *v1.Pod
-		expectInQueue bool
-		expectInCache bool
+		name                             string
+		pod                              *v1.Pod
+		genericWorkloadEnabled           bool
+		expectInQueue                    bool
+		expectInCache                    bool
+		expectInPodGroupStateUnscheduled bool
+		expectInPodGroupStateAssigned    bool
 	}{
 		{
 			name:          "add unscheduled pod",
-			pod:           st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").SchedulerName("supported-scheduler").Obj(),
+			pod:           basePod().Obj(),
 			expectInQueue: true,
 		},
 		{
 			name: "add unscheduled pod with other scheduler name",
-			pod:  st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").SchedulerName("other-scheduler").Obj(),
+			pod:  basePod().SchedulerName("other-scheduler").Obj(),
 		},
 		{
 			name:          "add scheduled pod",
-			pod:           st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").Obj(),
+			pod:           basePod().Node("node1").Obj(),
 			expectInCache: true,
+		},
+		{
+			name:          "add a pod group member with GenericWorkload disabled",
+			pod:           basePod().PodGroupName("pg1").Obj(),
+			expectInQueue: true,
+		},
+		{
+			name:                             "add an unscheduled pod group member",
+			pod:                              basePod().PodGroupName("pg1").Obj(),
+			genericWorkloadEnabled:           true,
+			expectInQueue:                    true,
+			expectInPodGroupStateUnscheduled: true,
+		},
+		{
+			name:                          "add a scheduled pod group member",
+			pod:                           basePod().Node("node1").PodGroupName("pg1").Obj(),
+			genericWorkloadEnabled:        true,
+			expectInCache:                 true,
+			expectInPodGroupStateAssigned: true,
 		},
 	}
 	for _, tt := range tests {
@@ -795,7 +720,7 @@ func TestAddPod(t *testing.T) {
 			defer cancel()
 
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, nil),
+				Cache:           internalcache.New(ctx, nil, tt.genericWorkloadEnabled),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 				Profiles: profile.Map{
@@ -816,6 +741,31 @@ func TestAddPod(t *testing.T) {
 				t.Errorf("Expected pod to be in cache: %v", err)
 			} else if !tt.expectInCache && err == nil {
 				t.Errorf("Expected pod not to be in cache")
+			}
+
+			if tt.pod.Spec.SchedulingGroup == nil {
+				// Pod has no pod group, so there is no pod group state to check, the test can complete.
+				return
+			}
+
+			pgs, err := sched.Cache.PodGroupStates().Get(tt.pod.Namespace, *tt.pod.Spec.SchedulingGroup.PodGroupName)
+
+			if !tt.genericWorkloadEnabled {
+				if err == nil {
+					t.Errorf("Expected no pod group state to exist when GenericWorkload is disabled, but found one")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("Expected pod group state to exist, got error: %v", err)
+			}
+
+			if inUnscheduled := pgs.UnscheduledPods()[tt.pod.Name] != nil; inUnscheduled != tt.expectInPodGroupStateUnscheduled {
+				t.Errorf("Expected pod in UnscheduledPods of PodGroupState: got %v, want %v", inUnscheduled, tt.expectInPodGroupStateUnscheduled)
+			}
+			if inAssigned := pgs.AssignedPods().Has(tt.pod.UID); inAssigned != tt.expectInPodGroupStateAssigned {
+				t.Errorf("Expected pod in AssignedPods of PodGroupState: got %v, want %v", inAssigned, tt.expectInPodGroupStateAssigned)
 			}
 		})
 	}
@@ -838,13 +788,23 @@ func TestUpdatePod(t *testing.T) {
 
 	scheduledPodOtherNode := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node2").SchedulerName("supported-scheduler").Obj()
 
+	unscheduledPodGroupMember := st.MakePod().Name("pod1").Namespace("ns1").UID("pgpod1").SchedulerName("supported-scheduler").PodGroupName("pg1").Obj()
+	unscheduledPodGroupMemberWithLabels := st.MakePod().Name("pod1").Namespace("ns1").UID("pgpod1").Labels(map[string]string{"foo": "bar"}).ResourceVersion("2").SchedulerName("supported-scheduler").PodGroupName("pg1").Obj()
+	scheduledPodGroupMember := st.MakePod().Name("pod1").Namespace("ns1").UID("pgpod1").Node("node1").SchedulerName("supported-scheduler").PodGroupName("pg1").Obj()
+	scheduledPodGroupMemberWithLabels := st.MakePod().Name("pod1").Namespace("ns1").UID("pgpod1").Labels(map[string]string{"foo": "bar"}).ResourceVersion("2").Node("node1").SchedulerName("supported-scheduler").PodGroupName("pg1").Obj()
+	scheduledPodGroupMemberWithOtherNode := st.MakePod().Name("pod1").Namespace("ns1").UID("pgpod1").Node("node2").SchedulerName("supported-scheduler").PodGroupName("pg1").Obj()
+
 	tests := []struct {
-		name          string
-		oldPod        *v1.Pod
-		assumedPod    *v1.Pod
-		newPod        *v1.Pod
-		expectInQueue *v1.Pod
-		expectInCache *v1.Pod
+		name                             string
+		oldPod                           *v1.Pod
+		assumedPod                       *v1.Pod
+		newPod                           *v1.Pod
+		genericWorkloadEnabled           bool
+		expectInQueue                    *v1.Pod
+		expectInCache                    *v1.Pod
+		expectInPodGroupStateUnscheduled bool
+		expectInPodGroupStateAssumed     bool
+		expectInPodGroupStateAssigned    bool
 	}{
 		{
 			name:          "update unscheduled pod",
@@ -908,6 +868,63 @@ func TestUpdatePod(t *testing.T) {
 			assumedPod: scheduledPod,
 			newPod:     podWithDeletionTimestamp,
 		},
+		{
+			name:          "update pod group member with GenericWorkload disabled",
+			oldPod:        unscheduledPodGroupMember,
+			newPod:        unscheduledPodGroupMemberWithLabels,
+			expectInQueue: unscheduledPodGroupMemberWithLabels,
+		},
+		{
+			name:                             "update unscheduled pod group member, add label",
+			oldPod:                           unscheduledPodGroupMember,
+			newPod:                           unscheduledPodGroupMemberWithLabels,
+			expectInQueue:                    unscheduledPodGroupMemberWithLabels,
+			genericWorkloadEnabled:           true,
+			expectInPodGroupStateUnscheduled: true,
+		},
+		{
+			name:                         "update assumed pod group member, add label",
+			oldPod:                       unscheduledPodGroupMember,
+			assumedPod:                   scheduledPodGroupMember,
+			newPod:                       unscheduledPodGroupMemberWithLabels,
+			expectInCache:                scheduledPodGroupMember,
+			genericWorkloadEnabled:       true,
+			expectInPodGroupStateAssumed: true,
+		},
+		{
+			name:                          "update scheduled pod group member, add label",
+			oldPod:                        scheduledPodGroupMember,
+			newPod:                        scheduledPodGroupMemberWithLabels,
+			expectInCache:                 scheduledPodGroupMemberWithLabels,
+			genericWorkloadEnabled:        true,
+			expectInPodGroupStateAssigned: true,
+		},
+		{
+			name:                          "bind unscheduled pod group member",
+			oldPod:                        unscheduledPodGroupMember,
+			newPod:                        scheduledPodGroupMember,
+			expectInCache:                 scheduledPodGroupMember,
+			genericWorkloadEnabled:        true,
+			expectInPodGroupStateAssigned: true,
+		},
+		{
+			name:                          "bind assumed pod group member",
+			oldPod:                        unscheduledPodGroupMember,
+			assumedPod:                    scheduledPodGroupMember,
+			newPod:                        scheduledPodGroupMember,
+			expectInCache:                 scheduledPodGroupMember,
+			genericWorkloadEnabled:        true,
+			expectInPodGroupStateAssigned: true,
+		},
+		{
+			name:                          "bind assumed pod group member to a different node",
+			oldPod:                        unscheduledPodGroupMember,
+			assumedPod:                    scheduledPodGroupMember,
+			newPod:                        scheduledPodGroupMemberWithOtherNode,
+			expectInCache:                 scheduledPodGroupMemberWithOtherNode,
+			genericWorkloadEnabled:        true,
+			expectInPodGroupStateAssigned: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -930,7 +947,7 @@ func TestUpdatePod(t *testing.T) {
 				t.Fatalf("Failed to create framework: %v", err)
 			}
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, nil),
+				Cache:           internalcache.New(ctx, nil, tt.genericWorkloadEnabled),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 				Profiles: profile.Map{
@@ -939,6 +956,9 @@ func TestUpdatePod(t *testing.T) {
 			}
 
 			if tt.assumedPod != nil {
+				if tt.oldPod.Spec.SchedulingGroup != nil {
+					sched.Cache.AddPodGroupMember(tt.oldPod)
+				}
 				err := sched.Cache.AssumePod(logger, tt.assumedPod)
 				if err != nil {
 					t.Fatalf("Failed to assume pod: %v", err)
@@ -969,6 +989,33 @@ func TestUpdatePod(t *testing.T) {
 			} else if err == nil {
 				t.Errorf("Expected pod not to be in cache")
 			}
+
+			if tt.newPod.Spec.SchedulingGroup == nil {
+				// Pod has no pod group, so there is no pod group state to check, the test can complete.
+				return
+			}
+			pgs, err := sched.Cache.PodGroupStates().Get(tt.oldPod.Namespace, *tt.oldPod.Spec.SchedulingGroup.PodGroupName)
+
+			if !tt.genericWorkloadEnabled {
+				if err == nil {
+					t.Errorf("Expected no pod group state to exist when GenericWorkload is disabled, but found one")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("Expected pod group state to exist, got error: %v", err)
+			}
+
+			if inUnscheduled := pgs.UnscheduledPods()[tt.newPod.Name] != nil; inUnscheduled != tt.expectInPodGroupStateUnscheduled {
+				t.Errorf("pod in UnscheduledPods of PodGroupState: got %v, want %v", inUnscheduled, tt.expectInPodGroupStateUnscheduled)
+			}
+			if inAssumed := pgs.AssumedPods().Has(tt.newPod.UID); inAssumed != tt.expectInPodGroupStateAssumed {
+				t.Errorf("pod in AssumedPods of PodGroupState: got %v, want %v", inAssumed, tt.expectInPodGroupStateAssumed)
+			}
+			if inAssigned := pgs.AssignedPods().Has(tt.newPod.UID); inAssigned != tt.expectInPodGroupStateAssigned {
+				t.Errorf("pod in AssignedPods of PodGroupState: got %v, want %v", inAssigned, tt.expectInPodGroupStateAssigned)
+			}
 		})
 	}
 }
@@ -978,13 +1025,16 @@ func TestDeletePod(t *testing.T) {
 	otherPod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").SchedulerName("other-scheduler").Obj()
 	scheduledPod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").SchedulerName("supported-scheduler").Obj()
 	otherScheduledPod := st.MakePod().Name("pod1").Namespace("ns1").UID("pod1").Node("node1").SchedulerName("other-scheduler").Obj()
+	podGroupMember := st.MakePod().Name("pod1").Namespace("ns1").UID("pgpod1").SchedulerName("supported-scheduler").PodGroupName("pg1").Obj()
+	scheduledPodGroupMember := st.MakePod().Name("pod1").Namespace("ns1").UID("pgpod1").Node("node1").SchedulerName("supported-scheduler").PodGroupName("pg1").Obj()
 
 	tests := []struct {
-		name            string
-		initialPod      *v1.Pod
-		assumed         bool
-		waitingOnPermit bool
-		podToDelete     any
+		name                   string
+		initialPod             *v1.Pod
+		assumed                bool
+		waitingOnPermit        bool
+		podToDelete            any
+		genericWorkloadEnabled bool
 	}{
 		{
 			name:        "delete unscheduled pod",
@@ -1027,6 +1077,23 @@ func TestDeletePod(t *testing.T) {
 			initialPod:  scheduledPod,
 			podToDelete: cache.DeletedFinalStateUnknown{Obj: pod},
 		},
+		{
+			name:        "delete a pod group member, GenericWorkload disabled",
+			initialPod:  podGroupMember,
+			podToDelete: podGroupMember,
+		},
+		{
+			name:                   "delete an unscheduled pod group member",
+			initialPod:             podGroupMember,
+			podToDelete:            podGroupMember,
+			genericWorkloadEnabled: true,
+		},
+		{
+			name:                   "delete a scheduled pod group member",
+			initialPod:             scheduledPodGroupMember,
+			podToDelete:            scheduledPodGroupMember,
+			genericWorkloadEnabled: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1049,7 +1116,7 @@ func TestDeletePod(t *testing.T) {
 				t.Fatalf("Failed to create framework: %v", err)
 			}
 			sched := &Scheduler{
-				Cache:           internalcache.New(ctx, nil),
+				Cache:           internalcache.New(ctx, nil, tt.genericWorkloadEnabled),
 				SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
 				logger:          logger,
 				Profiles: profile.Map{
@@ -1075,6 +1142,15 @@ func TestDeletePod(t *testing.T) {
 			_, ok := sched.SchedulingQueue.GetPod(tt.initialPod.Name, tt.initialPod.Namespace)
 			if ok {
 				t.Errorf("Unexpected pod in scheduling queue after removal")
+			}
+
+			if tt.initialPod.Spec.SchedulingGroup == nil {
+				// Pod has no pod group, so there is no pod group state to check, the test can complete.
+				return
+			}
+			_, err = sched.Cache.PodGroupStates().Get(tt.initialPod.Namespace, *tt.initialPod.Spec.SchedulingGroup.PodGroupName)
+			if err == nil {
+				t.Errorf("Unexpected pod group state in cache after pod removal")
 			}
 		})
 	}

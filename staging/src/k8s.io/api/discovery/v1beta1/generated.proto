@@ -39,8 +39,8 @@ message Endpoint {
   // use the first element. Refer to: https://issue.k8s.io/106267
   // +listType=set
   // +required
-  // +k8s:required
-  // +k8s:maxItems=100
+  // +k8s:alpha(since: "1.36")=+k8s:required
+  // +k8s:alpha(since: "1.36")=+k8s:maxItems=100
   repeated string addresses = 1;
 
   // conditions contains information about the current status of the endpoint.
@@ -171,13 +171,14 @@ message EndpointSlice {
   // * IPv6: Represents an IPv6 Address.
   // * FQDN: Represents a Fully Qualified Domain Name.
   // +required
-  // +k8s:required
-  // +k8s:immutable
+  // +k8s:alpha(since: "1.36")=+k8s:required
+  // +k8s:alpha(since: "1.36")=+k8s:immutable
   optional string addressType = 4;
 
   // endpoints is a list of unique endpoints in this slice. Each slice may
   // include a maximum of 1000 endpoints.
   // +listType=atomic
+  // +k8s:alpha(since: "1.36")=+k8s:optional
   repeated Endpoint endpoints = 2;
 
   // ports specifies the list of network ports exposed by each endpoint in

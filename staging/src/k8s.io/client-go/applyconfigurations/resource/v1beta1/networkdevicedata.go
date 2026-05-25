@@ -29,7 +29,7 @@ type NetworkDeviceDataApplyConfiguration struct {
 	// the allocated device. This might be the name of a physical or virtual
 	// network interface being configured in the pod.
 	//
-	// Must not be longer than 256 characters.
+	// Must not be longer than 256 bytes.
 	InterfaceName *string `json:"interfaceName,omitempty"`
 	// IPs lists the network addresses assigned to the device's network interface.
 	// This can include both IPv4 and IPv6 addresses.
@@ -41,7 +41,7 @@ type NetworkDeviceDataApplyConfiguration struct {
 	IPs []string `json:"ips,omitempty"`
 	// HardwareAddress represents the hardware address (e.g. MAC Address) of the device's network interface.
 	//
-	// Must not be longer than 128 characters.
+	// Must not be longer than 128 bytes.
 	HardwareAddress *string `json:"hardwareAddress,omitempty"`
 }
 

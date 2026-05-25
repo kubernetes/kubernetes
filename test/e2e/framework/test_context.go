@@ -414,7 +414,7 @@ func RegisterClusterFlags(flags *flag.FlagSet) {
 	flags.StringVar(&cloudConfig.Cluster, "gke-cluster", "", "GKE name of cluster being used, if applicable")
 	flags.StringVar(&cloudConfig.NodeInstanceGroup, "node-instance-group", "", "Name of the managed instance group for nodes. Valid only for gce, gke or aws. If there is more than one group: comma separated list of groups.")
 	flags.StringVar(&cloudConfig.Network, "network", "e2e", "The cloud provider network for this e2e cluster.")
-	flags.IntVar(&cloudConfig.NumNodes, "num-nodes", DefaultNumNodes, fmt.Sprintf("Number of nodes in the cluster. If the default value of '%q' is used the number of schedulable nodes is auto-detected.", DefaultNumNodes))
+	flags.IntVar(&cloudConfig.NumNodes, "num-nodes", DefaultNumNodes, fmt.Sprintf("Number of nodes in the cluster. If the default value of '%d' is used the number of schedulable nodes is auto-detected.", DefaultNumNodes))
 	flags.StringVar(&cloudConfig.ClusterIPRange, "cluster-ip-range", "10.64.0.0/14", "A CIDR notation IP range from which to assign IPs in the cluster.")
 	flags.StringVar(&cloudConfig.NodeTag, "node-tag", "", "Network tags used on node instances. Valid only for gce, gke")
 	flags.StringVar(&cloudConfig.MasterTag, "master-tag", "", "Network tags used on master instances. Valid only for gce, gke")

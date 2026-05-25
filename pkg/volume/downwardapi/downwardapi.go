@@ -202,7 +202,7 @@ func (b *downwardAPIVolumeMounter) SetUpAt(dir string, mounterArgs volume.Mounte
 			}
 			tearDownErr := unmounter.TearDown()
 			if tearDownErr != nil {
-				klog.Errorf("error tearing down volume %s with : %v", b.volName, tearDownErr)
+				klog.Errorf("error tearing down volume %s: %v", b.volName, tearDownErr)
 			}
 		}
 	}()

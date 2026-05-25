@@ -18,14 +18,16 @@ package validatingadmissionpolicybinding
 
 import (
 	"context"
-	"k8s.io/apimachinery/pkg/api/operation"
+
 	"k8s.io/apiserver/pkg/registry/rest"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration/validation"
@@ -34,14 +36,16 @@ import (
 
 // validatingAdmissionPolicyBindingStrategy implements verification logic for ValidatingAdmissionPolicyBinding.
 type validatingAdmissionPolicyBindingStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
-	authorizer       authorizer.Authorizer
+	authorizer       authorizer.UnconditionalAuthorizer
 	policyGetter     PolicyGetter
 	resourceResolver resolver.ResourceResolver
 }
 
-var Strategy = validatingAdmissionPolicyBindingStrategy{}
+var Strategy = validatingAdmissionPolicyBindingStrategy{
+	DeclarativeValidation: rest.DeclarativeValidation{Scheme: legacyscheme.Scheme},
+}
 
 type PolicyGetter interface {
 	// GetValidatingAdmissionPolicy returns a GetValidatingAdmissionPolicy
@@ -50,13 +54,13 @@ type PolicyGetter interface {
 }
 
 // NewStrategy is the default logic that applies when creating and updating ValidatingAdmissionPolicyBinding objects.
-func NewStrategy(authorizer authorizer.Authorizer, policyGetter PolicyGetter, resourceResolver resolver.ResourceResolver) *validatingAdmissionPolicyBindingStrategy {
+func NewStrategy(authorizer authorizer.UnconditionalAuthorizer, policyGetter PolicyGetter, resourceResolver resolver.ResourceResolver) *validatingAdmissionPolicyBindingStrategy {
 	return &validatingAdmissionPolicyBindingStrategy{
-		ObjectTyper:      legacyscheme.Scheme,
-		NameGenerator:    names.SimpleNameGenerator,
-		authorizer:       authorizer,
-		policyGetter:     policyGetter,
-		resourceResolver: resourceResolver,
+		DeclarativeValidation: rest.DeclarativeValidation{Scheme: legacyscheme.Scheme},
+		NameGenerator:         names.SimpleNameGenerator,
+		authorizer:            authorizer,
+		policyGetter:          policyGetter,
+		resourceResolver:      resourceResolver,
 	}
 }
 
@@ -86,18 +90,26 @@ func (v *validatingAdmissionPolicyBindingStrategy) PrepareForUpdate(ctx context.
 
 // Validate validates a new ValidatingAdmissionPolicyBinding.
 func (v *validatingAdmissionPolicyBindingStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
-	errs := validation.ValidateValidatingAdmissionPolicyBinding(obj.(*admissionregistration.ValidatingAdmissionPolicyBinding))
+	ic := obj.(*admissionregistration.ValidatingAdmissionPolicyBinding)
+	errs := validation.ValidateValidatingAdmissionPolicyBinding(ic)
+	if utilfeature.DefaultFeatureGate.Enabled(features.ManifestBasedAdmissionControlConfig) {
+		errs = append(errs, validation.ValidateStaticSuffix(ic.Name, field.NewPath("metadata", "name"))...)
+	}
 	if len(errs) == 0 {
 		// if the object is well-formed, also authorize the paramRef
 		if err := v.authorizeCreate(ctx, obj); err != nil {
 			errs = append(errs, field.Forbidden(field.NewPath("spec", "paramRef"), err.Error()))
 		}
 	}
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, nil, errs, operation.Create)
+	return errs
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (v *validatingAdmissionPolicyBindingStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	ic := obj.(*admissionregistration.ValidatingAdmissionPolicyBinding)
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ManifestBasedAdmissionControlConfig) {
+		return validation.WarningsForStaticSuffix(ic.Name)
+	}
 	return nil
 }
 
@@ -106,29 +118,32 @@ func (v *validatingAdmissionPolicyBindingStrategy) Canonicalize(obj runtime.Obje
 }
 
 // AllowCreateOnUpdate is false for ValidatingAdmissionPolicyBinding; this means you may not create one with a PUT request.
-func (v *validatingAdmissionPolicyBindingStrategy) AllowCreateOnUpdate() bool {
+func (v *validatingAdmissionPolicyBindingStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
 // ValidateUpdate is the default update validation for an end user.
 func (v *validatingAdmissionPolicyBindingStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	errs := validation.ValidateValidatingAdmissionPolicyBindingUpdate(obj.(*admissionregistration.ValidatingAdmissionPolicyBinding), old.(*admissionregistration.ValidatingAdmissionPolicyBinding))
+	newIC := obj.(*admissionregistration.ValidatingAdmissionPolicyBinding)
+	oldIC := old.(*admissionregistration.ValidatingAdmissionPolicyBinding)
+	errs := validation.ValidateValidatingAdmissionPolicyBindingUpdate(newIC, oldIC)
 	if len(errs) == 0 {
 		// if the object is well-formed, also authorize the paramRef
 		if err := v.authorizeUpdate(ctx, obj, old); err != nil {
 			errs = append(errs, field.Forbidden(field.NewPath("spec", "paramRef"), err.Error()))
 		}
 	}
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, errs, operation.Update)
+	return errs
 }
 
 // WarningsOnUpdate returns warnings for the given update.
 func (v *validatingAdmissionPolicyBindingStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	newIC := obj.(*admissionregistration.ValidatingAdmissionPolicyBinding)
+	return validation.WarningsForStaticSuffix(newIC.Name)
 }
 
 // AllowUnconditionalUpdate is the default update policy for ValidatingAdmissionPolicyBinding objects. Status update should
 // only be allowed if version match.
-func (v *validatingAdmissionPolicyBindingStrategy) AllowUnconditionalUpdate() bool {
+func (v *validatingAdmissionPolicyBindingStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }

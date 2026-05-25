@@ -31,6 +31,7 @@ import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
 option go_package = "k8s.io/api/batch/v1beta1";
 
 // CronJob represents the configuration of a single cron job.
+// +k8s:supportsSubresource="/status"
 message CronJob {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -63,7 +64,7 @@ message CronJobList {
 message CronJobSpec {
   // The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
   // +required
-  // +k8s:required
+  // +k8s:alpha(since: "1.36")=+k8s:required
   optional string schedule = 1;
 
   // The time zone name for the given schedule, see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones.

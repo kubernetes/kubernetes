@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"time"
 
@@ -79,7 +80,15 @@ var (
 
 		# Wait for the pod "busybox1" to be deleted, with a timeout of 60s, after having issued the "delete" command
 		kubectl delete pod/busybox1
-		kubectl wait --for=delete pod/busybox1 --timeout=60s`))
+		kubectl wait --for=delete pod/busybox1 --timeout=60s
+
+		# Wait for pod "busybox1" to be created AND reach the "Ready" status condition
+		kubectl wait --for=condition=Ready --for=create pod/busybox1
+
+		# Wait for pod "busybox1" to reach the "Ready" status OR for its containers to report a "False" readiness state
+		until kubectl wait pod/busybox1 --for=condition=Ready --timeout=1s 2>/dev/null || \
+		kubectl wait pod/busybox1 --for=condition=ContainersReady=False --timeout=1s 2>/dev/null; \
+		do echo "Checking conditions..."; sleep 1; done`))
 )
 
 // errNoMatchingResources is returned when there is no resources matching a query.
@@ -94,7 +103,7 @@ type WaitFlags struct {
 	ResourceBuilderFlags *genericclioptions.ResourceBuilderFlags
 
 	Timeout      time.Duration
-	ForCondition string
+	ForCondition []string
 
 	genericiooptions.IOStreams
 }
@@ -134,7 +143,6 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 			cmdutil.CheckErr(err)
 			cmdutil.CheckErr(o.RunWaitContext(cmd.Context()))
 		},
-		SuggestFor: []string{"list", "ps"},
 	}
 
 	flags.AddFlags(cmd)
@@ -148,7 +156,7 @@ func (flags *WaitFlags) AddFlags(cmd *cobra.Command) {
 	flags.ResourceBuilderFlags.AddFlags(cmd.Flags())
 
 	cmd.Flags().DurationVar(&flags.Timeout, "timeout", flags.Timeout, "The length of time to wait before giving up. Zero means check once and don't wait, negative means wait for a week.")
-	cmd.Flags().StringVar(&flags.ForCondition, "for", flags.ForCondition, "The condition to wait on: [create|delete|condition=condition-name[=condition-value]|jsonpath='{JSONPath expression}'=[JSONPath value]]. The default condition-value is true. Condition values are compared after Unicode simple case folding, which is a more general form of case-insensitivity.")
+	cmd.Flags().StringArrayVar(&flags.ForCondition, "for", flags.ForCondition, "The condition to wait on: [create|delete|condition=condition-name[=condition-value]|jsonpath='{JSONPath expression}'=[JSONPath value]]. The default condition-value is true. Condition values are compared after Unicode simple case folding, which is a more general form of case-insensitivity. Multiple conditions are supported and AND'ed to each other in a sequential order. If --for=create is passed, it is always waited first.")
 }
 
 // ToOptions converts from CLI inputs to runtime inputs
@@ -166,7 +174,7 @@ func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
 	if err != nil {
 		return nil, err
 	}
-	conditionFn, err := conditionFuncFor(flags.ForCondition, flags.ErrOut)
+	conditionFn, err := conditionFuncsFor(flags.ForCondition, flags.ErrOut)
 	if err != nil {
 		return nil, err
 	}
@@ -190,48 +198,56 @@ func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
 	return o, nil
 }
 
-func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error) {
-	lowercaseCond := strings.ToLower(condition)
-	switch {
-	case lowercaseCond == "delete":
-		return IsDeleted, nil
+func conditionFuncsFor(conditions []string, errOut io.Writer) ([]ConditionFunc, error) {
+	var condFuncs []ConditionFunc
+	for _, cond := range conditions {
+		lowercaseCond := strings.ToLower(cond)
+		switch {
+		case lowercaseCond == "delete":
+			condFuncs = append(condFuncs, IsDeleted)
 
-	case lowercaseCond == "create":
-		return IsCreated, nil
+		case lowercaseCond == "create":
+			condFuncs = append(condFuncs, IsCreated)
 
-	case strings.HasPrefix(condition, "condition="):
-		conditionName := strings.TrimPrefix(condition, "condition=")
-		conditionValue := "true"
-		if equalsIndex := strings.Index(conditionName, "="); equalsIndex != -1 {
-			conditionValue = conditionName[equalsIndex+1:]
-			conditionName = conditionName[0:equalsIndex]
+		case strings.HasPrefix(cond, "condition="):
+			conditionName := strings.TrimPrefix(cond, "condition=")
+			conditionValue := "true"
+			if equalsIndex := strings.Index(conditionName, "="); equalsIndex != -1 {
+				conditionValue = conditionName[equalsIndex+1:]
+				conditionName = conditionName[0:equalsIndex]
+			}
+
+			condFuncs = append(condFuncs, ConditionalWait{
+				conditionName:   conditionName,
+				conditionStatus: conditionValue,
+				errOut:          errOut,
+			}.IsConditionMet)
+
+		case strings.HasPrefix(cond, "jsonpath="):
+			jsonPathInput := strings.TrimPrefix(cond, "jsonpath=")
+			jsonPathExp, jsonPathValue, err := processJSONPathInput(jsonPathInput)
+			if err != nil {
+				return nil, err
+			}
+			j, err := newJSONPathParser(jsonPathExp)
+			if err != nil {
+				return nil, err
+			}
+			condFuncs = append(condFuncs, JSONPathWait{
+				matchAnyValue:  jsonPathValue == "",
+				jsonPathValue:  jsonPathValue,
+				jsonPathParser: j,
+				errOut:         errOut,
+			}.IsJSONPathConditionMet)
+		default:
+			return nil, fmt.Errorf("unrecognized condition: %q", cond)
 		}
-
-		return ConditionalWait{
-			conditionName:   conditionName,
-			conditionStatus: conditionValue,
-			errOut:          errOut,
-		}.IsConditionMet, nil
-
-	case strings.HasPrefix(condition, "jsonpath="):
-		jsonPathInput := strings.TrimPrefix(condition, "jsonpath=")
-		jsonPathExp, jsonPathValue, err := processJSONPathInput(jsonPathInput)
-		if err != nil {
-			return nil, err
-		}
-		j, err := newJSONPathParser(jsonPathExp)
-		if err != nil {
-			return nil, err
-		}
-		return JSONPathWait{
-			matchAnyValue:  jsonPathValue == "",
-			jsonPathValue:  jsonPathValue,
-			jsonPathParser: j,
-			errOut:         errOut,
-		}.IsJSONPathConditionMet, nil
+	}
+	if condFuncs == nil {
+		return nil, fmt.Errorf("unrecognized condition: %q", conditions)
 	}
 
-	return nil, fmt.Errorf("unrecognized condition: %q", condition)
+	return condFuncs, nil
 }
 
 // newJSONPathParser will create a new JSONPath parser based on the jsonPathExpression
@@ -307,10 +323,10 @@ type WaitOptions struct {
 	UIDMap        UIDMap
 	DynamicClient dynamic.Interface
 	Timeout       time.Duration
-	ForCondition  string
+	ForCondition  []string
 
 	Printer     printers.ResourcePrinter
-	ConditionFn ConditionFunc
+	ConditionFn []ConditionFunc
 	genericiooptions.IOStreams
 }
 
@@ -326,7 +342,7 @@ func (o *WaitOptions) RunWait() error {
 func (o *WaitOptions) RunWaitContext(ctx context.Context) error {
 	ctx, cancel := watchtools.ContextWithOptionalTimeout(ctx, o.Timeout)
 	defer cancel()
-	if strings.ToLower(o.ForCondition) == "create" {
+	if containsCondition(o.ForCondition, "create") {
 		// TODO(soltysh): this is not ideal solution, because we're polling every .5s,
 		// and we have to use ResourceFinder, which contains the resource name.
 		// In the long run, we should expose resource information from ResourceFinder,
@@ -360,18 +376,21 @@ func (o *WaitOptions) RunWaitContext(ctx context.Context) error {
 		}
 
 		visitCount++
-		finalObject, success, err := o.ConditionFn(ctx, info, o)
-		if success {
-			o.Printer.PrintObj(finalObject, o.Out)
-			return nil
+		for _, condFn := range o.ConditionFn {
+			finalObject, success, err := condFn(ctx, info, o)
+			if success {
+				o.Printer.PrintObj(finalObject, o.Out) //nolint:errcheck
+				continue
+			}
+			if err == nil {
+				return fmt.Errorf("%v unsatisfied for unknown reason", finalObject)
+			}
+			return err
 		}
-		if err == nil {
-			return fmt.Errorf("%v unsatisfied for unknown reason", finalObject)
-		}
-		return err
+		return nil
 	}
 	visitor := o.ResourceFinder.Do()
-	isForDelete := strings.ToLower(o.ForCondition) == "delete"
+	isForDelete := containsCondition(o.ForCondition, "delete")
 	if visitor, ok := visitor.(*resource.Result); ok && isForDelete {
 		visitor.IgnoreErrors(apierrors.IsNotFound)
 	}
@@ -384,4 +403,10 @@ func (o *WaitOptions) RunWaitContext(ctx context.Context) error {
 		return errNoMatchingResources
 	}
 	return err
+}
+
+func containsCondition(conditions []string, condition string) bool {
+	return slices.ContainsFunc(conditions, func(cond string) bool {
+		return strings.ToLower(cond) == condition
+	})
 }

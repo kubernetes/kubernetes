@@ -38,7 +38,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("NodeLease", func() {
+var _ = SIGDescribe("NodeLease", framework.WithNodeConformance(), func() {
 	var nodeName string
 	f := framework.NewDefaultFramework("node-lease-test")
 	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged

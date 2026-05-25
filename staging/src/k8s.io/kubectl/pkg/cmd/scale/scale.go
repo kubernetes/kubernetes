@@ -24,6 +24,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
@@ -238,13 +239,22 @@ func (o *ScaleOptions) RunScale() error {
 	for _, info := range infos {
 		mapping := info.ResourceMapping()
 		if o.dryRunStrategy == cmdutil.DryRunClient {
+			if err = updateReplicas(info, int64(o.Replicas)); err != nil {
+				return err
+			}
+
 			if err := o.PrintObj(info.Object, o.Out); err != nil {
 				return err
 			}
 			continue
 		}
 
-		if err := o.scaler.Scale(info.Namespace, info.Name, uint(o.Replicas), precondition, retry, waitForReplicas, mapping.Resource, o.dryRunStrategy == cmdutil.DryRunServer); err != nil {
+		actualSize := new(int32)
+		if err := o.scaler.Scale(info.Namespace, info.Name, uint(o.Replicas), actualSize, precondition, retry, waitForReplicas, mapping.Resource, o.dryRunStrategy == cmdutil.DryRunServer); err != nil {
+			return err
+		}
+
+		if err = updateReplicas(info, int64(*actualSize)); err != nil {
 			return err
 		}
 
@@ -278,4 +288,24 @@ func scaler(f cmdutil.Factory) (scale.Scaler, error) {
 	}
 
 	return scale.NewScaler(scalesGetter), nil
+}
+
+// updateReplicas updates spec.replicas for built-in scalable types.
+// replicas needs to be in int64, as SetNestedField only supports this type (and float64).
+func updateReplicas(info *resource.Info, replicas int64) error {
+	unstructuredObj, ok := info.Object.(*unstructured.Unstructured)
+	if !ok {
+		return nil
+	}
+
+	// Only update for built-in types where spec.replicas is guaranteed:
+	// - apps group: Deployment, ReplicaSet, StatefulSet
+	// - core group: ReplicationController
+	// Skip other groups (e.g., CRDs) as they may define replicas at a different path.
+	gvk := unstructuredObj.GroupVersionKind()
+	if gvk.Group != "apps" && gvk.Group != "" {
+		return nil
+	}
+
+	return unstructured.SetNestedField(unstructuredObj.Object, replicas, "spec", "replicas")
 }

@@ -4,4 +4,4 @@
 package otelrestful // import "go.opentelemetry.io/contrib/instrumentation/github.com/emicklei/go-restful/otelrestful"
 
 // Version is the current release version of the go-restful instrumentation.
-const Version = "0.65.0"
+const Version = "0.68.0"

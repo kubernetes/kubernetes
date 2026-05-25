@@ -35,6 +35,7 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -61,8 +62,10 @@ type NodeManager struct {
 // NewNodeManager doesn't return any error if it failed to retrieve NodeIPs and watchPodCIDRs
 // is false.
 func NewNodeManager(ctx context.Context, client clientset.Interface,
-	resyncInterval time.Duration, nodeName string, watchPodCIDRs bool,
+	nodeName string, config *kubeproxyconfig.KubeProxyConfiguration,
 ) (*NodeManager, error) {
+	resyncInterval := config.ConfigSyncPeriod.Duration
+	watchPodCIDRs := config.DetectLocalMode == kubeproxyconfig.LocalModeNodeCIDR
 	return newNodeManager(ctx, client, resyncInterval, nodeName, watchPodCIDRs, os.Exit, time.Second, 30*time.Second, 5*time.Minute)
 }
 
@@ -118,9 +121,9 @@ func newNodeManager(ctx context.Context, client clientset.Interface, resyncInter
 	// For backward-compatibility, we keep going even if we didn't find a node (in
 	// non-watchPodCIDRs mode) or it didn't have IPs.
 	if node == nil {
-		klog.FromContext(ctx).Error(nil, "Timed out waiting for node %q to exist", nodeName)
+		klog.FromContext(ctx).Error(nil, "Timed out waiting for node to exist", "node", klog.KRef("", nodeName))
 	} else if len(nodeIPs) == 0 {
-		klog.FromContext(ctx).Error(nil, "Timed out waiting for node %q to be assigned IPs", nodeName)
+		klog.FromContext(ctx).Error(nil, "Timed out waiting for node to be assigned IPs", "node", klog.KRef("", nodeName))
 	}
 
 	return &NodeManager{

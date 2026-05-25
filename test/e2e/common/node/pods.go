@@ -176,7 +176,7 @@ func getRestartDelay(ctx context.Context, podClient *e2epod.PodClient, podName s
 func expectNoErrorWithRetries(fn func() error, maxRetries int, explain ...interface{}) {
 	// TODO (pohly): replace the entire function with gomege.Eventually.
 	var err error
-	for i := 0; i < maxRetries; i++ {
+	for i := range maxRetries {
 		err = fn()
 		if err == nil {
 			return
@@ -750,7 +750,7 @@ var _ = SIGDescribe("Pods", func() {
 			delay1 time.Duration
 			err    error
 		)
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			delay1, err = getRestartDelay(ctx, podClient, podName, containerName)
 			if err != nil {
 				framework.Failf("timed out waiting for container restart in pod=%s/%s", podName, containerName)

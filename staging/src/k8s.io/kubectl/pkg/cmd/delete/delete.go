@@ -160,7 +160,7 @@ func NewCmdDelete(f cmdutil.Factory, streams genericiooptions.IOStreams) *cobra.
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunDelete(f))
 		},
-		SuggestFor: []string{"rm"},
+		SuggestFor: []string{"rm", "remove"},
 	}
 
 	deleteFlags.AddFlags(cmd)
@@ -464,7 +464,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		Timeout:        effectiveTimeout,
 
 		Printer:     printers.NewDiscardingPrinter(),
-		ConditionFn: cmdwait.IsDeleted,
+		ConditionFn: []cmdwait.ConditionFunc{cmdwait.IsDeleted},
 		IOStreams:   o.IOStreams,
 	}
 	err = waitOptions.RunWaitContext(context.Background())

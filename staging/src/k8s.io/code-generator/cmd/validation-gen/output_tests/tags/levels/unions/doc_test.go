@@ -45,6 +45,15 @@ func TestAlpha(t *testing.T) {
 			Z1: &Z1{}, Z2: &Z2{},
 		}, "only one of z1, z2 may be specified").WithOrigin("zeroOrOneOf").MarkAlpha(),
 	})
+
+	st.Value(&MyListStruct{
+		Tasks: []Task{
+			{Name: "succeeded", State: "Succeeded"},
+			{Name: "failed", State: "Failed"},
+		},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByValidationStabilityLevel(), field.ErrorList{
+		field.Invalid(field.NewPath("tasks"), nil, "").WithOrigin("zeroOrOneOf").MarkAlpha(),
+	})
 }
 
 func TestBeta(t *testing.T) {
@@ -69,5 +78,14 @@ func TestBeta(t *testing.T) {
 		field.Invalid(nil, &MyStructBeta{
 			Z1Beta: &BetaZ1{}, Z2Beta: &BetaZ2{},
 		}, "only one of z1Beta, z2Beta may be specified").WithOrigin("zeroOrOneOf").MarkBeta(),
+	})
+
+	st.Value(&MyListStructBeta{
+		TasksBeta: []Task{
+			{Name: "succeeded", State: "Succeeded"},
+			{Name: "failed", State: "Failed"},
+		},
+	}).ExpectMatches(field.ErrorMatcher{}.ByType().ByField().ByOrigin().ByValidationStabilityLevel(), field.ErrorList{
+		field.Invalid(field.NewPath("tasksBeta"), nil, "").WithOrigin("zeroOrOneOf").MarkBeta(),
 	})
 }

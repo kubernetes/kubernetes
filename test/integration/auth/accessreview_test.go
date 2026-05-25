@@ -178,6 +178,12 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 		},
 	})
 	defer tearDownFn()
+	// Switch back to a working authorizer so that tests in tear down work as expected.
+	defer func() {
+		mutex.Lock()
+		defer mutex.Unlock()
+		username = "alice"
+	}()
 
 	tests := []struct {
 		name           string

@@ -153,7 +153,7 @@ linters:
       - linters:
         - kubeapilinter
         path-except: staging/src/k8s.io/api/.*
-        
+
       {{include "hack/kube-api-linter/exceptions.yaml" | indent 6 | trim}}
 
       - linters:
@@ -229,6 +229,9 @@ linters:
     forbidigo:
       analyze-types: true
       forbid:
+        - pattern: \.AnnotatedEventf$
+          # https://github.com/kubernetes/kubernetes/pull/137270
+          msg: "Do not use AnnotatedEventf. Events are fire-and-forget and aggressively throttled; do not rely on them to pass state or metadata for programmatic triggers."
         - pattern: md5\.*
           # https://github.com/kubernetes/kubernetes/issues/129652
           msg: md5 is oudated, insecure, prefer a secure hash (such as sha256) or a non-cryptographic hash
@@ -239,7 +242,7 @@ linters:
           pkg: ^k8s\.io/client-go/applyconfigurations/
           msg: should not be used because managedFields was removed
         - pattern: \.Add$
-          pkg: ^k8s\.io/component-base/featuregate$         
+          pkg: ^k8s\.io/component-base/featuregate$
           msg: should not use Add, use AddVersioned instead
         - pattern: \.(ReportBeforeSuite|ReportAfterSuite)
           pkg: ^github\.com/onsi/ginkgo/v2$
@@ -251,7 +254,7 @@ linters:
           msg: "it does not produce a good failure message - use BeTrueBecause with an explicit printf-style failure message instead, or plain Go: if ... { ginkgo.Fail(...) }"
         - pattern: ^gomega\.BeFalse$
           pkg: ^github.com/onsi/gomega$
-          msg: "it does not produce a good failure message - use BeFalseBecause with an explicit printf-style failure message instead, or plain Go: if ... { ginkgo.Fail(...) }"        
+          msg: "it does not produce a good failure message - use BeFalseBecause with an explicit printf-style failure message instead, or plain Go: if ... { ginkgo.Fail(...) }"
       {{- end}}
       {{- if .Base }}
     gocritic:
@@ -297,11 +300,6 @@ linters:
         # should only be updated in old code
         # where it really matters.
         - fmtappendf
-        # Remove redundant re-declaration of loop variables.
-        #
-        # A useful hint that this is no longer necessary with
-        # the Go version that Kubernetes depends on.
-        - forvar
         # Replace explicit loops over maps with calls to maps package.
         #
         # Completely disabled because the benefit
@@ -311,6 +309,15 @@ linters:
         #
         # A useful hint for new code.
         - minmax
+        {{- end }}
+        # simplify code by using go1.26's new(expr)
+        # should only be updated in old code where it really matters (= always disable in base)
+        # and needs to remain disabled as hint until Go 1.26 is also available for backported code (https://github.com/kubernetes/kubernetes/issues/137595)
+        - newexpr
+        {{- if .Base }}
+        # use iterators instead of Len/At-style APIs
+        # should only be updated in old code where it really matters.
+        - stditerators
         {{- end }}
         # Suggest replacing omitempty with omitzero for struct fields.
         #

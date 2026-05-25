@@ -50,7 +50,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	otelsdkresource "go.opentelemetry.io/otel/sdk/resource"
-	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	oteltrace "go.opentelemetry.io/otel/trace"
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 
@@ -63,6 +63,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/flagz"
@@ -83,6 +84,7 @@ import (
 	"k8s.io/component-base/logs"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/component-base/metrics"
+	metricsfeatures "k8s.io/component-base/metrics/features"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/tracing"
 	"k8s.io/component-base/version"
@@ -119,6 +121,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/watchdog"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 	"k8s.io/kubernetes/pkg/util/flock"
+	utilkernel "k8s.io/kubernetes/pkg/util/kernel"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/rlimit"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
@@ -528,7 +531,7 @@ func UnsecuredDependencies(ctx context.Context, s *options.KubeletServer, featur
 		OOMAdjuster:         oom.NewOOMAdjuster(),
 		OSInterface:         kubecontainer.RealOS{},
 		VolumePlugins:       plugins,
-		DynamicPluginProber: GetDynamicPluginProber(s.VolumePluginDir, pluginRunner),
+		DynamicPluginProber: GetDynamicPluginProber(ctx, s.VolumePluginDir, pluginRunner),
 		TLSOptions:          tlsOptions}, nil
 }
 
@@ -557,12 +560,12 @@ func setConfigz(cz *configz.Config, kc *kubeletconfiginternal.KubeletConfigurati
 	if err != nil {
 		return err
 	}
-	versioned := kubeletconfigv1beta1.KubeletConfiguration{}
-	if err := scheme.Convert(kc, &versioned, nil); err != nil {
+	versioned := &kubeletconfigv1beta1.KubeletConfiguration{}
+	if err := scheme.Convert(kc, versioned, nil); err != nil {
 		return err
 	}
-	cz.Set(versioned)
-	return nil
+	versioned.GetObjectKind().SetGroupVersionKind(kubeletconfigv1beta1.SchemeGroupVersion.WithKind("KubeletConfiguration"))
+	return cz.Set(versioned)
 }
 
 func initConfigz(ctx context.Context, kc *kubeletconfiginternal.KubeletConfiguration) error {
@@ -633,15 +636,28 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	if err != nil {
 		return err
 	}
+	// Propagate feature gate state to the metrics subsystem. This must be called
+	// after feature gates are set and before any histogram metrics are registered.
+	metricsfeatures.ApplyFeatureGates(featureGate)
 	// validate the initial KubeletServer (we set feature gates first, because this validation depends on feature gates)
 	if err := options.ValidateKubeletServer(s); err != nil {
 		return err
 	}
 
-	// Warn if MemoryQoS enabled with cgroups v1
-	if utilfeature.DefaultFeatureGate.Enabled(features.MemoryQoS) &&
-		!kubeletutil.IsCgroup2UnifiedMode() {
-		logger.Info("Warning: MemoryQoS feature only works with cgroups v2 on Linux, but enabled with cgroups v1")
+	// Warn about MemoryQoS compatibility issues
+	if utilfeature.DefaultFeatureGate.Enabled(features.MemoryQoS) {
+		if !kubeletutil.IsCgroup2UnifiedMode() {
+			logger.Info("Warning: MemoryQoS feature only works with cgroups v2 on Linux, but enabled with cgroups v1")
+		} else {
+			kernelVersion, err := utilkernel.GetVersion()
+			if err != nil {
+				logger.Error(err, "Failed to detect kernel version for MemoryQoS compatibility check")
+			} else if kernelVersion.LessThan(utilversion.MustParseGeneric(utilkernel.MemoryQoSMinKernelVersion)) {
+				logger.Info("Warning: MemoryQoS memory.high throttling may cause process livelock on older kernels",
+					"currentKernel", kernelVersion,
+					"minimumKernel", utilkernel.MemoryQoSMinKernelVersion)
+			}
+		}
 	}
 	// Obtain Kubelet Lock File
 	if s.ExitOnLockContention && s.LockFilePath == "" {
@@ -741,7 +757,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		runAuthenticatorCAReload(ctx.Done())
 	}
 
-	if err := kubelet.PreInitRuntimeService(&s.KubeletConfiguration, kubeDeps); err != nil {
+	if err := kubelet.PreInitRuntimeService(ctx, &s.KubeletConfiguration, kubeDeps); err != nil {
 		return err
 	}
 
@@ -778,7 +794,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 
 	if kubeDeps.CAdvisorInterface == nil {
 		imageFsInfoProvider := cadvisor.NewImageFsInfoProvider(s.ContainerRuntimeEndpoint)
-		kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDirectory, cgroupRoots, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntimeEndpoint), s.LocalStorageCapacityIsolation)
+		kubeDeps.CAdvisorInterface, err = cadvisor.New(klog.FromContext(ctx), imageFsInfoProvider, s.RootDirectory, cgroupRoots, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntimeEndpoint), s.LocalStorageCapacityIsolation)
 		if err != nil {
 			return err
 		}
@@ -884,6 +900,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 				CPUManagerReconcilePeriod:    s.CPUManagerReconcilePeriod.Duration,
 				MemoryManagerPolicy:          s.MemoryManagerPolicy,
 				MemoryManagerReservedMemory:  s.ReservedMemory,
+				MemoryReservationPolicy:      s.MemoryReservationPolicy,
 				PodPidsLimit:                 s.PodPidsLimit,
 				EnforceCPULimits:             s.CPUCFSQuota,
 				CPUCFSQuotaPeriod:            s.CPUCFSQuotaPeriod.Duration,
@@ -906,7 +923,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	}
 
 	if kubeDeps.NodeStartupLatencyTracker == nil {
-		kubeDeps.NodeStartupLatencyTracker = kubeletutil.NewNodeStartupLatencyTracker()
+		kubeDeps.NodeStartupLatencyTracker = kubeletutil.NewNodeStartupLatencyTracker(logger)
 	}
 
 	// TODO(vmarmol): Do this through container config.
@@ -1155,7 +1172,7 @@ func InitializeTLS(ctx context.Context, kf *options.KubeletFlags, kc *kubeletcon
 
 	if len(tlsCipherSuites) > 0 {
 		insecureCiphers := cliflag.InsecureTLSCiphers()
-		for i := 0; i < len(tlsCipherSuites); i++ {
+		for i := range tlsCipherSuites {
 			for cipherName, cipherID := range insecureCiphers {
 				if tlsCipherSuites[i] == cipherID {
 					logger.Info("Use of insecure cipher detected.", "cipher", cipherName)
@@ -1175,24 +1192,18 @@ func InitializeTLS(ctx context.Context, kf *options.KubeletFlags, kc *kubeletcon
 		}
 	}
 
-	tlsOptions := &server.TLSOptions{
-		Config: &tls.Config{
-			MinVersion:   minTLSVersion,
-			CipherSuites: tlsCipherSuites,
-		},
-		CertFile: kc.TLSCertFile,
-		KeyFile:  kc.TLSPrivateKeyFile,
+	curvePreferences, err := cliflag.TLSCurvePreferences(kc.TLSCurvePreferences)
+	if err != nil {
+		return nil, err
 	}
 
-	if len(kc.Authentication.X509.ClientCAFile) > 0 {
-		clientCAs, err := certutil.NewPool(kc.Authentication.X509.ClientCAFile)
-		if err != nil {
-			return nil, fmt.Errorf("unable to load client CA file %s: %w", kc.Authentication.X509.ClientCAFile, err)
-		}
-		// Specify allowed CAs for client certificates
-		tlsOptions.Config.ClientCAs = clientCAs
-		// Populate PeerCertificates in requests, but don't reject connections without verified certificates
-		tlsOptions.Config.ClientAuth = tls.RequestClientCert
+	tlsOptions := &server.TLSOptions{
+		MinVersion:       minTLSVersion,
+		CipherSuites:     tlsCipherSuites,
+		CurvePreferences: curvePreferences,
+		CertFile:         kc.TLSCertFile,
+		KeyFile:          kc.TLSPrivateKeyFile,
+		ClientCAFile:     kc.Authentication.X509.ClientCAFile,
 	}
 
 	return tlsOptions, nil
@@ -1282,12 +1293,14 @@ func startKubelet(ctx context.Context, k kubelet.Bootstrap, podCfg *config.PodCo
 
 	// start the kubelet server
 	if enableServer {
-		go k.ListenAndServe(ctx, kubeCfg, kubeDeps.TLSOptions, kubeDeps.Auth, kubeDeps.TracerProvider)
+		go k.ListenAndServe(ctx, kubeCfg, kubeDeps.TLSConfig, kubeDeps.Auth, kubeDeps.TracerProvider)
 	}
 	if kubeCfg.ReadOnlyPort > 0 {
 		go k.ListenAndServeReadOnly(ctx, netutils.ParseIPSloppy(kubeCfg.Address), uint(kubeCfg.ReadOnlyPort), kubeDeps.TracerProvider)
 	}
+
 	go k.ListenAndServePodResources(ctx)
+	go k.ListenAndServePods(ctx)
 }
 
 func createAndInitKubelet(
@@ -1395,7 +1408,7 @@ func getCgroupDriverFromCRI(ctx context.Context, s *options.KubeletServer, kubeD
 	)
 	// Retry a couple of times, hoping that any errors are transient.
 	// Fail quickly on known, non transient errors.
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		runtimeConfig, err = kubeDeps.RemoteRuntimeService.RuntimeConfig(ctx)
 		if err != nil {
 			s, ok := status.FromError(err)
@@ -1408,7 +1421,7 @@ func getCgroupDriverFromCRI(ctx context.Context, s *options.KubeletServer, kubeD
 			}
 			// CRI implementation doesn't support RuntimeConfig, fallback
 			legacyregistry.MustRegister(kubeletmetrics.CRILosingSupport)
-			kubeletmetrics.CRILosingSupport.WithLabelValues("1.37.0").Inc()
+			kubeletmetrics.CRILosingSupport.WithLabelValues("1.38.0").Inc()
 			logger.Info("CRI implementation should be updated to support RuntimeConfig. Falling back to using cgroupDriver from kubelet config.")
 			return nil
 		}

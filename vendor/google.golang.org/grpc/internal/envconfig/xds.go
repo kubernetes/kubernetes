@@ -79,4 +79,14 @@ var (
 	// xDS bootstrap configuration via the `call_creds` field. For more details,
 	// see: https://github.com/grpc/proposal/blob/master/A97-xds-jwt-call-creds.md
 	XDSBootstrapCallCredsEnabled = boolFromEnv("GRPC_EXPERIMENTAL_XDS_BOOTSTRAP_CALL_CREDS", false)
+
+	// XDSSNIEnabled controls if gRPC should send SNI information in xDS
+	// configured TLS handshakes. For more details, see:
+	// https://github.com/grpc/proposal/blob/master/A101-SNI-setting-and-SNI-SAN-validation.md
+	XDSSNIEnabled = boolFromEnv("GRPC_EXPERIMENTAL_XDS_SNI", false)
+
+	// XDSORCAToLRSPropEnabled controls whether ORCA metrics are explicitly
+	// filtered and prefix-propagated to the LRS server. For more details, see:
+	// https://github.com/grpc/proposal/blob/master/A85-lrs-custom-metrics-changes.md
+	XDSORCAToLRSPropEnabled = boolFromEnv("GRPC_EXPERIMENTAL_XDS_ORCA_LRS_PROPAGATION", false)
 )

@@ -1828,8 +1828,8 @@ func TestWarnings(t *testing.T) {
 				},
 			}},
 			expected: []string{
-				`spec.dnsConfig.nameservers[1]: non-standard IP address "05.06.07.08" will be considered invalid in a future Kubernetes release: use "5.6.7.8"`,
-				`spec.hostAliases[0].ip: non-standard IP address "::ffff:1.2.3.4" will be considered invalid in a future Kubernetes release: use "1.2.3.4"`,
+				`spec.dnsConfig.nameservers[1]: non-standard IP address "05.06.07.08" is invalid: use "5.6.7.8"`,
+				`spec.hostAliases[0].ip: non-standard IP address "::ffff:1.2.3.4" is invalid: use "1.2.3.4"`,
 			},
 		},
 	}

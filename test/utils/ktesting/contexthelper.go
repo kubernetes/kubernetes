@@ -48,11 +48,17 @@ func withTimeout(ctx context.Context, tb TB, timeout time.Duration, timeoutCause
 	cancelCtx, cancel := context.WithCancelCause(ctx)
 	after := time.NewTimer(timeout)
 	stopCtx, stop := context.WithCancel(ctx) // Only used internally, doesn't need a cause.
+	done := make(chan struct{})
 	tb.Cleanup(func() {
 		cancel(cleanupErr(tb.Name()))
 		stop()
+		// Wait for goroutine termination. This is important because
+		// otherwise the goroutine might log through tb *after* the
+		// test has already finished, which causes a panic.
+		<-done
 	})
 	go func() {
+		defer close(done)
 		select {
 		case <-stopCtx.Done():
 			after.Stop()

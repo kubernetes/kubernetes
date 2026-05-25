@@ -741,7 +741,7 @@ func TestWaitForAllPodsUnmount(t *testing.T) {
 
 				for _, pod := range pods {
 					go func() {
-						err := manager.WaitForAttachAndMount(context.Background(), pod)
+						err := manager.WaitForAttachAndMount(ctx, pod)
 						resultChan <- attachResult{
 							podName: pod.Name,
 							err:     err,

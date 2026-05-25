@@ -62,6 +62,7 @@ func WaitForNamedAuthorizationUpdate(t *testing.T, ctx context.Context, c author
 		}
 		return true, nil
 	}); err != nil {
+		t.Logf("did not see expected allowed response %v for user=%s,namespace=%s,verb=%s,resourceName=%s,resource=%v", allowed, user, namespace, verb, resourceName, resource)
 		t.Fatal(err)
 	}
 }

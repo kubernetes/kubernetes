@@ -28,14 +28,14 @@ import (
 )
 
 var (
-	globalFIFOMetricsProvider  FIFOMetricsProvider = noopFIFOMetricsProvider{}
-	setFIFOMetricsProviderOnce sync.Once
+	globalInformerMetricsProvider  InformerMetricsProvider = noopInformerMetricsProvider{}
+	setInformerMetricsProviderOnce sync.Once
 )
 
-type noopFIFOMetricsProvider struct{}
+type noopInformerMetricsProvider struct{}
 
-// FIFOMetricsProvider defines an interface for creating metrics that track FIFO queue operations.
-type FIFOMetricsProvider interface {
+// InformerMetricsProvider defines an interface for creating metrics that track informer operations.
+type InformerMetricsProvider interface {
 	// NewQueuedItemMetric returns a gauge metric for tracking the total number of items
 	// currently queued and waiting to be processed.
 	// The returned metric should check id.Reserved() before updating to support
@@ -51,6 +51,11 @@ type FIFOMetricsProvider interface {
 	// The returned metric should check id.Reserved() before updating to support
 	// dynamic informers that may shut down while the process is still running.
 	NewProcessingLatencyMetric(id InformerNameAndResource) HistogramMetric
+
+	// NewStoreResourceVersionMetric returns a gauge metric for tracking the resource version of the store.
+	// The returned metric should check id.Reserved() before updating to support
+	// dynamic informers that may shut down while the process is still running.
+	NewStoreResourceVersionMetric(id InformerNameAndResource) GaugeMetric
 }
 
 // fifoMetrics holds all metrics for a FIFO.
@@ -59,17 +64,22 @@ type fifoMetrics struct {
 	processingLatency  HistogramMetric
 }
 
-// SetFIFOMetricsProvider sets the metrics provider for all subsequently created
+// storeMetrics holds all metrics for a store.
+type storeMetrics struct {
+	storeResourceVersion GaugeMetric
+}
+
+// SetInformerMetricsProvider sets the metrics provider for all subsequently created
 // FIFOs. Only the first call has an effect.
-func SetFIFOMetricsProvider(metricsProvider FIFOMetricsProvider) {
-	setFIFOMetricsProviderOnce.Do(func() {
-		globalFIFOMetricsProvider = metricsProvider
+func SetInformerMetricsProvider(metricsProvider InformerMetricsProvider) {
+	setInformerMetricsProviderOnce.Do(func() {
+		globalInformerMetricsProvider = metricsProvider
 	})
 }
 
-func newFIFOMetrics(id InformerNameAndResource, metricsProvider FIFOMetricsProvider) *fifoMetrics {
+func newFIFOMetrics(id InformerNameAndResource, metricsProvider InformerMetricsProvider) *fifoMetrics {
 	if metricsProvider == nil {
-		metricsProvider = globalFIFOMetricsProvider
+		metricsProvider = globalInformerMetricsProvider
 	}
 	metrics := &fifoMetrics{
 		numberOfQueuedItem: noopMetric{},
@@ -84,10 +94,29 @@ func newFIFOMetrics(id InformerNameAndResource, metricsProvider FIFOMetricsProvi
 	return metrics
 }
 
-func (noopFIFOMetricsProvider) NewQueuedItemMetric(InformerNameAndResource) GaugeMetric {
+func newStoreMetrics(id InformerNameAndResource, metricsProvider InformerMetricsProvider) *storeMetrics {
+	if metricsProvider == nil {
+		metricsProvider = globalInformerMetricsProvider
+	}
+	metrics := &storeMetrics{
+		storeResourceVersion: noopMetric{},
+	}
+
+	if id.Reserved() {
+		metrics.storeResourceVersion = metricsProvider.NewStoreResourceVersionMetric(id)
+	}
+
+	return metrics
+}
+
+func (noopInformerMetricsProvider) NewQueuedItemMetric(InformerNameAndResource) GaugeMetric {
 	return noopMetric{}
 }
 
-func (noopFIFOMetricsProvider) NewProcessingLatencyMetric(InformerNameAndResource) HistogramMetric {
+func (noopInformerMetricsProvider) NewProcessingLatencyMetric(InformerNameAndResource) HistogramMetric {
+	return noopMetric{}
+}
+
+func (noopInformerMetricsProvider) NewStoreResourceVersionMetric(InformerNameAndResource) GaugeMetric {
 	return noopMetric{}
 }

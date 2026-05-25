@@ -17,9 +17,7 @@ limitations under the License.
 package services
 
 import (
-	"crypto/tls"
 	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -27,7 +25,7 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 )
 
 // terminationSignals are signals that cause the program to exit in the
@@ -46,12 +44,6 @@ func waitForTerminationSignal() {
 // and return the error.
 func readinessCheck(name string, urls []string, errCh <-chan error) error {
 	klog.Infof("Running readiness check for service %q", name)
-
-	insecureTransport := http.DefaultTransport.(*http.Transport).Clone()
-	insecureTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	insecureHTTPClient := &http.Client{
-		Transport: insecureTransport,
-	}
 
 	endTime := time.Now().Add(*serverStartTimeout)
 	blockCh := make(chan error)
@@ -78,7 +70,7 @@ func readinessCheck(name string, urls []string, errCh <-chan error) error {
 		case <-time.After(time.Second):
 			ready := true
 			for _, url := range urls {
-				if !healthCheck(insecureHTTPClient, url) {
+				if !e2enode.HealthCheck(url) {
 					ready = false
 					break
 				}
@@ -89,21 +81,4 @@ func readinessCheck(name string, urls []string, errCh <-chan error) error {
 		}
 	}
 	return fmt.Errorf("e2e service %q readiness check timeout %v", name, *serverStartTimeout)
-}
-
-// Perform a health check. Anything other than a 200-response is treated as a failure.
-// Only returns non-recoverable errors.
-func healthCheck(client *http.Client, url string) bool {
-	req, err := http.NewRequest("HEAD", url, nil)
-	if err != nil {
-		return false
-	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", framework.TestContext.BearerToken))
-	resp, err := client.Do(req)
-	if err != nil {
-		klog.Warningf("Health check on %q failed, error=%v", url, err)
-	} else if resp.StatusCode != http.StatusOK {
-		klog.Warningf("Health check on %q failed, status=%d", url, resp.StatusCode)
-	}
-	return err == nil && resp.StatusCode == http.StatusOK
 }

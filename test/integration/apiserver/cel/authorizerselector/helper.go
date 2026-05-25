@@ -30,37 +30,16 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/version"
-	"k8s.io/apiserver/pkg/cel/environment"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
 	"k8s.io/utils/ptr"
 )
 
-func RunAuthzSelectorsLibraryTests(t *testing.T, featureEnabled bool) {
-	if _, initialized := environment.AuthzSelectorsLibraryEnabled(); initialized {
-		// This ensures CEL environments don't get initialized during init(),
-		// before they can be informed by configured feature gates.
-		// If this check fails, uncomment the debug.PrintStack() when the authz selectors
-		// library is first initialized to find the culprit, and modify it to be lazily initialized on first use.
-		t.Fatalf("authz selector library was initialized before feature gates were finalized (possibly from an init() or package variable)")
-	}
-
-	if !featureEnabled {
-		featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
-	}
-
-	// Start the server with the desired feature enablement
+func RunAuthzSelectorsLibraryTests(t *testing.T) {
+	// Start the server
 	args := []string{
-		fmt.Sprintf("--feature-gates=AuthorizeNodeWithSelectors=%v,AuthorizeWithSelectors=%v", featureEnabled, featureEnabled),
 		fmt.Sprintf("--runtime-config=%s=true", resourceapi.SchemeGroupVersion), // For ResourceClaim test case below.
-	}
-	if !featureEnabled {
-		// Without this, resource.k8s.io/v1 cannot be enabled in the emulated 1.33.
-		args = append(args, "--runtime-config-emulation-forward-compatible")
 	}
 	server, err := apiservertesting.StartTestServer(t, nil, args, framework.SharedEtcd())
 	if err != nil {
@@ -68,15 +47,8 @@ func RunAuthzSelectorsLibraryTests(t *testing.T, featureEnabled bool) {
 	}
 	defer server.TearDownFn()
 
-	// Ensure the authz selectors library was initialzed and saw the right feature enablement
-	if gotEnabled, initialized := environment.AuthzSelectorsLibraryEnabled(); !initialized {
-		t.Fatalf("authz selector library was not initialized during API server construction")
-	} else if gotEnabled != featureEnabled {
-		t.Fatalf("authz selector library enabled=%v, expected %v", gotEnabled, featureEnabled)
-	}
-
 	// Attempt to create API objects using the fieldSelector and labelSelector authorizer functions,
-	// and ensure they are only allowed when the feature is enabled.
+	// and ensure they are allowed.
 
 	c, err := kubernetes.NewForConfig(server.ClientConfig)
 	if err != nil {
@@ -89,13 +61,11 @@ func RunAuthzSelectorsLibraryTests(t *testing.T, featureEnabled bool) {
 
 	boolFieldSelectorExpression := `type(authorizer.group('').resource('').fieldSelector('')) == string`
 	stringFieldSelectorExpression := boolFieldSelectorExpression + ` ? 'yes' : 'no'`
-	fieldSelectorErrorSubstring := `undeclared reference to 'fieldSelector'`
 
 	testcases := []struct {
-		name                     string
-		createObject             func() error
-		expectErrorsWhenEnabled  []*regexp.Regexp
-		expectErrorsWhenDisabled []*regexp.Regexp
+		name         string
+		createObject func() error
+		expectErrors []*regexp.Regexp
 	}{
 		{
 			name: "ValidatingAdmissionPolicy",
@@ -117,17 +87,9 @@ func RunAuthzSelectorsLibraryTests(t *testing.T, featureEnabled bool) {
 				_, err := c.AdmissionregistrationV1().ValidatingAdmissionPolicies().Create(context.TODO(), obj, metav1.CreateOptions{})
 				return err
 			},
-			expectErrorsWhenEnabled: []*regexp.Regexp{
+			expectErrors: []*regexp.Regexp{
 				// authorizer is not available to messageExpression
 				regexp.MustCompile(`spec\.validations\[0\]\.messageExpression:.*undeclared reference to 'authorizer'`),
-			},
-			expectErrorsWhenDisabled: []*regexp.Regexp{
-				regexp.MustCompile(`spec\.validations\[0\]\.expression:.*` + fieldSelectorErrorSubstring),
-				// authorizer is not available to messageExpression
-				regexp.MustCompile(`spec\.validations\[0\]\.messageExpression:.*undeclared reference to 'authorizer'`),
-				regexp.MustCompile(`spec\.auditAnnotations\[0\]\.valueExpression:.*` + fieldSelectorErrorSubstring),
-				regexp.MustCompile(`spec\.matchConditions\[0\]\.expression:.*` + fieldSelectorErrorSubstring),
-				regexp.MustCompile(`spec\.variables\[0\]\.expression:.*` + fieldSelectorErrorSubstring),
 			},
 		},
 		{
@@ -147,9 +109,6 @@ func RunAuthzSelectorsLibraryTests(t *testing.T, featureEnabled bool) {
 				_, err := c.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(context.TODO(), obj, metav1.CreateOptions{})
 				return err
 			},
-			expectErrorsWhenDisabled: []*regexp.Regexp{
-				regexp.MustCompile(`webhooks\[0\]\.matchConditions\[0\]\.expression:.*` + fieldSelectorErrorSubstring),
-			},
 		},
 		{
 			name: "MutatingWebhookConfiguration",
@@ -168,37 +127,23 @@ func RunAuthzSelectorsLibraryTests(t *testing.T, featureEnabled bool) {
 				_, err := c.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.TODO(), obj, metav1.CreateOptions{})
 				return err
 			},
-			expectErrorsWhenDisabled: []*regexp.Regexp{
-				regexp.MustCompile(`webhooks\[0\]\.matchConditions\[0\]\.expression:.*` + fieldSelectorErrorSubstring),
-			},
 		},
 		{
-			name: "ResourceClaim",
+			name: "ResourceClaim - selector",
 			createObject: func() error {
 				obj := &resourceapi.ResourceClaim{
-					ObjectMeta: metav1.ObjectMeta{Name: "test"},
+					ObjectMeta: metav1.ObjectMeta{Name: "test", Namespace: "default"},
 					Spec: resourceapi.ResourceClaimSpec{
 						Devices: resourceapi.DeviceClaim{
 							Requests: []resourceapi.DeviceRequest{{
-								Name: "req-0",
+								Name: "test",
 								Exactly: &resourceapi.ExactDeviceRequest{
-									DeviceClassName: "example-class",
-									Selectors: []resourceapi.DeviceSelector{{
-										CEL: &resourceapi.CELDeviceSelector{
-											Expression: boolFieldSelectorExpression,
-										},
-									}},
-								},
-							}},
-						},
-					},
-				}
+									DeviceClassName: "test",
+									Selectors:       []resourceapi.DeviceSelector{{CEL: &resourceapi.CELDeviceSelector{Expression: boolFieldSelectorExpression}}}}}}}}}
 				_, err := c.ResourceV1().ResourceClaims("default").Create(context.TODO(), obj, metav1.CreateOptions{})
 				return err
 			},
-			// authorizer is not available to resource APIs
-			expectErrorsWhenEnabled:  []*regexp.Regexp{regexp.MustCompile(`spec\.devices\.requests\[0\]\.exactly\.selectors\[0\].cel\.expression:.*undeclared reference to 'authorizer'`)},
-			expectErrorsWhenDisabled: []*regexp.Regexp{regexp.MustCompile(`spec\.devices\.requests\[0\]\.exactly\.selectors\[0\].cel\.expression:.*undeclared reference to 'authorizer'`)},
+			expectErrors: []*regexp.Regexp{regexp.MustCompile(`spec\.devices\.requests\[0\]\.exactly\.selectors\[0].cel\.expression:.*undeclared reference to 'authorizer'`)},
 		},
 		{
 			name: "CustomResourceDefinition - rule",
@@ -224,8 +169,7 @@ func RunAuthzSelectorsLibraryTests(t *testing.T, featureEnabled bool) {
 				return err
 			},
 			// authorizer is not available to CRD validation
-			expectErrorsWhenEnabled:  []*regexp.Regexp{regexp.MustCompile(`x-kubernetes-validations\[0\]\.rule:.*undeclared reference to 'authorizer'`)},
-			expectErrorsWhenDisabled: []*regexp.Regexp{regexp.MustCompile(`x-kubernetes-validations\[0\]\.rule:.*undeclared reference to 'authorizer'`)},
+			expectErrors: []*regexp.Regexp{regexp.MustCompile(`x-kubernetes-validations\[0\]\.rule:.*undeclared reference to 'authorizer'`)},
 		},
 		{
 			name: "CustomResourceDefinition - messageExpression",
@@ -252,32 +196,24 @@ func RunAuthzSelectorsLibraryTests(t *testing.T, featureEnabled bool) {
 				return err
 			},
 			// authorizer is not available to CRD validation
-			expectErrorsWhenEnabled:  []*regexp.Regexp{regexp.MustCompile(`x-kubernetes-validations\[0\]\.messageExpression:.*undeclared reference to 'authorizer'`)},
-			expectErrorsWhenDisabled: []*regexp.Regexp{regexp.MustCompile(`x-kubernetes-validations\[0\]\.messageExpression:.*undeclared reference to 'authorizer'`)},
+			expectErrors: []*regexp.Regexp{regexp.MustCompile(`x-kubernetes-validations\[0\]\.messageExpression:.*undeclared reference to 'authorizer'`)},
 		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			err := tc.createObject()
 
-			var expectedErrors []*regexp.Regexp
-			if featureEnabled {
-				expectedErrors = tc.expectErrorsWhenEnabled
-			} else {
-				expectedErrors = tc.expectErrorsWhenDisabled
-			}
-
 			switch {
-			case len(expectedErrors) == 0 && err == nil:
+			case len(tc.expectErrors) == 0 && err == nil:
 				// success
-			case len(expectedErrors) == 0 && err != nil:
+			case len(tc.expectErrors) == 0 && err != nil:
 				t.Fatalf("expected success, got error:\n%s", strings.Join(sets.List(getCauses(t, err)), "\n\n"))
-			case len(expectedErrors) > 0 && err == nil:
+			case len(tc.expectErrors) > 0 && err == nil:
 				t.Fatalf("expected error, got success")
-			case len(expectedErrors) > 0 && err != nil:
+			case len(tc.expectErrors) > 0 && err != nil:
 				// make sure errors match expectations
 				actualCauses := getCauses(t, err)
-				for _, expectCause := range expectedErrors {
+				for _, expectCause := range tc.expectErrors {
 					found := false
 					for _, cause := range actualCauses.UnsortedList() {
 						if expectCause.MatchString(cause) {

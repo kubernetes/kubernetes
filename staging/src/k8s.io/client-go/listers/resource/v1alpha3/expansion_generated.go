@@ -21,3 +21,7 @@ package v1alpha3
 // DeviceTaintRuleListerExpansion allows custom methods to be added to
 // DeviceTaintRuleLister.
 type DeviceTaintRuleListerExpansion interface{}
+
+// ResourcePoolStatusRequestListerExpansion allows custom methods to be added to
+// ResourcePoolStatusRequestLister.
+type ResourcePoolStatusRequestListerExpansion interface{}

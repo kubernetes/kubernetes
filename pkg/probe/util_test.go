@@ -78,7 +78,6 @@ func TestFindPortByName(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got, err := findPortByName(tt.args.container, tt.args.portName)
@@ -181,7 +180,6 @@ func TestResolveContainerPort(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got, err := ResolveContainerPort(tt.args.param, tt.args.container)

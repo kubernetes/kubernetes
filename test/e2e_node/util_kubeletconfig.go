@@ -18,14 +18,20 @@ package e2enode
 
 import (
 	"context"
+	"crypto/sha256"
+	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2enodekubelet "k8s.io/kubernetes/test/e2e_node/kubeletconfig"
 
 	"github.com/onsi/ginkgo/v2"
@@ -74,30 +80,87 @@ type updateKubeletOptions struct {
 func updateKubeletConfigWithOptions(ctx context.Context, f *framework.Framework, kubeletConfig *kubeletconfig.KubeletConfiguration, opts updateKubeletOptions) {
 	ginkgo.GinkgoHelper()
 
-	// Update the Kubelet configuration.
-	restartKubelet := mustStopKubelet(ctx, f)
+	withStoppedKubelet(ctx, f, opts.ensureConsistentReadyNode, func() {
+		// Delete CPU and memory manager state files to be sure it will not prevent the kubelet restart
+		if opts.deleteStateFiles {
+			deleteStateFile(cpuManagerStateFile)
+			deleteStateFile(memoryManagerStateFile)
+			deleteStateFile(usernsStateFiles)
+		}
 
-	// Delete CPU and memory manager state files to be sure it will not prevent the kubelet restart
-	if opts.deleteStateFiles {
-		deleteStateFile(cpuManagerStateFile)
-		deleteStateFile(memoryManagerStateFile)
-	}
+		framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(kubeletConfig))
+	})
 
-	framework.ExpectNoError(e2enodekubelet.WriteKubeletConfigFile(kubeletConfig))
-
-	restartKubelet(ctx)
-
-	if opts.ensureConsistentReadyNode {
-		gomega.Consistently(ctx, func(ctx context.Context) bool {
-			return getNodeReadyStatus(ctx, f) && kubeletHealthCheck(kubeletHealthCheckURL)
-		}).WithTimeout(2 * time.Minute).WithPolling(2 * time.Second).Should(gomega.BeTrueBecause("node keeps reporting ready status"))
-	}
 }
 
 func updateKubeletConfig(ctx context.Context, f *framework.Framework, kubeletConfig *kubeletconfig.KubeletConfiguration, deleteStateFiles bool) {
 	updateKubeletConfigWithOptions(ctx, f, kubeletConfig, updateKubeletOptions{
 		deleteStateFiles: deleteStateFiles,
 	})
+}
+
+func tempRemoveImagePulledRecord(f *framework.Framework, imageID *string) {
+	pulledRecordFilenameFromID := func(imageID string) string {
+		return fmt.Sprintf("sha256-%x", sha256.Sum256([]byte(imageID)))
+	}
+
+	ginkgo.BeforeEach(func(ctx context.Context) {
+		pulledRecordsDir := "/var/lib/kubelet/image_manager/pulled"
+		fileName := pulledRecordFilenameFromID(*imageID)
+		origPath := filepath.Join(pulledRecordsDir, fileName)
+		tempPath := filepath.Join(pulledRecordsDir, "temp_"+fileName)
+
+		// wait for the kubelet to create the record
+		err := wait.PollUntilContextTimeout(ctx, time.Second, 5*time.Second, true, func(_ context.Context) (bool, error) {
+			if _, err := os.Stat(origPath); err != nil {
+				f.Logf("failed to stat file %q: %v", origPath, err)
+				dirEntries, err := os.ReadDir(pulledRecordsDir)
+				if err != nil {
+					f.Logf("failed to read directory contents for %q: %v", pulledRecordsDir, err)
+					return false, nil
+				}
+				files := map[string]string{}
+				for _, entry := range dirEntries {
+					entryPath := filepath.Join(pulledRecordsDir, entry.Name())
+					content, _ := os.ReadFile(entryPath)
+					files[entryPath] = string(content)
+				}
+				f.Logf("contents of %q: %v", pulledRecordsDir, files)
+				return false, nil
+			}
+			return true, nil
+		})
+		framework.ExpectNoError(err, "the file with the pulled record for the image ID never appeared")
+
+		withStoppedKubelet(ctx, f, false, func() {
+			err := os.Rename(origPath, tempPath)
+			framework.ExpectNoError(err, "failed to move the ImagePulledRecord file")
+
+			ginkgo.DeferCleanup(func(ctx context.Context) {
+				withStoppedKubelet(ctx, f, false, func() {
+					err := os.Rename(tempPath, origPath)
+					framework.ExpectNoError(err, "failed to move the ImagePulledRecord file back to its original location")
+				})
+			})
+		})
+	})
+}
+
+// withStoppedKubelet stops the kubelet, runs the `action`, and starts the kubelet again
+func withStoppedKubelet(ctx context.Context, f *framework.Framework, ensureConsistentReadyNode bool, action func()) {
+	ginkgo.GinkgoHelper()
+
+	kubeletStart := mustStopKubelet(ctx, f)
+	defer func() {
+		kubeletStart(ctx)
+		if ensureConsistentReadyNode {
+			gomega.Consistently(ctx, func(ctx context.Context) bool {
+				return getNodeReadyStatus(ctx, f) && e2enode.HealthCheck(kubeletHealthCheckURL)
+			}).WithTimeout(2 * time.Minute).WithPolling(2 * time.Second).Should(gomega.BeTrueBecause("node keeps reporting ready status"))
+		}
+	}()
+
+	action()
 }
 
 func getNodeReadyStatus(ctx context.Context, f *framework.Framework) bool {

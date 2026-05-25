@@ -43,7 +43,7 @@ func defaultFillFuncs() map[reflect.Type]FillFunc {
 		obj.(*metav1.TypeMeta).Kind = ""
 	}
 	funcs[reflect.TypeOf(&metav1.FieldsV1{})] = func(s string, i int, obj interface{}) {
-		obj.(*metav1.FieldsV1).Raw = []byte(`{}`)
+		obj.(*metav1.FieldsV1).SetRawString(`{}`)
 	}
 	funcs[reflect.TypeOf(&metav1.Time{})] = func(s string, i int, obj interface{}) {
 		// use the integer as an offset from the year
@@ -136,7 +136,8 @@ func fill(dataString string, dataInt int, t reflect.Type, v reflect.Value, fillF
 			}
 
 			// use the json field name, which must be stable
-			dataString := strings.Split(field.Tag.Get("json"), ",")[0]
+			jsonTag, _ := field.Tag.Lookup("json")
+			dataString = strings.Split(jsonTag, ",")[0]
 			if dataString == "-" {
 				// unserialized field, no need to fill it
 				continue

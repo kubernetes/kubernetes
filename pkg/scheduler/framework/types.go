@@ -26,6 +26,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -51,20 +52,13 @@ var (
 	nodeActionTypes = []fwk.ActionType{fwk.UpdateNodeAllocatable, fwk.UpdateNodeLabel, fwk.UpdateNodeTaint, fwk.UpdateNodeCondition, fwk.UpdateNodeAnnotation}
 )
 
-// Constants for GVKs.
-const (
-	// These assignedPod and unschedulablePod are internal resources that are used to represent the type of Pod.
-	// We don't expose them to the plugins deliberately because we don't publish Pod events with unschedulable Pods in the first place.
-	assignedPod      fwk.EventResource = "AssignedPod"
-	unschedulablePod fwk.EventResource = "UnschedulablePod"
-)
-
 var (
 	// allResources is a list of all resources.
 	allResources = []fwk.EventResource{
 		fwk.Pod,
-		assignedPod,
-		unschedulablePod,
+		fwk.AssignedPod,
+		fwk.UnscheduledPod,
+		fwk.TargetPod,
 		fwk.Node,
 		fwk.PersistentVolume,
 		fwk.PersistentVolumeClaim,
@@ -76,7 +70,7 @@ var (
 		fwk.ResourceClaim,
 		fwk.ResourceSlice,
 		fwk.DeviceClass,
-		fwk.Workload,
+		fwk.PodGroup,
 	}
 )
 
@@ -128,9 +122,8 @@ func matchEventResources(r, resource fwk.EventResource) bool {
 	return r == fwk.WildCard ||
 		// Exact match
 		r == resource ||
-		// Pod matches assignedPod and unschedulablePod.
-		// (assignedPod and unschedulablePod aren't exposed and hence only used for incoming events and never used in EventsToRegister)
-		r == fwk.Pod && (resource == assignedPod || resource == unschedulablePod)
+		// Pod matches any of these: AssignedPod, UnscheduledPod, TargetPod.
+		r == fwk.Pod && (resource == fwk.AssignedPod || resource == fwk.UnscheduledPod || resource == fwk.TargetPod)
 }
 
 func MatchAnyClusterEvent(ce fwk.ClusterEvent, incomingEvents []fwk.ClusterEvent) bool {
@@ -144,7 +137,9 @@ func MatchAnyClusterEvent(ce fwk.ClusterEvent, incomingEvents []fwk.ClusterEvent
 
 func UnrollWildCardResource() []fwk.ClusterEventWithHint {
 	events := []fwk.ClusterEventWithHint{
-		{Event: fwk.ClusterEvent{Resource: fwk.Pod, ActionType: fwk.All}},
+		{Event: fwk.ClusterEvent{Resource: fwk.AssignedPod, ActionType: fwk.All}},
+		{Event: fwk.ClusterEvent{Resource: fwk.UnscheduledPod, ActionType: fwk.All}},
+		{Event: fwk.ClusterEvent{Resource: fwk.TargetPod, ActionType: fwk.All}},
 		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.All}},
 		{Event: fwk.ClusterEvent{Resource: fwk.PersistentVolume, ActionType: fwk.All}},
 		{Event: fwk.ClusterEvent{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.All}},
@@ -156,9 +151,20 @@ func UnrollWildCardResource() []fwk.ClusterEventWithHint {
 		{Event: fwk.ClusterEvent{Resource: fwk.DeviceClass, ActionType: fwk.All}},
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.GenericWorkload) {
-		events = append(events, fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.Workload, ActionType: fwk.All}})
+		events = append(events, fwk.ClusterEventWithHint{Event: fwk.ClusterEvent{Resource: fwk.PodGroup, ActionType: fwk.All}})
 	}
 	return events
+}
+
+// UnrollPodEvent splits the cluster event with the resource Pod into three cluster events
+// with resources AssignedPod, UnscheduledPod, and TargetPod.
+// It assumes that event.Resource == fwk.Pod.
+func UnrollPodEvent(event fwk.ClusterEvent) []fwk.ClusterEvent {
+	return []fwk.ClusterEvent{
+		{Resource: fwk.AssignedPod, ActionType: event.ActionType},
+		{Resource: fwk.UnscheduledPod, ActionType: event.ActionType},
+		{Resource: fwk.TargetPod, ActionType: event.ActionType},
+	}
 }
 
 // NodeInfo is node level aggregated information.
@@ -205,6 +211,11 @@ type NodeInfo struct {
 
 	// DeclaredFeatures is a set of features published by the node
 	DeclaredFeatures ndf.FeatureSet
+
+	// NodeAllocatableDRAClaimStates tracks the state of claims requesting node-allocatable resources
+	// (resources published in Node.Status.Allocatable like cpu, memory. etc.).
+	// This is used to enforce sharing policies for these claims on the node.
+	NodeAllocatableDRAClaimStates map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState
 }
 
 func (n *NodeInfo) GetPods() []fwk.PodInfo {
@@ -252,6 +263,10 @@ func (n *NodeInfo) GetNodeDeclaredFeatures() ndf.FeatureSet {
 	return n.DeclaredFeatures
 }
 
+func (n *NodeInfo) GetNodeAllocatableDRAClaimState() map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState {
+	return n.NodeAllocatableDRAClaimStates
+}
+
 // NodeInfo implements KMetadata, so for example klog.KObjSlice(nodes) works
 // when nodes is a []*NodeInfo.
 var _ klog.KMetadata = &NodeInfo{}
@@ -290,15 +305,16 @@ func (n *NodeInfo) Snapshot() fwk.NodeInfo {
 // SnapshotConcrete returns a copy of this node, Except that ImageStates is copied without the Nodes field.
 func (n *NodeInfo) SnapshotConcrete() *NodeInfo {
 	clone := &NodeInfo{
-		node:             n.node,
-		Requested:        n.Requested.Clone(),
-		NonZeroRequested: n.NonZeroRequested.Clone(),
-		Allocatable:      n.Allocatable.Clone(),
-		UsedPorts:        make(fwk.HostPortInfo),
-		ImageStates:      make(map[string]*fwk.ImageStateSummary),
-		PVCRefCounts:     make(map[string]int),
-		Generation:       n.Generation,
-		DeclaredFeatures: n.DeclaredFeatures.Clone(),
+		node:                          n.node,
+		Requested:                     n.Requested.Clone(),
+		NonZeroRequested:              n.NonZeroRequested.Clone(),
+		Allocatable:                   n.Allocatable.Clone(),
+		UsedPorts:                     make(fwk.HostPortInfo),
+		ImageStates:                   make(map[string]*fwk.ImageStateSummary),
+		PVCRefCounts:                  make(map[string]int),
+		Generation:                    n.Generation,
+		DeclaredFeatures:              n.DeclaredFeatures.Clone(),
+		NodeAllocatableDRAClaimStates: make(map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState),
 	}
 	if len(n.Pods) > 0 {
 		clone.Pods = append([]fwk.PodInfo(nil), n.Pods...)
@@ -328,6 +344,9 @@ func (n *NodeInfo) SnapshotConcrete() *NodeInfo {
 	}
 	for key, value := range n.PVCRefCounts {
 		clone.PVCRefCounts[key] = value
+	}
+	for key, value := range n.NodeAllocatableDRAClaimStates {
+		clone.NodeAllocatableDRAClaimStates[key] = value.Snapshot()
 	}
 	return clone
 }
@@ -441,6 +460,42 @@ func (n *NodeInfo) update(podInfo fwk.PodInfo, sign int64) {
 	n.updatePVCRefCounts(podInfo.GetPod(), sign > 0)
 
 	n.Generation = nextGeneration()
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) {
+		n.updateNodeAllocatableDRAClaimState(podInfo, sign)
+	}
+}
+
+// updateNodeAllocatableDRAClaimState updates the NodeInfo based on DRA node allocatable resource claims in the pod.
+func (n *NodeInfo) updateNodeAllocatableDRAClaimState(podInfo fwk.PodInfo, sign int64) {
+	pod := podInfo.GetPod()
+
+	if n.NodeAllocatableDRAClaimStates == nil && len(pod.Status.NodeAllocatableResourceClaimStatuses) > 0 {
+		n.NodeAllocatableDRAClaimStates = make(map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState, len(pod.Status.NodeAllocatableResourceClaimStatuses))
+	}
+
+	for _, claimStatus := range pod.Status.NodeAllocatableResourceClaimStatuses {
+		resourceClaimNamespacedName := types.NamespacedName{
+			Namespace: pod.Namespace,
+			Name:      claimStatus.ResourceClaimName,
+		}
+
+		if _, exists := n.NodeAllocatableDRAClaimStates[resourceClaimNamespacedName]; !exists {
+			n.NodeAllocatableDRAClaimStates[resourceClaimNamespacedName] = &fwk.NodeAllocatableDRAClaimState{
+				ConsumerPods: sets.New[types.UID](),
+			}
+		}
+		state := n.NodeAllocatableDRAClaimStates[resourceClaimNamespacedName]
+
+		if sign > 0 {
+			state.ConsumerPods.Insert(pod.UID)
+		} else {
+			state.ConsumerPods.Delete(pod.UID)
+			if state.ConsumerPods.Len() == 0 {
+				delete(n.NodeAllocatableDRAClaimStates, resourceClaimNamespacedName)
+			}
+		}
+	}
 }
 
 // updateUsedPorts updates the UsedPorts of NodeInfo.
@@ -478,7 +533,10 @@ func (n *NodeInfo) SetNode(node *v1.Node) {
 	n.node = node
 	n.Allocatable = NewResource(node.Status.Allocatable)
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDeclaredFeatures) {
-		n.DeclaredFeatures = ndf.NewFeatureSet(node.Status.DeclaredFeatures...)
+		// Use TryMap rather than Map here in case the node has unknown features. Since we're only
+		// concerned with matching known features to the node, there is no risk to discarding
+		// unknown features.
+		n.DeclaredFeatures = ndf.DefaultFramework.TryMap(node.Status.DeclaredFeatures)
 	}
 	n.Generation = nextGeneration()
 }
@@ -553,11 +611,8 @@ type QueuedPodInfo struct {
 	// GatingPluginEvents records the events registered by the plugin that gated the Pod at PreEnqueue.
 	// We have it as a cache purpose to avoid re-computing which event(s) might ungate the Pod.
 	GatingPluginEvents []fwk.ClusterEvent
-	// NeedsPodGroupScheduling says whether the pod needs to pass a pod group scheduling cycle or not.
-	// If set to false, it means that the pod either passed the pod group cycle
-	// or doesn't belong to any pod group.
-	// This field can only be set to true when GenericWorkload feature flag is enabled.
-	NeedsPodGroupScheduling bool
+	// PodSignature for opportunistic batching
+	PodSignature fwk.PodSignature
 }
 
 func (pqi *QueuedPodInfo) GetPodInfo() fwk.PodInfo {
@@ -623,8 +678,15 @@ func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 		GatingPluginEvents:      slices.Clone(pqi.GatingPluginEvents),
 		PendingPlugins:          pqi.PendingPlugins.Clone(),
 		ConsecutiveErrorsCount:  pqi.ConsecutiveErrorsCount,
-		NeedsPodGroupScheduling: pqi.NeedsPodGroupScheduling,
+		PodSignature:            pqi.PodSignature,
 	}
+}
+
+// Update updates the pod in QueuedPodInfo and clears the cached PodSignature,
+// since the updated pod may no longer match the signature computed for the previous version.
+func (pqi *QueuedPodInfo) Update(pod *v1.Pod) error {
+	pqi.PodSignature = nil
+	return pqi.PodInfo.Update(pod)
 }
 
 // ClearRejectorPlugins clears the plugin-related fields that track why a pod
@@ -650,27 +712,25 @@ type QueuedPodGroupInfo struct {
 type PodGroupInfo struct {
 	// Namespace is a namespace of this pod group.
 	Namespace string
-	// WorkloadRef is a reference to this particular pod group.
-	WorkloadRef *v1.WorkloadReference
+	// Name is a name of this pod group.
+	Name string
 	// UnscheduledPods are pods that are currently being considered for scheduling.
 	// It can be useful to also retrieve the scheduled (assumed or assigned) pods.
-	// WorkloadManager.PodGroupState can be used for that.
+	// PodGroupManager.PodGroupState can be used for that.
 	// The order of the pods is deterministic and based on signature, priority and timestamp.
 	UnscheduledPods []*v1.Pod
 }
 
 func (pgi *PodGroupInfo) GetName() string {
-	if pgi.WorkloadRef == nil {
-		return ""
-	}
-	return fmt.Sprintf("%s/%s/%s", pgi.WorkloadRef.Name, pgi.WorkloadRef.PodGroup, pgi.WorkloadRef.PodGroupReplicaKey)
+	return pgi.Name
 }
 
 func (pgi *PodGroupInfo) GetNamespace() string {
-	if pgi.WorkloadRef == nil {
-		return ""
-	}
 	return pgi.Namespace
+}
+
+func (pgi *PodGroupInfo) GetUnscheduledPods() []*v1.Pod {
+	return pgi.UnscheduledPods
 }
 
 // PodInfo is a wrapper to a Pod with additional pre-computed information to
@@ -725,53 +785,22 @@ func (pi *PodInfo) DeepCopy() *PodInfo {
 	}
 }
 
-// Update creates a full new PodInfo by default. And only updates the pod when the PodInfo
-// has been instantiated and the passed pod is the exact same one as the original pod.
+// Update updates the pod pointer in PodInfo if the passed pod has the same UID.
+// It returns an error if the UIDs mismatch.
 func (pi *PodInfo) Update(pod *v1.Pod) error {
-	if pod != nil && pi.Pod != nil && pi.Pod.UID == pod.UID {
-		// PodInfo includes immutable information, and so it is safe to update the pod in place if it is
-		// the exact same pod
-		pi.Pod = pod
-		return nil
+	if pod == nil {
+		return fmt.Errorf("cannot update with nil pod")
 	}
-	var preferredAffinityTerms []v1.WeightedPodAffinityTerm
-	var preferredAntiAffinityTerms []v1.WeightedPodAffinityTerm
-	if affinity := pod.Spec.Affinity; affinity != nil {
-		if a := affinity.PodAffinity; a != nil {
-			preferredAffinityTerms = a.PreferredDuringSchedulingIgnoredDuringExecution
-		}
-		if a := affinity.PodAntiAffinity; a != nil {
-			preferredAntiAffinityTerms = a.PreferredDuringSchedulingIgnoredDuringExecution
-		}
+	if pi.Pod == nil {
+		return fmt.Errorf("cannot update PodInfo - its Pod is nil")
 	}
-
-	// Attempt to parse the affinity terms
-	var parseErrs []error
-	requiredAffinityTerms, err := fwk.GetAffinityTerms(pod, fwk.GetPodAffinityTerms(pod.Spec.Affinity))
-	if err != nil {
-		parseErrs = append(parseErrs, fmt.Errorf("requiredAffinityTerms: %w", err))
+	if pi.Pod.UID != pod.UID {
+		return fmt.Errorf("pod UID mismatch, expected %v, got %v", pi.Pod.UID, pod.UID)
 	}
-	requiredAntiAffinityTerms, err := fwk.GetAffinityTerms(pod,
-		fwk.GetPodAntiAffinityTerms(pod.Spec.Affinity))
-	if err != nil {
-		parseErrs = append(parseErrs, fmt.Errorf("requiredAntiAffinityTerms: %w", err))
-	}
-	weightedAffinityTerms, err := fwk.GetWeightedAffinityTerms(pod, preferredAffinityTerms)
-	if err != nil {
-		parseErrs = append(parseErrs, fmt.Errorf("preferredAffinityTerms: %w", err))
-	}
-	weightedAntiAffinityTerms, err := fwk.GetWeightedAffinityTerms(pod, preferredAntiAffinityTerms)
-	if err != nil {
-		parseErrs = append(parseErrs, fmt.Errorf("preferredAntiAffinityTerms: %w", err))
-	}
-
 	pi.Pod = pod
-	pi.RequiredAffinityTerms = requiredAffinityTerms
-	pi.RequiredAntiAffinityTerms = requiredAntiAffinityTerms
-	pi.PreferredAffinityTerms = weightedAffinityTerms
-	pi.PreferredAntiAffinityTerms = weightedAntiAffinityTerms
+	// Reset cached resource to force recomputation on next CalculateResource call.
 	pi.cachedResource = nil
-	return utilerrors.NewAggregate(parseErrs)
+	return nil
 }
 
 func (pi *PodInfo) CalculateResource() fwk.PodResource {
@@ -781,11 +810,14 @@ func (pi *PodInfo) CalculateResource() fwk.PodResource {
 	inPlacePodVerticalScalingEnabled := utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling)
 	podLevelResourcesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResources)
 	inPlacePodLevelResourcesVerticalScalingEnabled := utilfeature.DefaultMutableFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling)
+	nodeAllocatableResourcesDRAEnabled := utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources)
+
 	requests := resourcehelper.PodRequests(pi.Pod, resourcehelper.PodResourcesOptions{
 		UseStatusResources: inPlacePodVerticalScalingEnabled,
 		InPlacePodLevelResourcesVerticalScalingEnabled: inPlacePodLevelResourcesVerticalScalingEnabled,
 		// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-		SkipPodLevelResources: !podLevelResourcesEnabled,
+		SkipPodLevelResources:                    !podLevelResourcesEnabled,
+		UseDRANodeAllocatableResourceClaimStatus: nodeAllocatableResourcesDRAEnabled,
 	})
 	isPodLevelResourcesSet := podLevelResourcesEnabled && resourcehelper.IsPodLevelRequestsSet(pi.Pod)
 	nonMissingContainerRequests := getNonMissingContainerRequests(requests, isPodLevelResourcesSet)
@@ -795,8 +827,9 @@ func (pi *PodInfo) CalculateResource() fwk.PodResource {
 			UseStatusResources: inPlacePodVerticalScalingEnabled,
 			InPlacePodLevelResourcesVerticalScalingEnabled: inPlacePodLevelResourcesVerticalScalingEnabled,
 			// SkipPodLevelResources is set to false when PodLevelResources feature is enabled.
-			SkipPodLevelResources:       !podLevelResourcesEnabled,
-			NonMissingContainerRequests: nonMissingContainerRequests,
+			SkipPodLevelResources:                    !podLevelResourcesEnabled,
+			NonMissingContainerRequests:              nonMissingContainerRequests,
+			UseDRANodeAllocatableResourceClaimStatus: nodeAllocatableResourcesDRAEnabled,
 		})
 	}
 	non0CPU := non0Requests[v1.ResourceCPU]
@@ -919,9 +952,48 @@ func (f *FitError) Error() string {
 
 // NewPodInfo returns a new PodInfo.
 func NewPodInfo(pod *v1.Pod) (*PodInfo, error) {
-	pInfo := &PodInfo{}
-	err := pInfo.Update(pod)
-	return pInfo, err
+	if pod == nil {
+		return nil, fmt.Errorf("pod cannot be nil")
+	}
+	pInfo := &PodInfo{Pod: pod}
+
+	var preferredAffinityTerms []v1.WeightedPodAffinityTerm
+	var preferredAntiAffinityTerms []v1.WeightedPodAffinityTerm
+	if affinity := pod.Spec.Affinity; affinity != nil {
+		if a := affinity.PodAffinity; a != nil {
+			preferredAffinityTerms = a.PreferredDuringSchedulingIgnoredDuringExecution
+		}
+		if a := affinity.PodAntiAffinity; a != nil {
+			preferredAntiAffinityTerms = a.PreferredDuringSchedulingIgnoredDuringExecution
+		}
+	}
+
+	// Attempt to parse the affinity terms
+	var parseErrs []error
+	requiredAffinityTerms, err := fwk.GetAffinityTerms(pod, fwk.GetPodAffinityTerms(pod.Spec.Affinity))
+	if err != nil {
+		parseErrs = append(parseErrs, fmt.Errorf("requiredAffinityTerms: %w", err))
+	}
+	requiredAntiAffinityTerms, err := fwk.GetAffinityTerms(pod,
+		fwk.GetPodAntiAffinityTerms(pod.Spec.Affinity))
+	if err != nil {
+		parseErrs = append(parseErrs, fmt.Errorf("requiredAntiAffinityTerms: %w", err))
+	}
+	weightedAffinityTerms, err := fwk.GetWeightedAffinityTerms(pod, preferredAffinityTerms)
+	if err != nil {
+		parseErrs = append(parseErrs, fmt.Errorf("preferredAffinityTerms: %w", err))
+	}
+	weightedAntiAffinityTerms, err := fwk.GetWeightedAffinityTerms(pod, preferredAntiAffinityTerms)
+	if err != nil {
+		parseErrs = append(parseErrs, fmt.Errorf("preferredAntiAffinityTerms: %w", err))
+	}
+
+	pInfo.RequiredAffinityTerms = requiredAffinityTerms
+	pInfo.RequiredAntiAffinityTerms = requiredAntiAffinityTerms
+	pInfo.PreferredAffinityTerms = weightedAffinityTerms
+	pInfo.PreferredAntiAffinityTerms = weightedAntiAffinityTerms
+
+	return pInfo, utilerrors.NewAggregate(parseErrs)
 }
 
 // Resource is a collection of compute resource.
@@ -1047,13 +1119,14 @@ func (r *Resource) SetMaxResource(rl v1.ResourceList) {
 // the returned object.
 func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 	ni := &NodeInfo{
-		Requested:        &Resource{},
-		NonZeroRequested: &Resource{},
-		Allocatable:      &Resource{},
-		Generation:       nextGeneration(),
-		UsedPorts:        make(fwk.HostPortInfo),
-		ImageStates:      make(map[string]*fwk.ImageStateSummary),
-		PVCRefCounts:     make(map[string]int),
+		Requested:                     &Resource{},
+		NonZeroRequested:              &Resource{},
+		Allocatable:                   &Resource{},
+		Generation:                    nextGeneration(),
+		UsedPorts:                     make(fwk.HostPortInfo),
+		ImageStates:                   make(map[string]*fwk.ImageStateSummary),
+		PVCRefCounts:                  make(map[string]int),
+		NodeAllocatableDRAClaimStates: make(map[types.NamespacedName]*fwk.NodeAllocatableDRAClaimState),
 	}
 	for _, pod := range pods {
 		ni.AddPod(pod)

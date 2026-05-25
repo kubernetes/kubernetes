@@ -168,6 +168,7 @@ aliases:
   # - verult
   sig-scheduling-maintainers:
     - ahg-g
+    - ania-borowiec
     - dom4ha
     - Huang-Wei
     - kerthcet
@@ -188,6 +189,7 @@ aliases:
     - dom4ha
     - macsko
     - sanposhiho
+    - tosi3k
     - utam0k
     - kerthcet
   # emeritus:
@@ -281,6 +283,7 @@ aliases:
     - ffromani
     - tallclair
     - natasha41575
+    - ndixita
   sig-network-approvers:
     - aojea
     - bowei
@@ -337,6 +340,7 @@ aliases:
     - dgrisonnet
     - rexagod
     - richabanker
+    - pohly
   # sig-instrumentation-emeritus
   # - brancz
   # - DirectXMan12
@@ -351,6 +355,7 @@ aliases:
     - dgrisonnet
     - pohly
     - mengjiao-liu
+    - nmn3m
     - rexagod
     - richabanker
   api-approvers:
@@ -575,6 +580,7 @@ aliases:
     - mikezappa87 # Network
     - mrunalp # Node
     - msau42 # Storage
+    - pohly # Instrumentation
     - rexagod # Instrumentation
     - richabanker # Instrumentation
     - saad-ali # Storage

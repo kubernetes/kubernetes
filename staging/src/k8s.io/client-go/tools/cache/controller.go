@@ -452,9 +452,9 @@ type InformerOptions struct {
 	// If not set, metrics will not be published.
 	Identifier InformerNameAndResource
 
-	// FIFOMetricsProvider is the metrics provider for the FIFO queue.
+	// InformerMetricsProvider is the metrics provider for the informer.
 	// If not set, metrics will be no-ops.
-	FIFOMetricsProvider FIFOMetricsProvider
+	InformerMetricsProvider InformerMetricsProvider
 }
 
 // NewInformerWithOptions returns a Store and a controller for populating the store
@@ -464,9 +464,9 @@ type InformerOptions struct {
 func NewInformerWithOptions(options InformerOptions) (Store, Controller) {
 	var clientState Store
 	if options.Indexers == nil {
-		clientState = NewStore(DeletionHandlingMetaNamespaceKeyFunc)
+		clientState = NewStore(DeletionHandlingMetaNamespaceKeyFunc, WithStoreMetrics(options.Identifier, options.InformerMetricsProvider))
 	} else {
-		clientState = NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers)
+		clientState = NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers, WithStoreMetrics(options.Identifier, options.InformerMetricsProvider))
 	}
 	return clientState, newInformer(clientState, options, DeletionHandlingMetaNamespaceKeyFunc)
 }
@@ -814,7 +814,7 @@ func newInformer(clientState Store, options InformerOptions, keyFunc KeyFunc) Co
 	if options.Logger != nil {
 		logger = *options.Logger
 	}
-	logger, fifo := newQueueFIFO(logger, options.ObjectType, clientState, options.Transform, options.Identifier, options.FIFOMetricsProvider)
+	logger, fifo := newQueueFIFO(logger, options.ObjectType, clientState, options.Transform, options.Identifier, options.InformerMetricsProvider)
 
 	cfg := &Config{
 		Queue:            fifo,
@@ -844,7 +844,7 @@ func newInformer(clientState Store, options InformerOptions, keyFunc KeyFunc) Co
 // It returns the FIFO and the logger used by the FIFO.
 // That logger includes the name used for the FIFO,
 // in contrast to the logger which was passed in.
-func newQueueFIFO(logger klog.Logger, objectType any, clientState Store, transform TransformFunc, identifier InformerNameAndResource, metricsProvider FIFOMetricsProvider) (klog.Logger, Queue) {
+func newQueueFIFO(logger klog.Logger, objectType any, clientState Store, transform TransformFunc, identifier InformerNameAndResource, metricsProvider InformerMetricsProvider) (klog.Logger, Queue) {
 	if clientgofeaturegate.FeatureGates().Enabled(clientgofeaturegate.InOrderInformers) {
 		options := RealFIFOOptions{
 			Logger:          &logger,

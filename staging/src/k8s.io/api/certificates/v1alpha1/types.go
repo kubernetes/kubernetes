@@ -42,7 +42,7 @@ import (
 // anchors for that signer. Admission control is used to enforce that only users
 // with permissions on the signer can create or modify the corresponding bundle.
 type ClusterTrustBundle struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// metadata contains the object metadata.
 	// +optional
@@ -74,6 +74,8 @@ type ClusterTrustBundleSpec struct {
 	// using a `spec.signerName=NAME` field selector.
 	//
 	// +optional
+	// +k8s:alpha(since:"1.37")=+k8s:optional
+	// +k8s:alpha(since:"1.37")=+k8s:immutable
 	SignerName string `json:"signerName,omitempty" protobuf:"bytes,1,opt,name=signerName"`
 
 	// trustBundle contains the individual X.509 trust anchors for this
@@ -96,7 +98,7 @@ type ClusterTrustBundleSpec struct {
 
 // ClusterTrustBundleList is a collection of ClusterTrustBundle objects
 type ClusterTrustBundleList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// metadata contains the list metadata.
 	//

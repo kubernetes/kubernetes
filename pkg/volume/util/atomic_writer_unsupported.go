@@ -24,9 +24,10 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// chown changes the numeric uid and gid of the named file.
+// lchown changes the numeric uid and gid of the named file.
+// If the file is a symbolic link, it changes the uid and gid of the link itself.
 // This is a no-op on unsupported platforms.
-func (w *AtomicWriter) chown(name string, uid, _ /* gid */ int) error {
+func (w *AtomicWriter) lchown(name string, uid, _ /* gid */ int) error {
 	klog.Warningf("%s: skipping change of Linux owner %v for file %s; unsupported on %s", w.logContext, uid, name, runtime.GOOS)
 	return nil
 }

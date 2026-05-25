@@ -101,4 +101,8 @@ type DeviceHealth struct {
 	// Zero value means use the default timeout (DefaultHealthTimeout).
 	// This ensures backward compatibility with existing data.
 	HealthCheckTimeout time.Duration
+
+	// Message provides additional details about the device's health status.
+	// This field is optional and may be empty.
+	Message string
 }

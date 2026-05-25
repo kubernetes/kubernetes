@@ -35,12 +35,12 @@ import (
 
 // strategy implements behavior for ClusterTrustBundles.
 type strategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the create, update, and delete strategy for ClusterTrustBundles.
-var Strategy = strategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = strategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 var _ rest.RESTCreateStrategy = Strategy
 var _ rest.RESTUpdateStrategy = Strategy
@@ -85,7 +85,7 @@ func (strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []stri
 
 func (strategy) Canonicalize(obj runtime.Object) {}
 
-func (strategy) AllowCreateOnUpdate() bool {
+func (strategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -99,7 +99,7 @@ func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) [
 	return nil
 }
 
-func (strategy) AllowUnconditionalUpdate() bool {
+func (strategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 

@@ -314,7 +314,6 @@ func (c *AssumeCache) delete(obj interface{}) {
 // An update has both as non-nil.
 func (c *AssumeCache) pushEvent(oldObj, newObj interface{}) {
 	for _, handler := range c.eventHandlers {
-		handler := handler
 		if oldObj == nil {
 			c.eventQueue.WriteOne(func() {
 				handler.OnAdd(newObj, false)

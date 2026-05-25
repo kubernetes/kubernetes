@@ -97,7 +97,8 @@ func TestGetCgroupStats(t *testing.T) {
 	mockCadvisor.EXPECT().ContainerInfoV2(cgroupName, options).Return(containerInfoMap, nil)
 
 	provider := newStatsProvider(mockCadvisor, mockPodManager, fakeContainerStatsProvider{})
-	cs, ns, err := provider.GetCgroupStats(cgroupName, updateStats)
+	tCtx := ktesting.Init(t)
+	cs, ns, err := provider.GetCgroupStats(tCtx, cgroupName, updateStats)
 	assert.NoError(err)
 
 	checkCPUStats(t, "", containerInfoSeed, cs.CPU)

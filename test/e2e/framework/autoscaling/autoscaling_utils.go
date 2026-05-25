@@ -20,7 +20,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -43,14 +42,13 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	scaleclient "k8s.io/client-go/scale"
-	"k8s.io/client-go/tools/portforward"
-	"k8s.io/client-go/transport/spdy"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edebug "k8s.io/kubernetes/test/e2e/framework/debug"
 	e2eendpointslice "k8s.io/kubernetes/test/e2e/framework/endpointslice"
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -137,6 +135,8 @@ type ResourceConsumer struct {
 	requestSizeCustomMetric  int
 	sidecarStatus            SidecarStatusType
 	sidecarType              SidecarWorkloadType
+	cpuPerPod                chan int
+	stopCPUPerPod            chan int
 }
 
 // ExternalMetricsController provides methods to control the external metrics server at runtime
@@ -144,23 +144,14 @@ type ExternalMetricsController struct {
 	clientSet   clientset.Interface
 	serviceName string
 	namespace   string
-	httpClient  *http.Client
 }
 
 // NewExternalMetricsController creates a new controller for the external metrics server
 func NewExternalMetricsController(clientSet clientset.Interface, serviceName, namespace string) *ExternalMetricsController {
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	client := &http.Client{
-		Transport: tr,
-		Timeout:   30 * time.Second,
-	}
 	return &ExternalMetricsController{
 		clientSet:   clientSet,
 		serviceName: serviceName,
 		namespace:   namespace,
-		httpClient:  client,
 	}
 }
 
@@ -220,52 +211,18 @@ func (emc *ExternalMetricsController) doRequestWithPortForward(ctx context.Conte
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	transport, upgrader, err := spdy.RoundTripperFor(config)
-	if err != nil {
-		return fmt.Errorf("failed to create round tripper: %w", err)
+	// re-use NewTransport which supports both SPDY and WebSocket according to KEP-4006
+	transport := e2epod.NewTransport(emc.clientSet, config)
+	// the external metrics server uses a self-signed certificate.
+	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   30 * time.Second,
 	}
 
-	reqURL := emc.clientSet.CoreV1().RESTClient().Post().
-		Resource("pods").
-		Namespace(emc.namespace).
-		Name(podName).
-		SubResource("portforward").
-		URL()
-
-	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, http.MethodPost, reqURL)
-
-	stopChan := make(chan struct{})
-	readyChan := make(chan struct{})
-
-	fw, err := portforward.New(dialer, []string{"0:6443"}, stopChan, readyChan, io.Discard, io.Discard)
-	if err != nil {
-		return fmt.Errorf("failed to create port forwarder: %w", err)
-	}
-
-	errChan := make(chan error, 1)
-	go func() {
-		errChan <- fw.ForwardPorts()
-	}()
-
-	select {
-	case <-readyChan:
-		// Ready
-	case err := <-errChan:
-		return fmt.Errorf("port-forward failed: %w", err)
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-	defer close(stopChan)
-
-	// Get assigned local port
-	forwardedPorts, err := fw.GetPorts()
-	if err != nil {
-		return fmt.Errorf("failed to get forwarded ports: %w", err)
-	}
-	localPort := forwardedPorts[0].Local
-
-	// Build URL and make request
-	requestURL := fmt.Sprintf("https://localhost:%d/%s/%s", localPort, action, metricName)
+	// test/e2e/framework/pod/dial.go#ParseAddr expects
+	// <namespace>.<pod>:<port number> format as the URL
+	requestURL := fmt.Sprintf("https://%s.%s:%d/%s/%s", emc.namespace, podName, externalMetricsServerPort, action, metricName)
 	if len(params) > 0 {
 		requestURL += "?" + params.Encode()
 	}
@@ -277,12 +234,12 @@ func (emc *ExternalMetricsController) doRequestWithPortForward(ctx context.Conte
 		return err
 	}
 
-	resp, err := emc.httpClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		framework.Logf("ExternalMetrics %s failure: %v", action, err)
 		return err
 	}
-	defer resp.Body.Close() //nolint: errcheck
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
@@ -415,6 +372,8 @@ func NewResourceConsumer(ctx context.Context, name, nsName string, kind schema.G
 		stopCPU:                  make(chan int),
 		stopMem:                  make(chan int),
 		stopCustomMetric:         make(chan int),
+		cpuPerPod:                make(chan int),
+		stopCPUPerPod:            make(chan int),
 		consumptionTimeInSeconds: consumptionTimeInSeconds,
 		sleepTime:                time.Duration(consumptionTimeInSeconds) * time.Second,
 		requestSizeInMillicores:  requestSizeInMillicores,
@@ -430,6 +389,7 @@ func NewResourceConsumer(ctx context.Context, name, nsName string, kind schema.G
 	rc.ConsumeMem(initMemoryTotal)
 	go rc.makeConsumeCustomMetric(ctx)
 	rc.ConsumeCustomMetric(initCustomMetric)
+	go rc.makeConsumeCPUPerPodRequests(ctx)
 	return rc
 }
 
@@ -634,6 +594,117 @@ func (rc *ResourceConsumer) sendConsumeCustomMetric(ctx context.Context, delta i
 	framework.ExpectNoError(err)
 }
 
+/*
+ConsumeCPUPerPod sends CPU load directly to each consumer pod via the
+Kubernetes pod proxy API, bypassing kube-proxy's non-deterministic load
+balancing. millicoresTotal is divided evenly across all running pods,
+guaranteeing each pod receives an equal share regardless of cluster network config.
+*/
+func (rc *ResourceConsumer) ConsumeCPUPerPod(millicoresTotal int) {
+	framework.Logf("RC %s: consume %v millicores in total (evenly distributed per pod)", rc.name, millicoresTotal)
+	rc.cpuPerPod <- millicoresTotal
+}
+
+func (rc *ResourceConsumer) makeConsumeCPUPerPodRequests(ctx context.Context) {
+	defer ginkgo.GinkgoRecover()
+	rc.stopWaitGroup.Add(1)
+	defer rc.stopWaitGroup.Done()
+	tick := time.After(time.Duration(0))
+	millicoresTotal := 0
+	for {
+		select {
+		case millicoresTotal = <-rc.cpuPerPod:
+			if millicoresTotal != 0 {
+				framework.Logf("RC %s: setting per-pod CPU to %v millicores total", rc.name, millicoresTotal)
+			} else {
+				framework.Logf("RC %s: disabling per-pod CPU consumption", rc.name)
+			}
+		case <-tick:
+			if millicoresTotal != 0 {
+				framework.Logf("RC %s: sending per-pod CPU request: %d millicores total", rc.name, millicoresTotal)
+				rc.sendConsumeCPUPerPodRequest(ctx, millicoresTotal)
+			}
+			tick = time.After(rc.sleepTime)
+		case <-ctx.Done():
+			framework.Logf("RC %s: stopping per-pod CPU consumer: %v", rc.name, ctx.Err())
+			return
+		case <-rc.stopCPUPerPod:
+			framework.Logf("RC %s: stopping per-pod CPU consumer", rc.name)
+			return
+		}
+	}
+}
+
+// sendConsumeCPUPerPodRequest distributes CPU load evenly across all running
+// pods by sending requests directly via the Kubernetes pod proxy API. This
+// bypasses kube-proxy load balancing, guaranteeing each pod receives exactly
+// its share. Falls back to sendConsumeCPURequest if pod listing fails.
+func (rc *ResourceConsumer) sendConsumeCPUPerPodRequest(ctx context.Context, millicoresTotal int) {
+	pods, err := rc.clientSet.CoreV1().Pods(rc.nsName).List(ctx, metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("name=%s", rc.name),
+	})
+	if err != nil {
+		framework.Logf("ConsumeCPUPerPod: failed to list pods: %v, falling back to service proxy", err)
+		rc.sendConsumeCPURequest(ctx, millicoresTotal)
+		return
+	}
+
+	var readyPods []string
+	for i := range pods.Items {
+		if pods.Items[i].Status.Phase == v1.PodRunning {
+			readyPods = append(readyPods, pods.Items[i].Name)
+		}
+	}
+	if len(readyPods) == 0 {
+		framework.Logf("ConsumeCPUPerPod: no running pods, falling back to service proxy")
+		rc.sendConsumeCPURequest(ctx, millicoresTotal)
+		return
+	}
+
+	perPodMillicores := millicoresTotal / len(readyPods)
+	if perPodMillicores == 0 {
+		perPodMillicores = 1
+	}
+
+	framework.Logf("ConsumeCPUPerPod: distributing %d millicores across %d pods (%d per pod)",
+		millicoresTotal, len(readyPods), perPodMillicores)
+
+	var wg sync.WaitGroup
+	for _, podName := range readyPods {
+		wg.Add(1)
+		go func(name string) {
+			defer wg.Done()
+			// Pod proxy URL: /api/v1/namespaces/{ns}/pods/{podname}:{port}/proxy/{path}
+			// Both service and pod proxy support the name:port format. Without an explicit
+			// port the API server defaults to port 80, but resource-consumer listens on
+			// targetPort (8080), so the port must be specified.
+			err := framework.Gomega().Eventually(ctx, func(ctx context.Context) error {
+				_, podErr := rc.clientSet.CoreV1().RESTClient().Post().
+					Resource("pods").
+					Namespace(rc.nsName).
+					Name(fmt.Sprintf("%s:%d", name, targetPort)).
+					SubResource("proxy").
+					Suffix("ConsumeCPU").
+					Param("millicores", strconv.Itoa(perPodMillicores)).
+					Param("durationSec", strconv.Itoa(rc.consumptionTimeInSeconds)).
+					DoRaw(ctx)
+				if podErr != nil {
+					framework.Logf("ConsumeCPUPerPod: error sending to pod %s: %v", name, podErr)
+					return podErr
+				}
+				return nil
+			}).WithTimeout(serviceInitializationTimeout).WithPolling(serviceInitializationInterval).Should(gomega.Succeed())
+			if ctx.Err() != nil {
+				return
+			}
+			if err != nil {
+				framework.Logf("ConsumeCPUPerPod: giving up on pod %s: %v", name, err)
+			}
+		}(podName)
+	}
+	wg.Wait()
+}
+
 // GetReplicas get the replicas
 func (rc *ResourceConsumer) GetReplicas(ctx context.Context) (int, error) {
 	switch rc.kind {
@@ -719,6 +790,7 @@ func (rc *ResourceConsumer) Pause() {
 	rc.stopCPU <- 0
 	rc.stopMem <- 0
 	rc.stopCustomMetric <- 0
+	rc.stopCPUPerPod <- 0
 	rc.stopWaitGroup.Wait()
 }
 
@@ -728,6 +800,7 @@ func (rc *ResourceConsumer) Resume(ctx context.Context) {
 	go rc.makeConsumeCPURequests(ctx)
 	go rc.makeConsumeMemRequests(ctx)
 	go rc.makeConsumeCustomMetric(ctx)
+	go rc.makeConsumeCPUPerPodRequests(ctx)
 }
 
 // CleanUp clean up the background goroutines responsible for consuming resources.
@@ -736,6 +809,7 @@ func (rc *ResourceConsumer) CleanUp(ctx context.Context) {
 	close(rc.stopCPU)
 	close(rc.stopMem)
 	close(rc.stopCustomMetric)
+	close(rc.stopCPUPerPod)
 	rc.stopWaitGroup.Wait()
 	// Wait some time to ensure all child goroutines are finished.
 	time.Sleep(10 * time.Second)

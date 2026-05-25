@@ -178,6 +178,24 @@ type CSIDriverSpecApplyConfiguration struct {
 	//
 	// Default behavior if unset is to pass tokens in the VolumeContext field.
 	ServiceAccountTokenInSecrets *bool `json:"serviceAccountTokenInSecrets,omitempty"`
+	// PreventPodSchedulingIfMissing indicates that the CSI driver wants to prevent pod
+	// scheduling if the CSI driver on the node is missing.
+	//
+	// Enabling this option will prevent the scheduler (or any other
+	// component which embeds default scheduler such as cluster-autoscaler) from
+	// scheduling pods to nodes where CSI driver is not installed.
+	//
+	// For components(such as cluster-autoscaler) that embed the scheduler and run
+	// pod placement simulations using scheduler plugins, they MUST be aware of
+	// CSI driver registration information via CSINode object. They must create simulated
+	// CSINode objects in addition to Node objects during scheduling simulation, otherwise
+	// if PreventPodSchedulingIfMissing is enabled globally for CSIDriver object, any
+	// newly created node may be rejected by the scheduler because of missing CSI driver
+	// information from the node.
+	//
+	// This is an alpha feature and requires the VolumeLimitScaling feature gate to be enabled.
+	// Default is "false".
+	PreventPodSchedulingIfMissing *bool `json:"preventPodSchedulingIfMissing,omitempty"`
 }
 
 // CSIDriverSpecApplyConfiguration constructs a declarative configuration of the CSIDriverSpec type for use with
@@ -270,5 +288,13 @@ func (b *CSIDriverSpecApplyConfiguration) WithNodeAllocatableUpdatePeriodSeconds
 // If called multiple times, the ServiceAccountTokenInSecrets field is set to the value of the last call.
 func (b *CSIDriverSpecApplyConfiguration) WithServiceAccountTokenInSecrets(value bool) *CSIDriverSpecApplyConfiguration {
 	b.ServiceAccountTokenInSecrets = &value
+	return b
+}
+
+// WithPreventPodSchedulingIfMissing sets the PreventPodSchedulingIfMissing field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PreventPodSchedulingIfMissing field is set to the value of the last call.
+func (b *CSIDriverSpecApplyConfiguration) WithPreventPodSchedulingIfMissing(value bool) *CSIDriverSpecApplyConfiguration {
+	b.PreventPodSchedulingIfMissing = &value
 	return b
 }

@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	machineryutilnet "k8s.io/apimachinery/pkg/util/net"
-	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -92,7 +91,7 @@ func newStorageWithPods(t *testing.T, ipFamilies []api.IPFamily, pods []api.Pod,
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
 	if pods != nil && len(pods) > 0 {
-		ctx := genericapirequest.NewDefaultContext()
+		ctx := genericregistrytest.NewNamespaceScopeContext(podStorage.Pod.Store, metav1.NamespaceDefault)
 		for ix := range pods {
 			key, _ := podStorage.Pod.KeyFunc(ctx, pods[ix].Name)
 			if err := podStorage.Pod.Storage.Create(ctx, key, &pods[ix], nil, 0, false); err != nil {
@@ -110,7 +109,7 @@ func newStorageWithPods(t *testing.T, ipFamilies []api.IPFamily, pods []api.Pod,
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
 	if endpoints != nil && len(endpoints) > 0 {
-		ctx := genericapirequest.NewDefaultContext()
+		ctx := genericregistrytest.NewNamespaceScopeContext(endpointsStorage.Store, metav1.NamespaceDefault)
 		for ix := range endpoints {
 			key, _ := endpointsStorage.KeyFunc(ctx, endpoints[ix].Name)
 			if err := endpointsStorage.Store.Storage.Create(ctx, key, endpoints[ix], nil, 0, false); err != nil {
@@ -800,7 +799,7 @@ func helpTestCreateUpdateDeleteWithFamilies(t *testing.T, testCases []cudTestCas
 			name += "__@L" + tc.line
 		}
 		t.Run(name, func(t *testing.T) {
-			ctx := genericapirequest.NewDefaultContext()
+			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 
 			// Create the object as specified and check the results.
 			obj, err := storage.Create(ctx, tc.create.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -1399,7 +1398,7 @@ func TestCreateIgnoresIPsForExternalName(t *testing.T) {
 					itc.svc.Spec.Type = api.ServiceTypeExternalName
 					itc.svc.Spec.ExternalName = "example.com"
 
-					ctx := genericapirequest.NewDefaultContext()
+					ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 					createdObj, err := storage.Create(ctx, itc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 					if itc.expectError && err != nil {
 						return
@@ -1482,7 +1481,7 @@ func TestCreateInitClusterIPsFromClusterIP(t *testing.T) {
 			defer server.Terminate(t)
 			defer storage.Store.DestroyFunc()
 
-			ctx := genericapirequest.NewDefaultContext()
+			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error creating service: %v", err)
@@ -5941,7 +5940,7 @@ func TestCreateInitIPFields(t *testing.T) {
 
 			for _, itc := range otc.cases {
 				t.Run(itc.name+"__@L"+itc.line, func(t *testing.T) {
-					ctx := genericapirequest.NewDefaultContext()
+					ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 					createdObj, err := storage.Create(ctx, itc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 					if itc.expectError && err != nil {
 						return
@@ -6091,7 +6090,7 @@ func TestCreateInvalidClusterIPInputs(t *testing.T) {
 			defer server.Terminate(t)
 			defer storage.Store.DestroyFunc()
 
-			ctx := genericapirequest.NewDefaultContext()
+			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 			_, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 			if err == nil {
 				t.Fatalf("unexpected success creating service")
@@ -6130,7 +6129,7 @@ func TestCreateDeleteReuse(t *testing.T) {
 			defer server.Terminate(t)
 			defer storage.Store.DestroyFunc()
 
-			ctx := genericapirequest.NewDefaultContext()
+			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 
 			// Create it
 			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -6385,7 +6384,7 @@ func TestCreateInitNodePorts(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := genericapirequest.NewDefaultContext()
+			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 			if tc.expectError && err != nil {
 				return
@@ -6499,7 +6498,7 @@ func TestCreateSkipsAllocationsForHeadless(t *testing.T) {
 			// This test is ONLY headless services.
 			tc.svc.Spec.ClusterIP = api.ClusterIPNone
 
-			ctx := genericapirequest.NewDefaultContext()
+			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 			if tc.expectError && err != nil {
 				return
@@ -6568,7 +6567,7 @@ func TestCreateDryRun(t *testing.T) {
 			defer server.Terminate(t)
 			defer storage.Store.DestroyFunc()
 
-			ctx := genericapirequest.NewDefaultContext()
+			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{DryRun: []string{metav1.DryRunAll}})
 			if err != nil {
 				t.Fatalf("unexpected error creating service: %v", err)
@@ -6608,7 +6607,7 @@ func TestDeleteWithFinalizer(t *testing.T) {
 			s.Finalizers = []string{"example.com/test"}
 		})
 
-	ctx := genericapirequest.NewDefaultContext()
+	ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 
 	// Create it with finalizer.
 	obj, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
@@ -6696,7 +6695,7 @@ func TestDeleteDryRun(t *testing.T) {
 			defer server.Terminate(t)
 			defer storage.Store.DestroyFunc()
 
-			ctx := genericapirequest.NewDefaultContext()
+			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 			createdObj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error creating service: %v", err)
@@ -6793,7 +6792,7 @@ func TestUpdateDryRun(t *testing.T) {
 			defer server.Terminate(t)
 			defer storage.Store.DestroyFunc()
 
-			ctx := genericapirequest.NewDefaultContext()
+			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 			obj, err := storage.Create(ctx, tc.svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("unexpected error creating service: %v", err)
@@ -11650,7 +11649,7 @@ func TestServiceRegistryResourceLocation(t *testing.T) {
 	defer server.Terminate(t)
 	defer storage.Store.DestroyFunc()
 
-	ctx := genericapirequest.NewDefaultContext()
+	ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 	for _, name := range []string{"unnamed", "unnamed2", "no-endpoints"} {
 		_, err := storage.Create(ctx,
 			svctest.MakeService(name,
@@ -11840,7 +11839,7 @@ func TestUpdateServiceLoadBalancerStatus(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 
 			svc := svctest.MakeService("foo", svctest.SetTypeLoadBalancer)
-			ctx := genericapirequest.NewDefaultContext()
+			ctx := genericregistrytest.NewNamespaceScopeContext(storage.Store, metav1.NamespaceDefault)
 			obj, err := storage.Create(ctx, svc, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("created svc: %s", err)

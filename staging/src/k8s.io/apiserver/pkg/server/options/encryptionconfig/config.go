@@ -282,8 +282,6 @@ func getTransformerOverridesAndKMSPluginProbes(ctx context.Context, config *apis
 
 	// For each entry in the configuration
 	for _, resourceConfig := range config.Resources {
-		resourceConfig := resourceConfig
-
 		transformers, p, used, err := prefixTransformersAndProbes(ctx, resourceConfig, apiServerID)
 		if err != nil {
 			return nil, nil, nil, err
@@ -292,7 +290,6 @@ func getTransformerOverridesAndKMSPluginProbes(ctx context.Context, config *apis
 
 		// For each resource, create a list of providers to use
 		for _, resource := range resourceConfig.Resources {
-			resource := resource
 			gr := schema.ParseGroupResource(resource)
 
 			// check if resource is masked by *.group rule
@@ -317,8 +314,6 @@ func getTransformerOverridesAndKMSPluginProbes(ctx context.Context, config *apis
 
 	transformers := make(map[schema.GroupResource]storagevalue.Transformer, len(resourceToPrefixTransformer))
 	for gr, transList := range resourceToPrefixTransformer {
-		gr := gr
-		transList := transList
 		transformers[gr] = storagevalue.NewPrefixTransformers(fmt.Errorf("no matching prefix found"), transList...)
 	}
 
@@ -567,7 +562,6 @@ func prefixTransformersAndProbes(ctx context.Context, config apiserver.ResourceC
 	var kmsUsed kmsState
 
 	for _, provider := range config.Providers {
-		provider := provider
 		var (
 			transformer    storagevalue.PrefixTransformer
 			transformerErr error
@@ -624,7 +618,6 @@ func aesPrefixTransformer(config *apiserver.AESConfiguration, fn blockTransforme
 		return result, fmt.Errorf("aes provider has no valid keys")
 	}
 	for _, key := range config.Keys {
-		key := key
 		if key.Name == "" {
 			return result, fmt.Errorf("key with invalid name provided")
 		}
@@ -636,7 +629,6 @@ func aesPrefixTransformer(config *apiserver.AESConfiguration, fn blockTransforme
 	keyTransformers := []storagevalue.PrefixTransformer{}
 
 	for _, keyData := range config.Keys {
-		keyData := keyData
 		key, err := base64.StdEncoding.DecodeString(keyData.Secret)
 		if err != nil {
 			return result, fmt.Errorf("could not obtain secret for named key %s: %w", keyData.Name, err)
@@ -677,7 +669,6 @@ func secretboxPrefixTransformer(config *apiserver.SecretboxConfiguration) (stora
 		return result, fmt.Errorf("secretbox provider has no valid keys")
 	}
 	for _, key := range config.Keys {
-		key := key
 		if key.Name == "" {
 			return result, fmt.Errorf("key with invalid name provided")
 		}
@@ -689,7 +680,6 @@ func secretboxPrefixTransformer(config *apiserver.SecretboxConfiguration) (stora
 	keyTransformers := []storagevalue.PrefixTransformer{}
 
 	for _, keyData := range config.Keys {
-		keyData := keyData
 		key, err := base64.StdEncoding.DecodeString(keyData.Secret)
 		if err != nil {
 			return result, fmt.Errorf("could not obtain secret for named key %s: %s", keyData.Name, err)

@@ -27,6 +27,7 @@ import (
 type kvServer struct {
 	hdr header
 	kv  etcdserver.RaftKV
+	aa  *AuthAdmin
 	// maxTxnOps is the max operations per txn.
 	// e.g suppose maxTxnOps = 128.
 	// Txn.Success can have at most 128 operations,
@@ -35,7 +36,7 @@ type kvServer struct {
 }
 
 func NewKVServer(s *etcdserver.EtcdServer) pb.KVServer {
-	return &kvServer{hdr: newHeader(s), kv: s, maxTxnOps: s.Cfg.MaxTxnOps}
+	return &kvServer{hdr: newHeader(s), kv: s, aa: &AuthAdmin{s}, maxTxnOps: s.Cfg.MaxTxnOps}
 }
 
 func (s *kvServer) Range(ctx context.Context, r *pb.RangeRequest) (*pb.RangeResponse, error) {
@@ -102,6 +103,10 @@ func (s *kvServer) Txn(ctx context.Context, r *pb.TxnRequest) (*pb.TxnResponse, 
 }
 
 func (s *kvServer) Compact(ctx context.Context, r *pb.CompactionRequest) (*pb.CompactionResponse, error) {
+	if err := s.aa.isPermitted(ctx); err != nil {
+		return nil, togRPCError(err)
+	}
+
 	resp, err := s.kv.Compact(ctx, r)
 	if err != nil {
 		return nil, togRPCError(err)

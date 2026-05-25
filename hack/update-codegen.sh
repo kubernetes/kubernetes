@@ -202,7 +202,7 @@ function codegen::deepcopy() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
-        --bounding-dirs "k8s.io/kubernetes,k8s.io/api" \
+        --lint-rules=known-tags-only,require-explicit-disablement \
         "${tag_pkgs[@]}" \
         "$@"
 
@@ -326,6 +326,7 @@ function codegen::prerelease() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
+        --lint-rules=known-tags-only,require-explicit-disablement \
         "${tag_pkgs[@]}" \
         "$@"
 
@@ -390,6 +391,7 @@ function codegen::defaults() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
+        --lint-rules=known-tags-only,require-explicit-disablement \
         "${tag_pkgs[@]}" \
         "$@"
 
@@ -418,8 +420,11 @@ function codegen::validation() {
         k8s.io/code-generator/cmd/validation-gen
 
     # TODO: Where do we want these output?  It should be somewhere internal..
-    # The result file, in each pkg, of validation generation.
-    local output_file="${GENERATED_FILE_PREFIX}validations.go"
+    # All files emitted by validation-gen (the per-pkg validations file and the
+    # per-Kind coverage test fixtures under test/declarative_validation/) share
+    # this prefix so the cleanup below can glob-remove them in one pass.
+    local output_file_prefix="${GENERATED_FILE_PREFIX}validations."
+    local output_file="${output_file_prefix}go"
 
     # All directories that request any form of validation generation.
     if [[ "${DBG_CODEGEN}" == 1 ]]; then
@@ -460,12 +465,16 @@ function codegen::validation() {
         done
     fi
 
-    git_find -z ':(glob)**'/"${output_file}" | xargs -0 rm -f
+    git_find -z ':(glob)**'/"${output_file_prefix}"'*' | xargs -0 rm -f
 
     validation-gen \
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
+        --test-output-root "test/declarative_validation" \
+        --test-output-file-prefix "${output_file_prefix}" \
+        --test-allowlist "test/declarative_validation/coverage-allowlist.yaml" \
+        --lint-rules=known-tags-only,require-explicit-disablement \
         $(printf -- " --readonly-pkg %s" "${readonly_pkgs[@]}") \
         "${tag_pkgs[@]}" \
         "$@"
@@ -542,6 +551,7 @@ function codegen::conversions() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
+        --lint-rules=known-tags-only,require-explicit-disablement \
         $(printf -- " --extra-peer-dirs %s" "${extra_peer_pkgs[@]}") \
         "${tag_pkgs[@]}" \
         "$@"
@@ -597,6 +607,7 @@ function codegen::register() {
         -v "${KUBE_VERBOSE}" \
         --go-header-file "${BOILERPLATE_FILENAME}" \
         --output-file "${output_file}" \
+        --lint-rules=known-tags-only,require-explicit-disablement \
         "${tag_pkgs[@]}" \
         "$@"
 
@@ -929,6 +940,7 @@ function codegen::protobindings() {
         "staging/src/k8s.io/kubelet/pkg/apis/dra"
         "staging/src/k8s.io/kubelet/pkg/apis/deviceplugin"
         "staging/src/k8s.io/kubelet/pkg/apis/podresources"
+        "staging/src/k8s.io/kubelet/pkg/apis/pods"
         "staging/src/k8s.io/kms/apis"
         "staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/kmsv2"
         "staging/src/k8s.io/kubelet/pkg/apis/pluginregistration"

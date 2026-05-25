@@ -40,10 +40,9 @@ import (
 
 // VolumeZone is a plugin that checks volume zone.
 type VolumeZone struct {
-	pvLister                  corelisters.PersistentVolumeLister
-	pvcLister                 corelisters.PersistentVolumeClaimLister
-	scLister                  storagelisters.StorageClassLister
-	enableSchedulingQueueHint bool
+	pvLister  corelisters.PersistentVolumeLister
+	pvcLister corelisters.PersistentVolumeClaimLister
+	scLister  storagelisters.StorageClassLister
 }
 
 var _ fwk.FilterPlugin = &VolumeZone{}
@@ -270,22 +269,12 @@ func getErrorAsStatus(err error) *fwk.Status {
 // EventsToRegister returns the possible events that may make a Pod
 // failed by this plugin schedulable.
 func (pl *VolumeZone) EventsToRegister(_ context.Context) ([]fwk.ClusterEventWithHint, error) {
-	// A new node or updating a node's volume zone labels may make a pod schedulable.
-	// A note about UpdateNodeTaint event:
-	// Ideally, it's supposed to register only Add | UpdateNodeLabel because UpdateNodeTaint will never change the result from this plugin.
-	// But, we may miss Node/Add event due to preCheck, and we decided to register UpdateNodeTaint | UpdateNodeLabel for all plugins registering Node/Add.
-	// See: https://github.com/kubernetes/kubernetes/issues/109437
-	nodeActionType := fwk.Add | fwk.UpdateNodeLabel | fwk.UpdateNodeTaint
-	if pl.enableSchedulingQueueHint {
-		// preCheck is not used when QHint is enabled.
-		nodeActionType = fwk.Add | fwk.UpdateNodeLabel
-	}
-
 	return []fwk.ClusterEventWithHint{
 		// New storageClass with bind mode `VolumeBindingWaitForFirstConsumer` will make a pod schedulable.
 		// Due to immutable field `storageClass.volumeBindingMode`, storageClass update events are ignored.
 		{Event: fwk.ClusterEvent{Resource: fwk.StorageClass, ActionType: fwk.Add}, QueueingHintFn: pl.isSchedulableAfterStorageClassAdded},
-		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: nodeActionType}},
+		// A new node or updating a node's volume zone labels may make a pod schedulable.
+		{Event: fwk.ClusterEvent{Resource: fwk.Node, ActionType: fwk.Add | fwk.UpdateNodeLabel}},
 		// A new pvc may make a pod schedulable.
 		// Also, if pvc's VolumeName is filled, that also could make a pod schedulable.
 		{Event: fwk.ClusterEvent{Resource: fwk.PersistentVolumeClaim, ActionType: fwk.Add | fwk.Update}, QueueingHintFn: pl.isSchedulableAfterPersistentVolumeClaimChange},
@@ -410,9 +399,8 @@ func New(_ context.Context, _ runtime.Object, handle fwk.Handle, fts feature.Fea
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
 	return &VolumeZone{
-		pvLister:                  pvLister,
-		pvcLister:                 pvcLister,
-		scLister:                  scLister,
-		enableSchedulingQueueHint: fts.EnableSchedulingQueueHint,
+		pvLister:  pvLister,
+		pvcLister: pvcLister,
+		scLister:  scLister,
 	}, nil
 }

@@ -250,9 +250,9 @@ func SetObjectMeta(objectMeta metav1.ObjectMeta) Tweak {
 	}
 }
 
-func SetWorkloadRef(workloadRef *api.WorkloadReference) Tweak {
+func SetSchedulingGroup(schedulingGroup *api.PodSchedulingGroup) Tweak {
 	return func(pod *api.Pod) {
-		pod.Spec.WorkloadRef = workloadRef
+		pod.Spec.SchedulingGroup = schedulingGroup
 	}
 }
 
@@ -320,6 +320,12 @@ func SetContainerSecurityContext(ctx api.SecurityContext) TweakContainer {
 func SetContainerRestartPolicy(policy api.ContainerRestartPolicy) TweakContainer {
 	return func(cnr *api.Container) {
 		cnr.RestartPolicy = &policy
+	}
+}
+
+func SetContainerRestartPolicyRules(rules ...api.ContainerRestartRule) TweakContainer {
+	return func(cnr *api.Container) {
+		cnr.RestartPolicyRules = rules
 	}
 }
 

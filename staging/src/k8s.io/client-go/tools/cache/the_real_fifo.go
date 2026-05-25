@@ -72,7 +72,7 @@ type RealFIFOOptions struct {
 	Identifier InformerNameAndResource
 
 	// MetricsProvider is used to create metrics for the FIFO.
-	MetricsProvider FIFOMetricsProvider
+	MetricsProvider InformerMetricsProvider
 
 	// EmitDeltaTypeBookmark is used to specify whether the RealFIFO will emit
 	// bookmark deltas or not. This can only be set if AtomicEvents is true.

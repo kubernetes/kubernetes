@@ -90,7 +90,7 @@ func isCgroupv2Node(f *framework.Framework, ctx context.Context) bool {
 		framework.ExpectNoError(delErr, "failed to delete pod %s", delErr)
 	}()
 
-	return cgroups.IsPodOnCgroupv2Node(f, pod)
+	return cgroups.IsPodOnCgroupv2Node(f, pod.Name, pod.Spec.Containers[0].Name)
 }
 
 func makeObjectMetadata(name, namespace string) metav1.ObjectMeta {
@@ -440,7 +440,7 @@ func podLevelResourcesTests(f *framework.Framework) {
 			framework.ExpectNoError(err, "failed to verify pod's cgroup values: %v", err)
 
 			ginkgo.By("verifying containers cgroup limits are same as pod container's cgroup limits")
-			err = verifyContainersCgroupLimits(f, pod)
+			err = verifyContainersCgroupLimits(ctx, f, pod)
 			framework.ExpectNoError(err, "failed to verify containers cgroup values: %v", err)
 
 			ginkgo.By("deleting pods")
@@ -450,12 +450,12 @@ func podLevelResourcesTests(f *framework.Framework) {
 	}
 }
 
-func verifyContainersCgroupLimits(f *framework.Framework, pod *v1.Pod) error {
+func verifyContainersCgroupLimits(ctx context.Context, f *framework.Framework, pod *v1.Pod) error {
 	var errs []error
 	for _, container := range pod.Spec.Containers {
 		if pod.Spec.Resources != nil && pod.Spec.Resources.Limits.Memory() != nil &&
 			container.Resources.Limits.Memory() == nil {
-			err := cgroups.VerifyContainerMemoryLimit(f, pod, container.Name, &container.Resources, true)
+			err := cgroups.VerifyContainerMemoryLimit(ctx, f, pod, container.Name, &container.Resources, true)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("failed to verify memory limit cgroup value: %w", err))
 			}
@@ -463,7 +463,7 @@ func verifyContainersCgroupLimits(f *framework.Framework, pod *v1.Pod) error {
 
 		if pod.Spec.Resources != nil && pod.Spec.Resources.Limits.Cpu() != nil &&
 			container.Resources.Limits.Cpu() == nil {
-			err := cgroups.VerifyContainerCPULimit(f, pod, container.Name, &container.Resources, true)
+			err := cgroups.VerifyContainerCPULimit(ctx, f, pod, container.Name, &container.Resources, true)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("failed to verify cpu limit cgroup value: %w", err))
 			}

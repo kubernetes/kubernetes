@@ -426,7 +426,7 @@ func TestPolicyAdmission(t *testing.T) {
 }
 
 func testPolicyAdmission(t *testing.T, supportV1Beta1 bool) {
-	_, ctx := ktesting.NewTestContext(t)
+	tCtx := ktesting.Init(t)
 	supportedVersions := []string{}
 	if supportV1Beta1 {
 		supportedVersions = append(supportedVersions, "v1beta1")
@@ -466,7 +466,7 @@ func testPolicyAdmission(t *testing.T, supportV1Beta1 bool) {
 	// create CRDs
 	etcd.CreateTestCRDs(t, apiextensionsclientset.NewForConfigOrDie(server.ClientConfig), false, etcd.GetCustomResourceDefinitionData()...)
 
-	if _, err := client.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}, metav1.CreateOptions{}); err != nil {
+	if _, err := client.CoreV1().Namespaces().Create(tCtx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -563,11 +563,11 @@ func testPolicyAdmission(t *testing.T, supportV1Beta1 bool) {
 	}
 
 	if supportV1Beta1 {
-		if err := createV1beta1ValidatingPolicyAndBinding(ctx, client, convertedV1beta1Rules); err != nil {
+		if err := createV1beta1ValidatingPolicyAndBinding(tCtx, client, convertedV1beta1Rules); err != nil {
 			t.Fatal(err)
 		}
 	} else {
-		if err := createV1ValidatingPolicyAndBinding(ctx, client, convertedV1Rules); err != nil {
+		if err := createV1ValidatingPolicyAndBinding(tCtx, client, convertedV1Rules); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -577,13 +577,13 @@ func testPolicyAdmission(t *testing.T, supportV1Beta1 bool) {
 			Name: "test-k8s",
 		},
 	}
-	_, err = client.CoreV1().ConfigMaps(testNamespace).Create(ctx, &testConfigmap, metav1.CreateOptions{})
+	_, err = client.CoreV1().ConfigMaps(testNamespace).Create(tCtx, &testConfigmap, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Try to patch the configmap and look for the warning message.
-	if err := wait.PollUntilContextTimeout(ctx, time.Millisecond*100, time.Second*5, false, func(ctx context.Context) (bool, error) {
+	if err := wait.PollUntilContextTimeout(tCtx, time.Millisecond*100, time.Second*5, false, func(ctx context.Context) (bool, error) {
 		holder.reset(t)
 		_, err = client.CoreV1().ConfigMaps(testNamespace).Patch(ctx, testConfigmap.Name, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
 		if err != nil {
@@ -599,7 +599,7 @@ func testPolicyAdmission(t *testing.T, supportV1Beta1 bool) {
 		t.Errorf("timed out waiting policy and binding to establish: %v", err)
 	}
 
-	err = client.CoreV1().ConfigMaps(testNamespace).Delete(ctx, testConfigmap.Name, metav1.DeleteOptions{})
+	err = client.CoreV1().ConfigMaps(testNamespace).Delete(tCtx, testConfigmap.Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Errorf("failed to delete ConfigMap with error: %+v", err)
 	}

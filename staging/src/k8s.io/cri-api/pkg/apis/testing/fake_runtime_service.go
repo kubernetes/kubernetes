@@ -810,7 +810,7 @@ func (r *FakeRuntimeService) UpdatePodSandboxResources(context.Context, *runtime
 }
 
 // Close will shutdown the internal gRPC client connection.
-func (r *FakeRuntimeService) Close() error {
+func (r *FakeRuntimeService) Close(_ context.Context) error {
 	r.Lock()
 	defer r.Unlock()
 

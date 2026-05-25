@@ -42,7 +42,7 @@ const (
 
 // KubeSchedulerConfiguration configures a scheduler
 type KubeSchedulerConfiguration struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Parallelism defines the amount of parallelism in algorithms for scheduling a Pods. Must be greater than 0. Defaults to 16
 	Parallelism *int32 `json:"parallelism,omitempty"`
@@ -56,7 +56,7 @@ type KubeSchedulerConfiguration struct {
 
 	// DebuggingConfiguration holds configuration for Debugging related features
 	// TODO: We might wanna make this a substruct like Debugging componentbaseconfigv1alpha1.DebuggingConfiguration
-	componentbaseconfigv1alpha1.DebuggingConfiguration `json:",inline"`
+	componentbaseconfigv1alpha1.DebuggingConfiguration `json:""`
 
 	// PercentageOfNodesToScore is the percentage of all nodes that once found feasible
 	// for running a pod, the scheduler stops its search for more feasible nodes in
@@ -232,6 +232,12 @@ type Plugins struct {
 	// including `multiPoint.Disabled = '*'` and `multiPoint.Enabled = pluginA` will still register that specific
 	// plugin through MultiPoint. This follows the same behavior as all other extension point configurations.
 	MultiPoint PluginSet `json:"multiPoint,omitempty"`
+
+	// PlacementGenerate is a list of plugins that should be invoked during pod group scheduling cycle when determining placements for a pod group.
+	PlacementGenerate PluginSet `json:"placementGenerate,omitempty"`
+
+	// PlacementScore is a list of plugins that should be invoked during workload scheduling cycle when ranking pod group assignments.
+	PlacementScore PluginSet `json:"placementScore,omitempty"`
 }
 
 // PluginSet specifies enabled and disabled plugins for an extension point.
@@ -250,11 +256,11 @@ type PluginSet struct {
 	Disabled []Plugin `json:"disabled,omitempty"`
 }
 
-// Plugin specifies a plugin name and its weight when applicable. Weight is used only for Score plugins.
+// Plugin specifies a plugin name and its weight when applicable. Weight is used only for Score and PlacementScore plugins.
 type Plugin struct {
 	// Name defines the name of plugin
 	Name string `json:"name"`
-	// Weight defines the weight of plugin, only used for Score plugins.
+	// Weight defines the weight of plugin, only used for Score and PlacementScore plugins.
 	Weight *int32 `json:"weight,omitempty"`
 }
 
@@ -401,7 +407,7 @@ type ExtenderTLSConfig struct {
 
 // DynamicResourcesArgs holds arguments used to configure the DynamicResources plugin.
 type DynamicResourcesArgs struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// FilterTimeout limits the amount of time that the filter operation may
 	// take per node to search for devices that can be allocated to scheduler

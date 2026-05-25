@@ -663,6 +663,61 @@ func TestPlaintext(t *testing.T) {
 			},
 		},
 		{
+			// Shows that fieldDetail renders externalDocs after description
+			Name:        "FieldExternalDocs",
+			Subtemplate: "fieldDetail",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type":        "object",
+					"description": "parent description",
+					"properties": map[string]any{
+						"thefield": map[string]any{
+							"type":        "string",
+							"description": "a description that should be printed",
+							"externalDocs": map[string]any{
+								"description": "Find more info here",
+								"url":         "https://example.com/docs",
+							},
+						},
+					},
+				},
+				"name":  "thefield",
+				"short": false,
+			},
+			Checks: []check{
+				checkContains("a description that should be printed"),
+				checkContains("EXTERNAL DOCS:"),
+				checkContains("Find more info here"),
+				checkContains("URL: https://example.com/docs"),
+			},
+		},
+		{
+			// Shows that fieldDetail does not render externalDocs in short mode
+			Name:        "FieldExternalDocsShort",
+			Subtemplate: "fieldDetail",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type":        "object",
+					"description": "parent description",
+					"properties": map[string]any{
+						"thefield": map[string]any{
+							"type":        "string",
+							"description": "a description",
+							"externalDocs": map[string]any{
+								"description": "Find more info here",
+								"url":         "https://example.com/docs",
+							},
+						},
+					},
+				},
+				"name":  "thefield",
+				"short": true,
+			},
+			Checks: []check{
+				checkEquals("thefield\t<string>\n"),
+			},
+		},
+		{
 			// show that extractEnum can skip empty enum slice
 			Name:        "extractEmptyEnum",
 			Subtemplate: "extractEnum",
@@ -760,6 +815,176 @@ func TestPlaintext(t *testing.T) {
 			},
 			Checks: []check{
 				checkEquals("ENUM:\n    Block\n    File\n    \"\""),
+			},
+		},
+		{
+			// Shows that externalDocs renders both description and URL
+			Name:        "ExternalDocsDescriptionAndURL",
+			Subtemplate: "externalDocs",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"externalDocs": map[string]any{
+						"description": "Find more info here",
+						"url":         "https://example.com/docs",
+					},
+				},
+			},
+			Checks: []check{
+				checkContains("EXTERNAL DOCS:"),
+				checkContains("Find more info here"),
+				checkContains("URL: https://example.com/docs"),
+			},
+		},
+		{
+			// Shows that externalDocs renders URL when description is absent
+			Name:        "ExternalDocsURLOnly",
+			Subtemplate: "externalDocs",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"externalDocs": map[string]any{
+						"url": "https://example.com/docs",
+					},
+				},
+			},
+			Checks: []check{
+				checkContains("EXTERNAL DOCS:"),
+				checkContains("URL: https://example.com/docs"),
+			},
+		},
+		{
+			// Shows that externalDocs renders nothing when absent
+			Name:        "ExternalDocsAbsent",
+			Subtemplate: "externalDocs",
+			Context: map[string]any{
+				"schema": map[string]any{
+					"type": "object",
+				},
+			},
+			Checks: []check{
+				checkEquals(""),
+			},
+		},
+		{
+			// Integration test: shows that externalDocs appears in full output
+			Name: "SchemaWithExternalDocs",
+			Context: v2.TemplateContext{
+				Document: map[string]any{
+					"paths": map[string]any{
+						"/apis/example.com/v1/widgets": map[string]any{
+							"get": map[string]any{
+								"x-kubernetes-group-version-kind": map[string]any{
+									"group":   "example.com",
+									"version": "v1",
+									"kind":    "Widget",
+								},
+							},
+						},
+					},
+					"components": map[string]any{
+						"schemas": map[string]any{
+							"com.example.v1.Widget": map[string]any{
+								"type":        "object",
+								"description": "A widget is a thing.",
+								"x-kubernetes-group-version-kind": []map[string]any{
+									{
+										"group":   "example.com",
+										"version": "v1",
+										"kind":    "Widget",
+									},
+								},
+								"externalDocs": map[string]any{
+									"description": "Find more info here",
+									"url":         "https://example.com/docs/widgets",
+								},
+								"properties": map[string]any{
+									"apiVersion": map[string]any{
+										"type": "string",
+									},
+									"kind": map[string]any{
+										"type": "string",
+									},
+								},
+							},
+						},
+					},
+				},
+				GVR: schema.GroupVersionResource{
+					Group:    "example.com",
+					Version:  "v1",
+					Resource: "widgets",
+				},
+				FieldPath: nil,
+				Recursive: false,
+			},
+			Checks: []check{
+				checkContains("DESCRIPTION:"),
+				checkContains("A widget is a thing."),
+				checkContains("EXTERNAL DOCS:"),
+				checkContains("Find more info here"),
+				checkContains("URL: https://example.com/docs/widgets"),
+			},
+		},
+		{
+			// Integration test: shows that externalDocs on a child field appears in field list
+			Name: "SchemaWithFieldExternalDocs",
+			Context: v2.TemplateContext{
+				Document: map[string]any{
+					"paths": map[string]any{
+						"/apis/example.com/v1/widgets": map[string]any{
+							"get": map[string]any{
+								"x-kubernetes-group-version-kind": map[string]any{
+									"group":   "example.com",
+									"version": "v1",
+									"kind":    "Widget",
+								},
+							},
+						},
+					},
+					"components": map[string]any{
+						"schemas": map[string]any{
+							"com.example.v1.Widget": map[string]any{
+								"type":        "object",
+								"description": "A widget is a thing.",
+								"x-kubernetes-group-version-kind": []map[string]any{
+									{
+										"group":   "example.com",
+										"version": "v1",
+										"kind":    "Widget",
+									},
+								},
+								"properties": map[string]any{
+									"name": map[string]any{
+										"type":        "string",
+										"description": "name of the widget",
+										"externalDocs": map[string]any{
+											"description": "Widget naming conventions",
+											"url":         "https://example.com/docs/naming",
+										},
+									},
+									"size": map[string]any{
+										"type":        "integer",
+										"description": "size of the widget",
+									},
+								},
+							},
+						},
+					},
+				},
+				GVR: schema.GroupVersionResource{
+					Group:    "example.com",
+					Version:  "v1",
+					Resource: "widgets",
+				},
+				FieldPath: nil,
+				Recursive: false,
+			},
+			Checks: []check{
+				checkContains("FIELDS:"),
+				checkContains("name of the widget"),
+				checkContains("EXTERNAL DOCS:"),
+				checkContains("Widget naming conventions"),
+				checkContains("URL: https://example.com/docs/naming"),
+				checkContains("size of the widget"),
 			},
 		},
 	}

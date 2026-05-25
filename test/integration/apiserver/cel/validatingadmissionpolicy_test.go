@@ -509,7 +509,7 @@ func Test_ValidateAnnotationsAndWarnings(t *testing.T) {
 			checkExpectedError(t, err, testcase.err)
 			checkFailureReason(t, err, testcase.failureReason)
 			checkExpectedWarnings(t, warnHandler, testcase.warnings)
-			checkAuditEvents(t, logFile, expectedAuditEvents(testcase.auditAnnotations, ns, code), auditAnnotationFilter)
+			checkAuditEvents(t, logFile, expectedAuditEvents(testcase.auditAnnotations, ns, testcase.err, code), auditAnnotationFilter)
 		})
 	}
 }
@@ -3412,23 +3412,25 @@ func (w *warningHandler) HandleWarningHeader(code int, _ string, message string)
 	w.warnings.Insert(message)
 }
 
-func expectedAuditEvents(auditAnnotations map[string]string, ns string, code int32) []utils.AuditEvent {
+func expectedAuditEvents(auditAnnotations map[string]string, ns, msg string, code int32) []utils.AuditEvent {
 	return []utils.AuditEvent{
 		{
-			Level:                  auditinternal.LevelRequest,
-			Stage:                  auditinternal.StageResponseComplete,
-			RequestURI:             fmt.Sprintf("/api/v1/namespaces/%s/configmaps", ns),
-			Verb:                   "create",
-			Code:                   code,
-			User:                   "system:apiserver",
-			ImpersonatedUser:       testReinvocationClientUsername,
-			ImpersonatedGroups:     "system:authenticated",
-			Resource:               "configmaps",
-			Namespace:              ns,
-			AuthorizeDecision:      "allow",
-			RequestObject:          true,
-			ResponseObject:         false,
-			CustomAuditAnnotations: auditAnnotations,
+			Level:                   auditinternal.LevelRequest,
+			Stage:                   auditinternal.StageResponseComplete,
+			RequestURI:              fmt.Sprintf("/api/v1/namespaces/%s/configmaps", ns),
+			Verb:                    "create",
+			Code:                    code,
+			StatusMessage:           msg,
+			User:                    "system:apiserver",
+			ImpersonatedUser:        testReinvocationClientUsername,
+			ImpersonatedGroups:      "system:authenticated",
+			ImpersonationConstraint: new("impersonate:user-info"),
+			Resource:                "configmaps",
+			Namespace:               ns,
+			AuthorizeDecision:       "allow",
+			RequestObject:           true,
+			ResponseObject:          false,
+			CustomAuditAnnotations:  auditAnnotations,
 		},
 	}
 }

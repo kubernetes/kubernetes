@@ -22,6 +22,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -36,13 +37,13 @@ const (
 
 // csiDriverStrategy implements behavior for CSIDriver objects
 type csiDriverStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating
 // CSIDriver objects via the REST API.
-var Strategy = csiDriverStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = csiDriverStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 func (csiDriverStrategy) NamespaceScoped() bool {
 	return false
@@ -59,6 +60,9 @@ func (csiDriverStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 	}
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountTokenSecrets) {
 		csiDriver.Spec.ServiceAccountTokenInSecrets = nil
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeLimitScaling) {
+		csiDriver.Spec.PreventPodSchedulingIfMissing = nil
 	}
 }
 
@@ -87,7 +91,7 @@ func (csiDriverStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Objec
 func (csiDriverStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (csiDriverStrategy) AllowCreateOnUpdate() bool {
+func (csiDriverStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -111,6 +115,11 @@ func (csiDriverStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 	if oldCSIDriver.Spec.NodeAllocatableUpdatePeriodSeconds == nil &&
 		!utilfeature.DefaultFeatureGate.Enabled(features.MutableCSINodeAllocatableCount) {
 		newCSIDriver.Spec.NodeAllocatableUpdatePeriodSeconds = nil
+	}
+
+	if oldCSIDriver.Spec.PreventPodSchedulingIfMissing == nil &&
+		!utilfeature.DefaultFeatureGate.Enabled(features.VolumeLimitScaling) {
+		newCSIDriver.Spec.PreventPodSchedulingIfMissing = nil
 	}
 
 	// Any changes to the spec increment the generation number.
@@ -143,6 +152,6 @@ func (csiDriverStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.
 	return warnings
 }
 
-func (csiDriverStrategy) AllowUnconditionalUpdate() bool {
+func (csiDriverStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }

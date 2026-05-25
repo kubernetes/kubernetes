@@ -197,7 +197,9 @@ type validateFunc func(
 	versionedParams runtime.Object,
 	namespace *v1.Namespace,
 	runtimeCELCostBudget int64,
-	authz authorizer.Authorizer) validating.ValidateResult
+	authz authorizer.UnconditionalAuthorizer) validating.ValidateResult
+
+func (f validateFunc) CompileError() error { return nil }
 
 type fakeCompiler struct {
 	ValidateFuncs map[types.NamespacedName]validating.Validator
@@ -250,7 +252,7 @@ func (f validateFunc) Validate(
 	versionedParams runtime.Object,
 	namespace *v1.Namespace,
 	runtimeCELCostBudget int64,
-	authz authorizer.Authorizer,
+	authz authorizer.UnconditionalAuthorizer,
 ) validating.ValidateResult {
 	return f(
 		ctx,
@@ -368,7 +370,7 @@ func setupTestCommon(
 		func(p *validating.Policy) validating.Validator {
 			return compiler.CompilePolicy(p)
 		},
-		func(a authorizer.Authorizer, m *matching.Matcher, client kubernetes.Interface) generic.Dispatcher[validating.PolicyHook] {
+		func(a authorizer.UnconditionalAuthorizer, m *matching.Matcher, client kubernetes.Interface) generic.Dispatcher[validating.PolicyHook] {
 			coolMatcher := matcher
 			if coolMatcher == nil {
 				coolMatcher = generic.NewPolicyMatcher(m)
@@ -485,7 +487,7 @@ func TestBasicPolicyDefinitionFailure(t *testing.T) {
 		DefaultMatch: true,
 	}
 
-	compiler.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) validating.ValidateResult {
+	compiler.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.UnconditionalAuthorizer) validating.ValidateResult {
 		datalock.Lock()
 		numCompiles += 1
 		datalock.Unlock()
@@ -535,7 +537,7 @@ func TestDefinitionDoesntMatch(t *testing.T) {
 	passedParams := []*unstructured.Unstructured{}
 	numCompiles := 0
 
-	compiler.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) validating.ValidateResult {
+	compiler.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.UnconditionalAuthorizer) validating.ValidateResult {
 		datalock.Lock()
 		numCompiles += 1
 		datalock.Unlock()
@@ -630,7 +632,7 @@ func TestReconfigureBinding(t *testing.T) {
 		},
 	}
 
-	compiler.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) validating.ValidateResult {
+	compiler.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.UnconditionalAuthorizer) validating.ValidateResult {
 		datalock.Lock()
 		numCompiles += 1
 		datalock.Unlock()
@@ -714,7 +716,7 @@ func TestRemoveDefinition(t *testing.T) {
 	datalock := sync.Mutex{}
 	numCompiles := 0
 
-	compiler.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) validating.ValidateResult {
+	compiler.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.UnconditionalAuthorizer) validating.ValidateResult {
 		datalock.Lock()
 		numCompiles += 1
 		datalock.Unlock()
@@ -763,7 +765,7 @@ func TestRemoveBinding(t *testing.T) {
 	datalock := sync.Mutex{}
 	numCompiles := 0
 
-	compiler.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) validating.ValidateResult {
+	compiler.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.UnconditionalAuthorizer) validating.ValidateResult {
 		datalock.Lock()
 		numCompiles += 1
 		datalock.Unlock()
@@ -841,7 +843,7 @@ func TestInvalidParamSourceInstanceName(t *testing.T) {
 	passedParams := []*unstructured.Unstructured{}
 	numCompiles := 0
 
-	compiler.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) validating.ValidateResult {
+	compiler.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.UnconditionalAuthorizer) validating.ValidateResult {
 		datalock.Lock()
 		numCompiles += 1
 		datalock.Unlock()
@@ -884,7 +886,7 @@ func TestEmptyParamRef(t *testing.T) {
 	datalock := sync.Mutex{}
 	numCompiles := 0
 
-	compiler.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) validating.ValidateResult {
+	compiler.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.UnconditionalAuthorizer) validating.ValidateResult {
 		datalock.Lock()
 		numCompiles += 1
 		datalock.Unlock()
@@ -943,7 +945,7 @@ func TestEmptyParamSource(t *testing.T) {
 	noParamSourcePolicy := *denyPolicy
 	noParamSourcePolicy.Spec.ParamKind = nil
 
-	compiler.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) validating.ValidateResult {
+	compiler.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.UnconditionalAuthorizer) validating.ValidateResult {
 		datalock.Lock()
 		numCompiles += 1
 		datalock.Unlock()
@@ -1024,7 +1026,7 @@ func TestMultiplePoliciesSharedParamType(t *testing.T) {
 	evaluations1 := atomic.Int64{}
 	evaluations2 := atomic.Int64{}
 
-	compiler.RegisterDefinition(&policy1, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) validating.ValidateResult {
+	compiler.RegisterDefinition(&policy1, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.UnconditionalAuthorizer) validating.ValidateResult {
 		evaluations1.Add(1)
 
 		return validating.ValidateResult{
@@ -1036,7 +1038,7 @@ func TestMultiplePoliciesSharedParamType(t *testing.T) {
 		}
 	})
 
-	compiler.RegisterDefinition(&policy2, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) validating.ValidateResult {
+	compiler.RegisterDefinition(&policy2, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.UnconditionalAuthorizer) validating.ValidateResult {
 		evaluations2.Add(1)
 		return validating.ValidateResult{
 			Decisions: []validating.PolicyDecision{
@@ -1111,7 +1113,7 @@ func TestNativeTypeParam(t *testing.T) {
 		Kind:       "ConfigMap",
 	}
 
-	compiler.RegisterDefinition(&nativeTypeParamPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) validating.ValidateResult {
+	compiler.RegisterDefinition(&nativeTypeParamPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.UnconditionalAuthorizer) validating.ValidateResult {
 		evaluations.Add(1)
 		if _, ok := versionedParams.(*v1.ConfigMap); ok {
 			return validating.ValidateResult{
@@ -1174,7 +1176,7 @@ func TestAuditValidationAction(t *testing.T) {
 	noParamSourcePolicy := *denyPolicy
 	noParamSourcePolicy.Spec.ParamKind = nil
 
-	compiler.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) validating.ValidateResult {
+	compiler.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.UnconditionalAuthorizer) validating.ValidateResult {
 		return validating.ValidateResult{
 			Decisions: []validating.PolicyDecision{
 				{
@@ -1228,7 +1230,7 @@ func TestWarnValidationAction(t *testing.T) {
 	noParamSourcePolicy := *denyPolicy
 	noParamSourcePolicy.Spec.ParamKind = nil
 
-	compiler.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) validating.ValidateResult {
+	compiler.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.UnconditionalAuthorizer) validating.ValidateResult {
 		return validating.ValidateResult{
 			Decisions: []validating.PolicyDecision{
 				{
@@ -1270,7 +1272,7 @@ func TestAllValidationActions(t *testing.T) {
 	noParamSourcePolicy := *denyPolicy
 	noParamSourcePolicy.Spec.ParamKind = nil
 
-	compiler.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) validating.ValidateResult {
+	compiler.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.UnconditionalAuthorizer) validating.ValidateResult {
 		return validating.ValidateResult{
 			Decisions: []validating.PolicyDecision{
 				{
@@ -1336,7 +1338,7 @@ func TestNamespaceParamRefName(t *testing.T) {
 	}
 	lock := sync.Mutex{}
 	observedParamNamespaces := []string{}
-	compiler.RegisterDefinition(&nativeTypeParamPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) validating.ValidateResult {
+	compiler.RegisterDefinition(&nativeTypeParamPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.UnconditionalAuthorizer) validating.ValidateResult {
 		lock.Lock()
 		defer lock.Unlock()
 
@@ -1606,7 +1608,7 @@ func testParamRefCase(t *testing.T, paramIsClusterScoped, nameIsSet, namespaceIs
 		return oldParams
 	}
 
-	compiler.RegisterDefinition(&policy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) validating.ValidateResult {
+	compiler.RegisterDefinition(&policy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.UnconditionalAuthorizer) validating.ValidateResult {
 		observeParam(versionedParams)
 		return validating.ValidateResult{
 			Decisions: []validating.PolicyDecision{
@@ -1826,7 +1828,7 @@ func TestNamespaceParamRefClusterScopedParamError(t *testing.T) {
 		Namespace: "mynamespace",
 	}
 
-	compiler.RegisterDefinition(&nativeTypeParamPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) validating.ValidateResult {
+	compiler.RegisterDefinition(&nativeTypeParamPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.UnconditionalAuthorizer) validating.ValidateResult {
 		evaluations.Add(1)
 		if _, ok := versionedParams.(*admissionregistrationv1.ValidatingAdmissionPolicy); ok {
 			return validating.ValidateResult{
@@ -1873,7 +1875,7 @@ func TestAuditAnnotations(t *testing.T) {
 
 	// Push some fake
 	policy := *denyPolicy
-	compiler.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.Authorizer) validating.ValidateResult {
+	compiler.RegisterDefinition(denyPolicy, func(ctx context.Context, matchedResource schema.GroupVersionResource, versionedAttr *admission.VersionedAttributes, versionedParams runtime.Object, namespace *v1.Namespace, runtimeCELCostBudget int64, authz authorizer.UnconditionalAuthorizer) validating.ValidateResult {
 		o, err := meta.Accessor(versionedParams)
 		if err != nil {
 			t.Fatal(err)

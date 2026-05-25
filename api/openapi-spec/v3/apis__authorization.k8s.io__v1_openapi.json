@@ -11,12 +11,7 @@
           "requirements": {
             "description": "requirements is the parsed interpretation of a field selector. All requirements must be met for a resource instance to match the selector. Webhook implementations should handle requirements, but how to handle them is up to the webhook. Since requirements can only limit the request, it is safe to authorize as unlimited request if the requirements are not understood.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.FieldSelectorRequirement"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.FieldSelectorRequirement"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -34,12 +29,7 @@
           "requirements": {
             "description": "requirements is the parsed interpretation of a label selector. All requirements must be met for a resource instance to match the selector. Webhook implementations should handle requirements, but how to handle them is up to the webhook. Since requirements can only limit the request, it is safe to authorize as unlimited request if the requirements are not understood.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelectorRequirement"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -118,7 +108,6 @@
           "nonResourceURLs": {
             "description": "nonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path.  \"*\" means all.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -127,7 +116,6 @@
           "verbs": {
             "description": "verbs is a list of kubernetes non-resource API verbs, like: get, post, put, delete, patch, head, options.  \"*\" means all.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -195,7 +183,6 @@
           "apiGroups": {
             "description": "apiGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed.  \"*\" means all.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -204,7 +191,6 @@
           "resourceNames": {
             "description": "resourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.  \"*\" means all.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -213,7 +199,6 @@
           "resources": {
             "description": "resources is a list of resources this rule applies to.  \"*\" means all in the specified apiGroups.\n \"*/foo\" represents the subresource 'foo' for all resources in the specified apiGroups.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -222,7 +207,6 @@
           "verbs": {
             "description": "verbs is a list of kubernetes resource API verbs, like: get, list, watch, create, update, delete, proxy.  \"*\" means all.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -425,7 +409,6 @@
           "extra": {
             "additionalProperties": {
               "items": {
-                "default": "",
                 "type": "string"
               },
               "type": "array"
@@ -436,7 +419,6 @@
           "groups": {
             "description": "groups is the groups you're testing for.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -510,12 +492,7 @@
           "nonResourceRules": {
             "description": "nonResourceRules is the list of actions the subject is allowed to perform on non-resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.NonResourceRule"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.authorization.v1.NonResourceRule"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -523,12 +500,7 @@
           "resourceRules": {
             "description": "resourceRules is the list of actions the subject is allowed to perform on resources. The list ordering isn't significant, may contain duplicates, and possibly be incomplete.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.api.authorization.v1.ResourceRule"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.api.authorization.v1.ResourceRule"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -547,7 +519,6 @@
           "categories": {
             "description": "categories is a list of the grouped resources this resource belongs to (e.g. 'all')",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -575,7 +546,6 @@
           "shortNames": {
             "description": "shortNames is a list of suggested short names of the resource.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -593,7 +563,6 @@
           "verbs": {
             "description": "verbs is a list of supported kube verbs (this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy)",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array"
@@ -631,12 +600,7 @@
           "resources": {
             "description": "resources contains the name of the resources and if they are namespaced.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.APIResource"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -671,7 +635,6 @@
           "values": {
             "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -704,7 +667,6 @@
           "values": {
             "description": "values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -764,7 +726,6 @@
         "properties": {
           "annotations": {
             "additionalProperties": {
-              "default": "",
               "type": "string"
             },
             "description": "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations",
@@ -794,7 +755,6 @@
           "finalizers": {
             "description": "Must be empty before the object is deleted from the registry. Each entry is an identifier for the responsible component that will remove the entry from the list. If the deletionTimestamp of the object is non-nil, entries in this list can only be removed. Finalizers may be processed and removed in any order.  Order is NOT enforced because it introduces significant risk of stuck finalizers. finalizers is a shared field, any actor with permission can reorder it. If the finalizer list is processed in order, then this can lead to a situation in which the component responsible for the first finalizer in the list is waiting for a signal (field value, external system, or other) produced by a component responsible for a finalizer later in the list, resulting in a deadlock. Without enforced ordering finalizers are free to order amongst themselves and are not vulnerable to ordering changes in the list.",
             "items": {
-              "default": "",
               "type": "string"
             },
             "type": "array",
@@ -812,7 +772,6 @@
           },
           "labels": {
             "additionalProperties": {
-              "default": "",
               "type": "string"
             },
             "description": "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels",
@@ -821,12 +780,7 @@
           "managedFields": {
             "description": "ManagedFields maps workflow-id and version to the set of fields that are managed by that workflow. This is mostly for internal housekeeping, and users typically shouldn't need to set or understand this field. A workflow can be the user's name, a controller's name, or the name of a specific apply path like \"ci-cd\". The set of fields is always in the version that the workflow used when modifying the object.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry"
             },
             "type": "array",
             "x-kubernetes-list-type": "atomic"
@@ -842,12 +796,7 @@
           "ownerReferences": {
             "description": "List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller.",
             "items": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
-                }
-              ],
-              "default": {}
+              "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.OwnerReference"
             },
             "type": "array",
             "x-kubernetes-list-map-keys": [

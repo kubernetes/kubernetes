@@ -18,6 +18,7 @@ limitations under the License.
 // +k8s:validation-gen-scheme-registry=k8s.io/code-generator/cmd/validation-gen/testscheme.Scheme
 
 // This is a test package.
+// +k8s:validation-gen-nolint
 package simple
 
 import "k8s.io/code-generator/cmd/validation-gen/testscheme"
@@ -45,6 +46,14 @@ type Struct struct {
 	// +k8s:unionMember
 	// +k8s:optional
 	M4 *string `json:"m4"`
+
+	// +k8s:unionMember
+	// +k8s:optional
+	M5 []string `json:"m5"`
+
+	// +k8s:unionMember
+	// +k8s:optional
+	M6 map[string]string `json:"m6"`
 }
 
 type M1 struct{}

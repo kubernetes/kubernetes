@@ -200,6 +200,29 @@ func TestRetryWatcher(t *testing.T) {
 			},
 		},
 		{
+			name:      "recovers from 410 Gone error on watch establishment",
+			initialRV: "1",
+			watchClient: &cache.ListWatch{
+				WatchFunc: func() func(options metav1.ListOptions) (watch.Interface, error) {
+					firstRun := true
+					return func(options metav1.ListOptions) (watch.Interface, error) {
+						if firstRun {
+							firstRun = false
+							return nil, apierrors.NewResourceExpired("")
+						}
+
+						return watch.NewProxyWatcher(arrayToChannel(fromRV(options.ResourceVersion, []watch.Event{
+							makeTestEvent(2),
+						}))), nil
+					}
+				}(),
+			},
+			watchCount: 2,
+			expected: []watch.Event{
+				makeTestEvent(2),
+			},
+		},
+		{
 			name:      "recovers if watchClient returns nil watcher",
 			initialRV: "1",
 			watchClient: &cache.ListWatch{
@@ -548,7 +571,6 @@ func TestRetryWatcher(t *testing.T) {
 	}
 
 	for _, tc := range tt {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			_, ctx := ktesting.NewTestContext(t)
 			t.Parallel()

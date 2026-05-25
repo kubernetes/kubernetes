@@ -20,6 +20,7 @@ limitations under the License.
 // are not part of the gengo args.  Even though this package purports to have
 // validations, it is outside of the args used when generating output_tests,
 // and so the generated could should NOT descend into these.
+// +k8s:validation-gen-nolint
 package other
 
 // +k8s:validateFalse="you should not see this outside of this pkg"

@@ -598,7 +598,7 @@ const waitSuccessThreshold = 10
 // might be lagging behind. Calling f multiple times reduces the chance exponentially.
 func mustSucceedMultipleTimes(n int, f func() (bool, error)) func() (bool, error) {
 	return func() (bool, error) {
-		for i := 0; i < n; i++ {
+		for range n {
 			ok, err := f()
 			if err != nil || !ok {
 				return ok, err

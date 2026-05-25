@@ -39,6 +39,12 @@ type Args struct {
 	// When this is specified, the OpenAPI spec generator will use the function names
 	// instead of Go type names for schema names.
 	OutputModelNameFile string
+
+	// ReadOnlyPkgs is a list of package paths that should be treated as
+	// read-only. Model name files will not be generated for these packages.
+	// This prevents the generator from attempting to write into read-only
+	// dependency packages (e.g. in the Go module cache).
+	ReadOnlyPkgs []string
 }
 
 // New returns default arguments for the generator. Returning the arguments instead
@@ -67,6 +73,9 @@ a "+k8s:openapi-model-package" tag. The generated functions return fully qualifi
 model names, which are used in the OpenAPI spec as schema references instead of
 Go type names. If empty, no model name accessor functions are generated and names
 are inferred from Go type names.`)
+	fs.StringSliceVar(&args.ReadOnlyPkgs, "readonly-pkg", nil,
+		"Packages that are read-only dependencies. Model name files will not be generated "+
+			"for these packages. May be specified multiple times.")
 	fs.StringVar(&args.GoHeaderFile, "go-header-file", "",
 		"the path to a file containing boilerplate header text; the string \"YEAR\" will be replaced with the current 4-digit year")
 	fs.StringVarP(&args.ReportFilename, "report-filename", "r", args.ReportFilename,

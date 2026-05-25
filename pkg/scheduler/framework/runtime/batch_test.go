@@ -82,6 +82,10 @@ func (s sharedLister) StorageInfos() fwk.StorageInfoLister {
 	return &storageInfoListerContract{}
 }
 
+func (s sharedLister) PodGroupStates() fwk.PodGroupStateLister {
+	return nil
+}
+
 var batchRegistry = func() Registry {
 	r := make(Registry)
 	err := r.Register("batchTest", newBatchTestPlugin)
@@ -180,12 +184,6 @@ func newTestNodes(n []string) *testSortedScoredNodes {
 	return &testSortedScoredNodes{Nodes: n}
 }
 
-func newTestSigFunc(sig *fwk.PodSignature) SignatureFunc {
-	return func(h fwk.Handle, ctx context.Context, p *v1.Pod, shouldRecordStats bool) fwk.PodSignature {
-		return *sig
-	}
-}
-
 func TestBatchBasic(t *testing.T) {
 	// This test first let OpportunisticBatch handle the first pod, and then see how it behaves with the second pod.
 	tests := []struct {
@@ -197,14 +195,18 @@ func TestBatchBasic(t *testing.T) {
 		firstChosenNode string
 		// firstOtherNodes is supposed to set only if firstPodScheduledSuccessfully is true.
 		firstOtherNodes framework.SortedScoredNodes
+		// if it's true, the test case behaves as if the pods are processed during the same PodGroup scheduling cycle.
+		sameCycle bool
 		// if it's true, the test case behaves as if there is another pod handled by another profile between the first and second pod.
-		skipPod          bool
-		secondPodID      string
-		secondSig        string
-		secondChosenNode string
-		secondOtherNodes framework.SortedScoredNodes
-		expectedHint     string
-		expectedState    *batchState
+		skipPod                    bool
+		secondPodID                string
+		secondPodNominatedNodeName string
+		secondSig                  string
+		secondChosenNode           string
+		secondOtherNodes           framework.SortedScoredNodes
+		genericWorkloadEnabled     bool
+		expectedHint               string
+		expectedState              *batchState
 	}{
 		{
 			name:                          "a second pod with the same signature gets a hint",
@@ -292,6 +294,34 @@ func TestBatchBasic(t *testing.T) {
 			expectedHint:                  "",
 		},
 		{
+			name:                          "pod doesn't use batch from preceding pod when they are from the same cycle state, but GenericWorkload is disabled",
+			firstPodID:                    blockingPodID("1"),
+			firstSig:                      "sig",
+			firstChosenNode:               "n3",
+			firstOtherNodes:               newTestNodes([]string{"n1"}),
+			firstPodScheduledSuccessfully: true,
+			sameCycle:                     true,
+			secondPodID:                   blockingPodID("2"),
+			secondSig:                     "sig",
+			secondChosenNode:              "n1",
+			genericWorkloadEnabled:        false,
+			expectedHint:                  "",
+		},
+		{
+			name:                          "pod uses batch from preceding pod when they are from the same cycle state and GenericWorkload is enabled",
+			firstPodID:                    blockingPodID("1"),
+			firstSig:                      "sig",
+			firstChosenNode:               "n3",
+			firstOtherNodes:               newTestNodes([]string{"n1"}),
+			firstPodScheduledSuccessfully: true,
+			sameCycle:                     true,
+			secondPodID:                   blockingPodID("2"),
+			secondSig:                     "sig",
+			secondChosenNode:              "n1",
+			genericWorkloadEnabled:        true,
+			expectedHint:                  "n1",
+		},
+		{
 			name:                          "pod uses batch from preceding pod and leaves remaining batch to next pod",
 			firstPodID:                    blockingPodID("1"),
 			firstSig:                      "sig",
@@ -306,6 +336,19 @@ func TestBatchBasic(t *testing.T) {
 				signature:   []byte("sig"),
 				sortedNodes: newTestNodes([]string{"n2"}),
 			},
+		},
+		{
+			name:                          "a second pod with a nominated node does not get a hint",
+			firstPodID:                    blockingPodID("1"),
+			firstSig:                      "sig",
+			firstChosenNode:               "n3",
+			firstOtherNodes:               newTestNodes([]string{"n1"}),
+			firstPodScheduledSuccessfully: true,
+			secondPodID:                   blockingPodID("2"),
+			secondPodNominatedNodeName:    "n1",
+			secondSig:                     "sig",
+			secondChosenNode:              "n1",
+			expectedHint:                  "",
 		},
 	}
 
@@ -327,11 +370,11 @@ func TestBatchBasic(t *testing.T) {
 			}
 
 			signature := fwk.PodSignature(tt.firstSig)
-			batch := newOpportunisticBatch(testFwk, newTestSigFunc(&signature))
+			batch := newOpportunisticBatch(testFwk, tt.genericWorkloadEnabled)
 			state := framework.NewCycleState()
 
 			// Run the first "pod" through
-			hint, _ := batch.GetNodeHint(ctx, pod, state, 1)
+			hint := batch.GetNodeHint(ctx, pod, signature, state, 1)
 			if hint != "" {
 				t.Fatalf("Got unexpected hint %s", hint)
 			}
@@ -342,6 +385,8 @@ func TestBatchBasic(t *testing.T) {
 			var cycleCount int64 = 2
 			if tt.skipPod {
 				cycleCount = 3
+			} else if tt.sameCycle {
+				cycleCount = 1
 			}
 
 			// Run the second pod
@@ -349,6 +394,9 @@ func TestBatchBasic(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "pod2",
 					UID:  types.UID(tt.secondPodID),
+				},
+				Status: v1.PodStatus{
+					NominatedNodeName: tt.secondPodNominatedNodeName,
 				},
 			}
 
@@ -360,7 +408,7 @@ func TestBatchBasic(t *testing.T) {
 			lister.nodes = nodeInfoLister{lastChosenNode}
 
 			signature = fwk.PodSignature(tt.secondSig)
-			hint, _ = batch.GetNodeHint(ctx, pod2, state, cycleCount)
+			hint = batch.GetNodeHint(ctx, pod2, signature, state, cycleCount)
 
 			if hint != tt.expectedHint {
 				t.Fatalf("Got hint '%s' expected '%s' for test '%s'", hint, tt.expectedHint, tt.name)

@@ -67,6 +67,10 @@ func (p *nonePolicy) GetPodTopologyHints(_ logr.Logger, s state.State, pod *v1.P
 	return nil
 }
 
+func (p *nonePolicy) AllocatePod(_ logr.Logger, s state.State, pod *v1.Pod) error {
+	return nil
+}
+
 // Assignable CPUs are the ones that can be exclusively allocated to pods that meet the exclusivity requirement
 // (ie guaranteed QoS class and integral CPU request).
 // Assignability of CPUs as a concept is only applicable in case of static policy i.e. scenarios where workloads

@@ -35,7 +35,7 @@ var _ Scope = &noneScope{}
 func NewNoneScope() Scope {
 	return &noneScope{
 		scope{
-			name:             noneTopologyScope,
+			name:             NoneTopologyScope,
 			podTopologyHints: podTopologyHints{},
 			policy:           NewNonePolicy(),
 			podMap:           containermap.NewContainerMap(),

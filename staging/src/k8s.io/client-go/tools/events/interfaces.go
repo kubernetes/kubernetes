@@ -28,6 +28,7 @@ import (
 
 type EventRecorder = internalevents.EventRecorder
 type EventRecorderLogger = internalevents.EventRecorderLogger
+type AnnotatedEventRecorder = internalevents.AnnotatedEventRecorder
 
 // EventBroadcaster knows how to receive events and send them to any EventSink, watcher, or log.
 type EventBroadcaster interface {

@@ -56,13 +56,11 @@ var (
 		[]string{"completion_mode", "result", "action"},
 	)
 	// JobFinishedNum tracks the number of Jobs that finish.
-	// TODO: Once we remove the JobSuccessPolicy feature gate, we need to remove "" reason label comment.
-	// When the JobSuccessPolicy feature gate is disabled, empty reason label is used to count successful jobs.
-	// Otherwise, "CompletionsReached" reason label is used to count successful jobs.
+	// "CompletionsReached" reason label is used to count successful jobs.
 	// Possible label values:
 	//   completion_mode: Indexed, NonIndexed
 	//   result:          failed, succeeded
-	//   reason:          "BackoffLimitExceeded", "DeadlineExceeded", "PodFailurePolicy", "FailedIndexes", "MaxFailedIndexesExceeded", "SuccessPolicy", "CompletionsReached", ""
+	//   reason:          "BackoffLimitExceeded", "DeadlineExceeded", "PodFailurePolicy", "FailedIndexes", "MaxFailedIndexesExceeded", "SuccessPolicy", "CompletionsReached"
 	JobFinishedNum = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Subsystem:      JobControllerSubsystem,
@@ -116,6 +114,7 @@ var (
 			rule. Possible values of the action label correspond to the
 			possible values for the failure policy rule action, which are:
 			"FailJob", "Ignore" and "Count".`,
+			StabilityLevel: metrics.BETA,
 		},
 		[]string{"action"})
 
@@ -129,6 +128,7 @@ var (
 			Help: `The number of terminated pods (phase=Failed|Succeeded)
 that have the finalizer batch.kubernetes.io/job-tracking
 The event label can be "add" or "delete".`,
+			StabilityLevel: metrics.BETA,
 		}, []string{"event"})
 
 	// JobFinishedIndexesTotal records the number of finished indexes.

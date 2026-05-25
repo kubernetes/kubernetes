@@ -19,8 +19,11 @@ package topologymanager
 import (
 	"context"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/admission"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -38,7 +41,7 @@ var _ Scope = &podScope{}
 func NewPodScope(policy Policy) Scope {
 	return &podScope{
 		scope{
-			name:             podTopologyScope,
+			name:             PodTopologyScope,
 			podTopologyHints: podTopologyHints{},
 			policy:           policy,
 			podMap:           containermap.NewContainerMap(),
@@ -47,17 +50,21 @@ func NewPodScope(policy Policy) Scope {
 }
 
 func (s *podScope) Admit(ctx context.Context, pod *v1.Pod) lifecycle.PodAdmitResult {
+	// If the PodLevelResourceManagers feature is enabled, delegate the resource
+	// allocation to the hint providers (CPU and Memory managers) via the AllocatePod call.
+	// This is a one-time allocation for the entire pod.
+	if utilfeature.DefaultFeatureGate.Enabled(features.PodLevelResourceManagers) && resourcehelper.IsPodLevelResourcesSet(pod) {
+		return s.admitUsingPodResources(ctx, pod)
+	}
+	return s.admitUsingContainerResources(ctx, pod)
+}
+
+func (s *podScope) admitUsingContainerResources(ctx context.Context, pod *v1.Pod) lifecycle.PodAdmitResult {
 	logger := klog.FromContext(ctx)
 
-	bestHint, admit := s.calculateAffinity(logger, pod)
-	logger.Info("Best TopologyHint", "bestHint", bestHint, "pod", klog.KObj(pod))
+	bestHint, admit := s.checkAffinity(logger, pod)
 	if !admit {
-		if IsAlignmentGuaranteed(s.policy) {
-			// increment only if we know we allocate aligned resources.
-			metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Inc()
-		}
-		metrics.TopologyManagerAdmissionErrorsTotal.Inc()
-		return admission.GetPodAdmitResult(&TopologyAffinityError{})
+		return admission.GetPodAdmitResult(NewTopologyAffinityError())
 	}
 
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
@@ -70,12 +77,63 @@ func (s *podScope) Admit(ctx context.Context, pod *v1.Pod) lifecycle.PodAdmitRes
 			return admission.GetPodAdmitResult(err)
 		}
 	}
+
+	s.updateSuccessMetrics(logger, pod)
+	return admission.GetPodAdmitResult(nil)
+}
+
+func (s *podScope) admitUsingPodResources(ctx context.Context, pod *v1.Pod) lifecycle.PodAdmitResult {
+	logger := klog.FromContext(ctx)
+
+	bestHint, admit := s.checkAffinity(logger, pod)
+	if !admit {
+		return admission.GetPodAdmitResult(NewPodLevelTopologyAffinityError("pod with pod-level resources failed admission under pod-scope topology manager"))
+	}
+
+	// If the PodLevelResourceManagers feature is enabled, delegate the resource
+	// allocation to the hint providers (CPU and Memory managers) via the AllocatePod call.
+	// This is a one-time allocation for the entire pod.
+	logger.V(4).Info("Calling AllocatePod on hint providers", "pod", klog.KObj(pod))
+
+	// Store the best hint for all containers.
+	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+		logger.Info("Topology Affinity", "bestHint", bestHint, "pod", klog.KObj(pod), "containerName", container.Name)
+		s.setTopologyHints(string(pod.UID), container.Name, bestHint)
+	}
+
+	err := s.allocatePodAlignedResources(pod)
+	if err != nil {
+		logger.Error(err, "Pod-level allocation failed", "pod", klog.KObj(pod))
+		metrics.TopologyManagerAdmissionErrorsTotal.Inc()
+		return admission.GetPodAdmitResult(err)
+	}
+
+	s.updateSuccessMetrics(logger, pod)
+	return admission.GetPodAdmitResult(nil)
+}
+
+func (s *podScope) checkAffinity(logger klog.Logger, pod *v1.Pod) (TopologyHint, bool) {
+	// Calculate the best NUMA affinity for the pod as a whole.
+	bestHint, admit := s.calculateAffinity(logger, pod)
+	logger.Info("Best TopologyHint", "bestHint", bestHint, "pod", klog.KObj(pod))
+	if !admit {
+		if IsAlignmentGuaranteed(s.policy) {
+			// Increment failure metric only if alignment was guaranteed.
+			metrics.ContainerAlignedComputeResourcesFailure.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Inc()
+		}
+		metrics.TopologyManagerAdmissionErrorsTotal.Inc()
+
+		return TopologyHint{}, false
+	}
+	return bestHint, true
+}
+
+func (s *podScope) updateSuccessMetrics(logger klog.Logger, pod *v1.Pod) {
 	if IsAlignmentGuaranteed(s.policy) {
-		// increment only if we know we allocate aligned resources.
+		// Increment success metric only if alignment was guaranteed.
 		logger.V(4).Info("Resource alignment at pod scope guaranteed", "pod", klog.KObj(pod))
 		metrics.ContainerAlignedComputeResources.WithLabelValues(metrics.AlignScopePod, metrics.AlignedNUMANode).Inc()
 	}
-	return admission.GetPodAdmitResult(nil)
 }
 
 func (s *podScope) accumulateProvidersHints(logger klog.Logger, pod *v1.Pod) []map[string][]TopologyHint {

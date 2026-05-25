@@ -625,7 +625,12 @@ func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node)
 		// FinalizerDeletingDependents from the item, resulting in the final
 		// deletion of the item.
 		policy := metav1.DeletePropagationForeground
-		return gc.deleteObject(item.identity, latest.ResourceVersion, latest.OwnerReferences, &policy)
+		err := gc.deleteObject(item.identity, latest.ResourceVersion, latest.OwnerReferences, &policy)
+		if errors.IsNotFound(err) {
+			gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
+			return enqueuedVirtualDeleteEventErr
+		}
+		return err
 	default:
 		// item doesn't have any solid owner, so it needs to be garbage
 		// collected. Also, none of item's owners is waiting for the deletion of
@@ -646,7 +651,12 @@ func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node)
 			"item", item.identity,
 			"propagationPolicy", policy,
 		)
-		return gc.deleteObject(item.identity, latest.ResourceVersion, latest.OwnerReferences, &policy)
+		err := gc.deleteObject(item.identity, latest.ResourceVersion, latest.OwnerReferences, &policy)
+		if errors.IsNotFound(err) {
+			gc.dependencyGraphBuilder.enqueueVirtualDeleteEvent(item.identity)
+			return enqueuedVirtualDeleteEventErr
+		}
+		return err
 	}
 }
 

@@ -33,11 +33,13 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
+var _ = authorizer.Authorizer(unionAuthzHandler{})
+
 // unionAuthzHandler authorizer against a chain of authorizer.Authorizer
-type unionAuthzHandler []authorizer.Authorizer
+type unionAuthzHandler []authorizer.UnconditionalAuthorizer
 
 // New returns an authorizer that authorizes against a chain of authorizer.Authorizer objects
-func New(authorizationHandlers ...authorizer.Authorizer) authorizer.Authorizer {
+func New(authorizationHandlers ...authorizer.UnconditionalAuthorizer) authorizer.UnconditionalAuthorizer {
 	return unionAuthzHandler(authorizationHandlers)
 }
 

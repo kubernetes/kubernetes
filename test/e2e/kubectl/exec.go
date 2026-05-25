@@ -35,7 +35,7 @@ func worker(f *framework.Framework, pod *v1.Pod, id int, jobs <-chan int, result
 		func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
-			stdout, stderr, err := e2epod.ExecWithOptionsContext(ctx, f, e2epod.ExecOptions{
+			stdout, stderr, err := e2epod.Exec(f.TContext(ctx), e2epod.ExecOptions{
 				Command:            []string{"date"},
 				Namespace:          f.Namespace.Name,
 				PodName:            pod.Name,
@@ -69,11 +69,11 @@ var _ = SIGDescribe("Kubectl exec", func() {
 
 		// 10 workers for 1000 executions
 		ginkgo.By("Starting workers to exec on pod")
-		for w := 0; w < 10; w++ {
+		for w := range 10 {
 			framework.Logf("Starting worker %d", w)
 			go worker(f, pod, w, jobs, results)
 		}
-		for i := 0; i < size; i++ {
+		for i := range size {
 			framework.Logf("Sending job %d", i)
 			jobs <- i
 		}
@@ -81,7 +81,7 @@ var _ = SIGDescribe("Kubectl exec", func() {
 		close(jobs)
 
 		errors := []error{}
-		for c := 0; c < size; c++ {
+		for c := range size {
 			framework.Logf("Getting results %d", c)
 			err := <-results
 			if err != nil {

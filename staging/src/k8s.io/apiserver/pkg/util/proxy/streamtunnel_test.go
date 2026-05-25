@@ -33,8 +33,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/httpstream"
-	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	constants "k8s.io/apimachinery/pkg/util/portforward"
 	"k8s.io/apimachinery/pkg/util/proxy"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -44,6 +42,8 @@ import (
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/streaming/pkg/httpstream"
+	"k8s.io/streaming/pkg/httpstream/spdy"
 )
 
 func TestTunnelingHandler_UpgradeStreamingAndTunneling(t *testing.T) {

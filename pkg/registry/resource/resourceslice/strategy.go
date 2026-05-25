@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -41,11 +40,11 @@ import (
 
 // resourceSliceStrategy implements behavior for ResourceSlice objects
 type resourceSliceStrategy struct {
-	runtime.ObjectTyper
+	rest.DeclarativeValidation
 	names.NameGenerator
 }
 
-var Strategy = resourceSliceStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = resourceSliceStrategy{rest.DeclarativeValidation{Scheme: legacyscheme.Scheme}, names.SimpleNameGenerator}
 
 func (resourceSliceStrategy) NamespaceScoped() bool {
 	return false
@@ -60,9 +59,13 @@ func (resourceSliceStrategy) PrepareForCreate(ctx context.Context, obj runtime.O
 
 func (resourceSliceStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	slice := obj.(*resource.ResourceSlice)
-	errorList := validation.ValidateResourceSlice(slice)
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, slice, nil, errorList, operation.Create, rest.WithNormalizationRules(validation.ResourceNormalizationRules))
+	return validation.ValidateResourceSlice(slice)
+}
 
+// DeclarativeValidationConfig implements rest.DeclarativeValidationConfigurer to supply declarative
+// validation options to the generic BeforeCreate/BeforeUpdate code path.
+func (resourceSliceStrategy) DeclarativeValidationConfig(ctx context.Context, obj, oldObj runtime.Object) rest.DeclarativeValidationConfig {
+	return rest.DeclarativeValidationConfig{NormalizationRules: validation.ResourceNormalizationRules}
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
@@ -81,7 +84,7 @@ func (resourceSliceStrategy) WarningsOnCreate(ctx context.Context, obj runtime.O
 func (resourceSliceStrategy) Canonicalize(obj runtime.Object) {
 }
 
-func (resourceSliceStrategy) AllowCreateOnUpdate() bool {
+func (resourceSliceStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -98,8 +101,7 @@ func (resourceSliceStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 }
 
 func (resourceSliceStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidateResourceSliceUpdate(obj.(*resource.ResourceSlice), old.(*resource.ResourceSlice))
-	return rest.ValidateDeclarativelyWithMigrationChecks(ctx, legacyscheme.Scheme, obj, old, errorList, operation.Update, rest.WithNormalizationRules(validation.ResourceNormalizationRules))
+	return validation.ValidateResourceSliceUpdate(obj.(*resource.ResourceSlice), old.(*resource.ResourceSlice))
 }
 
 // WarningsOnUpdate returns warnings for the given update.
@@ -115,7 +117,7 @@ func (resourceSliceStrategy) WarningsOnUpdate(ctx context.Context, obj, old runt
 	return warnings
 }
 
-func (resourceSliceStrategy) AllowUnconditionalUpdate() bool {
+func (resourceSliceStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return true
 }
 
@@ -196,6 +198,8 @@ func dropDisabledFields(newSlice, oldSlice *resource.ResourceSlice) {
 	dropDisabledDRAPartitionableDevicesFields(newSlice, oldSlice)
 	dropDisabledDRADeviceBindingConditionsFields(newSlice, oldSlice)
 	dropDisabledDRAConsumableCapacityFields(newSlice, oldSlice)
+	dropDisabledDRANodeAllocatableResourcesFields(newSlice, oldSlice)
+	dropDisableDRAListTypeAttributesFields(newSlice, oldSlice)
 }
 
 func dropDisabledDRADeviceTaintsFields(newSlice, oldSlice *resource.ResourceSlice) {
@@ -323,4 +327,71 @@ func dropDisabledDRAConsumableCapacityFields(newSlice, oldSlice *resource.Resour
 			}
 		}
 	}
+}
+
+func dropDisabledDRANodeAllocatableResourcesFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRANodeAllocatableResources) || draNodeAllocatableResourcesFeatureInUse(oldSlice) {
+		return
+	}
+
+	for i := range newSlice.Spec.Devices {
+		newSlice.Spec.Devices[i].NodeAllocatableResourceMappings = nil
+	}
+}
+
+func draNodeAllocatableResourcesFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+
+	for _, device := range slice.Spec.Devices {
+		if len(device.NodeAllocatableResourceMappings) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func dropDisableDRAListTypeAttributesFields(newSlice, oldSlice *resource.ResourceSlice) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.DRAListTypeAttributes) ||
+		draListTypeAttributesFeatureInUse(oldSlice) {
+		return
+	}
+
+	for i := range newSlice.Spec.Devices {
+		for k, deviceAttribute := range newSlice.Spec.Devices[i].Attributes {
+			if deviceAttribute.BoolValues != nil {
+				deviceAttribute.BoolValues = nil
+				newSlice.Spec.Devices[i].Attributes[k] = deviceAttribute
+			}
+			if deviceAttribute.IntValues != nil {
+				deviceAttribute.IntValues = nil
+				newSlice.Spec.Devices[i].Attributes[k] = deviceAttribute
+			}
+			if deviceAttribute.StringValues != nil {
+				deviceAttribute.StringValues = nil
+				newSlice.Spec.Devices[i].Attributes[k] = deviceAttribute
+			}
+			if deviceAttribute.VersionValues != nil {
+				deviceAttribute.VersionValues = nil
+				newSlice.Spec.Devices[i].Attributes[k] = deviceAttribute
+			}
+		}
+	}
+}
+
+func draListTypeAttributesFeatureInUse(slice *resource.ResourceSlice) bool {
+	if slice == nil {
+		return false
+	}
+
+	for _, device := range slice.Spec.Devices {
+		for _, deviceAttribute := range device.Attributes {
+			if deviceAttribute.BoolValues != nil || deviceAttribute.IntValues != nil || deviceAttribute.StringValues != nil || deviceAttribute.VersionValues != nil {
+				return true
+			}
+		}
+	}
+
+	return false
 }

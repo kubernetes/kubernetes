@@ -42,6 +42,7 @@ import (
 	"google.golang.org/grpc/internal"
 	"google.golang.org/grpc/internal/binarylog"
 	"google.golang.org/grpc/internal/channelz"
+	"google.golang.org/grpc/internal/envconfig"
 	"google.golang.org/grpc/internal/grpcsync"
 	"google.golang.org/grpc/internal/grpcutil"
 	istats "google.golang.org/grpc/internal/stats"
@@ -149,6 +150,8 @@ type Server struct {
 
 	serverWorkerChannel      chan func()
 	serverWorkerChannelClose func()
+
+	strictPathCheckingLogEmitted atomic.Bool
 }
 
 type serverOptions struct {
@@ -189,6 +192,7 @@ var defaultServerOptions = serverOptions{
 	maxSendMessageSize:    defaultServerMaxSendMessageSize,
 	connectionTimeout:     120 * time.Second,
 	writeBufferSize:       defaultWriteBufSize,
+	sharedWriteBuffer:     true,
 	readBufferSize:        defaultReadBufSize,
 	bufferPool:            mem.DefaultBufferPool(),
 }
@@ -923,9 +927,7 @@ func (s *Server) Serve(lis net.Listener) error {
 					tempDelay = 5 * time.Millisecond
 				} else {
 					tempDelay *= 2
-				}
-				if max := 1 * time.Second; tempDelay > max {
-					tempDelay = max
+					tempDelay = min(tempDelay, 1*time.Second)
 				}
 				s.mu.Lock()
 				s.printf("Accept error: %v; retrying in %v", err, tempDelay)
@@ -1764,6 +1766,24 @@ func (s *Server) processStreamingRPC(ctx context.Context, stream *transport.Serv
 	return ss.s.WriteStatus(statusOK)
 }
 
+func (s *Server) handleMalformedMethodName(stream *transport.ServerStream, ti *traceInfo) {
+	if ti != nil {
+		ti.tr.LazyLog(&fmtStringer{"Malformed method name %q", []any{stream.Method()}}, true)
+		ti.tr.SetError()
+	}
+	errDesc := fmt.Sprintf("malformed method name: %q", stream.Method())
+	if err := stream.WriteStatus(status.New(codes.Unimplemented, errDesc)); err != nil {
+		if ti != nil {
+			ti.tr.LazyLog(&fmtStringer{"%v", []any{err}}, true)
+			ti.tr.SetError()
+		}
+		channelz.Warningf(logger, s.channelz, "grpc: Server.handleStream failed to write status: %v", err)
+	}
+	if ti != nil {
+		ti.tr.Finish()
+	}
+}
+
 func (s *Server) handleStream(t transport.ServerTransport, stream *transport.ServerStream) {
 	ctx := stream.Context()
 	ctx = contextWithServer(ctx, s)
@@ -1784,26 +1804,30 @@ func (s *Server) handleStream(t transport.ServerTransport, stream *transport.Ser
 	}
 
 	sm := stream.Method()
-	if sm != "" && sm[0] == '/' {
+	if sm == "" {
+		s.handleMalformedMethodName(stream, ti)
+		return
+	}
+	if sm[0] != '/' {
+		// TODO(easwars): Add a link to the CVE in the below log messages once
+		// published.
+		if envconfig.DisableStrictPathChecking {
+			if old := s.strictPathCheckingLogEmitted.Swap(true); !old {
+				channelz.Warningf(logger, s.channelz, "grpc: Server.handleStream received malformed method name %q. Allowing it because the environment variable GRPC_GO_EXPERIMENTAL_DISABLE_STRICT_PATH_CHECKING is set to true, but this option will be removed in a future release.", sm)
+			}
+		} else {
+			if old := s.strictPathCheckingLogEmitted.Swap(true); !old {
+				channelz.Warningf(logger, s.channelz, "grpc: Server.handleStream rejected malformed method name %q. To temporarily allow such requests, set the environment variable GRPC_GO_EXPERIMENTAL_DISABLE_STRICT_PATH_CHECKING to true. Note that this is not recommended as it may allow requests to bypass security policies.", sm)
+			}
+			s.handleMalformedMethodName(stream, ti)
+			return
+		}
+	} else {
 		sm = sm[1:]
 	}
 	pos := strings.LastIndex(sm, "/")
 	if pos == -1 {
-		if ti != nil {
-			ti.tr.LazyLog(&fmtStringer{"Malformed method name %q", []any{sm}}, true)
-			ti.tr.SetError()
-		}
-		errDesc := fmt.Sprintf("malformed method name: %q", stream.Method())
-		if err := stream.WriteStatus(status.New(codes.Unimplemented, errDesc)); err != nil {
-			if ti != nil {
-				ti.tr.LazyLog(&fmtStringer{"%v", []any{err}}, true)
-				ti.tr.SetError()
-			}
-			channelz.Warningf(logger, s.channelz, "grpc: Server.handleStream failed to write status: %v", err)
-		}
-		if ti != nil {
-			ti.tr.Finish()
-		}
+		s.handleMalformedMethodName(stream, ti)
 		return
 	}
 	service := sm[:pos]

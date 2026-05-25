@@ -25,6 +25,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/flagz"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/statusz"
@@ -41,12 +42,14 @@ type KubeletAuth struct {
 	// KubeletRequestAttributesGetter builds authorization.Attributes for a request to the Kubelet API
 	NodeRequestAttributesGetter
 	// authorizer determines whether a given authorization.Attributes is allowed
-	authorizer.Authorizer
+	authorizer.UnconditionalAuthorizer
+	// CAContentProvider returns CA content for client CA authorization
+	dynamiccertificates.CAContentProvider
 }
 
 // NewKubeletAuth returns a kubelet.AuthInterface composed of the given authenticator, attribute getter, and authorizer
-func NewKubeletAuth(authenticator authenticator.Request, authorizerAttributeGetter NodeRequestAttributesGetter, authorizer authorizer.Authorizer) AuthInterface {
-	return &KubeletAuth{authenticator, authorizerAttributeGetter, authorizer}
+func NewKubeletAuth(authenticator authenticator.Request, authorizerAttributeGetter NodeRequestAttributesGetter, authorizer authorizer.UnconditionalAuthorizer, clientCAProvider dynamiccertificates.CAContentProvider) AuthInterface {
+	return &KubeletAuth{authenticator, authorizerAttributeGetter, authorizer, clientCAProvider}
 }
 
 // NewNodeAuthorizerAttributesGetter creates a new authorizer.RequestAttributesGetter for the node.

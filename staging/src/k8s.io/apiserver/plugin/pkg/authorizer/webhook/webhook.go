@@ -41,8 +41,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
-	genericfeatures "k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook/metrics"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -306,19 +304,17 @@ func resourceAttributesFrom(attr authorizer.Attributes) *authorizationv1.Resourc
 		Name:        attr.GetName(),
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.AuthorizeWithSelectors) {
-		// If we are able to get any requirements while parsing selectors, use them, even if there's an error.
-		// This is because selectors only narrow, so if a subset of selector requirements are available, the request can be allowed.
-		if selectorRequirements, _ := fieldSelectorToAuthorizationAPI(attr); len(selectorRequirements) > 0 {
-			ret.FieldSelector = &authorizationv1.FieldSelectorAttributes{
-				Requirements: selectorRequirements,
-			}
+	// If we are able to get any requirements while parsing selectors, use them, even if there's an error.
+	// This is because selectors only narrow, so if a subset of selector requirements are available, the request can be allowed.
+	if selectorRequirements, _ := fieldSelectorToAuthorizationAPI(attr); len(selectorRequirements) > 0 {
+		ret.FieldSelector = &authorizationv1.FieldSelectorAttributes{
+			Requirements: selectorRequirements,
 		}
+	}
 
-		if selectorRequirements, _ := labelSelectorToAuthorizationAPI(attr); len(selectorRequirements) > 0 {
-			ret.LabelSelector = &authorizationv1.LabelSelectorAttributes{
-				Requirements: selectorRequirements,
-			}
+	if selectorRequirements, _ := labelSelectorToAuthorizationAPI(attr); len(selectorRequirements) > 0 {
+		ret.LabelSelector = &authorizationv1.LabelSelectorAttributes{
+			Requirements: selectorRequirements,
 		}
 	}
 

@@ -1043,7 +1043,7 @@ func testIterativeDeployments(ctx context.Context, f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	iterations := 20
-	for i := 0; i < iterations; i++ {
+	for i := range iterations {
 		if r := rand.Float32(); r < 0.6 {
 			time.Sleep(time.Duration(float32(i) * r * float32(time.Second)))
 		}

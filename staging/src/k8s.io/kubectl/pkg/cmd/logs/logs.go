@@ -366,7 +366,7 @@ func (o LogsOptions) RunLogs() error {
 //
 // When a signal is received, streaming is stopped, then followed by os.Exit(1).
 func (o LogsOptions) RunLogsContext(ctx context.Context) error {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	intr := interrupt.New(nil, cancel)
 	return intr.Run(func() error {

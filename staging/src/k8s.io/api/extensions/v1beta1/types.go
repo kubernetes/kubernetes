@@ -27,9 +27,9 @@ import (
 type ScaleSpec struct {
 	// desired number of instances for the scaled object.
 	// +optional
-	// +k8s:optional
+	// +k8s:alpha(since: "1.36")=+k8s:optional
 	// +default=0
-	// +k8s:minimum=0
+	// +k8s:alpha(since: "1.36")=+k8s:minimum=0
 	Replicas int32 `json:"replicas,omitempty" protobuf:"varint,1,opt,name=replicas"`
 }
 
@@ -57,11 +57,11 @@ type ScaleStatus struct {
 // +k8s:prerelease-lifecycle-gen:introduced=1.1
 // +k8s:prerelease-lifecycle-gen:deprecated=1.2
 // +k8s:prerelease-lifecycle-gen:removed=1.16
-// +k8s:isSubresource=/scale
+// +k8s:isSubresource="/scale"
 
 // represents a scaling request for a resource.
 type Scale struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -88,8 +88,9 @@ type Scale struct {
 // DEPRECATED - This group version of Deployment is deprecated by apps/v1beta2/Deployment. See the release notes for
 // more information.
 // Deployment enables declarative updates for Pods and ReplicaSets.
+// +k8s:supportsSubresource="/status"
 type Deployment struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -164,7 +165,7 @@ type DeploymentSpec struct {
 // DEPRECATED.
 // DeploymentRollback stores the information required to rollback a deployment.
 type DeploymentRollback struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Required: This must match the Name of a deployment.
 	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
 	// The annotations to be updated to a deployment
@@ -333,7 +334,7 @@ type DeploymentCondition struct {
 
 // DeploymentList is a list of Deployments.
 type DeploymentList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard list metadata.
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
@@ -539,8 +540,9 @@ type DaemonSetCondition struct {
 // DEPRECATED - This group version of DaemonSet is deprecated by apps/v1beta2/DaemonSet. See the release notes for
 // more information.
 // DaemonSet represents the configuration of a daemon set.
+// +k8s:supportsSubresource="/status"
 type DaemonSet struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -581,7 +583,7 @@ const (
 
 // DaemonSetList is a collection of daemon sets.
 type DaemonSetList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -603,8 +605,9 @@ type DaemonSetList struct {
 // externally-reachable urls, load balance traffic, terminate SSL, offer name
 // based virtual hosting etc.
 // DEPRECATED - This group version of Ingress is deprecated by networking.k8s.io/v1beta1 Ingress. See the release notes for more information.
+// +k8s:supportsSubresource="/status"
 type Ingress struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -629,7 +632,7 @@ type Ingress struct {
 
 // IngressList is a collection of Ingress.
 type IngressList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -786,7 +789,7 @@ type IngressRule struct {
 	// default backend, is left to the controller fulfilling the Ingress. Http is
 	// currently the only supported IngressRuleValue.
 	// +optional
-	IngressRuleValue `json:",inline" protobuf:"bytes,2,opt,name=ingressRuleValue"`
+	IngressRuleValue `json:"" protobuf:"bytes,2,opt,name=ingressRuleValue"`
 }
 
 // IngressRuleValue represents a rule to apply against incoming requests. If the
@@ -914,8 +917,9 @@ type IngressBackend struct {
 // DEPRECATED - This group version of ReplicaSet is deprecated by apps/v1beta2/ReplicaSet. See the release notes for
 // more information.
 // ReplicaSet ensures that a specified number of pod replicas are running at any given time.
+// +k8s:supportsSubresource="/status"
 type ReplicaSet struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// If the Labels of a ReplicaSet are empty, they are defaulted to
 	// be the same as the Pod(s) that the ReplicaSet manages.
@@ -945,7 +949,7 @@ type ReplicaSet struct {
 
 // ReplicaSetList is a collection of ReplicaSets.
 type ReplicaSetList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
 	// +optional
@@ -1060,7 +1064,7 @@ type ReplicaSetCondition struct {
 // DEPRECATED 1.9 - This group version of NetworkPolicy is deprecated by networking/v1/NetworkPolicy.
 // NetworkPolicy describes what network traffic is allowed for a set of Pods
 type NetworkPolicy struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -1106,6 +1110,7 @@ type NetworkPolicySpec struct {
 	// (and serves solely to ensure that the pods it selects are isolated by default).
 	// +optional
 	// +listType=atomic
+	// +k8s:alpha(since: "1.36")=+k8s:optional
 	Ingress []NetworkPolicyIngressRule `json:"ingress,omitempty" protobuf:"bytes,2,rep,name=ingress"`
 
 	// List of egress rules to be applied to the selected pods. Outgoing traffic is
@@ -1117,6 +1122,7 @@ type NetworkPolicySpec struct {
 	// This field is beta-level in 1.8
 	// +optional
 	// +listType=atomic
+	// +k8s:alpha(since: "1.36")=+k8s:optional
 	Egress []NetworkPolicyEgressRule `json:"egress,omitempty" protobuf:"bytes,3,rep,name=egress"`
 
 	// List of rule types that the NetworkPolicy relates to.
@@ -1153,6 +1159,7 @@ type NetworkPolicyIngressRule struct {
 	// traffic matches at least one item in the from list.
 	// +optional
 	// +listType=atomic
+	// +k8s:alpha(since: "1.36")=+k8s:optional
 	From []NetworkPolicyPeer `json:"from,omitempty" protobuf:"bytes,2,rep,name=from"`
 }
 
@@ -1177,6 +1184,7 @@ type NetworkPolicyEgressRule struct {
 	// allows traffic only if the traffic matches at least one item in the to list.
 	// +optional
 	// +listType=atomic
+	// +k8s:alpha(since: "1.36")=+k8s:optional
 	To []NetworkPolicyPeer `json:"to,omitempty" protobuf:"bytes,2,rep,name=to"`
 }
 
@@ -1210,7 +1218,7 @@ type IPBlock struct {
 	// CIDR is a string representing the IP Block
 	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
 	// +required
-	// +k8s:required
+	// +k8s:alpha(since: "1.36")=+k8s:required
 	CIDR string `json:"cidr" protobuf:"bytes,1,name=cidr"`
 	// Except is a slice of CIDRs that should not be included within an IP Block
 	// Valid examples are "192.168.1.0/24" or "2001:db8::/64"
@@ -1243,7 +1251,7 @@ type NetworkPolicyPeer struct {
 	// IPBlock defines policy on a particular IPBlock. If this field is set then
 	// neither of the other fields can be.
 	// +optional
-	// +k8s:optional
+	// +k8s:alpha(since: "1.36")=+k8s:optional
 	IPBlock *IPBlock `json:"ipBlock,omitempty" protobuf:"bytes,3,rep,name=ipBlock"`
 }
 
@@ -1256,7 +1264,7 @@ type NetworkPolicyPeer struct {
 // DEPRECATED 1.9 - This group version of NetworkPolicyList is deprecated by networking/v1/NetworkPolicyList.
 // Network Policy List is a list of NetworkPolicy objects.
 type NetworkPolicyList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional

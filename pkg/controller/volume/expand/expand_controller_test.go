@@ -90,19 +90,18 @@ func TestSyncHandler(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tests {
+	for _, test := range tests {
 		tCtx := ktesting.Init(t)
-		test := tc
 		fakeKubeClient := controllervolumetesting.CreateTestClient(tCtx.Logger())
 		informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 		pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
 
 		pvc := test.pvc
-		if tc.pv != nil {
-			informerFactory.Core().V1().PersistentVolumes().Informer().GetIndexer().Add(tc.pv)
+		if test.pv != nil {
+			_ = informerFactory.Core().V1().PersistentVolumes().Informer().GetIndexer().Add(test.pv)
 		}
 
-		if tc.pvc != nil {
+		if test.pvc != nil {
 			informerFactory.Core().V1().PersistentVolumeClaims().Informer().GetIndexer().Add(pvc)
 		}
 		allPlugins := []volume.VolumePlugin{}

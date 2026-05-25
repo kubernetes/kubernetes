@@ -149,6 +149,7 @@ func (t *volumeModeTestSuite) DefineTests(driver storageframework.TestDriver, pa
 				scName = fmt.Sprintf("%s-%s-sc-for-file", l.ns.Name, dInfo.Name)
 			}
 			if pDriver, ok := driver.(storageframework.PreprovisionedPVTestDriver); ok {
+				//lint:ignore SA5011 If pvSource == nil we are already skipping test.
 				pvSource, volumeNodeAffinity = pDriver.GetPersistentVolumeSource(false, fsType, l.Volume)
 				if pvSource == nil {
 					e2eskipper.Skipf("Driver %q does not define PersistentVolumeSource - skipping", dInfo.Name)

@@ -69,7 +69,8 @@ func (p *bestEffortPolicy) RemoveContainer(logger logr.Logger, s state.State, po
 }
 
 func (p *bestEffortPolicy) GetPodTopologyHints(logger logr.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
-	return p.static.GetPodTopologyHints(logger, s, pod)
+	// Pod-level resources are not supported on Windows.
+	return nil
 }
 
 func (p *bestEffortPolicy) GetTopologyHints(logger logr.Logger, s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
@@ -78,4 +79,9 @@ func (p *bestEffortPolicy) GetTopologyHints(logger logr.Logger, s state.State, p
 
 func (p *bestEffortPolicy) GetAllocatableMemory(s state.State) []state.Block {
 	return p.static.GetAllocatableMemory(s)
+}
+
+func (p *bestEffortPolicy) AllocatePod(logger logr.Logger, s state.State, pod *v1.Pod) error {
+	// Pod-level resources are not supported on Windows.
+	return nil
 }

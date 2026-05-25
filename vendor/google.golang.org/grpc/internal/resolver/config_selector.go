@@ -115,6 +115,9 @@ type ClientInterceptor interface {
 	// ClientStream after done is called, since the interceptor is invoked by
 	// application-layer operations.  done must never be nil when called.
 	NewStream(ctx context.Context, ri RPCInfo, done func(), newStream func(ctx context.Context, done func()) (ClientStream, error)) (ClientStream, error)
+	// Close closes the interceptor. Once called, no new calls to NewStream are
+	// accepted. Ongoing calls to NewStream are allowed to complete.
+	Close()
 }
 
 // ServerInterceptor is an interceptor for incoming RPC's on gRPC server side.
@@ -123,6 +126,9 @@ type ServerInterceptor interface {
 	// information about connection RPC was received on, and HTTP Headers. This
 	// information will be piped into context.
 	AllowRPC(ctx context.Context) error // TODO: Make this a real interceptor for filters such as rate limiting.
+	// Close closes the interceptor. Once called, no new calls to NewStream are
+	// accepted. Ongoing calls to NewStream are allowed to complete.
+	Close()
 }
 
 type csKeyType string

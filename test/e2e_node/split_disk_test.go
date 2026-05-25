@@ -131,7 +131,7 @@ func runImageFsPressureTest(f *framework.Framework, pressureTimeout time.Duratio
 		})
 
 		ginkgo.It("should evict all of the correct pods", func(ctx context.Context) {
-			_, is, err := getCRIClient()
+			_, is, err := getCRIClient(ctx)
 			framework.ExpectNoError(err)
 			resp, err := is.ImageFsInfo(ctx)
 			framework.ExpectNoError(err)
@@ -302,7 +302,7 @@ func removeDiskPressure(diskToPressure string) error {
 }
 
 func hasSplitFileSystem(ctx context.Context) bool {
-	_, is, err := getCRIClient()
+	_, is, err := getCRIClient(ctx)
 	framework.ExpectNoError(err)
 	resp, err := is.ImageFsInfo(ctx)
 	framework.ExpectNoError(err)

@@ -302,6 +302,52 @@ spec:
 			expectedResult: nil,
 			expectedError:  ptr.To("invalid service configuration object \"DaemonSet\""),
 		},
+		{
+			name:       "v1beta1 with tlsServerName",
+			createFile: true,
+			contents: `
+apiVersion: apiserver.k8s.io/v1beta1
+kind: EgressSelectorConfiguration
+egressSelections:
+- name: "cluster"
+  connection:
+    proxyProtocol: "HTTPConnect"
+    transport:
+      tcp:
+        url: "https://proxy.kube-system.svc.cluster.local:8443"
+        tlsConfig:
+          caBundle: "/etc/srv/kubernetes/pki/konnectivity-server/ca.crt"
+          clientKey: "/etc/srv/kubernetes/pki/konnectivity-server/client.key"
+          clientCert: "/etc/srv/kubernetes/pki/konnectivity-server/client.crt"
+          tlsServerName: "konnectivity-server.example.com"
+`,
+			expectedResult: &apiserver.EgressSelectorConfiguration{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "",
+					APIVersion: "",
+				},
+				EgressSelections: []apiserver.EgressSelection{
+					{
+						Name: "cluster",
+						Connection: apiserver.Connection{
+							ProxyProtocol: "HTTPConnect",
+							Transport: &apiserver.Transport{
+								TCP: &apiserver.TCPTransport{
+									URL: "https://proxy.kube-system.svc.cluster.local:8443",
+									TLSConfig: &apiserver.TLSConfig{
+										CABundle:      "/etc/srv/kubernetes/pki/konnectivity-server/ca.crt",
+										ClientKey:     "/etc/srv/kubernetes/pki/konnectivity-server/client.key",
+										ClientCert:    "/etc/srv/kubernetes/pki/konnectivity-server/client.crt",
+										TLSServerName: "konnectivity-server.example.com",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedError: nil,
+		},
 	}
 
 	for _, tc := range testcases {

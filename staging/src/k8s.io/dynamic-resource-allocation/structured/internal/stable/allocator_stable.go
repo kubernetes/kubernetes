@@ -184,12 +184,12 @@ func (a *Allocator) Allocate(ctx context.Context, node *v1.Node, claims []*resou
 				// We can only predict a lower number of devices because it depends on which
 				// subrequest gets chosen.
 				for i, subReq := range request.FirstAvailable {
+					requestKey.subRequestIndex = i
 					reqData, err := alloc.validateDeviceRequest(&deviceSubRequestAccessor{subRequest: &subReq},
 						&exactDeviceRequestAccessor{request: request}, requestKey, pools)
 					if err != nil {
 						return nil, err
 					}
-					requestKey.subRequestIndex = i
 					alloc.requestData[requestKey] = reqData
 					if reqData.numDevices < minDevicesPerRequest {
 						minDevicesPerRequest = reqData.numDevices
@@ -471,6 +471,7 @@ func (alloc *allocator) validateDeviceRequest(request requestAccessor, parentReq
 							id:     DeviceID{Driver: slice.Spec.Driver, Pool: slice.Spec.Pool.Name, Device: slice.Spec.Devices[deviceIndex].Name},
 							Device: &slice.Spec.Devices[deviceIndex],
 							slice:  slice,
+							pool:   pool,
 						}
 						requestData.allDevices = append(requestData.allDevices, device)
 					}
@@ -903,7 +904,7 @@ func (alloc *allocator) allocateOne(r deviceIndices, allocateSubRequest bool) (b
 			// get all of them, then there is no solution and we have to stop.
 			return false, nil
 		}
-		done, err := alloc.allocateOne(deviceIndices{claimIndex: r.claimIndex, requestIndex: r.requestIndex, deviceIndex: r.deviceIndex + 1}, allocateSubRequest)
+		done, err := alloc.allocateOne(deviceIndices{claimIndex: r.claimIndex, requestIndex: r.requestIndex, subRequestIndex: r.subRequestIndex, deviceIndex: r.deviceIndex + 1}, allocateSubRequest)
 		if err != nil || !done {
 			// If we get an error or didn't complete, we need to backtrack. Depending
 			// on the situation we might be able to retry, so we make sure we
@@ -1066,7 +1067,7 @@ func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.Device, 
 		// to use unique strings.
 		var d resourceapi.Device
 		if err := draapi.Convert_api_Device_To_v1_Device(device, &d, nil); err != nil {
-			return false, fmt.Errorf("convert Device: %w", err)
+			return false, fmt.Errorf("convert Device %s: %w", deviceID, err)
 		}
 		matches, details, err := expr.DeviceMatches(alloc.ctx, cel.Device{Driver: deviceID.Driver.String(), Attributes: d.Attributes, Capacity: d.Capacity})
 		if class != nil {
@@ -1076,11 +1077,11 @@ func (alloc *allocator) selectorsMatch(r requestIndices, device *draapi.Device, 
 		}
 
 		if err != nil {
-			// TODO (future): more detailed errors which reference class resp. claim.
+			err = cel.EnhanceRuntimeError(err)
 			if class != nil {
-				return false, fmt.Errorf("class %s: selector #%d: CEL runtime error: %w", class.Name, i, err)
+				return false, fmt.Errorf("class %s: selector #%d on device %s: CEL runtime error: %w", class.Name, i, deviceID, err)
 			}
-			return false, fmt.Errorf("claim %s: selector #%d: CEL runtime error: %w", klog.KObj(alloc.claimsToAllocate[r.claimIndex]), i, err)
+			return false, fmt.Errorf("claim %s: selector #%d on device %s: CEL runtime error: %w", klog.KObj(alloc.claimsToAllocate[r.claimIndex]), i, deviceID, err)
 		}
 		if !matches {
 			return false, nil

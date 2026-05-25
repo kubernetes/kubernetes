@@ -59,6 +59,12 @@ type Error struct {
 	// FromImperative denotes these errors are originating from  the hand written validations.
 	FromImperative bool
 
+	// ShortCircuit denotes that this error prevents further validation of the current field's children.
+	ShortCircuit bool
+
+	// ShortCircuitedInDeclarative denotes this error is covered by declarative validation. But not returned by declarative validation due to a short circuiting behavior for the current input.
+	ShortCircuitedInDeclarative bool
+
 	// ValidationStabilityLevel denotes the validation stability level of the declarative validation from this error is returned. This should be used in the declarative validations only.
 	ValidationStabilityLevel ValidationStabilityLevel
 }
@@ -109,10 +115,10 @@ var omitValue = OmitValueType{}
 func (e *Error) ErrorBody() string {
 	var s string
 	switch e.Type {
-	case ErrorTypeRequired, ErrorTypeForbidden, ErrorTypeTooLong, ErrorTypeInternal:
+	case ErrorTypeRequired, ErrorTypeForbidden, ErrorTypeTooLong, ErrorTypeTooShort, ErrorTypeInternal:
 		s = e.Type.String()
 	case ErrorTypeInvalid, ErrorTypeTypeInvalid, ErrorTypeNotSupported,
-		ErrorTypeNotFound, ErrorTypeDuplicate, ErrorTypeTooMany:
+		ErrorTypeNotFound, ErrorTypeDuplicate, ErrorTypeTooMany, ErrorTypeTooFew:
 		if e.BadValue == omitValue {
 			s = e.Type.String()
 			break
@@ -201,11 +207,18 @@ const (
 	// report that a given list has too many items. This is similar to FieldValueTooLong,
 	// but the error indicates quantity instead of length.
 	ErrorTypeTooMany ErrorType = "FieldValueTooMany"
+	// ErrorTypeTooFew is used to report "too few". This is used to
+	// report that a given list has too few items. This is similar to FieldValueTooLong,
+	// but the error indicates quantity instead of length.
+	ErrorTypeTooFew ErrorType = "FieldValueTooFew"
 	// ErrorTypeInternal is used to report other errors that are not related
 	// to user input.  See InternalError().
 	ErrorTypeInternal ErrorType = "InternalError"
 	// ErrorTypeTypeInvalid is for the value did not match the schema type for that field
 	ErrorTypeTypeInvalid ErrorType = "FieldValueTypeInvalid"
+	// ErrorTypeTooShort is used to report that the given value is too short.
+	// This is similar to ErrorTypeInvalid. See TooShort().
+	ErrorTypeTooShort ErrorType = "FieldValueTooShort"
 )
 
 // String converts a ErrorType into its corresponding canonical error message.
@@ -227,10 +240,14 @@ func (t ErrorType) String() string {
 		return "Too long"
 	case ErrorTypeTooMany:
 		return "Too many"
+	case ErrorTypeTooFew:
+		return "Too few"
 	case ErrorTypeInternal:
 		return "Internal error"
 	case ErrorTypeTypeInvalid:
 		return "Invalid value"
+	case ErrorTypeTooShort:
+		return "Too short"
 	default:
 		return fmt.Sprintf("<unknown error %q>", string(t))
 	}
@@ -346,6 +363,29 @@ func TooLong(field *Path, _ interface{}, maxLength int) *Error {
 	}
 }
 
+// TooLongCharacters returns a *Error indicating "too long".  This is used to report that
+// the given value is too long in characters (including multi-byte characters).
+// This is similar to Invalid, but the returned  error will not include the too-long value.
+// If maxLength is negative, it will be included in the message. The value argument is not used.
+func TooLongCharacters[T ~string](field *Path, _ T, maxLength int) *Error {
+	var msg string
+	if maxLength >= 0 {
+		bs := "characters"
+		if maxLength == 1 {
+			bs = "character"
+		}
+		msg = fmt.Sprintf("may not be more than %d %s", maxLength, bs)
+	} else {
+		msg = "value is too long"
+	}
+	return &Error{
+		Type:     ErrorTypeTooLong,
+		Field:    field.String(),
+		BadValue: "<value omitted>",
+		Detail:   msg,
+	}
+}
+
 // TooLongMaxLength returns a *Error indicating "too long".
 // Deprecated: Use TooLong instead.
 func TooLongMaxLength(field *Path, value interface{}, maxLength int) *Error {
@@ -392,6 +432,28 @@ func InternalError(field *Path, err error) *Error {
 		Field:    field.String(),
 		BadValue: err,
 		Detail:   err.Error(),
+	}
+}
+
+// TooShort returns a *Error indicating "too short".  This is used to report that
+// the given value is too short in characters. This is similar to Invalid.
+// If minLength is non-negative, it will  be included in the message.
+func TooShort[T ~string](field *Path, value T, minLength int) *Error {
+	var msg string
+	if minLength >= 0 {
+		bs := "characters"
+		if minLength == 1 {
+			bs = "character"
+		}
+		msg = fmt.Sprintf("must be at least %d %s", minLength, bs)
+	} else {
+		msg = "value is too short"
+	}
+	return &Error{
+		Type:     ErrorTypeTooShort,
+		Field:    field.String(),
+		BadValue: value,
+		Detail:   msg,
 	}
 }
 
@@ -489,6 +551,12 @@ func (e *Error) MarkAlpha() *Error {
 	return e
 }
 
+// MarkShortCircuitedInDV marks that this error is not returned by declarative validations, because DV returns before running the current validation. Handwritten validations still return it.
+func (e *Error) MarkShortCircuitedInDV() *Error {
+	e.ShortCircuitedInDeclarative = true
+	return e
+}
+
 // MarkAlpha marks the errors as alpha validation errors.
 func (list ErrorList) MarkAlpha() ErrorList {
 	for _, err := range list {
@@ -523,6 +591,14 @@ func (list ErrorList) MarkFromImperative() ErrorList {
 	return list
 }
 
+// MarkShortCircuit marks the errors as short-circuit errors.
+func (list ErrorList) MarkShortCircuit() ErrorList {
+	for _, err := range list {
+		err.ShortCircuit = true
+	}
+	return list
+}
+
 // RemoveCoveredByDeclarative returns a new ErrorList containing only the errors that should not be covered by declarative validation.
 func (list ErrorList) RemoveCoveredByDeclarative() ErrorList {
 	newList := ErrorList{}
@@ -532,4 +608,28 @@ func (list ErrorList) RemoveCoveredByDeclarative() ErrorList {
 		}
 	}
 	return newList
+}
+
+// TooFew returns a *Error indicating "too few". This is used to
+// report that a given list has too few items. This is similar to TooLong,
+// but the returned error indicates quantity instead of length.
+func TooFew(field *Path, actualQuantity, minQuantity int) *Error {
+	var msg string
+
+	if minQuantity >= 0 {
+		is := "items"
+		if minQuantity == 1 {
+			is = "item"
+		}
+		msg = fmt.Sprintf("must have at least %d %s", minQuantity, is)
+	} else {
+		msg = "has too few items"
+	}
+
+	return &Error{
+		Type:     ErrorTypeTooFew,
+		Field:    field.String(),
+		BadValue: actualQuantity,
+		Detail:   msg,
+	}
 }

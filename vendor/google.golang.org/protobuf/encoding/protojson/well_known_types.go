@@ -52,7 +52,10 @@ func wellKnownTypeMarshaler(name protoreflect.FullName) marshalFunc {
 		case genid.FieldMask_message_name:
 			return encoder.marshalFieldMask
 		case genid.Empty_message_name:
-			return encoder.marshalEmpty
+			// The spec explicitly specifies that the Empty message
+			// is not considered to have any special JSON mapping:
+			// https://protobuf.dev/programming-guides/json/#any
+			return nil
 		}
 	}
 	return nil

@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	clitesting "k8s.io/client-go/testing"
@@ -218,6 +219,9 @@ func TestMounterSetUp(t *testing.T) {
 	currentPodInfoMount := true
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			if !test.enableSELinuxFeatureGate {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SELinuxMountReadWriteOncePod, test.enableSELinuxFeatureGate)
 
 			modes := []storage.VolumeLifecycleMode{
@@ -1173,11 +1177,13 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 
 func TestMounterSetUpFWithNodePublishFinalError(t *testing.T) {
 	testCases := []struct {
-		name                string
-		podUID              types.UID
-		options             []string
-		spec                func(string, []string) *volume.Spec
-		reconstructedVolume bool
+		name                 string
+		podUID               types.UID
+		options              []string
+		spec                 func(string, []string) *volume.Spec
+		reconstructedVolume  bool
+		isRemount            bool
+		expectDataFileExists bool
 	}{
 		{
 			name:   "setup with reconstructed volume",
@@ -1188,7 +1194,8 @@ func TestMounterSetUpFWithNodePublishFinalError(t *testing.T) {
 				pvSrc.Spec.MountOptions = options
 				return volume.NewSpecFromPersistentVolume(pvSrc, false)
 			},
-			reconstructedVolume: true,
+			reconstructedVolume:  true,
+			expectDataFileExists: true,
 		},
 		{
 			name:   "setup with new volume",
@@ -1199,7 +1206,27 @@ func TestMounterSetUpFWithNodePublishFinalError(t *testing.T) {
 				pvSrc.Spec.MountOptions = options
 				return volume.NewSpecFromPersistentVolume(pvSrc, false)
 			},
-			reconstructedVolume: false,
+			reconstructedVolume:  false,
+			expectDataFileExists: false,
+		},
+		{
+			// Regression test for https://github.com/kubernetes/kubernetes/issues/121271:
+			// when NodePublishVolume fails on a remount (e.g. a republish
+			// triggered by CSIDriver.spec.requiresRepublish=true), the
+			// mount directory and vol_data.json must be preserved so the
+			// pod continues to see the previously-published contents and
+			// a subsequent successful republish can refresh them in place.
+			name:   "setup with remount preserves mount dir on final error",
+			podUID: types.UID(fmt.Sprintf("%08X", rand.Uint64())),
+			spec: func(fsType string, options []string) *volume.Spec {
+				pvSrc := makeTestPV("pv1", 20, testDriver, "vol1")
+				pvSrc.Spec.CSI.FSType = fsType
+				pvSrc.Spec.MountOptions = options
+				return volume.NewSpecFromPersistentVolume(pvSrc, false)
+			},
+			reconstructedVolume:  false,
+			isRemount:            true,
+			expectDataFileExists: true,
 		},
 	}
 
@@ -1236,21 +1263,20 @@ func TestMounterSetUpFWithNodePublishFinalError(t *testing.T) {
 			csiMounter.csiClient.(*fakeCsiDriverClient).nodeClient.SetNextError(status.Errorf(codes.InvalidArgument, "mount failed"))
 
 			// Mounter.SetUp()
-			if err := csiMounter.SetUp(volume.MounterArgs{ReconstructedVolume: tc.reconstructedVolume}); err == nil {
+			if err := csiMounter.SetUp(volume.MounterArgs{
+				ReconstructedVolume: tc.reconstructedVolume,
+				IsRemount:           tc.isRemount,
+			}); err == nil {
 				t.Fatalf("mounter.Setup expected err but succeed")
 			}
 
 			mountPath := csiMounter.GetPath()
 			volPath := filepath.Dir(mountPath)
 			dataFile := filepath.Join(volPath, volDataFileName)
-			if tc.reconstructedVolume {
-				if _, err := os.Stat(dataFile); os.IsNotExist(err) {
-					t.Errorf("volume file [%s] expects to be exists, but removed", dataFile)
-				}
-				return
-			}
-			if _, err := os.Stat(dataFile); err == nil {
-				t.Errorf("volume file [%s] expects to be removed, but exists", dataFile)
+			_, statErr := os.Stat(dataFile)
+			exists := statErr == nil
+			if exists != tc.expectDataFileExists {
+				t.Errorf("volume file [%s]: exists=%v, want=%v (statErr=%v)", dataFile, exists, tc.expectDataFileExists, statErr)
 			}
 		})
 	}

@@ -30,6 +30,19 @@ const (
 	group      = "group"
 	version    = "version"
 	resource   = "resource"
+	errorType  = "type"
+
+	// ProxyErrorEndpointResolution indicates a failure to resolve the network address of a peer apiserver.
+	ProxyErrorEndpointResolution = "endpoint_resolution"
+	// ProxyErrorTransport indicates a failure to build the proxy transport for the request.
+	ProxyErrorTransport = "proxy_transport"
+
+	// DiscoveryErrorLeaseList indicates a failure to list apiserver identity leases.
+	DiscoveryErrorLeaseList = "lease_list"
+	// DiscoveryErrorHostPortResolution indicates a failure to resolve host/port from an identity lease.
+	DiscoveryErrorHostPortResolution = "hostport_resolution"
+	// DiscoveryErrorFetch indicates a failure to fetch discovery document from a peer.
+	DiscoveryErrorFetch = "fetch_discovery"
 )
 
 var registerMetricsOnce sync.Once
@@ -45,11 +58,35 @@ var (
 		},
 		[]string{statuscode, group, version, resource},
 	)
+
+	// peerProxyErrorsTotal counts the number of errors encountered while proxying requests to a peer kube-apiserver.
+	peerProxyErrorsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      subsystem,
+			Name:           "peer_proxy_errors_total",
+			Help:           "Total number of errors encountered while proxying requests to a peer kube apiserver",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{errorType, group, version, resource},
+	)
+
+	// peerDiscoverySyncErrorsTotal counts the number of errors encountered while syncing discovery information from a peer kube-apiserver.
+	peerDiscoverySyncErrorsTotal = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      subsystem,
+			Name:           "peer_discovery_sync_errors_total",
+			Help:           "Total number of errors encountered while syncing discovery information from a peer kube-apiserver",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{errorType},
+	)
 )
 
 func Register() {
 	registerMetricsOnce.Do(func() {
 		legacyregistry.MustRegister(peerProxiedRequestsTotal)
+		legacyregistry.MustRegister(peerProxyErrorsTotal)
+		legacyregistry.MustRegister(peerDiscoverySyncErrorsTotal)
 	})
 }
 
@@ -61,4 +98,14 @@ func Reset() {
 // IncPeerProxiedRequest increments the # of proxied requests to peer kube-apiserver
 func IncPeerProxiedRequest(ctx context.Context, status, g, v, r string) {
 	peerProxiedRequestsTotal.WithContext(ctx).WithLabelValues(status, g, v, r).Add(1)
+}
+
+// IncPeerProxyError increments the # of errors encountered during peer proxying
+func IncPeerProxyError(ctx context.Context, e, g, v, r string) {
+	peerProxyErrorsTotal.WithContext(ctx).WithLabelValues(e, g, v, r).Add(1)
+}
+
+// IncPeerDiscoverySyncError increments the # of errors encountered during peer discovery sync
+func IncPeerDiscoverySyncError(ctx context.Context, e string) {
+	peerDiscoverySyncErrorsTotal.WithContext(ctx).WithLabelValues(e).Add(1)
 }

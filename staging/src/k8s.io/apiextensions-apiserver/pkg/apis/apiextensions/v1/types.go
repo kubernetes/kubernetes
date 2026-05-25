@@ -332,6 +332,9 @@ const (
 	// be true if .metadata.annotations["api-approved.kubernetes.io"] is set to a URL, otherwise it will be false.
 	// See https://github.com/kubernetes/enhancements/pull/1111 for more details.
 	KubernetesAPIApprovalPolicyConformant CustomResourceDefinitionConditionType = "KubernetesAPIApprovalPolicyConformant"
+	// StorageMigrating indicates that the underlying storage version of the CRD
+	// is undergoing migration.
+	StorageMigrating CustomResourceDefinitionConditionType = "StorageMigrating"
 )
 
 // CustomResourceDefinitionCondition contains details for the current condition of this pod.
@@ -399,7 +402,7 @@ const CustomResourceCleanupFinalizer = "customresourcecleanup.apiextensions.k8s.
 // CustomResourceDefinition represents a resource that should be exposed on the API server.  Its name MUST be in the format
 // <.spec.name>.<.spec.group>.
 type CustomResourceDefinition struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// Standard object's metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -417,7 +420,7 @@ type CustomResourceDefinition struct {
 
 // CustomResourceDefinitionList is a list of CustomResourceDefinition objects.
 type CustomResourceDefinitionList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard object's metadata
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -486,7 +489,7 @@ type CustomResourceSubresourceScale struct {
 
 // ConversionReview describes a conversion request/response.
 type ConversionReview struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// request describes the attributes for the conversion request.
 	// +optional
 	Request *ConversionRequest `json:"request,omitempty" protobuf:"bytes,1,opt,name=request"`

@@ -41,6 +41,8 @@ type Policy interface {
 	// and is consulted to achieve NUMA aware resource alignment per Pod
 	// among this and other resource controllers.
 	GetPodTopologyHints(logger logr.Logger, s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint
+	// AllocatePod is called to trigger the allocation of CPUs to a pod.
+	AllocatePod(logger logr.Logger, s state.State, pod *v1.Pod) error
 	// GetAllocatableCPUs returns the total set of CPUs available for allocation.
 	GetAllocatableCPUs(m state.State) cpuset.CPUSet
 }

@@ -435,6 +435,14 @@ var _ = SIGDescribe("LocalStorageCapacityIsolationEviction", framework.WithSlow(
 				evictionPriority: 0, // This pod should not be evicted because it uses less than its limit
 				pod:              diskConsumingPod("container-disk-below-sizelimit", useUnderLimit, nil, v1.ResourceRequirements{Limits: containerLimit}),
 			},
+			{
+				evictionPriority: 1, // The restartable init container (sidecar) exceeds its container ephemeral-storage limit, so the pod should be evicted.
+				pod:              diskConsumingSidecarPod("sidecar-container-disk-limit", useOverLimit, v1.ResourceRequirements{Limits: containerLimit}),
+			},
+			{
+				evictionPriority: 0, // The restartable init container (sidecar) stays under its limit, so the pod should not be evicted.
+				pod:              diskConsumingSidecarPod("sidecar-container-disk-below-sizelimit", useUnderLimit, v1.ResourceRequirements{Limits: containerLimit}),
+			},
 		})
 	})
 })
@@ -1278,6 +1286,41 @@ func diskConsumingPod(name string, diskConsumedMB int, volumeSource *v1.VolumeSo
 	}
 	// Each iteration writes 1 Mb, so do diskConsumedMB iterations.
 	return podWithCommand(volumeSource, resources, diskConsumedMB, name, fmt.Sprintf("dd if=/dev/urandom of=%s${i} bs=1048576 count=1 2>/dev/null; sleep .1;", filepath.Join(path, "file")), true)
+}
+
+// diskConsumingSidecarPod returns a pod whose restartable init container (sidecar)
+// writes diskConsumedMB MB to its writable layer, with the supplied resource
+// requirements applied to the sidecar. The main container only sleeps so that the
+// pod's eligibility for eviction is determined entirely by the sidecar's disk usage.
+func diskConsumingSidecarPod(name string, diskConsumedMB int, sidecarResources v1.ResourceRequirements) *v1.Pod {
+	var gracePeriod int64 = 1
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("%s-pod", name)},
+		Spec: v1.PodSpec{
+			RestartPolicy:                 v1.RestartPolicyNever,
+			TerminationGracePeriodSeconds: &gracePeriod,
+			InitContainers: []v1.Container{
+				{
+					Image:         busyboxImage,
+					Name:          fmt.Sprintf("%s-sidecar", name),
+					RestartPolicy: &containerRestartPolicyAlways,
+					Command: []string{
+						"sh",
+						"-c",
+						fmt.Sprintf("i=0; while [ $i -lt %d ]; do dd if=/dev/urandom of=file${i} bs=1048576 count=1 2>/dev/null; sleep .1; i=$(($i+1)); done; while true; do sleep 5; done", diskConsumedMB),
+					},
+					Resources: sidecarResources,
+				},
+			},
+			Containers: []v1.Container{
+				{
+					Image:   busyboxImage,
+					Name:    fmt.Sprintf("%s-container", name),
+					Command: []string{"sh", "-c", "sleep infinity"},
+				},
+			},
+		},
+	}
 }
 
 func pidConsumingPod(name string, numProcesses int) *v1.Pod {

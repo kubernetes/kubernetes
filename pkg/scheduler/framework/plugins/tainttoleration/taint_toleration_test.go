@@ -597,57 +597,12 @@ func TestIsSchedulableAfterNodeChange(t *testing.T) {
 	}
 }
 
-func Test_isSchedulableAfterPodTolerationChange(t *testing.T) {
+func Test_isSchedulableAfterTargetPodTolerationChange(t *testing.T) {
 	testcases := map[string]struct {
 		pod            *v1.Pod
 		oldObj, newObj interface{}
 		expectedHint   fwk.QueueingHint
-		expectedErr    bool
 	}{
-		"backoff-wrong-new-object": {
-			pod:          &v1.Pod{},
-			newObj:       "not-a-pod",
-			expectedHint: fwk.Queue,
-			expectedErr:  true,
-		},
-		"backoff-wrong-old-object": {
-			pod:          &v1.Pod{},
-			oldObj:       "not-a-pod",
-			newObj:       &v1.Pod{},
-			expectedHint: fwk.Queue,
-			expectedErr:  true,
-		},
-		"skip-updates-other-pod": {
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pod-1",
-					Namespace: "ns-1",
-					UID:       "uid0",
-				}},
-			oldObj: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pod-2",
-					Namespace: "ns-1",
-					UID:       "uid1",
-				}},
-			newObj: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "pod-2",
-					Namespace: "ns-1",
-					UID:       "uid1",
-				},
-				Spec: v1.PodSpec{
-					Tolerations: []v1.Toleration{
-						{
-							Key:    "foo",
-							Effect: v1.TaintEffectNoSchedule,
-						},
-					},
-				},
-			},
-			expectedHint: fwk.QueueSkip,
-			expectedErr:  false,
-		},
 		"queue-on-toleration-added": {
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
@@ -674,7 +629,6 @@ func Test_isSchedulableAfterPodTolerationChange(t *testing.T) {
 				},
 			},
 			expectedHint: fwk.Queue,
-			expectedErr:  false,
 		},
 	}
 
@@ -685,16 +639,9 @@ func Test_isSchedulableAfterPodTolerationChange(t *testing.T) {
 			if err != nil {
 				t.Fatalf("creating plugin: %v", err)
 			}
-			actualHint, err := p.(*TaintToleration).isSchedulableAfterPodTolerationChange(logger, tc.pod, tc.oldObj, tc.newObj)
-			if tc.expectedErr {
-				if err == nil {
-					t.Errorf("unexpected success")
-				}
-				return
-			}
+			actualHint, err := p.(*TaintToleration).isSchedulableAfterTargetPodTolerationChange(logger, tc.pod, tc.oldObj, tc.newObj)
 			if err != nil {
-				t.Errorf("unexpected error")
-				return
+				t.Fatalf("Unexpected error: %v", err)
 			}
 			if diff := cmp.Diff(tc.expectedHint, actualHint); diff != "" {
 				t.Errorf("Unexpected hint (-want, +got):\n%s", diff)

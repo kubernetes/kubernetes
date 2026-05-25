@@ -20,7 +20,8 @@ package util
 
 import "os"
 
-// chown changes the numeric uid and gid of the named file.
-func (w *AtomicWriter) chown(name string, uid, gid int) error {
-	return os.Chown(name, uid, gid)
+// lchown changes the numeric uid and gid of the named file.
+// If the file is a symbolic link, it changes the uid and gid of the link itself.
+func (w *AtomicWriter) lchown(name string, uid, gid int) error {
+	return os.Lchown(name, uid, gid)
 }

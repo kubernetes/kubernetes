@@ -226,7 +226,6 @@ func (s *watchableStore) syncWatchersLoop() {
 
 	delayTicker := time.NewTicker(watchResyncPeriod)
 	defer delayTicker.Stop()
-	var evs []mvccpb.Event
 
 	for {
 		s.mu.RLock()
@@ -236,7 +235,7 @@ func (s *watchableStore) syncWatchersLoop() {
 
 		unsyncedWatchers := 0
 		if lastUnsyncedWatchers > 0 {
-			unsyncedWatchers, evs = s.syncWatchers(evs)
+			unsyncedWatchers = s.syncWatchers()
 		}
 		syncDuration := time.Since(st)
 
@@ -344,12 +343,12 @@ func (s *watchableStore) moveVictims() (moved int) {
 //  2. iterate over the set to get the minimum revision and remove compacted watchers
 //  3. use minimum revision to get all key-value pairs and send those events to watchers
 //  4. remove synced watchers in set from unsynced group and move to synced group
-func (s *watchableStore) syncWatchers(evs []mvccpb.Event) (int, []mvccpb.Event) {
+func (s *watchableStore) syncWatchers() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.unsynced.size() == 0 {
-		return 0, []mvccpb.Event{}
+		return 0
 	}
 
 	s.store.revMu.RLock()
@@ -362,7 +361,7 @@ func (s *watchableStore) syncWatchers(evs []mvccpb.Event) (int, []mvccpb.Event) 
 	compactionRev := s.store.compactMainRev
 
 	wg, minRev := s.unsynced.choose(maxWatchersPerSync, curRev, compactionRev)
-	evs = rangeEventsWithReuse(s.store.lg, s.store.b, evs, minRev, curRev+1)
+	evs := rangeEvents(s.store.lg, s.store.b, minRev, curRev+1, wg)
 
 	victims := make(watcherBatch)
 	wb := newWatcherBatch(wg, evs)
@@ -411,43 +410,11 @@ func (s *watchableStore) syncWatchers(evs []mvccpb.Event) (int, []mvccpb.Event) 
 	}
 	slowWatcherGauge.Set(float64(s.unsynced.size() + vsz))
 
-	return s.unsynced.size(), evs
-}
-
-// rangeEventsWithReuse returns events in range [minRev, maxRev), while reusing already provided events.
-func rangeEventsWithReuse(lg *zap.Logger, b backend.Backend, evs []mvccpb.Event, minRev, maxRev int64) []mvccpb.Event {
-	if len(evs) == 0 {
-		return rangeEvents(lg, b, minRev, maxRev)
-	}
-	// append from left
-	if evs[0].Kv.ModRevision > minRev {
-		evs = append(rangeEvents(lg, b, minRev, evs[0].Kv.ModRevision), evs...)
-	}
-	// cut from left
-	prefixIndex := 0
-	for prefixIndex < len(evs) && evs[prefixIndex].Kv.ModRevision < minRev {
-		prefixIndex++
-	}
-	evs = evs[prefixIndex:]
-
-	if len(evs) == 0 {
-		return rangeEvents(lg, b, minRev, maxRev)
-	}
-	// append from right
-	if evs[len(evs)-1].Kv.ModRevision+1 < maxRev {
-		evs = append(evs, rangeEvents(lg, b, evs[len(evs)-1].Kv.ModRevision+1, maxRev)...)
-	}
-	// cut from right
-	suffixIndex := len(evs) - 1
-	for suffixIndex >= 0 && evs[suffixIndex].Kv.ModRevision >= maxRev {
-		suffixIndex--
-	}
-	evs = evs[:suffixIndex+1]
-	return evs
+	return s.unsynced.size()
 }
 
 // rangeEvents returns events in range [minRev, maxRev).
-func rangeEvents(lg *zap.Logger, b backend.Backend, minRev, maxRev int64) []mvccpb.Event {
+func rangeEvents(lg *zap.Logger, b backend.Backend, minRev, maxRev int64, c contains) []mvccpb.Event {
 	if minRev < 0 {
 		lg.Warn("Unexpected negative revision range start", zap.Int64("minRev", minRev))
 		minRev = 0
@@ -461,7 +428,7 @@ func rangeEvents(lg *zap.Logger, b backend.Backend, minRev, maxRev int64) []mvcc
 	tx := b.ReadTx()
 	tx.RLock()
 	revs, vs := tx.UnsafeRange(schema.Key, minBytes, maxBytes, 0)
-	evs := kvsToEvents(lg, revs, vs)
+	evs := kvsToEvents(lg, c, revs, vs)
 	// Must unlock after kvsToEvents, because vs (come from boltdb memory) is not deep copy.
 	// We can only unlock after Unmarshal, which will do deep copy.
 	// Otherwise we will trigger SIGSEGV during boltdb re-mmap.
@@ -469,12 +436,20 @@ func rangeEvents(lg *zap.Logger, b backend.Backend, minRev, maxRev int64) []mvcc
 	return evs
 }
 
+type contains interface {
+	contains(string) bool
+}
+
 // kvsToEvents gets all events for the watchers from all key-value pairs
-func kvsToEvents(lg *zap.Logger, revs, vals [][]byte) (evs []mvccpb.Event) {
+func kvsToEvents(lg *zap.Logger, c contains, revs, vals [][]byte) (evs []mvccpb.Event) {
 	for i, v := range vals {
 		var kv mvccpb.KeyValue
 		if err := kv.Unmarshal(v); err != nil {
 			lg.Panic("failed to unmarshal mvccpb.KeyValue", zap.Error(err))
+		}
+
+		if !c.contains(string(kv.Key)) {
+			continue
 		}
 
 		ty := mvccpb.PUT

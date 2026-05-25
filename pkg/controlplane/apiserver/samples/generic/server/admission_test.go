@@ -21,13 +21,16 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
+	"k8s.io/kubernetes/plugin/pkg/admission/job"
 	"k8s.io/kubernetes/plugin/pkg/admission/limitranger"
 	"k8s.io/kubernetes/plugin/pkg/admission/network/defaultingressclass"
 	"k8s.io/kubernetes/plugin/pkg/admission/nodedeclaredfeatures"
 	"k8s.io/kubernetes/plugin/pkg/admission/nodetaint"
+	"k8s.io/kubernetes/plugin/pkg/admission/podresize"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtopologylabels"
 	podpriority "k8s.io/kubernetes/plugin/pkg/admission/priority"
 	"k8s.io/kubernetes/plugin/pkg/admission/runtimeclass"
+	"k8s.io/kubernetes/plugin/pkg/admission/scheduling/podgroupprotection"
 	"k8s.io/kubernetes/plugin/pkg/admission/security/podsecurity"
 	"k8s.io/kubernetes/plugin/pkg/admission/storage/persistentvolume/resize"
 	"k8s.io/kubernetes/plugin/pkg/admission/storage/storageclass/setdefault"
@@ -39,6 +42,7 @@ var intentionallyOffPlugins = sets.New[string](
 	setdefault.PluginName,                   // DefaultStorageClass
 	resize.PluginName,                       // PersistentVolumeClaimResize
 	storageobjectinuseprotection.PluginName, // StorageObjectInUseProtection
+	podgroupprotection.PluginName,           // PodGroupProtection
 	podpriority.PluginName,                  // Priority
 	nodetaint.PluginName,                    // TaintNodesByCondition
 	runtimeclass.PluginName,                 // RuntimeClass
@@ -46,6 +50,8 @@ var intentionallyOffPlugins = sets.New[string](
 	podsecurity.PluginName,                  // PodSecurity
 	podtopologylabels.PluginName,            // PodTopologyLabels
 	nodedeclaredfeatures.PluginName,         // NodeDeclaredFeatures
+	job.PluginName,                          // JobValidation
+	podresize.PluginName,                    // PodResize
 )
 
 func TestDefaultOffAdmissionPlugins(t *testing.T) {

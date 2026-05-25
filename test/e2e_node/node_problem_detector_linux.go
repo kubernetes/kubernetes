@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/klog/v2"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"k8s.io/kubernetes/pkg/kubelet/util"
@@ -107,7 +108,7 @@ var _ = SIGDescribe("NodeProblemDetector", feature.NodeProblemDetector, framewor
 			var err error
 
 			nodeTime = time.Now()
-			bootTime, err = util.GetBootTime()
+			bootTime, err = util.GetBootTime(klog.FromContext(ctx))
 			framework.ExpectNoError(err)
 
 			// Set lookback duration longer than node up time.
@@ -452,7 +453,7 @@ func injectLog(file string, timestamp time.Time, log string, num int) error {
 		return err
 	}
 	defer f.Close()
-	for i := 0; i < num; i++ {
+	for range num {
 		_, err := f.WriteString(fmt.Sprintf("%s kernel: [0.000000] %s\n", timestamp.Format(time.Stamp), log))
 		if err != nil {
 			return err

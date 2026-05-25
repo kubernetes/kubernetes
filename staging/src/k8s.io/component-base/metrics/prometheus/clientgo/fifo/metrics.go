@@ -46,6 +46,15 @@ var (
 		},
 		[]string{"name", "group", "version", "resource"},
 	)
+	storeResourceVersion = k8smetrics.NewGaugeVec(
+		&k8smetrics.GaugeOpts{
+			Subsystem:      "informer",
+			Name:           "store_resource_version",
+			Help:           "The 15 least significant digits of the resource version of the store.",
+			StabilityLevel: k8smetrics.ALPHA,
+		},
+		[]string{"name", "group", "version", "resource"},
+	)
 	registerOnce sync.Once
 )
 
@@ -58,13 +67,14 @@ func Register() {
 	registerOnce.Do(func() {
 		legacyregistry.MustRegister(fifoQueuedItems)
 		legacyregistry.MustRegister(fifoProcessingLatency)
+		legacyregistry.MustRegister(storeResourceVersion)
 	})
-	cache.SetFIFOMetricsProvider(fifoMetricsProvider{})
+	cache.SetInformerMetricsProvider(informerMetricsProvider{})
 }
 
-type fifoMetricsProvider struct{}
+type informerMetricsProvider struct{}
 
-func (fifoMetricsProvider) NewQueuedItemMetric(id cache.InformerNameAndResource) cache.GaugeMetric {
+func (informerMetricsProvider) NewQueuedItemMetric(id cache.InformerNameAndResource) cache.GaugeMetric {
 	return &reservedGaugeMetric{
 		id: id,
 		gauge: fifoQueuedItems.WithLabelValues(
@@ -76,10 +86,22 @@ func (fifoMetricsProvider) NewQueuedItemMetric(id cache.InformerNameAndResource)
 	}
 }
 
-func (fifoMetricsProvider) NewProcessingLatencyMetric(id cache.InformerNameAndResource) cache.HistogramMetric {
+func (informerMetricsProvider) NewProcessingLatencyMetric(id cache.InformerNameAndResource) cache.HistogramMetric {
 	return &reservedHistogramMetric{
 		id: id,
 		histogram: fifoProcessingLatency.WithLabelValues(
+			id.Name(),
+			id.GroupVersionResource().Group,
+			id.GroupVersionResource().Version,
+			id.GroupVersionResource().Resource,
+		),
+	}
+}
+
+func (informerMetricsProvider) NewStoreResourceVersionMetric(id cache.InformerNameAndResource) cache.GaugeMetric {
+	return &reservedGaugeMetric{
+		id: id,
+		gauge: storeResourceVersion.WithLabelValues(
 			id.Name(),
 			id.GroupVersionResource().Group,
 			id.GroupVersionResource().Version,

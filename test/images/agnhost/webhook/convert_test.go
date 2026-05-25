@@ -35,7 +35,7 @@ import (
 
 func TestConvertAdmissionRequestToV1(t *testing.T) {
 	f := fuzzer.FuzzerFor(admissionfuzzer.Funcs, rand.NewSource(rand.Int63()), serializer.NewCodecFactory(runtime.NewScheme()))
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		t.Run(fmt.Sprintf("Run %d/100", i), func(t *testing.T) {
 			orig := &v1beta1.AdmissionRequest{}
 			f.Fill(orig)
@@ -50,7 +50,7 @@ func TestConvertAdmissionRequestToV1(t *testing.T) {
 
 func TestConvertAdmissionResponseToV1beta1(t *testing.T) {
 	f := randfill.New()
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		t.Run(fmt.Sprintf("Run %d/100", i), func(t *testing.T) {
 			orig := &v1.AdmissionResponse{}
 			f.Fill(orig)

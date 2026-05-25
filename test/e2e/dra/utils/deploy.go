@@ -75,8 +75,8 @@ import (
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/storage/drivers/proxy"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	"k8s.io/kubernetes/test/utils/image"
-	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
@@ -284,7 +284,7 @@ type driverResourcesMutatorFunc func(map[string]resourceslice.DriverResources)
 //
 // Call this outside of ginkgo.It, then use the instance inside ginkgo.It.
 func NewDriver(f *framework.Framework, nodes *Nodes, driverResourcesGenerator driverResourcesGenFunc, driverResourcesMutators ...driverResourcesMutatorFunc) *Driver {
-	d := NewDriverInstance(nil)
+	d := NewDriverInstance(ktesting.TContext{} /* no namespace yet, will be set later */)
 
 	ginkgo.BeforeEach(func() {
 		tCtx := f.TContext(context.Background())
@@ -300,6 +300,7 @@ func NewDriver(f *framework.Framework, nodes *Nodes, driverResourcesGenerator dr
 
 // NewDriverInstance is a variant of NewDriver where the driver is inactive and must
 // be started explicitly with Run. May be used inside ginkgo.It or a Go unit test.
+// The context is used to determine the test's and thus the driver's namespace.
 func NewDriverInstance(tCtx ktesting.TContext) *Driver {
 	d := &Driver{
 		fail:       map[MethodInstance]bool{},
@@ -314,9 +315,7 @@ func NewDriverInstance(tCtx ktesting.TContext) *Driver {
 		WithRealNodes:              true,
 		ExpectResourceSliceRemoval: true,
 	}
-	if tCtx != nil {
-		d.initName(tCtx)
-	}
+	d.initName(tCtx)
 	return d
 }
 
@@ -403,6 +402,11 @@ func (d *Driver) initName(tCtx ktesting.TContext) {
 	d.Name = tCtx.Namespace() + d.NameSuffix + ".k8s.io"
 }
 
+func (d *Driver) SetNameSuffix(tCtx ktesting.TContext, suffix string) {
+	d.NameSuffix = suffix
+	d.initName(tCtx)
+}
+
 func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nodes, driverResources map[string]resourceslice.DriverResources) {
 	tCtx.Logf("deploying driver %s on nodes %v", d.Name, nodes.NodeNames)
 	d.Nodes = make(map[string]KubeletPlugin)
@@ -470,7 +474,9 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 	// Create service account and corresponding RBAC rules.
 	d.serviceAccountName = "dra-kubelet-plugin-" + d.Name + d.InstanceSuffix + "-service-account"
 	content := example.PluginPermissions
+
 	content = strings.ReplaceAll(content, "dra-kubelet-plugin-namespace", tCtx.Namespace())
+	content = strings.ReplaceAll(content, "dra-kubelet-plugin-driver-name", d.Name)
 	content = strings.ReplaceAll(content, "dra-kubelet-plugin", "dra-kubelet-plugin-"+d.Name+d.InstanceSuffix)
 	d.createFromYAML(tCtx, []byte(content), tCtx.Namespace())
 
@@ -663,6 +669,7 @@ func (d *Driver) SetUp(tCtx ktesting.TContext, kubeletRootDir string, nodes *Nod
 		}
 
 		plugin, err := app.StartPlugin(loggerCtx, "/cdi", d.Name, driverClient, nodename, fileOps,
+			app.Options{EnableHealthService: true},
 			kubeletplugin.GRPCVerbosity(0),
 			kubeletplugin.GRPCInterceptor(func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 				return d.interceptor(nodename, ctx, req, info, handler)

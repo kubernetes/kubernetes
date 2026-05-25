@@ -69,6 +69,10 @@ type ContainerSpec struct {
 	// Time at which the container was created.
 	CreationTime time.Time `json:"creation_time,omitempty"`
 
+	// Time at which the container was started.
+	// This may be unset if the runtime does not provide it.
+	StartTime time.Time `json:"start_time,omitempty"`
+
 	// Other names by which the container is known within a certain namespace.
 	// This is unique within that namespace.
 	Aliases []string `json:"aliases,omitempty"`

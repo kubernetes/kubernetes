@@ -2219,7 +2219,7 @@ func startTestAPIServerForOIDC[L utilsoidc.JosePublicKey](t *testing.T, c apiSer
 
 	var customFlags []string
 	if len(c.authenticationConfigYAML) > 0 {
-		customFlags = []string{fmt.Sprintf("--authentication-config=%s", writeTempFile(t, c.authenticationConfigYAML))}
+		customFlags = []string{fmt.Sprintf("--authentication-config=%s", utilsoidc.WriteTempFile(t, c.authenticationConfigYAML))}
 		if c.needsEgressProxyOnStart {
 			udsName := filepath.Join(t.TempDir(), "uds")
 			ready := make(chan struct{})
@@ -2241,7 +2241,7 @@ egressSelections:
       uds:
         udsName: %s
 `, udsName)
-			customFlags = append(customFlags, fmt.Sprintf("--egress-selector-config-file=%s", writeTempFile(t, egressConfig)))
+			customFlags = append(customFlags, fmt.Sprintf("--egress-selector-config-file=%s", utilsoidc.WriteTempFile(t, egressConfig)))
 		}
 	} else {
 		customFlags = []string{
@@ -2356,23 +2356,6 @@ func generateCert(t *testing.T) (cert, key []byte, certFilePath, keyFilePath str
 	require.NoError(t, err)
 
 	return cert, key, certFilePath, keyFilePath
-}
-
-func writeTempFile(t *testing.T, content string) string {
-	t.Helper()
-	file, err := os.CreateTemp("", "oidc-test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if err := os.Remove(file.Name()); err != nil {
-			t.Fatal(err)
-		}
-	})
-	if err := os.WriteFile(file.Name(), []byte(content), 0600); err != nil {
-		t.Fatal(err)
-	}
-	return file.Name()
 }
 
 // indentCertificateAuthority indents the certificate authority to match

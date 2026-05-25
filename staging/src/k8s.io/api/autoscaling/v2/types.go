@@ -31,8 +31,9 @@ import (
 // HorizontalPodAutoscaler is the configuration for a horizontal pod
 // autoscaler, which automatically manages the replica count of any resource
 // implementing the scale subresource based on the metrics specified.
+// +k8s:supportsSubresource="/status"
 type HorizontalPodAutoscaler struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard object metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -59,16 +60,16 @@ type HorizontalPodAutoscalerSpec struct {
 	// metric is configured.  Scaling is active as long as at least one metric value is
 	// available.
 	// +optional
-	// +k8s:optional
-	// +k8s:ifEnabled(HPAScaleToZero)=+k8s:minimum=0
-	// +k8s:ifDisabled(HPAScaleToZero)=+k8s:minimum=1
+	// +k8s:alpha(since: "1.36")=+k8s:optional
+	// +k8s:alpha(since: "1.36")=+k8s:ifEnabled(HPAScaleToZero)=+k8s:minimum=0
+	// +k8s:alpha(since: "1.36")=+k8s:ifDisabled(HPAScaleToZero)=+k8s:minimum=1
 	MinReplicas *int32 `json:"minReplicas,omitempty" protobuf:"varint,2,opt,name=minReplicas"`
 
 	// maxReplicas is the upper limit for the number of replicas to which the autoscaler can scale up.
 	// It cannot be less that minReplicas.
 	// +required
-	// +k8s:required
-	// +k8s:minimum=1
+	// +k8s:alpha(since: "1.36")=+k8s:required
+	// +k8s:alpha(since: "1.36")=+k8s:minimum=1
 	MaxReplicas int32 `json:"maxReplicas" protobuf:"varint,3,opt,name=maxReplicas"`
 
 	// metrics contains the specifications for which to use to calculate the
@@ -450,6 +451,8 @@ const (
 	// ScalingLimited indicates that the calculated scale based on metrics would be above or
 	// below the range for the HPA, and has thus been capped.
 	ScalingLimited HorizontalPodAutoscalerConditionType = "ScalingLimited"
+	// ScaledToZero indicates that the HPA controller scaled the workload to zero.
+	ScaledToZero HorizontalPodAutoscalerConditionType = "ScaledToZero"
 )
 
 // HorizontalPodAutoscalerCondition describes the state of
@@ -501,7 +504,7 @@ type MetricStatus struct {
 	// +optional
 	Resource *ResourceMetricStatus `json:"resource,omitempty" protobuf:"bytes,4,opt,name=resource"`
 
-	// container resource refers to a resource metric (such as those specified in
+	// containerResource refers to a resource metric (such as those specified in
 	// requests and limits) known to Kubernetes describing a single container in each pod in the
 	// current scale target (e.g. CPU or memory). Such metrics are built in to
 	// Kubernetes, and have special scaling options on top of those available
@@ -527,7 +530,7 @@ type ObjectMetricStatus struct {
 	// current contains the current value for the given metric
 	Current MetricValueStatus `json:"current" protobuf:"bytes,2,name=current"`
 
-	// DescribedObject specifies the descriptions of a object,such as kind,name apiVersion
+	// describedObject specifies the descriptions of a object,such as kind,name apiVersion
 	DescribedObject CrossVersionObjectReference `json:"describedObject" protobuf:"bytes,3,name=describedObject"`
 }
 
@@ -591,7 +594,7 @@ type MetricValueStatus struct {
 	// +optional
 	AverageValue *resource.Quantity `json:"averageValue,omitempty" protobuf:"bytes,2,opt,name=averageValue"`
 
-	// currentAverageUtilization is the current value of the average of the
+	// averageUtilization is the current value of the average of the
 	// resource metric across all relevant pods, represented as a percentage of
 	// the requested value of the resource for the pods.
 	// +optional
@@ -603,7 +606,7 @@ type MetricValueStatus struct {
 
 // HorizontalPodAutoscalerList is a list of horizontal pod autoscaler objects.
 type HorizontalPodAutoscalerList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`

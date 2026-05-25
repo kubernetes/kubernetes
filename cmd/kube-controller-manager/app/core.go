@@ -30,19 +30,16 @@ import (
 	v1 "k8s.io/api/core/v1"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
-	cpnames "k8s.io/cloud-provider/names"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/controller-manager/controller"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
 	pkgcontroller "k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/devicetainteviction"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
@@ -52,7 +49,6 @@ import (
 	lifecyclecontroller "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/pkg/controller/podgc"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
-	"k8s.io/kubernetes/pkg/controller/resourceclaim"
 	resourcequotacontroller "k8s.io/kubernetes/pkg/controller/resourcequota"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/controller/storageversiongc"
@@ -80,19 +76,6 @@ const (
 	// defaultNodeMaskCIDRIPv6 is default mask size for IPv6 node cidr
 	defaultNodeMaskCIDRIPv6 = 64
 )
-
-func newServiceLBControllerDescriptor() *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:    cpnames.ServiceLBController,
-		aliases: []string{"service"},
-		constructor: func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-			logger := klog.FromContext(ctx)
-			logger.Info("Warning: service-controller is set, but no cloud provider functionality is available in kube-controller-manger (KEP-2395). Will not configure service controller.")
-			return nil, nil
-		},
-		isCloudProviderController: true,
-	}
-}
 
 func newNodeIpamControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
@@ -248,67 +231,6 @@ func newTaintEvictionController(ctx context.Context, controllerContext Controlle
 	return newControllerLoop(tec.Run, controllerName), nil
 }
 
-func newDeviceTaintEvictionControllerDescriptor() *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:        names.DeviceTaintEvictionController,
-		constructor: newDeviceTaintEvictionController,
-		requiredFeatureGates: []featuregate.Feature{
-			// TODO update app.TestFeatureGatedControllersShouldNotDefineAliases when removing these feature gates.
-			features.DynamicResourceAllocation,
-			features.DRADeviceTaints,
-		},
-	}
-}
-
-func newDeviceTaintEvictionController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.NewClient(names.DeviceTaintEvictionController)
-	if err != nil {
-		return nil, err
-	}
-
-	deviceTaintEvictionController := devicetainteviction.New(
-		client,
-		controllerContext.InformerFactory.Core().V1().Pods(),
-		controllerContext.InformerFactory.Resource().V1().ResourceClaims(),
-		controllerContext.InformerFactory.Resource().V1().ResourceSlices(),
-		controllerContext.InformerFactory.Resource().V1alpha3().DeviceTaintRules(),
-		controllerContext.InformerFactory.Resource().V1().DeviceClasses(),
-		controllerName,
-	)
-	return newControllerLoop(func(ctx context.Context) {
-		if err := deviceTaintEvictionController.Run(ctx, int(controllerContext.ComponentConfig.DeviceTaintEvictionController.ConcurrentSyncs)); err != nil {
-			klog.FromContext(ctx).Error(err, "Device taint processing leading to Pod eviction failed and is now paused")
-		}
-		<-ctx.Done()
-	}, controllerName), nil
-}
-
-func newCloudNodeLifecycleControllerDescriptor() *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:    cpnames.CloudNodeLifecycleController,
-		aliases: []string{"cloud-node-lifecycle"},
-		constructor: func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-			logger := klog.FromContext(ctx)
-			logger.Info("Warning: node-controller is set, but no cloud provider functionality is available in kube-controller-manger (KEP-2395). Will not configure node lifecyle controller.")
-			return nil, nil
-		},
-		isCloudProviderController: true,
-	}
-}
-
-func newNodeRouteControllerDescriptor() *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:    cpnames.NodeRouteController,
-		aliases: []string{"route"},
-		constructor: func(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-			logger := klog.FromContext(ctx)
-			logger.Info("Warning: configure-cloud-routes is set, but no cloud provider functionality is available in kube-controller-manger (KEP-2395). Will not configure cloud provider routes.")
-			return nil, nil
-		},
-		isCloudProviderController: true,
-	}
-}
-
 func newPersistentVolumeBinderControllerDescriptor() *ControllerDescriptor {
 	return &ControllerDescriptor{
 		name:        names.PersistentVolumeBinderController,
@@ -383,7 +305,7 @@ func newPersistentVolumeAttachDetachController(ctx context.Context, controllerCo
 		csiDriverInformer,
 		controllerContext.InformerFactory.Storage().V1().VolumeAttachments(),
 		plugins,
-		GetDynamicPluginProber(controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
+		GetDynamicPluginProber(ctx, controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
 		controllerContext.ComponentConfig.AttachDetachController.DisableAttachDetachReconcilerSync,
 		controllerContext.ComponentConfig.AttachDetachController.ReconcilerSyncLoopPeriod.Duration,
 		controllerContext.ComponentConfig.AttachDetachController.DisableForceDetachOnTimeout,
@@ -457,42 +379,6 @@ func newEphemeralVolumeController(ctx context.Context, controllerContext Control
 
 	return newControllerLoop(func(ctx context.Context) {
 		ephemeralController.Run(ctx, int(controllerContext.ComponentConfig.EphemeralVolumeController.ConcurrentEphemeralVolumeSyncs))
-	}, controllerName), nil
-}
-
-func newResourceClaimControllerDescriptor() *ControllerDescriptor {
-	return &ControllerDescriptor{
-		name:        names.ResourceClaimController,
-		aliases:     []string{"resource-claim-controller"},
-		constructor: newResourceClaimController,
-		requiredFeatureGates: []featuregate.Feature{
-			features.DynamicResourceAllocation, // TODO update app.TestFeatureGatedControllersShouldNotDefineAliases when removing this feature
-		},
-	}
-}
-
-func newResourceClaimController(ctx context.Context, controllerContext ControllerContext, controllerName string) (Controller, error) {
-	client, err := controllerContext.NewClient("resource-claim-controller")
-	if err != nil {
-		return nil, err
-	}
-
-	ephemeralController, err := resourceclaim.NewController(
-		klog.FromContext(ctx),
-		resourceclaim.Features{
-			AdminAccess:     utilfeature.DefaultFeatureGate.Enabled(features.DRAAdminAccess),
-			PrioritizedList: utilfeature.DefaultFeatureGate.Enabled(features.DRAPrioritizedList),
-		},
-		client,
-		controllerContext.InformerFactory.Core().V1().Pods(),
-		controllerContext.InformerFactory.Resource().V1().ResourceClaims(),
-		controllerContext.InformerFactory.Resource().V1().ResourceClaimTemplates())
-	if err != nil {
-		return nil, fmt.Errorf("failed to init resource claim controller: %w", err)
-	}
-
-	return newControllerLoop(func(ctx context.Context) {
-		ephemeralController.Run(ctx, int(controllerContext.ComponentConfig.ResourceClaimController.ConcurrentSyncs))
 	}, controllerName), nil
 }
 
@@ -1137,7 +1023,7 @@ func newSELinuxWarningController(ctx context.Context, controllerContext Controll
 		controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
 		csiDriverInformer,
 		plugins,
-		GetDynamicPluginProber(controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
+		GetDynamicPluginProber(ctx, controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to start SELinux warning controller: %w", err)

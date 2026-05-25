@@ -32,8 +32,9 @@ import (
 // +k8s:prerelease-lifecycle-gen:replacement=authorization.k8s.io,v1,SubjectAccessReview
 
 // SubjectAccessReview checks whether or not a user or group can perform an action.
+// +k8s:supportsSubresource="/status"
 type SubjectAccessReview struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -58,8 +59,9 @@ type SubjectAccessReview struct {
 // SelfSubjectAccessReview checks whether or the current user can perform an action.  Not filling in a
 // spec.namespace means "in all namespaces".  Self is a special case, because users should always be able
 // to check whether they can perform an action
+// +k8s:supportsSubresource="/status"
 type SelfSubjectAccessReview struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -83,8 +85,9 @@ type SelfSubjectAccessReview struct {
 // LocalSubjectAccessReview checks whether or not a user or group can perform an action in a given namespace.
 // Having a namespace scoped resource makes it much easier to grant namespace scoped policy that includes permissions
 // checking.
+// +k8s:supportsSubresource="/status"
 type LocalSubjectAccessReview struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
@@ -224,8 +227,9 @@ type SubjectAccessReviewStatus struct {
 // or to quickly let an end user reason about their permissions. It should NOT Be used by external systems to
 // drive authorization decisions as this raises confused deputy, cache lifetime/revocation, and correctness concerns.
 // SubjectAccessReview, and LocalAccessReview are the correct way to defer authorization decisions to the API server.
+// +k8s:supportsSubresource="/status"
 type SelfSubjectRulesReview struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 	// metadata is the standard list metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional

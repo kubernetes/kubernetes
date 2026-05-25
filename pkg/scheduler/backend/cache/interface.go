@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -61,6 +62,10 @@ type Cache interface {
 	// DO NOT use outside of tests.
 	PodCount() (int, error)
 
+	// GetNode returns the copy of node stored in the cache.
+	// DO NOT use outside of tests.
+	GetNode(name string) (*framework.NodeInfo, error)
+
 	// AssumePod assumes a pod scheduled and aggregates the pod's information into its node.
 	AssumePod(logger klog.Logger, pod *v1.Pod) error
 
@@ -84,12 +89,10 @@ type Cache interface {
 	IsAssumedPod(pod *v1.Pod) (bool, error)
 
 	// AddNode adds overall information about node.
-	// It returns a clone of added NodeInfo object.
-	AddNode(logger klog.Logger, node *v1.Node) *framework.NodeInfo
+	AddNode(logger klog.Logger, node *v1.Node)
 
 	// UpdateNode updates overall information about node.
-	// It returns a clone of updated NodeInfo object.
-	UpdateNode(logger klog.Logger, oldNode, newNode *v1.Node) *framework.NodeInfo
+	UpdateNode(logger klog.Logger, oldNode, newNode *v1.Node)
 
 	// RemoveNode removes overall information about node.
 	RemoveNode(logger klog.Logger, node *v1.Node) error
@@ -107,6 +110,18 @@ type Cache interface {
 	// BindPod handles the pod binding by adding a bind API call to the dispatcher.
 	// This method should be used only if the SchedulerAsyncAPICalls feature gate is enabled.
 	BindPod(binding *v1.Binding) (<-chan error, error)
+
+	// PodGroupStates returns a PodGroupStateLister.
+	PodGroupStates() fwk.PodGroupStateLister
+
+	// AddPodGroupMember adds not assigned and not assumed pod to its pod group state.
+	AddPodGroupMember(pod *v1.Pod)
+
+	// UpdatePodGroupMember updates a pod in its pod group state.
+	UpdatePodGroupMember(logger klog.Logger, oldPod, newPod *v1.Pod)
+
+	// RemovePodGroupMember removes a pod from its pod group state.
+	RemovePodGroupMember(pod *v1.Pod)
 }
 
 // Dump is a dump of the cache state.

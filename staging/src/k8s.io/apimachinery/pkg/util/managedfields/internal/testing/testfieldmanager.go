@@ -106,6 +106,11 @@ func (f *TestFieldManagerImpl) Update(obj runtime.Object, manager string) error 
 	return err
 }
 
+// UpdateNoErrors is the same as Update, but it will not return errors.
+func (f *TestFieldManagerImpl) UpdateNoErrors(obj runtime.Object, manager string) {
+	f.liveObj = f.fieldManager.UpdateNoErrors(f.liveObj, obj, manager)
+}
+
 // ManagedFields returns the list of existing managed fields for the
 // liveObj.
 func (f *TestFieldManagerImpl) ManagedFields() []metav1.ManagedFieldsEntry {

@@ -129,7 +129,7 @@ func TestPodCalculateAffinity(t *testing.T) {
 			scope{
 				hintProviders: tc.hp,
 				policy:        &mockPolicy{},
-				name:          podTopologyScope,
+				name:          PodTopologyScope,
 			},
 		}
 

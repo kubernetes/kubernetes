@@ -30,6 +30,34 @@
         "patch",
         "update"
       ]
+    },
+    {
+      "kind": "ResourcePoolStatusRequest",
+      "name": "resourcepoolstatusrequests",
+      "namespaced": false,
+      "singularName": "resourcepoolstatusrequest",
+      "storageVersionHash": "iy583CtMwdY=",
+      "verbs": [
+        "create",
+        "delete",
+        "deletecollection",
+        "get",
+        "list",
+        "patch",
+        "update",
+        "watch"
+      ]
+    },
+    {
+      "kind": "ResourcePoolStatusRequest",
+      "name": "resourcepoolstatusrequests/status",
+      "namespaced": false,
+      "singularName": "",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
     }
   ]
 }

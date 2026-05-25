@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
@@ -57,6 +58,7 @@ func TestMakeUserNsManagerSwitch(t *testing.T) {
 
 	// Test re-init works when the feature gate is disabled and there were some
 	// pods written on disk.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
 	m2, err := MakeUserNsManager(logger, testUserNsPodsManager, nil)
 	require.NoError(t, err)
@@ -93,6 +95,7 @@ func TestGetOrCreateUserNamespaceMappingsSwitch(t *testing.T) {
 
 	// Test no-op when the feature gate is disabled and there were some
 	// pods registered on disk.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
 	// Create a new manager with the feature gate off and verify the userns range is nil.
 	m2, err := MakeUserNsManager(logger, testUserNsPodsManager, nil)
@@ -131,6 +134,7 @@ func TestCleanupOrphanedPodUsernsAllocationsSwitch(t *testing.T) {
 
 	// Test cleanup works when the feature gate is disabled and there were some
 	// pods registered.
+	featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.35"))
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.UserNamespacesSupport, false)
 	err = m.CleanupOrphanedPodUsernsAllocations(ctx, nil, nil)
 	require.NoError(t, err)

@@ -19,7 +19,7 @@ package podtopologyspread
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/google/go-cmp/cmp"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2/ktesting"
@@ -161,23 +161,28 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 			p := pl.(*PodTopologySpread)
 			actualHint, err := p.isSchedulableAfterNodeChange(logger, tc.pod, tc.oldNode, tc.newNode)
 			if tc.expectedErr {
-				require.Error(t, err)
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
 				return
 			}
-			require.NoError(t, err)
-			require.Equal(t, tc.expectedHint, actualHint)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tc.expectedHint, actualHint); diff != "" {
+				t.Errorf("unexpected hint (-want, +got):\n%s", diff)
+			}
 		})
 	}
 }
 
-func Test_isSchedulableAfterPodChange(t *testing.T) {
+func Test_isSchedulableAfterAssignedPodChange(t *testing.T) {
 	testcases := []struct {
-		name                                         string
-		pod                                          *v1.Pod
-		oldPod, newPod                               *v1.Pod
-		expectedHint                                 fwk.QueueingHint
-		expectedErr                                  bool
-		enableNodeInclusionPolicyInPodTopologySpread bool
+		name           string
+		pod            *v1.Pod
+		oldPod, newPod *v1.Pod
+		expectedHint   fwk.QueueingHint
+		expectedErr    bool
 	}{
 		{
 			name: "add pod with labels match topologySpreadConstraints selector",
@@ -335,6 +340,40 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 			newPod:       st.MakePod().UID("p2").Node("fake-node").Label("foo", "").Label("bar", "bar2").Obj(),
 			expectedHint: fwk.QueueSkip,
 		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			snapshot := cache.NewSnapshot(nil, nil)
+			pl := plugintesting.SetupPlugin(ctx, t, topologySpreadFunc, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
+			p := pl.(*PodTopologySpread)
+
+			actualHint, err := p.isSchedulableAfterAssignedPodChange(logger, tc.pod, tc.oldPod, tc.newPod)
+			if tc.expectedErr {
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tc.expectedHint, actualHint); diff != "" {
+				t.Errorf("unexpected hint (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func Test_isSchedulableAfterTargetPodChange(t *testing.T) {
+	testcases := []struct {
+		name                                         string
+		pod                                          *v1.Pod
+		oldPod, newPod                               *v1.Pod
+		expectedHint                                 fwk.QueueingHint
+		expectedErr                                  bool
+		enableNodeInclusionPolicyInPodTopologySpread bool
+	}{
 		{
 			name: "the unschedulable Pod has topologySpreadConstraint with NodeTaintsPolicy:Honor and has got a new toleration",
 			pod: st.MakePod().UID("p").Name("p").Label("foo", "").
@@ -385,13 +424,19 @@ func Test_isSchedulableAfterPodChange(t *testing.T) {
 			p := pl.(*PodTopologySpread)
 			p.enableNodeInclusionPolicyInPodTopologySpread = tc.enableNodeInclusionPolicyInPodTopologySpread
 
-			actualHint, err := p.isSchedulableAfterPodChange(logger, tc.pod, tc.oldPod, tc.newPod)
+			actualHint, err := p.isSchedulableAfterTargetPodChange(logger, tc.pod, tc.oldPod, tc.newPod)
 			if tc.expectedErr {
-				require.Error(t, err)
+				if err == nil {
+					t.Fatalf("expected error, got nil")
+				}
 				return
 			}
-			require.NoError(t, err)
-			require.Equal(t, tc.expectedHint, actualHint)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if diff := cmp.Diff(tc.expectedHint, actualHint); diff != "" {
+				t.Errorf("unexpected hint (-want, +got):\n%s", diff)
+			}
 		})
 	}
 }

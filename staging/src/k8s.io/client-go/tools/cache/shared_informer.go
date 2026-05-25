@@ -35,6 +35,7 @@ import (
 	"k8s.io/utils/buffer"
 	"k8s.io/utils/clock"
 	"k8s.io/utils/ptr"
+	utiltrace "k8s.io/utils/trace"
 
 	"k8s.io/klog/v2"
 
@@ -322,7 +323,7 @@ func NewSharedIndexInformerWithOptions(lw ListerWatcher, exampleObject runtime.O
 	processor.listenersRCond = sync.NewCond(processor.listenersLock.RLocker())
 
 	return &sharedIndexInformer{
-		indexer:                         NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers),
+		indexer:                         NewIndexer(DeletionHandlingMetaNamespaceKeyFunc, options.Indexers, WithStoreMetrics(options.Identifier, options.InformerMetricsProvider)),
 		processor:                       processor,
 		synced:                          make(chan struct{}),
 		listerWatcher:                   lw,
@@ -333,7 +334,7 @@ func NewSharedIndexInformerWithOptions(lw ListerWatcher, exampleObject runtime.O
 		clock:                           realClock,
 		cacheMutationDetector:           NewCacheMutationDetector(fmt.Sprintf("%T", exampleObject)),
 		identifier:                      options.Identifier,
-		fifoMetricsProvider:             options.FIFOMetricsProvider,
+		informerMetricsProvider:         options.InformerMetricsProvider,
 		keyFunc:                         DeletionHandlingMetaNamespaceKeyFunc,
 	}
 }
@@ -355,9 +356,9 @@ type SharedIndexInformerOptions struct {
 	// If not set, metrics will not be published.
 	Identifier InformerNameAndResource
 
-	// FIFOMetricsProvider is the metrics provider for the FIFO queue.
+	// InformerMetricsProvider is the metrics provider for the FIFO queue.
 	// If not set, metrics will be no-ops.
-	FIFOMetricsProvider FIFOMetricsProvider
+	InformerMetricsProvider InformerMetricsProvider
 }
 
 // InformerSynced is a function that can be used to determine if an informer has synced.  This is useful for determining if caches have synced.
@@ -629,8 +630,8 @@ type sharedIndexInformer struct {
 	// identifier is used to identify this informer for metrics and logging purposes.
 	identifier InformerNameAndResource
 
-	// fifoMetricsProvider is the metrics provider for the FIFO queue.
-	fifoMetricsProvider FIFOMetricsProvider
+	// informerMetricsProvider is the metrics provider for the FIFO queue.
+	informerMetricsProvider InformerMetricsProvider
 
 	// keyFunc is called when processing deltas by the underlying process function.
 	keyFunc KeyFunc
@@ -728,7 +729,7 @@ func (s *sharedIndexInformer) RunWithContext(ctx context.Context) {
 		s.startedLock.Lock()
 		defer s.startedLock.Unlock()
 
-		logger, fifo := newQueueFIFO(logger, s.objectType, s.indexer, s.transform, s.identifier, s.fifoMetricsProvider)
+		logger, fifo := newQueueFIFO(logger, s.objectType, s.indexer, s.transform, s.identifier, s.informerMetricsProvider)
 
 		cfg := &Config{
 			Queue:             fifo,
@@ -907,7 +908,8 @@ func (s *sharedIndexInformer) AddEventHandlerWithOptions(handler ResourceEventHa
 	listener := newProcessListener(logger, handler, resyncPeriod, determineResyncPeriod(logger, resyncPeriod, s.resyncCheckPeriod), s.clock.Now(), initialBufferSize, s.HasSyncedChecker())
 
 	if !s.started {
-		return s.processor.addListener(listener), nil
+		handle, _ := s.processor.addListener(listener)
+		return handle, nil
 	}
 
 	// in order to safely join, we have to
@@ -918,7 +920,7 @@ func (s *sharedIndexInformer) AddEventHandlerWithOptions(handler ResourceEventHa
 	s.blockDeltas.Lock()
 	defer s.blockDeltas.Unlock()
 
-	handle := s.processor.addListener(listener)
+	handle, started := s.processor.addListener(listener)
 	for _, item := range s.indexer.List() {
 		// Note that we enqueue these notifications with the lock held
 		// and before returning the handle. That means there is never a
@@ -932,7 +934,9 @@ func (s *sharedIndexInformer) AddEventHandlerWithOptions(handler ResourceEventHa
 	}
 
 	// Initial list is added, now we can allow the listener to detect that "upstream has synced".
-	s.processor.wg.Start(listener.watchSynced)
+	if started {
+		s.processor.wg.Start(listener.watchSynced)
+	}
 
 	return handle, nil
 }
@@ -1043,7 +1047,7 @@ func (p *sharedProcessor) getListener(registration ResourceEventHandlerRegistrat
 	return nil
 }
 
-func (p *sharedProcessor) addListener(listener *processorListener) ResourceEventHandlerRegistration {
+func (p *sharedProcessor) addListener(listener *processorListener) (ResourceEventHandlerRegistration, bool) {
 	p.listenersLock.Lock()
 	defer p.listenersLock.Unlock()
 
@@ -1060,7 +1064,7 @@ func (p *sharedProcessor) addListener(listener *processorListener) ResourceEvent
 		p.wg.Start(listener.pop)
 	}
 
-	return listener
+	return listener, p.listenersStarted
 }
 
 func (p *sharedProcessor) removeListener(handle ResourceEventHandlerRegistration) error {
@@ -1210,7 +1214,8 @@ type processorListener struct {
 	addCh  chan interface{}
 	done   chan struct{}
 
-	handler ResourceEventHandler
+	handler     ResourceEventHandler
+	handlerName string
 
 	syncTracker       *synctrack.SingleFileTracker
 	upstreamHasSynced DoneChecker
@@ -1221,6 +1226,9 @@ type processorListener struct {
 	// TODO: This is no worse than before, since reflectors were backed by unbounded DeltaFIFOs, but
 	// we should try to do something better.
 	pendingNotifications buffer.RingGrowing
+	// pendingNotificationsLength tracks pendingNotifications size and is only mutated by pop().
+	// run() reads this to decide when to enable expensive time tracing.
+	pendingNotificationsLength atomic.Int64
 
 	// requestedResyncPeriod is how frequently the listener wants a
 	// full resync from the shared informer, but modified by two
@@ -1258,6 +1266,7 @@ func (p *processorListener) HasSyncedChecker() DoneChecker {
 }
 
 func newProcessListener(logger klog.Logger, handler ResourceEventHandler, requestedResyncPeriod, resyncPeriod time.Duration, now time.Time, bufferSize int, hasSynced DoneChecker) *processorListener {
+	handlerName := nameForHandler(handler)
 	ret := &processorListener{
 		logger:                logger,
 		nextCh:                make(chan interface{}),
@@ -1265,7 +1274,8 @@ func newProcessListener(logger klog.Logger, handler ResourceEventHandler, reques
 		done:                  make(chan struct{}),
 		upstreamHasSynced:     hasSynced,
 		handler:               handler,
-		syncTracker:           synctrack.NewSingleFileTracker(fmt.Sprintf("%s + event handler %s", hasSynced.Name(), nameForHandler(handler))),
+		handlerName:           handlerName,
+		syncTracker:           synctrack.NewSingleFileTracker(fmt.Sprintf("%s + event handler %s", hasSynced.Name(), handlerName)),
 		pendingNotifications:  *buffer.NewRingGrowing(bufferSize),
 		requestedResyncPeriod: requestedResyncPeriod,
 		resyncPeriod:          resyncPeriod,
@@ -1296,7 +1306,9 @@ func (p *processorListener) pop() {
 			// Notification dispatched
 			var ok bool
 			notification, ok = p.pendingNotifications.ReadOne()
-			if !ok { // Nothing to pop
+			if ok {
+				p.pendingNotificationsLength.Add(-1)
+			} else { // Nothing to pop
 				nextCh = nil // Disable this select case
 			}
 		case notificationToAdd, ok := <-p.addCh:
@@ -1309,6 +1321,7 @@ func (p *processorListener) pop() {
 				nextCh = p.nextCh
 			} else { // There is already a notification waiting to be dispatched
 				p.pendingNotifications.WriteOne(notificationToAdd)
+				p.pendingNotificationsLength.Add(1)
 			}
 		}
 	}
@@ -1331,6 +1344,14 @@ func (p *processorListener) run() {
 			// Gets reset below, but only if we get that far.
 			sleepAfterCrash = true
 			defer utilruntime.HandleCrashWithLogger(p.logger)
+			pendingNotifications := p.pendingNotificationsLength.Load()
+			if pendingNotifications > initialBufferSize {
+				trace := utiltrace.New("processorListener handler",
+					utiltrace.Field{Key: "handler", Value: p.handlerName},
+					utiltrace.Field{Key: "pendingNotifications", Value: pendingNotifications},
+				)
+				defer trace.LogIfLong(100 * time.Millisecond)
+			}
 
 			switch notification := next.(type) {
 			case updateNotification:

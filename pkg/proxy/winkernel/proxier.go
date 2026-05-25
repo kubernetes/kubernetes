@@ -42,7 +42,7 @@ import (
 	"k8s.io/klog/v2"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
-	"k8s.io/kubernetes/pkg/proxy/apis/config"
+	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/metaproxier"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
@@ -155,7 +155,8 @@ type remoteSubnetInfo struct {
 }
 
 const (
-	NETWORK_TYPE_OVERLAY = "overlay"
+	NETWORK_TYPE_OVERLAY  = "overlay"
+	NETWORK_TYPE_L2BRIDGE = "L2Bridge"
 	// MAX_COUNT_STALE_LOADBALANCERS is the maximum number of stale loadbalancers which cleanedup in single syncproxyrules.
 	// If there are more stale loadbalancers to clean, it will go to next iteration of syncproxyrules.
 	MAX_COUNT_STALE_LOADBALANCERS = 20
@@ -640,23 +641,20 @@ var _ proxy.Provider = &Proxier{}
 
 // NewProxier returns a new single-stack winkernel proxier.
 func NewProxier(
+	config *kubeproxyconfig.KubeProxyConfiguration,
 	ipFamily v1.IPFamily,
-	syncPeriod time.Duration,
-	minSyncPeriod time.Duration,
 	nodeName string,
 	nodeIP net.IP,
 	recorder events.EventRecorder,
 	healthzServer *healthcheck.ProxyHealthServer,
-	healthzBindAddress string,
-	config config.KubeProxyWinkernelConfiguration,
 ) (*Proxier, error) {
 	// windows listens to all node addresses
 	nodePortAddresses := proxyutil.NewNodePortAddresses(ipFamily, nil)
-	serviceHealthServer := healthcheck.NewServiceHealthServer(nodeName, recorder, nodePortAddresses, healthzServer)
+	serviceHealthServer := healthcheck.NewServiceHealthServer(nodeName, recorder, nodePortAddresses, healthzServer, ipFamily)
 
 	var healthzPort int
-	if len(healthzBindAddress) > 0 {
-		_, port, _ := net.SplitHostPort(healthzBindAddress)
+	if len(config.HealthzBindAddress) > 0 {
+		_, port, _ := net.SplitHostPort(config.HealthzBindAddress)
 		healthzPort, _ = strconv.Atoi(port)
 	}
 
@@ -670,12 +668,15 @@ func NewProxier(
 		healthzPort,
 		hcnImpl,
 		&localHostMacProvider{},
-		config,
+		config.Winkernel,
 		true, // waitForHNSOverlay
 	)
 	if err != nil {
 		return nil, err
 	}
+
+	syncPeriod := config.SyncPeriod.Duration
+	minSyncPeriod := config.MinSyncPeriod.Duration
 
 	klog.V(3).Info("Record sync params", "minSyncPeriod", minSyncPeriod, "syncPeriod", syncPeriod, "maxSyncPeriod", syncPeriod)
 	proxier.syncRunner = runner.NewBoundedFrequencyRunner("sync-runner", proxier.syncProxyRules, minSyncPeriod, syncPeriod, syncPeriod)
@@ -693,7 +694,7 @@ func newProxierInternal(
 	healthzPort int,
 	hcnImpl HcnService,
 	hostMacProvider HostMacProvider,
-	config config.KubeProxyWinkernelConfiguration,
+	config kubeproxyconfig.KubeProxyWinkernelConfiguration,
 	waitForHNSOverlay bool,
 ) (*Proxier, error) {
 	hns, supportedFeatures := newHostNetworkService(hcnImpl)
@@ -798,28 +799,22 @@ func newProxierInternal(
 }
 
 func NewDualStackProxier(
-	syncPeriod time.Duration,
-	minSyncPeriod time.Duration,
+	config *kubeproxyconfig.KubeProxyConfiguration,
 	nodeName string,
 	nodeIPs map[v1.IPFamily]net.IP,
 	recorder events.EventRecorder,
 	healthzServer *healthcheck.ProxyHealthServer,
-	healthzBindAddress string,
-	config config.KubeProxyWinkernelConfiguration,
 ) (proxy.Provider, error) {
 
 	// Create an ipv4 instance of the single-stack proxier
-	ipv4Proxier, err := NewProxier(v1.IPv4Protocol, syncPeriod, minSyncPeriod,
-		nodeName, nodeIPs[v1.IPv4Protocol], recorder, healthzServer,
-		healthzBindAddress, config)
-
+	ipv4Proxier, err := NewProxier(config, v1.IPv4Protocol,
+		nodeName, nodeIPs[v1.IPv4Protocol], recorder, healthzServer)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v, nodeName: %s, nodeIP:%v", err, nodeName, nodeIPs[v1.IPv4Protocol])
 	}
 
-	ipv6Proxier, err := NewProxier(v1.IPv6Protocol, syncPeriod, minSyncPeriod,
-		nodeName, nodeIPs[v1.IPv6Protocol], recorder, healthzServer,
-		healthzBindAddress, config)
+	ipv6Proxier, err := NewProxier(config, v1.IPv6Protocol,
+		nodeName, nodeIPs[v1.IPv6Protocol], recorder, healthzServer)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v, nodeName: %s, nodeIP:%v", err, nodeName, nodeIPs[v1.IPv6Protocol])
 	}
@@ -1170,7 +1165,9 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	_ = proxier.endpointsMap.Update(proxier.endpointsChanges)
 
 	// Query HNS for endpoints and load balancers
-	queriedEndpoints, err := hns.getAllEndpointsByNetwork(hnsNetworkName)
+	queriedEndpoints, remoteEPsWithDupIP, err := hns.getAllEndpointsByNetwork(hnsNetworkName)
+	defer hns.deleteAllRemoteEndpointsWithDupIP(remoteEPsWithDupIP)
+
 	if err != nil {
 		klog.ErrorS(err, "Querying HNS for endpoints failed")
 		return
@@ -1715,23 +1712,30 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 	}
 
 	// remove stale endpoint refcount entries
-	for epIP := range proxier.terminatedEndpoints {
-		klog.V(5).InfoS("Terminated endpoints ready for deletion", "epIP", epIP)
-		if epToDelete := queriedEndpoints[epIP]; epToDelete != nil && epToDelete.hnsID != "" && !epToDelete.IsLocal() {
-			if refCount := proxier.endPointsRefCount.getRefCount(epToDelete.hnsID); refCount == nil || *refCount == 0 {
-				err := proxier.hns.deleteEndpoint(epToDelete.hnsID)
-				if err != nil {
-					klog.ErrorS(err, "Deleting unreferenced remote endpoint failed", "hnsID", epToDelete.hnsID)
-				} else {
-					klog.V(3).InfoS("Deleting unreferenced remote endpoint succeeded", "hnsID", epToDelete.hnsID, "IP", epToDelete.ip)
-				}
-			}
-		}
-	}
+	proxier.deleteTerminatedEndpoints(queriedEndpoints)
+
 	// This will cleanup stale load balancers which are pending delete
 	// in last iteration
 	proxier.cleanupStaleLoadbalancers()
 	return
+}
+
+func (proxier *Proxier) deleteTerminatedEndpoints(queriedEndpoints map[string]*(endpointInfo)) {
+	for epIP := range proxier.terminatedEndpoints {
+		klog.V(5).InfoS("Terminated endpoints ready for deletion", "epIP", epIP)
+		if epToDelete := queriedEndpoints[epIP]; epToDelete != nil && epToDelete.hnsID != "" && !epToDelete.IsLocal() {
+			refCount := proxier.endPointsRefCount.getRefCount(epToDelete.hnsID)
+			if refCount == nil || *refCount == 0 {
+				if err := proxier.hns.deleteEndpoint(epToDelete.hnsID); err != nil {
+					klog.ErrorS(err, "Deleting unreferenced remote endpoint failed", "hnsID", epToDelete.hnsID)
+				} else {
+					klog.V(3).InfoS("Deleting unreferenced remote endpoint succeeded", "hnsID", epToDelete.hnsID, "IP", epToDelete.ip)
+				}
+			} else {
+				klog.V(3).InfoS("Not deleting remote endpoint as it is still referenced", "hnsID", epToDelete.hnsID, "IP", epToDelete.ip, "refCount", refCount)
+			}
+		}
+	}
 }
 
 // deleteExistingLoadBalancer checks whether loadbalancer delete is needed or not.

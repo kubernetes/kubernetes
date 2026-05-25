@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 	"sync"
 	"testing"
 
@@ -426,5 +427,49 @@ func TestCacheIntervalNextFromStore(t *testing.T) {
 	// The interval's buffer should now be empty.
 	if !wci.buffer.isEmpty() {
 		t.Error("expected cache interval's buffer to be empty")
+	}
+}
+
+// TestCacheIntervalFromStoreSorted verifies newCacheIntervalFromStore returns
+// events sorted by Key for both indexer backends.
+func TestCacheIntervalFromStoreSorted(t *testing.T) {
+	cases := []struct {
+		name    string
+		indexer store.Indexer
+	}{
+		{"legacy", cache.NewIndexer(store.ElementKey, store.ElementIndexers(nil))},
+		{"btree", store.NewIndexer(nil)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			const n = 50
+			// Insert in reverse-key order so any code path that returns
+			// items in insertion order trivially fails the sorted check below.
+			for i := n - 1; i >= 0; i-- {
+				key := fmt.Sprintf("pod-%08d", i)
+				elem := makeTestStoreElement(makeTestPod(key, uint64(i)))
+				err := tc.indexer.Add(elem)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			wci, err := newCacheIntervalFromStore(n, tc.indexer, "", false)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			got := make([]string, 0, n)
+			for range n {
+				ev, err := wci.Next()
+				if err != nil {
+					t.Fatal(err)
+				}
+				got = append(got, ev.Key)
+			}
+			if !sort.StringsAreSorted(got) {
+				t.Errorf("events not sorted by key: %v", got)
+			}
+		})
 	}
 }

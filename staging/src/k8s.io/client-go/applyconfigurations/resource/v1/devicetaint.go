@@ -43,8 +43,17 @@ type DeviceTaintApplyConfiguration struct {
 	// nodes is not valid here. More effects may get added in the future.
 	// Consumers must treat unknown effects like None.
 	Effect *resourcev1.DeviceTaintEffect `json:"effect,omitempty"`
-	// TimeAdded represents the time at which the taint was added.
+	// TimeAdded represents the time at which the taint was added or
+	// (only in a DeviceTaintRule) the effect was modified.
 	// Added automatically during create or update if not set.
+	//
+	// In addition, in a DeviceTaintRule a value provided during
+	// an update gets replaced with the current time if the provided
+	// value is the same as the old one and the new effect is different.
+	// Changing the key and/or value while keeping the effect unchanged
+	// is possible and does not update the time stamp because the eviction
+	// which uses it is either already started (NoExecute) or
+	// not started yet (NoEffect, NoSchedule).
 	TimeAdded *metav1.Time `json:"timeAdded,omitempty"`
 }
 

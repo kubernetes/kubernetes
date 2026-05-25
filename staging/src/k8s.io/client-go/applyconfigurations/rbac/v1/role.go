@@ -32,7 +32,7 @@ import (
 //
 // Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding.
 type RoleApplyConfiguration struct {
-	metav1.TypeMetaApplyConfiguration `json:",inline"`
+	metav1.TypeMetaApplyConfiguration `json:""`
 	// Standard object's metadata.
 	*metav1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// Rules holds all the PolicyRules for this Role

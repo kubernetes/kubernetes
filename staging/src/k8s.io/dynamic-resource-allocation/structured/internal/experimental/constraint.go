@@ -36,6 +36,7 @@ type distinctAttributeConstraint struct {
 	logger        klog.Logger // Includes name and attribute name, so no need to repeat in log messages.
 	requestNames  sets.Set[string]
 	attributeName resourceapi.FullyQualifiedName
+	features      Features
 
 	attributes map[string]resourceapi.DeviceAttribute
 	numDevices int
@@ -93,6 +94,37 @@ func (m *distinctAttributeConstraint) matches(requestName, subRequestName string
 }
 
 func (m *distinctAttributeConstraint) matchesAttribute(attribute resourceapi.DeviceAttribute) bool {
+	if m.features.ListTypeAttributes {
+		// Set-based comparison for ListAttributes feature:
+		// Check that the new device's attribute set is disjoint from all existing devices.
+		// This implements "Pairwise Disjoint" semantics for distinct attributes.
+		newSet := attributeAsSet(&attribute)
+		if newSet == nil {
+			m.logger.V(7).Info("Unknown attribute type")
+			return false
+		}
+
+		// Check that the new device is disjoint from each existing device
+		for _, attr := range m.attributes {
+			existingSet := attributeAsSet(&attr)
+			if existingSet == nil {
+				continue
+			}
+			if newSet.hasIntersection(existingSet) {
+				// New device has common elements with an existing device.
+				// This violates the distinct constraint.
+				m.logger.V(7).Info("Constraint not satisfied, devices have common elements")
+				return false
+			}
+		}
+
+		// New device is disjoint from all existing devices.
+		// The constraint is satisfied.
+		m.logger.V(7).Info("Constraint satisfied, new device is disjoint from all existing devices")
+		return true
+	}
+
+	// Scalar comparison (existing behavior)
 	for _, attr := range m.attributes {
 		switch {
 		case attribute.StringValue != nil:

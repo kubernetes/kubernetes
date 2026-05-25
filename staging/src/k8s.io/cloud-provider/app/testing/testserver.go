@@ -33,6 +33,7 @@ import (
 	"k8s.io/cloud-provider/names"
 	"k8s.io/cloud-provider/options"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/configz"
 	logsapi "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
 )
@@ -99,6 +100,7 @@ func StartTestServerWithOptions(t *testing.T,
 				klog.Errorf("Failed to shutdown test server clearly: %v", err)
 			}
 		}
+		configz.Delete(app.ConfigzName)
 	}
 	defer func() {
 		if result.TearDownFn == nil {

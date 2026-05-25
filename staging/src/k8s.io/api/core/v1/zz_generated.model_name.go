@@ -542,6 +542,11 @@ func (in NodeAffinity) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in NodeAllocatableResourceClaimStatus) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.NodeAllocatableResourceClaimStatus"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in NodeCondition) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.NodeCondition"
 }
@@ -802,6 +807,11 @@ func (in PodSchedulingGate) OpenAPIModelName() string {
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
+func (in PodSchedulingGroup) OpenAPIModelName() string {
+	return "io.k8s.api.core.v1.PodSchedulingGroup"
+}
+
+// OpenAPIModelName returns the OpenAPI model name for this type.
 func (in PodSecurityContext) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.PodSecurityContext"
 }
@@ -819,11 +829,6 @@ func (in PodSpec) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in PodStatus) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.PodStatus"
-}
-
-// OpenAPIModelName returns the OpenAPI model name for this type.
-func (in PodStatusResult) OpenAPIModelName() string {
-	return "io.k8s.api.core.v1.PodStatusResult"
 }
 
 // OpenAPIModelName returns the OpenAPI model name for this type.
@@ -1214,9 +1219,4 @@ func (in WeightedPodAffinityTerm) OpenAPIModelName() string {
 // OpenAPIModelName returns the OpenAPI model name for this type.
 func (in WindowsSecurityContextOptions) OpenAPIModelName() string {
 	return "io.k8s.api.core.v1.WindowsSecurityContextOptions"
-}
-
-// OpenAPIModelName returns the OpenAPI model name for this type.
-func (in WorkloadReference) OpenAPIModelName() string {
-	return "io.k8s.api.core.v1.WorkloadReference"
 }

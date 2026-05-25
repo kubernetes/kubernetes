@@ -94,7 +94,7 @@ type DeviceSubRequestApplyConfiguration struct {
 	//
 	// The maximum number of tolerations is 16.
 	//
-	// This is an alpha field and requires enabling the DRADeviceTaints
+	// This is a beta field and requires enabling the DRADeviceTaints
 	// feature gate.
 	Tolerations []DeviceTolerationApplyConfiguration `json:"tolerations,omitempty"`
 	// Capacity define resource requirements against each capacity.

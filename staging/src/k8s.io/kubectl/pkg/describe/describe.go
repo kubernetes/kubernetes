@@ -49,6 +49,7 @@ import (
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	policyv1 "k8s.io/api/policy/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	resourcev1 "k8s.io/api/resource/v1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -72,6 +73,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/reference"
 	utilcsr "k8s.io/client-go/util/certificate/csr"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/certificate"
@@ -80,7 +82,7 @@ import (
 	"k8s.io/kubectl/pkg/util/fieldpath"
 	"k8s.io/kubectl/pkg/util/qos"
 	"k8s.io/kubectl/pkg/util/rbac"
-	resourcehelper "k8s.io/kubectl/pkg/util/resource"
+	kubectlresourcehelper "k8s.io/kubectl/pkg/util/resource"
 	storageutil "k8s.io/kubectl/pkg/util/storage"
 )
 
@@ -867,8 +869,8 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 		printLabelsMultiline(w, "Node-Selectors", pod.Spec.NodeSelector)
 		printPodTolerationsMultiline(w, "Tolerations", pod.Spec.Tolerations)
 		describeTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints, w, "")
-		if pod.Spec.WorkloadRef != nil {
-			describeWorkloadReference(pod.Spec.WorkloadRef, w, "")
+		if pod.Spec.SchedulingGroup != nil {
+			describeSchedulingGroup(pod.Spec.SchedulingGroup, w, "")
 		}
 		if events != nil {
 			DescribeEvents(events, w)
@@ -1001,13 +1003,9 @@ func describeVolumes(volumes []corev1.Volume, w PrefixWriter, space string) {
 	}
 }
 
-func describeWorkloadReference(workloadRef *corev1.WorkloadReference, w PrefixWriter, space string) {
-	w.Write(LEVEL_0, "%sWorkloadRef:\n", space)
-	w.Write(LEVEL_1, "Name:\t%s\n", workloadRef.Name)
-	w.Write(LEVEL_1, "PodGroup:\t%s\n", workloadRef.PodGroup)
-	if workloadRef.PodGroupReplicaKey != "" {
-		w.Write(LEVEL_1, "PodGroupReplicaKey:\t%s\n", workloadRef.PodGroupReplicaKey)
-	}
+func describeSchedulingGroup(schedulingGroup *corev1.PodSchedulingGroup, w PrefixWriter, space string) {
+	w.Write(LEVEL_0, "%sSchedulingGroup:\n", space)
+	w.Write(LEVEL_1, "PodGroupName:\t%s\n", *schedulingGroup.PodGroupName)
 }
 
 func printHostPathVolumeSource(hostPath *corev1.HostPathVolumeSource, w PrefixWriter) {
@@ -1997,7 +1995,7 @@ func describeContainerEnvVars(container corev1.Container, resolverFn EnvVarResol
 			}
 			w.Write(LEVEL_3, "%s:\t%s (%s:%s)\n", e.Name, valueFrom, e.ValueFrom.FieldRef.APIVersion, e.ValueFrom.FieldRef.FieldPath)
 		case e.ValueFrom.ResourceFieldRef != nil:
-			valueFrom, err := resourcehelper.ExtractContainerResourceValue(e.ValueFrom.ResourceFieldRef, &container)
+			valueFrom, err := kubectlresourcehelper.ExtractContainerResourceValue(e.ValueFrom.ResourceFieldRef, &container)
 			if err != nil {
 				valueFrom = ""
 			}
@@ -2234,8 +2232,8 @@ func DescribePodTemplate(template *corev1.PodTemplateSpec, w PrefixWriter) {
 	}
 	printLabelsMultiline(w, "  Node-Selectors", template.Spec.NodeSelector)
 	printPodTolerationsMultiline(w, "  Tolerations", template.Spec.Tolerations)
-	if template.Spec.WorkloadRef != nil {
-		describeWorkloadReference(template.Spec.WorkloadRef, w, "  ")
+	if template.Spec.SchedulingGroup != nil {
+		describeSchedulingGroup(template.Spec.SchedulingGroup, w, "  ")
 	}
 }
 
@@ -2426,6 +2424,11 @@ func describeCronJob(cronJob *batchv1.CronJob, events *corev1.EventList) (string
 		w.Write(LEVEL_0, "Schedule:\t%s\n", cronJob.Spec.Schedule)
 		w.Write(LEVEL_0, "Concurrency Policy:\t%s\n", cronJob.Spec.ConcurrencyPolicy)
 		w.Write(LEVEL_0, "Suspend:\t%s\n", printBoolPtr(cronJob.Spec.Suspend))
+		if cronJob.Spec.TimeZone != nil {
+			w.Write(LEVEL_0, "Time Zone:\t%s\n", *cronJob.Spec.TimeZone)
+		} else {
+			w.Write(LEVEL_0, "Time Zone:\t<unset>\n")
+		}
 		if cronJob.Spec.SuccessfulJobsHistoryLimit != nil {
 			w.Write(LEVEL_0, "Successful Job History Limit:\t%d\n", *cronJob.Spec.SuccessfulJobsHistoryLimit)
 		} else {
@@ -3475,7 +3478,15 @@ func (d *NodeDescriber) Describe(namespace, name string, describerSettings Descr
 		}
 	}
 
-	return describeNode(node, nodeNonTerminatedPodsList, events, canViewPods, &LeaseDescriber{d})
+	// Fetch ResourceSlices exclusive to this node using indexed field selector (O(1) query)
+	var resourceSlices []resourcev1.ResourceSlice
+	if sliceList, err := d.ResourceV1().ResourceSlices().List(context.TODO(), metav1.ListOptions{
+		FieldSelector: fields.Set{resourcev1.ResourceSliceSelectorNodeName: node.Name}.AsSelector().String(),
+	}); err == nil {
+		resourceSlices = sliceList.Items
+	}
+
+	return describeNode(node, nodeNonTerminatedPodsList, events, canViewPods, &LeaseDescriber{d}, resourceSlices)
 }
 
 type LeaseDescriber struct {
@@ -3483,7 +3494,7 @@ type LeaseDescriber struct {
 }
 
 func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, events *corev1.EventList,
-	canViewPods bool, ld *LeaseDescriber) (string, error) {
+	canViewPods bool, ld *LeaseDescriber, resourceSlices []resourcev1.ResourceSlice) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", node.Name)
@@ -3545,6 +3556,9 @@ func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, 
 			w.Write(LEVEL_0, "Allocatable:\n")
 			printResourceList(node.Status.Allocatable)
 		}
+		if len(resourceSlices) > 0 {
+			describeNodeResourceSlices(w, resourceSlices)
+		}
 
 		w.Write(LEVEL_0, "System Info:\n")
 		w.Write(LEVEL_0, "  Machine ID:\t%s\n", node.Status.NodeInfo.MachineID)
@@ -3578,6 +3592,58 @@ func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, 
 		}
 		return nil
 	})
+}
+
+// describeNodeResourceSlices displays ResourceSlices that are exclusive to this node.
+// It aggregates slices by driver/pool and shows device counts, with output capped at 10 pools.
+func describeNodeResourceSlices(w PrefixWriter, resourceSlices []resourcev1.ResourceSlice) {
+	// Aggregate by driver/pool
+	type poolInfo struct {
+		driver      string
+		pool        string
+		sliceCount  int
+		deviceCount int
+	}
+	pools := make(map[string]*poolInfo)
+
+	for _, slice := range resourceSlices {
+		key := slice.Spec.Driver + "/" + slice.Spec.Pool.Name
+		if pools[key] == nil {
+			pools[key] = &poolInfo{
+				driver: slice.Spec.Driver,
+				pool:   slice.Spec.Pool.Name,
+			}
+		}
+		pools[key].sliceCount++
+		pools[key].deviceCount += len(slice.Spec.Devices)
+	}
+
+	if len(pools) == 0 {
+		return
+	}
+
+	// Sort pool keys for consistent output
+	sortedKeys := make([]string, 0, len(pools))
+	for k := range pools {
+		sortedKeys = append(sortedKeys, k)
+	}
+	sort.Strings(sortedKeys)
+
+	w.Write(LEVEL_0, "Node-Local ResourceSlices:\n")
+	w.Write(LEVEL_1, "Driver\tPool\tSlices\tDevices\n")
+	w.Write(LEVEL_1, "------\t----\t------\t-------\n")
+
+	const maxPoolsToShow = 10
+	shown := 0
+	for _, key := range sortedKeys {
+		if shown >= maxPoolsToShow {
+			w.Write(LEVEL_1, "...and %d more pools\n", len(sortedKeys)-maxPoolsToShow)
+			break
+		}
+		p := pools[key]
+		w.Write(LEVEL_1, "%s\t%s\t%d\t%d\n", p.driver, p.pool, p.sliceCount, p.deviceCount)
+		shown++
+	}
 }
 
 func describeNodeLease(lease *coordinationv1.Lease, w PrefixWriter) {
@@ -3988,7 +4054,8 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 	}
 
 	for _, pod := range nodeNonTerminatedPodsList.Items {
-		req, limit := resourcehelper.PodRequestsAndLimits(&pod)
+		req := resourcehelper.PodRequests(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false, UseStatusResources: true})
+		limit := resourcehelper.PodLimits(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false, UseStatusResources: true})
 		cpuReq, cpuLimit, memoryReq, memoryLimit := req[corev1.ResourceCPU], limit[corev1.ResourceCPU], req[corev1.ResourceMemory], limit[corev1.ResourceMemory]
 		fractionCpuReq := float64(cpuReq.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
 		fractionCpuLimit := float64(cpuLimit.MilliValue()) / float64(allocatable.Cpu().MilliValue()) * 100
@@ -4033,9 +4100,9 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 	extResources := make([]string, 0, len(allocatable))
 	hugePageResources := make([]string, 0, len(allocatable))
 	for resource := range allocatable {
-		if resourcehelper.IsHugePageResourceName(resource) {
+		if kubectlresourcehelper.IsHugePageResourceName(resource) {
 			hugePageResources = append(hugePageResources, string(resource))
-		} else if !resourcehelper.IsStandardContainerResourceName(string(resource)) && resource != corev1.ResourcePods {
+		} else if !kubectlresourcehelper.IsStandardContainerResourceName(string(resource)) && resource != corev1.ResourcePods {
 			extResources = append(extResources, string(resource))
 		}
 	}
@@ -4064,7 +4131,8 @@ func describeNodeResource(nodeNonTerminatedPodsList *corev1.PodList, node *corev
 func getPodsTotalRequestsAndLimits(podList *corev1.PodList) (reqs map[corev1.ResourceName]resource.Quantity, limits map[corev1.ResourceName]resource.Quantity) {
 	reqs, limits = map[corev1.ResourceName]resource.Quantity{}, map[corev1.ResourceName]resource.Quantity{}
 	for _, pod := range podList.Items {
-		podReqs, podLimits := resourcehelper.PodRequestsAndLimits(&pod)
+		podReqs := resourcehelper.PodRequests(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false})
+		podLimits := resourcehelper.PodLimits(&pod, resourcehelper.PodResourcesOptions{SkipPodLevelResources: false})
 		for podReqName, podReqValue := range podReqs {
 			if value, ok := reqs[podReqName]; !ok {
 				reqs[podReqName] = podReqValue.DeepCopy()

@@ -224,7 +224,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 		if pattern.VolType == storageframework.GenericEphemeralVolume {
 			// Create <limit> Pods.
 			ginkgo.By(fmt.Sprintf("Creating %d Pod(s) with one volume each", limit))
-			for i := 0; i < limit; i++ {
+			for range limit {
 				pod := StartInPodWithVolumeSource(ctx, l.cs, *l.resource.VolSource, l.ns.Name, "volume-limits", e2epod.InfiniteSleepCommand, selection)
 				l.podNames = append(l.podNames, pod.Name)
 				l.pvcNames = append(l.pvcNames, ephemeral.VolumeClaimName(pod, &pod.Spec.Volumes[0]))
@@ -233,7 +233,7 @@ func (t *volumeLimitsTestSuite) DefineTests(driver storageframework.TestDriver, 
 			// Create <limit> PVCs for one gigantic pod.
 			var pvcs []*v1.PersistentVolumeClaim
 			ginkgo.By(fmt.Sprintf("Creating %d PVC(s)", limit))
-			for i := 0; i < limit; i++ {
+			for range limit {
 				pvc := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 					ClaimSize:        claimSize,
 					StorageClassName: &l.resource.Sc.Name,

@@ -361,26 +361,6 @@ func (j *TestJig) CreateLoadBalancerService(ctx context.Context, timeout time.Du
 	return j.WaitForLoadBalancer(ctx, timeout)
 }
 
-// GetEndpointNodes returns a map of nodenames:external-ip on which the
-// endpoints of the Service are running.
-func (j *TestJig) GetEndpointNodes(ctx context.Context) (map[string][]string, error) {
-	return j.GetEndpointNodesWithIP(ctx, v1.NodeExternalIP)
-}
-
-// GetEndpointNodesWithIP returns a map of nodenames:<ip of given type> on which the
-// endpoints of the Service are running.
-func (j *TestJig) GetEndpointNodesWithIP(ctx context.Context, addressType v1.NodeAddressType) (map[string][]string, error) {
-	nodes, err := j.ListNodesWithEndpoint(ctx)
-	if err != nil {
-		return nil, err
-	}
-	nodeMap := map[string][]string{}
-	for _, node := range nodes {
-		nodeMap[node.Name] = e2enode.GetAddresses(&node, addressType)
-	}
-	return nodeMap, nil
-}
-
 // ListNodesWithEndpoint returns a list of nodes on which the
 // endpoints of the given Service are running.
 func (j *TestJig) ListNodesWithEndpoint(ctx context.Context) ([]v1.Node, error) {
@@ -548,7 +528,7 @@ func needsNodePorts(svc *v1.Service) bool {
 // then attempts to send the updated service. It tries up to 3 times in the
 // face of timeouts and conflicts.
 func (j *TestJig) UpdateService(ctx context.Context, update func(*v1.Service)) (*v1.Service, error) {
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		service, err := j.Client.CoreV1().Services(j.Namespace).Get(ctx, j.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("failed to get Service %q: %w", j.Name, err)

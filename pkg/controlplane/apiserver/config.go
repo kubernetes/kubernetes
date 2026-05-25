@@ -23,8 +23,6 @@ import (
 	"net/http"
 	"time"
 
-	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
-
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -49,6 +47,7 @@ import (
 	clientgoclientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/util/keyutil"
 	basecompatibility "k8s.io/component-base/compatibility"
+	metricsfeatures "k8s.io/component-base/metrics/features"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -167,10 +166,8 @@ func BuildGenericConfig(
 	if lastErr = s.EgressSelector.ApplyTo(genericConfig); lastErr != nil {
 		return
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
-		if lastErr = s.Traces.ApplyTo(genericConfig.EgressSelector, genericConfig); lastErr != nil {
-			return
-		}
+	if lastErr = s.Traces.ApplyTo(genericConfig.EgressSelector, genericConfig); lastErr != nil {
+		return
 	}
 	// wrap the definitions to revert any changes from disabled features
 	getOpenAPIDefinitions = openapi.GetOpenAPIDefinitionsWithoutDisabledFeatures(getOpenAPIDefinitions)
@@ -188,11 +185,7 @@ func BuildGenericConfig(
 	if genericConfig.EgressSelector != nil {
 		s.Etcd.StorageConfig.Transport.EgressLookup = genericConfig.EgressSelector.Lookup
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerTracing) {
-		s.Etcd.StorageConfig.Transport.TracerProvider = genericConfig.TracerProvider
-	} else {
-		s.Etcd.StorageConfig.Transport.TracerProvider = noopoteltrace.NewTracerProvider()
-	}
+	s.Etcd.StorageConfig.Transport.TracerProvider = genericConfig.TracerProvider
 
 	storageFactoryConfig := kubeapiserver.NewStorageFactoryConfigEffectiveVersion(genericConfig.EffectiveVersion)
 	storageFactoryConfig.APIResourceConfig = genericConfig.MergedResourceConfig
@@ -242,7 +235,7 @@ func BuildGenericConfig(
 }
 
 // BuildAuthorizer constructs the authorizer. If authorization is not set in s, it returns nil, nil, false, nil
-func BuildAuthorizer(ctx context.Context, s options.CompletedOptions, egressSelector *egressselector.EgressSelector, apiserverID string, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.Authorizer, authorizer.RuleResolver, bool, error) {
+func BuildAuthorizer(ctx context.Context, s options.CompletedOptions, egressSelector *egressselector.EgressSelector, apiserverID string, versionedInformers clientgoinformers.SharedInformerFactory) (authorizer.UnconditionalAuthorizer, authorizer.RuleResolver, bool, error) {
 	authorizationConfig, err := s.Authorization.ToAuthorizationConfig(versionedInformers)
 	if err != nil {
 		return nil, nil, false, err
@@ -288,6 +281,7 @@ func CreateConfig(
 ) {
 	proxyTransport := CreateProxyTransport()
 
+	metricsfeatures.ApplyFeatureGates(utilfeature.DefaultFeatureGate)
 	opts.Metrics.Apply()
 	serviceaccount.RegisterMetrics()
 

@@ -1060,7 +1060,6 @@ func TestWriteAgainAfterUnexpectedExit(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			targetDir, err := utiltesting.MkTmpdir("atomic-write")
 			if err != nil {

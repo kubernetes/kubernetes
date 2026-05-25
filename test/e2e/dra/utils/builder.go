@@ -34,6 +34,7 @@ import (
 	resourcealphaapi "k8s.io/api/resource/v1alpha3"
 	resourcev1beta1 "k8s.io/api/resource/v1beta1"
 	resourcev1beta2 "k8s.io/api/resource/v1beta2"
+	schedulingv1alpha3 "k8s.io/api/scheduling/v1alpha3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -44,7 +45,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/dra/test-driver/app"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/utils/ktesting"
+	"k8s.io/kubernetes/test/utils/client-go/ktesting"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
 )
@@ -63,6 +64,8 @@ type Builder struct {
 	UseExtendedResourceName bool
 
 	podCounter      int
+	workloadCounter int
+	podGroupCounter int
 	claimCounter    int
 	ClassParameters string // JSON
 	SkipCleanup     bool
@@ -77,6 +80,11 @@ type DeviceClassWrapper struct {
 // ClassName returns the default device class name.
 func (b *Builder) ClassName() string {
 	return b.namespace + b.Driver.NameSuffix + "-class"
+}
+
+// DriverName returns the default device driver name.
+func (b *Builder) DriverName() string {
+	return b.Driver.Name
 }
 
 // Class returns the device Class that the builder's other objects
@@ -331,6 +339,104 @@ func (b *Builder) PodExternalMultiple(externalClaimName string) *v1.Pod {
 	return pod
 }
 
+// GroupedPodWithClaims returns a pod that is a member of the given PodGroup.
+func (b *Builder) GroupedPodWithClaims(podGroup *schedulingv1alpha3.PodGroup) *v1.Pod {
+	pod := b.Pod()
+	pod.Spec.SchedulingGroup = &v1.PodSchedulingGroup{
+		PodGroupName: &podGroup.Name,
+	}
+	for _, claim := range podGroup.Spec.ResourceClaims {
+		pod.Spec.ResourceClaims = append(pod.Spec.ResourceClaims, v1.PodResourceClaim{
+			Name:                      claim.Name,
+			ResourceClaimName:         claim.ResourceClaimName,
+			ResourceClaimTemplateName: claim.ResourceClaimTemplateName,
+		})
+		pod.Spec.Containers[0].Resources.Claims = append(pod.Spec.Containers[0].Resources.Claims, v1.ResourceClaim{Name: claim.Name})
+	}
+	return pod
+}
+
+// Workload creates a Workload with one PodGroupTemplate and no ResourceClaims.
+func (b *Builder) Workload() *schedulingv1alpha3.Workload {
+	workload := &schedulingv1alpha3.Workload{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: b.namespace,
+			Name:      fmt.Sprintf("tester%s-%d", b.Driver.NameSuffix, b.workloadCounter),
+		},
+		Spec: schedulingv1alpha3.WorkloadSpec{
+			PodGroupTemplates: []schedulingv1alpha3.PodGroupTemplate{
+				{
+					Name: "group",
+					SchedulingPolicy: schedulingv1alpha3.PodGroupSchedulingPolicy{
+						Basic: &schedulingv1alpha3.BasicSchedulingPolicy{},
+					},
+				},
+			},
+		},
+	}
+	b.workloadCounter++
+	return workload
+}
+
+// WorkloadExternal creates a Workload with one PodGroupTemplate that refers to
+// one ResourceClaim with the given name.
+func (b *Builder) WorkloadExternal(externalClaimName string) *schedulingv1alpha3.Workload {
+	workload := b.Workload()
+	workload.Spec.PodGroupTemplates[0].ResourceClaims = []schedulingv1alpha3.PodGroupResourceClaim{
+		{
+			Name:              "resource-claim",
+			ResourceClaimName: &externalClaimName,
+		},
+	}
+	return workload
+}
+
+// WorkloadInline creates a ResourceClaimTemplate and a Workload with one
+// PodGroupTemplate that refers to that ResourceClaimTemplate.
+func (b *Builder) WorkloadInline() (*schedulingv1alpha3.Workload, *resourceapi.ResourceClaimTemplate) {
+	workload := b.Workload()
+	podGroupClaimName := "my-inline-claim"
+	workload.Spec.PodGroupTemplates[0].ResourceClaims = []schedulingv1alpha3.PodGroupResourceClaim{
+		{
+			Name:                      podGroupClaimName,
+			ResourceClaimTemplateName: new(workload.Name),
+		},
+	}
+	template := &resourceapi.ResourceClaimTemplate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      workload.Name,
+			Namespace: workload.Namespace,
+		},
+		Spec: resourceapi.ResourceClaimTemplateSpec{
+			Spec: b.ClaimSpec(),
+		},
+	}
+	return workload, template
+}
+
+// PodGroup returns a simple PodGroup owned by the given Workload with no
+// resource claims.
+func (b *Builder) PodGroup(workload *schedulingv1alpha3.Workload, template schedulingv1alpha3.PodGroupTemplate) *schedulingv1alpha3.PodGroup {
+	podGroup := &schedulingv1alpha3.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: b.namespace,
+			Name:      fmt.Sprintf("%s-%s-%d", workload.Name, template.Name, b.podGroupCounter),
+		},
+		Spec: schedulingv1alpha3.PodGroupSpec{
+			PodGroupTemplateRef: &schedulingv1alpha3.PodGroupTemplateReference{
+				Workload: &schedulingv1alpha3.WorkloadPodGroupTemplateReference{
+					WorkloadName:         workload.Name,
+					PodGroupTemplateName: template.Name,
+				},
+			},
+			SchedulingPolicy: template.SchedulingPolicy,
+			ResourceClaims:   template.ResourceClaims,
+		},
+	}
+	b.podGroupCounter++
+	return podGroup
+}
+
 // Create takes a bunch of objects and calls their Create function.
 func (b *Builder) Create(tCtx ktesting.TContext, objs ...klog.KMetadata) []klog.KMetadata {
 	tCtx.Helper()
@@ -381,6 +487,12 @@ func (b *Builder) Create(tCtx ktesting.TContext, objs ...klog.KMetadata) []klog.
 				err := tCtx.Client().ResourceV1alpha3().DeviceTaintRules().Delete(tCtx, createdObj.GetName(), metav1.DeleteOptions{})
 				tCtx.ExpectNoError(err, "delete DeviceTaintRule")
 			})
+		case *resourcev1beta2.DeviceTaintRule:
+			createdObj, err = tCtx.Client().ResourceV1beta2().DeviceTaintRules().Create(tCtx, obj, metav1.CreateOptions{})
+			cleanupCtx(func(tCtx ktesting.TContext) {
+				err := tCtx.Client().ResourceV1beta2().DeviceTaintRules().Delete(tCtx, createdObj.GetName(), metav1.DeleteOptions{})
+				tCtx.ExpectNoError(err, "delete DeviceTaintRule")
+			})
 		case *appsv1.DaemonSet:
 			createdObj, err = tCtx.Client().AppsV1().DaemonSets(b.namespace).Create(tCtx, obj, metav1.CreateOptions{})
 			// Cleanup not really needed, but speeds up namespace shutdown.
@@ -388,6 +500,10 @@ func (b *Builder) Create(tCtx ktesting.TContext, objs ...klog.KMetadata) []klog.
 				err := tCtx.Client().AppsV1().DaemonSets(b.namespace).Delete(tCtx, obj.Name, metav1.DeleteOptions{})
 				tCtx.ExpectNoError(err, "delete daemonset")
 			})
+		case *schedulingv1alpha3.Workload:
+			createdObj, err = tCtx.Client().SchedulingV1alpha3().Workloads(b.namespace).Create(tCtx, obj, metav1.CreateOptions{})
+		case *schedulingv1alpha3.PodGroup:
+			createdObj, err = tCtx.Client().SchedulingV1alpha3().PodGroups(b.namespace).Create(tCtx, obj, metav1.CreateOptions{})
 		default:
 			tCtx.Fatalf("internal error, unsupported type %T", obj)
 		}
@@ -433,7 +549,7 @@ var envLineRE = regexp.MustCompile(`^(?:admin|user|claim)_[a-zA-Z0-9_]*=.*$`)
 
 func TestContainerEnv(tCtx ktesting.TContext, pod *v1.Pod, containerName string, fullMatch bool, env ...string) {
 	tCtx.Helper()
-	stdout, stderr, err := e2epod.ExecWithOptionsTCtx(tCtx, e2epod.ExecOptions{
+	stdout, stderr, err := e2epod.Exec(tCtx, e2epod.ExecOptions{
 		Command:       []string{"env"},
 		Namespace:     pod.Namespace,
 		PodName:       pod.Name,
@@ -483,6 +599,8 @@ func NewBuilderNow(tCtx ktesting.TContext, driver *Driver) *Builder {
 func (b *Builder) setUp(tCtx ktesting.TContext) {
 	b.namespace = tCtx.Namespace()
 	b.podCounter = 0
+	b.workloadCounter = 0
+	b.podGroupCounter = 0
 	b.claimCounter = 0
 	b.Create(tCtx, b.Class().DeviceClass)
 	tCtx.CleanupCtx(b.tearDown)
@@ -500,7 +618,7 @@ func (b *Builder) tearDown(tCtx ktesting.TContext) {
 	// the framework, we must ensure that test pods and the claims that
 	// they use are deleted. Otherwise the driver might get deleted first,
 	// in which case deleting the claims won't work anymore.
-	tCtx.Log("delete pods and claims")
+	tCtx.Log("delete pods, podgroups, and claims")
 	pods, err := b.listTestPods(tCtx)
 	tCtx.ExpectNoError(err, "list pods")
 	for _, pod := range pods {
@@ -521,6 +639,23 @@ func (b *Builder) tearDown(tCtx ktesting.TContext) {
 	tCtx.Eventually(func(tCtx ktesting.TContext) ([]v1.Pod, error) {
 		return b.listTestPods(tCtx)
 	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "remaining pods despite deletion")
+
+	// Clean up PodGroups to release claims allocated for them.
+	podGroups, err := b.listTestPodGroups(tCtx)
+	tCtx.ExpectNoError(err, "list podgroups")
+	for _, podGroup := range podGroups {
+		if podGroup.DeletionTimestamp != nil {
+			continue
+		}
+		tCtx.Logf("Deleting %T %s", &podGroup, klog.KObj(&podGroup))
+		err := tCtx.Client().SchedulingV1alpha3().PodGroups(b.namespace).Delete(tCtx, podGroup.Name, metav1.DeleteOptions{})
+		if !apierrors.IsNotFound(err) {
+			tCtx.ExpectNoError(err, "delete podgroup")
+		}
+	}
+	tCtx.Eventually(func(tCtx ktesting.TContext) ([]schedulingv1alpha3.PodGroup, error) {
+		return b.listTestPodGroups(tCtx)
+	}).WithTimeout(time.Minute).Should(gomega.BeEmpty(), "remaining podgroups despite deletion")
 
 	claims, err := b.ClientV1(tCtx).ResourceClaims(b.namespace).List(tCtx, metav1.ListOptions{})
 	tCtx.ExpectNoError(err, "get resource claims")
@@ -562,6 +697,18 @@ func (b *Builder) listTestPods(tCtx ktesting.TContext) ([]v1.Pod, error) {
 	return testPods, nil
 }
 
+func (b *Builder) listTestPodGroups(tCtx ktesting.TContext) ([]schedulingv1alpha3.PodGroup, error) {
+	podGroups, err := tCtx.Client().SchedulingV1alpha3().PodGroups(b.namespace).List(tCtx, metav1.ListOptions{})
+	if apierrors.IsNotFound(err) {
+		// API is disabled
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return podGroups.Items, nil
+}
+
 func TaintAllDevices(taints ...resourceapi.DeviceTaint) driverResourcesMutatorFunc {
 	return func(resources map[string]resourceslice.DriverResources) {
 		for i := range resources {
@@ -580,7 +727,7 @@ func NetworkResources(maxAllocations int, tainted bool) driverResourcesGenFunc {
 	return func(nodes *Nodes) map[string]resourceslice.DriverResources {
 		driverResources := make(map[string]resourceslice.DriverResources)
 		devices := make([]resourceapi.Device, 0)
-		for i := 0; i < maxAllocations; i++ {
+		for i := range maxAllocations {
 			device := resourceapi.Device{
 				Name: fmt.Sprintf("device-%d", i),
 			}
@@ -646,7 +793,7 @@ func DriverResourcesNow(nodes *Nodes, maxAllocations int, devicesPerNode ...map[
 			}
 		} else if maxAllocations >= 0 {
 			devices := make([]resourceapi.Device, maxAllocations)
-			for i := 0; i < maxAllocations; i++ {
+			for i := range maxAllocations {
 				devices[i] = resourceapi.Device{
 					Name: fmt.Sprintf("device-%02d", i),
 				}

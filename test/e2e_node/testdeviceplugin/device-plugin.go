@@ -29,6 +29,13 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	kubeletdevicepluginv1beta1 "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
+	"k8s.io/kubernetes/pkg/cluster/ports"
+	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+)
+
+var (
+	kubeletHealthCheckURL = fmt.Sprintf("http://127.0.0.1:%d/healthz", ports.KubeletHealthzPort)
 )
 
 type DevicePlugin struct {
@@ -158,26 +165,41 @@ func (dp *DevicePlugin) RegisterDevicePlugin(ctx context.Context, uniqueName, re
 	devicePluginEndpoint := fmt.Sprintf("%s-%s.sock", "test-device-plugin", uniqueName)
 	dp.uniqueName = uniqueName
 
+	ginkgo.By("Ensuring kubelet is healthy")
+	gomega.Eventually(ctx, func() bool {
+		ok := e2enode.HealthCheck(kubeletHealthCheckURL)
+		framework.Logf("kubelet health check at %q value=%v", kubeletHealthCheckURL, ok)
+		return ok
+	}, framework.PodStartTimeout, framework.Poll).Should(gomega.BeTrueBecause("expected kubelet health check to be successful"))
+
 	// Implement the logic to register the device plugin with the kubelet
-	// Create a new gRPC server
-	dp.server = grpc.NewServer()
-	// Register the device plugin with the server
-	kubeletdevicepluginv1beta1.RegisterDevicePluginServer(dp.server, dp)
-	// Create a listener on a specific port
+	ginkgo.By("Create a listener on a specific port")
 	lis, err := net.Listen("unix", kubeletdevicepluginv1beta1.DevicePluginPath+devicePluginEndpoint)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to listen on the unix socket, error: %w", err)
 	}
-	// Start the gRPC server
+
+	ginkgo.By("Wait enough for unix socket to be open")
+	time.Sleep(time.Second)
+
+	ginkgo.By("Create a new gRPC server")
+	dp.server = grpc.NewServer()
+	ginkgo.By("Register the device plugin with the server")
+	kubeletdevicepluginv1beta1.RegisterDevicePluginServer(dp.server, dp)
+
+	ginkgo.By("Start the gRPC server")
 	go func() {
 		err := dp.server.Serve(lis)
 		gomega.Expect(err).To(gomega.Succeed())
 	}()
 
-	// Create a connection to the kubelet
-	conn, err := grpc.NewClient("unix://"+kubeletdevicepluginv1beta1.KubeletSocket,
+	ginkgo.By("Create a connection to the kubelet")
+	options := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	)
+		grpc.WithIdleTimeout(5 * time.Second),
+	}
+	ginkgo.By("gRPC server listening at socketPath")
+	conn, err := grpc.NewClient("unix://"+kubeletdevicepluginv1beta1.KubeletSocket, options...)
 	if err != nil {
 		return err
 	}
@@ -186,15 +208,20 @@ func (dp *DevicePlugin) RegisterDevicePlugin(ctx context.Context, uniqueName, re
 		gomega.Expect(err).To(gomega.Succeed())
 	}()
 
-	// Create a client for the kubelet
+	ginkgo.By("Wait enough for gRPC server unix scoket to be open")
+	time.Sleep(time.Second)
+
+	ginkgo.By("Create a client for the kubelet")
 	client := kubeletdevicepluginv1beta1.NewRegistrationClient(conn)
 
-	// Register the device plugin with the kubelet
-	_, err = client.Register(ctx, &kubeletdevicepluginv1beta1.RegisterRequest{
+	reqt := &kubeletdevicepluginv1beta1.RegisterRequest{
 		Version:      kubeletdevicepluginv1beta1.Version,
 		Endpoint:     devicePluginEndpoint,
 		ResourceName: resourceName,
-	})
+	}
+
+	ginkgo.By("Register the device plugin with the kubelet")
+	_, err = client.Register(ctx, reqt)
 	if err != nil {
 		return err
 	}
@@ -202,8 +229,12 @@ func (dp *DevicePlugin) RegisterDevicePlugin(ctx context.Context, uniqueName, re
 }
 
 func (dp *DevicePlugin) Stop() {
+	ginkgo.By("Waiting one second before stoping gRPC server")
+	time.Sleep(time.Second)
 	if dp.server != nil {
+		ginkgo.By("Stoping gRPC server stopped")
 		dp.server.Stop()
+		ginkgo.By("Fake gRPC server stopped")
 		dp.server = nil
 	}
 }

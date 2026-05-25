@@ -48,3 +48,25 @@ func IsJobSucceeded(j *batch.Job) bool {
 	}
 	return false
 }
+
+// IsGangSchedulingCandidate returns true when a Job matches the gang scheduling
+// shape used by Job workload integration:
+//   - parallelism > 1
+//   - completionMode == Indexed
+//   - completions == parallelism
+//   - schedulingGroup is not pre-set
+func IsGangSchedulingCandidate(parallelism, completions *int32, isIndexed bool, hasSchedulingGroup bool) bool {
+	if parallelism == nil || *parallelism <= 1 {
+		return false
+	}
+	if !isIndexed {
+		return false
+	}
+	if completions == nil || *completions != *parallelism {
+		return false
+	}
+	if hasSchedulingGroup {
+		return false
+	}
+	return true
+}

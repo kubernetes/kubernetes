@@ -15,7 +15,7 @@ spec:
       serviceAccountName: csi-mock
       containers:
         - name: csi-provisioner
-          image: registry.k8s.io/sig-storage/csi-provisioner:v6.0.0
+          image: registry.k8s.io/sig-storage/csi-provisioner:v6.2.0
           args:
             - "--csi-address=$(ADDRESS)"
             # Topology support is needed for the pod rescheduling test
@@ -34,11 +34,12 @@ spec:
             - mountPath: /csi
               name: socket-dir
         - name: driver-registrar
-          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.15.0
+          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.16.0
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
             - --kubelet-registration-path=/var/lib/kubelet/plugins/csi-mock/csi.sock
+            - --http-endpoint=:9809
           env:
             - name: KUBE_NODE_NAME
               valueFrom:
@@ -47,6 +48,18 @@ spec:
                   fieldPath: spec.nodeName
           securityContext:
             privileged: true
+          ports:
+            - containerPort: 9809
+              name: healthz
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 30
+            timeoutSeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3
           volumeMounts:
           - mountPath: /csi
             name: socket-dir

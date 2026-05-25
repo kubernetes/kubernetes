@@ -73,6 +73,6 @@ func ProbeVolumePlugins(ctx context.Context, featureGate featuregate.FeatureGate
 // GetDynamicPluginProber gets the probers of dynamically discoverable plugins
 // for kubelet.
 // Currently only Flexvolume plugins are dynamically discoverable.
-func GetDynamicPluginProber(pluginDir string, runner exec.Interface) volume.DynamicPluginProber {
-	return flexvolume.GetDynamicPluginProber(pluginDir, runner)
+func GetDynamicPluginProber(ctx context.Context, pluginDir string, runner exec.Interface) volume.DynamicPluginProber {
+	return flexvolume.GetDynamicPluginProber(ctx, pluginDir, runner)
 }

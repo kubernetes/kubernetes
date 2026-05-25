@@ -30,6 +30,7 @@ option go_package = "k8s.io/api/storagemigration/v1beta1";
 
 // StorageVersionMigration represents a migration of stored data to the latest
 // storage version.
+// +k8s:supportsSubresource="/status"
 message StorageVersionMigration {
   // Standard object metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata

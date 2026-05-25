@@ -210,7 +210,7 @@ var _ = SIGDescribe("SchedulerPriorities", framework.WithSerial(), func() {
 		// Generate 10 tolerable taints for the first node (and matching tolerations)
 		tolerableTaints := make([]v1.Taint, 0)
 		var tolerations []v1.Toleration
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			testTaint := getRandomTaint()
 			tolerableTaints = append(tolerableTaints, testTaint)
 			tolerations = append(tolerations, v1.Toleration{Key: testTaint.Key, Value: testTaint.Value, Effect: testTaint.Effect})
@@ -219,7 +219,7 @@ var _ = SIGDescribe("SchedulerPriorities", framework.WithSerial(), func() {
 		intolerableTaints := make(map[string][]v1.Taint)
 		for i := 1; i < len(nodeList.Items); i++ {
 			nodeTaints := make([]v1.Taint, 0)
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				nodeTaints = append(nodeTaints, getRandomTaint())
 			}
 			intolerableTaints[nodeList.Items[i].Name] = nodeTaints

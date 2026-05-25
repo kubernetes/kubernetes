@@ -174,8 +174,9 @@ const (
 // +k8s:prerelease-lifecycle-gen:replacement=policy,v1,PodDisruptionBudget
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
+// +k8s:supportsSubresource="/status"
 type PodDisruptionBudget struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -198,7 +199,7 @@ type PodDisruptionBudget struct {
 
 // PodDisruptionBudgetList is a collection of PodDisruptionBudgets.
 type PodDisruptionBudgetList struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// Standard object's metadata.
 	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -218,7 +219,7 @@ type PodDisruptionBudgetList struct {
 // This is a subresource of Pod.  A request to cause such an eviction is
 // created by POSTing to .../pods/<pod name>/evictions.
 type Eviction struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta `json:""`
 
 	// ObjectMeta describes the pod that is being evicted.
 	// +optional

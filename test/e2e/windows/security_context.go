@@ -37,8 +37,8 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
 	testutils "k8s.io/kubernetes/test/utils"
-	"k8s.io/kubernetes/test/utils/format"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	"k8s.io/kubernetes/test/utils/ktesting/format"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
 )

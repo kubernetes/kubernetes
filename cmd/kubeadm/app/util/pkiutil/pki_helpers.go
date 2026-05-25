@@ -340,11 +340,20 @@ func TryLoadPrivatePublicKeyFromDisk(pkiPath, name string) (crypto.PrivateKey, c
 	}
 
 	// Allow RSA and ECDSA formats only
+	mismatchErrFmt := "the private key file %[2]s is in %[1]s format but the public key file %[3]s is not in %[1]s format"
 	switch k := privKey.(type) {
 	case *rsa.PrivateKey:
-		return k, pubKeys[0].(*rsa.PublicKey), nil
+		pubKey, ok := pubKeys[0].(*rsa.PublicKey)
+		if !ok {
+			return nil, nil, errors.Errorf(mismatchErrFmt, "RSA", privateKeyPath, publicKeyPath)
+		}
+		return k, pubKey, nil
 	case *ecdsa.PrivateKey:
-		return k, pubKeys[0].(*ecdsa.PublicKey), nil
+		pubKey, ok := pubKeys[0].(*ecdsa.PublicKey)
+		if !ok {
+			return nil, nil, errors.Errorf(mismatchErrFmt, "ECDSA", privateKeyPath, publicKeyPath)
+		}
+		return k, pubKey, nil
 	default:
 		return nil, nil, errors.Errorf("the private key file %s is neither in RSA nor ECDSA format", privateKeyPath)
 	}

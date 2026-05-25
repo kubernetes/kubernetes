@@ -90,11 +90,11 @@ func (apiServerStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Objec
 	return nil
 }
 
-func (apiServerStrategy) AllowCreateOnUpdate() bool {
+func (apiServerStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
-func (apiServerStrategy) AllowUnconditionalUpdate() bool {
+func (apiServerStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 
@@ -149,11 +149,11 @@ func (apiServerStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old ru
 	newAPIService.OwnerReferences = oldAPIService.OwnerReferences
 }
 
-func (apiServerStatusStrategy) AllowCreateOnUpdate() bool {
+func (apiServerStatusStrategy) AllowCreateOnUpdate(ctx context.Context) bool {
 	return false
 }
 
-func (apiServerStatusStrategy) AllowUnconditionalUpdate() bool {
+func (apiServerStatusStrategy) AllowUnconditionalUpdate(ctx context.Context) bool {
 	return false
 }
 

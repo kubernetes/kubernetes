@@ -41,19 +41,15 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/apis/apiserver"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	authorizationcel "k8s.io/apiserver/pkg/authorization/cel"
-	"k8s.io/apiserver/pkg/features"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook/metrics"
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
 	utiltesting "k8s.io/client-go/util/testing"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/metrics/testutil"
 )
@@ -711,7 +707,6 @@ func TestStructuredAuthzConfigFeatureEnablement(t *testing.T) {
 		expectedEvalErr    bool
 		expectedDecision   authorizer.Decision
 		expressions        []apiserver.WebhookMatchCondition
-		selectorEnabled    bool
 	}
 	aliceAttr := authorizer.AttributesRecord{
 		User: &user.DefaultInfo{
@@ -778,17 +773,11 @@ func TestStructuredAuthzConfigFeatureEnablement(t *testing.T) {
 					Expression: "request.resourceAttributes.labelSelector.?requirements.orValue([]).exists(r, r.key=='baz' && r.operator=='In' && ('qux' in r.values))",
 				},
 			},
-			selectorEnabled: true,
 		},
 	}
 
 	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if !test.selectorEnabled {
-				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.33"))
-				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AuthorizeWithSelectors, false)
-			}
-
 			// create new compiler because it depends on the feature gate
 			compiler := authorizationcel.NewDefaultCompiler()
 

@@ -17,13 +17,17 @@ limitations under the License.
 package validation
 
 import (
+	"context"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/operation"
 	"k8s.io/apimachinery/pkg/api/validate/content"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	corevalidation "k8s.io/kubernetes/pkg/apis/core/v1/validation"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
@@ -46,6 +50,18 @@ func ValidateScale(scale *autoscaling.Scale) field.ErrorList {
 	}
 
 	return allErrs
+}
+
+// ValidateScaleUpdate is the single composition of handwritten and declarative
+// Scale validation invoked by every in-tree ScaleREST.UpdatedObject
+// (replicationcontroller, deployment, replicaset, statefulset) and by the
+// corresponding tests under test/declarative_validation/{autoscaling,apps}/scale.
+// mapper translates the request's parent group/version to the appropriate Scale
+// GVK; tests pass nil because they set RequestInfo directly to a Scale GV.
+func ValidateScaleUpdate(ctx context.Context, newScale, oldScale *autoscaling.Scale, scheme *runtime.Scheme, mapper rest.GroupVersionKindProvider) field.ErrorList {
+	errs := ValidateScale(newScale)
+	dv := rest.DeclarativeValidation{Scheme: scheme}
+	return dv.ValidateDeclaratively(ctx, newScale, oldScale, errs, operation.Update, rest.DeclarativeValidationConfig{SubresourceGVKMapper: mapper})
 }
 
 // ValidateHorizontalPodAutoscalerName can be used to check whether the given autoscaler name is valid.
