@@ -878,6 +878,7 @@ var _ = SIGDescribe("Pod InPlace Resize Container", func() {
 	doPodResizeReadAndReplaceTests(f)
 	doPodResizePatchErrorTests(f)
 	doPodResizeMemoryLimitDecreaseTest(f)
+	doPodResizeOOMKilledTest(f)
 })
 
 var _ = SIGDescribe("Pod InPlace Resize Init Container", framework.WithFeatureGate(features.InPlacePodVerticalScalingInitContainers), func() {
@@ -1214,17 +1215,3 @@ func doPodResizeOOMKilledTest(f *framework.Framework) {
 			podClient.DeleteSync(ctx, resizedPod.Name, metav1.DeleteOptions{}, f.Timeouts.PodDelete)
 		})
 }
-
-var _ = SIGDescribe("Pod InPlace Resize OOMKilled Container", func() {
-	f := framework.NewDefaultFramework("pod-resize-oomkill-tests")
-
-	ginkgo.BeforeEach(func(ctx context.Context) {
-		_, err := e2enode.GetRandomReadySchedulableNode(ctx, f.ClientSet)
-		framework.ExpectNoError(err)
-		if framework.NodeOSDistroIs("windows") {
-			e2eskipper.Skipf("runtime does not support InPlacePodVerticalScaling -- skipping")
-		}
-	})
-
-	doPodResizeOOMKilledTest(f)
-})
