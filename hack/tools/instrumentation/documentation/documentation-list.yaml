@@ -4195,6 +4195,14 @@
   componentEndpoints:
   - component: kubelet
     endpoint: /metrics
+- name: pod_pid_limit_applied_total
+  subsystem: kubelet
+  help: Cumulative number of pods where a per-pod PID limit was applied.
+  type: Counter
+  stabilityLevel: ALPHA
+  componentEndpoints:
+  - component: kubelet
+    endpoint: /metrics
 - name: pod_resize_duration_milliseconds
   subsystem: kubelet
   help: Duration in milliseconds to actuate a pod resize
