@@ -2793,6 +2793,8 @@ var validContainerResourceFieldPathExpressions = sets.New(
 	"requests.cpu",
 	"requests.memory",
 	"requests.ephemeral-storage",
+	"status.cpuset",
+	"status.memset",
 )
 
 var validContainerResourceFieldPathPrefixesWithDownwardAPIHugePages = sets.New(hugepagesRequestsPrefixDownwardAPI, hugepagesLimitsPrefixDownwardAPI)
@@ -3000,6 +3002,14 @@ func validateContainerResourceDivisor(rName string, divisor resource.Quantity, f
 	case "limits.ephemeral-storage", "requests.ephemeral-storage":
 		if !validContainerResourceDivisorForEphemeralStorage.Has(divisor.String()) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("divisor"), rName, "only divisor's values 1, 1k, 1M, 1G, 1T, 1P, 1E, 1Ki, 1Mi, 1Gi, 1Ti, 1Pi, 1Ei are supported with the local ephemeral storage resource"))
+		}
+	case "status.cpuset":
+		if !divisor.IsZero() {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("divisor"), rName, "status.cpuset can not configured divisor"))
+		}
+	case "status.memset":
+		if !divisor.IsZero() {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("divisor"), rName, "status.memset can not configured divisor"))
 		}
 	}
 	if strings.HasPrefix(rName, hugepagesRequestsPrefixDownwardAPI) || strings.HasPrefix(rName, hugepagesLimitsPrefixDownwardAPI) {

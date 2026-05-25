@@ -580,7 +580,7 @@ func (m *manager) handlePodResourcesResize(logger klog.Logger, pod *v1.Pod) (boo
 	if reason != "" {
 		if m.statusManager.SetPodResizePendingCondition(pod.UID, reason, message, pod.Generation) {
 			eventType := events.ResizeDeferred
-			if reason == v1.PodReasonInfeasible {
+			if reason == v1.PodReasonInfeasible || reason == "prohibitedCPUAllocationError" {
 				eventType = events.ResizeInfeasible
 			}
 			msg := events.PodResizePendingMsg(logger, pod, reason, message, pod.Generation)
@@ -607,6 +607,9 @@ func (m *manager) canAdmitPod(logger klog.Logger, allocatedPods []*v1.Pod, pod *
 	for _, podAdmitHandler := range m.admitHandlers {
 		if result := podAdmitHandler.Admit(attrs); !result.Admit {
 			logger.Info("Pod admission denied", "podUID", attrs.Pod.UID, "pod", klog.KObj(attrs.Pod), "reason", result.Reason, "message", result.Message, "operation", operation)
+			if result.Reason == "prohibitedCPUAllocationError" {
+				return false, v1.PodReasonInfeasible, result.Message
+			}
 			return false, result.Reason, result.Message
 		}
 	}

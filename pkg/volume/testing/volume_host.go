@@ -46,6 +46,14 @@ import (
 	"k8s.io/mount-utils"
 )
 
+const (
+	// TestCPUSet is a test constant for CPU assignments
+	TestCPUSet = "1,2"
+
+	// TestMemorySet is a test constant for memory assignments
+	TestMemorySet = "memory:1073741824,NUMA:[0]"
+)
+
 type FakeVolumeHost interface {
 	VolumeHost
 
@@ -175,6 +183,14 @@ func (f *fakeVolumeHost) NewWrapperUnmounter(volName string, spec Spec, podUID t
 
 func (f *fakeVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 	return v1.ResourceList{}, nil
+}
+
+func (f *fakeVolumeHost) GetAssignments(podUID, containerName string) string {
+	return TestCPUSet
+}
+
+func (f *fakeVolumeHost) GetMemoryAssignments(podUID, containerName string) string {
+	return TestMemorySet
 }
 
 func (f *fakeVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {

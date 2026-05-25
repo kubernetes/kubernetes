@@ -209,6 +209,11 @@ var (
 	// InPlacePodVerticalScaling is used for testing in-place pod vertical scaling (https://kep.k8s.io/1287).
 	InPlacePodVerticalScaling = framework.WithFeature(framework.ValidFeatures.Add("InPlacePodVerticalScaling"))
 
+	// Owner: sig-node
+	// Marks a test for InPlacePodVerticalScalingExclusiveCPUs feature that requires
+	// InPlacePodVerticalScalingExclusiveCPUs feature gate to be enabled.
+	InPlacePodVerticalScalingExclusiveCPUs = framework.WithFeature(framework.ValidFeatures.Add("InPlacePodVerticalScalingExclusiveCPUs"))
+
 	// Owner: sig-network
 	// Marks tests that require a conforming implementation of
 	// Ingress.networking.k8s.io to be present.

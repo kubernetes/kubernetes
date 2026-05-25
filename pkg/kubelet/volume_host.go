@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"runtime"
+	"strings"
 
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
@@ -34,6 +35,7 @@ import (
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/clustertrustbundle"
 	"k8s.io/kubernetes/pkg/kubelet/configmap"
 	"k8s.io/kubernetes/pkg/kubelet/podcertificate"
@@ -237,6 +239,49 @@ func (kvh *kubeletVolumeHost) GetNodeAllocatable() (v1.ResourceList, error) {
 		return nil, fmt.Errorf("error retrieving node: %v", err)
 	}
 	return node.Status.Allocatable, nil
+}
+
+func (kvh *kubeletVolumeHost) GetAssignments(podUID, containerName string) string {
+	if kvh.kubelet.containerManager != nil {
+		return kvh.kubelet.containerManager.GetAssignments(podUID, containerName)
+	}
+	return "null"
+}
+
+func (kvh *kubeletVolumeHost) GetMemoryAssignments(podUID, containerName string) string {
+	if kvh.kubelet.containerManager != nil {
+		containerMemories := kvh.kubelet.containerManager.GetMemory(podUID, containerName)
+		if len(containerMemories) == 0 {
+			return "null"
+		}
+		return containerMemoryToString(containerMemories)
+	}
+	return "null"
+}
+
+// containerMemoryToString converts ContainerMemory slice to a string format
+func containerMemoryToString(memories []*podresourcesapi.ContainerMemory) string {
+	if len(memories) == 0 {
+		return "null"
+	}
+	var sb strings.Builder
+	for i, m := range memories {
+		if i > 0 {
+			sb.WriteString(";")
+		}
+		fmt.Fprintf(&sb, "%s:%d", m.MemoryType, m.Size)
+		if m.Topology != nil && len(m.Topology.Nodes) > 0 {
+			sb.WriteString(",NUMA:[")
+			for j, node := range m.Topology.Nodes {
+				if j > 0 {
+					sb.WriteString(",")
+				}
+				fmt.Fprintf(&sb, "%d", node.ID)
+			}
+			sb.WriteString("]")
+		}
+	}
+	return sb.String()
 }
 
 func (kvh *kubeletVolumeHost) GetSecretFunc() func(namespace, name string) (*v1.Secret, error) {

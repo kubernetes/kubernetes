@@ -1046,7 +1046,7 @@ func (kl *Kubelet) podFieldSelectorRuntimeValue(ctx context.Context, fs *v1.Obje
 func containerResourceRuntimeValue(fs *v1.ResourceFieldSelector, pod *v1.Pod, container *v1.Container) (string, error) {
 	containerName := fs.ContainerName
 	if len(containerName) == 0 {
-		return resource.ExtractContainerResourceValue(fs, container)
+		return resource.ExtractContainerResourceValue(fs, container, nil, "")
 	}
 	return resource.ExtractResourceValueByContainerName(fs, pod, containerName)
 }
@@ -2471,7 +2471,13 @@ func (kl *Kubelet) convertToAPIContainerStatuses(ctx context.Context, pod *v1.Po
 				// allocated value in the API to avoid confusion and simplify comparisons.
 				if cStatus.Resources.CPURequest.MilliValue() > cm.MinShares ||
 					resources.Requests.Cpu().MilliValue() > cm.MinShares {
-					resources.Requests[v1.ResourceCPU] = cStatus.Resources.CPURequest.DeepCopy()
+					if kl.containerManager.IsCPUSetUpdateInProgress(pod) && oldStatus.Resources != nil {
+						if oldCPURequest, ok := oldStatus.Resources.Requests[v1.ResourceCPU]; ok {
+							resources.Requests[v1.ResourceCPU] = oldCPURequest.DeepCopy()
+						}
+					} else {
+						resources.Requests[v1.ResourceCPU] = cStatus.Resources.CPURequest.DeepCopy()
+					}
 				}
 			} else {
 				preserveOldResourcesValue(v1.ResourceCPU, oldStatus.Resources.Requests, resources.Requests)

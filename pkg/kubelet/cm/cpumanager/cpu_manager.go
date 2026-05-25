@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/utils/cpuset"
 )
@@ -61,12 +62,12 @@ type Manager interface {
 	// Start is called during Kubelet initialization.
 	// Start takes a `Context` because it may possibly spin the reconcileState helper, which in turn
 	// needs to update container state, which takes a context.
-	Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error
+	Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, runtimeHelper kubecontainer.RuntimeHelper, initialContainers containermap.ContainerMap) error
 
 	// Called to trigger the allocation of CPUs to a container. This must be
 	// called at some point prior to the AddContainer() call for a container,
 	// e.g. at pod admission time.
-	Allocate(pod *v1.Pod, container *v1.Container) error
+	Allocate(pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) error
 
 	// AddContainer adds the mapping between container ID to pod UID and the container name
 	// The mapping used to remove the CPU allocation during the container removal
@@ -83,7 +84,7 @@ type Manager interface {
 	// GetTopologyHints implements the topologymanager.HintProvider Interface
 	// and is consulted to achieve NUMA aware resource alignment among this
 	// and other resource controllers.
-	GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint
+	GetTopologyHints(pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint
 
 	// GetExclusiveCPUs implements the podresources.CPUsProvider interface to provide
 	// exclusively allocated cpus for the container
@@ -92,10 +93,10 @@ type Manager interface {
 	// GetPodTopologyHints implements the topologymanager.HintProvider Interface
 	// and is consulted to achieve NUMA aware resource alignment per Pod
 	// among this and other resource controllers.
-	GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint
+	GetPodTopologyHints(pod *v1.Pod, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint
 
 	// AllocatePod is called to trigger the allocation of CPUs to a pod.
-	AllocatePod(pod *v1.Pod) error
+	AllocatePod(pod *v1.Pod, operation lifecycle.Operation) error
 
 	// GetAllocatableCPUs returns the total set of CPUs available for allocation.
 	GetAllocatableCPUs() cpuset.CPUSet
@@ -110,6 +111,12 @@ type Manager interface {
 
 	// GetResourceIsolationLevel returns the isolation level of the container.
 	GetResourceIsolationLevel(pod *v1.Pod, container *v1.Container) cmqos.ResourceIsolationLevel
+
+	// Return true if any container in the pod has not updated its cpuset.
+	IsCPUSetUpdateInProgress(pod *v1.Pod) bool
+
+	// GetAssignments returns the current allocated CPU for the specified pod and container.
+	GetAssignments(podUID, containerName string) string
 }
 
 type manager struct {
@@ -159,6 +166,9 @@ type manager struct {
 	// allocatableCPUs is the set of online CPUs as reported by the system,
 	// and available for allocation, minus the reserved set
 	allocatableCPUs cpuset.CPUSet
+
+	// RuntimeHelper that wraps kubelet to generate runtime container options.
+	runtimeHelper kubecontainer.RuntimeHelper
 }
 
 var _ Manager = &manager{}
@@ -230,7 +240,7 @@ func NewManager(logger logr.Logger, cpuPolicyName string, cpuPolicyOptions map[s
 	return manager, nil
 }
 
-func (m *manager) Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
+func (m *manager) Start(ctx context.Context, activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, runtimeHelper kubecontainer.RuntimeHelper, initialContainers containermap.ContainerMap) error {
 	logger := klog.FromContext(ctx)
 	logger.Info("Starting", "policy", m.policy.Name())
 	logger.Info("Reconciling", "reconcilePeriod", m.reconcilePeriod)
@@ -238,6 +248,7 @@ func (m *manager) Start(ctx context.Context, activePods ActivePodsFunc, sourcesR
 	m.activePods = activePods
 	m.podStatusProvider = podStatusProvider
 	m.containerRuntime = containerRuntime
+	m.runtimeHelper = runtimeHelper
 	m.containerMap = initialContainers
 
 	stateImpl, err := state.NewCheckpointState(logger, m.stateFileDirectory, cpuManagerStateFileName, m.policy.Name(), m.containerMap)
@@ -266,7 +277,7 @@ func (m *manager) Start(ctx context.Context, activePods ActivePodsFunc, sourcesR
 	return nil
 }
 
-func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
+func (m *manager) Allocate(p *v1.Pod, c *v1.Container, operation lifecycle.Operation) error {
 	logger := klog.TODO() // until we move topology manager to contextual logging
 
 	// Garbage collect any stranded resources before allocating CPUs.
@@ -276,7 +287,7 @@ func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
 	defer m.Unlock()
 
 	// Call down into the policy to assign this container CPUs if required.
-	err := m.policy.Allocate(logger, m.state, p, c)
+	err := m.policy.Allocate(logger, m.state, p, c, operation)
 	if err != nil {
 		logger.Error(err, "policy error")
 		return err
@@ -285,7 +296,7 @@ func (m *manager) Allocate(p *v1.Pod, c *v1.Container) error {
 	return nil
 }
 
-func (m *manager) AllocatePod(pod *v1.Pod) error {
+func (m *manager) AllocatePod(pod *v1.Pod, operation lifecycle.Operation) error {
 	logger := klog.TODO() // until we move topology manager to contextual logging
 
 	// Garbage collect any stranded resources before allocating CPUs.
@@ -295,7 +306,7 @@ func (m *manager) AllocatePod(pod *v1.Pod) error {
 	defer m.Unlock()
 
 	// Call down into the policy to assign this container CPUs if required.
-	if err := m.policy.AllocatePod(logger, m.state, pod); err != nil {
+	if err := m.policy.AllocatePod(logger, m.state, pod, operation); err != nil {
 		logger.Error(err, "AllocatePod error", "pod", klog.KObj(pod))
 		return err
 	}
@@ -354,20 +365,20 @@ func (m *manager) State() state.Reader {
 	return m.state
 }
 
-func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+func (m *manager) GetTopologyHints(pod *v1.Pod, container *v1.Container, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	logger := klog.TODO()
 	// Garbage collect any stranded resources before providing TopologyHints
 	m.removeStaleState(logger)
 	// Delegate to active policy
-	return m.policy.GetTopologyHints(logger, m.state, pod, container)
+	return m.policy.GetTopologyHints(logger, m.state, pod, container, operation)
 }
 
-func (m *manager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+func (m *manager) GetPodTopologyHints(pod *v1.Pod, operation lifecycle.Operation) map[string][]topologymanager.TopologyHint {
 	logger := klog.TODO()
 	// Garbage collect any stranded resources before providing TopologyHints
 	m.removeStaleState(logger)
 	// Delegate to active policy
-	return m.policy.GetPodTopologyHints(logger, m.state, pod)
+	return m.policy.GetPodTopologyHints(logger, m.state, pod, operation)
 }
 
 func (m *manager) GetAllocatableCPUs() cpuset.CPUSet {
@@ -411,26 +422,48 @@ func (m *manager) removeStaleState(rootLogger logr.Logger) {
 		}
 	}
 
-	// Loop through the CPUManager state. Remove any state for containers not
-	// in the `activeContainers` list built above.
-	assignments := m.state.GetCPUAssignments()
-	for podUID := range assignments {
-		for containerName := range assignments[podUID] {
-			logger := klog.LoggerWithValues(rootLogger, "podUID", podUID, "containerName", containerName)
+	if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.InPlacePodVerticalScalingExclusiveCPUs) {
 
-			if _, ok := activeContainers[podUID][containerName]; ok {
-				logger.V(5).Info("container still active")
-				continue
+		// Loop through the CPUManager state. Remove any state for containers not
+		// in the `activeContainers` list built above.
+		assignments := m.state.GetCPUAssignments()
+		for podUID := range assignments {
+			for containerName := range assignments[podUID] {
+				logger := klog.LoggerWithValues(rootLogger, "podUID", podUID, "containerName", containerName)
+
+				if _, ok := activeContainers[podUID][containerName]; ok {
+					logger.V(5).Info("container still active")
+					continue
+				}
+
+				logger.V(2).Info("removing container")
+				err := m.policyRemoveContainerByRef(logger, podUID, containerName)
+				if err != nil {
+					logger.Error(err, "failed to remove container")
+				}
 			}
+		}
+	} else {
+		// Loop through the CPUManager state. Remove any state for containers not
+		// in the `activeContainers` list built above.
+		allocations := m.state.GetCPUAllocations()
+		for podUID := range allocations {
+			for containerName := range allocations[podUID] {
+				logger := klog.LoggerWithValues(rootLogger, "podUID", podUID, "containerName", containerName)
 
-			logger.V(2).Info("removing container")
-			err := m.policyRemoveContainerByRef(logger, podUID, containerName)
-			if err != nil {
-				logger.Error(err, "failed to remove container")
+				if _, ok := activeContainers[podUID][containerName]; ok {
+					logger.V(5).Info("container still active")
+					continue
+				}
+
+				logger.V(2).Info("removing container")
+				err := m.policyRemoveContainerByRef(logger, podUID, containerName)
+				if err != nil {
+					logger.Error(err, "failed to remove container")
+				}
 			}
 		}
 	}
-
 	m.containerMap.Visit(func(podUID, containerName, containerID string) {
 		logger := klog.LoggerWithValues(rootLogger, "podUID", podUID, "containerName", containerName)
 		if _, ok := activeContainers[podUID][containerName]; ok {
@@ -445,12 +478,18 @@ func (m *manager) removeStaleState(rootLogger logr.Logger) {
 	})
 }
 
+func (m *manager) releaseTimedOutScaleDownCPUs(rootLogger logr.Logger) {
+	m.Lock()
+	m.policy.ReleaseTimedOutScaleDownCPUs(rootLogger, m.state)
+	m.Unlock()
+}
+
 func (m *manager) reconcileState(ctx context.Context) (success []reconciledContainer, failure []reconciledContainer) {
 	success = []reconciledContainer{}
 	failure = []reconciledContainer{}
 
 	rootLogger := klog.FromContext(ctx)
-
+	m.releaseTimedOutScaleDownCPUs(rootLogger)
 	m.removeStaleState(rootLogger)
 	for _, pod := range m.activePods() {
 		podLogger := klog.LoggerWithValues(rootLogger, "pod", klog.KObj(pod))
@@ -527,6 +566,11 @@ func (m *manager) reconcileState(ctx context.Context) (success []reconciledConta
 					continue
 				}
 				m.lastUpdateState.SetCPUSet(string(pod.UID), container.Name, cset)
+				// After updating the container's exclusive CPU set, trigger the SyncLoop (PLEG) by setting the PLEG condition to check and clear the pod resize in progress.
+				exclusiveCPUSet, exist := m.state.GetCPUSet(string(pod.UID), container.Name)
+				if exist && exclusiveCPUSet.Equals(cset) {
+					m.runtimeHelper.RequestPodReinspect(pod.UID)
+				}
 			}
 			success = append(success, reconciledContainer{pod.Name, container.Name, containerID})
 		}
@@ -589,4 +633,22 @@ func (m *manager) GetResourceIsolationLevel(pod *v1.Pod, container *v1.Container
 	}
 
 	return cmqos.ResourceIsolationContainer
+}
+
+func (m *manager) IsCPUSetUpdateInProgress(pod *v1.Pod) bool {
+	for _, container := range pod.Spec.Containers {
+		cset, csetExist := m.state.GetCPUSet(string(pod.UID), container.Name)
+		lcset, lcsetExist := m.lastUpdateState.GetCPUSet(string(pod.UID), container.Name)
+		if csetExist && lcsetExist && !cset.Equals(lcset) {
+			return true
+		}
+		if m.policy.IsDuringScaleDownDelay(string(pod.UID), container.Name) {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *manager) GetAssignments(podUID, containerName string) string {
+	return m.policy.GetAssignments(m.state, podUID, containerName)
 }

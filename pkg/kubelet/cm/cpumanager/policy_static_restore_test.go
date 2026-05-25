@@ -32,6 +32,8 @@ import (
 	pkgfeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/test/utils/ktesting"
 	"k8s.io/utils/cpuset"
 )
@@ -140,14 +142,14 @@ func TestCPUManagerRestoreState(t *testing.T) {
 			pod.UID = types.UID("pod1")
 
 			// Start manager to initialize state and activePods
-			err = mgr.Start(context.Background(), func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
+			err = mgr.Start(context.Background(), func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, &containertest.FakeRuntimeHelper{}, containermap.NewContainerMap())
 			if err != nil {
 				t.Fatalf("could not start manager: %v", err)
 			}
 
 			// Allocate resources (Pod Scope)
 			if tc.podLevelResourceManagersEnabled && resourcehelper.IsPodLevelResourcesSet(pod) {
-				err = mgr.AllocatePod(pod)
+				err = mgr.AllocatePod(pod, lifecycle.AddOperation)
 				if err != nil {
 					t.Fatalf("could not allocate pod: %v", err)
 				}
@@ -155,7 +157,7 @@ func TestCPUManagerRestoreState(t *testing.T) {
 				// Allocate resources (Container Scope / Legacy)
 				for i := range pod.Spec.Containers {
 					container := &pod.Spec.Containers[i]
-					err = mgr.Allocate(pod, container)
+					err = mgr.Allocate(pod, container, lifecycle.AddOperation)
 					if err != nil {
 						t.Fatalf("could not allocate container %s: %v", container.Name, err)
 					}
@@ -204,7 +206,7 @@ func TestCPUManagerRestoreState(t *testing.T) {
 				t.Fatalf("could not create manager 2: %v", err)
 			}
 
-			err = mgr2.Start(context.Background(), func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, containermap.NewContainerMap())
+			err = mgr2.Start(context.Background(), func() []*v1.Pod { return []*v1.Pod{pod} }, &sourcesReadyStub{}, mockPodStatusProvider{}, mockRuntimeService{}, &containertest.FakeRuntimeHelper{}, containermap.NewContainerMap())
 			if err != nil {
 				t.Fatalf("could not start manager 2: %v", err)
 			}
