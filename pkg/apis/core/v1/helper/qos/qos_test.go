@@ -373,6 +373,62 @@ func TestComputePodQOS(t *testing.T) {
 			podLevelResourcesEnabled: true,
 			podLevelResourcesFixKubeletQOSClassEnabled: true,
 		},
+		{
+			// pids is a limit-only pod-level resource and must not affect QOS:
+			// a pod with only a pod-level pids limit keeps its container-derived class.
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "guaranteed-with-pod-level-pids-only"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "guaranteed", Resources: v1.ResourceRequirements{Requests: getResourceList("100m", "100Mi"), Limits: getResourceList("100m", "100Mi")}},
+					},
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{v1.ResourcePID: resource.MustParse("2048")},
+					},
+				},
+			},
+			expected:                 v1.PodQOSGuaranteed,
+			podLevelResourcesEnabled: true,
+			podLevelResourcesFixKubeletQOSClassEnabled: true,
+		},
+		{
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "burstable-with-pod-level-pids-only"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "burstable", Resources: v1.ResourceRequirements{Requests: getResourceList("100m", "100Mi"), Limits: getResourceList("200m", "200Mi")}},
+					},
+					Resources: &v1.ResourceRequirements{
+						Limits: v1.ResourceList{v1.ResourcePID: resource.MustParse("2048")},
+					},
+				},
+			},
+			expected:                 v1.PodQOSBurstable,
+			podLevelResourcesEnabled: true,
+			podLevelResourcesFixKubeletQOSClassEnabled: true,
+		},
+		{
+			// pids alongside pod-level cpu/memory keeps the pod-level derivation.
+			pod: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Name: "guaranteed-with-pod-level-resources-and-pids"},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{Name: "best-effort"},
+					},
+					Resources: &v1.ResourceRequirements{
+						Requests: getResourceList("100m", "100Mi"),
+						Limits: v1.ResourceList{
+							v1.ResourceCPU:    resource.MustParse("100m"),
+							v1.ResourceMemory: resource.MustParse("100Mi"),
+							v1.ResourcePID:    resource.MustParse("2048"),
+						},
+					},
+				},
+			},
+			expected:                 v1.PodQOSGuaranteed,
+			podLevelResourcesEnabled: true,
+			podLevelResourcesFixKubeletQOSClassEnabled: true,
+		},
 	}
 	tests = append(tests, explicitPLRTests...)
 
