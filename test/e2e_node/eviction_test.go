@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	kubeletstatsv1alpha1 "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
@@ -734,6 +735,79 @@ var _ = SIGDescribe("PriorityPidEvictionOrdering", framework.WithSlow(), framewo
 				wantPodDisruptionCondition: ptr.To(v1.DisruptionTarget),
 			},
 		}
+		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logPidMetrics, specs)
+	})
+})
+
+// PriorityPidEvictionWithPerPodPIDLimits verifies that per-pod PID limits do not
+// alter eviction manager behavior: PIDPressure detection remains node-level and
+// pod eviction ranking is based on priority and process count, not the pod's
+// spec.resources.limits.pid value.
+var _ = SIGDescribe("PriorityPidEvictionWithPerPodPIDLimits", framework.WithSlow(), framework.WithSerial(), framework.WithDisruptive(), feature.Eviction, func() {
+	f := framework.NewDefaultFramework("pidpressure-perpod-eviction-test")
+	f.NamespacePodSecurityLevel = admissionapi.LevelPrivileged
+	const pressureTimeout = 10 * time.Minute
+	const expectedNodeCondition = v1.NodePIDPressure
+	const expectedStarvedResource = noStarvedResource
+
+	highPriorityClassName := f.BaseName + "-high-priority"
+	const highPriority = int32(999999999)
+	const processes = 5000
+
+	ginkgo.Context(fmt.Sprintf("when pods with per-pod PID limits cause %s", expectedNodeCondition), func() {
+		tempSetCurrentKubeletConfig(f, func(ctx context.Context, initialConfig *kubeletconfig.KubeletConfiguration) {
+			pidsConsumed := int64(4000)
+			summary := eventuallyGetSummary(ctx)
+			availablePids := *(summary.Node.Rlimit.MaxPID) - *(summary.Node.Rlimit.NumOfRunningProcesses)
+			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalPIDAvailable): fmt.Sprintf("%d", availablePids-pidsConsumed)}
+			initialConfig.EvictionMinimumReclaim = map[string]string{}
+			if initialConfig.FeatureGates == nil {
+				initialConfig.FeatureGates = make(map[string]bool)
+			}
+			initialConfig.FeatureGates[string(features.PerPodPIDLimit)] = true
+			initialConfig.PodPidsLimit = int64(16384)
+		})
+		ginkgo.BeforeEach(func(ctx context.Context) {
+			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(ctx, &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: highPriorityClassName}, Value: highPriority}, metav1.CreateOptions{})
+			if err != nil && !apierrors.IsAlreadyExists(err) {
+				framework.ExpectNoError(err, "failed to create priority class")
+			}
+		})
+		ginkgo.AfterEach(func(ctx context.Context) {
+			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(ctx, highPriorityClassName, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+		})
+
+		lowPriorityForkBomb := pidConsumingPod("fork-bomb-low-priority-with-pid-limit", processes)
+		lowPriorityForkBomb.Spec.Resources = &v1.ResourceRequirements{
+			Limits: v1.ResourceList{
+				v1.ResourceName("pid"): resource.MustParse("2048"),
+			},
+		}
+
+		highPriorityForkBomb := pidConsumingPod("fork-bomb-high-priority-with-pid-limit", processes)
+		highPriorityForkBomb.Spec.Resources = &v1.ResourceRequirements{
+			Limits: v1.ResourceList{
+				v1.ResourceName("pid"): resource.MustParse("2048"),
+			},
+		}
+
+		specs := []podEvictSpec{
+			{
+				evictionPriority: 2,
+				pod:              lowPriorityForkBomb,
+			},
+			{
+				evictionPriority: 0,
+				pod:              innocentPod(),
+			},
+			{
+				evictionPriority: 1,
+				pod:              highPriorityForkBomb,
+			},
+		}
+		specs[1].pod.Spec.PriorityClassName = highPriorityClassName
+		specs[2].pod.Spec.PriorityClassName = highPriorityClassName
 		runEvictionTest(f, pressureTimeout, expectedNodeCondition, expectedStarvedResource, logPidMetrics, specs)
 	})
 })

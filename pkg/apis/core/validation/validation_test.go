@@ -21517,6 +21517,140 @@ func TestValidateResourceNames(t *testing.T) {
 	}
 }
 
+func TestValidateContainerResourceName_PID(t *testing.T) {
+	tests := []struct {
+		name      string
+		gateOn    bool
+		resource  core.ResourceName
+		expectErr bool
+	}{
+		{
+			name:      "pid rejected at container level even when gate is on",
+			gateOn:    true,
+			resource:  core.ResourcePID,
+			expectErr: true,
+		},
+		{
+			name:      "pid rejected at container level when gate is off",
+			gateOn:    false,
+			resource:  core.ResourcePID,
+			expectErr: true,
+		},
+		{
+			name:      "cpu still works with gate on",
+			gateOn:    true,
+			resource:  core.ResourceCPU,
+			expectErr: false,
+		},
+		{
+			name:      "cpu still works with gate off",
+			gateOn:    false,
+			resource:  core.ResourceCPU,
+			expectErr: false,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerPodPIDLimit, tc.gateOn)
+			errs := validateContainerResourceName(tc.resource, field.NewPath("resources"))
+			if tc.expectErr && len(errs) == 0 {
+				t.Errorf("expected error for resource %q with gate=%v, got none", tc.resource, tc.gateOn)
+			}
+			if !tc.expectErr && len(errs) != 0 {
+				t.Errorf("expected no error for resource %q with gate=%v, got: %v", tc.resource, tc.gateOn, errs)
+			}
+		})
+	}
+}
+
+func TestValidatePodResourceRequirements_PID(t *testing.T) {
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerPodPIDLimit, true)
+	path := field.NewPath("spec", "resources")
+
+	tests := []struct {
+		name         string
+		requirements core.ResourceRequirements
+		expectErr    bool
+	}{
+		{
+			name: "valid pid limit only",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{core.ResourcePID: resource.MustParse("2048")},
+			},
+			expectErr: false,
+		},
+		{
+			name: "requests.pid is forbidden even when equal to limits",
+			requirements: core.ResourceRequirements{
+				Limits:   core.ResourceList{core.ResourcePID: resource.MustParse("2048")},
+				Requests: core.ResourceList{core.ResourcePID: resource.MustParse("2048")},
+			},
+			expectErr: true,
+		},
+		{
+			name: "requests.pid alone is forbidden",
+			requirements: core.ResourceRequirements{
+				Requests: core.ResourceList{core.ResourcePID: resource.MustParse("2048")},
+			},
+			expectErr: true,
+		},
+		{
+			name: "pid below minimum (1024) rejected",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{core.ResourcePID: resource.MustParse("512")},
+			},
+			expectErr: true,
+		},
+		{
+			name: "pid above maximum (16384) rejected",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{core.ResourcePID: resource.MustParse("32768")},
+			},
+			expectErr: true,
+		},
+		{
+			name: "pid at minimum boundary (1024) valid",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{core.ResourcePID: resource.MustParse("1024")},
+			},
+			expectErr: false,
+		},
+		{
+			name: "pid at maximum boundary (16384) valid",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{core.ResourcePID: resource.MustParse("16384")},
+			},
+			expectErr: false,
+		},
+		{
+			name: "zero pid value rejected",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{core.ResourcePID: resource.MustParse("0")},
+			},
+			expectErr: true,
+		},
+		{
+			name: "negative pid value rejected",
+			requirements: core.ResourceRequirements{
+				Limits: core.ResourceList{core.ResourcePID: resource.MustParse("-1")},
+			},
+			expectErr: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			reqs := tc.requirements
+			errs := validatePodResourceRequirements(&reqs, nil, path, PodValidationOptions{})
+			if tc.expectErr && len(errs) == 0 {
+				t.Errorf("expected error, got none")
+			}
+			if !tc.expectErr && len(errs) != 0 {
+				t.Errorf("expected no error, got: %v", errs)
+			}
+		})
+	}
+}
+
 func TestValidateLimitRangeForLocalStorage(t *testing.T) {
 	testCases := []struct {
 		name string
@@ -31147,6 +31281,81 @@ func TestValidatePodBinding(t *testing.T) {
 				if len(errs) != 0 {
 					t.Errorf("Expected no error but got %v", errs)
 				}
+			}
+		})
+	}
+}
+
+func TestValidatePIDResource(t *testing.T) {
+	fldPath := field.NewPath("spec", "resources", "limits").Key("pid")
+
+	tests := []struct {
+		name      string
+		gateOn    bool
+		pidValue  string
+		expectErr bool
+	}{
+		{
+			name:      "pid allowed when gate is on, valid value",
+			gateOn:    true,
+			pidValue:  "2048",
+			expectErr: false,
+		},
+		{
+			name:      "pid rejected when gate is off",
+			gateOn:    false,
+			pidValue:  "2048",
+			expectErr: true,
+		},
+		{
+			name:      "pid at minimum boundary (1024)",
+			gateOn:    true,
+			pidValue:  "1024",
+			expectErr: false,
+		},
+		{
+			name:      "pid at maximum boundary (16384)",
+			gateOn:    true,
+			pidValue:  "16384",
+			expectErr: false,
+		},
+		{
+			name:      "pid below minimum rejected",
+			gateOn:    true,
+			pidValue:  "512",
+			expectErr: true,
+		},
+		{
+			name:      "pid above maximum rejected",
+			gateOn:    true,
+			pidValue:  "32768",
+			expectErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PerPodPIDLimit, tt.gateOn)
+
+			q := resource.MustParse(tt.pidValue)
+
+			errs := validatePodResourceName(core.ResourcePID, fldPath)
+			if !tt.gateOn {
+				if len(errs) == 0 {
+					t.Errorf("expected pid to be rejected when gate is off")
+				}
+				return
+			}
+			if len(errs) != 0 {
+				t.Errorf("expected no resource name errors with gate on, got: %v", errs)
+				return
+			}
+			rangeErrs := validatePIDResourceValue(core.ResourcePID, q, fldPath)
+			if tt.expectErr && len(rangeErrs) == 0 {
+				t.Errorf("expected range validation error for %v", q.String())
+			}
+			if !tt.expectErr && len(rangeErrs) != 0 {
+				t.Errorf("unexpected range validation error: %v", rangeErrs)
 			}
 		})
 	}

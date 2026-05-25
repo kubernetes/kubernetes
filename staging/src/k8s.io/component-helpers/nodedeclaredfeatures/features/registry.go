@@ -19,6 +19,7 @@ package features
 import (
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/extendwebsocketstokubelet"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/inplacepodresize"
+	"k8s.io/component-helpers/nodedeclaredfeatures/features/perpodpidlimit"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/restartallcontainers"
 	"k8s.io/component-helpers/nodedeclaredfeatures/features/usernamespaceshostnetwork"
 	"k8s.io/component-helpers/nodedeclaredfeatures/types"
@@ -32,5 +33,6 @@ var AllFeatures = []types.Feature{
 	inplacepodresize.PodLevelResourcesResizeFeature,
 	extendwebsocketstokubelet.Feature,
 	inplacepodresize.NonSidecarInitContainerResizeFeature,
+	perpodpidlimit.Feature,
 	usernamespaceshostnetwork.Feature,
 }

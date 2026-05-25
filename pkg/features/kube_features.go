@@ -713,6 +713,13 @@ const (
 	// Enables relisting individual pods on-demand.
 	PLEGOnDemandRelist featuregate.Feature = "PLEGOnDemandRelist"
 
+	// owner: @BhargaviGudi
+	// kep: https://kep.k8s.io/6063
+	//
+	// Enables per-pod PID limits via spec.resources.limits.pid.
+	// Depends on the PodLevelResources feature gate.
+	PerPodPIDLimit featuregate.Feature = "PerPodPIDLimit"
+
 	// owner: @ArvindParekh
 	// kep: https://kep.k8s.io/5541
 	//
@@ -1676,6 +1683,10 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.36"), Default: true, PreRelease: featuregate.Beta},
 	},
 
+	PerPodPIDLimit: {
+		{Version: version.MustParse("1.37"), Default: false, PreRelease: featuregate.Alpha},
+	},
+
 	PersistentVolumeClaimUnusedSinceTime: {
 		{Version: version.MustParse("1.36"), Default: false, PreRelease: featuregate.Alpha},
 	},
@@ -2437,6 +2448,8 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	OpportunisticBatching: {},
 
 	PLEGOnDemandRelist: {},
+
+	PerPodPIDLimit: {PodLevelResources},
 
 	PersistentVolumeClaimUnusedSinceTime: {},
 

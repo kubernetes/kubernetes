@@ -48,7 +48,8 @@ func TestFeatureRequirementsConsistency(t *testing.T) {
 
 			discoverCfg := &types.NodeConfiguration{
 				FeatureGates: mockFG,
-				Version:      version.MustParse("1.36.0"),
+				Version:      version.MustParse("1.37.0"),
+				StaticConfig: types.StaticConfiguration{Cgroupsv2: true},
 			}
 			if reqs.RequiredRuntimeFeatures != nil {
 				discoverCfg.RuntimeFeatures = *reqs.RequiredRuntimeFeatures

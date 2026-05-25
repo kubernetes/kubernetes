@@ -82,7 +82,8 @@ type RuntimeFeatures struct {
 
 // StaticConfiguration provides a view of a node's static configuration required for feature discovery.
 type StaticConfiguration struct {
-	// Add configuration fields here as required by registered features.
+	// Cgroupsv2 indicates whether the node is running cgroupsv2 (unified mode).
+	Cgroupsv2 bool
 }
 
 // NodeConfiguration provides a generic view of a node's static configuration.
