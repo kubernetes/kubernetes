@@ -1042,6 +1042,19 @@ func TestPlaintext(t *testing.T) {
 			},
 		},
 		{
+			Name: "MaxDepthZeroIsUnlimited",
+			Context: v2.TemplateContext{
+				Document:  nestedWidgetOpenAPI,
+				GVR:       nestedWidgetGVR,
+				FieldPath: nil,
+				Recursive: true,
+				MaxDepth:  0,
+			},
+			Checks: []check{
+				checkEquals("GROUP:      example.com\nKIND:       Widget\nVERSION:    v1\n\nDESCRIPTION:\n    <empty>\nFIELDS:\n  meta\t<Object>\n    id\t<string>\n    tags\t<Object>\n      key\t<string>\n  name\t<string>\n\n"),
+			},
+		},
+		{
 			Name: "MaxDepthOneStopsAtTopLevelFields",
 			Context: v2.TemplateContext{
 				Document:  nestedWidgetOpenAPI,
@@ -1051,11 +1064,7 @@ func TestPlaintext(t *testing.T) {
 				MaxDepth:  1,
 			},
 			Checks: []check{
-				checkContains("meta\t<Object>"),
-				checkContains("name\t<string>"),
-				checkNotContains("id\t<string>"),
-				checkNotContains("tags\t<Object>"),
-				checkNotContains("key\t<string>"),
+				checkEquals("GROUP:      example.com\nKIND:       Widget\nVERSION:    v1\n\nDESCRIPTION:\n    <empty>\nFIELDS:\n  meta\t<Object>\n  name\t<string>\n\n"),
 			},
 		},
 		{
@@ -1068,10 +1077,33 @@ func TestPlaintext(t *testing.T) {
 				MaxDepth:  2,
 			},
 			Checks: []check{
-				checkContains("meta\t<Object>"),
-				checkContains("id\t<string>"),
-				checkContains("tags\t<Object>"),
-				checkNotContains("key\t<string>"),
+				checkEquals("GROUP:      example.com\nKIND:       Widget\nVERSION:    v1\n\nDESCRIPTION:\n    <empty>\nFIELDS:\n  meta\t<Object>\n    id\t<string>\n    tags\t<Object>\n  name\t<string>\n\n"),
+			},
+		},
+		{
+			Name: "MaxDepthLargerThanSchemaEqualsUnlimited",
+			Context: v2.TemplateContext{
+				Document:  nestedWidgetOpenAPI,
+				GVR:       nestedWidgetGVR,
+				FieldPath: nil,
+				Recursive: true,
+				MaxDepth:  100,
+			},
+			Checks: []check{
+				checkEquals("GROUP:      example.com\nKIND:       Widget\nVERSION:    v1\n\nDESCRIPTION:\n    <empty>\nFIELDS:\n  meta\t<Object>\n    id\t<string>\n    tags\t<Object>\n      key\t<string>\n  name\t<string>\n\n"),
+			},
+		},
+		{
+			Name: "MaxDepthIgnoredWhenRecursiveFalse",
+			Context: v2.TemplateContext{
+				Document:  nestedWidgetOpenAPI,
+				GVR:       nestedWidgetGVR,
+				FieldPath: nil,
+				Recursive: false,
+				MaxDepth:  5,
+			},
+			Checks: []check{
+				checkEquals("GROUP:      example.com\nKIND:       Widget\nVERSION:    v1\n\nDESCRIPTION:\n    <empty>\nFIELDS:\n  meta\t<Object>\n    <no description>\n\n  name\t<string>\n    <no description>\n\n\n"),
 			},
 		},
 	}

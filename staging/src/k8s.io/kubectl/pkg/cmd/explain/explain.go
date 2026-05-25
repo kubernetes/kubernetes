@@ -91,7 +91,7 @@ func (flags *ExplainFlags) AddFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&flags.Recursive, "recursive", "R", flags.Recursive, "Print the fields of fields. Use --max-depth to cap the recursion depth.")
 	cmd.Flags().StringVar(&flags.APIVersion, "api-version", flags.APIVersion, "Get different explanations for particular API version (API group/version)")
 	cmd.Flags().StringVarP(&flags.OutputFormat, "output", "o", plaintextTemplateName, "Format in which to render the schema (plaintext, plaintext-openapiv2)")
-	cmd.Flags().IntVar(&flags.MaxDepth, "max-depth", flags.MaxDepth, "Maximum recursion depth when printing nested fields. 0 means no limit. Implies --recursive when greater than 0.")
+	cmd.Flags().IntVar(&flags.MaxDepth, "max-depth", flags.MaxDepth, "Maximum recursion depth when printing nested fields with --recursive. 0 means no limit. Requires --recursive when greater than 0.")
 }
 
 // ToOptions converts from CLI inputs to runtime input
@@ -122,10 +122,6 @@ func (flags *ExplainFlags) ToOptions(f cmdutil.Factory, parent string, args []st
 		openAPIGetter: f,
 
 		OpenAPIV3Client: openAPIV3Client,
-	}
-
-	if o.MaxDepth > 0 {
-		o.Recursive = true
 	}
 
 	return o, nil
@@ -182,6 +178,9 @@ func (o *ExplainOptions) Validate() error {
 	}
 	if o.MaxDepth < 0 {
 		return fmt.Errorf("--max-depth must be non-negative")
+	}
+	if o.MaxDepth > 0 && !o.Recursive {
+		return fmt.Errorf("--max-depth requires --recursive")
 	}
 
 	return nil
