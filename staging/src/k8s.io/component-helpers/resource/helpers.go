@@ -62,7 +62,11 @@ type PodResourcesOptions struct {
 	UseDRANodeAllocatableResourceClaimStatus bool
 }
 
-var supportedPodLevelResources = sets.New(v1.ResourceCPU, v1.ResourceMemory)
+var supportedPodLevelResources = sets.New(v1.ResourceCPU, v1.ResourceMemory, v1.ResourcePID)
+
+// limitOnlyPodLevelResources are pod-level resources that only support limits
+// (requests must not be set and must not be defaulted from limits).
+var limitOnlyPodLevelResources = sets.New(v1.ResourcePID)
 
 func SupportedPodLevelResources() sets.Set[v1.ResourceName] {
 	return supportedPodLevelResources.Clone().Insert(v1.ResourceHugePagesPrefix)
@@ -75,8 +79,18 @@ func IsSupportedPodLevelResource(name v1.ResourceName) bool {
 	return supportedPodLevelResources.Has(name) || strings.HasPrefix(string(name), v1.ResourceHugePagesPrefix)
 }
 
+// IsLimitOnlyPodLevelResource returns true for pod-level resources that only
+// support limits. Requests must not be set or defaulted for these resources.
+func IsLimitOnlyPodLevelResource(name v1.ResourceName) bool {
+	return limitOnlyPodLevelResources.Has(name)
+}
+
 // IsPodLevelResourcesSet check if PodLevelResources pod-level resources are set.
-// It returns true if either the Requests or Limits maps are non-empty.
+// It returns true if either the Requests or Limits maps contain a supported
+// pod-level resource that participates in pod-level requests/limits accounting.
+// Limit-only resources (e.g. pids) are excluded: they do not feed into QOS,
+// scheduling, quota or cgroup cpu/memory computations, so their presence alone
+// must not switch callers onto pod-level resource code paths.
 // Note: keep this in sync with k8s.io/kubernetes/pkg/apis/core/helper.IsPodLevelResourcesSet
 func IsPodLevelResourcesSet(pod *v1.Pod) bool {
 	if pod.Spec.Resources == nil {
@@ -88,13 +102,13 @@ func IsPodLevelResourcesSet(pod *v1.Pod) bool {
 	}
 
 	for resourceName := range pod.Spec.Resources.Requests {
-		if IsSupportedPodLevelResource(resourceName) {
+		if IsSupportedPodLevelResource(resourceName) && !IsLimitOnlyPodLevelResource(resourceName) {
 			return true
 		}
 	}
 
 	for resourceName := range pod.Spec.Resources.Limits {
-		if IsSupportedPodLevelResource(resourceName) {
+		if IsSupportedPodLevelResource(resourceName) && !IsLimitOnlyPodLevelResource(resourceName) {
 			return true
 		}
 	}
@@ -172,7 +186,9 @@ func PodRequests(pod *v1.Pod, opts PodResourcesOptions) v1.ResourceList {
 
 func applyPodLevelResources(result, effectiveResources v1.ResourceList) {
 	for resourceName, quantity := range effectiveResources {
-		if IsSupportedPodLevelResource(resourceName) {
+		// Limit-only resources (e.g. pids) are enforced by the kubelet directly
+		// from the pod spec and do not participate in resource aggregation.
+		if IsSupportedPodLevelResource(resourceName) && !IsLimitOnlyPodLevelResource(resourceName) {
 			result[resourceName] = quantity
 		}
 	}

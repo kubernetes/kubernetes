@@ -35,7 +35,11 @@ import (
 )
 
 // IsPodLevelResourcesSet check if PodLevelResources pod-level resources are set.
-// It returns true if either the Requests or Limits maps are non-empty.
+// It returns true if either the Requests or Limits maps contain a supported
+// pod-level resource that participates in pod-level requests/limits accounting.
+// Limit-only resources (e.g. pids) are excluded: they do not feed into QOS,
+// scheduling, quota or cgroup cpu/memory computations, so their presence alone
+// must not switch callers onto pod-level resource code paths.
 // Note: keep this in sync with k8s.io/component-helpers/resource.IsPodLevelResourcesSet
 func IsPodLevelResourcesSet(pod *core.Pod) bool {
 	if pod.Spec.Resources == nil {
@@ -47,13 +51,13 @@ func IsPodLevelResourcesSet(pod *core.Pod) bool {
 	}
 
 	for name := range pod.Spec.Resources.Requests {
-		if resourcehelper.IsSupportedPodLevelResource(v1.ResourceName(name)) {
+		if resourcehelper.IsSupportedPodLevelResource(v1.ResourceName(name)) && !resourcehelper.IsLimitOnlyPodLevelResource(v1.ResourceName(name)) {
 			return true
 		}
 	}
 
 	for name := range pod.Spec.Resources.Limits {
-		if resourcehelper.IsSupportedPodLevelResource(v1.ResourceName(name)) {
+		if resourcehelper.IsSupportedPodLevelResource(v1.ResourceName(name)) && !resourcehelper.IsLimitOnlyPodLevelResource(v1.ResourceName(name)) {
 			return true
 		}
 	}
@@ -282,6 +286,7 @@ var standardResources = sets.New(
 	core.ResourceCPU,
 	core.ResourceMemory,
 	core.ResourceEphemeralStorage,
+	core.ResourcePID,
 	core.ResourceRequestsCPU,
 	core.ResourceRequestsMemory,
 	core.ResourceRequestsEphemeralStorage,
@@ -316,6 +321,7 @@ var integerResources = sets.New(
 	core.ResourcePersistentVolumeClaims,
 	core.ResourceServicesNodePorts,
 	core.ResourceServicesLoadBalancers,
+	core.ResourcePID,
 )
 
 // IsIntegerResourceName returns true if the resource is measured in integer values
