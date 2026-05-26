@@ -133,6 +133,42 @@ func TestAddRemovePods(t *testing.T) {
 	}
 }
 
+func TestAddPodContinuesWhenProbeWorkerExists(t *testing.T) {
+	ctx := ktesting.Init(t)
+	m := newTestManager()
+	defer cleanup(t, m)
+
+	pod := v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID: "existing_worker_pod",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{{
+				Name:         "existing",
+				StartupProbe: defaultProbe,
+			}},
+		},
+	}
+
+	m.AddPod(ctx, &pod)
+	if err := expectProbes(m, []probeKey{{"existing_worker_pod", "existing", startup}}); err != nil {
+		t.Error(err)
+	}
+
+	pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
+		Name:           "next",
+		ReadinessProbe: defaultProbe,
+	})
+
+	m.AddPod(ctx, &pod)
+	if err := expectProbes(m, []probeKey{
+		{"existing_worker_pod", "existing", startup},
+		{"existing_worker_pod", "next", readiness},
+	}); err != nil {
+		t.Error(err)
+	}
+}
+
 func TestAddRemovePodsWithRestartableInitContainer(t *testing.T) {
 	m := newTestManager()
 	defer cleanup(t, m)
