@@ -246,6 +246,11 @@ func newPersistentVolumeBinderController(ctx context.Context, controllerContext 
 		return nil, fmt.Errorf("failed to probe volume plugins when starting persistentvolume controller: %w", err)
 	}
 
+	metricsPlugins, err := ProbePersistentVolumePlugins(logger, controllerContext.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to probe metrics volume plugins when starting persistentvolume controller: %w", err)
+	}
+
 	client, err := controllerContext.NewClient("persistent-volume-binder")
 	if err != nil {
 		return nil, err
@@ -255,6 +260,7 @@ func newPersistentVolumeBinderController(ctx context.Context, controllerContext 
 		KubeClient:                client,
 		SyncPeriod:                controllerContext.ComponentConfig.PersistentVolumeBinderController.PVClaimBinderSyncPeriod.Duration,
 		VolumePlugins:             plugins,
+		MetricsVolumePlugins:      metricsPlugins,
 		VolumeInformer:            controllerContext.InformerFactory.Core().V1().PersistentVolumes(),
 		ClaimInformer:             controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
 		ClassInformer:             controllerContext.InformerFactory.Storage().V1().StorageClasses(),
