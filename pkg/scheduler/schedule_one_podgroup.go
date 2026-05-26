@@ -53,6 +53,12 @@ func (sched *Scheduler) scheduleOnePodGroup(ctx context.Context, podGroupInfo *f
 
 	schedFwk, err := sched.frameworkForPodGroup(podGroupInfo)
 	if err != nil {
+		sched.updatePodGroupCondition(ctx, podGroupInfo, &metav1.Condition{
+			Type:    schedulingapi.PodGroupScheduled,
+			Status:  metav1.ConditionFalse,
+			Reason:  schedulingapi.PodGroupReasonSchedulerError,
+			Message: err.Error(),
+		})
 		for _, podInfo := range podGroupInfo.QueuedPodInfos {
 			podFwk, podFwkErr := sched.frameworkForPod(podInfo.Pod)
 			if podFwkErr != nil {
