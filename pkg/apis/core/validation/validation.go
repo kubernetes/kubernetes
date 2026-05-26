@@ -4186,16 +4186,10 @@ func validatePodDNSConfig(dnsConfig *core.PodDNSConfig, dnsPolicy *core.DNSPolic
 		}
 
 		for i, search := range dnsConfig.Searches {
-			if opts.AllowRelaxedDNSSearchValidation {
-				if search != "." {
-					search = strings.TrimSuffix(search, ".")
-					allErrs = append(allErrs, ValidateDNS1123SubdomainWithUnderScore(search, fldPath.Child("searches").Index(i))...)
-				}
-			} else {
+			if search != "." {
 				search = strings.TrimSuffix(search, ".")
-				allErrs = append(allErrs, ValidateDNS1123Subdomain(search, fldPath.Child("searches").Index(i))...)
+				allErrs = append(allErrs, ValidateDNS1123SubdomainWithUnderScore(search, fldPath.Child("searches").Index(i))...)
 			}
-
 		}
 		// Validate options.
 		for i, option := range dnsConfig.Options {
@@ -4460,8 +4454,6 @@ type PodValidationOptions struct {
 	ResourceIsPod bool
 	// Allow relaxed validation of environment variable names
 	AllowRelaxedEnvironmentVariableValidation bool
-	// Allow the use of a relaxed DNS search
-	AllowRelaxedDNSSearchValidation bool
 	// Allows zero value for Pod Lifecycle Sleep Action
 	AllowPodLifecycleSleepActionZeroValue bool
 	// Allow only Recursive value of SELinuxChangePolicy.

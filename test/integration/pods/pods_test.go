@@ -1403,11 +1403,9 @@ func TestMutablePodSchedulingDirectives(t *testing.T) {
 	}
 }
 
-// Test disabling of RelaxedDNSSearchValidation after a Pod has been created
-func TestRelaxedDNSSearchValidation(t *testing.T) {
+func TestDNSSearchValidation(t *testing.T) {
 	// Disable ServiceAccount admission plugin as we don't have serviceaccount controller running.
-	server := kubeapiservertesting.StartTestServerOrDie(t, nil,
-		append(framework.DefaultTestServerFlags(), "--emulated-version=1.32"), framework.SharedEtcd())
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, framework.DefaultTestServerFlags(), framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client := clientset.NewForConfigOrDie(server.ClientConfig)
@@ -1432,75 +1430,48 @@ func TestRelaxedDNSSearchValidation(t *testing.T) {
 	}
 
 	cases := []struct {
-		name               string
-		original           *v1.PodDNSConfig
-		valid              bool
-		featureGateEnabled bool
-		update             bool
+		name     string
+		original *v1.PodDNSConfig
+		valid    bool
 	}{
 		{
-			name:               "new pod with underscore - feature gate enabled",
-			original:           &v1.PodDNSConfig{Searches: []string{"_sip._tcp.abc_d.example.com"}},
-			valid:              true,
-			featureGateEnabled: true,
+			name:     "leading underscore",
+			original: &v1.PodDNSConfig{Searches: []string{"_sip._tcp.abc_d.example.com"}},
+			valid:    true,
 		},
 		{
-			name:               "new pod with dot - feature gate enabled",
-			original:           &v1.PodDNSConfig{Searches: []string{"."}},
-			valid:              true,
-			featureGateEnabled: true,
-		},
-
-		{
-			name:               "new pod without underscore - feature gate enabled",
-			original:           &v1.PodDNSConfig{Searches: []string{"example.com"}},
-			valid:              true,
-			featureGateEnabled: true,
+			name:     "single dot",
+			original: &v1.PodDNSConfig{Searches: []string{"."}},
+			valid:    true,
 		},
 		{
-			name:               "new pod with underscore - feature gate disabled",
-			original:           &v1.PodDNSConfig{Searches: []string{"_sip._tcp.abc_d.example.com"}},
-			valid:              false,
-			featureGateEnabled: false,
+			name:     "without underscore",
+			original: &v1.PodDNSConfig{Searches: []string{"example.com"}},
+			valid:    true,
 		},
 		{
-			name:               "new pod with dot - feature gate disabled",
-			original:           &v1.PodDNSConfig{Searches: []string{"."}},
-			valid:              false,
-			featureGateEnabled: false,
+			name:     "double dot",
+			original: &v1.PodDNSConfig{Searches: []string{".."}},
+			valid:    false,
 		},
 		{
-			name:               "new pod without underscore - feature gate disabled",
-			original:           &v1.PodDNSConfig{Searches: []string{"example.com"}},
-			valid:              true,
-			featureGateEnabled: false,
+			name:     "leading unicode",
+			original: &v1.PodDNSConfig{Searches: []string{"☃.example.com"}},
+			valid:    false,
 		},
 	}
 
 	for _, tc := range cases {
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RelaxedDNSSearchValidation, tc.featureGateEnabled)
 		pod := testPod("dns")
 		pod.Spec.DNSConfig = tc.original
-		_, err := client.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-		if tc.valid && err != nil {
-			t.Errorf("%v: %v", tc.name, err)
-		} else if !tc.valid && err == nil {
-			t.Errorf("%v: unexpected allowed update to ephemeral containers", tc.name)
-		}
-
-		// Disable gate and perform update
-		featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RelaxedDNSSearchValidation, false)
-		pod.ObjectMeta.Labels = map[string]string{"label": "value"}
-		_, err = client.CoreV1().Pods(ns.Name).Update(context.TODO(), pod, metav1.UpdateOptions{})
-
-		if tc.valid && err != nil {
-			t.Errorf("%v: failed to update ephemeral containers: %v", tc.name, err)
-		} else if !tc.valid && err == nil {
-			t.Errorf("%v: unexpected allowed update to ephemeral containers", tc.name)
-		}
-
+		_, err := client.CoreV1().Pods(ns.Name).Create(t.Context(), pod, metav1.CreateOptions{})
 		if tc.valid {
+			if err != nil {
+				t.Errorf("%v: %v", tc.name, err)
+			}
 			integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+		} else if err == nil {
+			t.Errorf("%v: unexpected allowed update to ephemeral containers", tc.name)
 		}
 	}
 }

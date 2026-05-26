@@ -838,12 +838,6 @@ const (
 	// containers (aka containers in CrashLoopBackOff)
 	ReduceDefaultCrashLoopBackOffDecay featuregate.Feature = "ReduceDefaultCrashLoopBackOffDecay"
 
-	// owner: @adrianmoisey
-	// kep: https://kep.k8s.io/4427
-	//
-	// Relaxed DNS search string validation.
-	RelaxedDNSSearchValidation featuregate.Feature = "RelaxedDNSSearchValidation"
-
 	// owner: @HirazawaUi
 	// kep: https://kep.k8s.io/4369
 	//
@@ -1783,12 +1777,6 @@ var defaultVersionedKubernetesFeatureGates = map[featuregate.Feature]featuregate
 		{Version: version.MustParse("1.33"), Default: false, PreRelease: featuregate.Alpha},
 	},
 
-	RelaxedDNSSearchValidation: {
-		{Version: version.MustParse("1.32"), Default: false, PreRelease: featuregate.Alpha},
-		{Version: version.MustParse("1.33"), Default: true, PreRelease: featuregate.Beta},
-		{Version: version.MustParse("1.34"), Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.37
-	},
-
 	RelaxedEnvironmentVariableValidation: {
 		{Version: version.MustParse("1.30"), Default: false, PreRelease: featuregate.Alpha},
 		{Version: version.MustParse("1.32"), Default: true, PreRelease: featuregate.Beta},
@@ -2479,8 +2467,6 @@ var defaultKubernetesFeatureGateDependencies = map[featuregate.Feature][]feature
 	RecursiveReadOnlyMounts: {},
 
 	ReduceDefaultCrashLoopBackOffDecay: {},
-
-	RelaxedDNSSearchValidation: {},
 
 	RelaxedEnvironmentVariableValidation: {},
 
