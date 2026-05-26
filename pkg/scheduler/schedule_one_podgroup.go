@@ -92,6 +92,14 @@ func (sched *Scheduler) handlePodGroupFailureBeforeScheduling(ctx context.Contex
 		}
 		sched.FailureHandler(ctx, podFwk, podInfo, fwk.AsStatus(err), clearNominatedNode, time.Now())
 	}
+	if podGroupInfo.PodGroup != nil {
+		sched.updatePodGroupCondition(ctx, podGroupInfo, &metav1.Condition{
+			Type:    schedulingapi.PodGroupInitiallyScheduled,
+			Status:  metav1.ConditionFalse,
+			Reason:  schedulingapi.PodGroupReasonSchedulerError,
+			Message: err.Error(),
+		})
+	}
 	err = sched.SchedulingQueue.AddAttemptedPodGroupIfNeeded(logger, podGroupInfo, sched.SchedulingQueue.SchedulingCycle())
 	if err != nil {
 		utilruntime.HandleErrorWithContext(ctx, err, "Failed to add pod group back to scheduling queue", "podGroup", klog.KObj(podGroupInfo))
