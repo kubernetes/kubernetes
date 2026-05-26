@@ -471,6 +471,21 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			rbacv1helpers.NewRule("get", "list", "watch", "delete").Groups(certificatesGroup).Resources("podcertificaterequests").RuleOrDie(),
 		},
 	})
+
+	fgAddControllerRole(features.KubeServingCertificatesSigner, &controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+		Name: saRolePrefix + "kube-service-serving-signer",
+		Rules: []rbacv1.PolicyRule{
+			rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("services").RuleOrDie(),
+			// signing rules
+			rbacv1helpers.NewRule("get", "list", "watch").Groups(certificatesGroup).Resources("podcertificaterequests").RuleOrDie(),
+			rbacv1helpers.NewRule("update").Groups(certificatesGroup).Resources("podcertificaterequests/status").RuleOrDie(),
+			// trust bundle publishing rules
+			rbacv1helpers.NewRule("attest").Groups(certificatesGroup).Resources("signers").Names("kubernetes.io/service-serving").RuleOrDie(),
+			rbacv1helpers.NewRule("sign").Groups(certificatesGroup).Resources("signers").Names("kubernetes.io/service-serving").RuleOrDie(),
+			rbacv1helpers.NewRule("create", "update", "delete", "list", "watch").Groups(certificatesGroup).Resources("clustertrustbundles").RuleOrDie(),
+			eventsRule(),
+		},
+	})
 	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "pvc-protection-controller"},
 		Rules: []rbacv1.PolicyRule{
