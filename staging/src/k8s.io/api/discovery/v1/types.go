@@ -51,7 +51,7 @@ type EndpointSlice struct {
 	// +required
 	// +k8s:alpha(since: "1.36")=+k8s:required
 	// +k8s:alpha(since: "1.36")=+k8s:immutable
-	AddressType AddressType `json:"addressType" protobuf:"bytes,4,rep,name=addressType"`
+	AddressType AddressType `json:"addressType" protobuf:"bytes,4,opt,name=addressType"`
 
 	// endpoints is a list of unique endpoints in this slice. Each slice may
 	// include a maximum of 1000 endpoints.
