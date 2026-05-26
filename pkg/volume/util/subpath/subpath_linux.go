@@ -122,7 +122,7 @@ func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, strin
 			// It's already mounted, so check if it's bind-mounted to the same path
 			samePath, err := checkSubPathFileEqual(subpath, bindPathTarget)
 			if err != nil {
-				return false, "", fmt.Errorf("error checking subpath mount info for %s: %s", bindPathTarget, err)
+				return false, "", fmt.Errorf("error checking subpath mount info for %s: %w", bindPathTarget, err)
 			}
 			if !samePath {
 				// It's already mounted but not what we want, unmount it

@@ -1063,7 +1063,7 @@ func TestIsStaleMountFnNonExistentPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(dir)
+	defer func() { _ = os.RemoveAll(dir) }()
 
 	if isStaleMountFn(dir) {
 		t.Errorf("expected isStaleMountFn(%q) = false for a live directory, got true", dir)
@@ -1071,7 +1071,7 @@ func TestIsStaleMountFnNonExistentPath(t *testing.T) {
 
 	nonExistent := filepath.Join(os.TempDir(), "isstalemount-nonexistent-99999999")
 	// Guarantee the path does not exist.
-	os.RemoveAll(nonExistent)
+	_ = os.RemoveAll(nonExistent)
 
 	// Statfs on a non-existent path returns ENOENT, which is not ESTALE/EIO.
 	// isStaleMountFn must return false, not true.
@@ -1087,7 +1087,7 @@ func TestPrepareSubpathTargetStaleRemount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(base)
+	defer func() { _ = os.RemoveAll(base) }()
 
 	volPath, subpathMount := getTestPaths(base)
 	subPath := filepath.Join(volPath, "dir0")
