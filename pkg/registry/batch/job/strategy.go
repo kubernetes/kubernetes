@@ -128,6 +128,16 @@ func (jobStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 	return batchvalidation.ValidateJob(job, opts)
 }
 
+// shouldAllowMutablePodTemplate returns true if the Job's pod template should
+// be mutable. This is safe for suspended jobs with no active pods that either
+// have never started or have the JobSuspended condition set.
+func shouldAllowMutablePodTemplate(job *batch.Job) bool {
+	suspended := job.Spec.Suspend != nil && *job.Spec.Suspend
+	notStarted := job.Status.StartTime == nil
+	hasSuspendedCondition := batchvalidation.IsConditionTrue(job.Status.Conditions, batch.JobSuspended)
+	return suspended && (notStarted || hasSuspendedCondition) && job.Status.Active == 0
+}
+
 func validationOptionsForJob(newJob, oldJob *batch.Job) batchvalidation.JobValidationOptions {
 	var newPodTemplate, oldPodTemplate *core.PodTemplateSpec
 	if newJob != nil {
@@ -147,11 +157,12 @@ func validationOptionsForJob(newJob, oldJob *batch.Job) batchvalidation.JobValid
 		suspended := oldJob.Spec.Suspend != nil && *oldJob.Spec.Suspend
 		notStarted := oldJob.Status.StartTime == nil
 		opts.AllowMutableSchedulingDirectives = suspended && notStarted
+		allowMutablePodTemplate := shouldAllowMutablePodTemplate(oldJob)
 		if utilfeature.DefaultFeatureGate.Enabled(features.MutablePodResourcesForSuspendedJobs) {
-			opts.AllowMutablePodResources = suspended && batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobSuspended) && oldJob.Status.Active == 0
+			opts.AllowMutablePodResources = allowMutablePodTemplate
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.MutableSchedulingDirectivesForSuspendedJobs) {
-			opts.AllowMutableSchedulingDirectives = suspended && batchvalidation.IsConditionTrue(oldJob.Status.Conditions, batch.JobSuspended) && oldJob.Status.Active == 0
+			opts.AllowMutableSchedulingDirectives = allowMutablePodTemplate
 		}
 		// Validation should not fail jobs if they don't have the new labels.
 		// This can be removed once we have high confidence that both labels exist (1.30 at least)
