@@ -435,22 +435,6 @@ func TestCompletePodGroupAlgorithmResult_SetsPod(t *testing.T) {
 			t.Errorf("expected pod result %d status code %v, got %v", i+1, groupStatus.Code(), got.status.Code())
 		}
 	}
-
-	nominatedNodes := map[*v1.Pod]*fwk.NominatingInfo{
-		p2: {NominatingMode: fwk.ModeOverride, NominatedNodeName: "node2"},
-		p3: {NominatingMode: fwk.ModeOverride, NominatedNodeName: "node3"},
-	}
-	for i := range result.podResults {
-		if nodeNameInfo, ok := nominatedNodes[result.podResults[i].pod]; ok {
-			result.podResults[i].scheduleResult.nominatingInfo = nodeNameInfo
-		}
-	}
-	if result.podResults[1].scheduleResult.nominatingInfo.NominatedNodeName != "node2" {
-		t.Errorf("expected p2 nominated node node2, got %q", result.podResults[1].scheduleResult.nominatingInfo.NominatedNodeName)
-	}
-	if result.podResults[2].scheduleResult.nominatingInfo.NominatedNodeName != "node3" {
-		t.Errorf("expected p3 nominated node node3, got %q", result.podResults[2].scheduleResult.nominatingInfo.NominatedNodeName)
-	}
 }
 
 func TestPodGroupCycle_FillsPodResultsOnFewerResults(t *testing.T) {
