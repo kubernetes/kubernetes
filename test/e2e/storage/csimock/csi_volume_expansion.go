@@ -705,6 +705,17 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 			_, err = e2epv.WaitForPVClaimBoundPhase(ctx, m.cs, []*v1.PersistentVolumeClaim{reboundPVC}, framework.ClaimProvisionTimeout)
 			framework.ExpectNoError(err, "while waiting for new PVC to be bound")
 
+			ginkgo.By("Verifying PVC status.capacity reflects pre-resize capacity from PV annotation")
+			originalSize := resource.MustParse("1Gi")
+			gomega.Eventually(func(g gomega.Gomega) {
+				reboundPVC, err = m.cs.CoreV1().PersistentVolumeClaims(reboundPVC.Namespace).Get(ctx, reboundPVC.Name, metav1.GetOptions{})
+				g.Expect(err).NotTo(gomega.HaveOccurred())
+				pvcStatusCap := reboundPVC.Status.Capacity[v1.ResourceStorage]
+				g.Expect(pvcStatusCap.Cmp(originalSize)).To(gomega.Equal(0),
+					fmt.Sprintf("expected PVC status.capacity to be %s (from pre-resize annotation), got %s", originalSize.String(), pvcStatusCap.String()))
+			}).WithTimeout(csiResizeWaitPeriod).WithPolling(resizePollInterval).
+				Should(gomega.Succeed(), "PV controller should set PVC status.capacity from pre-resize-capacity annotation")
+
 			ginkgo.By("Creating a new pod with the rebound PVC")
 			pod2, err := m.createPodWithPVC(reboundPVC)
 			gomega.Expect(pod2).NotTo(gomega.BeNil(), "while creating pod for resizing")
