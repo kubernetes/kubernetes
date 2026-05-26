@@ -37,6 +37,16 @@ func (mock *mockAuthzHandler) Authorize(ctx context.Context, a authorizer.Attrib
 	return mock.decision, "", mock.err
 }
 
+// ConditionsAwareAuthorize is not conditions-aware, converts the Authorize decision.
+func (mock *mockAuthzHandler) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return authorizer.ConditionsAwareDecisionFromParts(mock.Authorize(ctx, a))
+}
+
+// EvaluateConditions is not supported by this authorizer.
+func (*mockAuthzHandler) EvaluateConditions(_ context.Context, _ authorizer.ConditionsAwareDecision, _ authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return authorizer.DecisionDeny, "", authorizer.ErrorConditionEvaluationNotSupported
+}
+
 func TestAuthorizationSecondPasses(t *testing.T) {
 	handler1 := &mockAuthzHandler{decision: authorizer.DecisionNoOpinion}
 	handler2 := &mockAuthzHandler{decision: authorizer.DecisionAllow}
@@ -223,15 +233,15 @@ func getNonResourceRules(infos []authorizer.NonResourceRuleInfo) []authorizer.De
 
 func TestAuthorizationUnequivocalDeny(t *testing.T) {
 	cs := []struct {
-		authorizers []authorizer.UnconditionalAuthorizer
+		authorizers []authorizer.Authorizer
 		decision    authorizer.Decision
 	}{
 		{
-			authorizers: []authorizer.UnconditionalAuthorizer{},
+			authorizers: []authorizer.Authorizer{},
 			decision:    authorizer.DecisionNoOpinion,
 		},
 		{
-			authorizers: []authorizer.UnconditionalAuthorizer{
+			authorizers: []authorizer.Authorizer{
 				&mockAuthzHandler{decision: authorizer.DecisionNoOpinion},
 				&mockAuthzHandler{decision: authorizer.DecisionAllow},
 				&mockAuthzHandler{decision: authorizer.DecisionDeny},
@@ -239,7 +249,7 @@ func TestAuthorizationUnequivocalDeny(t *testing.T) {
 			decision: authorizer.DecisionAllow,
 		},
 		{
-			authorizers: []authorizer.UnconditionalAuthorizer{
+			authorizers: []authorizer.Authorizer{
 				&mockAuthzHandler{decision: authorizer.DecisionNoOpinion},
 				&mockAuthzHandler{decision: authorizer.DecisionDeny},
 				&mockAuthzHandler{decision: authorizer.DecisionAllow},
@@ -247,7 +257,7 @@ func TestAuthorizationUnequivocalDeny(t *testing.T) {
 			decision: authorizer.DecisionDeny,
 		},
 		{
-			authorizers: []authorizer.UnconditionalAuthorizer{
+			authorizers: []authorizer.Authorizer{
 				&mockAuthzHandler{decision: authorizer.DecisionNoOpinion},
 				&mockAuthzHandler{decision: authorizer.DecisionDeny, err: errors.New("webhook failed closed")},
 				&mockAuthzHandler{decision: authorizer.DecisionAllow},

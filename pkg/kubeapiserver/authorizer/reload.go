@@ -74,7 +74,7 @@ type reloadableAuthorizerResolver struct {
 }
 
 type authorizerResolver struct {
-	authorizer   authorizer.UnconditionalAuthorizer
+	authorizer   authorizer.Authorizer
 	ruleResolver authorizer.RuleResolver
 }
 
@@ -82,18 +82,28 @@ func (r *reloadableAuthorizerResolver) Authorize(ctx context.Context, a authoriz
 	return r.current.Load().authorizer.Authorize(ctx, a)
 }
 
+// ConditionsAwareAuthorize delegates to the current authorizer.
+func (r *reloadableAuthorizerResolver) ConditionsAwareAuthorize(ctx context.Context, a authorizer.Attributes) authorizer.ConditionsAwareDecision {
+	return r.current.Load().authorizer.ConditionsAwareAuthorize(ctx, a)
+}
+
+// EvaluateConditions delegates to the current authorizer.
+func (r *reloadableAuthorizerResolver) EvaluateConditions(ctx context.Context, decision authorizer.ConditionsAwareDecision, data authorizer.ConditionsData) (authorizer.Decision, string, error) {
+	return r.current.Load().authorizer.EvaluateConditions(ctx, decision, data)
+}
+
 func (r *reloadableAuthorizerResolver) RulesFor(ctx context.Context, user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error) {
 	return r.current.Load().ruleResolver.RulesFor(ctx, user, namespace)
 }
 
 // newForConfig constructs
-func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.AuthorizationConfiguration) (authorizer.UnconditionalAuthorizer, authorizer.RuleResolver, error) {
+func (r *reloadableAuthorizerResolver) newForConfig(authzConfig *authzconfig.AuthorizationConfiguration) (authorizer.Authorizer, authorizer.RuleResolver, error) {
 	if len(authzConfig.Authorizers) == 0 {
 		return nil, nil, fmt.Errorf("at least one authorization mode must be passed")
 	}
 
 	var (
-		authorizers   []authorizer.UnconditionalAuthorizer
+		authorizers   []authorizer.Authorizer
 		ruleResolvers []authorizer.RuleResolver
 	)
 

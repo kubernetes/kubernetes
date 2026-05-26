@@ -275,7 +275,8 @@ func (t *impersonationModesTracker) getImpersonatedUser(ctx context.Context, wan
 	return nil, errors.New("all impersonation modes failed")
 }
 
-var _ = authorizer.Authorizer(&metricsAuthorizer{})
+// For now, constrained impersonation only supports unconditional authorization
+var _ = authorizer.UnconditionalAuthorizer(&metricsAuthorizer{})
 
 type metricsAuthorizer struct {
 	delegate                authorizer.UnconditionalAuthorizer

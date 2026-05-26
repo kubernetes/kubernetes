@@ -34,7 +34,8 @@ type authzResult struct {
 	err        error
 }
 
-var _ = authorizer.Authorizer(&cachingAuthorizer{})
+// For now, secondary authorization checks in admission only support unconditional authorization
+var _ = authorizer.UnconditionalAuthorizer(&cachingAuthorizer{})
 
 type cachingAuthorizer struct {
 	authorizer authorizer.UnconditionalAuthorizer
