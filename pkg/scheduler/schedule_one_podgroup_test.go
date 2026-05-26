@@ -2924,3 +2924,85 @@ func TestPodGroupCycle_NominatedNodes(t *testing.T) {
 		t.Errorf("Expected p2 to not be nominated, got %v", capturedFailureHandler[p2.Name])
 	}
 }
+
+func TestScheduleOnePodGroup_SchedulerNameMismatchUpdatesStatus(t *testing.T) {
+	p1 := st.MakePod().Name("p1").UID("p1").PodGroupName("pg").SchedulerName("sched1").Obj()
+	p2 := st.MakePod().Name("p2").UID("p2").PodGroupName("pg").SchedulerName("sched2").Obj()
+	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}}
+	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}}
+	testPodGroup := &schedulingv1alpha3.PodGroup{
+		ObjectMeta: metav1.ObjectMeta{Name: "pg", Namespace: "default"},
+	}
+	podGroupInfo := &framework.QueuedPodGroupInfo{
+		QueuedPodInfos: []*framework.QueuedPodInfo{qInfo1, qInfo2},
+		PodGroupInfo: &framework.PodGroupInfo{
+			Name:      "pg",
+			Namespace: "default",
+		},
+	}
+	_, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	registry := frameworkruntime.Registry{
+		queuesort.Name:     queuesort.New,
+		defaultbinder.Name: defaultbinder.New,
+	}
+	profileCfg := config.KubeSchedulerProfile{
+		SchedulerName: "sched1",
+		Plugins: &config.Plugins{
+			QueueSort: config.PluginSet{
+				Enabled: []config.Plugin{{Name: queuesort.Name}},
+			},
+			Bind: config.PluginSet{
+				Enabled: []config.Plugin{{Name: defaultbinder.Name}},
+			},
+		},
+	}
+	schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
+		frameworkruntime.WithEventRecorder(events.NewFakeRecorder(100)),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create new framework: %v", err)
+	}
+
+	client := clientsetfake.NewClientset(testPodGroup)
+	informerFactory := informers.NewSharedInformerFactory(client, 0)
+	podGroupLister := informerFactory.Scheduling().V1alpha3().PodGroups().Lister()
+	informerFactory.Start(ctx.Done())
+	informerFactory.WaitForCacheSync(ctx.Done())
+
+	sched := &Scheduler{
+		Profiles:        profile.Map{"sched1": schedFwk, "sched2": schedFwk},
+		SchedulingQueue: internalqueue.NewTestQueue(ctx, nil),
+		Cache:           internalcache.New(ctx, nil, true),
+		client:          client,
+		podGroupLister:  podGroupLister,
+		FailureHandler: func(ctx context.Context, fwk framework.Framework, p *framework.QueuedPodInfo, status *fwk.Status, ni *fwk.NominatingInfo, start time.Time) {
+		},
+	}
+
+	sched.scheduleOnePodGroup(ctx, podGroupInfo)
+
+	pg, err := client.SchedulingV1alpha3().PodGroups("default").Get(ctx, "pg", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get PodGroup: %v", err)
+	}
+	expectedCondition := metav1.Condition{
+		Type:   schedulingapi.PodGroupScheduled,
+		Status: metav1.ConditionFalse,
+		Reason: schedulingapi.PodGroupReasonSchedulerError,
+	}
+	var matchedCondition *metav1.Condition
+	for i := range pg.Status.Conditions {
+		if pg.Status.Conditions[i].Type == schedulingapi.PodGroupScheduled {
+			matchedCondition = &pg.Status.Conditions[i]
+			break
+		}
+	}
+	if matchedCondition == nil {
+		t.Errorf("Expected PodGroup.Status.Conditions to contain PodGroupScheduled condition, got: %+v", pg.Status.Conditions)
+	} else if diff := cmp.Diff(expectedCondition, *matchedCondition, cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime", "Message", "ObservedGeneration")); diff != "" {
+		t.Errorf("Unexpected condition (-want +got):\n%s", diff)
+	}
+}
