@@ -95,6 +95,7 @@ type KubeControllerManagerOptions struct {
 	ReplicationController                     *ReplicationControllerOptions
 	ResourceQuotaController                   *ResourceQuotaControllerOptions
 	SAController                              *SAControllerOptions
+	ServiceCAController                       *ServiceCAControllerOptions
 	TTLAfterFinishedController                *TTLAfterFinishedControllerOptions
 	ValidatingAdmissionPolicyStatusController *ValidatingAdmissionPolicyStatusControllerOptions
 
@@ -212,6 +213,9 @@ func NewKubeControllerManagerOptions() (*KubeControllerManagerOptions, error) {
 		SAController: &SAControllerOptions{
 			&componentConfig.SAController,
 		},
+		ServiceCAController: &ServiceCAControllerOptions{
+			&componentConfig.ServiceCAController,
+		},
 		TTLAfterFinishedController: &TTLAfterFinishedControllerOptions{
 			&componentConfig.TTLAfterFinishedController,
 		},
@@ -294,6 +298,7 @@ func (s *KubeControllerManagerOptions) Flags(allControllers []string, disabledBy
 	s.ReplicationController.AddFlags(fss.FlagSet(names.ReplicationControllerController))
 	s.ResourceQuotaController.AddFlags(fss.FlagSet(names.ResourceQuotaController))
 	s.SAController.AddFlags(fss.FlagSet(names.ServiceAccountController))
+	s.ServiceCAController.AddFlags(fss.FlagSet("FIXME_ServiceCAController"))
 	s.TTLAfterFinishedController.AddFlags(fss.FlagSet(names.TTLAfterFinishedController))
 	s.ValidatingAdmissionPolicyStatusController.AddFlags(fss.FlagSet(names.ValidatingAdmissionPolicyStatusController))
 
@@ -401,6 +406,9 @@ func (s *KubeControllerManagerOptions) ApplyTo(c *kubecontrollerconfig.Config, a
 	if err := s.SAController.ApplyTo(&c.ComponentConfig.SAController); err != nil {
 		return err
 	}
+	if err := s.ServiceCAController.ApplyTo(&c.ComponentConfig.ServiceCAController); err != nil {
+		return err
+	}
 	if err := s.TTLAfterFinishedController.ApplyTo(&c.ComponentConfig.TTLAfterFinishedController); err != nil {
 		return err
 	}
@@ -459,6 +467,7 @@ func (s *KubeControllerManagerOptions) Validate(allControllers []string, disable
 	errs = append(errs, s.ReplicationController.Validate()...)
 	errs = append(errs, s.ResourceQuotaController.Validate()...)
 	errs = append(errs, s.SAController.Validate()...)
+	errs = append(errs, s.ServiceCAController.Validate()...)
 	errs = append(errs, s.TTLAfterFinishedController.Validate()...)
 	errs = append(errs, s.SecureServing.Validate()...)
 	errs = append(errs, s.Authentication.Validate()...)

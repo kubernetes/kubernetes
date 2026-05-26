@@ -467,6 +467,21 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			eventsRule(),
 		},
 	})
+
+	// TODO: featuregate it
+	addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "kube-service-ca-signer"},
+		Rules: []rbacv1.PolicyRule{
+			// signing rules
+			rbacv1helpers.NewRule("get", "list", "watch").Groups(certificatesGroup).Resources("podcertificaterequests").RuleOrDie(),
+			rbacv1helpers.NewRule("update").Groups(certificatesGroup).Resources("podcertificaterequests/status").RuleOrDie(),
+			rbacv1helpers.NewRule("sign").Groups(certificatesGroup).Resources("signers").Names("kubernetes.io/service-ca").RuleOrDie(),
+			// trust bundle publishing rules
+			rbacv1helpers.NewRule("attest").Groups(certificatesGroup).Resources("signers").Names("kubernetes.io/service-ca").RuleOrDie(),
+			rbacv1helpers.NewRule("create", "update", "delete", "list", "watch").Groups(certificatesGroup).Resources("clustertrustbundles").RuleOrDie(),
+			eventsRule(),
+		},
+	})
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodCertificateRequest) {
 		addControllerRole(&controllerRoles, &controllerRoleBindings, rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{Name: saRolePrefix + "podcertificaterequestcleaner"},

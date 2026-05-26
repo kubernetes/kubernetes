@@ -867,6 +867,64 @@ items:
       rbac.authorization.kubernetes.io/autoupdate: "true"
     labels:
       kubernetes.io/bootstrapping: rbac-defaults
+    name: system:controller:kube-service-ca-signer
+  rules:
+  - apiGroups:
+    - certificates.k8s.io
+    resources:
+    - podcertificaterequests
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - certificates.k8s.io
+    resources:
+    - podcertificaterequests/status
+    verbs:
+    - update
+  - apiGroups:
+    - certificates.k8s.io
+    resourceNames:
+    - kubernetes.io/service-ca
+    resources:
+    - signers
+    verbs:
+    - sign
+  - apiGroups:
+    - certificates.k8s.io
+    resourceNames:
+    - kubernetes.io/service-ca
+    resources:
+    - signers
+    verbs:
+    - attest
+  - apiGroups:
+    - certificates.k8s.io
+    resources:
+    - clustertrustbundles
+    verbs:
+    - create
+    - delete
+    - list
+    - update
+    - watch
+  - apiGroups:
+    - ""
+    - events.k8s.io
+    resources:
+    - events
+    verbs:
+    - create
+    - patch
+    - update
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    annotations:
+      rbac.authorization.kubernetes.io/autoupdate: "true"
+    labels:
+      kubernetes.io/bootstrapping: rbac-defaults
     name: system:controller:legacy-service-account-token-cleaner
   rules:
   - apiGroups:
