@@ -62,6 +62,7 @@ func (sched *Scheduler) scheduleOnePodGroup(ctx context.Context, podGroupInfo *f
 	if err != nil {
 		// It can happen that the pod group was popped from the scheduling queue before it observed the PodGroup deletion.
 		// PodGroup should come back to the scheduling queue.
+		podGroupInfo.PodGroup = nil
 		sched.handlePodGroupFailureBeforeScheduling(ctx, podGroupInfo, err)
 		return
 	}
@@ -100,6 +101,14 @@ func (sched *Scheduler) handlePodGroupFailureBeforeScheduling(ctx context.Contex
 			continue
 		}
 		sched.FailureHandler(ctx, podFwk, podInfo, fwk.AsStatus(err), clearNominatedNode, time.Now())
+	}
+	if podGroupInfo.PodGroup != nil {
+		sched.updatePodGroupCondition(ctx, podGroupInfo, &metav1.Condition{
+			Type:    schedulingapi.PodGroupInitiallyScheduled,
+			Status:  metav1.ConditionFalse,
+			Reason:  schedulingapi.PodGroupReasonSchedulerError,
+			Message: err.Error(),
+		})
 	}
 	err = sched.SchedulingQueue.AddAttemptedPodGroupIfNeeded(logger, podGroupInfo, sched.SchedulingQueue.SchedulingCycle())
 	if err != nil {
