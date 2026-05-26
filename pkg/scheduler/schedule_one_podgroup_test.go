@@ -392,6 +392,67 @@ func TestPodGroupCycle_UpdateSnapshotError(t *testing.T) {
 	}
 }
 
+func TestCompletePodGroupAlgorithmResult_SetsPod(t *testing.T) {
+	p1 := st.MakePod().Name("p1").UID("p1").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
+	p2 := st.MakePod().Name("p2").UID("p2").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
+	p3 := st.MakePod().Name("p3").UID("p3").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
+
+	qInfo1 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p1}}
+	qInfo2 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p2}}
+	qInfo3 := &framework.QueuedPodInfo{PodInfo: &framework.PodInfo{Pod: p3}}
+
+	podGroupInfo := &framework.QueuedPodGroupInfo{
+		QueuedPodInfos: []*framework.QueuedPodInfo{qInfo1, qInfo2, qInfo3},
+	}
+
+	_, ctx := ktesting.NewTestContext(t)
+	podGroupState := framework.NewCycleState()
+	groupStatus := fwk.NewStatus(fwk.Unschedulable, "pod group unschedulable")
+
+	result := completePodGroupAlgorithmResult(ctx, podGroupInfo, podGroupState, runAllPostFilters, podGroupAlgorithmResult{
+		status: groupStatus,
+		podResults: []algorithmResult{{
+			pod:    p1,
+			status: fwk.NewStatus(fwk.Unschedulable, "p1 unschedulable"),
+		}},
+	})
+
+	if len(result.podResults) != 3 {
+		t.Fatalf("expected 3 pod results, got %d", len(result.podResults))
+	}
+	if result.podResults[0].pod != p1 {
+		t.Errorf("expected pod result 0 to reference p1, got %v", result.podResults[0].pod)
+	}
+	for i, wantPod := range []*v1.Pod{p2, p3} {
+		got := result.podResults[i+1]
+		if got.pod != wantPod {
+			t.Errorf("expected pod result %d to reference %q, got %v", i+1, wantPod.Name, got.pod)
+		}
+		if got.podCtx == nil {
+			t.Errorf("expected pod result %d to have podCtx set", i+1)
+		}
+		if got.status.Code() != groupStatus.Code() {
+			t.Errorf("expected pod result %d status code %v, got %v", i+1, groupStatus.Code(), got.status.Code())
+		}
+	}
+
+	nominatedNodes := map[*v1.Pod]*fwk.NominatingInfo{
+		p2: {NominatingMode: fwk.ModeOverride, NominatedNodeName: "node2"},
+		p3: {NominatingMode: fwk.ModeOverride, NominatedNodeName: "node3"},
+	}
+	for i := range result.podResults {
+		if nodeNameInfo, ok := nominatedNodes[result.podResults[i].pod]; ok {
+			result.podResults[i].scheduleResult.nominatingInfo = nodeNameInfo
+		}
+	}
+	if result.podResults[1].scheduleResult.nominatingInfo.NominatedNodeName != "node2" {
+		t.Errorf("expected p2 nominated node node2, got %q", result.podResults[1].scheduleResult.nominatingInfo.NominatedNodeName)
+	}
+	if result.podResults[2].scheduleResult.nominatingInfo.NominatedNodeName != "node3" {
+		t.Errorf("expected p3 nominated node node3, got %q", result.podResults[2].scheduleResult.nominatingInfo.NominatedNodeName)
+	}
+}
+
 func TestPodGroupCycle_FillsPodResultsOnFewerResults(t *testing.T) {
 	testPodGroup := st.MakePodGroup().Name("pg").Namespace("default").Obj()
 	p1 := st.MakePod().Name("p1").UID("p1").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
