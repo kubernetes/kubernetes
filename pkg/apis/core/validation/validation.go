@@ -3500,46 +3500,52 @@ func validateTCPSocketAction(tcp *core.TCPSocketAction, fldPath *field.Path) fie
 func validateGRPCAction(grpc *core.GRPCAction, fldPath *field.Path) field.ErrorList {
 	return ValidatePortNumOrName(intstr.FromInt32(grpc.Port), fldPath.Child("port"))
 }
+
+// checkHandlerCount verifies that only a single handler type is specified.
+// It returns an error if a handler was already registered, otherwise increments the count.
+func checkHandlerCount(numHandlers *int, name string, fldPath *field.Path) *field.Error {
+	if *numHandlers > 0 {
+		return field.Forbidden(fldPath.Child(name), "may not specify more than 1 handler type")
+	}
+	*numHandlers++
+	return nil
+}
+
 func validateHandler(handler commonHandler, gracePeriod *int64, fldPath *field.Path, opts PodValidationOptions) field.ErrorList {
 	numHandlers := 0
 	allErrors := field.ErrorList{}
 	if handler.Exec != nil {
-		if numHandlers > 0 {
-			allErrors = append(allErrors, field.Forbidden(fldPath.Child("exec"), "may not specify more than 1 handler type"))
+		if err := checkHandlerCount(&numHandlers, "exec", fldPath); err != nil {
+			allErrors = append(allErrors, err)
 		} else {
-			numHandlers++
 			allErrors = append(allErrors, validateExecAction(handler.Exec, fldPath.Child("exec"))...)
 		}
 	}
 	if handler.HTTPGet != nil {
-		if numHandlers > 0 {
-			allErrors = append(allErrors, field.Forbidden(fldPath.Child("httpGet"), "may not specify more than 1 handler type"))
+		if err := checkHandlerCount(&numHandlers, "httpGet", fldPath); err != nil {
+			allErrors = append(allErrors, err)
 		} else {
-			numHandlers++
 			allErrors = append(allErrors, validateHTTPGetAction(handler.HTTPGet, fldPath.Child("httpGet"))...)
 		}
 	}
 	if handler.TCPSocket != nil {
-		if numHandlers > 0 {
-			allErrors = append(allErrors, field.Forbidden(fldPath.Child("tcpSocket"), "may not specify more than 1 handler type"))
+		if err := checkHandlerCount(&numHandlers, "tcpSocket", fldPath); err != nil {
+			allErrors = append(allErrors, err)
 		} else {
-			numHandlers++
 			allErrors = append(allErrors, validateTCPSocketAction(handler.TCPSocket, fldPath.Child("tcpSocket"))...)
 		}
 	}
 	if handler.GRPC != nil {
-		if numHandlers > 0 {
-			allErrors = append(allErrors, field.Forbidden(fldPath.Child("grpc"), "may not specify more than 1 handler type"))
+		if err := checkHandlerCount(&numHandlers, "grpc", fldPath); err != nil {
+			allErrors = append(allErrors, err)
 		} else {
-			numHandlers++
 			allErrors = append(allErrors, validateGRPCAction(handler.GRPC, fldPath.Child("grpc"))...)
 		}
 	}
 	if handler.Sleep != nil {
-		if numHandlers > 0 {
-			allErrors = append(allErrors, field.Forbidden(fldPath.Child("sleep"), "may not specify more than 1 handler type"))
+		if err := checkHandlerCount(&numHandlers, "sleep", fldPath); err != nil {
+			allErrors = append(allErrors, err)
 		} else {
-			numHandlers++
 			allErrors = append(allErrors, validateSleepAction(handler.Sleep, gracePeriod, fldPath.Child("sleep"), opts)...)
 		}
 	}
