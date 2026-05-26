@@ -1,0 +1,619 @@
+goos: linux
+goarch: amd64
+pkg: k8s.io/kubernetes/test/integration/scheduler_perf/affinity
+cpu: Intel(R) Xeon(R) W-2135 CPU @ 3.70GHz
+                                                                                     │    /tmp/master_suite.txt    │                 /tmp/aa_fix_suite.txt                  │
+                                                                                     │ SchedulingDuration/Duration │ SchedulingDuration/Duration  vs base                   │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                         8.548 ± 12%                   5.599 ± 17%  -34.50% (p=0.000 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                10.425 ± 10%                   7.458 ±  1%  -28.46% (p=0.000 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                      7.307 ±  1%                   7.297 ±  1%        ~ (p=0.868 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                             42.78 ±  7%                   38.58 ±  0%   -9.84% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                    18.87 ±  6%                   17.17 ±  9%   -9.01% (p=0.002 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                         7.319 ± 13%                   6.326 ±  1%  -13.56% (p=0.002 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                36.30 ±  7%                   31.53 ±  3%  -13.15% (p=0.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                            9.390 ± 21%                   5.332 ± 20%  -43.22% (p=0.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                  19.655 ±  5%                   9.668 ± 10%  -50.81% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                              6.380 ± 17%                   6.330 ± 16%        ~ (p=0.101 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                     12.75 ±  1%                   12.71 ± 16%        ~ (p=0.898 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                7.321 ± 13%                   8.352 ± 25%  +14.08% (p=0.011 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                       15.56 ±  7%                   14.63 ±  7%        ~ (p=0.406 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                         17.71 ±  0%                   17.66 ±  1%        ~ (p=0.516 n=10)
+geomean                                                                                                13.07                         10.96        -16.13%
+
+                                                                                     │    /tmp/master_suite.txt     │                  /tmp/aa_fix_suite.txt                   │
+                                                                                     │ SchedulingThroughput/Average │ SchedulingThroughput/Average  vs base                    │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                          254.1 ± 10%                    418.9 ± 16%   +64.80% (p=0.000 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                  534.3 ±  7%                    757.7 ±  4%   +41.79% (p=0.000 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                       146.9 ±  2%                    144.9 ±  1%    -1.36% (p=0.029 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                              120.1 ±  7%                    132.9 ±  1%   +10.70% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                     276.6 ± 10%                    308.1 ±  8%   +11.35% (p=0.005 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                          144.4 ± 21%                    172.3 ±  3%   +19.32% (p=0.005 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                 141.7 ±  7%                    162.9 ±  2%   +15.04% (p=0.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                             109.8 ± 17%                    199.2 ± 15%   +81.38% (p=0.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                    107.0 ±  4%                    224.7 ± 11%  +110.00% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                               169.9 ± 15%                    170.4 ± 14%         ~ (p=0.631 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                      169.9 ±  5%                    164.8 ± 12%         ~ (p=0.436 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                 142.9 ±  9%                    126.1 ± 19%   -11.79% (p=0.011 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                        136.1 ±  6%                    141.8 ±  3%         ~ (p=0.481 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                          299.3 ±  2%                    302.6 ±  0%         ~ (p=0.063 n=10)
+geomean                                                                                                 175.7                          211.5         +20.38%
+
+                                                                                     │    /tmp/master_suite.txt    │                 /tmp/aa_fix_suite.txt                  │
+                                                                                     │ SchedulingThroughput/Perc50 │ SchedulingThroughput/Perc50  vs base                   │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                         252.9 ±  6%                   410.9 ± 18%  +62.42% (p=0.000 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                 566.0 ±  3%                   770.5 ±  7%  +36.14% (p=0.000 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                      150.4 ±  7%                   150.4 ±  8%        ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                             119.2 ±  7%                   133.1 ±  2%  +11.57% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                    287.1 ±  8%                   309.6 ±  5%   +7.84% (p=0.005 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                         150.5 ± 16%                   185.9 ±  5%  +23.55% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                147.1 ±  6%                   164.8 ±  3%  +12.07% (p=0.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                            104.6 ± 14%                   194.4 ± 14%  +85.90% (p=0.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                   110.0 ±  9%                   207.9 ± 21%  +88.95% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                              169.9 ± 19%                   175.9 ± 12%        ~ (p=0.494 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                     170.1 ±  3%                   167.6 ± 10%        ~ (p=0.617 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                142.4 ±  7%                   125.1 ± 19%  -12.18% (p=0.008 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                       136.0 ±  6%                   142.9 ±  2%        ~ (p=0.248 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                         299.5 ±  3%                   300.8 ±  3%        ~ (p=0.754 n=10)
+geomean                                                                                                177.8                         212.6        +19.59%
+
+                                                                                     │    /tmp/master_suite.txt    │                  /tmp/aa_fix_suite.txt                  │
+                                                                                     │ SchedulingThroughput/Perc90 │ SchedulingThroughput/Perc90  vs base                    │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                         342.5 ±  3%                   499.3 ±  6%   +45.78% (p=0.000 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                 619.0 ±  2%                   857.1 ±  6%   +38.47% (p=0.000 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                      167.1 ±  3%                   162.1 ±  6%         ~ (p=0.123 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                             138.1 ±  6%                   153.4 ±  4%   +11.12% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                    337.4 ±  8%                   362.6 ±  7%    +7.45% (p=0.005 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                         175.9 ±  7%                   195.0 ±  4%   +10.83% (p=0.003 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                164.2 ±  4%                   179.4 ±  3%    +9.29% (p=0.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                            131.7 ± 16%                   231.7 ±  8%   +76.00% (p=0.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                   136.0 ±  7%                   332.0 ±  5%  +144.12% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                              186.4 ± 10%                   193.5 ±  9%         ~ (p=0.270 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                     182.9 ±  4%                   181.6 ±  9%         ~ (p=0.781 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                158.6 ±  3%                   138.7 ± 13%   -12.52% (p=0.005 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                       151.1 ±  5%                   153.1 ±  3%         ~ (p=0.421 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                         353.4 ±  4%                   363.1 ±  6%         ~ (p=0.382 n=10)
+geomean                                                                                                205.9                         245.0         +19.00%
+
+                                                                                     │    /tmp/master_suite.txt    │                  /tmp/aa_fix_suite.txt                  │
+                                                                                     │ SchedulingThroughput/Perc95 │ SchedulingThroughput/Perc95  vs base                    │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                         342.5 ±  3%                   499.3 ±  6%   +45.78% (p=0.000 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                 619.0 ±  2%                   857.1 ±  6%   +38.47% (p=0.000 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                      167.1 ±  3%                   162.1 ±  6%         ~ (p=0.123 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                             144.4 ±  6%                   157.5 ±  3%    +9.07% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                    340.9 ±  9%                   383.2 ±  5%   +12.39% (p=0.001 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                         175.9 ±  7%                   195.0 ±  4%   +10.83% (p=0.003 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                170.1 ±  6%                   182.2 ±  2%    +7.14% (p=0.001 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                            131.7 ± 12%                   231.7 ±  8%   +76.00% (p=0.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                   138.0 ±  4%                   332.0 ±  5%  +140.58% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                              186.4 ± 10%                   193.5 ±  9%         ~ (p=0.270 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                     188.7 ±  3%                   183.1 ±  7%         ~ (p=0.566 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                158.6 ±  3%                   138.7 ± 13%   -12.52% (p=0.005 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                       155.0 ±  5%                   157.5 ±  4%         ~ (p=0.106 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                         364.1 ±  8%                   374.5 ±  4%         ~ (p=0.481 n=10)
+geomean                                                                                                208.7                         247.9         +18.77%
+
+                                                                                     │    /tmp/master_suite.txt    │                  /tmp/aa_fix_suite.txt                  │
+                                                                                     │ SchedulingThroughput/Perc99 │ SchedulingThroughput/Perc99  vs base                    │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                         342.5 ±  3%                   499.3 ±  6%   +45.78% (p=0.000 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                 619.0 ±  2%                   857.1 ±  6%   +38.47% (p=0.000 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                      167.1 ±  3%                   162.1 ±  6%         ~ (p=0.123 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                             150.4 ±  6%                   160.1 ±  3%    +6.48% (p=0.001 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                    340.9 ±  9%                   383.2 ±  5%   +12.39% (p=0.001 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                         175.9 ±  7%                   195.0 ±  4%   +10.83% (p=0.003 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                172.4 ±  7%                   187.0 ±  4%    +8.50% (p=0.001 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                            131.7 ± 12%                   231.7 ±  8%   +76.00% (p=0.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                   138.0 ±  4%                   332.0 ±  5%  +140.58% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                              186.4 ± 10%                   193.5 ±  9%         ~ (p=0.270 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                     188.7 ±  3%                   183.1 ±  7%         ~ (p=0.566 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                158.6 ±  3%                   138.7 ± 13%   -12.52% (p=0.005 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                       155.0 ±  5%                   157.5 ±  4%         ~ (p=0.106 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                         364.1 ±  8%                   374.5 ±  4%         ~ (p=0.481 n=10)
+geomean                                                                                                209.5                         248.7         +18.67%
+
+                                                                                     │   /tmp/master_suite.txt   │                /tmp/aa_fix_suite.txt                │
+                                                                                     │ heap_memory_usage/Average │ heap_memory_usage/Average  vs base                  │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                        503.2 ± 1%                  501.6 ± 2%       ~ (p=0.579 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                657.6 ± 2%                  662.5 ± 1%       ~ (p=0.305 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                     766.2 ± 2%                  762.5 ± 1%       ~ (p=0.325 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                           1.008k ± 1%                 1.015k ± 1%  +0.74% (p=0.022 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                   938.2 ± 1%                  943.0 ± 1%       ~ (p=0.353 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                        703.6 ± 3%                  711.6 ± 4%       ~ (p=0.529 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                               963.2 ± 1%                  968.2 ± 2%       ~ (p=0.271 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                           624.3 ± 3%                  633.2 ± 3%       ~ (p=0.105 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                  708.8 ± 2%                  720.9 ± 4%       ~ (p=0.143 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                             616.2 ± 3%                  616.0 ± 7%       ~ (p=0.912 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                    698.0 ± 4%                  700.0 ± 5%       ~ (p=0.971 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                               712.3 ± 1%                  725.3 ± 2%  +1.82% (p=0.031 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                      785.8 ± 1%                  795.5 ± 1%       ~ (p=0.174 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                        941.5 ± 1%                  941.1 ± 1%       ~ (p=1.000 n=10)
+geomean                                                                                               745.2                       750.1       +0.66%
+
+                                                                                     │ /tmp/master_suite.txt │              /tmp/aa_fix_suite.txt              │
+                                                                                     │ heap_memory_usage/Max │ heap_memory_usage/Max  vs base                  │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                    589.5 ± 2%              574.4 ± 6%  -2.57% (p=0.005 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                            753.9 ± 5%              754.5 ± 5%       ~ (p=0.481 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                 880.8 ± 2%              883.3 ± 4%       ~ (p=0.955 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                       1.163k ± 2%             1.165k ± 1%       ~ (p=0.516 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                              1.067k ± 2%             1.056k ± 2%       ~ (p=0.353 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                    799.6 ± 4%              802.8 ± 4%       ~ (p=0.971 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                          1.103k ± 1%             1.113k ± 1%  +0.86% (p=0.030 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                       730.9 ± 4%              731.5 ± 6%       ~ (p=0.796 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12              840.2 ± 1%              843.5 ± 3%       ~ (p=0.644 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                         715.5 ± 4%              707.4 ± 4%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                807.8 ± 5%              816.1 ± 5%       ~ (p=0.631 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                           856.5 ± 1%              859.3 ± 2%       ~ (p=0.551 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                  933.8 ± 1%              935.2 ± 1%       ~ (p=0.443 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                   1.093k ± 2%             1.093k ± 2%       ~ (p=0.796 n=10)
+geomean                                                                                           865.7                   865.1       -0.07%
+
+                                                                                     │  /tmp/master_suite.txt   │               /tmp/aa_fix_suite.txt                │
+                                                                                     │ heap_memory_usage/Perc50 │ heap_memory_usage/Perc50  vs base                  │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                       493.3 ± 4%                 497.2 ± 2%       ~ (p=0.066 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                               663.0 ± 3%                 684.8 ± 4%       ~ (p=0.060 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                    738.2 ± 6%                 736.7 ± 3%       ~ (p=0.382 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                           991.8 ± 2%                1002.0 ± 2%  +1.03% (p=0.014 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                  936.3 ± 1%                 941.7 ± 2%       ~ (p=0.393 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                       700.3 ± 4%                 711.9 ± 6%       ~ (p=0.481 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                              949.3 ± 1%                 951.2 ± 4%       ~ (p=0.971 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                          616.8 ± 2%                 623.6 ± 3%       ~ (p=0.393 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                 697.9 ± 5%                 703.8 ± 4%       ~ (p=0.481 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                            625.6 ± 4%                 613.7 ± 6%       ~ (p=0.796 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                   697.9 ± 6%                 704.3 ± 6%       ~ (p=0.853 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                              687.3 ± 4%                 719.0 ± 3%  +4.60% (p=0.044 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                     770.9 ± 2%                 780.2 ± 2%       ~ (p=0.187 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                       937.8 ± 1%                 942.6 ± 1%       ~ (p=0.315 n=10)
+geomean                                                                                              736.9                      744.5       +1.04%
+
+                                                                                     │  /tmp/master_suite.txt   │               /tmp/aa_fix_suite.txt                │
+                                                                                     │ heap_memory_usage/Perc90 │ heap_memory_usage/Perc90  vs base                  │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                       581.2 ± 4%                 545.8 ± 5%  -6.08% (p=0.005 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                               731.4 ± 2%                 730.9 ± 3%       ~ (p=0.928 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                    856.2 ± 5%                 853.5 ± 3%       ~ (p=0.912 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                          1.128k ± 1%                1.137k ± 1%       ~ (p=0.092 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                 1.032k ± 3%                1.025k ± 3%       ~ (p=0.811 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                       787.6 ± 3%                 790.0 ± 8%       ~ (p=0.971 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                             1.073k ± 1%                1.083k ± 1%       ~ (p=0.100 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                          724.6 ± 6%                 710.8 ± 6%       ~ (p=0.127 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                 821.1 ± 1%                 806.4 ± 8%       ~ (p=0.971 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                            687.9 ± 5%                 688.2 ± 8%       ~ (p=0.912 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                   788.4 ± 4%                 790.1 ± 7%       ~ (p=0.684 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                              820.0 ± 3%                 843.1 ± 5%       ~ (p=0.422 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                     920.5 ± 1%                 916.7 ± 2%       ~ (p=0.528 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                      1.058k ± 2%                1.051k ± 2%       ~ (p=0.696 n=10)
+geomean                                                                                              843.5                      839.2       -0.50%
+
+                                                                                     │  /tmp/master_suite.txt   │               /tmp/aa_fix_suite.txt                │
+                                                                                     │ heap_memory_usage/Perc95 │ heap_memory_usage/Perc95  vs base                  │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                       589.5 ± 2%                 574.4 ± 6%  -2.57% (p=0.005 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                               738.0 ± 2%                 754.5 ± 5%       ~ (p=0.089 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                    880.8 ± 2%                 883.3 ± 4%       ~ (p=0.955 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                          1.140k ± 1%                1.149k ± 1%       ~ (p=0.160 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                 1.052k ± 2%                1.042k ± 1%       ~ (p=0.092 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                       799.6 ± 4%                 802.8 ± 4%       ~ (p=0.971 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                             1.084k ± 1%                1.087k ± 1%       ~ (p=0.159 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                          730.8 ± 4%                 731.5 ± 6%       ~ (p=0.912 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                 834.6 ± 1%                 833.0 ± 6%       ~ (p=0.739 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                            715.5 ± 4%                 707.4 ± 4%       ~ (p=0.971 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                   798.6 ± 4%                 803.0 ± 3%       ~ (p=0.436 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                              856.5 ± 1%                 857.6 ± 4%       ~ (p=0.737 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                     928.6 ± 1%                 927.2 ± 3%       ~ (p=0.648 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                      1.071k ± 1%                1.073k ± 2%       ~ (p=0.810 n=10)
+geomean                                                                                              858.6                      858.5       -0.01%
+
+                                                                                     │  /tmp/master_suite.txt   │               /tmp/aa_fix_suite.txt                │
+                                                                                     │ heap_memory_usage/Perc99 │ heap_memory_usage/Perc99  vs base                  │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                       589.5 ± 2%                 574.4 ± 6%  -2.57% (p=0.005 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                               753.9 ± 5%                 754.5 ± 5%       ~ (p=0.481 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                    880.8 ± 2%                 883.3 ± 4%       ~ (p=0.955 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                          1.163k ± 2%                1.165k ± 1%       ~ (p=0.516 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                 1.067k ± 2%                1.056k ± 2%       ~ (p=0.353 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                       799.6 ± 4%                 802.8 ± 4%       ~ (p=0.971 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                             1.103k ± 1%                1.113k ± 1%  +0.86% (p=0.030 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                          730.9 ± 4%                 731.5 ± 6%       ~ (p=0.796 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                 840.2 ± 1%                 843.5 ± 3%       ~ (p=0.644 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                            715.5 ± 4%                 707.4 ± 4%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                   807.8 ± 5%                 816.1 ± 5%       ~ (p=0.631 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                              856.5 ± 1%                 859.3 ± 2%       ~ (p=0.551 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                     933.8 ± 1%                 935.2 ± 1%       ~ (p=0.443 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                      1.093k ± 2%                1.093k ± 2%       ~ (p=0.796 n=10)
+geomean                                                                                              865.7                      865.1       -0.07%
+
+                                                                                     │     /tmp/master_suite.txt     │                   /tmp/aa_fix_suite.txt                   │
+                                                                                     │ memory_growth_rate/GrowthRate │ memory_growth_rate/GrowthRate  vs base                    │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                          740.3 ±  14%                   1209.5 ±  46%   +63.38% (p=0.000 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                 1.286k ±  55%                   2.111k ±   6%   +64.19% (p=0.002 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                      1.266k ±  14%                   1.143k ±  23%         ~ (p=0.143 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                              327.1 ±   8%                    356.4 ±  26%    +8.96% (p=0.019 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                     979.8 ±   7%                   1034.0 ±   7%    +5.54% (p=0.002 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                          557.5 ±  80%                    519.6 ± 252%         ~ (p=0.579 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                 401.4 ±  57%                    412.4 ±  68%         ~ (p=0.393 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                             894.2 ±  64%                   1011.6 ± 144%         ~ (p=0.123 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                    444.4 ±  21%                   1521.5 ±  40%  +242.37% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                              1.852k ±  51%                   1.881k ±  70%         ~ (p=0.796 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                     1.040k ±  48%                   1.131k ±  54%         ~ (p=0.631 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                1.333k ±  38%                   1.123k ±  40%         ~ (p=0.155 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                        455.0 ± 132%                   1204.5 ±  21%  +164.73% (p=0.002 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                         1.056k ±   6%                   1.039k ±   6%         ~ (p=0.796 n=10)
+geomean                                                                                                 797.9                          1.004k          +25.85%
+
+                                                                                     │ /tmp/master_suite.txt │           /tmp/aa_fix_suite.txt            │
+                                                                                     │    runtime_seconds    │ runtime_seconds  vs base                   │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                    25.82 ± 5%        24.06 ± 3%   -6.80% (p=0.004 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                            28.55 ± 3%        24.32 ± 2%  -14.80% (p=0.001 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                 53.34 ± 1%        53.44 ± 2%        ~ (p=0.870 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                        95.50 ± 8%        86.54 ± 1%   -9.39% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                               47.67 ± 6%        43.40 ± 6%   -8.97% (p=0.003 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                    45.12 ± 4%        42.05 ± 2%   -6.80% (p=0.001 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                           76.31 ± 4%        67.76 ± 1%  -11.20% (p=0.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                       126.8 ± 2%        122.2 ± 1%   -3.63% (p=0.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12              138.9 ± 1%        128.0 ± 1%   -7.88% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                         125.0 ± 1%        123.7 ± 1%   -1.04% (p=0.024 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                131.2 ± 2%        130.9 ± 2%        ~ (p=0.362 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                           133.1 ± 1%        136.7 ± 3%   +2.74% (p=0.003 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                  140.6 ± 2%        139.9 ± 0%        ~ (p=0.353 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                    134.9 ± 0%        135.2 ± 0%        ~ (p=0.272 n=10)
+geomean                                                                                           80.12             76.12        -5.00%
+
+                                                                                     │            /tmp/master_suite.txt             │                          /tmp/aa_fix_suite.txt                          │
+                                                                                     │ scheduler_event_handling_duration_ms/Average │ scheduler_event_handling_duration_ms/Average  vs base                   │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                                         74.83m ±  9%                                   93.23m ±  5%  +24.60% (p=0.000 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                                 72.89m ±  7%                                   73.52m ±  6%        ~ (p=0.853 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                                      133.6m ±  5%                                   132.0m ±  3%        ~ (p=0.183 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                                             161.5m ± 22%                                   142.3m ± 10%  -11.83% (p=0.007 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                                    82.75m ± 21%                                   72.05m ±  8%  -12.93% (p=0.023 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                                         87.03m ± 11%                                   72.53m ±  5%  -16.66% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                               100.60m ± 25%                                   75.31m ± 10%  -25.14% (p=0.002 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                                            80.99m ± 13%                                   72.40m ±  5%  -10.61% (p=0.001 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                  102.80m ±  7%                                   92.68m ± 17%   -9.85% (p=0.025 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                                              90.92m ± 15%                                   79.47m ± 12%  -12.60% (p=0.037 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                    101.45m ±  7%                                   89.08m ± 15%  -12.19% (p=0.035 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                                144.0m ±  5%                                   160.9m ± 13%  +11.81% (p=0.038 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                                       141.9m ± 18%                                   140.0m ± 18%        ~ (p=0.204 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                                         74.88m ±  5%                                   74.81m ±  5%        ~ (p=0.739 n=10)
+geomean                                                                                                                100.0m                                         93.76m         -6.25%
+
+                                                                                     │            /tmp/master_suite.txt            │                         /tmp/aa_fix_suite.txt                          │
+                                                                                     │ scheduler_event_handling_duration_ms/Perc50 │ scheduler_event_handling_duration_ms/Perc50  vs base                   │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                                        59.78m ±  7%                                  80.53m ±  8%  +34.71% (p=0.000 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                                57.77m ±  7%                                  59.26m ±  4%        ~ (p=0.393 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                                     143.2m ±  1%                                  141.6m ±  2%        ~ (p=0.493 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                                            155.1m ± 17%                                  148.1m ±  4%   -4.55% (p=0.014 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                                   66.84m ± 34%                                  58.02m ±  8%  -13.19% (p=0.019 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                                        70.86m ± 12%                                  56.48m ±  2%  -20.29% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                               87.66m ± 33%                                  58.90m ± 10%  -32.81% (p=0.005 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                                           65.54m ± 15%                                  57.82m ±  6%  -11.79% (p=0.005 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                  88.89m ±  9%                                  78.17m ± 21%        ~ (p=0.075 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                                             74.63m ± 19%                                  63.42m ± 13%  -15.02% (p=0.043 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                    81.76m ± 21%                                  72.42m ± 18%        ~ (p=0.089 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                               148.8m ±  2%                                  155.2m ±  6%   +4.30% (p=0.045 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                                      147.6m ±  9%                                  146.2m ±  8%        ~ (p=0.154 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                                        58.50m ±  5%                                  58.77m ±  7%        ~ (p=0.631 n=10)
+geomean                                                                                                               87.13m                                        81.12m         -6.90%
+
+                                                                                     │            /tmp/master_suite.txt            │                         /tmp/aa_fix_suite.txt                          │
+                                                                                     │ scheduler_event_handling_duration_ms/Perc90 │ scheduler_event_handling_duration_ms/Perc90  vs base                   │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                                        141.2m ± 27%                                  177.8m ±  3%  +26.00% (p=0.000 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                                126.1m ± 19%                                  137.8m ± 16%        ~ (p=0.393 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                                     194.2m ±  2%                                  193.7m ±  1%        ~ (p=0.591 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                                            284.3m ± 31%                                  197.3m ± 28%  -30.60% (p=0.008 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                                   162.5m ± 27%                                  128.9m ± 23%  -20.68% (p=0.035 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                                        168.9m ± 10%                                  113.2m ± 12%  -32.97% (p=0.001 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                               182.3m ± 28%                                  134.8m ± 17%  -26.08% (p=0.005 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                                           158.8m ± 22%                                  126.1m ± 17%  -20.59% (p=0.005 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                  186.9m ±  5%                                  176.8m ±  7%   -5.43% (p=0.023 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                                             172.5m ± 17%                                  154.6m ± 18%        ~ (p=0.075 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                    184.8m ±  5%                                  170.2m ± 11%   -7.87% (p=0.030 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                               197.9m ± 26%                                  288.1m ± 32%  +45.55% (p=0.045 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                                      198.1m ± 57%                                  197.2m ± 53%        ~ (p=0.268 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                                        131.9m ± 22%                                  133.8m ± 26%        ~ (p=0.644 n=10)
+geomean                                                                                                               174.4m                                        161.5m         -7.39%
+
+                                                                                     │            /tmp/master_suite.txt            │                         /tmp/aa_fix_suite.txt                          │
+                                                                                     │ scheduler_event_handling_duration_ms/Perc95 │ scheduler_event_handling_duration_ms/Perc95  vs base                   │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                                        173.7m ± 12%                                  192.5m ±  3%  +10.83% (p=0.000 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                                164.2m ±  8%                                  171.0m ±  7%        ~ (p=0.447 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                                     217.9m ± 27%                                  205.5m ± 20%        ~ (p=0.593 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                                            345.1m ± 20%                                  271.9m ± 21%  -21.21% (p=0.015 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                                   183.2m ± 12%                                  166.6m ± 11%   -9.09% (p=0.034 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                                        186.6m ±  5%                                  158.5m ±  4%  -15.06% (p=0.001 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                               194.6m ± 14%                                  169.6m ±  6%  -12.85% (p=0.004 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                                           181.3m ± 10%                                  165.4m ±  6%   -8.77% (p=0.009 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                  202.7m ± 42%                                  191.5m ±  4%   -5.48% (p=0.008 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                                             189.5m ±  8%                                  178.9m ±  8%        ~ (p=0.123 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                    201.2m ± 41%                                  189.1m ± 23%   -6.01% (p=0.029 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                               281.9m ± 16%                                  347.6m ± 26%  +23.33% (p=0.044 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                                      286.5m ± 25%                                  273.8m ± 29%        ~ (p=0.286 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                                        167.2m ±  8%                                  168.0m ± 11%        ~ (p=0.684 n=10)
+geomean                                                                                                               207.2m                                        197.9m         -4.52%
+
+                                                                                     │            /tmp/master_suite.txt            │                         /tmp/aa_fix_suite.txt                          │
+                                                                                     │ scheduler_event_handling_duration_ms/Perc99 │ scheduler_event_handling_duration_ms/Perc99  vs base                   │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                                        198.8m ± 27%                                  321.9m ± 35%  +61.96% (p=0.001 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                                194.6m ±  2%                                  196.8m ±  2%        ~ (p=0.342 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                                     367.2m ±  5%                                  365.0m ±  2%        ~ (p=0.739 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                                            393.6m ±  4%                                  376.9m ±  3%   -4.26% (p=0.023 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                                   234.7m ± 52%                                  195.3m ± 21%        ~ (p=0.105 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                                        207.8m ± 64%                                  194.3m ±  1%   -6.47% (p=0.002 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                               336.6m ± 41%                                  197.0m ±  1%  -41.47% (p=0.003 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                                           199.3m ± 44%                                  195.5m ±  2%   -1.96% (p=0.025 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                  365.4m ± 12%                                  310.1m ± 36%  -15.14% (p=0.029 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                                             295.6m ± 33%                                  198.5m ± 52%        ~ (p=0.143 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                    360.9m ±  7%                                  310.6m ± 36%  -13.94% (p=0.023 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                               382.6m ±  2%                                  394.8m ±  4%   +3.19% (p=0.028 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                                      384.8m ±  3%                                  379.9m ±  3%        ~ (p=0.359 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                                        195.4m ±  1%                                  195.8m ± 10%        ~ (p=0.529 n=10)
+geomean                                                                                                               282.4m                                        261.9m         -7.25%
+
+                                                                                     │                  /tmp/master_suite.txt                  │                               /tmp/aa_fix_suite.txt                               │
+                                                                                     │ scheduler_framework_extension_point_duration_ms/Average │ scheduler_framework_extension_point_duration_ms/Average  vs base                  │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                                                    873.9µ ±  9%                                              888.0µ ±  5%       ~ (p=0.971 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                                            901.2µ ±  6%                                              853.1µ ±  9%  -5.34% (p=0.019 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                                                 883.8µ ± 12%                                              909.3µ ± 11%       ~ (p=0.280 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                                                        913.0µ ±  7%                                              914.8µ ±  7%       ~ (p=0.912 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                                               948.9µ ± 10%                                              934.2µ ±  8%       ~ (p=0.631 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                                                    954.1µ ±  6%                                              918.8µ ±  9%       ~ (p=0.280 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                                           964.4µ ± 38%                                              917.5µ ± 17%       ~ (p=0.089 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                                                       1.033m ±  8%                                              1.085m ±  4%       ~ (p=0.060 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                              1.009m ±  4%                                              1.056m ±  6%  +4.66% (p=0.009 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                                                         998.2µ ±  4%                                             1033.5µ ±  3%  +3.54% (p=0.029 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                                1.024m ±  8%                                              1.068m ±  7%  +4.30% (p=0.043 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                                           988.8µ ±  5%                                             1055.5µ ± 15%  +6.75% (p=0.002 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                                                  1.039m ±  4%                                              1.057m ±  7%       ~ (p=0.528 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                                                    976.4µ ±  5%                                              987.1µ ±  5%       ~ (p=0.143 n=10)
+geomean                                                                                                                           963.3µ                                                    973.9µ        +1.09%
+
+                                                                                     │                 /tmp/master_suite.txt                  │                              /tmp/aa_fix_suite.txt                               │
+                                                                                     │ scheduler_framework_extension_point_duration_ms/Perc50 │ scheduler_framework_extension_point_duration_ms/Perc50  vs base                  │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                                                    50.00m ± 0%                                              50.00m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                                            50.00m ± 0%                                              50.00m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                                                 50.00m ± 0%                                              50.00m ± 0%       ~ (p=0.582 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                                                        50.00m ± 0%                                              50.00m ± 0%       ~ (p=0.303 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                                               50.00m ± 0%                                              50.00m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                                                    50.00m ± 0%                                              50.00m ± 0%       ~ (p=0.474 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                                           50.00m ± 0%                                              50.00m ± 0%       ~ (p=0.721 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                                                       50.00m ± 0%                                              50.00m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                              50.00m ± 0%                                              50.00m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                                                         50.00m ± 0%                                              50.00m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                                50.00m ± 0%                                              50.00m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                                           50.00m ± 0%                                              50.00m ± 0%       ~ (p=0.502 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                                                  50.00m ± 0%                                              50.00m ± 0%       ~ (p=0.182 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                                                    50.00m ± 0%                                              50.01m ± 0%       ~ (p=0.350 n=10)
+geomean                                                                                                                           50.00m                                                   50.00m       +0.00%
+
+                                                                                     │                 /tmp/master_suite.txt                  │                              /tmp/aa_fix_suite.txt                               │
+                                                                                     │ scheduler_framework_extension_point_duration_ms/Perc90 │ scheduler_framework_extension_point_duration_ms/Perc90  vs base                  │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                                                    90.00m ± 0%                                              90.00m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                                            90.00m ± 0%                                              90.00m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                                                 90.00m ± 0%                                              90.00m ± 0%       ~ (p=0.582 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                                                        90.00m ± 0%                                              90.00m ± 0%       ~ (p=0.303 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                                               90.00m ± 0%                                              90.00m ± 0%       ~ (p=0.907 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                                                    90.00m ± 0%                                              90.00m ± 0%       ~ (p=0.474 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                                           90.00m ± 0%                                              90.00m ± 0%       ~ (p=0.536 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                                                       90.00m ± 0%                                              90.00m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                              90.00m ± 0%                                              90.00m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                                                         90.00m ± 0%                                              90.00m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                                90.00m ± 0%                                              90.00m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                                           90.00m ± 0%                                              90.00m ± 0%       ~ (p=0.502 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                                                  90.00m ± 0%                                              90.00m ± 0%       ~ (p=0.182 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                                                    90.00m ± 0%                                              90.00m ± 0%       ~ (p=0.266 n=10)
+geomean                                                                                                                           90.00m                                                   90.00m       +0.00%
+
+                                                                                     │                 /tmp/master_suite.txt                  │                              /tmp/aa_fix_suite.txt                               │
+                                                                                     │ scheduler_framework_extension_point_duration_ms/Perc95 │ scheduler_framework_extension_point_duration_ms/Perc95  vs base                  │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                                                    95.00m ± 0%                                              95.00m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                                            95.00m ± 0%                                              95.00m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                                                 95.00m ± 0%                                              95.00m ± 0%       ~ (p=0.582 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                                                        95.00m ± 0%                                              95.00m ± 0%       ~ (p=0.303 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                                               95.00m ± 0%                                              95.00m ± 0%       ~ (p=0.907 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                                                    95.00m ± 0%                                              95.00m ± 0%       ~ (p=0.474 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                                           95.00m ± 0%                                              95.00m ± 0%       ~ (p=0.536 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                                                       95.00m ± 0%                                              95.00m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                              95.00m ± 0%                                              95.00m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                                                         95.00m ± 0%                                              95.00m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                                95.00m ± 0%                                              95.00m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                                           95.00m ± 0%                                              95.00m ± 0%       ~ (p=0.502 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                                                  95.00m ± 0%                                              95.00m ± 0%       ~ (p=0.182 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                                                    95.00m ± 0%                                              95.01m ± 0%       ~ (p=0.266 n=10)
+geomean                                                                                                                           95.00m                                                   95.00m       +0.00%
+
+                                                                                     │                 /tmp/master_suite.txt                  │                              /tmp/aa_fix_suite.txt                               │
+                                                                                     │ scheduler_framework_extension_point_duration_ms/Perc99 │ scheduler_framework_extension_point_duration_ms/Perc99  vs base                  │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                                                    99.00m ± 0%                                              99.00m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                                            99.00m ± 0%                                              99.00m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                                                 99.00m ± 0%                                              99.00m ± 0%       ~ (p=0.582 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                                                        99.00m ± 0%                                              99.00m ± 0%       ~ (p=0.303 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                                               99.00m ± 0%                                              99.00m ± 0%       ~ (p=0.907 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                                                    99.00m ± 0%                                              99.00m ± 0%       ~ (p=0.474 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                                           99.00m ± 0%                                              99.00m ± 0%       ~ (p=0.536 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                                                       99.00m ± 0%                                              99.00m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                              99.00m ± 0%                                              99.00m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                                                         99.00m ± 0%                                              99.00m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                                99.00m ± 0%                                              99.00m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                                           99.00m ± 0%                                              99.00m ± 0%       ~ (p=0.502 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                                                  99.00m ± 0%                                              99.00m ± 0%       ~ (p=0.182 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                                                    99.00m ± 0%                                              99.01m ± 0%       ~ (p=0.266 n=10)
+geomean                                                                                                                           99.00m                                                   99.00m       +0.00%
+
+                                                                                     │             /tmp/master_suite.txt              │                           /tmp/aa_fix_suite.txt                           │
+                                                                                     │ scheduler_plugin_execution_duration_ms/Average │ scheduler_plugin_execution_duration_ms/Average  vs base                   │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                                           638.6µ ± 17%                                     580.3µ ± 15%        ~ (p=0.165 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                                   728.8µ ±  6%                                     586.2µ ±  7%  -19.56% (p=0.000 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                                        740.5µ ± 14%                                     698.2µ ± 38%        ~ (p=0.105 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                                               818.6µ ±  9%                                     749.6µ ± 11%   -8.44% (p=0.003 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                                      689.3µ ±  9%                                     713.8µ ± 13%        ~ (p=0.684 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                                           785.0µ ±  7%                                     750.7µ ± 19%        ~ (p=0.165 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                                  750.7µ ±  4%                                     738.9µ ±  6%        ~ (p=0.353 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                                              723.4µ ±  9%                                     811.2µ ± 11%  +12.15% (p=0.002 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                     711.3µ ±  6%                                     780.4µ ±  7%   +9.72% (p=0.009 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                                                783.1µ ±  7%                                     833.8µ ±  8%        ~ (p=0.165 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                       778.3µ ±  6%                                     789.6µ ±  8%        ~ (p=0.971 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                                  714.9µ ±  8%                                     727.4µ ±  8%        ~ (p=1.000 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                                         759.7µ ±  6%                                     767.9µ ± 15%        ~ (p=0.359 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                                           763.7µ ±  6%                                     859.9µ ±  6%  +12.60% (p=0.000 n=10)
+geomean                                                                                                                  740.5µ                                           737.6µ         -0.39%
+
+                                                                                     │             /tmp/master_suite.txt             │                           /tmp/aa_fix_suite.txt                           │
+                                                                                     │ scheduler_plugin_execution_duration_ms/Perc50 │ scheduler_plugin_execution_duration_ms/Perc50  vs base                    │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                                           5.000m ± 0%                                     5.000m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                                   5.000m ± 0%                                     5.000m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                                        5.000m ± 0%                                     5.000m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                                               5.000m ± 0%                                     5.000m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                                      5.000m ± 0%                                     5.000m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                                           5.000m ± 0%                                     5.000m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                                  5.000m ± 0%                                     5.000m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                                              5.000m ± 0%                                     5.000m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                     5.000m ± 0%                                     5.000m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                                                5.000m ± 0%                                     5.000m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                       5.000m ± 0%                                     5.000m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                                  5.000m ± 0%                                     5.000m ± 0%       ~ (p=1.000 n=20+10) ¹
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                                         5.000m ± 0%                                     5.000m ± 1%       ~ (p=0.431 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                                           5.000m ± 0%                                     5.000m ± 1%       ~ (p=0.474 n=10)
+geomean                                                                                                                  5.000m                                          5.000m       +0.00%
+¹ all samples are equal
+
+                                                                                     │             /tmp/master_suite.txt             │                           /tmp/aa_fix_suite.txt                           │
+                                                                                     │ scheduler_plugin_execution_duration_ms/Perc90 │ scheduler_plugin_execution_duration_ms/Perc90  vs base                    │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                                           9.000m ± 0%                                     9.000m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                                   9.000m ± 0%                                     9.000m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                                        9.000m ± 0%                                     9.000m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                                               9.000m ± 0%                                     9.000m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                                      9.000m ± 0%                                     9.000m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                                           9.000m ± 0%                                     9.000m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                                  9.000m ± 0%                                     9.000m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                                              9.000m ± 0%                                     9.000m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                     9.000m ± 0%                                     9.000m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                                                9.000m ± 0%                                     9.000m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                       9.000m ± 0%                                     9.000m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                                  9.000m ± 0%                                     9.000m ± 0%       ~ (p=1.000 n=20+10) ¹
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                                         9.000m ± 0%                                     9.000m ± 1%       ~ (p=0.605 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                                           9.000m ± 0%                                     9.000m ± 1%       ~ (p=0.474 n=10)
+geomean                                                                                                                  9.000m                                          9.000m       +0.00%
+¹ all samples are equal
+
+                                                                                     │             /tmp/master_suite.txt             │                           /tmp/aa_fix_suite.txt                           │
+                                                                                     │ scheduler_plugin_execution_duration_ms/Perc95 │ scheduler_plugin_execution_duration_ms/Perc95  vs base                    │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                                           9.500m ± 0%                                     9.500m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                                   9.500m ± 0%                                     9.500m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                                        9.500m ± 0%                                     9.500m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                                               9.500m ± 0%                                     9.500m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                                      9.500m ± 0%                                     9.500m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                                           9.500m ± 0%                                     9.500m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                                  9.500m ± 0%                                     9.500m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                                              9.500m ± 0%                                     9.500m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                     9.500m ± 0%                                     9.500m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                                                9.500m ± 0%                                     9.500m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                       9.500m ± 0%                                     9.500m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                                  9.500m ± 0%                                     9.500m ± 0%       ~ (p=1.000 n=20+10) ¹
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                                         9.500m ± 0%                                     9.500m ± 1%       ~ (p=0.431 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                                           9.500m ± 0%                                     9.500m ± 1%       ~ (p=0.474 n=10)
+geomean                                                                                                                  9.500m                                          9.500m       +0.00%
+¹ all samples are equal
+
+                                                                                     │             /tmp/master_suite.txt             │                           /tmp/aa_fix_suite.txt                           │
+                                                                                     │ scheduler_plugin_execution_duration_ms/Perc99 │ scheduler_plugin_execution_duration_ms/Perc99  vs base                    │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                                           9.900m ± 0%                                     9.900m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                                   9.900m ± 0%                                     9.900m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                                        9.900m ± 0%                                     9.900m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                                               9.900m ± 0%                                     9.900m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                                      9.900m ± 0%                                     9.900m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                                           9.900m ± 0%                                     9.900m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                                  9.900m ± 0%                                     9.900m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                                              9.900m ± 0%                                     9.900m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                     9.900m ± 0%                                     9.900m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                                                9.900m ± 0%                                     9.900m ± 0%       ~ (p=1.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                       9.900m ± 0%                                     9.900m ± 0%       ~ (p=1.000 n=10)    ¹
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                                  9.900m ± 0%                                     9.900m ± 0%       ~ (p=1.000 n=20+10) ¹
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                                         9.900m ± 0%                                     9.900m ± 1%       ~ (p=0.605 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                                           9.900m ± 0%                                     9.900m ± 1%       ~ (p=0.474 n=10)
+geomean                                                                                                                  9.900m                                          9.900m       +0.00%
+¹ all samples are equal
+
+                                                                                     │              /tmp/master_suite.txt               │                            /tmp/aa_fix_suite.txt                            │
+                                                                                     │ scheduler_scheduling_attempt_duration_ms/Average │ scheduler_scheduling_attempt_duration_ms/Average  vs base                   │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                                              5.385 ±  3%                                         4.650 ± 4%  -13.65% (p=0.000 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                                      4.209 ±  2%                                         3.933 ± 4%   -6.57% (p=0.000 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                                           7.294 ±  1%                                         7.242 ± 3%        ~ (p=0.853 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                                                  9.902 ±  7%                                         8.903 ± 1%  -10.08% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                                         6.036 ±  7%                                         5.383 ± 7%  -10.80% (p=0.005 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                                              7.636 ±  5%                                         6.918 ± 2%   -9.40% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                                     9.087 ±  4%                                         8.044 ± 1%  -11.48% (p=0.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                                                 7.869 ±  8%                                         5.675 ± 2%  -27.89% (p=0.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                        8.681 ±  8%                                         5.303 ± 4%  -38.92% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                                                   7.038 ±  3%                                         6.877 ± 5%        ~ (p=0.105 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                          7.495 ±  6%                                         7.417 ± 5%        ~ (p=0.684 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                                     7.779 ±  3%                                         8.431 ± 8%   +8.39% (p=0.008 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                                            8.062 ± 10%                                         8.102 ± 1%        ~ (p=0.834 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                                              5.553 ±  1%                                         5.551 ± 1%        ~ (p=0.912 n=10)
+geomean                                                                                                                     7.120                                               6.428        -9.72%
+
+                                                                                     │              /tmp/master_suite.txt              │                           /tmp/aa_fix_suite.txt                            │
+                                                                                     │ scheduler_scheduling_attempt_duration_ms/Perc50 │ scheduler_scheduling_attempt_duration_ms/Perc50  vs base                   │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                                             4.782 ±  5%                                        3.402 ± 3%  -28.86% (p=0.000 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                                     3.218 ±  1%                                        3.237 ± 0%   +0.59% (p=0.008 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                                          6.181 ±  1%                                        6.246 ± 2%        ~ (p=0.143 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                                                 9.906 ± 11%                                        8.528 ± 3%  -13.91% (p=0.001 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                                        5.534 ±  4%                                        5.075 ± 5%   -8.29% (p=0.003 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                                             6.481 ±  5%                                        6.079 ± 2%   -6.20% (p=0.001 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                                    8.498 ± 11%                                        6.889 ± 3%  -18.94% (p=0.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                                                6.970 ±  3%                                        5.298 ± 1%  -23.98% (p=0.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                       7.513 ±  3%                                        4.454 ± 7%  -40.71% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                                                  6.260 ±  3%                                        6.163 ± 3%        ~ (p=0.280 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                         6.440 ±  4%                                        6.482 ± 4%        ~ (p=0.971 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                                    6.676 ±  4%                                        7.351 ± 8%  +10.10% (p=0.004 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                                           7.047 ± 15%                                        7.073 ± 2%        ~ (p=1.000 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                                             5.560 ±  0%                                        5.586 ± 1%        ~ (p=0.066 n=10)
+geomean                                                                                                                    6.310                                              5.654       -10.39%
+
+                                                                                     │              /tmp/master_suite.txt              │                           /tmp/aa_fix_suite.txt                            │
+                                                                                     │ scheduler_scheduling_attempt_duration_ms/Perc90 │ scheduler_scheduling_attempt_duration_ms/Perc90  vs base                   │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                                             7.908 ±  0%                                       7.981 ± 10%        ~ (p=0.218 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                                     7.367 ±  1%                                       7.279 ±  4%        ~ (p=0.579 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                                          13.60 ±  2%                                       13.59 ±  4%        ~ (p=0.838 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                                                 15.64 ±  2%                                       15.32 ±  0%   -2.01% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                                       10.410 ± 19%                                       8.361 ± 15%  -19.68% (p=0.005 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                                             14.27 ±  5%                                       12.20 ±  7%  -14.54% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                                    15.57 ±  1%                                       14.91 ±  1%   -4.21% (p=0.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                                               14.565 ±  2%                                       7.941 ± 15%  -45.48% (p=0.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                      15.055 ±  2%                                       8.744 ± 18%  -41.92% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                                                  12.91 ± 15%                                       12.22 ± 12%        ~ (p=0.280 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                         13.73 ±  7%                                       13.72 ±  8%        ~ (p=0.853 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                                    14.41 ±  2%                                       14.96 ±  4%   +3.89% (p=0.010 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                                           14.67 ±  4%                                       14.66 ±  1%        ~ (p=0.824 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                                             7.959 ±  1%                                       7.954 ±  0%        ~ (p=0.838 n=10)
+geomean                                                                                                                    12.33                                             10.99        -10.88%
+
+                                                                                     │              /tmp/master_suite.txt              │                           /tmp/aa_fix_suite.txt                            │
+                                                                                     │ scheduler_scheduling_attempt_duration_ms/Perc95 │ scheduler_scheduling_attempt_duration_ms/Perc95  vs base                   │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                                             13.36 ±  2%                                       13.09 ±  5%        ~ (p=0.271 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                                     12.14 ±  3%                                       11.91 ±  5%        ~ (p=0.256 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                                          16.87 ±  7%                                       16.14 ±  5%        ~ (p=0.210 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                                                 23.38 ± 14%                                       19.50 ±  3%  -16.61% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                                        14.73 ±  8%                                       13.32 ±  5%   -9.57% (p=0.005 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                                             18.91 ± 11%                                       15.85 ±  2%  -16.20% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                                    22.36 ±  5%                                       19.52 ±  1%  -12.68% (p=0.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                                                15.88 ± 15%                                       13.27 ±  5%  -16.40% (p=0.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                       17.05 ± 30%                                       13.54 ±  5%  -20.59% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                                                  15.46 ±  3%                                       15.29 ±  5%        ~ (p=0.218 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                         15.91 ± 18%                                       15.86 ±  2%        ~ (p=0.516 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                                    15.89 ±  1%                                       17.37 ± 19%        ~ (p=0.152 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                                           15.96 ± 25%                                       15.93 ±  3%        ~ (p=0.665 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                                             12.57 ±  3%                                       12.41 ±  4%        ~ (p=0.353 n=10)
+geomean                                                                                                                    16.19                                             15.04         -7.08%
+
+                                                                                     │              /tmp/master_suite.txt              │                           /tmp/aa_fix_suite.txt                            │
+                                                                                     │ scheduler_scheduling_attempt_duration_ms/Perc99 │ scheduler_scheduling_attempt_duration_ms/Perc99  vs base                   │
+PerfScheduling/SchedulingPodAntiAffinity/5000Nodes_2000Pods-12                                                             27.88 ±  3%                                       26.31 ±  8%   -5.63% (p=0.019 n=10)
+PerfScheduling/SchedulingPodMatchingAntiAffinity/5000Nodes_5000Pods-12                                                     23.12 ± 11%                                       23.84 ±  7%        ~ (p=0.315 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes-12                                                                          31.02 ±  2%                                       30.80 ±  2%        ~ (p=0.210 n=10)
+PerfScheduling/SchedulingPodAffinity/5000Nodes_5000Pods-12                                                                 50.49 ±  9%                                       42.44 ±  6%  -15.94% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredPodAffinity/5000Nodes_5000Pods-12                                                        29.09 ±  6%                                       26.44 ±  5%   -9.13% (p=0.004 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes-12                                                             30.93 ±  2%                                       29.52 ±  2%   -4.54% (p=0.001 n=10)
+PerfScheduling/SchedulingPreferredPodAntiAffinity/5000Nodes_5000Pods-12                                                    33.45 ± 16%                                       30.66 ±  1%   -8.35% (p=0.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes-12                                                41.92 ± 11%                                       27.92 ±  3%  -33.40% (p=0.000 n=10)
+PerfScheduling/SchedulingRequiredPodAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                       44.62 ±  9%                                       27.74 ±  3%  -37.82% (p=0.000 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes-12                                                  29.01 ±  2%                                       28.84 ±  4%        ~ (p=0.315 n=10)
+PerfScheduling/SchedulingPreferredAntiAffinityWithNSSelector/5000Nodes_2000Pods-12                                         30.00 ±  4%                                       29.93 ±  3%        ~ (p=0.781 n=10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes-12                                                    31.97 ±  7%                                       38.72 ± 19%  +21.11% (p=0.043 n=20+10)
+PerfScheduling/SchedulingRequiredPodAffinityWithNSSelector/5000Nodes_2000Pods-12                                           35.79 ± 25%                                       35.39 ± 11%        ~ (p=0.529 n=17+10)
+PerfScheduling/SchedulingPreferredAffinityWithNSSelector/5000Nodes_5000Pods-12                                             23.89 ± 10%                                       22.75 ±  9%        ~ (p=0.218 n=10)
+geomean                                                                                                                    32.31                                             29.67         -8.19%
