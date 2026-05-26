@@ -2000,3 +2000,135 @@ func TestValidateHorizontalPodAutoscalerUpdateInvalidHPA(t *testing.T) {
 		t.Error("expected error, APIVersion should be checked")
 	}
 }
+
+func TestValidateHorizontalPodAutoscalerStatusUpdate(t *testing.T) {
+	baseHPA := autoscaling.HorizontalPodAutoscaler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "myautoscaler",
+			Namespace:       metav1.NamespaceDefault,
+			ResourceVersion: "1",
+		},
+	}
+
+	testCases := []struct {
+		name        string
+		status      autoscaling.HorizontalPodAutoscalerStatus
+		expectError bool
+		errContains string
+	}{
+		{
+			name: "valid: no conditions",
+			status: autoscaling.HorizontalPodAutoscalerStatus{
+				CurrentReplicas: 2,
+				DesiredReplicas: 3,
+			},
+		}, {
+			name: "valid: condition with nil observedGeneration",
+			status: autoscaling.HorizontalPodAutoscalerStatus{
+				CurrentReplicas: 1,
+				DesiredReplicas: 1,
+				Conditions: []autoscaling.HorizontalPodAutoscalerCondition{
+					{Type: autoscaling.ScalingLimited, Status: autoscaling.ConditionFalse, ObservedGeneration: nil},
+				},
+			},
+		}, {
+			name: "valid: condition with zero observedGeneration",
+			status: autoscaling.HorizontalPodAutoscalerStatus{
+				CurrentReplicas: 1,
+				DesiredReplicas: 1,
+				Conditions: []autoscaling.HorizontalPodAutoscalerCondition{
+					{Type: autoscaling.ScalingLimited, Status: autoscaling.ConditionFalse, ObservedGeneration: ptr.To[int64](0)},
+				},
+			},
+		}, {
+			name: "valid: condition with positive observedGeneration",
+			status: autoscaling.HorizontalPodAutoscalerStatus{
+				CurrentReplicas: 2,
+				DesiredReplicas: 2,
+				Conditions: []autoscaling.HorizontalPodAutoscalerCondition{
+					{Type: autoscaling.ScalingLimited, Status: autoscaling.ConditionFalse, ObservedGeneration: ptr.To[int64](5)},
+				},
+			},
+		}, {
+			name: "valid: multiple conditions all with non-negative observedGeneration",
+			status: autoscaling.HorizontalPodAutoscalerStatus{
+				CurrentReplicas: 1,
+				DesiredReplicas: 1,
+				Conditions: []autoscaling.HorizontalPodAutoscalerCondition{
+					{Type: autoscaling.ScalingActive, Status: autoscaling.ConditionTrue, ObservedGeneration: ptr.To[int64](1)},
+					{Type: autoscaling.AbleToScale, Status: autoscaling.ConditionTrue, ObservedGeneration: ptr.To[int64](2)},
+				},
+			},
+		}, {
+			name: "invalid: condition with negative observedGeneration",
+			status: autoscaling.HorizontalPodAutoscalerStatus{
+				CurrentReplicas: 1,
+				DesiredReplicas: 1,
+				Conditions: []autoscaling.HorizontalPodAutoscalerCondition{
+					{
+						Type:               autoscaling.ScalingActive,
+						Status:             autoscaling.ConditionTrue,
+						ObservedGeneration: ptr.To[int64](-1),
+					},
+				},
+			},
+			expectError: true,
+			errContains: "status.conditions[0].observedGeneration",
+		}, {
+			name: "invalid: second condition has negative observedGeneration",
+			status: autoscaling.HorizontalPodAutoscalerStatus{
+				CurrentReplicas: 1,
+				DesiredReplicas: 1,
+				Conditions: []autoscaling.HorizontalPodAutoscalerCondition{
+					{Type: autoscaling.ScalingActive, Status: autoscaling.ConditionTrue, ObservedGeneration: ptr.To[int64](1)},
+					{Type: autoscaling.AbleToScale, Status: autoscaling.ConditionFalse, ObservedGeneration: ptr.To[int64](-3)},
+				},
+			},
+			expectError: true,
+			errContains: "status.conditions[1].observedGeneration",
+		}, {
+			name: "invalid: negative currentReplicas",
+			status: autoscaling.HorizontalPodAutoscalerStatus{
+				CurrentReplicas: -1,
+				DesiredReplicas: 1,
+			},
+			expectError: true,
+			errContains: "status.currentReplicas",
+		}, {
+			name: "invalid: negative desiredReplicas",
+			status: autoscaling.HorizontalPodAutoscalerStatus{
+				CurrentReplicas: 1,
+				DesiredReplicas: -1,
+			},
+			expectError: true,
+			errContains: "status.desiredReplicas",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			newHPA := baseHPA.DeepCopy()
+			newHPA.Status = tc.status
+
+			errs := ValidateHorizontalPodAutoscalerStatusUpdate(newHPA, &baseHPA)
+			if tc.expectError {
+				if len(errs) == 0 {
+					t.Errorf("expected error containing %q, got none", tc.errContains)
+					return
+				}
+				found := false
+				for _, err := range errs {
+					if strings.Contains(err.Field, tc.errContains) || strings.Contains(err.Error(), tc.errContains) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("expected error containing %q, got: %v", tc.errContains, errs)
+				}
+			} else if len(errs) != 0 {
+				t.Errorf("expected no errors, got: %v", errs)
+			}
+		})
+	}
+}
