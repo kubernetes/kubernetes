@@ -163,7 +163,16 @@ type dummyConditionalAuthorizer struct {
 }
 
 func (d *dummyConditionalAuthorizer) Authorize(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
-	return d.ConditionsAwareAuthorize(ctx, attrs).UnconditionalParts()
+	switch {
+	case d.authorizeDecision.IsAllow():
+		return authorizer.DecisionAllow, d.authorizeDecision.Reason(), d.authorizeDecision.Error()
+	case d.authorizeDecision.IsNoOpinion():
+		return authorizer.DecisionNoOpinion, d.authorizeDecision.Reason(), d.authorizeDecision.Error()
+	case d.authorizeDecision.IsDeny():
+		return authorizer.DecisionDeny, d.authorizeDecision.Reason(), d.authorizeDecision.Error()
+	default: // Conditional case
+		return authorizer.DecisionDeny, "failed closed: wanted to return a conditional decision, but called on the conditions-unaware method", nil
+	}
 }
 
 func (d *dummyConditionalAuthorizer) ConditionsAwareAuthorize(ctx context.Context, attrs authorizer.Attributes) authorizer.ConditionsAwareDecision {

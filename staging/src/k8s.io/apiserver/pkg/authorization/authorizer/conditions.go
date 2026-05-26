@@ -95,10 +95,8 @@ func ConditionsAwareDecisionFromParts(unconditional Decision, reason string, err
 	}
 }
 
-// INVARIANT: Exactly one of Is* must return true at all times.
-
-// IsAllowed returns true if the decision is an unconditional Allow.
-func (d ConditionsAwareDecision) IsAllowed() bool {
+// IsAllow returns true if the decision is an unconditional Allow.
+func (d ConditionsAwareDecision) IsAllow() bool {
 	return d.unconditionalDecision == DecisionAllow
 }
 
@@ -107,54 +105,14 @@ func (d ConditionsAwareDecision) IsNoOpinion() bool {
 	return d.unconditionalDecision == DecisionNoOpinion
 }
 
-// IsDenied returns true if the decision is an unconditional Deny.
-func (d ConditionsAwareDecision) IsDenied() bool {
+// IsDeny returns true if the decision is an unconditional Deny.
+func (d ConditionsAwareDecision) IsDeny() bool {
 	return d.unconditionalDecision == DecisionDeny // == 0 == zero value
 }
 
-// IsUnconditional is true if d is Allowed, Denied or NoOpinion.
+// IsUnconditional is true if d is Allow, Deny or NoOpinion.
 func (d ConditionsAwareDecision) IsUnconditional() bool {
-	return d.IsAllowed() || d.IsDenied() || d.IsNoOpinion()
-}
-
-// UnconditionalParts turns a ConditionsAwareDecision into the
-// triple that Authorizer.Authorize expects. If the decision is
-// conditional, the returned condition is Deny if there were at least
-// some Deny condition, otherwise NoOpinion.
-// This function is meant to be called when IsUnconditional() == true.
-//
-// If the authorizer is conditions-aware, it can choose to only implement
-// real business logic in the ConditionsAwareAuthorize method, and implement
-// Authorize() as "return self.ConditionsAwareAuthorize(ctx, attrs).UnconditionalParts()"
-func (d ConditionsAwareDecision) UnconditionalParts() (Decision, string, error) {
-	switch {
-	case d.IsAllowed():
-		return DecisionAllow, d.Reason(), d.Error()
-	case d.IsDenied():
-		return DecisionDeny, d.Reason(), d.Error()
-	case d.IsNoOpinion():
-		return DecisionNoOpinion, d.Reason(), d.Error()
-	default:
-		// An error is not returned here, as that could yield a HTTP response code of 500 instead of 403.
-		// For the use-case described above with regards to calling this function in Authorize, not returning
-		// an error is important, as it is valid to always fail closed, as if this happens, no unconditional
-		// permissions were given the requestor.
-		return d.FailClosedDecision(), "failed closed: tried to return conditional decision to conditions-unaware authorizer", nil
-	}
-}
-
-// FailClosedDecision returns either a Deny or NoOpinion decision to fail closed
-// whenever processing a decision fails. If the decision contains one or
-// more Deny decisions or conditions, one must fail closed with Deny, as that could or would
-// have been the if the condition evaluation did not error. Otherwise, NoOpinion is returned.
-func (d ConditionsAwareDecision) FailClosedDecision() Decision {
-	if d.IsAllowed() || d.IsNoOpinion() {
-		return DecisionNoOpinion
-	}
-	// TODO(luxas): In the follow-up PR, add the logic for ConditionsMap and Union here, which
-	// makes this function useful.
-	// => d.IsDenied() == true
-	return DecisionDeny
+	return d.IsAllow() || d.IsDeny() || d.IsNoOpinion()
 }
 
 // Reason returns the reason associated with the decision.
@@ -182,7 +140,7 @@ func (d ConditionsAwareDecision) String() string {
 		}
 		return fmt.Sprintf("(%s)", strings.Join(params, ", "))
 	}
-	if d.IsAllowed() {
+	if d.IsAllow() {
 		return fmt.Sprintf("Allow%s", paramsStr())
 	}
 	if d.IsNoOpinion() {

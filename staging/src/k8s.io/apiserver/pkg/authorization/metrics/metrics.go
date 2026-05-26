@@ -99,10 +99,10 @@ func (a *instrumentedAuthorizer) ConditionsAwareAuthorize(ctx context.Context, a
 	switch {
 	case decision.IsNoOpinion():
 		// non-terminal, not reported
-	case decision.IsAllowed():
+	case decision.IsAllow():
 		// matches SubjectAccessReview status.allowed field name
 		RecordAuthorizationDecision(a.authorizerType, a.authorizerName, "allowed")
-	case decision.IsDenied():
+	case decision.IsDeny():
 		// matches SubjectAccessReview status.denied field name
 		RecordAuthorizationDecision(a.authorizerType, a.authorizerName, "denied")
 	default:

@@ -33,17 +33,16 @@ func TestConditionsAwareDecision(t *testing.T) {
 	sampleAttrs := authorizer.AttributesRecord{}
 
 	tests := []struct {
-		name                 string
-		testDecisions        []authorizer.ConditionsAwareDecision
-		wantIsAllowed        bool
-		wantIsNoOpinion      bool
-		wantIsDenied         bool
-		wantIsUnconditional  bool
-		wantFailClosedIsDeny bool
-		wantReason           string
-		wantAnyError         bool
-		wantErrorIs          error
-		wantString           string
+		name                string
+		testDecisions       []authorizer.ConditionsAwareDecision
+		wantIsAllowed       bool
+		wantIsNoOpinion     bool
+		wantIsDenied        bool
+		wantIsUnconditional bool
+		wantReason          string
+		wantAnyError        bool
+		wantErrorIs         error
+		wantString          string
 	}{
 		{
 			name: "zero value",
@@ -54,12 +53,11 @@ func TestConditionsAwareDecision(t *testing.T) {
 					return
 				}).ConditionsAwareAuthorize(ctx, sampleAttrs),
 			},
-			wantIsDenied:         true,
-			wantIsUnconditional:  true,
-			wantFailClosedIsDeny: true,
-			wantReason:           "",
-			wantErrorIs:          nil,
-			wantString:           `Deny`,
+			wantIsDenied:        true,
+			wantIsUnconditional: true,
+			wantReason:          "",
+			wantErrorIs:         nil,
+			wantString:          `Deny`,
 		},
 		{
 			name: "deny constructor",
@@ -70,12 +68,11 @@ func TestConditionsAwareDecision(t *testing.T) {
 					return authorizer.DecisionDeny, "foo", unexpectedErr
 				}).ConditionsAwareAuthorize(ctx, sampleAttrs),
 			},
-			wantIsDenied:         true,
-			wantIsUnconditional:  true,
-			wantFailClosedIsDeny: true,
-			wantReason:           "foo",
-			wantErrorIs:          unexpectedErr,
-			wantString:           `Deny(reason="foo", err="unexpected things happened")`,
+			wantIsDenied:        true,
+			wantIsUnconditional: true,
+			wantReason:          "foo",
+			wantErrorIs:         unexpectedErr,
+			wantString:          `Deny(reason="foo", err="unexpected things happened")`,
 		},
 		{
 			name: "allow constructor",
@@ -115,12 +112,11 @@ func TestConditionsAwareDecision(t *testing.T) {
 					return 42, "", nil
 				}).ConditionsAwareAuthorize(ctx, sampleAttrs),
 			},
-			wantIsDenied:         true,
-			wantIsUnconditional:  true,
-			wantFailClosedIsDeny: true,
-			wantReason:           "",
-			wantAnyError:         true,
-			wantString:           `Deny(err="unknown unconditional decision type: 42")`,
+			wantIsDenied:        true,
+			wantIsUnconditional: true,
+			wantReason:          "",
+			wantAnyError:        true,
+			wantString:          `Deny(err="unknown unconditional decision type: 42")`,
 		},
 		{
 			name: "from parts: unsupported mode with other error",
@@ -130,19 +126,18 @@ func TestConditionsAwareDecision(t *testing.T) {
 					return 42, "foo", otherErr
 				}).ConditionsAwareAuthorize(ctx, sampleAttrs),
 			},
-			wantIsDenied:         true,
-			wantIsUnconditional:  true,
-			wantFailClosedIsDeny: true,
-			wantReason:           "foo",
-			wantErrorIs:          otherErr,
-			wantString:           `Deny(reason="foo", err="[other error, unknown unconditional decision type: 42]")`,
+			wantIsDenied:        true,
+			wantIsUnconditional: true,
+			wantReason:          "foo",
+			wantErrorIs:         otherErr,
+			wantString:          `Deny(reason="foo", err="[other error, unknown unconditional decision type: 42]")`,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			for i, d := range tt.testDecisions {
 				t.Run(fmt.Sprint(i), func(t *testing.T) {
-					isAllowed := d.IsAllowed()
+					isAllowed := d.IsAllow()
 					if isAllowed != tt.wantIsAllowed {
 						t.Errorf("IsAllowed() = %v, want %v", isAllowed, tt.wantIsAllowed)
 					}
@@ -150,7 +145,7 @@ func TestConditionsAwareDecision(t *testing.T) {
 					if isNoOpinion != tt.wantIsNoOpinion {
 						t.Errorf("IsNoOpinion() = %v, want %v", isNoOpinion, tt.wantIsNoOpinion)
 					}
-					isDenied := d.IsDenied()
+					isDenied := d.IsDeny()
 					if isDenied != tt.wantIsDenied {
 						t.Errorf("IsDenied() = %v, want %v", isDenied, tt.wantIsDenied)
 					}
@@ -170,16 +165,6 @@ func TestConditionsAwareDecision(t *testing.T) {
 					} else {
 						if !errors.Is(gotError, tt.wantErrorIs) {
 							t.Errorf("Error() = %v, want %v", gotError, tt.wantErrorIs)
-						}
-					}
-					failClosed := d.FailClosedDecision()
-					if tt.wantFailClosedIsDeny {
-						if failClosed != authorizer.DecisionDeny {
-							t.Errorf("want FailClosedDecision() == Deny; got %s", failClosed)
-						}
-					} else {
-						if failClosed != authorizer.DecisionNoOpinion {
-							t.Errorf("want FailClosedDecision() == NoOpinion; got %s", failClosed)
 						}
 					}
 
