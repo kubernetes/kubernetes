@@ -158,6 +158,7 @@ type PersistentVolumeController struct {
 	eventBroadcaster          record.EventBroadcaster
 	eventRecorder             record.EventRecorder
 	volumePluginMgr           vol.VolumePluginMgr
+	metricsPluginMgr          vol.VolumePluginMgr
 	enableDynamicProvisioning bool
 	resyncPeriod              time.Duration
 
