@@ -2783,6 +2783,7 @@ func TestPlacementCycleStateLifecycle(t *testing.T) {
 	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 		features.TopologyAwareWorkloadScheduling: true,
 		features.GenericWorkload:                 true,
+		features.GangScheduling:                  true,
 	})
 
 	// A single scenario exercises both isolation and continuity:
@@ -2870,25 +2871,13 @@ func TestPlacementCycleStateLifecycle(t *testing.T) {
 		t.Fatalf("Expected success, got: %v", result.status)
 	}
 
-	tracker.mu.Lock()
-	defer tracker.mu.Unlock()
-
-	// Continuity: ScorePlacement must have been called and able to read simulation data.
-	// ScorePlacement returns an error status if the read fails, so a failed read would
-	// already have been caught by the result.status check above.
-	for _, placementName := range []string{"placementA", "placementB"} {
-		if _, ok := tracker.scoreReadValues[placementName]; !ok {
-			t.Fatalf("placement %s: ScorePlacement was not called", placementName)
-		}
-	}
-
-	// Isolation: each placement's scorer must read only what its own simulation wrote.
-	// placementA simulated on node1, placementB simulated on node2.
-	if v := tracker.scoreReadValues["placementA"]; v != "node1" {
-		t.Errorf("placementA: scorer read %q, want %q (isolation violation if it read placementB's value)", v, "node1")
-	}
-	if v := tracker.scoreReadValues["placementB"]; v != "node2" {
-		t.Errorf("placementB: scorer read %q, want %q (isolation violation if it read placementA's value)", v, "node2")
+	// Each placement's scorer must read only what its own simulation wrote
+	// (placementA simulated on node1, placementB on node2). This proves both:
+	//   - Continuity: data written during a placement's simulation is readable during its scoring.
+	//   - Isolation: a placement's scorer does not see another placement's writes.
+	expectedScoreReadValues := map[string]string{"placementA": "node1", "placementB": "node2"}
+	if diff := cmp.Diff(expectedScoreReadValues, tracker.scoreReadValues); diff != "" {
+		t.Errorf("Unexpected scoreReadValues (-want,+got)\n%s", diff)
 	}
 }
 

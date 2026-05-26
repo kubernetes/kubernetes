@@ -1482,6 +1482,10 @@ func (f *frameworkImpl) runScoreExtension(ctx context.Context, pl fwk.ScorePlugi
 // It also returns *Status, which is set to non-success if any of the plugins returns
 // a non-success status.
 //
+// placementStates holds the per-placement cycle state for each entry in podGroupAssignments
+// (1:1 by index): placementStates[i] is the state with which podGroupAssignments[i] was
+// processed, and is passed to ScorePlacement for that placement.
+//
 // This function mostly duplicates RunScorePlugins. Any changes to it should likely be reflected in both places.
 func (f *frameworkImpl) RunPlacementScorePlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo, podGroupAssignments []*fwk.PodGroupAssignments, placementStates []fwk.PlacementCycleState) (ps []fwk.PlacementPluginScores, status *fwk.Status) {
 	startTime := time.Now()
@@ -1491,15 +1495,6 @@ func (f *frameworkImpl) RunPlacementScorePlugins(ctx context.Context, state fwk.
 
 	if len(podGroupAssignments) != len(placementStates) {
 		return nil, fwk.AsStatus(fmt.Errorf("expected one PlacementCycleState per PodGroupAssignments, got %d placement states for %d assignments", len(placementStates), len(podGroupAssignments)))
-	}
-	for i, placementState := range placementStates {
-		if placementState == nil {
-			placementName := ""
-			if podGroupAssignments[i] != nil && podGroupAssignments[i].Placement != nil {
-				placementName = podGroupAssignments[i].Placement.Name
-			}
-			return nil, fwk.AsStatus(fmt.Errorf("missing PlacementCycleState for placement %q", placementName))
-		}
 	}
 
 	allPlacementPluginScores := make([]fwk.PlacementPluginScores, len(podGroupAssignments))

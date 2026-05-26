@@ -361,7 +361,7 @@ type podGroupAlgorithmResult struct {
 	// waitingOnPreemption indicates whether this pod group requires or is waiting for preemption to complete.
 	// This can only be set to true when the status is Unschedulable.
 	waitingOnPreemption bool
-	// placementCycleState is used to score this result as one placement candidate.
+	// placementCycleState is the state with which this placement was processed.
 	placementCycleState fwk.PlacementCycleState
 }
 
