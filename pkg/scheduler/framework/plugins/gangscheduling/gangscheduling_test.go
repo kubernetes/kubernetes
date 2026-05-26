@@ -167,6 +167,9 @@ func (pam *podActivatorMock) Activate(_ klog.Logger, pods map[string]*v1.Pod) {
 	}
 }
 
+func (pam *podActivatorMock) Requeue(_ klog.Logger, _ []*v1.Pod) {
+}
+
 func TestGangSchedulingFlow(t *testing.T) {
 	gangPodGroup1 := st.MakePodGroup().Namespace("ns1").Name("pg1").TemplateRef("t1", "gang-wl").MinCount(3).Obj()
 	gangPodGroup2 := st.MakePodGroup().Namespace("ns1").Name("pg2").TemplateRef("t2", "gang-wl").MinCount(4).Obj()

@@ -2459,6 +2459,8 @@ type fakePodActivator struct {
 
 func (f *fakePodActivator) Activate(logger klog.Logger, pods map[string]*v1.Pod) {}
 
+func (f *fakePodActivator) Requeue(logger klog.Logger, pods []*v1.Pod) {}
+
 type mockProposedAssignment struct {
 	nodeName string
 	pod      *v1.Pod

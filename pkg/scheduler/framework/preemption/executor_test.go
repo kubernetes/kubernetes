@@ -199,6 +199,7 @@ func TestIsPodRunningPreemption(t *testing.T) {
 
 type fakePodActivator struct {
 	activatedPods map[string]*v1.Pod
+	requeuedPods  map[string]*v1.Pod
 	mu            *sync.RWMutex
 }
 
@@ -210,17 +211,34 @@ func (f *fakePodActivator) Activate(logger klog.Logger, pods map[string]*v1.Pod)
 	}
 }
 
+func (f *fakePodActivator) Requeue(logger klog.Logger, pods []*v1.Pod) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, pod := range pods {
+		f.requeuedPods[pod.Name] = pod
+	}
+}
+
 type fakePodNominator struct {
 	// embed it so that we can only override NominatedPodsForNode
 	internalqueue.SchedulingQueue
+	nominatedPods []fwk.PodInfo
 
 	// fakePodNominator doesn't respond to NominatedPodsForNode() until the channel is closed.
 	requestStopper chan struct{}
 }
 
 func (f *fakePodNominator) NominatedPodsForNode(nodeName string) []fwk.PodInfo {
-	<-f.requestStopper
-	return nil
+	if f.requestStopper != nil {
+		<-f.requestStopper
+	}
+	return f.nominatedPods
+}
+
+func (f *fakePodNominator) PatchPodStatus(pod *v1.Pod, condition *v1.PodCondition, nominatingInfo *fwk.NominatingInfo) (<-chan error, error) {
+	ch := make(chan error, 1)
+	ch <- nil
+	return ch, nil
 }
 
 func TestPrepareCandidate(t *testing.T) {
@@ -285,6 +303,11 @@ func TestPrepareCandidate(t *testing.T) {
 				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
 				Obj()
 
+		nominatedPod = st.MakePod().Name("nominated").UID("nominated").
+				SchedulerName(defaultSchedulerName).Priority(midPriority).
+				Containers([]v1.Container{st.MakeContainer().Name("container1").Obj()}).
+				Obj()
+
 		podGroupPreemptor = &schedulingapi.PodGroup{ObjectMeta: metav1.ObjectMeta{Name: "pg1", Namespace: "default", UID: "pg1"}}
 
 		errDeletePodFailed   = errors.New("delete pod failed")
@@ -304,6 +327,7 @@ func TestPrepareCandidate(t *testing.T) {
 		preemptor         *v1.Pod
 		preemptorPodGroup *schedulingapi.PodGroup
 		testPods          []*v1.Pod
+		nominatedPods     []*v1.Pod
 		// expectedDeletedPod is the pod name that is expected to be deleted.
 		//
 		// You can set multiple pod name if there're multiple possibilities.
@@ -316,6 +340,7 @@ func TestPrepareCandidate(t *testing.T) {
 		// Only compared when async preemption is enabled.
 		expectedPreemptingMap sets.Set[types.UID]
 		expectedActivatedPods map[string]*v1.Pod
+		expectedRequeuedPods  map[string]*v1.Pod
 	}{
 		{
 			name: "no victims",
@@ -547,6 +572,25 @@ func TestPrepareCandidate(t *testing.T) {
 			expectedPreemptingMap: sets.New(types.UID("preemptor")),
 			expectedActivatedPods: map[string]*v1.Pod{preemptor.Name: preemptor},
 		},
+		{
+			name: "nominated pods on the same node should be requeued",
+			candidate: &candidate{
+				name: node1Name,
+				victims: &extenderv1.Victims{
+					Pods: []*v1.Pod{victim1},
+				},
+			},
+			preemptor:     preemptor,
+			testPods:      []*v1.Pod{victim1, nominatedPod},
+			nominatedPods: []*v1.Pod{nominatedPod},
+			nodeNames:     []string{node1Name},
+			expectedDeletedPod: []string{
+				"victim1",
+			},
+			expectedStatus:        nil,
+			expectedPreemptingMap: sets.New(types.UID("preemptor")),
+			expectedRequeuedPods:  map[string]*v1.Pod{nominatedPod.Name: nominatedPod},
+		},
 	}
 
 	for _, asyncPreemptionEnabled := range []bool{true, false} {
@@ -611,14 +655,24 @@ func TestPrepareCandidate(t *testing.T) {
 
 					informerFactory := informers.NewSharedInformerFactory(cs, 0)
 					eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: cs.EventsV1()})
-					fakeActivator := &fakePodActivator{activatedPods: make(map[string]*v1.Pod), mu: mu}
+					fakeActivator := &fakePodActivator{
+						activatedPods: make(map[string]*v1.Pod),
+						requeuedPods:  make(map[string]*v1.Pod),
+						mu:            mu,
+					}
 
 					// Note: NominatedPodsForNode is called at the beginning of the goroutine in any case.
 					// fakePodNominator can delay the response of NominatedPodsForNode until the channel is closed,
 					// which allows us to test the preempting map before the goroutine does nothing yet.
 					requestStopper := make(chan struct{})
+					var nominatedPodInfos []fwk.PodInfo
+					for _, pod := range tt.nominatedPods {
+						pInfo, _ := framework.NewPodInfo(pod)
+						nominatedPodInfos = append(nominatedPodInfos, pInfo)
+					}
 					nominator := &fakePodNominator{
 						SchedulingQueue: internalqueue.NewSchedulingQueue(nil, informerFactory),
+						nominatedPods:   nominatedPodInfos,
 						requestStopper:  requestStopper,
 					}
 					var apiDispatcher *apidispatcher.APIDispatcher
@@ -649,7 +703,7 @@ func TestPrepareCandidate(t *testing.T) {
 					informerFactory.WaitForCacheSync(ctx.Done())
 					if asyncAPICallsEnabled {
 						cache := internalcache.New(ctx, apiDispatcher, false)
-						framework.SetAPICacher(apicache.New(nil, cache))
+						framework.SetAPICacher(apicache.New(nominator, cache))
 					}
 
 					executor := NewExecutor(framework, feature.Features{EnableAsyncPreemption: asyncPreemptionEnabled})
@@ -725,6 +779,15 @@ func TestPrepareCandidate(t *testing.T) {
 								lastErrMsg = fmt.Sprintf("expected no activated pods, got %v", fakeActivator.activatedPods)
 								return false, nil
 							}
+						}
+
+						if diff := cmp.Diff(tt.expectedRequeuedPods, fakeActivator.requeuedPods); tt.expectedRequeuedPods != nil && diff != "" {
+							lastErrMsg = fmt.Sprintf("Unexpected requeued pods (-want,+got):\n%s", diff)
+							return false, nil
+						}
+						if tt.expectedRequeuedPods == nil && len(fakeActivator.requeuedPods) != 0 {
+							lastErrMsg = fmt.Sprintf("expected no requeued pods, got %v", fakeActivator.requeuedPods)
+							return false, nil
 						}
 
 						if deletedPods.Len() > 1 {

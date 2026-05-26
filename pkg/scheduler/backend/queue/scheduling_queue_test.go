@@ -5263,3 +5263,147 @@ func TestConcurrentUpdateAndPop(t *testing.T) {
 	wg.Wait()
 	q.Close()
 }
+
+func TestPriorityQueue_Requeue(t *testing.T) {
+	mustNewPodInfo := func(pod *v1.Pod) *framework.PodInfo {
+		pi, _ := framework.NewPodInfo(pod)
+		return pi
+	}
+	metrics.Register()
+	tests := []struct {
+		name                       string
+		podInfoInUnschedulablePods []*framework.QueuedPodInfo
+		podInfoInBackoffQ          []*framework.QueuedPodInfo
+		podInActiveQ               []*v1.Pod
+		podsToRequeue              []*v1.Pod
+		wantActive                 int
+		wantBackoff                int
+		wantUnschedulable          int
+	}{
+		{
+			name: "pod in unschedulablePods, not backing off",
+			podInfoInUnschedulablePods: []*framework.QueuedPodInfo{
+				{
+					PodInfo:            mustNewPodInfo(st.MakePod().Name("p1").UID("p1").Obj()),
+					Timestamp:          time.Now().Add(-10 * time.Second),
+					UnschedulableCount: 1, // 1s backoff, so it should be expired
+				},
+			},
+			podsToRequeue:     []*v1.Pod{st.MakePod().Name("p1").UID("p1").Obj()},
+			wantActive:        1,
+			wantBackoff:       0,
+			wantUnschedulable: 0,
+		},
+		{
+			name: "pod in unschedulablePods, backing off",
+			podInfoInUnschedulablePods: []*framework.QueuedPodInfo{
+				{
+					PodInfo:            mustNewPodInfo(st.MakePod().Name("p1").UID("p1").Obj()),
+					Timestamp:          time.Now(),
+					UnschedulableCount: 1, // 1s backoff, not expired
+				},
+			},
+			podsToRequeue:     []*v1.Pod{st.MakePod().Name("p1").UID("p1").Obj()},
+			wantActive:        0,
+			wantBackoff:       1,
+			wantUnschedulable: 0,
+		},
+		{
+			name: "pod in backoffQ, not backing off",
+			podInfoInBackoffQ: []*framework.QueuedPodInfo{
+				{
+					PodInfo:            mustNewPodInfo(st.MakePod().Name("p1").UID("p1").Obj()),
+					Timestamp:          time.Now().Add(-10 * time.Second),
+					UnschedulableCount: 1,
+				},
+			},
+			podsToRequeue:     []*v1.Pod{st.MakePod().Name("p1").UID("p1").Obj()},
+			wantActive:        0,
+			wantBackoff:       1, // Should stay in backoffQ
+			wantUnschedulable: 0,
+		},
+		{
+			name: "pod in backoffQ, backing off",
+			podInfoInBackoffQ: []*framework.QueuedPodInfo{
+				{
+					PodInfo:            mustNewPodInfo(st.MakePod().Name("p1").UID("p1").Obj()),
+					Timestamp:          time.Now(),
+					UnschedulableCount: 1,
+				},
+			},
+			podsToRequeue:     []*v1.Pod{st.MakePod().Name("p1").UID("p1").Obj()},
+			wantActive:        0,
+			wantBackoff:       1,
+			wantUnschedulable: 0,
+		},
+		{
+			name:              "pod not in any queue",
+			podsToRequeue:     []*v1.Pod{st.MakePod().Name("p1").UID("p1").Obj()},
+			wantActive:        0,
+			wantBackoff:       0,
+			wantUnschedulable: 0,
+		},
+		{
+			name:              "pod already in activeQ",
+			podInActiveQ:      []*v1.Pod{st.MakePod().Name("p1").UID("p1").Obj()},
+			podsToRequeue:     []*v1.Pod{st.MakePod().Name("p1").UID("p1").Obj()},
+			wantActive:        1,
+			wantBackoff:       0,
+			wantUnschedulable: 0,
+		},
+		{
+			name: "multiple pods mixed",
+			podInfoInUnschedulablePods: []*framework.QueuedPodInfo{
+				{
+					PodInfo:            mustNewPodInfo(st.MakePod().Name("p1").UID("p1").Obj()),
+					Timestamp:          time.Now().Add(-10 * time.Second),
+					UnschedulableCount: 1, // should be active
+				},
+			},
+			podInfoInBackoffQ: []*framework.QueuedPodInfo{
+				{
+					PodInfo:            mustNewPodInfo(st.MakePod().Name("p2").UID("p2").Obj()),
+					Timestamp:          time.Now(),
+					UnschedulableCount: 1, // should stay in backoff
+				},
+			},
+			podInActiveQ: []*v1.Pod{st.MakePod().Name("p3").UID("p3").Obj()},
+			podsToRequeue: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Obj(),
+				st.MakePod().Name("p2").UID("p2").Obj(),
+			},
+			wantActive:        2, // p1 (requeued) + p3 (existing)
+			wantBackoff:       1, // p2 (stayed)
+			wantUnschedulable: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			q := NewTestQueue(ctx, newDefaultQueueSort())
+
+			for _, pInfo := range tt.podInfoInUnschedulablePods {
+				q.unschedulablePods.addOrUpdate(pInfo, false, "event")
+			}
+			for _, pInfo := range tt.podInfoInBackoffQ {
+				q.backoffQ.add(logger, pInfo, "event")
+			}
+			for _, pod := range tt.podInActiveQ {
+				q.Add(ctx, pod)
+			}
+
+			q.Requeue(logger, tt.podsToRequeue)
+
+			if q.activeQ.len() != tt.wantActive {
+				t.Errorf("activeQ length: want %v, got %v", tt.wantActive, q.activeQ.len())
+			}
+			if q.backoffQ.len() != tt.wantBackoff {
+				t.Errorf("backoffQ length: want %v, got %v", tt.wantBackoff, q.backoffQ.len())
+			}
+			if len(q.unschedulablePods.podInfoMap) != tt.wantUnschedulable {
+				t.Errorf("unschedulablePods length: want %v, got %v", tt.wantUnschedulable, len(q.unschedulablePods.podInfoMap))
+			}
+		})
+	}
+}
