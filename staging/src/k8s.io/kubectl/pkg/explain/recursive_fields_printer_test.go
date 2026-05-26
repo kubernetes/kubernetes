@@ -181,7 +181,6 @@ field2	<Object>
 	}
 }
 
-
 func TestRecursiveFieldsMaxDepthNonRecursiveSchema(t *testing.T) {
 	s := resources.LookupResource(schema.GroupVersionKind{
 		Group:   "",

@@ -159,6 +159,7 @@ FIELDS:
 		}
 	}
 }
+
 // TestModelMaxDepth is an integration-style test for the v1 (OpenAPIv2) render
 // path. It exercises PrintModelDescription end-to-end with exact expected
 // outputs across the boundary values of --max-depth.
