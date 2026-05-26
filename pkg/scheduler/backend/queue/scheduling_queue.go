@@ -1196,7 +1196,10 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(logger klog.Logger, podIn
 
 	activated := false
 	for _, pInfo := range podInfoList {
-		if pInfo.Gated() && !framework.MatchAnyClusterEvent(event, pInfo.GatingPluginEvents) {
+		// As an optimization, we avoid re-evaluating gated pods for events unrelated to their gating plugin.
+		// However, wildcard events (e.g., periodic flushes) always trigger re-evaluation to ensure pods don't
+		// get stuck due to incomplete or incorrect queueing hints.
+		if pInfo.Gated() && !framework.ClusterEventIsWildCard(event) && !framework.MatchAnyClusterEvent(event, pInfo.GatingPluginEvents) {
 			// This event doesn't interest the gating plugin of this Pod,
 			// which means this event never moves this Pod to activeQ.
 			continue

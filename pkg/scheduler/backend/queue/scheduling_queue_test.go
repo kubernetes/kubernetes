@@ -2157,12 +2157,15 @@ func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithQueueingHint(t *testing.T) {
 	now := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	p := st.MakePod().Name("pod1").Namespace("ns1").UID("1").Label("foo", "bar").Obj()
+	gatedPod := st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj()
 	tests := []struct {
 		name    string
 		podInfo *framework.QueuedPodInfo
 		hint    fwk.QueueingHintFn
 		// duration is the duration that the Pod has been in the unschedulable queue.
 		duration time.Duration
+		// triggerEvent is the event to trigger the move. If unset, defaults to nodeAdd.
+		triggerEvent *fwk.ClusterEvent
 		// expectedQ is the queue name (activeQ, backoffQ, or unschedulablePods) that this Pod should be quened to.
 		expectedQ string
 	}{
@@ -2194,6 +2197,33 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithQueueingHint(t *testing.
 			name:      "Skip queues pod to unschedulablePods",
 			podInfo:   &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p), UnschedulablePlugins: sets.New("foo")},
 			hint:      queueHintReturnSkip,
+			expectedQ: unschedulableQ,
+		},
+		{
+			name:         "Queue queues pod to backoffQ if Pod is not gated and the event is wildcard",
+			podInfo:      &framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p), UnschedulablePlugins: sets.New("foo")},
+			triggerEvent: &framework.EventUnschedulableTimeout,
+			hint: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+				return fwk.Queue, fmt.Errorf("QueueingHintFn should not be called as trigger event is wildcard")
+			},
+			expectedQ: backoffQ,
+		},
+		{
+			name:         "Queue queues pod to backoffQ when Pod is no longer gated and the event is wildcard",
+			podInfo:      setQueuedPodInfoGated(&framework.QueuedPodInfo{PodInfo: mustNewPodInfo(p)}, "foo", []fwk.ClusterEvent{framework.EventUnscheduledPodUpdate}),
+			triggerEvent: &framework.EventUnschedulableTimeout,
+			hint: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+				return fwk.Queue, fmt.Errorf("QueueingHintFn should not be called as trigger event is wildcard")
+			},
+			expectedQ: backoffQ,
+		},
+		{
+			name:         "Queue queues pod to unschedulableQ when Pod is gated and the event is wildcard",
+			podInfo:      setQueuedPodInfoGated(&framework.QueuedPodInfo{PodInfo: mustNewPodInfo(gatedPod)}, "foo", []fwk.ClusterEvent{framework.EventUnscheduledPodUpdate}),
+			triggerEvent: &framework.EventUnschedulableTimeout,
+			hint: func(logger klog.Logger, pod *v1.Pod, oldObj, newObj interface{}) (fwk.QueueingHint, error) {
+				return fwk.Queue, fmt.Errorf("QueueingHintFn should not be called as trigger event is wildcard")
+			},
 			expectedQ: unschedulableQ,
 		},
 		{
@@ -2241,19 +2271,29 @@ func TestPriorityQueue_MoveAllToActiveOrBackoffQueueWithQueueingHint(t *testing.
 			}}
 			q := NewTestQueue(ctx, newDefaultQueueSort(), WithQueueingHintMapPerProfile(m), WithClock(cl), WithPreEnqueuePluginMap(preEnqM))
 			q.Add(ctx, test.podInfo.Pod)
-			if p, err := q.Pop(logger); err != nil {
-				t.Errorf("Pop failed: %v", err)
-			} else if diff := cmp.Diff(test.podInfo.Pod, p.Pod); diff != "" {
-				t.Errorf("Unexpected pod after Pop (-want, +got):\n%s", diff)
-			}
-			// add to unsched pod pool
-			err := q.AddUnschedulableIfNotPresent(logger, test.podInfo, q.SchedulingCycle())
-			if err != nil {
-				t.Fatalf("unexpected error from AddUnschedulableIfNotPresent: %v", err)
+			if q.activeQ.len() > 0 {
+				if p, err := q.Pop(logger); err != nil {
+					t.Errorf("Pop failed: %v", err)
+				} else if diff := cmp.Diff(test.podInfo.Pod, p.Pod); diff != "" {
+					t.Errorf("Unexpected pod after Pop (-want, +got):\n%s", diff)
+				}
+				// add to unsched pod pool
+				err := q.AddUnschedulableIfNotPresent(logger, test.podInfo, q.SchedulingCycle())
+				if err != nil {
+					t.Fatalf("unexpected error from AddUnschedulableIfNotPresent: %v", err)
+				}
+			} else {
+				// The pod was already moved to unschedulablePods because it's gated.
+				// Update it with the test's configured podInfo to ensure custom test fields are set.
+				q.unschedulablePods.addOrUpdate(test.podInfo, test.podInfo.Gated(), "test-setup")
 			}
 			cl.Step(test.duration)
 
-			q.MoveAllToActiveOrBackoffQueue(logger, nodeAdd, nil, nil, nil)
+			event := nodeAdd
+			if test.triggerEvent != nil {
+				event = *test.triggerEvent
+			}
+			q.MoveAllToActiveOrBackoffQueue(logger, event, nil, nil, nil)
 
 			if q.backoffQ.len() == 0 && test.expectedQ == backoffQ {
 				t.Fatalf("expected pod to be queued to backoffQ, but it was not")
