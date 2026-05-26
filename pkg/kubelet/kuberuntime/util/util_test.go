@@ -33,6 +33,7 @@ import (
 )
 
 func TestPodSandboxChanged(t *testing.T) {
+	logger := ktesting.Init(t).Logger()
 	for desc, test := range map[string]struct {
 		pod               *v1.Pod
 		status            *kubecontainer.PodStatus
@@ -159,7 +160,7 @@ func TestPodSandboxChanged(t *testing.T) {
 		},
 	} {
 		t.Run(desc, func(t *testing.T) {
-			changed, attempt, id := PodSandboxChanged(test.pod, test.status)
+			changed, attempt, id := PodSandboxChanged(logger, test.pod, test.status)
 			require.Equal(t, test.expectedChanged, changed)
 			require.Equal(t, test.expectedAttempt, attempt)
 			require.Equal(t, test.expectedSandboxID, id)

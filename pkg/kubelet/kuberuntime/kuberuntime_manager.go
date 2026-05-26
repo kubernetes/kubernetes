@@ -1176,7 +1176,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(ctx context.Context, pod *
 	logger := klog.FromContext(ctx)
 	logger.V(5).Info("Syncing Pod", "pod", klog.KObj(pod))
 
-	createPodSandbox, attempt, sandboxID := runtimeutil.PodSandboxChanged(pod, podStatus)
+	createPodSandbox, attempt, sandboxID := runtimeutil.PodSandboxChanged(logger, pod, podStatus)
 	changes := podActions{
 		KillPod:           createPodSandbox,
 		CreateSandbox:     createPodSandbox,
