@@ -18,6 +18,7 @@ package main
 
 import (
 	"fmt"
+	"k8s.io/code-generator/cmd/validation-gen/util"
 	"path"
 	"strings"
 
@@ -156,14 +157,14 @@ func hasRequirednessTag(tags []codetags.Tag) bool {
 	return hasTag(tags, "k8s:optional") || hasTag(tags, "k8s:required") || hasTag(tags, "k8s:forbidden")
 }
 
-// hasAnyValidationTag returns true if tags contain any registered validation tag.
-func hasAnyValidationTag(tags []codetags.Tag) bool {
+// hasNonOpaqueValidationTag returns true if tags contain any registered validation tag that is not opaqueType.
+func hasNonOpaqueValidationTag(tags []codetags.Tag) bool {
 	for _, tag := range tags {
 		switch tag.Name {
-		case "k8s:optional":
+		case "k8s:optional", "k8s:opaqueType":
 			continue
-		case "k8s:alpha", "k8s:beta":
-			if tag.ValueTag != nil && hasAnyValidationTag([]codetags.Tag{*tag.ValueTag}) {
+		case "k8s:alpha", "k8s:beta", "k8s:eachVal", "k8s:eachKey", "k8s:ifEnabled", "k8s:ifDisabled", "k8s:subfield", "k8s:ifMode":
+			if tag.ValueTag != nil && hasNonOpaqueValidationTag([]codetags.Tag{*tag.ValueTag}) {
 				return true
 			}
 			continue
@@ -183,65 +184,91 @@ func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
 	// Tri-state: key absent = unvisited, value nil = in-progress (cycle), value *bool = computed result.
 	hasValidation := make(map[*types.Type]*bool)
 
-	// checkType recursively checks if a type has any validation (transitively).
-	var checkType func(t *types.Type) (bool, bool)
-	checkType = func(t *types.Type) (bool, bool) {
+	var hasTransitiveValidation func(t *types.Type, tags []codetags.Tag) (bool, bool)
+
+	// hasTransitiveValidation returns (hasVal, cycleBroken).
+	// If cycleBroken is true, we cannot cache a negative result.
+	hasTransitiveValidation = func(t *types.Type, tags []codetags.Tag) (bool, bool) {
+		if hasNonOpaqueValidationTag(tags) {
+			return true, false
+		}
+
+		var hasVal, cycleBroken bool
+
 		if val, ok := hasValidation[t]; ok {
-			if val == nil {
-				return false, true // Cycle detected, break conservatively
-			}
-			return *val, false
-		}
-		// Mark in-progress
-		hasValidation[t] = nil
-		extractedTags, err := extractor.ExtractTags(validators.Context{}, t.CommentLines)
-		hasVal := err == nil && hasAnyValidationTag(extractedTags)
-		cycleBroken := false
-
-		switch t.Kind {
-		case types.Alias:
-			if hv, cb := checkType(t.Underlying); hv {
-				hasVal = true
-			} else if cb {
+			if val != nil {
+				hasVal = *val
+			} else {
 				cycleBroken = true
 			}
-		case types.Struct:
-			for _, member := range t.Members {
-				memberTags, err := extractor.ExtractTags(validators.Context{}, member.CommentLines)
-				memberHasVal := err == nil && hasAnyValidationTag(memberTags)
-				if hv, cb := checkType(member.Type); hv {
-					memberHasVal = true
-				} else if cb {
-					cycleBroken = true
-				}
-				if memberHasVal {
-					hasVal = true
-				}
-			}
-		case types.Slice, types.Array, types.Pointer:
-			if hv, cb := checkType(t.Elem); hv {
-				hasVal = true
-			} else if cb {
-				cycleBroken = true
-			}
-		case types.Map:
-			if hv, cb := checkType(t.Key); hv {
-				hasVal = true
-			} else if cb {
-				cycleBroken = true
-			}
-			if hv, cb := checkType(t.Elem); hv {
-				hasVal = true
-			} else if cb {
-				cycleBroken = true
-			}
-		}
-
-		if hasVal || !cycleBroken {
-			hasValidation[t] = &hasVal
 		} else {
-			delete(hasValidation, t)
+			hasValidation[t] = nil // Mark in-progress
+			tTags, _ := extractor.ExtractTags(validators.Context{}, t.CommentLines)
+			hasVal = hasNonOpaqueValidationTag(tTags)
+
+			if !hasVal {
+				switch t.Kind {
+				case types.Alias:
+					hasVal, cycleBroken = hasTransitiveValidation(t.Underlying, nil)
+				case types.Slice, types.Array, types.Pointer:
+					hasVal, cycleBroken = hasTransitiveValidation(t.Elem, nil)
+				case types.Map:
+					hvKey, cbKey := hasTransitiveValidation(t.Key, nil)
+					if hvKey {
+						hasVal, cycleBroken = true, cbKey
+					} else {
+						hvElem, cbElem := hasTransitiveValidation(t.Elem, nil)
+						hasVal, cycleBroken = hvElem, cbKey || cbElem
+					}
+				case types.Struct:
+					for _, m := range t.Members {
+						mTags, _ := extractor.ExtractTags(validators.Context{}, m.CommentLines)
+						hv, cb := hasTransitiveValidation(m.Type, mTags)
+						if hv {
+							hasVal = true
+						}
+						if cb {
+							cycleBroken = true
+						}
+						if hasVal {
+							break
+						}
+					}
+				}
+			}
+
+			if hasVal || !cycleBroken {
+				hasValidation[t] = &hasVal
+			} else {
+				// Do not cache false if a cycle was broken, as validation could exist on another path.
+				delete(hasValidation, t)
+			}
 		}
+
+		// Field-level opacity overrides structural validation.
+		if hasVal && len(tags) > 0 {
+			var valTags []codetags.Tag
+			for _, tag := range tags {
+				if _, err := validators.GetStability(tag.Name); err == nil {
+					valTags = append(valTags, tag)
+				}
+			}
+
+			if vals, err := extractor.ExtractValidations(validators.Context{Scope: validators.ScopeField, Type: t}, valTags...); err == nil {
+				if vals.OpaqueType {
+					hasVal = false
+				} else if t.Kind == types.Map {
+					kVal, _ := hasTransitiveValidation(t.Key, nil)
+					eVal, _ := hasTransitiveValidation(t.Elem, nil)
+					hasKeyVal := kVal && !vals.OpaqueKeyType
+					hasElemVal := eVal && !vals.OpaqueValType
+					hasVal = hasKeyVal || hasElemVal
+				} else if t.Kind == types.Slice || t.Kind == types.Array {
+					hasVal = !vals.OpaqueValType
+				}
+			}
+		}
+
 		return hasVal, cycleBroken
 	}
 
@@ -252,11 +279,7 @@ func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
 		}
 
 		// Skip non-pointer structs (and aliases to them) as they don't support requiredness tags.
-		underlying := t
-		for underlying.Kind == types.Alias {
-			underlying = underlying.Underlying
-		}
-		if underlying.Kind == types.Struct {
+		if util.NativeType(t).Kind == types.Struct {
 			return "", nil
 		}
 
@@ -265,9 +288,9 @@ func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
 			return "", nil
 		}
 
-		// Check if it has validation (direct or transitive)
-		hasDirectVal := hasAnyValidationTag(tags)
-		hasTransitiveVal, _ := checkType(t)
+		// Check if it has validation (direct or active transitive)
+		hasDirectVal := hasNonOpaqueValidationTag(tags)
+		hasTransitiveVal, _ := hasTransitiveValidation(t, tags)
 
 		if hasDirectVal || hasTransitiveVal {
 			return "field with validation must have +k8s:optional, +k8s:required or +k8s:forbidden", nil

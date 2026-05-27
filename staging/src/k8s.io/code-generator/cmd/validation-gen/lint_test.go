@@ -484,8 +484,8 @@ func TestHasAnyValidationTag(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tags, _ := validator.ExtractTags(validators.Context{}, tt.comments)
-			if got := hasAnyValidationTag(tags); got != tt.want {
-				t.Errorf("hasAnyValidationTag() = %v, want %v", got, tt.want)
+			if got := hasNonOpaqueValidationTag(tags); got != tt.want {
+				t.Errorf("hasNonOpaqueValidationTag() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -552,145 +552,64 @@ func TestLintRequiredness(t *testing.T) {
 	}{
 		{
 			name: "pointer field without validation - no error",
-			typeToLint: &types.Type{
-				Name: types.Name{Package: "pkg", Name: "T"},
-				Kind: types.Struct,
-				Members: []types.Member{{
-					Name: "Foo",
-					Type: &types.Type{
-						Name: types.Name{Package: "pkg", Name: "Bar"},
-						Kind: types.Pointer,
-						Elem: &types.Type{Name: types.Name{Package: "", Name: "string"}},
-					},
-				}},
-			},
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testPtr(testType("string"))),
+			}),
 			wantError: "",
 		},
 		{
 			name: "pointer field with direct validation, no requireness - error",
-			typeToLint: &types.Type{
-				Name: types.Name{Package: "pkg", Name: "T"},
-				Kind: types.Struct,
-				Members: []types.Member{{
-					Name:         "Foo",
-					CommentLines: []string{"+k8s:minimum=0"},
-					Type: &types.Type{
-						Name: types.Name{Package: "pkg", Name: "Bar"},
-						Kind: types.Pointer,
-						Elem: &types.Type{Name: types.Name{Package: "", Name: "int"}},
-					},
-				}},
-			},
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testPtr(testType("int")), "+k8s:minimum=0"),
+			}),
 			wantError: "field Foo: field with validation must have +k8s:optional, +k8s:required or +k8s:forbidden",
 		},
 		{
 			name: "pointer field with transitive validation, no requireness - error",
-			typeToLint: &types.Type{
-				Name: types.Name{Package: "pkg", Name: "T"},
-				Kind: types.Struct,
-				Members: []types.Member{{
-					Name: "Foo",
-					Type: &types.Type{
-						Name: types.Name{Package: "pkg", Name: "Nested"},
-						Kind: types.Pointer,
-						Elem: &types.Type{
-							Name: types.Name{Package: "pkg", Name: "Inner"},
-							Kind: types.Struct,
-							Members: []types.Member{{
-								Name:         "Bar",
-								CommentLines: []string{"+k8s:minimum=0"},
-								Type:         &types.Type{Name: types.Name{Package: "", Name: "int"}},
-							}},
-						},
-					},
-				}},
-			},
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testPtr(
+					testStruct("Inner", []types.Member{
+						testField("Bar", testType("int"), "+k8s:minimum=0"),
+					}),
+				)),
+			}),
 			wantError: "field Foo: field with validation must have +k8s:optional, +k8s:required or +k8s:forbidden",
 		},
 		{
 			name: "pointer field with validation and +k8s:optional - no error",
-			typeToLint: &types.Type{
-				Name: types.Name{Package: "pkg", Name: "T"},
-				Kind: types.Struct,
-				Members: []types.Member{{
-					Name:         "Foo",
-					CommentLines: []string{"+k8s:optional", "+k8s:minimum=0"},
-					Type: &types.Type{
-						Name: types.Name{Package: "pkg", Name: "Bar"},
-						Kind: types.Pointer,
-						Elem: &types.Type{Name: types.Name{Package: "", Name: "int"}},
-					},
-				}},
-			},
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testPtr(testType("int")), "+k8s:optional", "+k8s:minimum=0"),
+			}),
 			wantError: "",
 		},
 		{
 			name: "slice field with validation, no requireness - error",
-			typeToLint: &types.Type{
-				Name: types.Name{Package: "pkg", Name: "T"},
-				Kind: types.Struct,
-				Members: []types.Member{{
-					Name:         "Items",
-					CommentLines: []string{"+k8s:maxItems=10"},
-					Type: &types.Type{
-						Name: types.Name{Package: "pkg", Name: "List"},
-						Kind: types.Slice,
-						Elem: &types.Type{Name: types.Name{Package: "", Name: "string"}},
-					},
-				}},
-			},
+			typeToLint: testStruct("T", []types.Member{
+				testField("Items", testSlice(testType("string")), "+k8s:maxItems=10"),
+			}),
 			wantError: "field Items: field with validation must have +k8s:optional, +k8s:required or +k8s:forbidden",
 		},
 		{
 			name: "map field with validation, no requireness - error",
-			typeToLint: &types.Type{
-				Name: types.Name{Package: "pkg", Name: "T"},
-				Kind: types.Struct,
-				Members: []types.Member{{
-					Name:         "Data",
-					CommentLines: []string{"+k8s:maxItems=5"},
-					Type: &types.Type{
-						Name: types.Name{Package: "pkg", Name: "M"},
-						Kind: types.Map,
-						Key:  &types.Type{Name: types.Name{Package: "", Name: "string"}},
-						Elem: &types.Type{Name: types.Name{Package: "", Name: "string"}},
-					},
-				}},
-			},
+			typeToLint: testStruct("T", []types.Member{
+				testField("Data", testMap(testType("string"), testType("string")), "+k8s:maxItems=5"),
+			}),
 			wantError: "field Data: field with validation must have +k8s:optional, +k8s:required or +k8s:forbidden",
 		},
 		{
 			name: "non-pointer struct field with validation - no error (exempt)",
-			typeToLint: &types.Type{
-				Name: types.Name{Package: "pkg", Name: "T"},
-				Kind: types.Struct,
-				Members: []types.Member{{
-					Name: "Nested",
-					Type: &types.Type{
-						Name:         types.Name{Package: "pkg", Name: "Inner"},
-						Kind:         types.Struct,
-						CommentLines: []string{"+k8s:minimum=0"},
-					},
-				}},
-			},
+			typeToLint: testStruct("T", []types.Member{
+				testField("Nested", testStruct("Inner", nil, "+k8s:minimum=0")),
+			}),
 			wantError: "",
 		},
 		{
 			name: "recursive type with pointer to self - no infinite loop",
 			typeToLint: func() *types.Type {
-				t := &types.Type{
-					Name: types.Name{Package: "pkg", Name: "Node"},
-					Kind: types.Struct,
+				t := testStruct("Node", nil)
+				t.Members = []types.Member{
+					testField("Next", testPtr(t), "+k8s:optional"),
 				}
-				t.Members = []types.Member{{
-					Name:         "Next",
-					CommentLines: []string{"+k8s:optional"},
-					Type: &types.Type{
-						Name: types.Name{Package: "pkg", Name: "NodePtr"},
-						Kind: types.Pointer,
-						Elem: t, // cycle
-					},
-				}}
 				return t
 			}(),
 			wantError: "",
@@ -698,19 +617,10 @@ func TestLintRequiredness(t *testing.T) {
 		{
 			name: "recursive type with pointer to self - no infinite loop, missing required validation",
 			typeToLint: func() *types.Type {
-				t := &types.Type{
-					Name: types.Name{Package: "pkg", Name: "Node"},
-					Kind: types.Struct,
+				t := testStruct("Node", nil)
+				t.Members = []types.Member{
+					testField("Next", testPtr(t), "+k8s:immutable"),
 				}
-				t.Members = []types.Member{{
-					Name:         "Next",
-					CommentLines: []string{"+k8s:immutable"},
-					Type: &types.Type{
-						Name: types.Name{Package: "pkg", Name: "NodePtr"},
-						Kind: types.Pointer,
-						Elem: t, // cycle
-					},
-				}}
 				return t
 			}(),
 			wantError: "field Next: field with validation must have +k8s:optional, +k8s:required or +k8s:forbidden",
@@ -718,43 +628,160 @@ func TestLintRequiredness(t *testing.T) {
 		{
 			name: "recursive type with validation - detects validation on first visit",
 			typeToLint: func() *types.Type {
-				t := &types.Type{
-					Name:         types.Name{Package: "pkg", Name: "Node"},
-					Kind:         types.Struct,
-					CommentLines: []string{"+k8s:immutable"},
+				t := testStruct("Node", nil, "+k8s:immutable")
+				t.Members = []types.Member{
+					testField("Next", testPtr(t), "+k8s:optional"),
 				}
-				t.Members = []types.Member{{
-					Name:         "Next",
-					CommentLines: []string{"+k8s:optional"},
-					Type: &types.Type{
-						Name: types.Name{Package: "pkg", Name: "NodePtr"},
-						Kind: types.Pointer,
-						Elem: t, // cycle
-					},
-				}}
 				return t
 			}(),
 			wantError: "",
 		},
 		{
 			name: "array field with transitive validation, no requiredNess - error",
-			typeToLint: &types.Type{
-				Name: types.Name{Package: "pkg", Name: "T"},
-				Kind: types.Struct,
-				Members: []types.Member{{
-					Name: "Arr",
-					Type: &types.Type{
-						Name: types.Name{Package: "pkg", Name: "ArrType"},
-						Kind: types.Array,
-						Elem: &types.Type{
-							Name:         types.Name{Package: "pkg", Name: "Inner"},
-							Kind:         types.Struct,
-							CommentLines: []string{"+k8s:enum"},
-						},
-					},
-				}},
-			},
+			typeToLint: testStruct("T", []types.Member{
+				testField("Arr", testArray(testStruct("Inner", nil, "+k8s:enum"))),
+			}),
 			wantError: "field Arr: field with validation must have +k8s:optional, +k8s:required or +k8s:forbidden",
+		},
+		{
+			name: "pointer field with transitive validation but marked opaqueType - no error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testPtr(
+					testStruct("Inner", []types.Member{
+						testField("Bar", testType("int"), "+k8s:minimum=0"),
+					}),
+				), "+k8s:opaqueType"),
+			}),
+			wantError: "",
+		},
+		{
+			name: "pointer to alias field with transitive validation but marked opaqueType - no error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testPtr(
+					testAlias("MyAlias",
+						testStruct("Inner", []types.Member{
+							testField("Bar", testType("int"), "+k8s:minimum=0"),
+						}),
+					),
+				), "+k8s:opaqueType"),
+			}),
+			wantError: "",
+		},
+		{
+			name: "alias field (to slice) with transitive validation but marked opaqueType - no error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testAlias("MyAlias",
+					testSlice(
+						testStruct("Inner", []types.Member{
+							testField("Bar", testType("int"), "+k8s:minimum=0"),
+						}),
+					),
+				), "+k8s:opaqueType"),
+			}),
+			wantError: "",
+		},
+		{
+			name: "slice field with transitive validation marked opaqueValType - no error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testSlice(
+					testStruct("Inner", []types.Member{
+						testField("Bar", testType("int"), "+k8s:minimum=0"),
+					}),
+				), "+k8s:eachVal=+k8s:opaqueType"),
+			}),
+			wantError: "",
+		},
+		{
+			name: "array field with transitive validation marked opaqueValType - no error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testArray(
+					testStruct("Inner", nil, "+k8s:enum"),
+				), "+k8s:eachVal=+k8s:opaqueType"),
+			}),
+			wantError: "",
+		},
+		{
+			name: "map field with transitive validation on key, marked opaqueKeyType - no error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testMap(
+					testAlias("KeyType", testType("string"), "+k8s:minimum=0"),
+					testType("string"),
+				), "+k8s:eachKey=+k8s:opaqueType"),
+			}),
+			wantError: "",
+		},
+		{
+			name: "map field with transitive validation on key, not marked opaqueKeyType - error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testMap(
+					testAlias("KeyType", testType("string"), "+k8s:minimum=0"),
+					testType("string"),
+				)),
+			}),
+			wantError: "field Foo: field with validation must have +k8s:optional, +k8s:required or +k8s:forbidden",
+		},
+		{
+			name: "map field with transitive validation on value, marked opaqueValType - no error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testMap(
+					testType("string"),
+					testStruct("Inner", []types.Member{
+						testField("Bar", testType("int"), "+k8s:minimum=0"),
+					}),
+				), "+k8s:eachVal=+k8s:opaqueType"),
+			}),
+			wantError: "",
+		},
+		{
+			name: "map field with transitive validation on both, both marked opaque - no error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testMap(
+					testAlias("KeyType", testType("string"), "+k8s:minimum=0"),
+					testStruct("Inner", []types.Member{
+						testField("Bar", testType("int"), "+k8s:minimum=0"),
+					}),
+				), "+k8s:eachKey=+k8s:opaqueType", "+k8s:eachVal=+k8s:opaqueType"),
+			}),
+			wantError: "",
+		},
+		{
+			name: "map field with transitive validation on both, only key marked opaque - error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testMap(
+					testAlias("KeyType", testType("string"), "+k8s:minimum=0"),
+					testStruct("Inner", []types.Member{
+						testField("Bar", testType("int"), "+k8s:minimum=0"),
+					}),
+				), "+k8s:eachKey=+k8s:opaqueType"),
+			}),
+			wantError: "field Foo: field with validation must have +k8s:optional, +k8s:required or +k8s:forbidden",
+		},
+		{
+			name: "map field with transitive validation on both, only value marked opaque - error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testMap(
+					testAlias("KeyType", testType("string"), "+k8s:minimum=0"),
+					testStruct("Inner", []types.Member{
+						testField("Bar", testType("int"), "+k8s:minimum=0"),
+					}),
+				), "+k8s:eachVal=+k8s:opaqueType"),
+			}),
+			wantError: "field Foo: field with validation must have +k8s:optional, +k8s:required or +k8s:forbidden",
+		},
+		{
+			name: "pointer field with nested opaque field - bypasses transitive validation",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testPtr(
+					testStruct("Inner", []types.Member{
+						testField("Bar", testPtr(
+							testStruct("NestedInner", []types.Member{
+								testField("Val", testType("int"), "+k8s:minimum=0"),
+							}),
+						), "+k8s:opaqueType"),
+					}),
+				)),
+			}),
+			wantError: "",
 		},
 	}
 
@@ -776,5 +803,76 @@ func TestLintRequiredness(t *testing.T) {
 				t.Errorf("lintRequiredness() error = %q, want %q", gotError, tt.wantError)
 			}
 		})
+	}
+}
+
+func testType(name string, comments ...string) *types.Type {
+	return &types.Type{
+		Name:         types.Name{Package: "", Name: name},
+		Kind:         types.Builtin,
+		CommentLines: comments,
+	}
+}
+
+func testPtr(elem *types.Type, comments ...string) *types.Type {
+	return &types.Type{
+		Name:         types.Name{Package: "pkg", Name: elem.Name.Name + "Ptr"},
+		Kind:         types.Pointer,
+		Elem:         elem,
+		CommentLines: comments,
+	}
+}
+
+func testStruct(name string, members []types.Member, comments ...string) *types.Type {
+	return &types.Type{
+		Name:         types.Name{Package: "pkg", Name: name},
+		Kind:         types.Struct,
+		Members:      members,
+		CommentLines: comments,
+	}
+}
+
+func testField(name string, fieldType *types.Type, comments ...string) types.Member {
+	return types.Member{
+		Name:         name,
+		Type:         fieldType,
+		CommentLines: comments,
+	}
+}
+
+func testSlice(elem *types.Type, comments ...string) *types.Type {
+	return &types.Type{
+		Name:         types.Name{Package: "pkg", Name: "[]" + elem.Name.Name},
+		Kind:         types.Slice,
+		Elem:         elem,
+		CommentLines: comments,
+	}
+}
+
+func testArray(elem *types.Type, comments ...string) *types.Type {
+	return &types.Type{
+		Name:         types.Name{Package: "pkg", Name: "array_" + elem.Name.Name},
+		Kind:         types.Array,
+		Elem:         elem,
+		CommentLines: comments,
+	}
+}
+
+func testMap(key, val *types.Type, comments ...string) *types.Type {
+	return &types.Type{
+		Name:         types.Name{Package: "pkg", Name: "map_" + key.Name.Name + "_" + val.Name.Name},
+		Kind:         types.Map,
+		Key:          key,
+		Elem:         val,
+		CommentLines: comments,
+	}
+}
+
+func testAlias(name string, underlying *types.Type, comments ...string) *types.Type {
+	return &types.Type{
+		Name:         types.Name{Package: "pkg", Name: name},
+		Kind:         types.Alias,
+		Underlying:   underlying,
+		CommentLines: comments,
 	}
 }
