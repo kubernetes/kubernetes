@@ -3434,6 +3434,79 @@ func TestFlushUnschedulablePodsLeftoverSetsFlag_GatedPod(t *testing.T) {
 	}
 }
 
+// TestGatedPodFlushFrequency verifies that a gated pod is only flushed once every
+// podMaxInUnschedulablePodsDuration, and not on every periodic flush execution.
+func TestGatedPodFlushFrequency(t *testing.T) {
+	gatedPod := mustNewPodInfo(st.MakePod().Name("pod1").Namespace("ns1").UID("1").Obj())
+
+	podInfo := &framework.QueuedPodInfo{
+		PodInfo:              gatedPod,
+		UnschedulablePlugins: sets.New("foo"),
+	}
+
+	c := testingclock.NewFakeClock(time.Now())
+	m := makeEmptyQueueingHintMapPerProfile()
+	preEnqueuePluginName := "preEnqueuePlugin"
+	preEnqM := map[string]map[string]fwk.PreEnqueuePlugin{
+		"": {
+			preEnqueuePluginName: &preEnqueuePlugin{}, // Empty allowlist, gates all pods
+		},
+	}
+	logger, ctx := ktesting.NewTestContext(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Use a user-defined 5-minute duration for clarity
+	flushDuration := 5 * time.Minute
+	q := NewTestQueue(ctx, newDefaultQueueSort(), WithClock(c), WithQueueingHintMapPerProfile(m), WithPreEnqueuePluginMap(preEnqM),
+		WithPodMaxInUnschedulablePodsDuration(flushDuration))
+
+	getPodFromAnyQueue := func() *framework.QueuedPodInfo {
+		pInfo, ok := q.GetPod(podInfo.Pod.Name, podInfo.Pod.Namespace)
+		if !ok {
+			t.Fatalf("Failed to find pod in any queue")
+		}
+		return pInfo
+	}
+
+	// Add gated pod directly to unschedulablePods
+	q.unschedulablePods.addOrUpdate(podInfo, false, "test-setup")
+
+	// Step clock past the flush duration and trigger flush
+	// (T=5:01)
+	c.Step(flushDuration + time.Second)
+
+	q.flushUnschedulablePodsLeftover(logger)
+
+	actualPod := getPodFromAnyQueue()
+	// Verify that flush happened
+	firstFlushTime := actualPod.GetFlushTimestamp()
+	if firstFlushTime.IsZero() {
+		t.Errorf("Expected FlushTimestamp to be set after the first leftover flush")
+	}
+
+	// Step clock by less than the flush duration and trigger flush
+	// T=9:01
+	c.Step(4 * time.Minute)
+	q.flushUnschedulablePodsLeftover(logger)
+
+	actualPod = getPodFromAnyQueue()
+	if actualPod.GetFlushTimestamp() != firstFlushTime {
+		t.Errorf("Expected FlushTimestamp to remain %v, but was updated to %v (pod was flushed prematurely)", firstFlushTime, actualPod.GetFlushTimestamp())
+	}
+
+	// Step clock past the duration since the last flush
+	// T=10:02
+	c.Step(time.Minute + time.Second)
+	q.flushUnschedulablePodsLeftover(logger)
+
+	actualPod = getPodFromAnyQueue()
+	// Verify that flush happened
+	if !actualPod.GetFlushTimestamp().After(firstFlushTime) {
+		t.Errorf("Expected FlushTimestamp to be updated to a newer time after 5 minutes elapsed, but remained %v", actualPod.GetFlushTimestamp())
+	}
+}
+
 func TestPriorityQueue_initPodMaxInUnschedulablePodsDuration(t *testing.T) {
 	pod1 := st.MakePod().Name("test-pod-1").Namespace("ns1").UID("tp-1").NominatedNodeName("node1").Obj()
 	pod2 := st.MakePod().Name("test-pod-2").Namespace("ns2").UID("tp-2").NominatedNodeName("node2").Obj()

@@ -587,6 +587,8 @@ type QueuedPodInfo struct {
 	// indicate queueing hint misconfigurations or event handling bugs.
 	// This flag is cleared when the pod returns to the queue for any reason.
 	WasFlushedFromUnschedulable bool
+	// FlushTimestamp tracks the last time this pod was flushed from the unschedulable queue.
+	FlushTimestamp time.Time
 	// The time when the pod is added to the queue for the first time. The pod may be added
 	// back to the queue multiple times before it's successfully scheduled.
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
@@ -659,11 +661,16 @@ func (pqi *QueuedPodInfo) Gated() bool {
 	return pqi.GatingPlugin != ""
 }
 
+func (qp *QueuedPodInfo) GetFlushTimestamp() time.Time {
+	return qp.FlushTimestamp
+}
+
 // DeepCopy returns a deep copy of the QueuedPodInfo object.
 func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 	return &QueuedPodInfo{
 		PodInfo:                 pqi.PodInfo.DeepCopy(),
 		Timestamp:               pqi.Timestamp,
+		FlushTimestamp:          pqi.FlushTimestamp,
 		Attempts:                pqi.Attempts,
 		UnschedulableCount:      pqi.UnschedulableCount,
 		InitialAttemptTimestamp: pqi.InitialAttemptTimestamp,
@@ -693,6 +700,10 @@ func (pqi *QueuedPodInfo) ClearRejectorPlugins() {
 	pqi.GatingPluginEvents = nil
 }
 
+func (pqi *QueuedPodInfo) SetFlushTimestamp(t time.Time) {
+	pqi.FlushTimestamp = t
+}
+
 // QueuedPodGroupInfo is a PodGroupInfo wrapper with additional information related to
 // the pod group's status in the scheduling queue and stores all queued pods from that pod group.
 type QueuedPodGroupInfo struct {
@@ -700,6 +711,13 @@ type QueuedPodGroupInfo struct {
 	// QueuedPodInfos are the pod group's pods that are currently queued.
 	// The order of the pods is deterministic and based on the priority and InitialAttemptTimestamp.
 	QueuedPodInfos []*QueuedPodInfo
+	// FlushTimestamp tracks the last time this pod group was flushed from the unschedulable queue.
+	FlushTimestamp time.Time
+}
+
+func (pgqi *QueuedPodGroupInfo) SetFlushTimestamp(t time.Time) {
+	// We don't need to set it for all members as it's only checked at the root level.
+	pgqi.FlushTimestamp = t
 }
 
 // PodGroupInfo is a wrapper around the PodGroup API object together with a list of pods that belong to the pod group.

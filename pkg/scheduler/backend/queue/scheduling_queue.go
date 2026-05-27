@@ -943,6 +943,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(logger klog.Logger, pInfo *
 	pInfo.BackoffExpiration = time.Time{}
 	// Clear the flush flag since the pod is returning to the queue after a scheduling attempt.
 	pInfo.WasFlushedFromUnschedulable = false
+	pInfo.FlushTimestamp = time.Time{}
 
 	if !p.isSchedulingQueueHintEnabled {
 		// fall back to the old behavior which doesn't depend on the queueing hint.
@@ -996,9 +997,13 @@ func (p *PriorityQueue) flushUnschedulablePodsLeftover(logger klog.Logger) {
 	currentTime := p.clock.Now()
 	for _, pInfo := range p.unschedulablePods.podInfoMap {
 		lastScheduleTime := pInfo.Timestamp
+		if flushTime := pInfo.GetFlushTimestamp(); flushTime.After(lastScheduleTime) {
+			lastScheduleTime = flushTime
+		}
 		if currentTime.Sub(lastScheduleTime) > p.podMaxInUnschedulablePodsDuration {
 			// Mark this pod as flushed so we can detect if it schedules soon after
 			pInfo.WasFlushedFromUnschedulable = true
+			pInfo.SetFlushTimestamp(currentTime)
 			podsToMove = append(podsToMove, pInfo)
 		}
 	}
