@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -230,7 +231,7 @@ func TestRunHandlerHttps(t *testing.T) {
 	pod.Spec.Containers = []v1.Container{container}
 
 	t.Run("consistent", func(t *testing.T) {
-		container.Lifecycle.PostStart.HTTPGet.Port = intstr.FromString("70")
+		container.Lifecycle.PostStart.HTTPGet.Port = intstr.FromInt32(70)
 		pod.Spec.Containers = []v1.Container{container}
 		_, err := handlerRunner.Run(tCtx, containerID, &pod, &container, container.Lifecycle.PostStart)
 
@@ -252,7 +253,7 @@ func TestRunHandlerHTTPPort(t *testing.T) {
 	}{
 		{
 			Name:     "consistent/with port",
-			Port:     intstr.FromString("70"),
+			Port:     intstr.FromInt32(70),
 			Expected: "https://foo:70/bar",
 		}, {
 			Name:        "consistent/without port",
@@ -324,7 +325,7 @@ func TestRunHTTPHandler(t *testing.T) {
 			PodIP: "",
 			HTTPGet: &v1.HTTPGetAction{
 				Path:        "foo",
-				Port:        intstr.FromString("42"),
+				Port:        intstr.FromInt32(42),
 				Host:        "example.test",
 				Scheme:      "http",
 				HTTPHeaders: []v1.HTTPHeader{},
@@ -343,7 +344,7 @@ func TestRunHTTPHandler(t *testing.T) {
 			PodIP: "233.252.0.1",
 			HTTPGet: &v1.HTTPGetAction{
 				Path:        "foo",
-				Port:        intstr.FromString("42"),
+				Port:        intstr.FromInt32(42),
 				Scheme:      "http",
 				HTTPHeaders: []v1.HTTPHeader{},
 			},
@@ -361,7 +362,7 @@ func TestRunHTTPHandler(t *testing.T) {
 			PodIP: "233.252.0.1",
 			HTTPGet: &v1.HTTPGetAction{
 				Path:        "/foo",
-				Port:        intstr.FromString("42"),
+				Port:        intstr.FromInt32(42),
 				Scheme:      "http",
 				HTTPHeaders: []v1.HTTPHeader{},
 			},
@@ -379,7 +380,7 @@ func TestRunHTTPHandler(t *testing.T) {
 			PodIP: "233.252.0.1",
 			HTTPGet: &v1.HTTPGetAction{
 				Path:        "foo",
-				Port:        intstr.FromString("42"),
+				Port:        intstr.FromInt32(42),
 				Scheme:      "http",
 				HTTPHeaders: []v1.HTTPHeader{},
 			},
@@ -415,7 +416,7 @@ func TestRunHTTPHandler(t *testing.T) {
 			PodIP: "233.252.0.1",
 			HTTPGet: &v1.HTTPGetAction{
 				Path:        "foo",
-				Port:        intstr.FromString("4430"),
+				Port:        intstr.FromInt32(4430),
 				Scheme:      "https",
 				HTTPHeaders: []v1.HTTPHeader{},
 			},
@@ -433,7 +434,7 @@ func TestRunHTTPHandler(t *testing.T) {
 			PodIP: "233.252.0.1",
 			HTTPGet: &v1.HTTPGetAction{
 				Path:        "foo",
-				Port:        intstr.FromString("80"),
+				Port:        intstr.FromInt32(80),
 				Scheme:      "baz",
 				HTTPHeaders: []v1.HTTPHeader{},
 			},
@@ -451,7 +452,7 @@ func TestRunHTTPHandler(t *testing.T) {
 			PodIP: "233.252.0.1",
 			HTTPGet: &v1.HTTPGetAction{
 				Path:        "foo?k=v",
-				Port:        intstr.FromString("80"),
+				Port:        intstr.FromInt32(80),
 				Scheme:      "http",
 				HTTPHeaders: []v1.HTTPHeader{},
 			},
@@ -469,7 +470,7 @@ func TestRunHTTPHandler(t *testing.T) {
 			PodIP: "233.252.0.1",
 			HTTPGet: &v1.HTTPGetAction{
 				Path:        "foo#frag",
-				Port:        intstr.FromString("80"),
+				Port:        intstr.FromInt32(80),
 				Scheme:      "http",
 				HTTPHeaders: []v1.HTTPHeader{},
 			},
@@ -487,7 +488,7 @@ func TestRunHTTPHandler(t *testing.T) {
 			PodIP: "233.252.0.1",
 			HTTPGet: &v1.HTTPGetAction{
 				Path:   "foo",
-				Port:   intstr.FromString("80"),
+				Port:   intstr.FromInt32(80),
 				Scheme: "http",
 				HTTPHeaders: []v1.HTTPHeader{
 					{
@@ -512,7 +513,7 @@ func TestRunHTTPHandler(t *testing.T) {
 			HTTPGet: &v1.HTTPGetAction{
 				Host:   "example.test",
 				Path:   "foo",
-				Port:   intstr.FromString("80"),
+				Port:   intstr.FromInt32(80),
 				Scheme: "http",
 				HTTPHeaders: []v1.HTTPHeader{
 					{
@@ -707,6 +708,10 @@ func TestRunHandlerHttpsFailureFallback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	portNumber, err := strconv.Atoi(port)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	recorder := &record.FakeRecorder{Events: make(chan string, 10)}
 
@@ -724,7 +729,7 @@ func TestRunHandlerHttpsFailureFallback(t *testing.T) {
 					// set the scheme to https to ensure it falls back to HTTP.
 					Scheme: "https",
 					Host:   "127.0.0.1",
-					Port:   intstr.FromString(port),
+					Port:   intstr.FromInt32(int32(portNumber)),
 					Path:   "bar",
 					HTTPHeaders: []v1.HTTPHeader{
 						{
