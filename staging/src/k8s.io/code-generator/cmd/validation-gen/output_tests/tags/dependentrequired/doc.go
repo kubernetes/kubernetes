@@ -35,6 +35,9 @@ type Struct struct {
 
 	// +k8s:optional
 	Dependent *string `json:"dependent"`
+
+	// +k8s:optional
+	OtherField *string `json:"otherField"`
 }
 
 // One trigger, many dependents (repeated tags).

@@ -80,7 +80,9 @@ func (drv dependentRequiredTagValidator) GetValidations(context Context, tag cod
 	}
 	triggerJSONName := triggerJSONTag.Name
 
-	// Restrict to kinds with a natural "is set" test, matching union.
+	// "Is set" has an obvious meaning for these kinds: pointer non-nil,
+	// slice/map non-empty, builtin non-zero. We don't restrict what a
+	// pointer points to — in practice it's a builtin or a struct.
 	for _, m := range []struct {
 		role   string
 		member *types.Member

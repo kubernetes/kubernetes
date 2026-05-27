@@ -28,12 +28,13 @@ import (
 
 func TestDependentRequired(t *testing.T) {
 	type obj struct {
-		Trigger   *string
-		Dependent *string
+		Trigger    *string
+		Dependent  *string
+		OtherField *string
 	}
 
-	triggerSet := func(o *obj) bool { return o != nil && o.Trigger != nil }
-	dependentSet := func(o *obj) bool { return o != nil && o.Dependent != nil }
+	triggerIsSet := func(o *obj) bool { return o != nil && o.Trigger != nil }
+	dependentIsSet := func(o *obj) bool { return o != nil && o.Dependent != nil }
 
 	cases := []struct {
 		name   string
@@ -42,20 +43,29 @@ func TestDependentRequired(t *testing.T) {
 		oldObj *obj
 		err    string // regex; empty means expect no error
 	}{{
-		name: "trigger unset, dependent set",
+		name: "create: trigger unset, dependent set",
+		op:   operation.Operation{Type: operation.Create},
 		obj:  &obj{Dependent: ptr.To("d")},
 	}, {
-		name: "trigger set, dependent set",
+		name: "create: trigger set, dependent set",
+		op:   operation.Operation{Type: operation.Create},
 		obj:  &obj{Trigger: ptr.To("t"), Dependent: ptr.To("d")},
 	}, {
-		name: "trigger set, dependent unset",
+		name: "create: trigger set, dependent unset",
+		op:   operation.Operation{Type: operation.Create},
 		obj:  &obj{Trigger: ptr.To("t")},
 		err:  `fldpath\.dependent: Required value: must be set when trigger is set`,
 	}, {
-		name: "nil obj",
+		name: "create: nil obj",
+		op:   operation.Operation{Type: operation.Create},
 		obj:  nil,
 	}, {
-		name:   "ratchet: pre-existing violation, no relevant change",
+		name:   "ratchet: unrelated field changed, trigger and dependent set-ness unchanged",
+		op:     operation.Operation{Type: operation.Update},
+		obj:    &obj{Trigger: ptr.To("t"), OtherField: ptr.To("new")},
+		oldObj: &obj{Trigger: ptr.To("t"), OtherField: ptr.To("old")},
+	}, {
+		name:   "ratchet: trigger value changed, set-ness unchanged",
 		op:     operation.Operation{Type: operation.Update},
 		obj:    &obj{Trigger: ptr.To("t")},
 		oldObj: &obj{Trigger: ptr.To("old")},
@@ -71,19 +81,14 @@ func TestDependentRequired(t *testing.T) {
 		obj:    &obj{Trigger: ptr.To("t")},
 		oldObj: &obj{Trigger: ptr.To("t"), Dependent: ptr.To("d")},
 		err:    `fldpath\.dependent: Required value: must be set when trigger is set`,
-	}, {
-		name: "create: no ratchet",
-		op:   operation.Operation{Type: operation.Create},
-		obj:  &obj{Trigger: ptr.To("t")},
-		err:  `fldpath\.dependent: Required value: must be set when trigger is set`,
 	}}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			result := DependentRequired(context.Background(), tc.op,
 				field.NewPath("fldpath"), tc.obj, tc.oldObj,
-				"trigger", triggerSet,
-				"dependent", dependentSet)
+				"trigger", triggerIsSet,
+				"dependent", dependentIsSet)
 			if len(result) > 0 && tc.err == "" {
 				t.Fatalf("unexpected failure: %v", fmtErrs(result))
 			}

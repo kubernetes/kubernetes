@@ -24,26 +24,26 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
-// DependentRequired verifies that when triggerSet(obj) is true, dependentSet(obj)
+// DependentRequired verifies that when triggerIsSet(obj) is true, dependentIsSet(obj)
 // is also true; otherwise reports an error at fldPath.Child(dependentName).
 // On Update, the check is skipped if neither side's set-ness changed from oldObj,
 // so unrelated updates can proceed past a pre-existing violation.
 func DependentRequired[T any](_ context.Context, op operation.Operation, fldPath *field.Path, obj, oldObj *T,
-	triggerName string, triggerSet ExtractorFn[*T, bool],
-	dependentName string, dependentSet ExtractorFn[*T, bool],
+	triggerName string, triggerIsSet ExtractorFn[*T, bool],
+	dependentName string, dependentIsSet ExtractorFn[*T, bool],
 ) field.ErrorList {
 	if obj == nil {
 		return nil
 	}
 	if op.Type == operation.Update && oldObj != nil {
-		if triggerSet(obj) == triggerSet(oldObj) && dependentSet(obj) == dependentSet(oldObj) {
+		if triggerIsSet(obj) == triggerIsSet(oldObj) && dependentIsSet(obj) == dependentIsSet(oldObj) {
 			return nil
 		}
 	}
-	if !triggerSet(obj) {
+	if !triggerIsSet(obj) {
 		return nil
 	}
-	if dependentSet(obj) {
+	if dependentIsSet(obj) {
 		return nil
 	}
 	return field.ErrorList{

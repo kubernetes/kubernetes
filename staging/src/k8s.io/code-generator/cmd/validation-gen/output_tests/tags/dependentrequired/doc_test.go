@@ -38,7 +38,12 @@ func TestStruct(t *testing.T) {
 		},
 	)
 
-	// Ratchet: pre-existing violation, no relevant change → skip.
+	// Ratchet: unrelated field changed, trigger and dependent set-ness unchanged → skip.
+	st.Value(&Struct{Trigger: ptr.To("t"), OtherField: ptr.To("new")}).
+		OldValue(&Struct{Trigger: ptr.To("t"), OtherField: ptr.To("old")}).
+		ExpectValid()
+
+	// Ratchet: trigger value changed but set-ness unchanged → skip (same rationale as union).
 	st.Value(&Struct{Trigger: ptr.To("t")}).
 		OldValue(&Struct{Trigger: ptr.To("old")}).
 		ExpectValid()
