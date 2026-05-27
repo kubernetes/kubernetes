@@ -36,6 +36,7 @@ func Filter(w Interface, f FilterFunc) Interface {
 	fw := &filteredWatch{
 		incoming: w,
 		result:   make(chan Event),
+		done:     make(chan struct{}),
 		f:        f,
 	}
 	go fw.loop()
@@ -45,6 +46,8 @@ func Filter(w Interface, f FilterFunc) Interface {
 type filteredWatch struct {
 	incoming Interface
 	result   chan Event
+	done     chan struct{}
+	stopOnce sync.Once
 	f        FilterFunc
 }
 
@@ -53,9 +56,12 @@ func (fw *filteredWatch) ResultChan() <-chan Event {
 	return fw.result
 }
 
-// Stop stops the upstream watch, which will eventually stop this watch.
+// Stop stops the upstream watch and unblocks this watch if it is waiting to send an event.
 func (fw *filteredWatch) Stop() {
-	fw.incoming.Stop()
+	fw.stopOnce.Do(func() {
+		close(fw.done)
+		fw.incoming.Stop()
+	})
 }
 
 // loop waits for new values, filters them, and resends them.
@@ -64,7 +70,11 @@ func (fw *filteredWatch) loop() {
 	for event := range fw.incoming.ResultChan() {
 		filtered, keep := fw.f(event)
 		if keep {
-			fw.result <- filtered
+			select {
+			case fw.result <- filtered:
+			case <-fw.done:
+				return
+			}
 		}
 	}
 }

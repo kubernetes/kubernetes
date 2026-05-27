@@ -18,7 +18,10 @@ package watch_test
 
 import (
 	"reflect"
+	goruntime "runtime"
+	"strings"
 	"testing"
+	"time"
 
 	. "k8s.io/apimachinery/pkg/watch"
 )
@@ -111,4 +114,36 @@ func TestRecorder(t *testing.T) {
 	if !reflect.DeepEqual(recordedEvents, events) {
 		t.Errorf("got %v, expected %v", recordedEvents, events)
 	}
+}
+
+func TestFilterStopUnblocksPendingSend(t *testing.T) {
+	source := NewFake()
+	filterReached := make(chan struct{})
+	filtered := Filter(source, func(e Event) (Event, bool) {
+		close(filterReached)
+		return e, true
+	})
+
+	go source.Add(testType("foo"))
+
+	select {
+	case <-filterReached:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for filter to receive event")
+	}
+
+	filtered.Stop()
+
+	for start := time.Now(); time.Since(start) < 5*time.Second; time.Sleep(10 * time.Millisecond) {
+		if !filteredWatchLoopRunning() {
+			return
+		}
+	}
+	t.Fatal("filtered watch loop is still running after Stop")
+}
+
+func filteredWatchLoopRunning() bool {
+	buf := make([]byte, 1<<20)
+	n := goruntime.Stack(buf, true)
+	return strings.Contains(string(buf[:n]), "k8s.io/apimachinery/pkg/watch.(*filteredWatch).loop")
 }
