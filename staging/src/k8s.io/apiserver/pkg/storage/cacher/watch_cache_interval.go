@@ -245,6 +245,10 @@ func (wcib *watchCacheIntervalBuffer) next() (*watchCacheEvent, bool) {
 		return nil, false
 	}
 	next := wcib.buffer[wcib.startIndex]
+	// clean the unused event reference in the buffer. If this is not
+	// done, event if the watch event is aged out from the watch
+	// cache, it will not be GCed during the lifetime of the watcher
+	// that holds a reference to the buffer.
 	wcib.buffer[wcib.startIndex] = nil
 	wcib.startIndex++
 	return next, true
