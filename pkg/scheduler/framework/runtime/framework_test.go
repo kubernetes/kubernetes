@@ -1381,12 +1381,13 @@ func TestRunPreScorePlugins(t *testing.T) {
 
 func TestRunScorePlugins(t *testing.T) {
 	tests := []struct {
-		name           string
-		registry       Registry
-		plugins        *config.Plugins
-		pluginConfigs  []config.PluginConfig
-		want           []fwk.NodePluginScores
-		skippedPlugins sets.Set[string]
+		name                string
+		registry            Registry
+		plugins             *config.Plugins
+		pluginConfigs       []config.PluginConfig
+		want                []fwk.NodePluginScores
+		skippedPlugins      sets.Set[string]
+		skipAllScorePlugins bool
 		// If err is true, we expect RunScorePlugin to fail.
 		err bool
 	}{
@@ -1744,6 +1745,29 @@ func TestRunScorePlugins(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:                "skip all score plugins",
+			plugins:             buildScoreConfigDefaultWeights(scorePlugin1),
+			skipAllScorePlugins: true,
+			pluginConfigs: []config.PluginConfig{
+				{
+					Name: scorePlugin1,
+					Args: &runtime.Unknown{
+						Raw: []byte(`{ "scoreStatus": 1 }`), // To make sure this plugin isn't called, set error as an injected result.
+					},
+				},
+			},
+			want: []fwk.NodePluginScores{
+				{
+					Name:   "node1",
+					Scores: []fwk.PluginScore{},
+				},
+				{
+					Name:   "node2",
+					Scores: []fwk.PluginScore{},
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -1766,6 +1790,7 @@ func TestRunScorePlugins(t *testing.T) {
 
 			state := framework.NewCycleState()
 			state.SetSkipScorePlugins(tt.skippedPlugins)
+			state.SetSkipAllScorePlugins(tt.skipAllScorePlugins)
 			res, status := f.RunScorePlugins(ctx, state, pod, BuildNodeInfos(nodes))
 
 			if tt.err {

@@ -1346,7 +1346,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state fwk.CycleStat
 	plugins := make([]fwk.ScorePlugin, 0, numPlugins)
 	pluginToNodeScores := make(map[string]fwk.NodeScoreList, numPlugins)
 	for _, pl := range f.scorePlugins {
-		if state.GetSkipScorePlugins().Has(pl.Name()) {
+		if state.ShouldSkipAllScorePlugins() || state.GetSkipScorePlugins().Has(pl.Name()) {
 			continue
 		}
 		plugins = append(plugins, pl)

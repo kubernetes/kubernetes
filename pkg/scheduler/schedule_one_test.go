@@ -4902,3 +4902,222 @@ func TestEvaluateNominatedNode(t *testing.T) {
 		})
 	}
 }
+
+func TestTryScheduling(t *testing.T) {
+	node1 := st.MakeNode().Name("node1").Obj()
+	pod1 := st.MakePod().Name("pod1").Namespace("default").UID("pod1").Obj()
+
+	tests := []struct {
+		name                string
+		pod                 *v1.Pod
+		filterStatus        *fwk.Status
+		postFilterStatus    *fwk.Status
+		postFilterResult    *fwk.PostFilterResult
+		reserveStatus       *fwk.Status
+		isPodGroupCycle     bool
+		wantSuccess         bool
+		wantSuggestedHost   string
+		wantAssumedInCache  bool
+		wantAssumedInSnap   bool
+		wantRequiresPreempt bool
+		wantErrorMessage    string
+	}{
+		{
+			name:               "success: pod fits on node",
+			pod:                pod1,
+			filterStatus:       fwk.NewStatus(fwk.Success),
+			wantSuccess:        true,
+			wantSuggestedHost:  "node1",
+			wantAssumedInCache: true,
+		},
+		{
+			name:             "failure: algorithm finds no nodes",
+			pod:              pod1,
+			filterStatus:     fwk.NewStatus(fwk.Unschedulable, "fake failure"),
+			postFilterStatus: fwk.NewStatus(fwk.Unschedulable),
+			wantSuccess:      false,
+			wantErrorMessage: "fake failure",
+		},
+		{
+			name:                "preemption: algorithm fails but PostFilter nominates node",
+			pod:                 pod1,
+			filterStatus:        fwk.NewStatus(fwk.Unschedulable, "fake failure"),
+			postFilterStatus:    fwk.NewStatus(fwk.Success),
+			postFilterResult:    &fwk.PostFilterResult{NominatingInfo: &fwk.NominatingInfo{NominatedNodeName: "node1", NominatingMode: fwk.ModeOverride}},
+			wantSuccess:         false,
+			wantRequiresPreempt: true,
+			wantSuggestedHost:   "node1",
+			wantAssumedInCache:  true,
+		},
+		{
+			name:               "reserve failure: algorithm succeeds but Reserve plugin fails",
+			pod:                pod1,
+			filterStatus:       fwk.NewStatus(fwk.Success),
+			reserveStatus:      fwk.NewStatus(fwk.Error, "reserve fake failure"),
+			wantSuccess:        false,
+			wantErrorMessage:   "reserve fake failure",
+			wantAssumedInCache: false,
+		},
+		{
+			name:               "pod group cycle: assumed in snapshot only",
+			pod:                pod1,
+			filterStatus:       fwk.NewStatus(fwk.Success),
+			isPodGroupCycle:    true,
+			wantSuccess:        true,
+			wantSuggestedHost:  "node1",
+			wantAssumedInCache: false,
+			wantAssumedInSnap:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			logger, ctx := ktesting.NewTestContext(t)
+			client := clientsetfake.NewClientset(node1, tt.pod)
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+			cache := internalcache.New(ctx, nil, true)
+			cache.AddNode(logger, node1)
+			snapshot := internalcache.NewEmptySnapshot()
+			queue := internalqueue.NewTestQueue(ctx, nil)
+
+			podInfo, _ := framework.NewPodInfo(tt.pod)
+			queuedPodInfo := &framework.QueuedPodInfo{PodInfo: podInfo}
+
+			fakePlugin := &trySchedulingPlugin{
+				fakePodGroupPlugin: &fakePodGroupPlugin{
+					filterStatus:     map[string]*fwk.Status{tt.pod.Name: tt.filterStatus},
+					postFilterStatus: map[string]*fwk.Status{tt.pod.Name: tt.postFilterStatus},
+					postFilterResult: map[string]*fwk.PostFilterResult{tt.pod.Name: tt.postFilterResult},
+				},
+				reserveStatus: tt.reserveStatus,
+			}
+
+			registry := frameworkruntime.Registry{
+				queuesort.Name:     queuesort.New,
+				defaultbinder.Name: defaultbinder.New,
+				"TrySchedulingPlugin": func(ctx context.Context, obj runtime.Object, handle fwk.Handle) (fwk.Plugin, error) {
+					return fakePlugin, nil
+				},
+			}
+			profileCfg := schedulerapi.KubeSchedulerProfile{
+				SchedulerName: "default-scheduler",
+				Plugins: &schedulerapi.Plugins{
+					QueueSort:  schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: queuesort.Name}}},
+					Filter:     schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "TrySchedulingPlugin"}}},
+					PostFilter: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "TrySchedulingPlugin"}}},
+					Reserve:    schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "TrySchedulingPlugin"}}},
+					Bind:       schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: defaultbinder.Name}}},
+				},
+			}
+
+			schedFwk, err := frameworkruntime.NewFramework(ctx, registry, &profileCfg,
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithPodNominator(queue),
+			)
+			if err != nil {
+				t.Fatalf("Failed to create framework: %v", err)
+			}
+
+			sched := &Scheduler{
+				Cache:            cache,
+				nodeInfoSnapshot: snapshot,
+				Profiles:         profile.Map{"default-scheduler": schedFwk},
+				SchedulingQueue:  queue,
+			}
+			sched.SchedulePod = sched.schedulePod
+
+			if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
+				t.Fatalf("Failed to update snapshot: %v", err)
+			}
+
+			state := framework.NewCycleState()
+			if tt.isPodGroupCycle {
+				state.SetPodGroupSchedulingCycle(framework.NewCycleState())
+			}
+
+			tryResult, revertFn := sched.TryScheduling(ctx, state, schedFwk, queuedPodInfo)
+
+			// Verify Success/Failure
+			if tryResult.Status.IsSuccess() != tt.wantSuccess {
+				t.Errorf("tryResult.Status.IsSuccess() = %v, want %v", tryResult.Status.IsSuccess(), tt.wantSuccess)
+			}
+
+			// Verify Error Message
+			if tt.wantErrorMessage != "" && !strings.Contains(tryResult.Status.Message(), tt.wantErrorMessage) {
+				t.Errorf("tryResult.Status.Message() = %q, want it to contain %q", tryResult.Status.Message(), tt.wantErrorMessage)
+			}
+
+			// Verify Suggested Host
+			if tryResult.ScheduleResult.SuggestedHost != tt.wantSuggestedHost {
+				t.Errorf("tryResult.ScheduleResult.SuggestedHost = %q, want %q", tryResult.ScheduleResult.SuggestedHost, tt.wantSuggestedHost)
+			}
+
+			// Verify RequiresPreemption
+			if tryResult.RequiresPreemption != tt.wantRequiresPreempt {
+				t.Errorf("tryResult.RequiresPreemption = %v, want %v", tryResult.RequiresPreemption, tt.wantRequiresPreempt)
+			}
+
+			// Verify Assumption in Cache
+			isAssumed, _ := cache.IsAssumedPod(tt.pod)
+			if isAssumed != tt.wantAssumedInCache {
+				t.Errorf("cache.IsAssumedPod() = %v, want %v", isAssumed, tt.wantAssumedInCache)
+			}
+
+			// Verify Assumption in Snapshot
+			inSnap := false
+			if nodeInfo, err := snapshot.Get("node1"); err == nil {
+				for _, p := range nodeInfo.GetPods() {
+					if p.GetPod().Name == tt.pod.Name {
+						inSnap = true
+						break
+					}
+				}
+			}
+			if inSnap != tt.wantAssumedInSnap {
+				t.Errorf("pod in snapshot = %v, want %v", inSnap, tt.wantAssumedInSnap)
+			}
+
+			// Verify Revert Function
+			if (revertFn != nil) != (tt.wantAssumedInCache || tt.wantAssumedInSnap) {
+				t.Errorf("revertFn is nil = %v, want %v", revertFn == nil, !(tt.wantAssumedInCache || tt.wantAssumedInSnap))
+			}
+
+			if revertFn != nil {
+				revertFn()
+				isAssumed, _ = cache.IsAssumedPod(tt.pod)
+				if isAssumed {
+					t.Errorf("pod still assumed in cache after revert")
+				}
+				inSnap = false
+				if nodeInfo, err := snapshot.Get("node1"); err == nil {
+					for _, p := range nodeInfo.GetPods() {
+						if p.GetPod().Name == tt.pod.Name {
+							inSnap = true
+							break
+						}
+					}
+				}
+				if inSnap {
+					t.Errorf("pod still in snapshot after revert")
+				}
+			}
+		})
+	}
+}
+
+// trySchedulingPlugin is a mock plugin used in TestTryScheduling to control
+// the outcome of various extension points.
+type trySchedulingPlugin struct {
+	*fakePodGroupPlugin
+	reserveStatus *fwk.Status
+}
+
+func (p *trySchedulingPlugin) Reserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) *fwk.Status {
+	if p.reserveStatus != nil {
+		return p.reserveStatus
+	}
+	return fwk.NewStatus(fwk.Success)
+}
+func (p *trySchedulingPlugin) Unreserve(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeName string) {
+}

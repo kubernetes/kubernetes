@@ -38,6 +38,8 @@ type CycleState struct {
 	skipPreBindPlugins sets.Set[string]
 	// skipAllPostFilterPlugins indicates whether to skip all plugins in the PostFilter extension point.
 	skipAllPostFilterPlugins bool
+	// skipAllScorePlugins indicates whether to skip all plugins in the Score extension point.
+	skipAllScorePlugins bool
 	// GetParallelPreBindPlugins returns plugins that can be run in parallel with other plugins
 	// in the PreBind extension point.
 	parallelPreBindPlugins sets.Set[string]
@@ -83,6 +85,16 @@ func (c *CycleState) SetSkipScorePlugins(plugins sets.Set[string]) {
 
 func (c *CycleState) GetSkipScorePlugins() sets.Set[string] {
 	return c.skipScorePlugins
+}
+
+// SetSkipAllScorePlugins sets whether to skip all plugins in the Score extension point.
+func (c *CycleState) SetSkipAllScorePlugins(flag bool) {
+	c.skipAllScorePlugins = flag
+}
+
+// ShouldSkipAllScorePlugins returns whether to skip all plugins in the Score extension point.
+func (c *CycleState) ShouldSkipAllScorePlugins() bool {
+	return c.skipAllScorePlugins
 }
 
 func (c *CycleState) SetSkipPreBindPlugins(plugins sets.Set[string]) {
@@ -141,6 +153,7 @@ func (c *CycleState) Clone() fwk.CycleState {
 	copy.parallelPreBindPlugins = c.parallelPreBindPlugins
 	copy.podGroupCycleState = c.podGroupCycleState
 	copy.skipAllPostFilterPlugins = c.skipAllPostFilterPlugins
+	copy.skipAllScorePlugins = c.skipAllScorePlugins
 
 	return copy
 }
