@@ -136,6 +136,7 @@ var (
 	PreemptionVictims            *metrics.Histogram
 	PreemptionAttempts           *metrics.Counter
 	pendingPods                  *metrics.GaugeVec
+	gatedPods                    *metrics.GaugeVec
 	InFlightEvents               *metrics.GaugeVec
 	Goroutines                   *metrics.GaugeVec
 	BatchAttemptStats            *metrics.CounterVec
@@ -279,6 +280,13 @@ func InitMetrics() {
 			Help:           "Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulablePods that the scheduler attempted to schedule and failed; 'gated' is the number of unschedulable pods that the scheduler never attempted to schedule because they are gated.",
 			StabilityLevel: metrics.STABLE,
 		}, []string{"queue"})
+	gatedPods = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "gated_pods",
+			Help:           "Number of pods in the gated queue broken down by scheduling gate name from spec.schedulingGates. A pod declaring multiple scheduling gates is counted once per gate, so the sum across gates is greater than or equal to scheduler_pending_pods{queue=\"gated\"}. Pods gated by plugins that do not correspond to a spec.schedulingGates entry are not included.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"gate"})
 	InFlightEvents = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      SchedulerSubsystem,
@@ -537,6 +545,7 @@ func InitMetrics() {
 		PreemptionVictims,
 		PreemptionAttempts,
 		pendingPods,
+		gatedPods,
 		PodSchedulingSLIDuration,
 		PodSchedulingAttempts,
 		PodScheduledAfterFlush,
@@ -588,6 +597,17 @@ func UnschedulablePods() metrics.GaugeMetric {
 // GatedPods returns the pending pods metrics with the label gated
 func GatedPods() metrics.GaugeMetric {
 	return pendingPods.With(metrics.Labels{"queue": "gated"})
+}
+
+// GatedPodsByGate returns the gated_pods metric scoped to the given
+// scheduling gate name.
+func GatedPodsByGate(gate string) metrics.GaugeMetric {
+	return gatedPods.With(metrics.Labels{"gate": gate})
+}
+
+// ResetGatedPodsByGate clears all series of the gated_pods metric.
+func ResetGatedPodsByGate() {
+	gatedPods.Reset()
 }
 
 // SinceInSeconds gets the time since the specified start in seconds.

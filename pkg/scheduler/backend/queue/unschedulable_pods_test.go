@@ -17,6 +17,7 @@ limitations under the License.
 package queue
 
 import (
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -50,6 +51,47 @@ func (m *mockMetricRecorder) Clear() {
 
 func (m *mockMetricRecorder) value() int64 {
 	return m.val.Load()
+}
+
+var _ metrics.GatedPodsByGateRecorder = &mockGatedPodsByGateRecorder{}
+
+type mockGatedPodsByGateRecorder struct {
+	mu     sync.Mutex
+	counts map[string]int64
+}
+
+func newMockGatedPodsByGateRecorder() *mockGatedPodsByGateRecorder {
+	return &mockGatedPodsByGateRecorder{counts: map[string]int64{}}
+}
+
+func (m *mockGatedPodsByGateRecorder) Inc(gate string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.counts[gate]++
+}
+
+func (m *mockGatedPodsByGateRecorder) Dec(gate string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.counts[gate]--
+}
+
+func (m *mockGatedPodsByGateRecorder) Clear() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.counts = map[string]int64{}
+}
+
+func (m *mockGatedPodsByGateRecorder) snapshot() map[string]int64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	out := make(map[string]int64, len(m.counts))
+	for k, v := range m.counts {
+		if v != 0 {
+			out[k] = v
+		}
+	}
+	return out
 }
 
 func TestUnschedulablePods(t *testing.T) {
@@ -370,7 +412,8 @@ func TestUnschedulablePods(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			unschedulableRecorder := &mockMetricRecorder{}
 			gatedRecorder := &mockMetricRecorder{}
-			upm := newUnschedulablePods(unschedulableRecorder, gatedRecorder)
+			gatedByGateRecorder := newMockGatedPodsByGateRecorder()
+			upm := newUnschedulablePods(unschedulableRecorder, gatedRecorder, gatedByGateRecorder)
 			assertMetrics := func(expectedPods []*framework.QueuedPodInfo, action string) {
 				t.Helper()
 
@@ -410,4 +453,125 @@ func TestUnschedulablePods(t *testing.T) {
 			assertMetrics([]*framework.QueuedPodInfo{}, string(clear))
 		})
 	}
+}
+
+func TestUnschedulablePods_GatedByGateRecorder(t *testing.T) {
+	const (
+		gateFoo = "example.com/foo"
+		gateBar = "example.com/bar"
+		gateBaz = "example.com/baz"
+	)
+
+	makeGatedPodInfo := func(name string, gates ...string) *framework.QueuedPodInfo {
+		pod := st.MakePod().Name(name).Namespace("ns").SchedulingGates(gates).Obj()
+		info := &framework.QueuedPodInfo{
+			PodInfo:              mustNewTestPodInfo(t, pod),
+			GatingPlugin:         "test",
+			UnschedulablePlugins: sets.New[string]("test"),
+		}
+		return info
+	}
+
+	ungated := func(info *framework.QueuedPodInfo) *framework.QueuedPodInfo {
+		clone := *info
+		clone.GatingPlugin = ""
+		clone.UnschedulablePlugins = sets.New[string]()
+		clone.PodInfo = mustNewTestPodInfo(t, info.Pod.DeepCopy())
+		clone.Pod.Spec.SchedulingGates = nil
+		return &clone
+	}
+
+	dropGate := func(info *framework.QueuedPodInfo, gate string) *framework.QueuedPodInfo {
+		pod := info.Pod.DeepCopy()
+		filtered := pod.Spec.SchedulingGates[:0]
+		for _, g := range pod.Spec.SchedulingGates {
+			if g.Name != gate {
+				filtered = append(filtered, g)
+			}
+		}
+		pod.Spec.SchedulingGates = filtered
+		clone := *info
+		clone.PodInfo = mustNewTestPodInfo(t, pod)
+		return &clone
+	}
+
+	assertCounts := func(t *testing.T, rec *mockGatedPodsByGateRecorder, want map[string]int64, msg string) {
+		t.Helper()
+		if diff := cmp.Diff(want, rec.snapshot()); diff != "" {
+			t.Errorf("Unexpected gatedByGateRecorder counts after %s (-want, +got):\n%s", msg, diff)
+		}
+	}
+
+	t.Run("adds and decrements per-gate counters across gated pods", func(t *testing.T) {
+		rec := newMockGatedPodsByGateRecorder()
+		upm := newUnschedulablePods(&mockMetricRecorder{}, &mockMetricRecorder{}, rec)
+
+		p1 := makeGatedPodInfo("p1", gateFoo, gateBar)
+		p2 := makeGatedPodInfo("p2", gateFoo)
+
+		upm.addOrUpdate(p1, false, framework.EventUnscheduledPodAdd.Label())
+		assertCounts(t, rec, map[string]int64{gateFoo: 1, gateBar: 1}, "adding p1")
+
+		upm.addOrUpdate(p2, false, framework.EventUnscheduledPodAdd.Label())
+		assertCounts(t, rec, map[string]int64{gateFoo: 2, gateBar: 1}, "adding p2")
+
+		upm.delete(p1.Pod, true)
+		assertCounts(t, rec, map[string]int64{gateFoo: 1}, "deleting p1")
+
+		upm.delete(p2.Pod, true)
+		assertCounts(t, rec, map[string]int64{}, "deleting p2")
+	})
+
+	t.Run("reconciles when a gate is removed while pod stays gated", func(t *testing.T) {
+		rec := newMockGatedPodsByGateRecorder()
+		upm := newUnschedulablePods(&mockMetricRecorder{}, &mockMetricRecorder{}, rec)
+
+		p := makeGatedPodInfo("p", gateFoo, gateBar)
+		upm.addOrUpdate(p, false, framework.EventUnscheduledPodAdd.Label())
+		assertCounts(t, rec, map[string]int64{gateFoo: 1, gateBar: 1}, "initial add")
+
+		updated := dropGate(p, gateBar)
+		upm.addOrUpdate(updated, true, framework.EventUnscheduledPodUpdate.Label())
+		assertCounts(t, rec, map[string]int64{gateFoo: 1}, "dropping gateBar")
+	})
+
+	t.Run("releases per-gate counters when pod transitions to ungated", func(t *testing.T) {
+		rec := newMockGatedPodsByGateRecorder()
+		upm := newUnschedulablePods(&mockMetricRecorder{}, &mockMetricRecorder{}, rec)
+
+		p := makeGatedPodInfo("p", gateFoo, gateBaz)
+		upm.addOrUpdate(p, false, framework.EventUnscheduledPodAdd.Label())
+		assertCounts(t, rec, map[string]int64{gateFoo: 1, gateBaz: 1}, "initial add")
+
+		upm.addOrUpdate(ungated(p), true, framework.EventUnscheduledPodUpdate.Label())
+		assertCounts(t, rec, map[string]int64{}, "transition to ungated")
+	})
+
+	t.Run("ignores pods that are gated without spec.schedulingGates", func(t *testing.T) {
+		rec := newMockGatedPodsByGateRecorder()
+		upm := newUnschedulablePods(&mockMetricRecorder{}, &mockMetricRecorder{}, rec)
+
+		// Pod is Gated() because a plugin set GatingPlugin, but has no spec gates.
+		p := makeGatedPodInfo("p")
+		upm.addOrUpdate(p, false, framework.EventUnscheduledPodAdd.Label())
+		assertCounts(t, rec, map[string]int64{}, "plugin-only gating")
+
+		upm.delete(p.Pod, true)
+		assertCounts(t, rec, map[string]int64{}, "delete plugin-only gated pod")
+	})
+
+	t.Run("clear() resets the recorder", func(t *testing.T) {
+		rec := newMockGatedPodsByGateRecorder()
+		upm := newUnschedulablePods(&mockMetricRecorder{}, &mockMetricRecorder{}, rec)
+
+		upm.addOrUpdate(makeGatedPodInfo("p1", gateFoo), false, framework.EventUnscheduledPodAdd.Label())
+		upm.addOrUpdate(makeGatedPodInfo("p2", gateBar), false, framework.EventUnscheduledPodAdd.Label())
+		assertCounts(t, rec, map[string]int64{gateFoo: 1, gateBar: 1}, "two gated pods")
+
+		upm.clear()
+		assertCounts(t, rec, map[string]int64{}, "clear")
+		if len(upm.countedGates) != 0 {
+			t.Errorf("expected countedGates to be empty after clear, got %d entries", len(upm.countedGates))
+		}
+	})
 }

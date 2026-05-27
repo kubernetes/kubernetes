@@ -80,6 +80,37 @@ func (r *PendingPodsRecorder) Clear() {
 	r.recorder.Set(float64(0))
 }
 
+// GatedPodsByGateRecorder records the per-gate count of pods sitting in the
+// gated queue. Unlike MetricRecorder it is parameterised by a gate name so
+// that one gauge series is emitted per scheduling gate.
+type GatedPodsByGateRecorder interface {
+	Inc(gate string)
+	Dec(gate string)
+	Clear()
+}
+
+var _ GatedPodsByGateRecorder = &gatedPodsByGateRecorder{}
+
+type gatedPodsByGateRecorder struct{}
+
+// NewGatedPodsByGateRecorder returns a recorder that updates the scheduler
+// gated_pods gauge.
+func NewGatedPodsByGateRecorder() GatedPodsByGateRecorder {
+	return &gatedPodsByGateRecorder{}
+}
+
+func (r *gatedPodsByGateRecorder) Inc(gate string) {
+	GatedPodsByGate(gate).Inc()
+}
+
+func (r *gatedPodsByGateRecorder) Dec(gate string) {
+	GatedPodsByGate(gate).Dec()
+}
+
+func (r *gatedPodsByGateRecorder) Clear() {
+	ResetGatedPodsByGate()
+}
+
 // histogramVecMetric is the data structure passed in the buffer channel between the main framework thread
 // and the metricsRecorder goroutine.
 type histogramVecMetric struct {
