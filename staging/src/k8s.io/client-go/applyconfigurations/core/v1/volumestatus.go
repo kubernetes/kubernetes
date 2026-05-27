@@ -26,6 +26,9 @@ package v1
 type VolumeStatusApplyConfiguration struct {
 	// image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.
 	Image *ImageVolumeStatusApplyConfiguration `json:"image,omitempty"`
+	// emptyDir represents the status of an emptyDir volume.
+	// This is only populated for memory-backed emptyDir volumes.
+	EmptyDir *EmptyDirVolumeStatusApplyConfiguration `json:"emptyDir,omitempty"`
 }
 
 // VolumeStatusApplyConfiguration constructs a declarative configuration of the VolumeStatus type for use with
@@ -39,5 +42,13 @@ func VolumeStatus() *VolumeStatusApplyConfiguration {
 // If called multiple times, the Image field is set to the value of the last call.
 func (b *VolumeStatusApplyConfiguration) WithImage(value *ImageVolumeStatusApplyConfiguration) *VolumeStatusApplyConfiguration {
 	b.Image = value
+	return b
+}
+
+// WithEmptyDir sets the EmptyDir field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the EmptyDir field is set to the value of the last call.
+func (b *VolumeStatusApplyConfiguration) WithEmptyDir(value *EmptyDirVolumeStatusApplyConfiguration) *VolumeStatusApplyConfiguration {
+	b.EmptyDir = value
 	return b
 }

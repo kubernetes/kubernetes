@@ -572,6 +572,15 @@ func (EmptyDirVolumeSource) SwaggerDoc() map[string]string {
 	return map_EmptyDirVolumeSource
 }
 
+var map_EmptyDirVolumeStatus = map[string]string{
+	"":          "EmptyDirVolumeStatus represents the status of an emptyDir volume.",
+	"sizeLimit": "sizeLimit represents the actual mounted capacity of the emptyDir volume. This is only populated for memory-backed emptyDir volumes.",
+}
+
+func (EmptyDirVolumeStatus) SwaggerDoc() map[string]string {
+	return map_EmptyDirVolumeStatus
+}
+
 var map_EndpointAddress = map[string]string{
 	"":          "EndpointAddress is a tuple that describes single IP address. Deprecated: This API is deprecated in v1.33+.",
 	"ip":        "The IP of this endpoint. May not be loopback (127.0.0.0/8 or ::1), link-local (169.254.0.0/16 or fe80::/10), or link-local multicast (224.0.0.0/24 or ff02::/16).",
@@ -2882,8 +2891,9 @@ func (VolumeSource) SwaggerDoc() map[string]string {
 }
 
 var map_VolumeStatus = map[string]string{
-	"":      "VolumeStatus represents the status of a mounted volume. At most one of its members must be specified.",
-	"image": "image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.",
+	"":         "VolumeStatus represents the status of a mounted volume. At most one of its members must be specified.",
+	"image":    "image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine.",
+	"emptyDir": "emptyDir represents the status of an emptyDir volume. This is only populated for memory-backed emptyDir volumes.",
 }
 
 func (VolumeStatus) SwaggerDoc() map[string]string {

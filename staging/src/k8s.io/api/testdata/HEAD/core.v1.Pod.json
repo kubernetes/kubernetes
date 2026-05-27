@@ -1894,6 +1894,9 @@
             "volumeStatus": {
               "image": {
                 "imageRef": "imageRefValue"
+              },
+              "emptyDir": {
+                "sizeLimit": "0"
               }
             }
           }
@@ -1993,6 +1996,9 @@
             "volumeStatus": {
               "image": {
                 "imageRef": "imageRefValue"
+              },
+              "emptyDir": {
+                "sizeLimit": "0"
               }
             }
           }
@@ -2093,6 +2099,9 @@
             "volumeStatus": {
               "image": {
                 "imageRef": "imageRefValue"
+              },
+              "emptyDir": {
+                "sizeLimit": "0"
               }
             }
           }

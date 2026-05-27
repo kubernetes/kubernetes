@@ -1262,6 +1262,15 @@ message EmptyDirVolumeSource {
   optional .k8s.io.apimachinery.pkg.api.resource.Quantity sizeLimit = 2;
 }
 
+// EmptyDirVolumeStatus represents the status of an emptyDir volume.
+message EmptyDirVolumeStatus {
+  // sizeLimit represents the actual mounted capacity of the emptyDir volume.
+  // This is only populated for memory-backed emptyDir volumes.
+  // +featureGate=InPlacePodVerticalScalingMemoryBackedVolumes
+  // +optional
+  optional .k8s.io.apimachinery.pkg.api.resource.Quantity sizeLimit = 1;
+}
+
 // EndpointAddress is a tuple that describes single IP address.
 // Deprecated: This API is deprecated in v1.33+.
 // +structType=atomic
@@ -7275,6 +7284,12 @@ message VolumeStatus {
   // +featureGate=ImageVolumeWithDigest
   // +optional
   optional ImageVolumeStatus image = 1;
+
+  // emptyDir represents the status of an emptyDir volume.
+  // This is only populated for memory-backed emptyDir volumes.
+  // +featureGate=InPlacePodVerticalScalingMemoryBackedVolumes
+  // +optional
+  optional EmptyDirVolumeStatus emptyDir = 3;
 }
 
 // Represents a vSphere volume resource.
