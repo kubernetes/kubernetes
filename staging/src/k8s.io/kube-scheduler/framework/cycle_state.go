@@ -121,9 +121,6 @@ type PlacementCycleState interface {
 	// should be recorded.
 	// This function is mostly for the scheduling framework runtime, plugins usually don't have to use it.
 	ShouldRecordPluginMetrics() bool
-	// GetPodGroupSchedulingCycle gets the cycle state of the PodGroup for this Placement.
-	// This should be only used when GenericWorkload feature flag is enabled.
-	GetPodGroupSchedulingCycle() PodGroupCycleState
 	// Read retrieves data with the given "key" from PlacementCycleState. If the key is not
 	// present, ErrNotFound is returned.
 	//
@@ -137,6 +134,9 @@ type PlacementCycleState interface {
 	//
 	// See PlacementCycleState for notes on concurrency.
 	Delete(key StateKey)
+	// GetPodGroupSchedulingCycle gets the cycle state of the PodGroup for this Placement.
+	// This should be only used when GenericWorkload feature flag is enabled.
+	GetPodGroupSchedulingCycle() PodGroupCycleState
 }
 
 // PodGroupCycleState provides a mechanism for plugins that operate on pod groups to store and retrieve arbitrary data.
