@@ -184,13 +184,53 @@ func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
 	// Tri-state: key absent = unvisited, value nil = in-progress (cycle), value *bool = computed result.
 	hasValidation := make(map[*types.Type]*bool)
 
-	var hasTransitiveValidation func(t *types.Type, tags []codetags.Tag) (bool, bool)
+	var hasTransitiveValidation func(t *types.Type, tags []codetags.Tag) (bool, bool, error)
 
-	// hasTransitiveValidation returns (hasVal, cycleBroken).
+	hasValidationAfterOpacity := func(t *types.Type, scope validators.Scope, tags []codetags.Tag) (bool, error) {
+		if len(tags) == 0 {
+			return true, nil
+		}
+
+		var valTags []codetags.Tag
+		for _, tag := range tags {
+			if _, err := validators.GetStability(tag.Name); err == nil {
+				valTags = append(valTags, tag)
+			}
+		}
+
+		vals, err := extractor.ExtractValidations(validators.Context{Scope: scope, Type: t}, valTags...)
+		if err != nil {
+			return false, err
+		}
+
+		nativeT := util.NativeType(t)
+		if vals.OpaqueType {
+			return false, nil
+		}
+		if nativeT.Kind == types.Map {
+			kVal, _, err := hasTransitiveValidation(nativeT.Key, nil)
+			if err != nil {
+				return false, err
+			}
+			eVal, _, err := hasTransitiveValidation(nativeT.Elem, nil)
+			if err != nil {
+				return false, err
+			}
+			hasKeyVal := kVal && !vals.OpaqueKeyType
+			hasElemVal := eVal && !vals.OpaqueValType
+			return hasKeyVal || hasElemVal, nil
+		}
+		if nativeT.Kind == types.Slice || nativeT.Kind == types.Array {
+			return !vals.OpaqueValType, nil
+		}
+		return true, nil
+	}
+
+	// hasTransitiveValidation returns (hasVal, cycleBroken, err).
 	// If cycleBroken is true, we cannot cache a negative result.
-	hasTransitiveValidation = func(t *types.Type, tags []codetags.Tag) (bool, bool) {
+	hasTransitiveValidation = func(t *types.Type, tags []codetags.Tag) (bool, bool, error) {
 		if hasNonOpaqueValidationTag(tags) {
-			return true, false
+			return true, false, nil
 		}
 
 		var hasVal, cycleBroken bool
@@ -203,27 +243,50 @@ func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
 			}
 		} else {
 			hasValidation[t] = nil // Mark in-progress
-			tTags, _ := extractor.ExtractTags(validators.Context{}, t.CommentLines)
+			tTags, err := extractor.ExtractTags(validators.Context{Scope: validators.ScopeType, Type: t}, t.CommentLines)
+			if err != nil {
+				return false, false, err
+			}
 			hasVal = hasNonOpaqueValidationTag(tTags)
 
 			if !hasVal {
 				switch t.Kind {
 				case types.Alias:
-					hasVal, cycleBroken = hasTransitiveValidation(t.Underlying, nil)
+					var err error
+					hasVal, cycleBroken, err = hasTransitiveValidation(t.Underlying, nil)
+					if err != nil {
+						return false, false, err
+					}
 				case types.Slice, types.Array, types.Pointer:
-					hasVal, cycleBroken = hasTransitiveValidation(t.Elem, nil)
+					var err error
+					hasVal, cycleBroken, err = hasTransitiveValidation(t.Elem, nil)
+					if err != nil {
+						return false, false, err
+					}
 				case types.Map:
-					hvKey, cbKey := hasTransitiveValidation(t.Key, nil)
+					hvKey, cbKey, err := hasTransitiveValidation(t.Key, nil)
+					if err != nil {
+						return false, false, err
+					}
 					if hvKey {
 						hasVal, cycleBroken = true, cbKey
 					} else {
-						hvElem, cbElem := hasTransitiveValidation(t.Elem, nil)
+						hvElem, cbElem, err := hasTransitiveValidation(t.Elem, nil)
+						if err != nil {
+							return false, false, err
+						}
 						hasVal, cycleBroken = hvElem, cbKey || cbElem
 					}
 				case types.Struct:
 					for _, m := range t.Members {
-						mTags, _ := extractor.ExtractTags(validators.Context{}, m.CommentLines)
-						hv, cb := hasTransitiveValidation(m.Type, mTags)
+						mTags, err := extractor.ExtractTags(validators.Context{Scope: validators.ScopeField, Type: m.Type}, m.CommentLines)
+						if err != nil {
+							return false, false, err
+						}
+						hv, cb, err := hasTransitiveValidation(m.Type, mTags)
+						if err != nil {
+							return false, false, err
+						}
 						if hv {
 							hasVal = true
 						}
@@ -237,6 +300,15 @@ func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
 				}
 			}
 
+			// Type-level opacity overrides structural validation.
+			if hasVal {
+				var err error
+				hasVal, err = hasValidationAfterOpacity(t, validators.ScopeType, tTags)
+				if err != nil {
+					return false, false, err
+				}
+			}
+
 			if hasVal || !cycleBroken {
 				hasValidation[t] = &hasVal
 			} else {
@@ -246,30 +318,15 @@ func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
 		}
 
 		// Field-level opacity overrides structural validation.
-		if hasVal && len(tags) > 0 {
-			var valTags []codetags.Tag
-			for _, tag := range tags {
-				if _, err := validators.GetStability(tag.Name); err == nil {
-					valTags = append(valTags, tag)
-				}
-			}
-
-			if vals, err := extractor.ExtractValidations(validators.Context{Scope: validators.ScopeField, Type: t}, valTags...); err == nil {
-				if vals.OpaqueType {
-					hasVal = false
-				} else if t.Kind == types.Map {
-					kVal, _ := hasTransitiveValidation(t.Key, nil)
-					eVal, _ := hasTransitiveValidation(t.Elem, nil)
-					hasKeyVal := kVal && !vals.OpaqueKeyType
-					hasElemVal := eVal && !vals.OpaqueValType
-					hasVal = hasKeyVal || hasElemVal
-				} else if t.Kind == types.Slice || t.Kind == types.Array {
-					hasVal = !vals.OpaqueValType
-				}
+		if hasVal {
+			var err error
+			hasVal, err = hasValidationAfterOpacity(t, validators.ScopeField, tags)
+			if err != nil {
+				return false, false, err
 			}
 		}
 
-		return hasVal, cycleBroken
+		return hasVal, cycleBroken, nil
 	}
 
 	return func(container *types.Type, t *types.Type, tags []codetags.Tag) (string, error) {
@@ -290,7 +347,10 @@ func requiredAndOptional(extractor validators.ValidationExtractor) lintRule {
 
 		// Check if it has validation (direct or active transitive)
 		hasDirectVal := hasNonOpaqueValidationTag(tags)
-		hasTransitiveVal, _ := hasTransitiveValidation(t, tags)
+		hasTransitiveVal, _, err := hasTransitiveValidation(t, tags)
+		if err != nil {
+			return fmt.Sprintf("invalid validation tags: %v", err), nil
+		}
 
 		if hasDirectVal || hasTransitiveVal {
 			return "field with validation must have +k8s:optional, +k8s:required or +k8s:forbidden", nil

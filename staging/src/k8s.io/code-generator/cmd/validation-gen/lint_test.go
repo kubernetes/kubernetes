@@ -639,7 +639,9 @@ func TestLintRequiredness(t *testing.T) {
 		{
 			name: "array field with transitive validation, no requiredNess - error",
 			typeToLint: testStruct("T", []types.Member{
-				testField("Arr", testArray(testStruct("Inner", nil, "+k8s:enum"))),
+				testField("Arr", testArray(testStruct("Inner", []types.Member{
+					testField("Bar", testType("int"), "+k8s:minimum=0"),
+				}))),
 			}),
 			wantError: "field Arr: field with validation must have +k8s:optional, +k8s:required or +k8s:forbidden",
 		},
@@ -695,7 +697,9 @@ func TestLintRequiredness(t *testing.T) {
 			name: "array field with transitive validation marked opaqueValType - no error",
 			typeToLint: testStruct("T", []types.Member{
 				testField("Foo", testArray(
-					testStruct("Inner", nil, "+k8s:enum"),
+					testStruct("Inner", []types.Member{
+						testField("Bar", testType("int"), "+k8s:minimum=0"),
+					}),
 				), "+k8s:eachVal=+k8s:opaqueType"),
 			}),
 			wantError: "",
@@ -704,8 +708,8 @@ func TestLintRequiredness(t *testing.T) {
 			name: "map field with transitive validation on key, marked opaqueKeyType - no error",
 			typeToLint: testStruct("T", []types.Member{
 				testField("Foo", testMap(
-					testAlias("KeyType", testType("string"), "+k8s:minimum=0"),
-					testType("string"),
+					testAlias("KeyType", types.String, "+k8s:minLength=1"),
+					types.String,
 				), "+k8s:eachKey=+k8s:opaqueType"),
 			}),
 			wantError: "",
@@ -714,8 +718,8 @@ func TestLintRequiredness(t *testing.T) {
 			name: "map field with transitive validation on key, not marked opaqueKeyType - error",
 			typeToLint: testStruct("T", []types.Member{
 				testField("Foo", testMap(
-					testAlias("KeyType", testType("string"), "+k8s:minimum=0"),
-					testType("string"),
+					testAlias("KeyType", types.String, "+k8s:minLength=1"),
+					types.String,
 				)),
 			}),
 			wantError: "field Foo: field with validation must have +k8s:optional, +k8s:required or +k8s:forbidden",
@@ -724,7 +728,7 @@ func TestLintRequiredness(t *testing.T) {
 			name: "map field with transitive validation on value, marked opaqueValType - no error",
 			typeToLint: testStruct("T", []types.Member{
 				testField("Foo", testMap(
-					testType("string"),
+					types.String,
 					testStruct("Inner", []types.Member{
 						testField("Bar", testType("int"), "+k8s:minimum=0"),
 					}),
@@ -736,7 +740,7 @@ func TestLintRequiredness(t *testing.T) {
 			name: "map field with transitive validation on both, both marked opaque - no error",
 			typeToLint: testStruct("T", []types.Member{
 				testField("Foo", testMap(
-					testAlias("KeyType", testType("string"), "+k8s:minimum=0"),
+					testAlias("KeyType", types.String, "+k8s:minLength=1"),
 					testStruct("Inner", []types.Member{
 						testField("Bar", testType("int"), "+k8s:minimum=0"),
 					}),
@@ -748,7 +752,7 @@ func TestLintRequiredness(t *testing.T) {
 			name: "map field with transitive validation on both, only key marked opaque - error",
 			typeToLint: testStruct("T", []types.Member{
 				testField("Foo", testMap(
-					testAlias("KeyType", testType("string"), "+k8s:minimum=0"),
+					testAlias("KeyType", types.String, "+k8s:minLength=1"),
 					testStruct("Inner", []types.Member{
 						testField("Bar", testType("int"), "+k8s:minimum=0"),
 					}),
@@ -760,7 +764,7 @@ func TestLintRequiredness(t *testing.T) {
 			name: "map field with transitive validation on both, only value marked opaque - error",
 			typeToLint: testStruct("T", []types.Member{
 				testField("Foo", testMap(
-					testAlias("KeyType", testType("string"), "+k8s:minimum=0"),
+					testAlias("KeyType", types.String, "+k8s:minLength=1"),
 					testStruct("Inner", []types.Member{
 						testField("Bar", testType("int"), "+k8s:minimum=0"),
 					}),
@@ -782,6 +786,100 @@ func TestLintRequiredness(t *testing.T) {
 				)),
 			}),
 			wantError: "",
+		},
+		{
+			name: "alias field (to slice) with transitive validation but no opacity tags on type - error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testAlias("MyAlias",
+					testSlice(
+						testStruct("Inner", []types.Member{
+							testField("Bar", testType("int"), "+k8s:minimum=0"),
+						}),
+					),
+				)),
+			}),
+			wantError: "field Foo: field with validation must have +k8s:optional, +k8s:required or +k8s:forbidden",
+		},
+		{
+			name: "alias field (to slice) with transitive validation and eachVal marked opaque on the field - no error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testAlias("MyAlias",
+					testSlice(
+						testStruct("Inner", []types.Member{
+							testField("Bar", testType("int"), "+k8s:minimum=0"),
+						}),
+					),
+				), "+k8s:eachVal=+k8s:opaqueType"),
+			}),
+			wantError: "",
+		},
+		{
+			name: "alias field (to slice) with transitive validation and eachVal marked opaque on the type definition - no error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testAlias("MyAlias",
+					testSlice(
+						testStruct("Inner", []types.Member{
+							testField("Bar", testType("int"), "+k8s:minimum=0"),
+						}),
+					),
+					"+k8s:eachVal=+k8s:opaqueType",
+				)),
+			}),
+			wantError: "",
+		},
+		{
+			name: "pointer to alias field (to slice) with transitive validation, eachVal marked opaque on type definition - no error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testPtr(
+					testAlias("MyAlias",
+						testSlice(
+							testStruct("Inner", []types.Member{
+								testField("Bar", testType("int"), "+k8s:minimum=0"),
+							}),
+						),
+						"+k8s:eachVal=+k8s:opaqueType",
+					),
+				)),
+			}),
+			wantError: "",
+		},
+		{
+			name: "alias field (to map) with transitive validation, eachVal marked opaque on type definition - no error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testAlias("MyAlias",
+					testMap(
+						types.String,
+						testStruct("Inner", []types.Member{
+							testField("Bar", testType("int"), "+k8s:minimum=0"),
+						}),
+					),
+					"+k8s:eachVal=+k8s:opaqueType",
+				)),
+			}),
+			wantError: "",
+		},
+		{
+			name: "pointer to alias field (to struct) with transitive validation, opaqueType marked on type definition - no error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testPtr(
+					testAlias("MyAlias",
+						testStruct("Inner", []types.Member{
+							testField("Bar", testType("int"), "+k8s:minimum=0"),
+						}),
+						"+k8s:opaqueType",
+					),
+				)),
+			}),
+			wantError: "",
+		},
+		{
+			name: "pointer field with transitive malformed tag on alias type definition - reports error as lint warning instead of crashing",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testPtr(
+					testAlias("MyString", testType("string"), "+k8s:minimum=0"),
+				)),
+			}),
+			wantError: "field Foo: invalid validation tags: tag \"k8s:minimum\": can only be used on integer types (pkg.MyString -> string)",
 		},
 	}
 
