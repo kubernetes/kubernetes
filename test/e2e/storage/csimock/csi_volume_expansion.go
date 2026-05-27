@@ -709,7 +709,7 @@ var _ = utils.SIGDescribe("CSI Mock volume expansion", func() {
 			originalSize := resource.MustParse("1Gi")
 			gomega.Eventually(func(g gomega.Gomega) {
 				reboundPVC, err = m.cs.CoreV1().PersistentVolumeClaims(reboundPVC.Namespace).Get(ctx, reboundPVC.Name, metav1.GetOptions{})
-				g.Expect(err).NotTo(gomega.HaveOccurred())
+				framework.ExpectNoError(err, "error fetching pvc")
 				pvcStatusCap := reboundPVC.Status.Capacity[v1.ResourceStorage]
 				g.Expect(pvcStatusCap.Cmp(originalSize)).To(gomega.Equal(0),
 					fmt.Sprintf("expected PVC status.capacity to be %s (from pre-resize annotation), got %s", originalSize.String(), pvcStatusCap.String()))
