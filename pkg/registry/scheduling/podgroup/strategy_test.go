@@ -69,7 +69,7 @@ func podGroupWithSchedulingConstraints(keys ...string) *scheduling.PodGroup {
 }
 
 func podGroupWithDisruptionModeSingle() *scheduling.PodGroup {
-	pg := podGroup.DeepCopy()
+	pg := podGroupWithDefaultPreemptionPolicy(podGroup)
 	pg.Spec.DisruptionMode = &scheduling.DisruptionMode{
 		Single: &scheduling.SingleDisruptionMode{},
 	}
@@ -77,7 +77,7 @@ func podGroupWithDisruptionModeSingle() *scheduling.PodGroup {
 }
 
 func podGroupWithDisruptionModeAll() *scheduling.PodGroup {
-	pg := podGroup.DeepCopy()
+	pg := podGroupWithDefaultPreemptionPolicy(podGroup)
 	pg.Spec.DisruptionMode = &scheduling.DisruptionMode{
 		All: &scheduling.AllDisruptionMode{},
 	}
@@ -85,12 +85,19 @@ func podGroupWithDisruptionModeAll() *scheduling.PodGroup {
 }
 
 func podGroupWithDisruptionModeBoth() *scheduling.PodGroup {
-	pg := podGroup.DeepCopy()
+	pg := podGroupWithDefaultPreemptionPolicy(podGroup)
 	pg.Spec.DisruptionMode = &scheduling.DisruptionMode{
 		Single: &scheduling.SingleDisruptionMode{},
 		All:    &scheduling.AllDisruptionMode{},
 	}
 	return pg
+}
+
+func podGroupWithDefaultPreemptionPolicy(pg *scheduling.PodGroup) *scheduling.PodGroup {
+	pgCopy := podGroup.DeepCopy()
+	preemptLowerPriority := core.PreemptLowerPriority
+	pgCopy.Spec.PreemptionPolicy = &preemptLowerPriority
+	return pgCopy
 }
 
 func podGroupWithPreemptionPolicy(policy core.PreemptionPolicy) *scheduling.PodGroup {

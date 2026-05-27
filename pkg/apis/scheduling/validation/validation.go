@@ -70,11 +70,7 @@ func ValidatePriorityClassUpdate(pc, oldPc *scheduling.PriorityClass) field.Erro
 
 // ValidatePodGroup tests if all fields in a PodGroup are set correctly.
 func ValidatePodGroup(podGroup *scheduling.PodGroup) field.ErrorList {
-	allErrs := apivalidation.ValidateObjectMeta(&podGroup.ObjectMeta, true, apivalidation.ValidatePodGroupName, field.NewPath("metadata"))
-	if podGroup.Spec.PreemptionPolicy != nil {
-		allErrs = append(allErrs, apivalidation.ValidatePreemptionPolicy(podGroup.Spec.PreemptionPolicy, field.NewPath("spec", "preemptionPolicy"))...)
-	}
-	return allErrs
+	return apivalidation.ValidateObjectMeta(&podGroup.ObjectMeta, true, apivalidation.ValidatePodGroupName, field.NewPath("metadata"))
 }
 
 // ValidatePodGroupUpdate tests if an update to PodGroup is valid.
@@ -84,15 +80,7 @@ func ValidatePodGroupUpdate(podGroup, oldPodGroup *scheduling.PodGroup) field.Er
 
 // ValidateWorkload tests if all fields in a Workload are set correctly.
 func ValidateWorkload(workload *scheduling.Workload) field.ErrorList {
-	allErrs := apivalidation.ValidateObjectMeta(&workload.ObjectMeta, true, validateWorkloadName, field.NewPath("metadata"))
-	fldPath := field.NewPath("spec", "podGroupTemplates")
-	for i, template := range workload.Spec.PodGroupTemplates {
-		idxPath := fldPath.Index(i)
-		if template.PreemptionPolicy != nil {
-			allErrs = append(allErrs, apivalidation.ValidatePreemptionPolicy(template.PreemptionPolicy, idxPath.Child("preemptionPolicy"))...)
-		}
-	}
-	return allErrs
+	return apivalidation.ValidateObjectMeta(&workload.ObjectMeta, true, validateWorkloadName, field.NewPath("metadata"))
 }
 
 // ValidateWorkloadUpdate tests if an update to Workload is valid.

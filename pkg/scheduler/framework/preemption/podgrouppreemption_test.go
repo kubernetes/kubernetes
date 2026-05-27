@@ -205,52 +205,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 			expectedStatus: fwk.NewStatus(fwk.Success),
 		},
 		{
-			name:      "PodGroup with PreemptNever in a single pod is ignored and performs preemption",
-			nodeNames: []string{"node1", "node2", "node3"},
-			initPods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("v1").Node("node1").Priority(lowPriority).Obj(),
-				st.MakePod().Name("p2").UID("v2").Node("node2").Priority(lowPriority).PodGroupName("pg1").Obj(),
-				st.MakePod().Name("p3").UID("v3").Node("node3").Priority(lowPriority).PodGroupName("pg2").Obj(),
-			},
-			preemptor: newPodGroupPreemptor(
-				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
-				[]*v1.Pod{
-					st.MakePod().Name("p-1").UID("p-1").Priority(highPriority).PreemptionPolicy(v1.PreemptNever).Obj(),
-				},
-			),
-			blockingRules: []blockingRule{
-				{nodeName: "node1", capacity: 1, blockingVictims: sets.New("p1")},
-				{nodeName: "node2", capacity: 1, blockingVictims: sets.New("p2")},
-				{nodeName: "node3", capacity: 1, blockingVictims: sets.New("p3")},
-			},
-			expectedPods:   []string{"p1"},
-			expectedStatus: fwk.NewStatus(fwk.Success),
-		},
-		{
-			name:      "PodGroup with PreemptNever does not perform preemption",
-			nodeNames: []string{"node1", "node2", "node3"},
-			initPods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("v1").Node("node1").Priority(lowPriority).Obj(),
-				st.MakePod().Name("p2").UID("v2").Node("node2").Priority(lowPriority).PodGroupName("pg1").Obj(),
-				st.MakePod().Name("p3").UID("v3").Node("node3").Priority(lowPriority).PodGroupName("pg2").Obj(),
-			},
-			preemptor: newPodGroupPreemptor(
-				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).PreemptionPolicy(v1.PreemptNever).Obj(),
-				[]*v1.Pod{
-					st.MakePod().Name("p-1").UID("p-1").Priority(highPriority).Obj(),
-					st.MakePod().Name("p-2").UID("p-2").Priority(highPriority).Obj(),
-				},
-			),
-			blockingRules: []blockingRule{
-				{nodeName: "node1", capacity: 1, blockingVictims: sets.New("p1")},
-				{nodeName: "node2", capacity: 1, blockingVictims: sets.New("p2")},
-				{nodeName: "node3", capacity: 1, blockingVictims: sets.New("p3")},
-			},
-			expectedPods:   []string{},
-			expectedStatus: fwk.NewStatus(fwk.Unschedulable, "not eligible due to preemptionPolicy=Never."),
-		},
-		{
-			name:      "PodGroup with default preemption policy performs preemption",
+			name:      "PodGroup with default (PreemptLowerPriority) preemption policy performs preemption",
 			nodeNames: []string{"node1", "node2", "node3"},
 			initPods: []*v1.Pod{
 				st.MakePod().Name("p1").UID("v1").Node("node1").Priority(lowPriority).Obj(),
@@ -288,6 +243,73 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 			},
 			expectedPods:   []string{"p1"},
 			expectedStatus: fwk.NewStatus(fwk.Success),
+		},
+		{
+			name:      "PodGroup with default (PreemptLowerPriority) preemption policy performs preemption, ignoring member pod preemption policy",
+			nodeNames: []string{"node1", "node2", "node3"},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("v1").Node("node1").Priority(lowPriority).Obj(),
+				st.MakePod().Name("p2").UID("v2").Node("node2").Priority(lowPriority).PodGroupName("pg1").Obj(),
+				st.MakePod().Name("p3").UID("v3").Node("node3").Priority(lowPriority).PodGroupName("pg2").Obj(),
+			},
+			preemptor: newPodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(), // PreemptionPolicy is nil (default)
+				[]*v1.Pod{
+					st.MakePod().Name("p-1").UID("p-1").Priority(highPriority).PreemptionPolicy(v1.PreemptNever).Obj(),
+				},
+			),
+			blockingRules: []blockingRule{
+				{nodeName: "node1", capacity: 1, blockingVictims: sets.New("p1")},
+				{nodeName: "node2", capacity: 1, blockingVictims: sets.New("p2")},
+				{nodeName: "node3", capacity: 1, blockingVictims: sets.New("p3")},
+			},
+			expectedPods:   []string{"p1"},
+			expectedStatus: fwk.NewStatus(fwk.Success),
+		},
+		{
+			name:      "PodGroup with PreemptLowerPriority policy performs preemption, ignoring member pod preemption policy",
+			nodeNames: []string{"node1", "node2", "node3"},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("v1").Node("node1").Priority(lowPriority).Obj(),
+				st.MakePod().Name("p2").UID("v2").Node("node2").Priority(lowPriority).PodGroupName("pg1").Obj(),
+				st.MakePod().Name("p3").UID("v3").Node("node3").Priority(lowPriority).PodGroupName("pg2").Obj(),
+			},
+			preemptor: newPodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
+				[]*v1.Pod{
+					st.MakePod().Name("p-1").UID("p-1").Priority(highPriority).PreemptionPolicy(v1.PreemptNever).Obj(),
+				},
+			),
+			blockingRules: []blockingRule{
+				{nodeName: "node1", capacity: 1, blockingVictims: sets.New("p1")},
+				{nodeName: "node2", capacity: 1, blockingVictims: sets.New("p2")},
+				{nodeName: "node3", capacity: 1, blockingVictims: sets.New("p3")},
+			},
+			expectedPods:   []string{"p1"},
+			expectedStatus: fwk.NewStatus(fwk.Success),
+		},
+		{
+			name:      "PodGroup with PreemptNever policy does not perform preemption",
+			nodeNames: []string{"node1", "node2", "node3"},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("v1").Node("node1").Priority(lowPriority).Obj(),
+				st.MakePod().Name("p2").UID("v2").Node("node2").Priority(lowPriority).PodGroupName("pg1").Obj(),
+				st.MakePod().Name("p3").UID("v3").Node("node3").Priority(lowPriority).PodGroupName("pg2").Obj(),
+			},
+			preemptor: newPodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).PreemptionPolicy(v1.PreemptNever).Obj(),
+				[]*v1.Pod{
+					st.MakePod().Name("p-1").UID("p-1").Priority(highPriority).Obj(),
+					st.MakePod().Name("p-2").UID("p-2").Priority(highPriority).Obj(),
+				},
+			),
+			blockingRules: []blockingRule{
+				{nodeName: "node1", capacity: 1, blockingVictims: sets.New("p1")},
+				{nodeName: "node2", capacity: 1, blockingVictims: sets.New("p2")},
+				{nodeName: "node3", capacity: 1, blockingVictims: sets.New("p3")},
+			},
+			expectedPods:   []string{},
+			expectedStatus: fwk.NewStatus(fwk.Unschedulable, "not eligible due to preemptionPolicy=Never."),
 		},
 		{
 			name:      "Preemptor group is not eligible if any member has nominated node with terminating pods",
@@ -494,32 +516,6 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 			expectedStatus: fwk.NewStatus(fwk.Success),
 		},
 		{
-			name:      "PodGroup with PreemptNever in a single pod is ignored and performs preemption with PodGroup victims",
-			nodeNames: []string{"node1", "node2", "node3"},
-			initPods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("v1").Node("node1").Priority(lowPriority).Obj(),
-				st.MakePod().Name("p2").UID("v2").Node("node2").Priority(lowPriority).PodGroupName("pg1").Obj(),
-				st.MakePod().Name("p3").UID("v3").Node("node3").Priority(lowPriority).PodGroupName("pg2").Obj(),
-			},
-			initPodGroups: []*schedulingapi.PodGroup{
-				st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeSingle().Priority(lowPriority).Obj(),
-				st.MakePodGroup().Name("pg2").UID("pg2").DisruptionModeSingle().Priority(lowPriority).Obj(),
-			},
-			preemptor: newPodGroupPreemptor(
-				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
-				[]*v1.Pod{
-					st.MakePod().Name("p-1").UID("p-1").Priority(highPriority).PreemptionPolicy(v1.PreemptNever).Obj(),
-				},
-			),
-			blockingRules: []blockingRule{
-				{nodeName: "node1", capacity: 1, blockingVictims: sets.New("p1")},
-				{nodeName: "node2", capacity: 1, blockingVictims: sets.New("p2")},
-				{nodeName: "node3", capacity: 1, blockingVictims: sets.New("p3")},
-			},
-			expectedPods:   []string{"p1"},
-			expectedStatus: fwk.NewStatus(fwk.Success),
-		},
-		{
 			name:      "PodGroup with PreemptNever does not perform preemption with PodGroup victims",
 			nodeNames: []string{"node1", "node2", "node3"},
 			initPods: []*v1.Pod{
@@ -547,7 +543,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 			expectedStatus: fwk.NewStatus(fwk.Unschedulable, "not eligible due to preemptionPolicy=Never."),
 		},
 		{
-			name:      "PodGroup with default preemption policy performs preemption with PodGroup victims",
+			name:      "PodGroup with default (PreemptLowerPriority) preemption policy performs preemption with PodGroup victims",
 			nodeNames: []string{"node1", "node2", "node3"},
 			initPods: []*v1.Pod{
 				st.MakePod().Name("p1").UID("v1").Node("node1").Priority(lowPriority).Obj(),
@@ -559,7 +555,7 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				st.MakePodGroup().Name("pg2").UID("pg2").DisruptionModeSingle().Priority(lowPriority).Obj(),
 			},
 			preemptor: newPodGroupPreemptor(
-				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(),
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(), // PreemptionPolicy is nil (default)
 				[]*v1.Pod{
 					st.MakePod().Name("p-1").UID("p-1").Priority(highPriority).Obj(),
 				},
@@ -588,6 +584,58 @@ func TestPodGroupEvaluator_SelectVictimsOnDomain(t *testing.T) {
 				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
 				[]*v1.Pod{
 					st.MakePod().Name("p-1").UID("p-1").Priority(highPriority).Obj(),
+				},
+			),
+			blockingRules: []blockingRule{
+				{nodeName: "node1", capacity: 1, blockingVictims: sets.New("p1")},
+				{nodeName: "node2", capacity: 1, blockingVictims: sets.New("p2")},
+				{nodeName: "node3", capacity: 1, blockingVictims: sets.New("p3")},
+			},
+			expectedPods:   []string{"p1"},
+			expectedStatus: fwk.NewStatus(fwk.Success),
+		},
+		{
+			name:      "PodGroup with default (PreemptLowerPriority) preemption policy performs preemption with PodGroup victims, ignoring member pod preemption policy",
+			nodeNames: []string{"node1", "node2", "node3"},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("v1").Node("node1").Priority(lowPriority).Obj(),
+				st.MakePod().Name("p2").UID("v2").Node("node2").Priority(lowPriority).PodGroupName("pg1").Obj(),
+				st.MakePod().Name("p3").UID("v3").Node("node3").Priority(lowPriority).PodGroupName("pg2").Obj(),
+			},
+			initPodGroups: []*schedulingapi.PodGroup{
+				st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeSingle().Priority(lowPriority).Obj(),
+				st.MakePodGroup().Name("pg2").UID("pg2").DisruptionModeSingle().Priority(lowPriority).Obj(),
+			},
+			preemptor: newPodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).Obj(), // PreemptionPolicy is nil (default)
+				[]*v1.Pod{
+					st.MakePod().Name("p-1").UID("p-1").Priority(highPriority).PreemptionPolicy(v1.PreemptNever).Obj(),
+				},
+			),
+			blockingRules: []blockingRule{
+				{nodeName: "node1", capacity: 1, blockingVictims: sets.New("p1")},
+				{nodeName: "node2", capacity: 1, blockingVictims: sets.New("p2")},
+				{nodeName: "node3", capacity: 1, blockingVictims: sets.New("p3")},
+			},
+			expectedPods:   []string{"p1"},
+			expectedStatus: fwk.NewStatus(fwk.Success),
+		},
+		{
+			name:      "PodGroup with PreemptLowerPriority preemption policy performs preemption with PodGroup victims, ignoring member pod preemption policy",
+			nodeNames: []string{"node1", "node2", "node3"},
+			initPods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("v1").Node("node1").Priority(lowPriority).Obj(),
+				st.MakePod().Name("p2").UID("v2").Node("node2").Priority(lowPriority).PodGroupName("pg1").Obj(),
+				st.MakePod().Name("p3").UID("v3").Node("node3").Priority(lowPriority).PodGroupName("pg2").Obj(),
+			},
+			initPodGroups: []*schedulingapi.PodGroup{
+				st.MakePodGroup().Name("pg1").UID("pg1").DisruptionModeSingle().Priority(lowPriority).Obj(),
+				st.MakePodGroup().Name("pg2").UID("pg2").DisruptionModeSingle().Priority(lowPriority).Obj(),
+			},
+			preemptor: newPodGroupPreemptor(
+				st.MakePodGroup().Name("preemptor-pg").Priority(highPriority).PreemptionPolicy(v1.PreemptLowerPriority).Obj(),
+				[]*v1.Pod{
+					st.MakePod().Name("p-1").UID("p-1").Priority(highPriority).PreemptionPolicy(v1.PreemptNever).Obj(),
 				},
 			),
 			blockingRules: []blockingRule{
