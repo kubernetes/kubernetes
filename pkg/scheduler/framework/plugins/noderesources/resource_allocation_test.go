@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -546,6 +547,9 @@ func testCalculateResourceAllocatableRequest(tCtx ktesting.TContext) {
 	for name, tc := range tests {
 		tCtx.SyncTest(name, func(tCtx ktesting.TContext) {
 			// Setup environment, create required objects
+			if !tc.enableDRAExtendedResource {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(tCtx, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+			}
 			featuregatetesting.SetFeatureGateDuringTest(tCtx, utilfeature.DefaultFeatureGate, features.DRAExtendedResource, tc.enableDRAExtendedResource)
 
 			draManager := newTestDRAManager(tCtx, tc.draObjects...)

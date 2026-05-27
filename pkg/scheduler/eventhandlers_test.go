@@ -465,6 +465,9 @@ func TestAddAllEventHandlers(t *testing.T) {
 			if !tt.enableDRA {
 				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.34"))
 			} else {
+				if !tt.enableDRAExtendedResource {
+					featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+				}
 				// Making this depend on the emulated version avoids "cannot set feature gate DRADeviceTaintRules to false, feature is PreAlpha at emulated version 1.34".
 				overrides[features.DRADeviceTaintRules] = tt.enableDRADeviceTaintRules
 				overrides[features.GenericWorkload] = tt.enableGenericWorkload
@@ -647,6 +650,9 @@ func TestAdmissionCheck(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if !tt.enableDRAExtendedResource {
+				featuregatetesting.SetFeatureGateEmulationVersionDuringTest(t, utilfeature.DefaultFeatureGate, version.MustParse("1.36"))
+			}
 			featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
 				features.DRAExtendedResource:         tt.enableDRAExtendedResource,
 				features.DRANodeAllocatableResources: tt.enableDRANodeAllocatableResources,
