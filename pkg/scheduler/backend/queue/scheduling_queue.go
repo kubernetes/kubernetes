@@ -693,6 +693,9 @@ func (p *PriorityQueue) moveToActiveQ(logger klog.Logger, pInfo *framework.Queue
 			if p.unschedulablePods.get(pInfo.Pod) == nil {
 				logger.V(5).Info("Pod moved to an internal scheduling queue, because the pod is gated", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", unschedulableQ)
 			}
+			// Clearing WasFlushedFromUnschedulable is typically done on scheduling failure, but in case the flushed pod was gated, it never attempts scheduling.
+			// We clear it here to ensure it's not set the next time the pod is woken up by a non-flush event.
+			pInfo.WasFlushedFromUnschedulable = false
 			p.unschedulablePods.addOrUpdate(pInfo, gatedBefore, event)
 			return
 		}
@@ -726,6 +729,9 @@ func (p *PriorityQueue) moveToBackoffQ(logger klog.Logger, pInfo *framework.Queu
 			if p.unschedulablePods.get(pInfo.Pod) == nil {
 				logger.V(5).Info("Pod moved to an internal scheduling queue", "pod", klog.KObj(pInfo.Pod), "event", event, "queue", unschedulableQ)
 			}
+			// Clearing WasFlushedFromUnschedulable is typically done on scheduling failure, but in case the flushed pod was gated, it never attempts scheduling.
+			// We clear it here to ensure it's not set the next time the pod is woken up by a non-flush event.
+			pInfo.WasFlushedFromUnschedulable = false
 			p.unschedulablePods.addOrUpdate(pInfo, gatedBefore, event)
 			return false
 		}
