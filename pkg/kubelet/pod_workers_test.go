@@ -2255,6 +2255,42 @@ func TestKillPodNowFunc(t *testing.T) {
 	}
 }
 
+// TestKillPodNowFuncFinishedPod verifies killPodNow returns immediately on an already-finished pod.
+// Regression test for https://github.com/kubernetes/kubernetes/issues/118679
+func TestKillPodNowFuncFinishedPod(t *testing.T) {
+	fakeRecorder := &record.FakeRecorder{Events: make(chan string, 10)}
+	logger, tCtx := ktesting.NewTestContext(t)
+	podWorkers, _, _ := createPodWorkers(logger)
+	pod := newNamedPod("test", "ns", "test", false)
+
+	// Set up pod as already finished
+	podWorkers.podLock.Lock()
+	podWorkers.podSyncStatuses[pod.UID] = &podSyncStatus{
+		terminatingAt: time.Now().Add(-time.Minute),
+		terminatedAt:  time.Now().Add(-time.Second),
+		finished:      true,
+		fullname:      pod.Name + "_" + pod.Namespace,
+	}
+	podWorkers.podLock.Unlock()
+
+	// Attempt to kill the finished pod - should return immediately without 10s timeout
+	gracePeriod := int64(0)
+	start := time.Now()
+	err := killPodNow(tCtx, podWorkers, fakeRecorder)(pod, true, &gracePeriod, nil)
+
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Errorf("killPodNow took %v, expected immediate return", elapsed)
+	}
+	select {
+	case event := <-fakeRecorder.Events:
+		t.Errorf("Unexpected ExceededGracePeriod event: %v", event)
+	default:
+	}
+}
+
 func Test_allowPodStart(t *testing.T) {
 	testCases := []struct {
 		desc                               string

@@ -856,6 +856,14 @@ func (p *podWorkers) UpdatePod(ctx context.Context, options UpdatePodOptions) {
 	// once a pod is terminated by UID, it cannot reenter the pod worker (until the UID is purged by housekeeping)
 	if status.IsFinished() {
 		updateLogger.V(4).Info("Pod is finished processing, no further updates")
+		// If we received a kill request with a CompletedCh, close it immediately since
+		// the pod is already finished and no further work will be done.
+		if options.KillPodOptions != nil {
+			if ch := options.KillPodOptions.CompletedCh; ch != nil {
+				close(ch)
+			}
+			options.KillPodOptions = nil
+		}
 		return
 	}
 
