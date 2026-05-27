@@ -7273,6 +7273,16 @@
       },
       "type": "object"
     },
+    "io.k8s.api.core.v1.EmptyDirVolumeStatus": {
+      "description": "EmptyDirVolumeStatus represents the status of an emptyDir volume.",
+      "properties": {
+        "sizeLimit": {
+          "$ref": "#/definitions/io.k8s.apimachinery.pkg.api.resource.Quantity",
+          "description": "sizeLimit represents the actual mounted capacity of the emptyDir volume. This is only populated for memory-backed emptyDir volumes."
+        }
+      },
+      "type": "object"
+    },
     "io.k8s.api.core.v1.EndpointAddress": {
       "description": "EndpointAddress is a tuple that describes single IP address. Deprecated: This API is deprecated in v1.33+.",
       "properties": {
@@ -12880,6 +12890,10 @@
     "io.k8s.api.core.v1.VolumeStatus": {
       "description": "VolumeStatus represents the status of a mounted volume. At most one of its members must be specified.",
       "properties": {
+        "emptyDir": {
+          "$ref": "#/definitions/io.k8s.api.core.v1.EmptyDirVolumeStatus",
+          "description": "emptyDir represents the status of an emptyDir volume. This is only populated for memory-backed emptyDir volumes."
+        },
         "image": {
           "$ref": "#/definitions/io.k8s.api.core.v1.ImageVolumeStatus",
           "description": "image represents an OCI object (a container image or artifact) pulled and mounted on the kubelet's host machine."
