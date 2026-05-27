@@ -26,6 +26,7 @@ package v1
 //
 // The contents of the target ConfigMap's Data field will represent the
 // key-value pairs as environment variables.
+// Keys in the BinaryData field are not currently propagated to container env vars.
 type ConfigMapEnvSourceApplyConfiguration struct {
 	// The ConfigMap to select from.
 	LocalObjectReferenceApplyConfiguration `json:""`
