@@ -809,7 +809,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 			s.CgroupRoot = "/"
 		}
 
-		machineInfo, err := kubeDeps.CAdvisorInterface.MachineInfo()
+		machineInfo, err := kubeDeps.CAdvisorInterface.MachineInfo(logger)
 		if err != nil {
 			return err
 		}

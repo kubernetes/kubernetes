@@ -26,6 +26,7 @@ import (
 	"github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/info/v2"
 	mock "github.com/stretchr/testify/mock"
+	"k8s.io/klog/v2"
 )
 
 // NewMockInterface creates a new instance of MockInterface. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
@@ -372,8 +373,8 @@ func (_c *MockInterface_ImagesFsInfo_Call) RunAndReturn(run func(context1 contex
 }
 
 // MachineInfo provides a mock function for the type MockInterface
-func (_mock *MockInterface) MachineInfo() (*v1.MachineInfo, error) {
-	ret := _mock.Called()
+func (_mock *MockInterface) MachineInfo(logger klog.Logger) (*v1.MachineInfo, error) {
+	ret := _mock.Called(logger)
 
 	if len(ret) == 0 {
 		panic("no return value specified for MachineInfo")
@@ -381,18 +382,18 @@ func (_mock *MockInterface) MachineInfo() (*v1.MachineInfo, error) {
 
 	var r0 *v1.MachineInfo
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (*v1.MachineInfo, error)); ok {
-		return returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(klog.Logger) (*v1.MachineInfo, error)); ok {
+		return returnFunc(logger)
 	}
-	if returnFunc, ok := ret.Get(0).(func() *v1.MachineInfo); ok {
-		r0 = returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(klog.Logger) *v1.MachineInfo); ok {
+		r0 = returnFunc(logger)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*v1.MachineInfo)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
+	if returnFunc, ok := ret.Get(1).(func(klog.Logger) error); ok {
+		r1 = returnFunc(logger)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -405,13 +406,20 @@ type MockInterface_MachineInfo_Call struct {
 }
 
 // MachineInfo is a helper method to define mock.On call
-func (_e *MockInterface_Expecter) MachineInfo() *MockInterface_MachineInfo_Call {
-	return &MockInterface_MachineInfo_Call{Call: _e.mock.On("MachineInfo")}
+//   - logger klog.Logger
+func (_e *MockInterface_Expecter) MachineInfo(logger interface{}) *MockInterface_MachineInfo_Call {
+	return &MockInterface_MachineInfo_Call{Call: _e.mock.On("MachineInfo", logger)}
 }
 
-func (_c *MockInterface_MachineInfo_Call) Run(run func()) *MockInterface_MachineInfo_Call {
+func (_c *MockInterface_MachineInfo_Call) Run(run func(logger klog.Logger)) *MockInterface_MachineInfo_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		var arg0 klog.Logger
+		if args[0] != nil {
+			arg0 = args[0].(klog.Logger)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -421,7 +429,7 @@ func (_c *MockInterface_MachineInfo_Call) Return(machineInfo *v1.MachineInfo, er
 	return _c
 }
 
-func (_c *MockInterface_MachineInfo_Call) RunAndReturn(run func() (*v1.MachineInfo, error)) *MockInterface_MachineInfo_Call {
+func (_c *MockInterface_MachineInfo_Call) RunAndReturn(run func(logger klog.Logger) (*v1.MachineInfo, error)) *MockInterface_MachineInfo_Call {
 	_c.Call.Return(run)
 	return _c
 }

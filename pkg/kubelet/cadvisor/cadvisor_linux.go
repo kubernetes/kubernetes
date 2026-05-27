@@ -157,7 +157,7 @@ func (cc *cadvisorClient) VersionInfo() (*cadvisorapi.VersionInfo, error) {
 	return cc.GetVersionInfo()
 }
 
-func (cc *cadvisorClient) MachineInfo() (*cadvisorapi.MachineInfo, error) {
+func (cc *cadvisorClient) MachineInfo(logger klog.Logger) (*cadvisorapi.MachineInfo, error) {
 	return cc.GetMachineInfo()
 }
 
