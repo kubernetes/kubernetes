@@ -79,15 +79,19 @@ func (c *PodConfig) Channel(ctx context.Context, source string) chan<- sourceUpd
 	return c.mux.ChannelWithContext(ctx, source)
 }
 
+// SourcesReadyFn returns a readiness callback using the provided logger for SeenAllSources.
+func (c *PodConfig) SourcesReadyFn(logger klog.Logger) SourcesReadyFn {
+	return func(seenSources sets.Set[string]) bool {
+		return c.SeenAllSources(logger, seenSources)
+	}
+}
+
 // SeenAllSources returns true if seenSources contains all sources in the
 // config, and also this config has received a SET message from each source.
-func (c *PodConfig) SeenAllSources(seenSources sets.Set[string]) bool {
+func (c *PodConfig) SeenAllSources(logger klog.Logger, seenSources sets.Set[string]) bool {
 	if c.pods == nil {
 		return false
 	}
-	// Use klog.TODO() because we currently do not have a proper context to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
 	c.sourcesLock.Lock()
 	defer c.sourcesLock.Unlock()
 	logger.V(5).Info("Looking for sources, have seen", "sources", sets.List(c.sources), "seenSources", seenSources)
