@@ -23,7 +23,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -31,23 +30,23 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
-	"k8s.io/kubernetes/pkg/registry/coordination/evictionrequest"
+	"k8s.io/kubernetes/pkg/registry/coordination/eviction"
 	"k8s.io/utils/clock"
 )
 
-// REST implements a RESTStorage for evictionrequests against etcd
+// REST implements a RESTStorage for evictions against etcd
 type REST struct {
 	*genericregistry.Store
 }
 
-// NewREST returns a RESTStorage object that will work against evictionrequests.
-func NewREST(optsGetter generic.RESTOptionsGetter, authorizer authorizer.Authorizer, clock clock.PassiveClock) (*REST, *StatusREST, error) {
-	strategy := evictionrequest.NewStrategy(authorizer, clock)
+// NewREST returns a RESTStorage object that will work against evictions.
+func NewREST(optsGetter generic.RESTOptionsGetter, clock clock.PassiveClock) (*REST, *StatusREST, error) {
+	strategy := eviction.NewStrategy(clock)
 	store := &genericregistry.Store{
-		NewFunc:                   func() runtime.Object { return &coordinationapi.EvictionRequest{} },
-		NewListFunc:               func() runtime.Object { return &coordinationapi.EvictionRequestList{} },
-		DefaultQualifiedResource:  coordinationapi.Resource("evictionrequests"),
-		SingularQualifiedResource: coordinationapi.Resource("evictionrequest"),
+		NewFunc:                   func() runtime.Object { return &coordinationapi.Eviction{} },
+		NewListFunc:               func() runtime.Object { return &coordinationapi.EvictionList{} },
+		DefaultQualifiedResource:  coordinationapi.Resource("evictions"),
+		SingularQualifiedResource: coordinationapi.Resource("eviction"),
 
 		CreateStrategy:      strategy,
 		UpdateStrategy:      strategy,
@@ -61,7 +60,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter, authorizer authorizer.Authori
 		return nil, nil, err
 	}
 
-	statusStrategy := evictionrequest.NewStatusStrategy(strategy)
+	statusStrategy := eviction.NewStatusStrategy(strategy)
 
 	statusStore := *store
 	statusStore.UpdateStrategy = statusStrategy
@@ -70,14 +69,14 @@ func NewREST(optsGetter generic.RESTOptionsGetter, authorizer authorizer.Authori
 	return &REST{store}, &StatusREST{store: &statusStore}, nil
 }
 
-// StatusREST implements the REST endpoint for changing the status of evictionrequests.
+// StatusREST implements the REST endpoint for changing the status of evictions.
 type StatusREST struct {
 	store *genericregistry.Store
 }
 
-// New creates a new EvictionRequest object.
+// New creates a new Eviction object.
 func (r *StatusREST) New() runtime.Object {
-	return &coordinationapi.EvictionRequest{}
+	return &coordinationapi.Eviction{}
 }
 
 // Destroy cleans up resources on shutdown.

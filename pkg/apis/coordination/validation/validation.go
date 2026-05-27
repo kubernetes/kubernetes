@@ -41,9 +41,9 @@ import (
 	"k8s.io/utils/clock"
 )
 
-const defaultEvictionRequestResponderCount = 1 // EvictionResponderImperativeEviction
+const defaultEvictionResponderCount = 1 // EvictionResponderImperativeEviction
 // more than .pod.spec.evictionResponders to account for default responders
-const maxEvictionRequestResponders = apivalidation.MaxPodEvictionResponders + defaultEvictionRequestResponderCount
+const maxEvictionResponders = apivalidation.MaxPodEvictionResponders + defaultEvictionResponderCount
 
 var validLeaseStrategies = []coordination.CoordinatedLeaseStrategy{coordination.OldestEmulationVersion}
 
@@ -181,93 +181,96 @@ func ValidateCoordinatedLeaseStrategy(strategy coordination.CoordinatedLeaseStra
 	return allErrs
 }
 
-type EvictionRequestSpecValidationOptions struct {
-	// Name of the eviction request
-	EvictionRequestName string
-}
-
-// ValidateEvictionRequest validates an EvictionRequest.
-func ValidateEvictionRequest(evictionRequest *coordination.EvictionRequest) field.ErrorList {
+// ValidateEviction validates an Eviction.
+func ValidateEviction(eviction *coordination.Eviction) field.ErrorList {
 	var allErrs field.ErrorList
-	metadataFldPath := field.NewPath("metadata")
-	// generateName
-	// validate.ForbiddenValue
+	allErrs = validation.ValidateObjectMeta(&eviction.ObjectMeta, true, validation.NameIsDNSSubdomain, field.NewPath("metadata"))
 
-	// name
-	// validate.UUID covered by DV
-
-	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&evictionRequest.ObjectMeta, true, func(name string, prefix bool) []string {
-		// validation is done declaratively by the validate.UUID
-		return nil
-	}, metadataFldPath)...)
-	specOpts := EvictionRequestSpecValidationOptions{EvictionRequestName: evictionRequest.Name}
-	allErrs = append(allErrs, ValidateEvictionRequestSpec(&evictionRequest.Spec, field.NewPath("spec"), specOpts)...)
-	return allErrs
-}
-
-// ValidateEvictionRequestSpec validates an EvictionRequest spec.
-func ValidateEvictionRequestSpec(evictionRequestSpec *coordination.EvictionRequestSpec, fldPath *field.Path, opts EvictionRequestSpecValidationOptions) field.ErrorList {
-	var allErrs field.ErrorList
-	allErrs = append(allErrs, ValidateEvictionTarget(evictionRequestSpec.Target, fldPath.Child("target"), opts)...)
-	allErrs = append(allErrs, ValidateRequesters(evictionRequestSpec.Requesters, fldPath.Child("requesters"))...)
-	return allErrs
-}
-
-func ValidateEvictionTarget(evictionTarget coordination.EvictionTarget, fldPath *field.Path, opts EvictionRequestSpecValidationOptions) field.ErrorList {
-	var allErrs field.ErrorList
+	// .spec.target
 	// validate.Union covered by DV
-	if evictionTarget.Pod != nil {
-		allErrs = append(allErrs, ValidatePodReference(*evictionTarget.Pod, fldPath.Child("pod"), opts)...)
-	}
-	return allErrs
-}
 
-func ValidatePodReference(podReference coordination.PodReference, fldPath *field.Path, opts EvictionRequestSpecValidationOptions) field.ErrorList {
-	var allErrs field.ErrorList
-	// name
+	// .spec.target.pod.name
 	// validate.RequiredValue covered by DV
 	// validate.LongName covered by DV
-	// uid
-	uidFldPath := fldPath.Child("uid")
+
+	// .spec.target.pod.uid
 	// validate.RequiredValue covered by DV
-	if len(podReference.UID) != 0 {
-		if string(podReference.UID) != opts.EvictionRequestName {
-			msg := fmt.Sprintf("must be the same value as %s", uidFldPath.String())
-			allErrs = append(allErrs, field.Invalid(field.NewPath("metadata").Child("name"), podReference.UID, msg))
-		}
-	}
+	// validate.UUID covered by DV
 	return allErrs
 }
 
-func ValidateRequesters(requesters []coordination.Requester, fldPath *field.Path) field.ErrorList {
+// ValidateEvictionUpdate validates an Eviction.
+func ValidateEvictionUpdate(eviction, oldEviction *coordination.Eviction) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&eviction.ObjectMeta, &oldEviction.ObjectMeta, field.NewPath("metadata"))
+
+	// .spec.target
+	// validate.Immutable covered by DV
+	return allErrs
+}
+
+type EvictionStatusValidationOptions struct {
+	Clock clock.PassiveClock
+}
+
+// ValidateEvictionStatusUpdate validates an Eviction Status update.
+func ValidateEvictionStatusUpdate(eviction, oldEviction *coordination.Eviction, opts EvictionStatusValidationOptions) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&eviction.ObjectMeta, &oldEviction.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateEvictionStatus(&eviction.Status, &oldEviction.Status, field.NewPath("status"), opts)...)
+	return allErrs
+}
+
+// ValidateEvictionStatus validates an Eviction Status.
+func ValidateEvictionStatus(status, oldStatus *coordination.EvictionStatus, fldPath *field.Path, opts EvictionStatusValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
 
-	// validate.Required covered by DV
+	// observedGeneration
+	observedGenerationPath := fldPath.Child("observedGeneration")
+	// validate.Minimum covered by DV
+	shouldCheckObservedGen := ptr.Deref(status.ObservedGeneration, 0) >= 1 || (status.ObservedGeneration == nil && oldStatus.ObservedGeneration != nil) // the rest is handled by validate.Minimum
+	if shouldCheckObservedGen && ptr.Deref(status.ObservedGeneration, 0) < ptr.Deref(oldStatus.ObservedGeneration, 0) {
+		allErrs = append(allErrs, field.Invalid(observedGenerationPath, status.ObservedGeneration, "cannot decrement, "+content.MinError(ptr.Deref(oldStatus.ObservedGeneration, 1))))
+	}
+
+	// conditions
+	conditionsPath := fldPath.Child("conditions")
 	// validate.MaxItems covered by DV
 	// validate.Unique covered by DV
-	if hasAllWithdrawnIntents(requesters) {
-		allErrs = append(allErrs, field.Invalid(fldPath, requesters, fmt.Sprintf("must have at least one requester with an intent that is not %q on EvictionRequest creation", coordination.RequesterIntentWithdrawn)))
+	for i, condition := range status.Conditions {
+		allErrs = append(allErrs, validation2.ValidateCondition(condition, conditionsPath.Index(i))...)
 	}
-	for i, requester := range requesters {
-		allErrs = append(allErrs, ValidateRequester(requester, fldPath.Index(i))...)
+	isEvicted := meta.IsStatusConditionTrue(status.Conditions, string(coordination.EvictionConditionEvicted))
+	isFailed := meta.IsStatusConditionTrue(status.Conditions, string(coordination.EvictionConditionFailed))
+	for _, oldCondition := range oldStatus.Conditions {
+		if oldCondition.Type == string(coordination.EvictionConditionEvicted) || oldCondition.Type == string(coordination.EvictionConditionFailed) {
+			newCondition := meta.FindStatusCondition(status.Conditions, oldCondition.Type)
+			if oldCondition.Status == v1.ConditionTrue && !validate.SemanticDeepEqual(&oldCondition, newCondition) {
+				allErrs = append(allErrs, field.Invalid(conditionsPath, status.Conditions, fmt.Sprintf("%s condition status cannot be reverted", oldCondition.Type)))
+				if oldCondition.Type == string(coordination.EvictionConditionEvicted) {
+					isEvicted = true // do not use invalid condition state for next validations
+				}
+				if oldCondition.Type == string(coordination.EvictionConditionFailed) {
+					isFailed = true // do not use invalid condition state for next validations
+				}
+			}
+		}
 	}
+
+	// requesters
+	allErrs = append(allErrs, ValidateEvictionStatusRequesters(status.Requesters, oldStatus.Requesters, fldPath.Child("requesters"))...)
+
+	// targetResponders, and responders
+	allErrs = append(allErrs, ValidateAllEvictionStatusResponderFields(status, oldStatus, fldPath, EvictionStatusRespondersValidationOptions{
+		Clock:     opts.Clock,
+		IsEvicted: isEvicted,
+		IsFailed:  isFailed,
+	})...)
+
 	return allErrs
 }
 
-func hasAllWithdrawnIntents(requesters []coordination.Requester) bool {
-	for _, requester := range requesters {
-		if requester.Intent != coordination.RequesterIntentWithdrawn {
-			return false
-		}
-	}
-	return true
-}
-
-func ValidateRequestersUpdate(requesters, oldRequesters []coordination.Requester, fldPath *field.Path) field.ErrorList {
+func ValidateEvictionStatusRequesters(requesters, oldRequesters []coordination.Requester, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
-	// validate.MinItems covered by DV
-	// validate.MaxItems covered by DV
 	// validate.Unique covered by DV
 	newRequestersSet := sets.New[string]()
 	for _, requester := range requesters {
@@ -282,24 +285,6 @@ func ValidateRequestersUpdate(requesters, oldRequesters []coordination.Requester
 	for i, requester := range requesters {
 		allErrs = append(allErrs, ValidateRequester(requester, fldPath.Index(i))...)
 	}
-	return allErrs
-}
-
-// ValidateEvictionRequestUpdate validates an EvictionRequest.
-func ValidateEvictionRequestUpdate(evictionRequest, oldEvictionRequest *coordination.EvictionRequest) field.ErrorList {
-	allErrs := apivalidation.ValidateObjectMetaUpdate(&evictionRequest.ObjectMeta, &oldEvictionRequest.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateEvictionRequestSpecUpdate(&evictionRequest.Spec, &oldEvictionRequest.Spec, field.NewPath("spec"))...)
-	return allErrs
-}
-
-// ValidateEvictionRequestSpecUpdate validates an EvictionRequest Spec update.
-func ValidateEvictionRequestSpecUpdate(evictionRequestSpec, oldEvictionRequestSpec *coordination.EvictionRequestSpec, fldPath *field.Path) field.ErrorList {
-	var allErrs field.ErrorList
-	// target
-	// validate.Immutable covered by DV
-
-	// requesters
-	allErrs = append(allErrs, ValidateRequestersUpdate(evictionRequestSpec.Requesters, oldEvictionRequestSpec.Requesters, fldPath.Child("requesters"))...)
 	return allErrs
 }
 
@@ -319,82 +304,25 @@ func ValidateRequester(requester coordination.Requester, fldPath *field.Path) fi
 	return allErrs
 }
 
-type EvictionRequestStatusValidationOptions struct {
-	Clock clock.PassiveClock
-}
-
-// ValidateEvictionRequestStatusUpdate validates an EvictionRequest Status update.
-func ValidateEvictionRequestStatusUpdate(evictionRequest, oldEvictionRequest *coordination.EvictionRequest, opts EvictionRequestStatusValidationOptions) field.ErrorList {
-	allErrs := apivalidation.ValidateObjectMetaUpdate(&evictionRequest.ObjectMeta, &oldEvictionRequest.ObjectMeta, field.NewPath("metadata"))
-	allErrs = append(allErrs, ValidateEvictionRequestStatus(&evictionRequest.Status, &oldEvictionRequest.Status, field.NewPath("status"), opts)...)
-	return allErrs
-}
-
-// ValidateEvictionRequestStatus validates an EvictionRequest Status.
-func ValidateEvictionRequestStatus(status, oldStatus *coordination.EvictionRequestStatus, fldPath *field.Path, opts EvictionRequestStatusValidationOptions) field.ErrorList {
-	var allErrs field.ErrorList
-
-	// observedGeneration
-	observedGenerationPath := fldPath.Child("observedGeneration")
-	// validate.Minimum covered by DV
-	shouldCheckObservedGen := ptr.Deref(status.ObservedGeneration, 0) >= 1 || (status.ObservedGeneration == nil && oldStatus.ObservedGeneration != nil) // the rest is handled by validate.Minimum
-	if shouldCheckObservedGen && ptr.Deref(status.ObservedGeneration, 0) < ptr.Deref(oldStatus.ObservedGeneration, 0) {
-		allErrs = append(allErrs, field.Invalid(observedGenerationPath, status.ObservedGeneration, "cannot decrement, "+content.MinError(ptr.Deref(oldStatus.ObservedGeneration, 1))))
-	}
-
-	// conditions
-	conditionsPath := fldPath.Child("conditions")
-	// validate.MaxItems covered by DV
-	// validate.Unique covered by DV
-	for i, condition := range status.Conditions {
-		allErrs = append(allErrs, validation2.ValidateCondition(condition, conditionsPath.Index(i))...)
-	}
-	isEvicted := meta.IsStatusConditionTrue(status.Conditions, string(coordination.EvictionRequestConditionEvicted))
-	isFailed := meta.IsStatusConditionTrue(status.Conditions, string(coordination.EvictionRequestConditionFailed))
-	for _, oldCondition := range oldStatus.Conditions {
-		if oldCondition.Type == string(coordination.EvictionRequestConditionEvicted) || oldCondition.Type == string(coordination.EvictionRequestConditionFailed) {
-			newCondition := meta.FindStatusCondition(status.Conditions, oldCondition.Type)
-			if oldCondition.Status == v1.ConditionTrue && !validate.SemanticDeepEqual(&oldCondition, newCondition) {
-				allErrs = append(allErrs, field.Invalid(conditionsPath, status.Conditions, fmt.Sprintf("%s condition status cannot be reverted", oldCondition.Type)))
-				if oldCondition.Type == string(coordination.EvictionRequestConditionEvicted) {
-					isEvicted = true // do not use invalid condition state for next validations
-				}
-				if oldCondition.Type == string(coordination.EvictionRequestConditionFailed) {
-					isFailed = true // do not use invalid condition state for next validations
-				}
-			}
-		}
-	}
-
-	// targetResponders, and responders
-	allErrs = append(allErrs, ValidateAllEvictionRequestStatusResponderFields(status, oldStatus, fldPath, EvictionRequestStatusRespondersValidationOptions{
-		Clock:     opts.Clock,
-		IsEvicted: isEvicted,
-		IsFailed:  isFailed,
-	})...)
-
-	return allErrs
-}
-
-type EvictionRequestStatusRespondersValidationOptions struct {
+type EvictionStatusRespondersValidationOptions struct {
 	Clock     clock.PassiveClock
 	IsEvicted bool
 	IsFailed  bool
 }
 
-// ValidateAllEvictionRequestStatusResponderFields validates .status.targetResponders and .status.responders
+// ValidateAllEvictionStatusResponderFields validates .status.targetResponders and .status.responders
 //
-// Multiple actors are expected to update the status (evictionrequest-controller, responders and requesters updating conditions).
-// We have to emulate the evictionrequest-controller behavior, to prevent invalid updates by other misbehaving/malicious actors.
+// Multiple actors are expected to update the status (eviction-controller, responders and requesters updating conditions).
+// We have to emulate the eviction-controller behavior, to prevent invalid updates by other misbehaving/malicious actors.
 //  1. .status.targetResponders and .status.responders should be set first.
 //  2. Responders' state transitions from Inactive to Active, and from Active to Interrupted, Canceled or, Complete.
 //     gradually in the order they appear in the first list. This is not reversible.
 //  3. Responders' state transition from Active to Interrupted, Canceled or, Complete when
 //     .status.responders[].completionTime is set or when heartbeat is exceeded. This is not reversible.
 //  4. .status.responders items cannot be removed once set. Only active responders can mutate it.
-//  5. The controller can mark an EvictionRequest as Evicted or Canceled via conditions. We then have to allow removal
+//  5. The controller can mark an Eviction as Evicted or Canceled via conditions. We then have to allow removal
 //     from activeResponders and prevent any new ones.
-func ValidateAllEvictionRequestStatusResponderFields(status, oldStatus *coordination.EvictionRequestStatus, fldPath *field.Path, opts EvictionRequestStatusRespondersValidationOptions) field.ErrorList {
+func ValidateAllEvictionStatusResponderFields(status, oldStatus *coordination.EvictionStatus, fldPath *field.Path, opts EvictionStatusRespondersValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
 	heartbeatDeadline := time.Minute * 20
 	allowedTimeSkew := time.Second * 30
@@ -406,7 +334,7 @@ func ValidateAllEvictionRequestStatusResponderFields(status, oldStatus *coordina
 	statusResponders := append(make([]coordination.ResponderStatus, 0, len(status.Responders)), status.Responders...)
 
 	// targetResponders
-	if errs := ValidateEvictionRequestTargetResponders(status.TargetResponders, oldStatus.TargetResponders, fldPath.Child("targetResponders"), ValidateEvictionRequestTargetRespondersOptions{
+	if errs := ValidateEvictionTargetResponders(status.TargetResponders, oldStatus.TargetResponders, fldPath.Child("targetResponders"), ValidateEvictionTargetRespondersOptions{
 		Clock:             opts.Clock,
 		IsFailed:          opts.IsFailed,
 		IsEvicted:         opts.IsEvicted,
@@ -421,7 +349,7 @@ func ValidateAllEvictionRequestStatusResponderFields(status, oldStatus *coordina
 	}
 
 	// responders
-	allErrs = append(allErrs, ValidateEvictionRequestStatusResponders(status.Responders, oldStatus.Responders, fldPath.Child("responders"), ValidateEvictionRequestStatusRespondersOptions{
+	allErrs = append(allErrs, ValidateEvictionStatusResponders(status.Responders, oldStatus.Responders, fldPath.Child("responders"), ValidateEvictionStatusRespondersOptions{
 		Clock:                     opts.Clock,
 		TargetResponders:          targetResponders,
 		AllowedTimeSkew:           allowedTimeSkew,
@@ -441,7 +369,7 @@ func filterOutDeclarativeErrors(errs field.ErrorList) field.ErrorList {
 	return allErrs
 }
 
-type ValidateEvictionRequestTargetRespondersOptions struct {
+type ValidateEvictionTargetRespondersOptions struct {
 	Clock             clock.PassiveClock
 	IsEvicted         bool
 	IsFailed          bool
@@ -450,7 +378,7 @@ type ValidateEvictionRequestTargetRespondersOptions struct {
 	AllowedTimeSkew   time.Duration
 }
 
-func ValidateEvictionRequestTargetResponders(targetResponders, oldTargetResponders []coordination.TargetResponder, fldPath *field.Path, opts ValidateEvictionRequestTargetRespondersOptions) field.ErrorList {
+func ValidateEvictionTargetResponders(targetResponders, oldTargetResponders []coordination.TargetResponder, fldPath *field.Path, opts ValidateEvictionTargetRespondersOptions) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(oldTargetResponders) != 0 {
 		if len(targetResponders) != len(oldTargetResponders) {
@@ -467,9 +395,9 @@ func ValidateEvictionRequestTargetResponders(targetResponders, oldTargetResponde
 		return allErrs
 	}
 
-	if len(targetResponders) > maxEvictionRequestResponders {
+	if len(targetResponders) > maxEvictionResponders {
 		// simulate declarative error for code flow control and further data validation
-		return append(allErrs, field.TooMany(fldPath, len(targetResponders), maxEvictionRequestResponders).WithOrigin("maxItems").MarkCoveredByDeclarative())
+		return append(allErrs, field.TooMany(fldPath, len(targetResponders), maxEvictionResponders).WithOrigin("maxItems").MarkCoveredByDeclarative())
 	}
 
 	// simulate declarative error for further data validation
@@ -540,7 +468,7 @@ func ValidateEvictionRequestTargetResponders(targetResponders, oldTargetResponde
 			responderStatus = &opts.StatusResponders[i]
 		}
 
-		allErrs = append(allErrs, ValidateTargetResponder(responder, fldPath.Index(i), ValidateEvictionRequestTargetResponderOptions{
+		allErrs = append(allErrs, ValidateTargetResponder(responder, fldPath.Index(i), ValidateEvictionTargetResponderOptions{
 			Clock:                opts.Clock,
 			IsEvicted:            opts.IsEvicted,
 			IsFailed:             opts.IsFailed,
@@ -554,7 +482,7 @@ func ValidateEvictionRequestTargetResponders(targetResponders, oldTargetResponde
 	return allErrs
 }
 
-type ValidateEvictionRequestTargetResponderOptions struct {
+type ValidateEvictionTargetResponderOptions struct {
 	Clock                clock.PassiveClock
 	IsEvicted            bool
 	IsFailed             bool
@@ -565,7 +493,7 @@ type ValidateEvictionRequestTargetResponderOptions struct {
 	AllowedTimeSkew      time.Duration
 }
 
-func ValidateTargetResponder(evictionResponder coordination.TargetResponder, fldPath *field.Path, opts ValidateEvictionRequestTargetResponderOptions) field.ErrorList {
+func ValidateTargetResponder(evictionResponder coordination.TargetResponder, fldPath *field.Path, opts ValidateEvictionTargetResponderOptions) field.ErrorList {
 	var allErrs field.ErrorList
 
 	// name
@@ -604,8 +532,8 @@ func ValidateTargetResponder(evictionResponder coordination.TargetResponder, fld
 	// must be present in status responders
 
 	// check the heartbeat deadline if the responder is not active anymore (.status.responders)
-	// we can skip the check if the EvictionRequest is final (failed or evicted).
-	// StartTime presence is validated in ValidateEvictionRequestStatusResponder
+	// we can skip the check if the Eviction is final (failed or evicted).
+	// StartTime presence is validated in ValidateEvictionStatusResponder
 	if !opts.expectedStates.Has(coordination.ResponderStateActive) && opts.responderStatus.StartTime != nil &&
 		opts.responderStatus.CompletionTime == nil && !opts.IsEvicted && !opts.IsFailed {
 		heartbeat := opts.responderStatus.StartTime
@@ -620,21 +548,21 @@ func ValidateTargetResponder(evictionResponder coordination.TargetResponder, fld
 	return allErrs
 }
 
-type ValidateEvictionRequestActiveRespondersOptions struct {
+type ValidateEvictionActiveRespondersOptions struct {
 	IsEvicted           bool
 	IsFailed            bool
 	TargetResponders    []string
 	ProcessedResponders sets.Set[string]
 }
 
-type ValidateEvictionRequestStatusRespondersOptions struct {
+type ValidateEvictionStatusRespondersOptions struct {
 	Clock                     clock.PassiveClock
 	TargetResponders          []coordination.TargetResponder
 	AllowedTimeSkew           time.Duration
 	MaxExpectedCompletionTime time.Duration
 }
 
-func ValidateEvictionRequestStatusResponders(statusResponders, oldStatusResponders []coordination.ResponderStatus, fldPath *field.Path, opts ValidateEvictionRequestStatusRespondersOptions) field.ErrorList {
+func ValidateEvictionStatusResponders(statusResponders, oldStatusResponders []coordination.ResponderStatus, fldPath *field.Path, opts ValidateEvictionStatusRespondersOptions) field.ErrorList {
 	var allErrs field.ErrorList
 
 	if len(opts.TargetResponders) != len(statusResponders) {
@@ -650,7 +578,7 @@ func ValidateEvictionRequestStatusResponders(statusResponders, oldStatusResponde
 		return allErrs
 	}
 
-	if len(statusResponders) > maxEvictionRequestResponders {
+	if len(statusResponders) > maxEvictionResponders {
 		// TooMany is handled by declarative validation - detect early return
 		return allErrs
 	}
@@ -669,7 +597,7 @@ func ValidateEvictionRequestStatusResponders(statusResponders, oldStatusResponde
 		if i < len(oldStatusResponders) {
 			oldResponderStatus = &oldStatusResponders[i] // +k8s:verify-mutation:reason=clone
 		}
-		allErrs = append(allErrs, ValidateEvictionRequestStatusResponder(&responder, oldResponderStatus, responderPath, EvictionRequestStatusResponderValidationOptions{
+		allErrs = append(allErrs, ValidateEvictionStatusResponder(&responder, oldResponderStatus, responderPath, EvictionStatusResponderValidationOptions{
 			Clock:                     opts.Clock,
 			responderState:            targetResponder.State,
 			AllowedTimeSkew:           opts.AllowedTimeSkew,
@@ -679,14 +607,14 @@ func ValidateEvictionRequestStatusResponders(statusResponders, oldStatusResponde
 	return allErrs
 }
 
-type EvictionRequestStatusResponderValidationOptions struct {
+type EvictionStatusResponderValidationOptions struct {
 	responderState            coordination.ResponderStateType
 	AllowedTimeSkew           time.Duration
 	MaxExpectedCompletionTime time.Duration
 	Clock                     clock.PassiveClock
 }
 
-func ValidateEvictionRequestStatusResponder(status, oldStatus *coordination.ResponderStatus, fldPath *field.Path, opts EvictionRequestStatusResponderValidationOptions) field.ErrorList {
+func ValidateEvictionStatusResponder(status, oldStatus *coordination.ResponderStatus, fldPath *field.Path, opts EvictionStatusResponderValidationOptions) field.ErrorList {
 	var allErrs field.ErrorList
 	oldDefaultedStatus := coordination.ResponderStatus{}
 	if oldStatus != nil {
@@ -700,7 +628,7 @@ func ValidateEvictionRequestStatusResponder(status, oldStatus *coordination.Resp
 
 	// name
 	// validate.Required covered by DV
-	// The existence of targetResponder with the same name is done in ValidateEvictionRequestStatusResponders
+	// The existence of targetResponder with the same name is done in ValidateEvictionStatusResponders
 
 	// startTime
 	startTimePath := fldPath.Child("startTime")

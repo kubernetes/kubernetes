@@ -82,6 +82,9 @@ const (
 	KubeControllerManager = "system:kube-controller-manager"
 	KubeScheduler         = "system:kube-scheduler"
 
+	// core kubernetes controllers
+	EvictionRequestController = "system:controller:evictionrequest-controller"
+
 	// CredentialIDKey is the key used in a user's "extra" to specify the unique
 	// identifier for this identity document).
 	CredentialIDKey = "authentication.kubernetes.io/credential-id"

@@ -310,11 +310,18 @@ func GetEtcdStorageDataForNamespaceServedAt(namespace string, v string, isEmulat
 
 		// k8s.io/kubernetes/pkg/apis/coordination/v1alpha1
 		gvr("coordination.k8s.io", "v1alpha1", "evictionrequests"): {
-			Stub:              `{"metadata": {"name": "3d7fdff1-3fe5-48b9-b106-1ee24b0277f6"}, "spec": {"target": {"pod": {"name": "evictionrequestsv1alpha1", "uid": "3d7fdff1-3fe5-48b9-b106-1ee24b0277f6"}}, "requesters": [{"name": "drain.foo.com/bar", "intent": "Eviction"}]}}`,
-			ExpectedEtcdPath:  "/registry/evictionrequests/" + namespace + "/3d7fdff1-3fe5-48b9-b106-1ee24b0277f6",
+			Stub:              `{"metadata": {"name": "pod-eviction-request"}, "spec": {"target": {"pod": {"name": "my-workload", "uid": "2fad7183-87cb-41d9-beb2-c071a65d7d40"}}, "RequesterName": "drain.foo.com/bar", "intent": "Eviction"}}`,
+			ExpectedEtcdPath:  "/registry/evictionrequests/" + namespace + "/pod-eviction-request",
 			ExpectedGVK:       gvkP("coordination.k8s.io", "v1alpha1", "EvictionRequest"),
-			IntroducedVersion: "1.36",
+			IntroducedVersion: "1.37",
 			RemovedVersion:    "1.42",
+		},
+		gvr("coordination.k8s.io", "v1alpha1", "evictions"): {
+			Stub:              `{"metadata": {"name": "pod-1-my-workload"}, "spec": {"target": {"pod": {"name": "my-workload", "uid": "3d7fdff1-3fe5-48b9-b106-1ee24b0277f6"}}}}`,
+			ExpectedEtcdPath:  "/registry/evictions/" + namespace + "/pod-1-my-workload",
+			ExpectedGVK:       gvkP("coordination.k8s.io", "v1alpha1", "Eviction"),
+			IntroducedVersion: "1.37",
+			RemovedVersion:    "1.43",
 		},
 		// --
 

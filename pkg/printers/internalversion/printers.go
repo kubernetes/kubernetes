@@ -773,21 +773,21 @@ func AddHandlers(h printers.PrintHandler) {
 	_ = h.TableHandler(podGroupColumnDefinitions, printPodGroup)
 	_ = h.TableHandler(podGroupColumnDefinitions, printPodGroupList)
 
-	evictionRequestColumnDefinitions := []metav1.TableColumnDefinition{
+	evictionColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Target", Type: "string", Description: coordinationv1alpha1.EvictionRequestSpec{}.SwaggerDoc()["target"]},
-		{Name: "Target Type", Type: "string", Description: coordinationv1alpha1.EvictionRequestSpec{}.SwaggerDoc()["target"]},
-		{Name: "Status", Type: "string", Description: coordinationv1alpha1.EvictionRequestStatus{}.SwaggerDoc()["conditions"]},
+		{Name: "Target", Type: "string", Description: coordinationv1alpha1.EvictionSpec{}.SwaggerDoc()["target"]},
+		{Name: "Target Type", Type: "string", Description: coordinationv1alpha1.EvictionSpec{}.SwaggerDoc()["target"]},
+		{Name: "Status", Type: "string", Description: coordinationv1alpha1.EvictionStatus{}.SwaggerDoc()["conditions"]},
 		{Name: "Active Responder", Type: "string", Description: coordinationv1alpha1.TargetResponder{}.SwaggerDoc()["state"]},
 		{Name: "Responder Status", Type: "string", Description: coordinationv1alpha1.ResponderStatus{}.SwaggerDoc()[""]},
 		{Name: "Responder Expected Finish", Type: "string", Description: coordinationv1alpha1.ResponderStatus{}.SwaggerDoc()["expectedCompletionTime"]},
-		{Name: "Requesters", Type: "string", Description: coordinationv1alpha1.EvictionRequestSpec{}.SwaggerDoc()["requesters"]},
+		{Name: "Requesters", Type: "string", Description: coordinationv1alpha1.EvictionStatus{}.SwaggerDoc()["requesters"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
 		{Name: "Responder Heartbeat", Type: "string", Priority: 1, Description: coordinationv1alpha1.ResponderStatus{}.SwaggerDoc()["heartbeatTime"]},
 		{Name: "Responder Status Message", Type: "string", Priority: 1, Description: coordinationv1alpha1.ResponderStatus{}.SwaggerDoc()["message"]},
 	}
-	_ = h.TableHandler(evictionRequestColumnDefinitions, printEvictionRequest)
-	_ = h.TableHandler(evictionRequestColumnDefinitions, printEvictionRequestList)
+	_ = h.TableHandler(evictionColumnDefinitions, printEviction)
+	_ = h.TableHandler(evictionColumnDefinitions, printEvictionList)
 }
 
 // Pass ports=nil for all ports.
@@ -3551,7 +3551,7 @@ func printPodGroupList(list *scheduling.PodGroupList, options printers.GenerateO
 	return rows, nil
 }
 
-func printEvictionRequest(obj *coordination.EvictionRequest, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+func printEviction(obj *coordination.Eviction, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -3568,19 +3568,7 @@ func printEvictionRequest(obj *coordination.EvictionRequest, options printers.Ge
 	row.Cells = append(row.Cells, target, targetType)
 
 	// resolve status
-	evictionStatus := "Pending"
-	if ptr.Deref(obj.Status.ObservedGeneration, 0) > 0 {
-		evictionStatus = "Progressing"
-	}
-	evicted := meta.FindStatusCondition(obj.Status.Conditions, string(coordination.EvictionRequestConditionEvicted))
-	failed := meta.FindStatusCondition(obj.Status.Conditions, string(coordination.EvictionRequestConditionFailed))
-	isFailed := failed != nil && failed.Status == metav1.ConditionTrue
-	if isFailed {
-		evictionStatus = fmt.Sprintf("%s (%s)", failed.Type, failed.Reason)
-	}
-	if evicted != nil && evicted.Status == metav1.ConditionTrue {
-		evictionStatus = fmt.Sprintf("%s (%s)", evicted.Type, evicted.Reason)
-	}
+	evictionStatus := resolveEvictionStatusConditions(obj.Status.ObservedGeneration, obj.Status.Conditions)
 	row.Cells = append(row.Cells, evictionStatus)
 
 	// resolve responder progress and find an active responder
@@ -3661,11 +3649,16 @@ func printEvictionRequest(obj *coordination.EvictionRequest, options printers.Ge
 
 	// resolve requesters
 	var requesters []string
-	for _, requester := range obj.Spec.Requesters {
-		requesters = append(requesters, requester.Name)
+	for _, requester := range obj.Status.Requesters {
+		if requester.Intent != coordination.RequesterIntentWithdrawn {
+			requesters = append(requesters, requester.Name)
+		}
 	}
 	slices.Sort(requesters)
 	requestersStr := "<none>"
+	if len(obj.Status.Requesters) > 0 {
+		requestersStr = "<withdrawn>"
+	}
 	if len(requesters) > 0 {
 		requestersStr = listWithMoreString(requesters[:1], len(requesters) > 1, len(requesters), 1)
 	}
@@ -3675,16 +3668,33 @@ func printEvictionRequest(obj *coordination.EvictionRequest, options printers.Ge
 	return []metav1.TableRow{row}, nil
 }
 
-func printEvictionRequestList(list *coordination.EvictionRequestList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+func printEvictionList(list *coordination.EvictionList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
-		r, err := printEvictionRequest(&list.Items[i], options)
+		r, err := printEviction(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}
 		rows = append(rows, r...)
 	}
 	return rows, nil
+}
+
+func resolveEvictionStatusConditions(observedGeneration *int64, conditions []metav1.Condition) string {
+	evictionStatus := "Pending"
+	if ptr.Deref(observedGeneration, 0) > 0 {
+		evictionStatus = "Progressing"
+	}
+	evicted := meta.FindStatusCondition(conditions, string(coordination.EvictionConditionEvicted))
+	failed := meta.FindStatusCondition(conditions, string(coordination.EvictionConditionFailed))
+	isFailed := failed != nil && failed.Status == metav1.ConditionTrue
+	if isFailed {
+		evictionStatus = fmt.Sprintf("%s (%s)", failed.Type, failed.Reason)
+	}
+	if evicted != nil && evicted.Status == metav1.ConditionTrue {
+		evictionStatus = fmt.Sprintf("%s (%s)", evicted.Type, evicted.Reason)
+	}
+	return evictionStatus
 }
 
 func printBoolPtr(value *bool) string {

@@ -274,7 +274,7 @@ items:
   - apiGroups:
     - coordination.k8s.io
     resources:
-    - evictionrequests
+    - evictions
     verbs:
     - create
     - delete
@@ -448,7 +448,7 @@ items:
   - apiGroups:
     - coordination.k8s.io
     resources:
-    - evictionrequests
+    - evictions
     verbs:
     - get
     - list
