@@ -362,7 +362,7 @@ func (p *Plugin) admitPodStatus(nodeName string, a admission.Attributes) error {
 		if !extendedResourceClaimStatusEqual(oldPod.Status.ExtendedResourceClaimStatus, newPod.Status.ExtendedResourceClaimStatus) {
 			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update extended resource claim status", nodeName))
 		}
-		if !apiequality.Semantic.DeepEqual(oldPod.Status.NodeAllocatableResourceClaimStatuses, newPod.Status.NodeAllocatableResourceClaimStatuses) {
+		if !nodeAllocatableResourceClaimStatusesEqual(oldPod.Status.NodeAllocatableResourceClaimStatuses, newPod.Status.NodeAllocatableResourceClaimStatuses) {
 			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update node allocatable resource claim statuses", nodeName))
 		}
 		return nil
@@ -409,6 +409,36 @@ func extendedResourceClaimStatusEqual(statusA, statusB *api.PodExtendedResourceC
 	// But this cannot be guaranteed, so for the sake of correctness in all
 	// cases this code here has to check.
 	return slices.Equal(statusA.RequestMappings, statusB.RequestMappings)
+}
+
+func nodeAllocatableResourceClaimStatusesEqual(statusA, statusB []api.NodeAllocatableResourceClaimStatus) bool {
+	if len(statusA) != len(statusB) {
+		return false
+	}
+	// In most cases, status entries only get added once and not modified.
+	// But this cannot be guaranteed, so for the sake of correctness in all
+	// cases this code here has to check.
+	for i := range statusA {
+		if statusA[i].ResourceClaimName != statusB[i].ResourceClaimName {
+			return false
+		}
+		if !slices.Equal(statusA[i].Containers, statusB[i].Containers) {
+			return false
+		}
+		if len(statusA[i].Resources) != len(statusB[i].Resources) {
+			return false
+		}
+		for name, qtyA := range statusA[i].Resources {
+			qtyB, ok := statusB[i].Resources[name]
+			if !ok {
+				return false
+			}
+			if qtyA.Cmp(qtyB) != 0 {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // admitPodEviction allows to evict a pod if it is assigned to the current node.
