@@ -225,7 +225,7 @@ func (s *placementFeasibleState) Clone() fwk.StateData {
 	}
 }
 
-func getPlacementFeasibleState(placementCycleState fwk.PodGroupCycleState) *placementFeasibleState {
+func getPlacementFeasibleState(placementCycleState fwk.PlacementCycleState) *placementFeasibleState {
 	state, err := placementCycleState.Read(placementFeasibleStateKey)
 	if err != nil {
 		state = &placementFeasibleState{}
@@ -237,7 +237,7 @@ func getPlacementFeasibleState(placementCycleState fwk.PodGroupCycleState) *plac
 // PlacementFeasible is responsible for enforcing the gang's MinCount constraint in the pod group scheduling cycle.
 // The function will only return success once the gang's MinCount is satisfied or if the pod group is not using gang scheduling policy.
 // In case there are not enough remaining pods to satisfy the gang's MinCount, it returns UnschedulableAndUnresolvable which will terminate the pod group scheduling cycle early.
-func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleState fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo) *fwk.Status {
+func (pl *GangScheduling) PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo) *fwk.Status {
 	pg, err := pl.podGroupLister.PodGroups(podGroupInfo.GetNamespace()).Get(podGroupInfo.GetName())
 	if err != nil {
 		return fwk.AsStatus(fmt.Errorf("failed to get podGroup %s to compute gang feasibility: %w", klog.KObj(podGroupInfo), err))
