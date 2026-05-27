@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epodoutput "k8s.io/kubernetes/test/e2e/framework/pod/output"
@@ -76,6 +77,16 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 		})
 	})
 
+	f.It("should set DefaultUser on files [LinuxOnly]", f.WithFeatureGate(features.AtomicWriteVolumeUserFields), func(ctx context.Context) {
+		podName := "downwardapi-volume-" + string(uuid.NewUUID())
+		defaultUser := int64(1000)
+		pod := projectedDownwardAPIVolumePodForUserTest(podName, "/etc/podinfo/podname", nil, &defaultUser, &defaultUser)
+
+		e2epodoutput.TestContainerOutput(ctx, f, "downward API volume plugin", pod, 0, []string{
+			"owner UID of \"/etc/podinfo/podname\": 1000",
+		})
+	})
+
 	/*
 	   Release: v1.9
 	   Testname: Projected Volume, DownwardAPI, volume mode 0400
@@ -89,6 +100,16 @@ var _ = SIGDescribe("Projected downwardAPI", func() {
 
 		e2epodoutput.TestContainerOutput(ctx, f, "downward API volume plugin", pod, 0, []string{
 			"mode of file \"/etc/podinfo/podname\": -r--------",
+		})
+	})
+
+	f.It("should set user on item file [LinuxOnly]", f.WithFeatureGate(features.AtomicWriteVolumeUserFields), func(ctx context.Context) {
+		podName := "downwardapi-volume-" + string(uuid.NewUUID())
+		user := int64(1000)
+		pod := projectedDownwardAPIVolumePodForUserTest(podName, "/etc/podinfo/podname", &user, nil, &user)
+
+		e2epodoutput.TestContainerOutput(ctx, f, "downward API volume plugin", pod, 0, []string{
+			"owner UID of \"/etc/podinfo/podname\": 1000",
 		})
 	})
 
@@ -288,6 +309,37 @@ func projectedDownwardAPIVolumePodForModeTest(name, filePath string, itemMode, d
 	}
 	if defaultMode != nil {
 		pod.Spec.Volumes[0].VolumeSource.Projected.DefaultMode = defaultMode
+	}
+
+	return pod
+}
+
+func projectedDownwardAPIVolumePodForUserTest(name, filePath string, itemUser, defaultUser, runAsUser *int64) *v1.Pod {
+	pod := projectedDownwardAPIVolumeBasePod(name, nil, nil)
+
+	pod.Spec.Containers = []v1.Container{
+		{
+			Name:  "client-container",
+			Image: imageutils.GetE2EImage(imageutils.Agnhost),
+			Args:  []string{"mounttest", "--file_owner=" + filePath},
+			VolumeMounts: []v1.VolumeMount{
+				{
+					Name:      "podinfo",
+					MountPath: "/etc/podinfo",
+				},
+			},
+		},
+	}
+	if runAsUser != nil {
+		pod.Spec.SecurityContext = &v1.PodSecurityContext{
+			RunAsUser: runAsUser,
+		}
+	}
+	if itemUser != nil {
+		pod.Spec.Volumes[0].VolumeSource.Projected.Sources[0].DownwardAPI.Items[0].User = itemUser
+	}
+	if defaultUser != nil {
+		pod.Spec.Volumes[0].VolumeSource.Projected.DefaultUser = defaultUser
 	}
 
 	return pod
