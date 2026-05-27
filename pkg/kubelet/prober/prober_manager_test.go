@@ -308,6 +308,7 @@ func TestCleanupRepeated(t *testing.T) {
 
 func TestUpdatePodStatus(t *testing.T) {
 	ctx := ktesting.Init(t)
+	logger := ctx.Logger()
 	unprobed := v1.ContainerStatus{
 		Name:        "unprobed_container",
 		ContainerID: "test://unprobed_container_id",
@@ -377,10 +378,10 @@ func TestUpdatePodStatus(t *testing.T) {
 		{testPodUID, startedNoReadiness.Name, startup}:    {},
 		{testPodUID, terminated.Name, readiness}:          {},
 	}
-	m.readinessManager.Set(kubecontainer.ParseContainerID(probedReady.ContainerID), results.Success, &v1.Pod{})
-	m.readinessManager.Set(kubecontainer.ParseContainerID(probedUnready.ContainerID), results.Failure, &v1.Pod{})
-	m.startupManager.Set(kubecontainer.ParseContainerID(startedNoReadiness.ContainerID), results.Success, &v1.Pod{})
-	m.readinessManager.Set(kubecontainer.ParseContainerID(terminated.ContainerID), results.Success, &v1.Pod{})
+	m.readinessManager.Set(kubecontainer.ParseContainerID(logger, probedReady.ContainerID), results.Success, &v1.Pod{})
+	m.readinessManager.Set(kubecontainer.ParseContainerID(logger, probedUnready.ContainerID), results.Failure, &v1.Pod{})
+	m.startupManager.Set(kubecontainer.ParseContainerID(logger, startedNoReadiness.ContainerID), results.Success, &v1.Pod{})
+	m.readinessManager.Set(kubecontainer.ParseContainerID(logger, terminated.ContainerID), results.Success, &v1.Pod{})
 
 	m.UpdatePodStatus(ctx, &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -421,6 +422,7 @@ func TestUpdatePodStatus(t *testing.T) {
 }
 
 func TestUpdatePodStatusWithInitContainers(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	notStarted := v1.ContainerStatus{
 		Name:        "not_started_container",
 		ContainerID: "test://not_started_container_id",
@@ -451,7 +453,7 @@ func TestUpdatePodStatusWithInitContainers(t *testing.T) {
 		{testPodUID, notStarted.Name, startup}: {},
 		{testPodUID, started.Name, startup}:    {},
 	}
-	m.startupManager.Set(kubecontainer.ParseContainerID(started.ContainerID), results.Success, &v1.Pod{})
+	m.startupManager.Set(kubecontainer.ParseContainerID(logger, started.ContainerID), results.Success, &v1.Pod{})
 
 	testCases := []struct {
 		desc                        string
