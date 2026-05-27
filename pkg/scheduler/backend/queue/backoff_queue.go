@@ -17,7 +17,9 @@ limitations under the License.
 package queue
 
 import (
+	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -75,6 +77,8 @@ type backoffQueuer interface {
 	list() []*v1.Pod
 	// len returns length of the queue.
 	len() int
+	// updateLastMinutePendingPodsCount updates the last minute pending pods count.
+	updateLastMinutePendingPodsCount(count int)
 }
 
 // backoffQueue implements backoffQueuer and wraps two queues inside,
@@ -105,6 +109,9 @@ type backoffQueue struct {
 
 	// isPopFromBackoffQEnabled indicates whether the feature gate SchedulerPopFromBackoffQ is enabled.
 	isPopFromBackoffQEnabled bool
+
+	// lastMinutePendingPodsCount stores the number of pending pods in the last minute.
+	lastMinutePendingPodsCount atomic.Int64
 }
 
 func newBackoffQueue(clock clock.WithTicker, podInitialBackoffDuration time.Duration, podMaxBackoffDuration time.Duration, activeQLessFn fwk.LessFunc, popFromBackoffQEnabled bool) *backoffQueue {
@@ -248,13 +255,24 @@ func (bq *backoffQueue) getBackoffTime(podInfo *framework.QueuedPodInfo) time.Ti
 // calculateBackoffDuration is a helper function for calculating the backoffDuration
 // based on the number of attempts the pod has made.
 func (bq *backoffQueue) calculateBackoffDuration(count int) time.Duration {
+	pendingCount := bq.lastMinutePendingPodsCount.Load()
+
 	if count == 0 {
 		return 0
 	}
 
+	maxBackoff := bq.podMaxBackoff
+	if pendingCount > 0 {
+		scale := math.Log(float64(pendingCount))
+		if scale > 0 {
+			newMaxBackoff := time.Duration(float64(bq.podMaxBackoff) * scale)
+			maxBackoff = max(newMaxBackoff, maxBackoff)
+		}
+	}
+
 	shift := count - 1
-	if bq.podInitialBackoff > bq.podMaxBackoff>>shift {
-		return bq.podMaxBackoff
+	if bq.podInitialBackoff > maxBackoff>>shift {
+		return maxBackoff
 	}
 	return time.Duration(bq.podInitialBackoff << shift)
 }
@@ -411,4 +429,9 @@ func (bq *backoffQueue) lenBackoff() int {
 	defer bq.lock.RUnlock()
 
 	return bq.podBackoffQ.Len()
+}
+
+// updateLastMinutePendingPodsCount updates the last minute pending pods count.
+func (bq *backoffQueue) updateLastMinutePendingPodsCount(count int) {
+	bq.lastMinutePendingPodsCount.Store(int64(count))
 }

@@ -429,6 +429,10 @@ func (p *PriorityQueue) Run(logger klog.Logger) {
 	go wait.Until(func() {
 		p.flushUnschedulablePodsLeftover(logger)
 	}, 30*time.Second, p.stop)
+	go wait.Until(func() {
+		pods, _ := p.PendingPods()
+		p.backoffQ.updateLastMinutePendingPodsCount(len(pods))
+	}, time.Minute, p.stop)
 }
 
 // queueingStrategy indicates how the scheduling queue should enqueue the Pod from unschedulable pod pool.
