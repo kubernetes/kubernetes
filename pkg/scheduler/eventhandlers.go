@@ -34,6 +34,7 @@ import (
 	corev1nodeaffinity "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/dynamic-resource-allocation/deviceclass/extendedresourcecache"
 	resourceslicetracker "k8s.io/dynamic-resource-allocation/resourceslice/tracker"
+	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/klog/v2"
 	fwk "k8s.io/kube-scheduler/framework"
 	"k8s.io/kubernetes/pkg/features"
@@ -495,6 +496,12 @@ func addAllEventHandlers(
 			evt := fwk.ClusterEvent{Resource: resource, ActionType: fwk.Add}
 			funcs.AddFunc = func(obj interface{}) {
 				defer metrics.EventHandlingLatency.ObserveSince(time.Now(), evt.Label())()
+				if resource == fwk.ResourceClaim {
+					if podKey := claimOwnerPodKey(obj); podKey != "" {
+						sched.SchedulingQueue.MoveOneToActiveOrBackoffQueue(logger, evt, nil, obj, podKey)
+						return
+					}
+				}
 				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, nil, obj, nil)
 			}
 		}
@@ -502,6 +509,13 @@ func addAllEventHandlers(
 			evt := fwk.ClusterEvent{Resource: resource, ActionType: fwk.Update}
 			funcs.UpdateFunc = func(old, obj interface{}) {
 				start := time.Now()
+				if resource == fwk.ResourceClaim {
+					if podKey := claimOwnerPodKey(obj); podKey != "" {
+						sched.SchedulingQueue.MoveOneToActiveOrBackoffQueue(logger, evt, old, obj, podKey)
+						metrics.EventHandlingLatency.WithLabelValues(evt.Label()).Observe(metrics.SinceInSeconds(start))
+						return
+					}
+				}
 				sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(logger, evt, old, obj, nil)
 				metrics.EventHandlingLatency.WithLabelValues(evt.Label()).Observe(metrics.SinceInSeconds(start))
 			}
@@ -709,4 +723,19 @@ type AdmissionResult struct {
 	Name                 string
 	Reason               string
 	InsufficientResource *noderesources.InsufficientResource
+}
+
+// claimOwnerPodKey returns the pod key (name_namespace) for a ResourceClaim
+// with a pod owner reference. Returns empty string otherwise.
+func claimOwnerPodKey(obj interface{}) string {
+	claim, ok := obj.(*resourceapi.ResourceClaim)
+	if !ok {
+		return ""
+	}
+	for _, ref := range claim.OwnerReferences {
+		if ref.Kind == "Pod" && ref.APIVersion == v1.SchemeGroupVersion.String() {
+			return ref.Name + "_" + claim.Namespace
+		}
+	}
+	return ""
 }
