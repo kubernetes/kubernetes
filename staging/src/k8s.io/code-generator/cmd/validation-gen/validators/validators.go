@@ -577,10 +577,12 @@ type FunctionGen struct {
 	// embedded or handled, and should not be wrapped by levelTagValidator.
 	StabilityLevelSelfManaged bool
 
-	// Emits, when non-nil, declares the field.Error the runtime validator
-	// produces on failure. Set via WithEmits; nil for wrappers and
-	// non-emitting validators.
-	Emits *Emission
+	// Emits, when non-empty, declares the field.Errors the runtime validator
+	// produces on failure. Set via WithEmits; empty for wrappers and
+	// non-emitting validators. A single function call may emit errors of
+	// different types and/or at different path fragments (e.g. UpdateSlice
+	// with NoAddItem and NoRemoveItem), so this is a slice.
+	Emits []Emission
 }
 
 // WithTypeArgs returns a derived FunctionGen with type arguments.
@@ -612,10 +614,11 @@ func (fg FunctionGen) WithStabilityLevel(level ValidationStabilityLevel) Functio
 	return fg
 }
 
-// WithEmits returns a new FunctionGen that declares the field.Error the
-// runtime validator produces on failure.
-func (fg FunctionGen) WithEmits(emits Emission) FunctionGen {
-	fg.Emits = &emits
+// WithEmits returns a new FunctionGen that declares the field.Errors the
+// runtime validator produces on failure. A function may emit more than one
+// distinct (type, path) tuple — pass each as a separate Emission.
+func (fg FunctionGen) WithEmits(emits ...Emission) FunctionGen {
+	fg.Emits = emits
 	return fg
 }
 
