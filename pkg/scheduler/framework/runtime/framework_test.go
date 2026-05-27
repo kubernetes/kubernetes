@@ -212,7 +212,7 @@ func (pl *TestPlugin) Name() string {
 	return pl.name
 }
 
-func (pl *TestPlugin) Less(fwk.QueuedPodInfo, fwk.QueuedPodInfo) bool {
+func (pl *TestPlugin) Less(fwk.QueuedEntityInfo, fwk.QueuedEntityInfo) bool {
 	return false
 }
 
@@ -417,7 +417,7 @@ func (pl *TestQueueSortPlugin) Name() string {
 	return queueSortPlugin
 }
 
-func (pl *TestQueueSortPlugin) Less(_, _ fwk.QueuedPodInfo) bool {
+func (pl *TestQueueSortPlugin) Less(_, _ fwk.QueuedEntityInfo) bool {
 	return false
 }
 

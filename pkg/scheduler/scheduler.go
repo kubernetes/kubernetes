@@ -72,11 +72,11 @@ type Scheduler struct {
 
 	Extenders []fwk.Extender
 
-	// NextPod should be a function that blocks until the next pod
+	// NextEntity should be a function that blocks until the next entity (pod or pod group)
 	// is available. We don't use a channel for this, because scheduling
 	// a pod may take some amount of time and we don't want pods to get
 	// stale while they sit in a channel.
-	NextPod func(logger klog.Logger) (*framework.QueuedPodInfo, error)
+	NextEntity func(logger klog.Logger) (framework.QueuedEntityInfo, error)
 
 	// FailureHandler is called upon a scheduling failure.
 	FailureHandler FailureHandlerFn
@@ -457,7 +457,7 @@ func New(ctx context.Context,
 		genericWorkloadEnabled:                 feature.DefaultFeatureGate.Enabled(features.GenericWorkload),
 		workloadAwarePreemptionEnabled:         feature.DefaultFeatureGate.Enabled(features.WorkloadAwarePreemption),
 	}
-	sched.NextPod = podQueue.Pop
+	sched.NextEntity = podQueue.Pop
 	sched.applyDefaultHandlers()
 
 	if err = addAllEventHandlers(sched, informerFactory, dynInformerFactory, resourceClaimCache, resourceSliceTracker, draManager, unionedGVKs(queueingHintsPerProfile)); err != nil {

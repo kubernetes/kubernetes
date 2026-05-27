@@ -31,6 +31,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -555,30 +556,58 @@ func nextGeneration() int64 {
 	return atomic.AddInt64(&generation, 1)
 }
 
-// QueuedPodInfo is a Pod wrapper with additional information related to
-// the pod's status in the scheduling queue, such as the timestamp when
-// it's added to the queue.
-type QueuedPodInfo struct {
-	*PodInfo
-	// The time pod added to the scheduling queue.
+// QueuedEntityInfo is an interface that represents a schedulable entity in the scheduling queue.
+// It can be a single Pod (QueuedPodInfo) or a group of Pods (QueuedPodGroupInfo).
+type QueuedEntityInfo interface {
+	fwk.QueuedEntityInfo
+	// GetName returns the name of the entity.
+	GetName() string
+	// GetNamespace returns the namespace of the entity.
+	GetNamespace() string
+	// ForEachPodInfo iterates over all QueuedPodInfos in the entity and applies the function fn.
+	// If fn returns false, the iteration stops.
+	ForEachPodInfo(fn func(pInfo *QueuedPodInfo) bool)
+	// Update updates the specified pod in the entity and returns the updated QueuedPodInfo.
+	Update(pod *v1.Pod) (*QueuedPodInfo, error)
+	// Gated returns true if the entity is gated by any plugin at PreEnqueue.
+	Gated() bool
+	// Size returns the number of pods in the entity.
+	Size() int
+	// IncAttempts increments the number of schedule attempts in QueueingParams.
+	IncAttempts()
+	// SetInitialAttemptTimestamp sets the initial attempt timestamp in QueueingParams.
+	SetInitialAttemptTimestamp(t time.Time)
+	// SetWasFlushedFromUnschedulable sets the WasFlushedFromUnschedulable flag in QueueingParams.
+	SetWasFlushedFromUnschedulable(flushed bool)
+	// SetBackoffExpiration sets the BackoffExpiration in QueueingParams.
+	SetBackoffExpiration(t time.Time)
+	// SetGatingPlugin sets the GatingPlugin in QueueingParams.
+	SetGatingPlugin(gatingPlugin string, gatingEvents []fwk.ClusterEvent)
+}
+
+// QueueingParams holds parameters related to the queueing status and history of an entity
+// (Pod or PodGroup) in the scheduling queue.
+type QueueingParams struct {
+	// The time entity added to the scheduling queue.
 	Timestamp time.Time
 	// Number of all schedule attempts before successfully scheduled.
 	// It's used to record the # attempts metric.
 	Attempts int
-	// BackoffExpiration is the time when the Pod will complete its backoff.
+	// BackoffExpiration is the time when the entity will complete its backoff.
+	// It's empty for Pods that belong to a pod group. QueuedPodGroupInfo's BackoffExpiration is used instead.
 	// If the SchedulerPopFromBackoffQ feature is enabled, the value is aligned to the backoff ordering window.
-	// Then, two Pods with the same BackoffExpiration (time bucket) are ordered by priority and eventually the timestamp,
-	// to make sure popping from the backoffQ considers priority of pods that are close to the expiration time.
+	// Then, two entities with the same BackoffExpiration (time bucket) are ordered by priority and eventually the timestamp,
+	// to make sure popping from the backoffQ considers priority of entities that are close to the expiration time.
 	BackoffExpiration time.Time
-	// The total number of the scheduling attempts that this Pod gets unschedulable.
-	// Basically it equals Attempts, but when the Pod fails with the Error status (e.g., the network error),
+	// The total number of the scheduling attempts that this entity gets unschedulable.
+	// Basically it equals Attempts, but when the entity fails with the Error status (e.g., the network error),
 	// this count won't be incremented.
-	// It's used to calculate the backoff time this Pod is obliged to get before retrying.
+	// It's used to calculate the backoff time this entity is obliged to get before retrying.
 	UnschedulableCount int
-	// The number of the error status that this Pod gets sequentially.
-	// This count is reset when the Pod gets another status than Error.
+	// The number of the error status that this entity gets sequentially.
+	// This count is reset when the entity gets another status than Error.
 	//
-	// If the error status is returned (e.g., kube-apiserver is unstable), we don't want to immediately retry the Pod and hence need a backoff retry mechanism
+	// If the error status is returned (e.g., kube-apiserver is unstable), we don't want to immediately retry the entity and hence need a backoff retry mechanism
 	// because that might push more burden to the kube-apiserver.
 	// But, we don't want to calculate the backoff time in the same way as the normal unschedulable reason
 	// since the purpose is different; the backoff for a unschedulable status etc is for the punishment of wasting the scheduling cycles,
@@ -586,125 +615,317 @@ type QueuedPodInfo struct {
 	// That's why we need to distinguish ConsecutiveErrorsCount for the error status and UnschedulableCount for the unschedulable status.
 	// See https://github.com/kubernetes/kubernetes/issues/128744 for the discussion.
 	ConsecutiveErrorsCount int
-	// WasFlushedFromUnschedulable tracks whether this pod was most recently moved to activeQ
-	// by the periodic flush from unschedulablePods due to timeout (rather than by an event).
-	// This is used to detect if the pod becomes schedulable soon after flush, which may
+	// WasFlushedFromUnschedulable tracks whether this entity was most recently moved to activeQ
+	// by the periodic flush from unschedulableEntities due to timeout (rather than by an event).
+	// This is used to detect if the entity becomes schedulable soon after flush, which may
 	// indicate queueing hint misconfigurations or event handling bugs.
-	// This flag is cleared when the pod returns to the queue for any reason.
+	// This flag is cleared when the entity returns to the queue for any reason.
 	WasFlushedFromUnschedulable bool
-	// The time when the pod is added to the queue for the first time. The pod may be added
+	// The time when the entity is added to the active queue for the first time. The entity may be added
 	// back to the queue multiple times before it's successfully scheduled.
 	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
-	// latency for a pod.
+	// latency for an entity.
 	InitialAttemptTimestamp *time.Time
-	// UnschedulablePlugins records the plugin names that the Pod failed with Unschedulable or UnschedulableAndUnresolvable status
+	// UnschedulablePlugins records the plugin names that the entity failed with Unschedulable or UnschedulableAndUnresolvable status
 	// at specific extension points: PreFilter, Filter, Reserve, or Permit (WaitOnPermit).
-	// If Pods are rejected at other extension points,
+	// If entities are rejected at other extension points,
 	// they're assumed to be unexpected errors (e.g., temporal network issue, plugin implementation issue, etc)
 	// and retried soon after a backoff period.
 	// That is because such failures could be solved regardless of incoming cluster events (registered in EventsToRegister).
 	UnschedulablePlugins sets.Set[string]
-	// PendingPlugins records the plugin names that the Pod failed with Pending status.
+	// PendingPlugins records the plugin names that the entity failed with Pending status.
 	PendingPlugins sets.Set[string]
-	// GatingPlugin records the plugin name that gated the Pod at PreEnqueue.
+	// GatingPlugin records the plugin name that gated the entity at PreEnqueue.
 	GatingPlugin string
-	// GatingPluginEvents records the events registered by the plugin that gated the Pod at PreEnqueue.
-	// We have it as a cache purpose to avoid re-computing which event(s) might ungate the Pod.
+	// GatingPluginEvents records the events registered by the plugin that gated the entity at PreEnqueue.
+	// We have it as a cache purpose to avoid re-computing which event(s) might ungate the entity.
 	GatingPluginEvents []fwk.ClusterEvent
+}
+
+func (qp *QueueingParams) GetTimestamp() time.Time {
+	return qp.Timestamp
+}
+
+func (qp *QueueingParams) GetAttempts() int {
+	return qp.Attempts
+}
+
+func (qp *QueueingParams) GetBackoffExpiration() time.Time {
+	return qp.BackoffExpiration
+}
+
+func (qp *QueueingParams) GetUnschedulableCount() int {
+	return qp.UnschedulableCount
+}
+
+func (qp *QueueingParams) GetConsecutiveErrorsCount() int {
+	return qp.ConsecutiveErrorsCount
+}
+
+func (qp *QueueingParams) GetInitialAttemptTimestamp() *time.Time {
+	return qp.InitialAttemptTimestamp
+}
+
+func (qp *QueueingParams) GetUnschedulablePlugins() sets.Set[string] {
+	return qp.UnschedulablePlugins
+}
+
+func (qp *QueueingParams) GetPendingPlugins() sets.Set[string] {
+	return qp.PendingPlugins
+}
+
+func (qp *QueueingParams) GetGatingPlugin() string {
+	return qp.GatingPlugin
+}
+
+func (qp *QueueingParams) GetGatingPluginEvents() []fwk.ClusterEvent {
+	return qp.GatingPluginEvents
+}
+
+// DeepCopy returns a deep copy of the QueueingParams object.
+func (qp *QueueingParams) DeepCopy() *QueueingParams {
+	return &QueueingParams{
+		Timestamp:                   qp.Timestamp,
+		Attempts:                    qp.Attempts,
+		UnschedulableCount:          qp.UnschedulableCount,
+		InitialAttemptTimestamp:     qp.InitialAttemptTimestamp,
+		BackoffExpiration:           qp.BackoffExpiration,
+		UnschedulablePlugins:        qp.UnschedulablePlugins.Clone(),
+		PendingPlugins:              qp.PendingPlugins.Clone(),
+		GatingPlugin:                qp.GatingPlugin,
+		GatingPluginEvents:          slices.Clone(qp.GatingPluginEvents),
+		ConsecutiveErrorsCount:      qp.ConsecutiveErrorsCount,
+		WasFlushedFromUnschedulable: qp.WasFlushedFromUnschedulable,
+	}
+}
+
+// QueuedPodInfo is a Pod wrapper with additional information related to
+// the pod's status in the scheduling queue, such as the timestamp when
+// it's added to the queue.
+type QueuedPodInfo struct {
+	*PodInfo
+	QueueingParams
 	// PodSignature for opportunistic batching
 	PodSignature fwk.PodSignature
+}
+
+func (pqi *QueuedPodInfo) Type() string {
+	return "pod"
+}
+
+func (pqi *QueuedPodInfo) ForEachPodInfo(fn func(pInfo *QueuedPodInfo) bool) {
+	_ = fn(pqi)
+}
+
+// Update updates the pod in QueuedPodInfo and clears the cached PodSignature,
+// since the updated pod may no longer match the signature computed for the previous version.
+func (pqi *QueuedPodInfo) Update(pod *v1.Pod) (*QueuedPodInfo, error) {
+	pqi.PodSignature = nil
+	err := pqi.PodInfo.Update(pod)
+	return pqi, err
 }
 
 func (pqi *QueuedPodInfo) GetPodInfo() fwk.PodInfo {
 	return pqi.PodInfo
 }
 
-func (pqi *QueuedPodInfo) GetTimestamp() time.Time {
-	return pqi.Timestamp
-}
-
-func (pqi *QueuedPodInfo) GetAttempts() int {
-	return pqi.Attempts
-}
-
-func (pqi *QueuedPodInfo) GetBackoffExpiration() time.Time {
-	return pqi.BackoffExpiration
-}
-
-func (pqi *QueuedPodInfo) GetUnschedulableCount() int {
-	return pqi.UnschedulableCount
-}
-
-func (pqi *QueuedPodInfo) GetConsecutiveErrorsCount() int {
-	return pqi.ConsecutiveErrorsCount
-}
-
-func (pqi *QueuedPodInfo) GetInitialAttemptTimestamp() *time.Time {
-	return pqi.InitialAttemptTimestamp
-}
-
-func (pqi *QueuedPodInfo) GetUnschedulablePlugins() sets.Set[string] {
-	return pqi.UnschedulablePlugins
-}
-
-func (pqi *QueuedPodInfo) GetPendingPlugins() sets.Set[string] {
-	return pqi.PendingPlugins
-}
-
-func (pqi *QueuedPodInfo) GetGatingPlugin() string {
-	return pqi.GatingPlugin
-}
-
-func (pqi *QueuedPodInfo) GetGatingPluginEvents() []fwk.ClusterEvent {
-	return pqi.GatingPluginEvents
-}
-
 // Gated returns true if the pod is gated by any plugin.
 func (pqi *QueuedPodInfo) Gated() bool {
-	return pqi.GatingPlugin != ""
+	return pqi.QueueingParams.GatingPlugin != ""
+}
+
+func (pqi *QueuedPodInfo) GetPriority() int32 {
+	return corev1helpers.PodPriority(pqi.GetPod())
 }
 
 // DeepCopy returns a deep copy of the QueuedPodInfo object.
 func (pqi *QueuedPodInfo) DeepCopy() *QueuedPodInfo {
 	return &QueuedPodInfo{
-		PodInfo:                 pqi.PodInfo.DeepCopy(),
-		Timestamp:               pqi.Timestamp,
-		Attempts:                pqi.Attempts,
-		UnschedulableCount:      pqi.UnschedulableCount,
-		InitialAttemptTimestamp: pqi.InitialAttemptTimestamp,
-		UnschedulablePlugins:    pqi.UnschedulablePlugins.Clone(),
-		BackoffExpiration:       pqi.BackoffExpiration,
-		GatingPlugin:            pqi.GatingPlugin,
-		GatingPluginEvents:      slices.Clone(pqi.GatingPluginEvents),
-		PendingPlugins:          pqi.PendingPlugins.Clone(),
-		ConsecutiveErrorsCount:  pqi.ConsecutiveErrorsCount,
-		PodSignature:            pqi.PodSignature,
+		PodInfo:        pqi.PodInfo.DeepCopy(),
+		QueueingParams: *pqi.QueueingParams.DeepCopy(),
+		PodSignature:   pqi.PodSignature,
 	}
 }
 
-// Update updates the pod in QueuedPodInfo and clears the cached PodSignature,
-// since the updated pod may no longer match the signature computed for the previous version.
-func (pqi *QueuedPodInfo) Update(pod *v1.Pod) error {
-	pqi.PodSignature = nil
-	return pqi.PodInfo.Update(pod)
+func (pqi *QueuedPodInfo) Size() int {
+	return 1
+}
+
+func (pqi *QueuedPodInfo) IncAttempts() {
+	pqi.Attempts++
+}
+
+func (pqi *QueuedPodInfo) SetInitialAttemptTimestamp(t time.Time) {
+	if pqi.InitialAttemptTimestamp == nil {
+		pqi.InitialAttemptTimestamp = &t
+	}
+}
+
+func (pqi *QueuedPodInfo) SetWasFlushedFromUnschedulable(flushed bool) {
+	pqi.WasFlushedFromUnschedulable = flushed
+}
+
+func (pqi *QueuedPodInfo) SetBackoffExpiration(t time.Time) {
+	pqi.BackoffExpiration = t
+}
+
+func (pqi *QueuedPodInfo) SetGatingPlugin(gatingPlugin string, gatingEvents []fwk.ClusterEvent) {
+	pqi.GatingPlugin = gatingPlugin
+	pqi.GatingPluginEvents = gatingEvents
 }
 
 // ClearRejectorPlugins clears the plugin-related fields that track why a pod
 // was rejected in a previous scheduling attempt.
 func (pqi *QueuedPodInfo) ClearRejectorPlugins() {
-	pqi.UnschedulablePlugins.Clear()
-	pqi.PendingPlugins.Clear()
-	pqi.GatingPlugin = ""
-	pqi.GatingPluginEvents = nil
+	pqi.QueueingParams.UnschedulablePlugins.Clear()
+	pqi.QueueingParams.PendingPlugins.Clear()
+	pqi.QueueingParams.GatingPlugin = ""
+	pqi.QueueingParams.GatingPluginEvents = nil
 }
 
 // QueuedPodGroupInfo is a PodGroupInfo wrapper with additional information related to
 // the pod group's status in the scheduling queue and stores all queued pods from that pod group.
 type QueuedPodGroupInfo struct {
 	*PodGroupInfo
+	QueueingParams
 	// QueuedPodInfos are the pod group's pods that are currently queued.
-	// The order of the pods is deterministic and based on the priority and InitialAttemptTimestamp.
+	// The order of the pods is deterministic and based on the priority and timestamp.
 	QueuedPodInfos []*QueuedPodInfo
+}
+
+func (pgqi *QueuedPodGroupInfo) Type() string {
+	return "podgroup"
+}
+
+// AddPod adds a pod to the queued pod group info.
+func (pgqi *QueuedPodGroupInfo) AddPod(pInfo *QueuedPodInfo) {
+	index, _ := slices.BinarySearchFunc(pgqi.QueuedPodInfos, pInfo, PodGroupMemberPodsOrderingFunc)
+	pgqi.QueuedPodInfos = slices.Insert(pgqi.QueuedPodInfos, index, pInfo)
+	pgqi.UnscheduledPods = slices.Insert(pgqi.UnscheduledPods, index, pInfo.Pod)
+}
+
+// RemovePod removes a pod from the queued pod group info.
+func (pgqi *QueuedPodGroupInfo) RemovePod(pod *v1.Pod) *QueuedPodInfo {
+	for i, pInfo := range pgqi.QueuedPodInfos {
+		if pInfo.Pod.Name == pod.Name && pInfo.Pod.Namespace == pod.Namespace {
+			pgqi.QueuedPodInfos = slices.Delete(pgqi.QueuedPodInfos, i, i+1)
+			pgqi.UnscheduledPods = slices.Delete(pgqi.UnscheduledPods, i, i+1)
+			return pInfo
+		}
+	}
+	return nil
+}
+
+// SetPods sets the pods in the queued pod group info, overwriting the existing ones.
+func (pgqi *QueuedPodGroupInfo) SetPods(pInfos []*QueuedPodInfo) {
+	pgqi.QueuedPodInfos = pInfos
+	slices.SortStableFunc(pgqi.QueuedPodInfos, PodGroupMemberPodsOrderingFunc)
+	pgqi.UnscheduledPods = make([]*v1.Pod, 0, len(pgqi.QueuedPodInfos))
+	for _, pInfo := range pgqi.QueuedPodInfos {
+		pgqi.UnscheduledPods = append(pgqi.UnscheduledPods, pInfo.Pod)
+	}
+}
+
+// PodGroupMemberPodsOrderingFunc orders pod group member pods by priority (descending),
+// attempts (descending), and then by timestamp (ascending).
+func PodGroupMemberPodsOrderingFunc(a, b *QueuedPodInfo) int {
+	if a.GetPriority() > b.GetPriority() {
+		return -1
+	} else if a.GetPriority() < b.GetPriority() {
+		return 1
+	}
+	// Priorities are equal, use attempts as tie-breaker.
+	// Since timestamps are recreated after each scheduling cycle,
+	// pods with higher attempts (i.e. older pods) should appear first.
+	if a.Attempts > b.Attempts {
+		return -1
+	} else if a.Attempts < b.Attempts {
+		return 1
+	}
+	// Priorities and attempts are equal, use timestamp as tie-breaker.
+	if a.Timestamp.Before(b.Timestamp) {
+		return -1
+	} else if a.Timestamp.After(b.Timestamp) {
+		return 1
+	}
+	// Return 0 when priority, attempts and timestamp are equal.
+	// This relies on slices.SortStableFunc to preserve consistent order for the same set of pods.
+	return 0
+}
+
+func (pgqi *QueuedPodGroupInfo) ForEachPodInfo(fn func(pInfo *QueuedPodInfo) bool) {
+	for _, pInfo := range pgqi.QueuedPodInfos {
+		ok := fn(pInfo)
+		if !ok {
+			return
+		}
+	}
+}
+
+func (pgqi *QueuedPodGroupInfo) Update(pod *v1.Pod) (*QueuedPodInfo, error) {
+	for _, pInfo := range pgqi.QueuedPodInfos {
+		if pInfo.Pod.Name == pod.Name && pInfo.Pod.Namespace == pod.Namespace {
+			err := pInfo.PodInfo.Update(pod)
+			// Pod update shouldn't change the priority or timestamp, so it's safe to keep the precomputed pod group priority.
+			return pInfo, err
+		}
+	}
+	return nil, fmt.Errorf("pod %s/%s to update not found in the queued group info", pod.Namespace, pod.Name)
+}
+
+// Gated returns true if the pod is gated by any plugin.
+func (pgqi *QueuedPodGroupInfo) Gated() bool {
+	return pgqi.QueueingParams.GatingPlugin != ""
+}
+
+// GetPriority returns the pod group's priority.
+// It returns the priority of the first member pod, because all member pods should have the same priority.
+func (pgqi *QueuedPodGroupInfo) GetPriority() int32 {
+	// TODO(macsko): Update this to return PodGroup object's priority instead.
+	return pgqi.QueuedPodInfos[0].GetPriority()
+}
+
+func (pgqi *QueuedPodGroupInfo) Size() int {
+	return len(pgqi.QueuedPodInfos)
+}
+
+func (pgqi *QueuedPodGroupInfo) IncAttempts() {
+	pgqi.Attempts++
+	for _, pInfo := range pgqi.QueuedPodInfos {
+		pInfo.IncAttempts()
+	}
+}
+
+func (pgqi *QueuedPodGroupInfo) SetInitialAttemptTimestamp(t time.Time) {
+	if pgqi.InitialAttemptTimestamp == nil {
+		pgqi.InitialAttemptTimestamp = &t
+	}
+	// A new pod might get added to the pod group, even after the initial
+	// attempt timestamp has been set. We need to always try to set the initial
+	// attempt timestamp for all member pods.
+	for _, pInfo := range pgqi.QueuedPodInfos {
+		pInfo.SetInitialAttemptTimestamp(t)
+	}
+}
+
+func (pgqi *QueuedPodGroupInfo) SetWasFlushedFromUnschedulable(flushed bool) {
+	pgqi.WasFlushedFromUnschedulable = flushed
+	for _, pInfo := range pgqi.QueuedPodInfos {
+		pInfo.SetWasFlushedFromUnschedulable(flushed)
+	}
+}
+
+func (pgqi *QueuedPodGroupInfo) SetBackoffExpiration(t time.Time) {
+	// It doesn't have to set BackoffExpiration for all members, as they all share the same backoff
+	// expiration time.
+	pgqi.BackoffExpiration = t
+}
+
+func (pgqi *QueuedPodGroupInfo) SetGatingPlugin(gatingPlugin string, gatingEvents []fwk.ClusterEvent) {
+	// It shouldn't set GatingPlugin and GatingPluginEvents for all members,
+	// as each pod has its own gating plugin and events.
+	pgqi.GatingPlugin = gatingPlugin
+	pgqi.GatingPluginEvents = gatingEvents
 }
 
 // PodGroupInfo is a wrapper around the PodGroup API object together with a list of pods that belong to the pod group.
@@ -751,6 +972,14 @@ type PodInfo struct {
 	// Note: cachedResource field shouldn't be accessed directly.
 	// Use calculateResource method to obtain it instead.
 	cachedResource *fwk.PodResource
+}
+
+func (pi *PodInfo) GetName() string {
+	return pi.Pod.Name
+}
+
+func (pi *PodInfo) GetNamespace() string {
+	return pi.Pod.Namespace
 }
 
 func (pi *PodInfo) GetPod() *v1.Pod {
@@ -1192,6 +1421,11 @@ func GetPodKey(pod *v1.Pod) (string, error) {
 		return "", errors.New("cannot get cache key for pod with empty UID")
 	}
 	return uid, nil
+}
+
+// GetPodNamespacedName returns the string format of a pod's namespaced name.
+func GetPodNamespacedName(pod *v1.Pod) string {
+	return GetNamespacedName(pod.Namespace, pod.Name)
 }
 
 // GetNamespacedName returns the string format of a namespaced resource name.

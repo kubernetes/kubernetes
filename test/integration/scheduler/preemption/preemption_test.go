@@ -1524,7 +1524,7 @@ func TestAsyncPreemption(t *testing.T) {
 						if !podInUnschedulablePodPool(t, testCtx.Scheduler.SchedulingQueue, scenario.podGatedInQueue) {
 							t.Fatalf("Expected the pod %s to be in the queue even after the activation", scenario.podGatedInQueue)
 						}
-						if pInfo, _ := testCtx.Scheduler.SchedulingQueue.GetPod(scenario.podGatedInQueue, testCtx.NS.Name); pInfo == nil || !pInfo.Gated() {
+						if pInfo, _ := testCtx.Scheduler.SchedulingQueue.GetPod(scenario.podGatedInQueue, testCtx.NS.Name, nil); pInfo == nil || !pInfo.Gated() {
 							t.Fatalf("Expected the pod %s to be gated", scenario.podGatedInQueue)
 						}
 					case scenario.podRunningPreemption != nil:

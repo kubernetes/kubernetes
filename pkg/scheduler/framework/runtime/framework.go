@@ -812,12 +812,12 @@ func (f *frameworkImpl) EnqueueExtensions() []fwk.EnqueueExtensions {
 	return f.enqueueExtensions
 }
 
-// QueueSortFunc returns the function to sort pods in scheduling queue
+// QueueSortFunc returns the function to sort entities in scheduling queue
 func (f *frameworkImpl) QueueSortFunc() fwk.LessFunc {
 	if f == nil {
 		// If frameworkImpl is nil, simply keep their order unchanged.
 		// NOTE: this is primarily for tests.
-		return func(_, _ fwk.QueuedPodInfo) bool { return false }
+		return func(_, _ fwk.QueuedEntityInfo) bool { return false }
 	}
 
 	if len(f.queueSortPlugins) == 0 {
