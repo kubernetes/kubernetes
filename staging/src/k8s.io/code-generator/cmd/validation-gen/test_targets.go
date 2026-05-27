@@ -437,14 +437,18 @@ func collectRules(node *typeNode) fieldRules {
 
 // recordRules descends fg, accumulating Wrapper/MultiWrapperFunction
 // PathFragments into suffix, and records (basePath+suffix, Rule) at each
-// emitting leaf (Emits != nil).
+// emitting leaf. A FunctionGen may declare multiple Emissions when the
+// runtime emits errors of different types or at different path fragments
+// from the same call (e.g. UpdateSlice with NoAddItem and NoRemoveItem).
 func recordRules(rules fieldRules, basePath string, fg validators.FunctionGen, suffix string) {
-	if fg.Emits != nil {
-		path := basePath + suffix + fg.Emits.PathFragment
-		rules[path] = append(rules[path], rule{
-			ErrorType: string(fg.Emits.Type),
-			Origin:    fg.Emits.Origin,
-		})
+	if len(fg.Emits) > 0 {
+		for _, e := range fg.Emits {
+			path := basePath + suffix + e.PathFragment
+			rules[path] = append(rules[path], rule{
+				ErrorType: string(e.Type),
+				Origin:    e.Origin,
+			})
+		}
 		return
 	}
 	for _, arg := range fg.Args {
