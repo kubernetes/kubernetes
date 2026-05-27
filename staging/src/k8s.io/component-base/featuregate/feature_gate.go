@@ -1033,6 +1033,15 @@ func (f *featureGate) Freeze() error {
 	return nil
 }
 
+// ThawForTest.
+func (f *featureGate) ThawForTest() {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.frozen = false
+	f.firstReadStack = ""
+	f.firstRead = sync.Once{}
+}
+
 // AddFlag adds a flag for setting global feature gates to the specified FlagSet.
 func (f *featureGate) AddFlag(fs *pflag.FlagSet) {
 	// TODO(mtaufen): Shouldn't we just close it on the first Set/SetFromMap instead?

@@ -363,7 +363,7 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 	if !fs.Changed("advertise-address") && !fs.Changed("endpoint-reconciler-type") {
 		s.EndpointReconcilerType = "none"
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(zpagesfeatures.ComponentFlagz) {
+	if featureGate.Enabled(zpagesfeatures.ComponentFlagz) {
 		s.Flagz = flagz.NamedFlagSetsReader{FlagSets: namedFlagSets}
 	}
 
@@ -394,15 +394,18 @@ func StartTestServer(t ktesting.TB, instanceOptions *TestServerInstanceOptions, 
 		featuregatetesting.SetFeatureGateVersionsDuringTest(t, utilfeature.DefaultMutableFeatureGate, effectiveVersion.EmulationVersion(), effectiveVersion.MinCompatibilityVersion())
 	}
 	featureOverrides := map[featuregate.Feature]bool{}
-	for f := range utilfeature.DefaultMutableFeatureGate.GetAll() {
-		if featureGate.Enabled(f) != utilfeature.DefaultFeatureGate.Enabled(f) {
-			featureOverrides[f] = featureGate.Enabled(f)
+	{
+		// compare to Enabled() state in a copy of DefaultFeatureGate to avoid tripping pre-Freeze() Enabled() check detection
+		defaultFeatureGateCopy := utilfeature.DefaultFeatureGate.DeepCopy()
+		for f := range utilfeature.DefaultMutableFeatureGate.GetAll() {
+			if featureGate.Enabled(f) != defaultFeatureGateCopy.Enabled(f) {
+				featureOverrides[f] = featureGate.Enabled(f)
+			}
 		}
 	}
 	if len(featureOverrides) > 0 {
 		featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featureOverrides)
 	}
-	utilfeature.DefaultMutableFeatureGate.AddMetrics()
 
 	if instanceOptions.EnableCertAuth {
 		if featureGate.Enabled(genericfeatures.UnknownVersionInteroperabilityProxy) {
