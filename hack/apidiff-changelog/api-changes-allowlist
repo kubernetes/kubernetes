@@ -15,6 +15,7 @@
 # - ./kubernetes/typed/certificates/v1alpha1.(*CertificatesV1alpha1Client).PodCertificateRequests: removed
 # - ./kubernetes/typed/certificates/v1alpha1.PodCertificateRequestsGetter.PodCertificateRequests, method set of CertificatesV1alpha1Interface: removed
 # - ./kubernetes/typed/certificates/v1alpha1/fake.(*FakeCertificatesV1alpha1).PodCertificateRequests: removed
+
 ^- \./(informers|kubernetes/typed)/[a-z]+/v[a-z0-9]+(\.[a-zA-Z0-9]+)?\.[a-zA-Z0-9]+(, method set of .*)?: (added|removed|old is comparable, new is not)$
 ^- \./kubernetes(\.Interface|/fake...Clientset.|...Clientset.)\.[A-Za-z]+V[a-z0-9]+(, method set of .*)?: (added|removed)$
 ^- \./kubernetes/typed/[a-z]+/v[a-z0-9]+(/fake)?\.(..[a-zA-Z0-9]+.|[a-zA-Z0-9]+)\.[a-zA-Z0-9]+(, method set of .*)?: (added|removed|old is comparable, new is not)$

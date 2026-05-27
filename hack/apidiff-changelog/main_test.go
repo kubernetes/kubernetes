@@ -17,10 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"bytes"
-	"errors"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -311,118 +307,6 @@ func TestInsertHeading(t *testing.T) {
 	}
 }
 
-func TestRun(t *testing.T) {
-	tempDir := t.TempDir()
-
-	t.Run("insert-mode", func(t *testing.T) {
-		changelogPath := filepath.Join(tempDir, "insert-test.md")
-		if err := os.WriteFile(changelogPath, []byte("# Existing\n"), 0644); err != nil {
-			t.Fatal(err)
-		}
-
-		err := run(changelogPath, false, true, "test changes", "Replace with a short title", "Replace this text with a short summary of the change\nand how users of the package can deal with this breaking\nchange. If users are not expected to be affected, then\ninstead explain why. If the changes are too long,\nyou may shorten them by replacing multiple lines\nwith three dots (...).")
-		if err != nil {
-			t.Errorf("run() insert mode error = %v", err)
-		}
-
-		content, err := os.ReadFile(changelogPath)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if !strings.Contains(string(content), "```\ntest changes\n```") {
-			t.Errorf("run() insert mode did not insert changes, got instead:\n%s", string(content))
-		}
-	})
-
-	t.Run("verify-mode-success", func(t *testing.T) {
-		changelogPath := filepath.Join(tempDir, "verify-success.md")
-		markdown := `### Breaking Change
-
-Description
-
-` + "```" + `
-line1
-line2
-` + "```" + `
-`
-		if err := os.WriteFile(changelogPath, []byte(markdown), 0644); err != nil {
-			t.Fatal(err)
-		}
-
-		err := run(changelogPath, true, false, "line1\nline2\n", "", "")
-		if err != nil {
-			t.Errorf("run() verify mode error = %v, expected success", err)
-		}
-	})
-
-	t.Run("verify-mode-with-wildcard", func(t *testing.T) {
-		changelogPath := filepath.Join(tempDir, "verify-wildcard.md")
-		markdown := `### Breaking Change
-
-Description
-
-` + "```" + `
-line1
-...
-line4
-` + "```" + `
-`
-		if err := os.WriteFile(changelogPath, []byte(markdown), 0644); err != nil {
-			t.Fatal(err)
-		}
-
-		err := run(changelogPath, true, false, "line1\nline2\nline3\nline4\n", "", "")
-		if err != nil {
-			t.Errorf("run() verify mode with wildcard error = %v, expected success", err)
-		}
-	})
-
-	t.Run("verify-mode-failure", func(t *testing.T) {
-		changelogPath := filepath.Join(tempDir, "verify-fail.md")
-		markdown := `### Breaking Change
-
-Description
-
-` + "```" + `
-different content
-` + "```" + `
-`
-		if err := os.WriteFile(changelogPath, []byte(markdown), 0644); err != nil {
-			t.Fatal(err)
-		}
-
-		err := run(changelogPath, true, false, "expected content", "", "")
-		if !errors.Is(err, errVerificationFail) {
-			t.Errorf("run() verify mode error = %v, expected errVerificationFail", err)
-		}
-	})
-
-	t.Run("missing-changes-flag", func(t *testing.T) {
-		changelogPath := filepath.Join(tempDir, "test.md")
-		err := run(changelogPath, true, false, "", "", "")
-		if err == nil {
-			t.Error("run() with empty changes should return error")
-		}
-	})
-
-	t.Run("both-flags-set", func(t *testing.T) {
-		changelogPath := filepath.Join(tempDir, "test.md")
-		err := run(changelogPath, true, true, "changes", "", "")
-		if !errors.Is(err, errOperation) {
-			t.Errorf("run() with both flags error = %v, expected errOperation", err)
-		}
-	})
-
-	t.Run("no-flags-set", func(t *testing.T) {
-		changelogPath := filepath.Join(tempDir, "test.md")
-		err := run(changelogPath, false, false, "changes", "", "")
-		if !errors.Is(err, errOperation) {
-			t.Errorf("run() with no flags error = %v, expected errOperation", err)
-		}
-	})
-}
-
 func TestFilterChanges(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -512,16 +396,122 @@ func TestFilterChanges(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			input := bytes.NewBufferString(tt.input)
-			var output bytes.Buffer
-
-			err := grepAPIChanges(input, &output, tt.exclude)
+			got, err := filterChanges(tt.input, tt.exclude)
 			if err != nil {
-				t.Fatalf("grepAPIChanges() error = %v", err)
+				t.Fatalf("filterChanges() error = %v", err)
 			}
 
-			if output.String() != tt.expected {
-				t.Errorf("grepAPIChanges() output mismatch\nGot:\n%s\nExpected:\n%s", output.String(), tt.expected)
+			if got != tt.expected {
+				t.Errorf("filterChanges() output mismatch\nGot:\n%s\nExpected:\n%s", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestOutputName(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{input: "./", expected: "__.out"},
+		{input: "./staging/src/k8s.io/client-go", expected: "__staging_src_k8s_io_client-go.out"},
+		{input: ".", expected: "_.out"},
+		{input: "simple", expected: "simple.out"},
+		{input: "with spaces", expected: "with_spaces.out"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := outputName(tt.input)
+			if got != tt.expected {
+				t.Errorf("outputName(%q) = %q, want %q", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSplitApidiffSections(t *testing.T) {
+	tests := []struct {
+		name             string
+		lines            []string
+		expectedPreamble string
+		expectedIncompat []string
+		expectedCompat   []string
+	}{
+		{
+			name: "both-sections",
+			lines: []string{
+				"Incompatible changes:",
+				"- pkg1: removed",
+				"- pkg2: changed",
+				"Compatible changes:",
+				"- pkg3: added",
+			},
+			expectedPreamble: "",
+			expectedIncompat: []string{"- pkg1: removed", "- pkg2: changed"},
+			expectedCompat:   []string{"- pkg3: added"},
+		},
+		{
+			name: "incompatible-only",
+			lines: []string{
+				"Incompatible changes:",
+				"- pkg1: removed",
+			},
+			expectedPreamble: "",
+			expectedIncompat: []string{"- pkg1: removed"},
+			expectedCompat:   nil,
+		},
+		{
+			name: "compatible-only",
+			lines: []string{
+				"Compatible changes:",
+				"- pkg1: added",
+			},
+			expectedPreamble: "",
+			expectedIncompat: nil,
+			expectedCompat:   []string{"- pkg1: added"},
+		},
+		{
+			name: "sorting",
+			lines: []string{
+				"Incompatible changes:",
+				"- zzz: removed",
+				"- aaa: changed",
+			},
+			expectedPreamble: "",
+			expectedIncompat: []string{"- aaa: changed", "- zzz: removed"},
+			expectedCompat:   nil,
+		},
+		{
+			name:             "empty",
+			lines:            []string{},
+			expectedPreamble: "",
+			expectedIncompat: nil,
+			expectedCompat:   nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			preamble, incompat, compat := splitApidiffSections(tt.lines)
+			if preamble != tt.expectedPreamble {
+				t.Errorf("preamble = %q, want %q", preamble, tt.expectedPreamble)
+			}
+			if len(incompat) != len(tt.expectedIncompat) {
+				t.Errorf("incompatible count = %d, want %d: %v", len(incompat), len(tt.expectedIncompat), incompat)
+			} else {
+				for i := range incompat {
+					if incompat[i] != tt.expectedIncompat[i] {
+						t.Errorf("incompatible[%d] = %q, want %q", i, incompat[i], tt.expectedIncompat[i])
+					}
+				}
+			}
+			if len(compat) != len(tt.expectedCompat) {
+				t.Errorf("compatible count = %d, want %d: %v", len(compat), len(tt.expectedCompat), compat)
+			} else {
+				for i := range compat {
+					if compat[i] != tt.expectedCompat[i] {
+						t.Errorf("compatible[%d] = %q, want %q", i, compat[i], tt.expectedCompat[i])
+					}
+				}
 			}
 		})
 	}

@@ -23,8 +23,6 @@
 # compatible changes or all incompatible changes are documented, the script
 # returns success.
 
-CHANGELOG="CHANGELOG.md"
-
 usage () {
   cat <<EOF >&2
 Usage: $0 [-r <revision>] [directory ...]"
@@ -37,7 +35,7 @@ Usage: $0 [-r <revision>] [directory ...]"
                   staging repo. May be given more than once. Must be an
                   absolute path.
                   WARNING: this will modify the go.mod in that directory.
-   -u             Update ${CHANGELOG} files if incompatible changes are found.
+   -u             Update changelog files if incompatible changes are found.
    -m             When enabled, -t must be used and must be given a merge commit
                   for a GitHub pull request. The diff is then calculated for
                   the merged branch. When updating the changelog, populates
@@ -55,6 +53,7 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
+cd "${KUBE_ROOT}"
 
 base=
 target=
@@ -177,224 +176,16 @@ echo "Checking $(if [ -n "${target}" ]; then describe "${target}"; else echo "cu
 kube::golang::setup_env
 kube::util::ensure-temp-dir
 
-# Install apidiff and make sure it's found.
+# Install tools and make sure they are found.
 export GOBIN="${KUBE_TEMP}"
 PATH="${GOBIN}:${PATH}"
 echo "Installing apidiff into ${GOBIN}."
 go install golang.org/x/exp/cmd/apidiff@latest
-
-# Build api-changelog tool
-echo "Building api-changelog tool."
-go install ./hack/api-changelog
-
-cd "${KUBE_ROOT}"
-
-# output_name targets a target directory and prints the base name of
-# an output file for that target.
-output_name () {
-    what="$1"
-
-    echo "${what}" | sed -e 's/[^a-zA-Z0-9_-]/_/g' -e 's/$/.out/'
-}
-
-# run invokes apidiff once per target and stores the output
-# file(s) in the given directory.
-#
-# shellcheck disable=SC2317 # "Command appears to be unreachable" - gets called indirectly.
-run () {
-    out="$1"
-    mkdir -p "$out"
-    for d in "${targets[@]}"; do
-        if ! [ -d "${d}" ]; then
-            echo "module ${d} does not exist, skipping ..."
-            continue
-        fi
-        # cd to the path for modules that are intree but not part of the go workspace
-        # per example staging/src/k8s.io/code-generator/examples
-        (
-            cd "${d}"
-            apidiff -m -w "${out}/$(output_name "${d}")" .
-        ) &
-    done
-    wait
-}
-
-# inWorktree checks out a specific revision, then invokes the given
-# command there.
-#
-# shellcheck disable=SC2317 # "Command appears to be unreachable" - gets called indirectly.
-inWorktree () {
-    local worktree="$1"
-    shift
-    local rev="$1"
-    shift
-
-    # Create a copy of the repo with the specific revision checked out.
-    # Might already have been done before.
-    if ! [ -d "${worktree}" ]; then
-        git worktree add -f -d "${worktree}" "${rev}"
-        # Clean up the copy on exit.
-        kube::util::trap_add "git worktree remove -f ${worktree}" EXIT
-    fi
-
-    # Ready for apidiff.
-    (
-        cd "${worktree}"
-        "$@"
-    )
-}
-
-# inTarget runs the given command in the target revision of Kubernetes,
-# checking it out in a work tree if necessary.
-inTarget () {
-    if [ -z "${target}" ]; then
-        "$@"
-    else
-        inWorktree "${KUBE_TEMP}/target" "${target}" "$@"
-    fi
-}
-
-# Dump old and new api state.
-inTarget run "${KUBE_TEMP}/after"
-inWorktree "${KUBE_TEMP}/base" "${base}" run "${KUBE_TEMP}/before"
-
-# Now produce a report. All changes get reported because exporting some API
-# unnecessarily might also be good to know, but the final exit code will only
-# be non-zero if there are incompatible changes.
-#
-# The report is Markdown-formatted and can be copied into a PR comment verbatim.
-failures=()
-declare -A changelog_updates
-echo
-compare () {
-    what="$1"
-    before="$2"
-    after="$3"
-    if [ ! -f "${before}" ] || [ ! -f "${after}" ]; then
-        echo "can not compare changes, module didn't exist before or after"
-        return
-    fi
-    changes=$(apidiff -m "${before}" "${after}" 2>&1 | grep -v -e "^Ignoring internal package") || true
-    incompatible=
-    echo "## ${what}"
-    if [ -z "$changes" ]; then
-        echo "no changes"
-    else
-        # The output contains incompatible changes first, then compatible ones.
-        # Both are optional. To find exactly the incompatible ones, we first
-        # drop the compatible ones (if present) at the end, then look for the
-        # incompatible changes. What's left is the header.
-        #
-        # The content of each section is unsorted. We fix this via sorting
-        # the lines within each section because it makes the output more
-        # predictable and is crucial for comparison of the incompatible
-        # changes against the CHANGELOG.md (if there is any).
-        sep=$(echo "$changes" | grep -n '^Compatible changes:$' | sed -e 's/:.*//') || true
-        compatible=
-        if [ -n "$sep" ]; then
-            compatible=$(echo "$changes" | tail -n "+$((sep + 1))" | LC_ALL=C sort) || true
-            changes=$(echo "$changes" | head -n "$((sep-1))") || true
-        fi
-        sep=$(echo "$changes" | grep -n '^Incompatible changes:$' | sed -e 's/:.*//') || true
-        tolerated=
-        if [ -n "$sep" ]; then
-            # This is where we filter out certain known harmless changes.
-            # Regular expressions for known harmless incompatible changes are stored
-            # in hack/api-changelog/api-changes-allowlist.
-            #
-            # We can do that here in a generic script because the regular expressions for client-go
-            # are unlikely to match incorrectly in a different component. If this ever changes,
-            # then we can also store per-component filters in special file in
-            # the component and load them from there.
-            incompatible=$(echo "$changes" | tail -n "+$((sep + 1))" | LC_ALL=C sort) || true
-            tolerated=$(echo "$incompatible" | api-changelog -grep-allowed-api-changes) || true
-            incompatible=$(echo "$incompatible" | api-changelog -v -grep-allowed-api-changes) || true
-            changes=$(echo "$changes" | head -n "$((sep-1))") || true
-        fi
-        # One of these strings must contain some change.
-        echo "$changes"
-        if [ -n "$incompatible" ]; then
-            echo "Incompatible changes:"
-            echo "${incompatible}"
-        fi
-        if [ -n "$tolerated" ]; then
-            echo "Acceptable incompatible changes:"
-            echo "${tolerated}"
-        fi
-        if [ -n "$compatible" ]; then
-            echo "Compatible changes:"
-            echo "${compatible}"
-        fi
-
-        echo
-    fi
-    if [ -n "$incompatible" ]; then
-        # Does this directory have a changelog?
-        # If yes, then maybe it already contains this incompatible change.
-        changelog="${what}/${CHANGELOG}"
-        if [ -f "${changelog}" ]; then
-            # Use api-changelog tool to verify that incompatible changes are documented.
-            # Exit codes: 0=success, 1=error, 2=verification failed
-            set +e
-            verify_output=$(api-changelog -verify -changelog="${changelog}" -changes="${incompatible}" 2>&1)
-            verify_result=$?
-            set -e
-            if [ ${verify_result} -eq 0 ]; then
-                # Documented => don't track it as a reason for failure.
-                return 0
-            elif [ ${verify_result} -eq 1 ]; then
-                # Unexpected error from api-changelog tool
-                echo "ERROR: api-changelog verification failed with unexpected error:" >&2
-                echo "${verify_output}" >&2
-                exit 1
-            fi
-
-            # verify_result == 2 means changes not found, so let's add it.
-            # Copy the original changelog to a temp location and update it there.
-            temp_changelog="${KUBE_TEMP}/${changelog}"
-            mkdir -p "$(dirname "${temp_changelog}")"
-            cp "${changelog}" "${temp_changelog}"
-            if ${from_merge_commit}; then
-                # Example for a body:
-                #
-                # Merge pull request #137170 from pohly/dra-device-taints-beta
-                #
-                # DRA device taints: graduate to beta
-                #
-                # Parsing this is good enough for actual merge commits in Kubernetes 1.36.
-                # It's not meant to catch errors or unexpected body content.
-                body=$(git show --no-patch --format=%B "${merge_commit}")
-                # shellcheck disable=SC2207 # Here we intentionally split into words.
-                commit_summary=( $(echo "${body}" | head -n 1) )
-                pr=${commit_summary[3]}
-                pr=${pr#?}
-                title=$(echo "${body}" | tail -n 1)
-                description="See [PR #${pr}](https://github.com/kubernetes/kubernetes/pull/${pr})."
-                api-changelog -insert -changelog="${temp_changelog}" -changes="${incompatible}" -title="${title}" -description="${description}"
-            else
-                api-changelog -insert -changelog="${temp_changelog}" -changes="${incompatible}"
-            fi
-
-            # When updating in-place, copy back. Otherwise remember that we have an updated changelog
-            # for printing a patch at the end.
-            if ${update_changelog}; then
-                cp "${temp_changelog}" "${changelog}"
-            else
-                changelog_updates["${changelog}"]="${temp_changelog}"
-            fi
-        fi
-        failures+=("${what}")
-    fi
-}
-
-for d in "${targets[@]}"; do
-    compare "${d}" "${KUBE_TEMP}/before/$(output_name "${d}")" "${KUBE_TEMP}/after/$(output_name "${d}")"
-done
+echo "Building apidiff tool."
+go install ./hack/apidiff-changelog
 
 # tryBuild checks whether some other project builds with the staging repos
 # of the current Kubernetes directory.
-#
-# shellcheck disable=SC2317 # "Command appears to be unreachable" - gets called indirectly.
 tryBuild () {
     local build="$1"
 
@@ -420,37 +211,40 @@ tryBuild () {
     )
 }
 
+# Build the flags for apidiff-changelog.
+apidiff_flags=(-base="${base}")
+if [ -n "${target}" ]; then
+    apidiff_flags+=(-target="${target}")
+fi
+if ${update_changelog}; then
+    apidiff_flags+=(-update-changelog)
+fi
+if ${from_merge_commit}; then
+    apidiff_flags+=(-merge-commit="${merge_commit}")
+fi
+
 res=0
-if [ ${#failures[@]} -gt 0 ]; then
+set +e
+apidiff-changelog "${apidiff_flags[@]}" "${targets[@]}"
+apidiff_exit=$?
+set -e
+
+# Fail if apidiff-changelog failed, unless the exit code indicates that all
+# incompatible changes were documented.
+if [ "${apidiff_exit}" -ne 0 ] && ! [ "${apidiff_exit}" -ne 3 ]; then
     res=1
-    echo
-    echo "Detected incompatible changes on modules:"
-    printf '%s\n' "${failures[@]}"
+fi
+
+# Were any incompatible changes detected?
+if [ "${apidiff_exit}" -gt 1 ] && [ ${#builds[@]} -gt 0 ]; then
     cat <<EOF
-
-Some notes about API differences:
-
-Changes in internal packages are usually okay.
-However, remember that custom schedulers
-and scheduler plugins depend on pkg/scheduler/framework.
-
-API changes in staging repos are more critical.
-Try to avoid them as much as possible.
-But sometimes changing an API is the lesser evil
-and/or the impact on downstream consumers is low.
-Use common sense and code searches.
-EOF
-
-    if [ ${#builds[@]} -gt 0 ]; then
-
-cat <<EOF
 
 To help with assessing the real-world impact of an
 API change, $0 will now try to build code in
 ${builds[@]}.
 EOF
 
-        if [[ "${builds[*]}" =~ controller-runtime ]]; then
+    if [[ "${builds[*]}" =~ controller-runtime ]]; then
 cat <<EOF
 
 controller-runtime is used because
@@ -467,45 +261,21 @@ explicitly states that a controller-runtime
 release cannot be expected to work with a newer
 release of the Kubernetes Go packages.
 EOF
-        fi
+    fi
 
-        for build in "${builds[@]}"; do
-            echo
-            echo "vvvvvvvvvvvvvvvv ${build} vvvvvvvvvvvvvvvvvv"
-            if inTarget tryBuild "${build}"; then
-                echo "${build} builds without errors."
-            else
-                cat <<EOF
+    for build in "${builds[@]}"; do
+        echo
+        echo "vvvvvvvvvvvvvvvv ${build} vvvvvvvvvvvvvvvvvv"
+        if tryBuild "${build}"; then
+            echo "${build} builds without errors."
+        else
+            cat <<EOF
 
 WARNING: Building ${build} failed. This may or may not be because of the API changes!
 EOF
-            fi
-            echo "^^^^^^^^^^^^^^^^ ${build} ^^^^^^^^^^^^^^^^^^"
-        done
-    fi
-
-    if [[ -n "${!changelog_updates[*]}" ]]; then
-        cat <<EOF
-
-Run the following command to add the incompatible changes to
-the ${CHANGELOG} file(s), edit the modified file(s) to
-replace the template text in the new section at the top
-with and explanation of the changes, then include the result
-in the pull request for review:
-
-    hack/apidiff.sh -u -r ${base} ${target:+-t ${target} }${targets[*]}
-
-Alternatively, apply the following diff by piping it into "patch -p0":
-
-vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-EOF
-        for changelog in "${!changelog_updates[@]}"; do
-            temp_changelog="${changelog_updates[$changelog]}"
-            diff -c "${changelog}" "${temp_changelog}" || true
-        done
-        echo "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"
-        echo
-    fi
+        fi
+        echo "^^^^^^^^^^^^^^^^ ${build} ^^^^^^^^^^^^^^^^^^"
+    done
 fi
 
 exit "$res"
