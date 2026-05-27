@@ -362,6 +362,9 @@ func (p *Plugin) admitPodStatus(nodeName string, a admission.Attributes) error {
 		if !extendedResourceClaimStatusEqual(oldPod.Status.ExtendedResourceClaimStatus, newPod.Status.ExtendedResourceClaimStatus) {
 			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update extended resource claim status", nodeName))
 		}
+		if !apiequality.Semantic.DeepEqual(oldPod.Status.NodeAllocatableResourceClaimStatuses, newPod.Status.NodeAllocatableResourceClaimStatuses) {
+			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update node allocatable resource claim statuses", nodeName))
+		}
 		return nil
 
 	default:
