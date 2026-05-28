@@ -51,3 +51,19 @@ type OtherStruct struct {
 type SmallStruct struct {
 	StringField string `json:"stringField"`
 }
+
+type SetByServerSmallStruct struct {
+	// +setByServer
+	SetByServerField string `json:"setByServerField"`
+}
+
+type SetByServerOtherStruct struct {
+	StructField SetByServerSmallStruct `json:"structField"`
+}
+
+type SetByServerStruct struct {
+	TypeMeta int `json:"typeMeta"`
+
+	// +k8s:subfield(structField)=+k8s:subfield(setByServerField)=+k8s:optional
+	StructField SetByServerOtherStruct `json:"structField"`
+}

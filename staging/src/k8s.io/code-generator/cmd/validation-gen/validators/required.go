@@ -30,10 +30,11 @@ import (
 )
 
 const (
-	requiredTagName  = "k8s:required"
-	optionalTagName  = "k8s:optional"
-	forbiddenTagName = "k8s:forbidden"
-	defaultTagName   = "default" // TODO: this should eventually be +k8s:default
+	requiredTagName    = "k8s:required"
+	optionalTagName    = "k8s:optional"
+	forbiddenTagName   = "k8s:forbidden"
+	defaultTagName     = "default" // TODO: this should eventually be +k8s:default
+	setByServerTagName = "setByServer"
 )
 
 func init() {
@@ -145,6 +146,18 @@ func (rtv requirednessTagValidator) doOptional(context Context) (Validations, er
 	//
 	// TODO: handle default=ref(...)
 	// TODO: handle manual defaulting
+	tags := codetags.Extract("+", context.Member.CommentLines)
+	if _, hasSetByServer := tags[setByServerTagName]; hasSetByServer {
+		validations, err := rtv.doRequired(context)
+		if err != nil {
+			return Validations{}, err
+		}
+		for i, fn := range validations.Functions {
+			validations.Functions[i] = fn.WithComment("optional fields set by the server are effectively required")
+		}
+		return validations, nil
+	}
+
 	if hasDefault, zeroDefault, err := rtv.hasZeroDefault(context); err != nil {
 		return Validations{}, err
 	} else if hasDefault {
