@@ -162,7 +162,9 @@ func TestMonitorShutdown(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.desc, func(t *testing.T) {
-			fakeSystemBus := &fakeSystemDBus{}
+			fakeSystemBus := &fakeSystemDBus{
+				signalChannel: make(chan *dbus.Signal, 1),
+			}
 			bus := DBusCon{
 				SystemBus: fakeSystemBus,
 			}
@@ -186,6 +188,8 @@ func TestMonitorShutdown(t *testing.T) {
 			signal := &dbus.Signal{Body: []interface{}{tc.shutdownActive}}
 			fakeSystemBus.signalChannel <- signal
 			<-done
+
+			close(fakeSystemBus.signalChannel)
 		})
 	}
 }
