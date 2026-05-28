@@ -509,10 +509,12 @@ func updateEmptyDirVolumeLimitsFromAllocation(pod *v1.Pod, allocated state.PodRe
 
 // SetAllocatedResources checkpoints the resources allocated to a pod's containers
 func (m *manager) SetAllocatedResources(logger klog.Logger, pod *v1.Pod) error {
-	return m.allocated.SetPodResourceInfo(logger, pod.UID, allocationFromPod(pod))
+	return m.allocated.SetPodResourceInfo(logger, pod.UID, ResourceInfoForPod(pod))
 }
 
-func allocationFromPod(pod *v1.Pod) state.PodResourceInfo {
+// ResourceInfoForPod constructs a state.PodResourceInfo containing container resources,
+// memory-backed emptyDir volume limits, and pod-level resources for the given pod.
+func ResourceInfoForPod(pod *v1.Pod) state.PodResourceInfo {
 	var podAlloc state.PodResourceInfo
 	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodLevelResourcesVerticalScaling) && pod.Spec.Resources != nil {
 		podAlloc.PodLevelResources = pod.Spec.Resources.DeepCopy()
