@@ -41,6 +41,7 @@ import (
 	draclient "k8s.io/dynamic-resource-allocation/client"
 	"k8s.io/dynamic-resource-allocation/resourceclaim"
 	"k8s.io/dynamic-resource-allocation/resourceslice"
+	drahealthv1 "k8s.io/kubelet/pkg/apis/dra-health/v1"
 	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
 	drapbv1 "k8s.io/kubelet/pkg/apis/dra/v1"
 	drapbv1beta1 "k8s.io/kubelet/pkg/apis/dra/v1beta1"
@@ -189,6 +190,32 @@ type DRAPlugin interface {
 	// - dropped fields (see [resourceslice.DroppedFieldsError])
 	// - validation errors (see [apierrors.IsInvalid])
 	HandleError(ctx context.Context, err error, msg string)
+
+	// WatchHealthStatus reports the health of the driver's devices to the
+	// kubelet. Send an initial [DeviceHealthReport] covering all devices,
+	// then a new report whenever the health of a device changes, until ctx
+	// is canceled; then return nil. The method may be called again after a
+	// previous call returned, for example when the kubelet reconnects.
+	//
+	// The kubelet reports a device's health as unknown when it was not
+	// refreshed within the device's [DeviceHealth.HealthCheckTimeout]
+	// (30 seconds by default), so re-send reports within that window even
+	// when nothing changed. Reports may also cover a subset of devices,
+	// see [DeviceHealthReport].
+	//
+	// Sending must not block indefinitely when ctx is canceled:
+	//
+	//	select {
+	//	case <-ctx.Done():
+	//		return nil
+	//	case reports <- report:
+	//	}
+	//
+	// A driver which does not support health reporting must return
+	// [ErrHealthNotSupported] promptly without sending anything, or turn
+	// the service off entirely with the [HealthService] option, in which
+	// case WatchHealthStatus is never called.
+	WatchHealthStatus(ctx context.Context, reports chan<- DeviceHealthReport) error
 }
 
 // ErrRecoverable distinguishes recoverable errors from those errors which are fatal
@@ -563,6 +590,51 @@ func DRAService(enabled bool) Option {
 	}
 }
 
+// HealthService controls whether the optional DRAResourceHealth gRPC service
+// is advertised to the kubelet and served. It's on by default.
+//
+// Disabling it allows a driver to implement [DRAPlugin.WatchHealthStatus] but
+// turn off device health reporting, for example behind its own configuration
+// flag. When disabled, the kubelet does not subscribe to health updates and
+// [DRAPlugin.WatchHealthStatus] is never called.
+func HealthService(enabled bool) Option {
+	return func(o *options) error {
+		o.healthService = enabled
+		return nil
+	}
+}
+
+// HealthV1 explicitly chooses whether the DRAResourceHealth gRPC API
+// v1 gets enabled. True by default. Only has an effect when the health
+// service itself is enabled (see [HealthService]).
+//
+// This is used in Kubernetes for end-to-end testing. The default should
+// be fine for DRA drivers.
+func HealthV1(enabled bool) Option {
+	return func(o *options) error {
+		o.healthV1 = enabled
+		return nil
+	}
+}
+
+// HealthV1alpha1 chooses whether the DRAResourceHealth gRPC API v1alpha1
+// gets served in addition to v1. True by default, so that kubelets from
+// releases where only v1alpha1 existed (1.36 and older) can consume device
+// health. Only has an effect when the health service itself is enabled
+// (see [HealthService]).
+//
+// This is used in Kubernetes for end-to-end testing. The default should
+// be fine for DRA drivers.
+//
+// TODO(harche): remove this option and the v1alpha1 serving support in the
+// 1.40 era, when kubelet 1.36 is no longer within the supported version skew.
+func HealthV1alpha1(enabled bool) Option {
+	return func(o *options) error {
+		o.healthV1alpha1 = enabled
+		return nil
+	}
+}
+
 // ReconcilePoolWithName limits reconciliation to slices with Spec.Pool.Name
 // equal to name.
 //
@@ -758,7 +830,9 @@ type options struct {
 	nodeV1                     bool
 	registrationService        bool
 	draService                 bool
-	healthService              *bool
+	healthService              bool
+	healthV1alpha1             bool
+	healthV1                   bool
 	reconcilePoolWithName      string
 	enableDeviceMetadata       bool
 	metadataVersions           []schema.GroupVersion
@@ -819,6 +893,9 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 		},
 		draService:          true,
 		registrationService: true,
+		healthService:       true,
+		healthV1:            true,
+		healthV1alpha1:      true,
 	}
 	for _, option := range opts {
 		if err := option(&o); err != nil {
@@ -917,14 +994,38 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 	if o.nodeV1beta1 {
 		supportedServices = append(supportedServices, drapbv1beta1.DRAPluginService)
 	}
-	// Check if the plugin implements the DRAResourceHealth service.
-	if _, ok := plugin.(drahealthv1alpha1.DRAResourceHealthServer); ok {
-		// If it does, add it to the list of services this plugin supports.
-		logger.V(5).Info("detected v1alpha1.DRAResourceHealth gRPC service")
-		supportedServices = append(supportedServices, drahealthv1alpha1.DRAResourceHealth_ServiceDesc.ServiceName)
-	}
+	// The health service is an add-on: without at least one DRA gRPC API
+	// version the kubelet cannot use the driver, so fail fast before
+	// advertising anything else.
 	if len(supportedServices) == 0 {
 		return nil, errors.New("no supported DRA gRPC API is implemented and enabled")
+	}
+	// Advertise the DRAResourceHealth service unless turned off with
+	// HealthService(false). Drivers implement the version-neutral
+	// [DRAPlugin.WatchHealthStatus] method; the helper serves both the newest
+	// (v1) gRPC API and the older v1alpha1 API (via a conversion wrapper)
+	// so the kubelet can pick the most recent version it supports. This enables
+	// graceful migration of DRA drivers across health API versions without
+	// requiring source changes in the driver.
+	//
+	// A driver which does not support health reporting returns
+	// ErrHealthNotSupported from WatchHealthStatus; the helper then fails the
+	// kubelet's stream with Unimplemented, which tells the kubelet to stop
+	// watching.
+	//
+	// Advertisement is intentionally independent of o.draService: in split
+	// deployments the registrar instance (DRAService(false)) advertises
+	// services which a separate service instance provides on the shared
+	// endpoint.
+	if o.healthService {
+		if o.healthV1 {
+			logger.V(5).Info("advertising v1.DRAResourceHealth gRPC service")
+			supportedServices = append(supportedServices, drahealthv1.DRAResourceHealthService)
+		}
+		if o.healthV1alpha1 {
+			logger.V(5).Info("advertising v1alpha1.DRAResourceHealth gRPC service")
+			supportedServices = append(supportedServices, drahealthv1alpha1.DRAResourceHealthService)
+		}
 	}
 	draEndpoint := endpoint{
 		dir:        o.pluginDataDirectoryPath,
@@ -954,10 +1055,19 @@ func Start(ctx context.Context, plugin DRAPlugin, opts ...Option) (result *Helpe
 					drapbv1beta1.RegisterDRAPluginServer(grpcServer, drapbv1beta1.V1ServerWrapper{DRAPluginServer: &nodePluginImplementation{Helper: d}})
 				}
 
-				if heatlhServer, ok := d.plugin.(drahealthv1alpha1.DRAResourceHealthServer); ok {
-					if o.healthService == nil || *o.healthService {
+				if o.healthService {
+					// The helper implements the versioned gRPC servers itself
+					// by calling the driver's version-neutral WatchHealthStatus.
+					healthServer := &healthServerBridge{plugin: d.plugin}
+					if o.healthV1 {
+						logger.V(5).Info("registering v1.DRAResourceHealth gRPC service")
+						drahealthv1.RegisterDRAResourceHealthServer(grpcServer, healthServer)
+					}
+					if o.healthV1alpha1 {
+						// Also serve the older v1alpha1 API by converting
+						// the v1 responses on the fly.
 						logger.V(5).Info("registering v1alpha1.DRAResourceHealth gRPC service")
-						drahealthv1alpha1.RegisterDRAResourceHealthServer(grpcServer, heatlhServer)
+						drahealthv1alpha1.RegisterDRAResourceHealthServer(grpcServer, drahealthv1.V1ServerWrapper{Server: healthServer})
 					}
 				}
 			},
