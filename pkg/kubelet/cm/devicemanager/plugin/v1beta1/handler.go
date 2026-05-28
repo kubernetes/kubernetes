@@ -87,7 +87,21 @@ func (s *server) connectClient(ctx context.Context, name string, socketPath stri
 
 	s.registerClient(logger, name, c)
 	if err := c.Connect(ctx); err != nil {
-		// Need to re-connect the client if connection fails
+		// The kubelet expects that the plugin will retry registration if it fails.
+		// The best practice for the plugin implementation is to restart it's gRPC server completely,
+		// while switching to another socket. Reusing the same socket name may result in
+		// inadequate recovery or non-zero downtime take over of a socket.
+		//
+		// For example, Connect can fail either because the dial failed or because
+		// PluginConnected rejected the registration (e.g. "device plugin
+		// already connected") if the same socket was used. The "device plugin already connected" error
+		// is recoverable if the plugin will keep retrying to register. However if it didn't perform
+		// the full server take down and socket switch, there is a small window for a race condition.
+		//
+		// Two plugins may attempt to register at the same socket almost simultaneously in the fast-takeover race.
+		// Kubelet can register the first plugin (reply OK), but connect ListAndWatch to the second plugin.
+		// Kubelet then will reply to the second plugin with "device plugin already connected" error.
+		// If the second plugin retries registration at the same socket, kubelet will reply with the same error again.
 		s.deregisterClient(logger, name, socketPath)
 		logger.Error(err, "Failed to connect to new client", "resource", name, "socketPath", socketPath)
 		return err
@@ -121,6 +135,11 @@ func (s *server) deregisterClient(logger klog.Logger, name string, socketPath st
 	// We intentionally avoid mutating in place.
 	// We only remove the connection when both the client name and socket path matches.
 	// This ensures if there is two connections with same client name, only that specific client is removed.
+	// Protection against the fast-takeover race (where plugin1's dial
+	// connects to plugin2's server on the same socket) comes from
+	// PluginConnected in the manager: it rejects duplicate
+	// (resourceName, socketPath) registrations, so only one endpoint can
+	// be registered per socket at a time.
 	var newClients []Client
 	for _, c := range s.clients[name] {
 		if c.SocketPath() == socketPath {
