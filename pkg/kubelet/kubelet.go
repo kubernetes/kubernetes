@@ -2999,8 +2999,10 @@ func recordResizeOperations(oldPod, newPod *v1.Pod) bool {
 		return true
 	}
 
-	hasResize := recordContainerResizeOperations(oldPod, newPod) || recordPodLevelResourceResizeOperations(oldPod, newPod)
-	return hasResize
+	hasContainerResize := recordContainerResizeOperations(oldPod, newPod)
+	hasPodLevelResourceResize := recordPodLevelResourceResizeOperations(oldPod, newPod)
+	hasVolumeResize := recordVolumeResizeOperations(oldPod, newPod)
+	return hasContainerResize || hasPodLevelResourceResize || hasVolumeResize
 }
 
 // recordPodLevelResourceResizeOperations records if any of the pod level resources need to be resized, and returns
@@ -3057,6 +3059,14 @@ func recordContainerResizeOperations(oldPod, newPod *v1.Pod) bool {
 	}
 
 	return hasResize
+}
+
+// recordVolumeResizeOperations records if any of the pod's memory-backed emptyDir volumes needs to be resized, and returns true if so
+func recordVolumeResizeOperations(oldPod, newPod *v1.Pod) bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+		return false
+	}
+	return allocation.IsMemoryBackedVolumeResizeRequested(oldPod, newPod)
 }
 
 func resizeOperationForResources(new, old *resource.Quantity) string {
