@@ -293,9 +293,9 @@ kube::golang::server_test_targets() {
     ginkgo
   )
 
-  # Build the Linux e2e_node.test binary unless cross-building only for Windows
-  # (Windows has its own e2e_node test binary under test/e2e_node_windows).
-  [[ "${OSTYPE:-}" == "linux"* && "${KUBE_BUILD_PLATFORMS:-}" != *"windows"* ]] && targets+=( test/e2e_node/e2e_node.test )
+  if [[ "${OSTYPE:-}" == "linux"* ]]; then
+    targets+=( test/e2e_node/e2e_node.test )
+  fi
 
   echo "${targets[@]}"
 }

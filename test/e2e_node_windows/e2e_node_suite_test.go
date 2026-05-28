@@ -54,7 +54,6 @@ import (
 	_ "k8s.io/kubernetes/test/e2e/framework/debug/init"
 	_ "k8s.io/kubernetes/test/e2e/framework/metrics/init"
 	_ "k8s.io/kubernetes/test/e2e/framework/node/init"
-	_ "k8s.io/kubernetes/test/utils/format"
 	"k8s.io/kubernetes/test/utils/ktesting"
 
 	"github.com/onsi/ginkgo/v2"
@@ -76,7 +75,6 @@ var (
 	runServicesMode    = flag.Bool("run-services-mode", false, "If true, only run services (etcd, apiserver) in current process, and not run test.")
 	runKubeletMode     = flag.Bool("run-kubelet-mode", false, "If true, only start kubelet, and not run test.")
 	systemValidateMode = flag.Bool("system-validate-mode", false, "If true, only run system validation in current process, and not run test.")
-	systemSpecFile     = flag.String("system-spec-file", "", "The name of the system spec file that will be used for node conformance test. If it's unspecified or empty, the default system spec (system.DefaultSysSpec) will be used.")
 )
 
 // registerNodeFlags registers flags specific to the node e2e test suite.
@@ -147,10 +145,6 @@ func TestMain(m *testing.M) {
 	setExtraEnvs()
 	os.Exit(m.Run())
 }
-
-// When running the containerized conformance test, we'll mount the
-// host root filesystem as readonly to /rootfs.
-const rootfs = "/rootfs"
 
 func TestE2eNode(t *testing.T) {
 	tCtx := ktesting.Init(t)

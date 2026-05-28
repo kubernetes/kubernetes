@@ -1,11 +1,10 @@
 # Windows Node End-To-End (e2e) tests
 
-Node e2e tests are component tests meant for testing the Kubelet code on a custom host environment,
- They are now supported on the Windows platform and can be executed locally; however, Windows support 
- is still in the early stage, and not all tests are supported yet.
- Remote execution is planned as the next step.
+Node e2e tests are component tests meant for testing the Kubelet code on a custom single-host environment with the fake api server running on the same host. This directory include tests on the Windows platform and can be executed locally. The test framework and set of tests are replicating the non-Windows tests under [e2e_node](../e2e_node), however, Windows support is still in the early stage, and not all tests are supported yet. Remote execution is planned as the next step.
 
-*Note: There is no scheduler running. The e2e tests have to do manual scheduling, e.g. by using `framework.PodClient`.*
+For general background on node e2e tests, see the SIG Node [Node End-to-End Tests guide](https://github.com/kubernetes/community/blob/main/contributors/devel/sig-node/e2e-node-tests.md).
+
+*Note: There is no scheduler running. The e2e tests have to do manual nodeName assignment.
 
 # Running tests
 
@@ -39,6 +38,16 @@ It will run the specified windows e2e node tests, which will in turn:
 - Run the test using the locally started processes
 - Output the test results to STDOUT
 - Stop *kubelet*, *kube-apiserver*, and *etcd*
+
+### Log files
+
+Test execution produces several log streams:
+
+- **Ginkgo / `go test` output** (pass/fail, test logs): written to STDOUT when `--test.v` is used. Redirect with shell pipes if you need a file copy (e.g. `... > run.log 2>&1`).
+- **`services.log`** (etcd + kube-apiserver wrapper output): written to `<report-dir>/services.log`.
+- **`kubelet.log`** (kubelet output): written to `<report-dir>/kubelet.log`.
+
+`<report-dir>` is controlled by the `--report-dir=<path>` flag. If not set, the wrapper log files are created in the test binary's current working directory.
 
 ## Cross-building from Linux
 
