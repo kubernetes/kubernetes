@@ -34,7 +34,7 @@ import (
 )
 
 type podStartupSLIObserver interface {
-	ObservedPodOnWatch(pod *v1.Pod, when time.Time)
+	ObservedPodOnWatch(logger klog.Logger, pod *v1.Pod, when time.Time)
 }
 
 // PodConfig is a configuration mux that merges many sources of pod configuration into a single
@@ -207,7 +207,7 @@ func (s *podStorage) merge(ctx context.Context, source string, update sourceUpda
 			ref.Annotations[kubetypes.ConfigSourceAnnotationKey] = source
 			// ignore static pods
 			if !kubetypes.IsStaticPod(ref) {
-				s.startupSLIObserver.ObservedPodOnWatch(ref, time.Now())
+				s.startupSLIObserver.ObservedPodOnWatch(logger, ref, time.Now())
 			}
 			if existing, found := oldPods[ref.UID]; found {
 				pods[ref.UID] = existing
