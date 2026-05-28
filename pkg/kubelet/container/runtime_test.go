@@ -25,15 +25,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestParseContainerID(t *testing.T) {
-	logger, _ := ktesting.NewTestContext(t)
 	tests := []struct {
 		name     string
 		input    string
 		expected ContainerID
+		wantErr  bool
 	}{
 		{
 			name:     "valid docker container id",
@@ -54,17 +53,24 @@ func TestParseContainerID(t *testing.T) {
 			name:     "invalid format - missing separator",
 			input:    `"dockerabc123"`,
 			expected: ContainerID{},
+			wantErr:  true,
 		},
 		{
 			name:     "empty string",
 			input:    `""`,
 			expected: ContainerID{},
+			wantErr:  true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ParseContainerID(logger, tt.input)
+			result, err := ParseContainerID(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
 			assert.Equal(t, tt.expected, result, "ParseContainerID(%q)", tt.input)
 		})
 	}

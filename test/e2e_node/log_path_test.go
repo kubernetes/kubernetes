@@ -22,7 +22,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -129,8 +128,9 @@ var _ = SIGDescribe("ContainerLogPath", framework.WithNodeConformance(), func() 
 
 				// get containerID from created Pod
 				createdLogPod, err := podClient.Get(ctx, logPodName, metav1.GetOptions{})
-				logContainerID := kubecontainer.ParseContainerID(klog.FromContext(ctx), createdLogPod.Status.ContainerStatuses[0].ContainerID)
 				framework.ExpectNoError(err, "Failed to get pod: %s", logPodName)
+				logContainerID, err := kubecontainer.ParseContainerID(createdLogPod.Status.ContainerStatuses[0].ContainerID)
+				framework.ExpectNoError(err, "Failed to parse container ID")
 
 				// build log file path
 				expectedlogFile := logDir + "/" + logPodName + "_" + f.Namespace.Name + "_" + logContainerName + "-" + logContainerID.ID + ".log"

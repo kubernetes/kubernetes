@@ -272,12 +272,37 @@ func (m *manager) CleanupPods(desiredPods map[types.UID]sets.Empty) {
 	}
 }
 
+func parseContainerID(logger klog.Logger, containerID string) (kubecontainer.ContainerID, bool) {
+	parsedContainerID, err := kubecontainer.ParseContainerID(containerID)
+	if err != nil {
+		logger.Error(err, "Parsing container ID failed", "containerID", containerID)
+		return kubecontainer.ContainerID{}, false
+	}
+	return parsedContainerID, true
+}
+
+func (m *manager) getStartupResult(logger klog.Logger, containerID string) (results.Result, bool) {
+	parsedContainerID, ok := parseContainerID(logger, containerID)
+	if !ok {
+		return results.Unknown, false
+	}
+	return m.startupManager.Get(parsedContainerID)
+}
+
+func (m *manager) getReadinessResult(logger klog.Logger, containerID string) (results.Result, bool) {
+	parsedContainerID, ok := parseContainerID(logger, containerID)
+	if !ok {
+		return results.Unknown, false
+	}
+	return m.readinessManager.Get(parsedContainerID)
+}
+
 func (m *manager) isContainerStarted(logger klog.Logger, pod *v1.Pod, containerStatus *v1.ContainerStatus) bool {
 	if containerStatus.State.Running == nil {
 		return false
 	}
 
-	if result, ok := m.startupManager.Get(kubecontainer.ParseContainerID(logger, containerStatus.ContainerID)); ok {
+	if result, ok := m.getStartupResult(logger, containerStatus.ContainerID); ok {
 		return result == results.Success
 	}
 
@@ -310,7 +335,7 @@ func (m *manager) setReadyStateOnKubeletRestart(logger klog.Logger, ready *bool,
 		// - It has been added to the readinessManager, but the probe has not yet started execution.
 		// Therefore, in this case, we also need to set the container status to Ready.
 		if !*ready {
-			if _, ok := m.readinessManager.Get(kubecontainer.ParseContainerID(logger, containerStatus.ContainerID)); !ok {
+			if _, ok := m.getReadinessResult(logger, containerStatus.ContainerID); !ok {
 				*ready = true
 			}
 		}
@@ -342,7 +367,7 @@ func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, podStatus *v
 		var ready bool
 		if c.State.Running == nil {
 			ready = false
-		} else if result, ok := m.readinessManager.Get(kubecontainer.ParseContainerID(logger, c.ContainerID)); ok && result == results.Success {
+		} else if result, ok := m.getReadinessResult(logger, c.ContainerID); ok && result == results.Success {
 			ready = true
 		} else {
 			// The check whether there is a probe which hasn't run yet.
@@ -397,7 +422,7 @@ func (m *manager) UpdatePodStatus(ctx context.Context, pod *v1.Pod, podStatus *v
 		var ready bool
 		if c.State.Running == nil {
 			ready = false
-		} else if result, ok := m.readinessManager.Get(kubecontainer.ParseContainerID(logger, c.ContainerID)); ok && result == results.Success {
+		} else if result, ok := m.getReadinessResult(logger, c.ContainerID); ok && result == results.Success {
 			ready = true
 		} else {
 			// The check whether there is a probe which hasn't run yet.

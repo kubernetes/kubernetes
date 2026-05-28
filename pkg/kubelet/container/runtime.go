@@ -33,7 +33,6 @@ import (
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/flowcontrol"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/volume"
@@ -248,13 +247,14 @@ func BuildContainerID(typ, ID string) ContainerID {
 	return ContainerID{Type: typ, ID: ID}
 }
 
-// ParseContainerID is a convenience method for creating a ContainerID from an ID string.
-func ParseContainerID(logger klog.Logger, containerID string) ContainerID {
+// ParseContainerID parses an ID string into a ContainerID.
+// It returns an error when the ID string is malformed.
+func ParseContainerID(containerID string) (ContainerID, error) {
 	var id ContainerID
 	if err := id.ParseString(containerID); err != nil {
-		logger.Error(err, "Parsing containerID failed")
+		return ContainerID{}, err
 	}
-	return id
+	return id, nil
 }
 
 // ParseString converts given string into ContainerID

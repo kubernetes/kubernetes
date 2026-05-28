@@ -1599,7 +1599,12 @@ func (kl *Kubelet) validateContainerLogStatus(logger klog.Logger, podName string
 		return kubecontainer.ContainerID{}, fmt.Errorf("container %q in pod %q is waiting to start - no logs yet", containerName, podName)
 	}
 
-	return kubecontainer.ParseContainerID(logger, cID), nil
+	containerID, err = kubecontainer.ParseContainerID(cID)
+	if err != nil {
+		logger.Error(err, "Parsing container ID failed", "containerID", cID)
+		return kubecontainer.ContainerID{}, err
+	}
+	return containerID, nil
 }
 
 // GetKubeletContainerLogs returns logs from the container
