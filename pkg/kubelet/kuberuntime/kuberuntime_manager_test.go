@@ -5063,6 +5063,89 @@ func TestDoPodResizeAction_Volumes(t *testing.T) {
 	}
 }
 
+func TestIsPodResizeInProgress_Volumes(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	for _, tc := range []struct {
+		testName        string
+		enableGate      bool
+		specLimit       *resource.Quantity
+		statusLimit     *resource.Quantity
+		expectHasResize bool
+	}{
+		{
+			testName:        "Feature gate disabled",
+			enableGate:      false,
+			specLimit:       resource.NewQuantity(100, resource.BinarySI),
+			statusLimit:     resource.NewQuantity(200, resource.BinarySI),
+			expectHasResize: false,
+		},
+		{
+			testName:        "Spec set, status not set (initial startup safety)",
+			enableGate:      true,
+			specLimit:       resource.NewQuantity(100, resource.BinarySI),
+			statusLimit:     nil,
+			expectHasResize: false,
+		},
+		{
+			testName:        "Spec set, status set, both equal",
+			enableGate:      true,
+			specLimit:       resource.NewQuantity(100, resource.BinarySI),
+			statusLimit:     resource.NewQuantity(100, resource.BinarySI),
+			expectHasResize: false,
+		},
+		{
+			testName:        "Spec set, status set, they differ",
+			enableGate:      true,
+			specLimit:       resource.NewQuantity(100, resource.BinarySI),
+			statusLimit:     resource.NewQuantity(200, resource.BinarySI),
+			expectHasResize: true,
+		},
+		{
+			testName:        "Spec nil (removed), status set",
+			enableGate:      true,
+			specLimit:       nil,
+			statusLimit:     resource.NewQuantity(200, resource.BinarySI),
+			expectHasResize: false,
+		},
+	} {
+		t.Run(tc.testName, func(t *testing.T) {
+			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.InPlacePodVerticalScalingMemoryBackedVolumes, tc.enableGate)
+
+			_, _, m, err := createTestRuntimeManager(tCtx)
+			require.NoError(t, err)
+
+			pod := &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					UID: "test-pod-uid",
+				},
+				Spec: v1.PodSpec{
+					Volumes: []v1.Volume{
+						{
+							Name: "mem-vol",
+							VolumeSource: v1.VolumeSource{
+								EmptyDir: &v1.EmptyDirVolumeSource{
+									Medium:    v1.StorageMediumMemory,
+									SizeLimit: tc.specLimit,
+								},
+							},
+						},
+					},
+				},
+			}
+
+			if tc.statusLimit != nil {
+				err := m.actuatedState.SetEmptyDirVolumeLimit(pod.UID, "mem-vol", tc.statusLimit)
+				require.NoError(t, err)
+			}
+
+			podStatus := &kubecontainer.PodStatus{}
+			hasResize := m.IsPodResizeInProgress(pod, podStatus)
+			assert.Equal(t, tc.expectHasResize, hasResize)
+		})
+	}
+}
+
 func TestValidatePodResizeAction(t *testing.T) {
 	if goruntime.GOOS != "linux" {
 		t.Skip("unsupported OS")

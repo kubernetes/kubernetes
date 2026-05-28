@@ -2330,12 +2330,39 @@ func (m *kubeGenericRuntimeManager) UpdateActuatedPodLevelResources(actuatedPod 
 // - Non-resizable resources: only CPU & memory are resizable
 // - Non-running containers: they will be sized correctly when (re)started
 // * any running pod if InPlacePodLevelResourcesVerticalScaling is enabled.
+// * any running pod if InPlacePodVerticalScalingMemoryBackedVolumes is enabled.
 func (m *kubeGenericRuntimeManager) IsPodResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
 	if m.isContainerResourceResizeInProgress(allocatedPod, podStatus) {
 		return true
 	}
 
+	if m.isMemoryBackedVolumeResizeInProgress(allocatedPod) {
+		return true
+	}
+
 	return m.isPodLevelResourcesResizeInProgress(allocatedPod, podStatus)
+}
+
+func (m *kubeGenericRuntimeManager) isMemoryBackedVolumeResizeInProgress(allocatedPod *v1.Pod) bool {
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+		for _, volume := range allocatedPod.Spec.Volumes {
+			if !allocation.VolHasMemoryBackedEmptyDirSizeLimit(&volume) {
+				continue
+			}
+
+			desiredLimit := volume.EmptyDir.SizeLimit
+			actuatedLimit, found := m.actuatedState.GetEmptyDirVolumeLimit(allocatedPod.UID, volume.Name)
+			if !found {
+				// No actuation checkpoint yet.
+				return false
+			}
+
+			if desiredLimit != nil && !desiredLimit.Equal(*actuatedLimit) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (m *kubeGenericRuntimeManager) isContainerResourceResizeInProgress(allocatedPod *v1.Pod, podStatus *kubecontainer.PodStatus) bool {
