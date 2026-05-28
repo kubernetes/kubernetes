@@ -4456,6 +4456,19 @@ func Test_computesScore(t *testing.T) {
 			allocations: nodeAllocation{},
 			expectErr:   true,
 		},
+		"mix-of-allocated-and-unallocated-claims": {
+			claims: []*resourceapi.ResourceClaim{
+				allocatedClaim,
+				pendingClaim2,
+			},
+			allocations: nodeAllocation{
+				allocationResults: []resourceapi.AllocationResult{
+					*allocationResult2,
+				},
+			},
+			expectedScore: 0,
+			expectErr:     false,
+		},
 		"single-request-only-subrequest-allocated": {
 			claims: []*resourceapi.ResourceClaim{
 				st.MakeResourceClaim().
