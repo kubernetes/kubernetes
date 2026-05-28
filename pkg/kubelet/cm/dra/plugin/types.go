@@ -19,7 +19,7 @@ package plugin
 import (
 	"context"
 
-	drahealthv1alpha1 "k8s.io/kubelet/pkg/apis/dra-health/v1alpha1"
+	drahealthv1beta1 "k8s.io/kubelet/pkg/apis/dra-health/v1beta1"
 )
 
 // StreamHandler defines the interface for handling DRA health streams.
@@ -27,5 +27,5 @@ import (
 // package from the manager package, breaking the import cycle.
 type StreamHandler interface {
 	// HandleWatchResourcesStream processes health updates from a specific DRA plugin stream.
-	HandleWatchResourcesStream(ctx context.Context, stream drahealthv1alpha1.DRAResourceHealth_NodeWatchResourcesClient, resourceName string) error
+	HandleWatchResourcesStream(ctx context.Context, stream drahealthv1beta1.DRAResourceHealth_NodeWatchResourcesClient, resourceName string) error
 }

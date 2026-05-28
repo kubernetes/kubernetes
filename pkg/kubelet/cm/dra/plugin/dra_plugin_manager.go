@@ -327,11 +327,16 @@ func (pm *DRAPluginManager) RegisterPlugin(driverName string, endpoint string, s
 		return fmt.Errorf("invalid supported gRPC versions of DRA driver plugin %s at endpoint %s: %w", driverName, endpoint, err)
 	}
 
+	// The DRAResourceHealth service is optional. Pick the most recent version
+	// that both the plugin and the kubelet support, or "" if the plugin does
+	// not advertise it.
+	chosenHealthService := pickHealthService(supportedServices)
+
 	timeout := ptr.Deref(pluginClientTimeout, defaultClientCallTimeout)
 
 	// Storing endpoint of newly registered DRA DRAPlugin into the map, where the DRA driver name will be the key
 	// under which the manager will be able to get a plugin when it needs to call it.
-	if err := pm.add(driverName, endpoint, chosenService, timeout); err != nil {
+	if err := pm.add(driverName, endpoint, chosenService, chosenHealthService, timeout); err != nil {
 		// No wrapping, the error already contains details.
 		return err
 	}
@@ -339,16 +344,29 @@ func (pm *DRAPluginManager) RegisterPlugin(driverName string, endpoint string, s
 	return nil
 }
 
-func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenService string, clientCallTimeout time.Duration) error {
+// pickHealthService returns the most recent DRAResourceHealth gRPC service that
+// is supported by both the plugin and the kubelet, or "" if the plugin does not
+// advertise the optional health service.
+func pickHealthService(supportedServices []string) string {
+	for _, service := range healthServicesSupportedByKubelet {
+		if slices.Contains(supportedServices, service) {
+			return service
+		}
+	}
+	return ""
+}
+
+func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenService string, chosenHealthService string, clientCallTimeout time.Duration) error {
 	pm.mutex.Lock()
 	defer pm.mutex.Unlock()
 
 	p := &DRAPlugin{
-		driverName:        driverName,
-		endpoint:          endpoint,
-		chosenService:     chosenService,
-		clientCallTimeout: clientCallTimeout,
-		backgroundCtx:     pm.backgroundCtx,
+		driverName:          driverName,
+		endpoint:            endpoint,
+		chosenService:       chosenService,
+		chosenHealthService: chosenHealthService,
+		clientCallTimeout:   clientCallTimeout,
+		backgroundCtx:       pm.backgroundCtx,
 	}
 	if pm.store == nil {
 		pm.store = make(map[string][]*monitoredPlugin)
@@ -384,7 +402,7 @@ func (pm *DRAPluginManager) add(driverName string, endpoint string, chosenServic
 	}
 	p.conn = conn
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) && pm.streamHandler != nil {
+	if utilfeature.DefaultFeatureGate.Enabled(features.ResourceHealthStatus) && pm.streamHandler != nil && p.chosenHealthService != "" {
 		pm.wg.Add(1)
 		go func() {
 			defer pm.wg.Done()
