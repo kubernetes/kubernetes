@@ -7,14 +7,26 @@ Go API changes are typically not included in the Kubernetes release notes, so
 non-breaking noteworthy Go API changes *may* be documented here if they are
 useful to know about for developers.
 
-### Replace with a short title
+### restmapper + discovery: add context-aware APIs
 
-Replace this text with a short summary of the change
-and how users of the package can deal with this breaking
-change. If users are not expected to be affected, then
-instead explain why. If the changes are too long,
-you may shorten them by replacing multiple lines
-with three dots (...).
+The main purpose is to replace context.TODO with a context provided by the
+caller. A secondary purpose is to enable contextual logging.
+
+Most of the changes were made without breaking the Go API via interface
+assertion. To use the new methods, wrap a `DiscoveryInterface` instance with
+`ToDiscoveryInterfaceWithContext`, it'll return a
+`DiscoveryInterfacesWithContext`. Typically this is just a type cast, otherwise
+it wraps the old methods.
+
+There is one intentional exception: client-go's Discovery() method returns a
+`DiscoveryInterfaces` union of the old `DiscoveryInterface` and new
+`DiscoveryInterfacesWithContext` interfaces to make the better alternative more
+discoverable (code completion!) and to enable calling both old and new methods
+with the result.
+
+This is a breaking change because Discovery is itself included in interfaces.
+Code which implements this interface (typically some tests) must be updated to
+also return `DiscoveryInterfaces` or the code won't compile.
 
 ```
 - ./kubernetes.(*Clientset).Discovery: changed from func() k8s.io/client-go/discovery.DiscoveryInterface to func() k8s.io/client-go/discovery.DiscoveryInterfaces
