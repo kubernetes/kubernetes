@@ -218,7 +218,12 @@ func CreateKubeAPIServerConfig(
 		return nil, nil, nil, fmt.Errorf("failed to create admission plugin initializer: %w", err)
 	}
 
-	serviceResolver, err := buildServiceResolver(opts.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers)
+	endpointSliceGetter, err := proxy.NewEndpointSliceIndexerGetter(versionedInformers.Discovery().V1().EndpointSlices())
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to create endpoint slice getter: %w", err)
+	}
+
+	serviceResolver, err := buildServiceResolver(opts.EnableAggregatorRouting, genericConfig.LoopbackClientConfig.Host, versionedInformers, endpointSliceGetter)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error building service resolver: %w", err)
 	}
@@ -280,14 +285,9 @@ func SetServiceResolverForTests(resolver webhook.ServiceResolver) func() {
 	}
 }
 
-func buildServiceResolver(enabledAggregatorRouting bool, hostname string, informer clientgoinformers.SharedInformerFactory) (webhook.ServiceResolver, error) {
+func buildServiceResolver(enabledAggregatorRouting bool, hostname string, informer clientgoinformers.SharedInformerFactory, endpointSliceGetter proxy.EndpointSliceGetter) (webhook.ServiceResolver, error) {
 	if testServiceResolver != nil {
 		return testServiceResolver, nil
-	}
-
-	endpointSliceGetter, err := proxy.NewEndpointSliceIndexerGetter(informer.Discovery().V1().EndpointSlices())
-	if err != nil {
-		return nil, err
 	}
 
 	var serviceResolver webhook.ServiceResolver
