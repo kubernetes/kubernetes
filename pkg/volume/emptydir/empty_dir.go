@@ -61,15 +61,15 @@ type emptyDirPlugin struct {
 	host volume.VolumeHost
 }
 
-var _ volume.VolumePlugin = &emptyDirPlugin{}
+var _ volume.ResizableEphemeralVolumePlugin = &emptyDirPlugin{}
 
 const (
-	emptyDirPluginName           = "kubernetes.io/empty-dir"
+	EmptyDirPluginName           = "kubernetes.io/empty-dir"
 	hugePagesPageSizeMountOption = "pagesize"
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
-	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(emptyDirPluginName), volName)
+	return host.GetPodVolumeDir(uid, utilstrings.EscapeQualifiedName(EmptyDirPluginName), volName)
 }
 
 func (plugin *emptyDirPlugin) Init(host volume.VolumeHost) error {
@@ -79,7 +79,7 @@ func (plugin *emptyDirPlugin) Init(host volume.VolumeHost) error {
 }
 
 func (plugin *emptyDirPlugin) GetPluginName() string {
-	return emptyDirPluginName
+	return EmptyDirPluginName
 }
 
 func (plugin *emptyDirPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
@@ -97,6 +97,8 @@ func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
 }
 
 func (plugin *emptyDirPlugin) RequiresRemount(spec *volume.Spec) bool {
+	// The kuberuntime_manager is responsible for resizing memory-backed emptyDir volumes,
+	// so we never remount them from within the volume plugin.
 	return false
 }
 
@@ -334,7 +336,7 @@ func (ed *emptyDir) setupTmpfs(dir string) error {
 		return nil
 	}
 
-	options := ed.generateTmpfsMountOptions(swap.IsTmpfsNoswapOptionSupported(ed.mounter, ed.plugin.host.GetPluginDir(emptyDirPluginName)))
+	options := ed.generateTmpfsMountOptions(swap.IsTmpfsNoswapOptionSupported(ed.mounter, ed.plugin.host.GetPluginDir(EmptyDirPluginName)))
 
 	klog.V(3).Infof("pod %v: mounting tmpfs for volume %v", ed.pod.UID, ed.volName)
 	return ed.mounter.MountSensitiveWithoutSystemd("tmpfs", dir, "tmpfs", options, nil)
@@ -556,7 +558,7 @@ func (ed *emptyDir) teardownTmpfsOrHugetlbfs(dir string) error {
 }
 
 func (ed *emptyDir) getMetaDir() string {
-	return filepath.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, utilstrings.EscapeQualifiedName(emptyDirPluginName)), ed.volName)
+	return filepath.Join(ed.plugin.host.GetPodPluginDir(ed.pod.UID, utilstrings.EscapeQualifiedName(EmptyDirPluginName)), ed.volName)
 }
 
 func getVolumeSource(spec *volume.Spec) (*v1.EmptyDirVolumeSource, bool) {
