@@ -34,6 +34,7 @@ var _ State = &stateCheckpoint{}
 
 type stateCheckpoint struct {
 	mux               sync.RWMutex
+	logger            klog.Logger
 	cache             State
 	checkpointManager checkpointmanager.CheckpointManager
 	checkpointName    string
@@ -41,10 +42,7 @@ type stateCheckpoint struct {
 }
 
 // NewStateCheckpoint creates new State for keeping track of pod resource information with checkpoint backend
-func NewStateCheckpoint(stateDir, checkpointName string) (State, error) {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
+func NewStateCheckpoint(logger klog.Logger, stateDir, checkpointName string) (State, error) {
 	checkpointManager, err := checkpointmanager.NewCheckpointManager(stateDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize checkpoint manager for pod resource information tracking: %w", err)
@@ -58,7 +56,8 @@ func NewStateCheckpoint(stateDir, checkpointName string) (State, error) {
 	}
 
 	stateCheckpoint := &stateCheckpoint{
-		cache:             NewStateMemory(pra),
+		logger:            logger,
+		cache:             NewStateMemory(logger, pra),
 		checkpointManager: checkpointManager,
 		checkpointName:    checkpointName,
 		lastChecksum:      checksum,
@@ -138,30 +137,24 @@ func (sc *stateCheckpoint) GetPodResourceInfo(podUID types.UID) (PodResourceInfo
 
 // SetContainerResoruces sets resources information for a pod's container
 func (sc *stateCheckpoint) SetContainerResources(podUID types.UID, containerName string, resources v1.ResourceRequirements) error {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
 	err := sc.cache.SetContainerResources(podUID, containerName, resources)
 	if err != nil {
 		return err
 	}
-	return sc.storeState(logger)
+	return sc.storeState(sc.logger)
 }
 
 // SetPodLevelResources sets resources information for a pod's resources at pod-level.
 func (sc *stateCheckpoint) SetPodLevelResources(podUID types.UID, resInfo *v1.ResourceRequirements) error {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
 	sc.mux.Lock()
 	defer sc.mux.Unlock()
 	err := sc.cache.SetPodLevelResources(podUID, resInfo)
 	if err != nil {
 		return err
 	}
-	return sc.storeState(logger)
+	return sc.storeState(sc.logger)
 }
 
 // SetPodResourceInfo sets pod resource information

@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/component-base/logs/logreduction"
 	internalapi "k8s.io/cri-api/pkg/apis"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/kubelet/allocation/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -114,7 +115,7 @@ func newFakeKubeRuntimeManager(ctx context.Context, runtimeService internalapi.R
 		logManager:             logs.NewStubContainerLogManager(),
 		memoryThrottlingFactor: 0.9,
 		podLogsDirectory:       fakePodLogsDirectory,
-		actuatedState:          state.NewStateMemory(nil),
+		actuatedState:          state.NewStateMemory(klog.FromContext(ctx), nil),
 	}
 
 	// Initialize swap controller availability check (always false for tests)

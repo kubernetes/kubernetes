@@ -110,6 +110,7 @@ type Manager interface {
 type manager struct {
 	allocated state.State
 
+	logger        klog.Logger
 	admitHandlers lifecycle.PodAdmitHandlers
 	statusManager status.Manager
 	sourcesReady  config.SourcesReady
@@ -125,7 +126,8 @@ type manager struct {
 	recorder record.EventRecorderLogger
 }
 
-func NewManager(checkpointDirectory string,
+func NewManager(logger klog.Logger,
+	checkpointDirectory string,
 	statusManager status.Manager,
 	triggerPodSync func(pod *v1.Pod),
 	getActivePods func() []*v1.Pod,
@@ -133,12 +135,10 @@ func NewManager(checkpointDirectory string,
 	sourcesReady config.SourcesReady,
 	recorder record.EventRecorderLogger,
 ) Manager {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
 	return &manager{
 		allocated: newStateImpl(logger, checkpointDirectory, allocatedPodsStateFile),
 
+		logger:        logger,
 		statusManager: statusManager,
 		admitHandlers: lifecycle.PodAdmitHandlers{},
 		sourcesReady:  sourcesReady,
@@ -156,7 +156,7 @@ func newStateImpl(logger klog.Logger, checkpointDirectory, checkpointName string
 		return state.NewNoopStateCheckpoint()
 	}
 
-	stateImpl, err := state.NewStateCheckpoint(checkpointDirectory, checkpointName)
+	stateImpl, err := state.NewStateCheckpoint(logger, checkpointDirectory, checkpointName)
 	if err != nil {
 		// This is a critical, non-recoverable failure.
 		logger.Error(err, "Failed to initialize allocation checkpoint manager",
@@ -170,6 +170,7 @@ func newStateImpl(logger klog.Logger, checkpointDirectory, checkpointName string
 // NewInMemoryManager returns an allocation manager that doesn't persist state.
 // For testing purposes only!
 func NewInMemoryManager(
+	logger klog.Logger,
 	statusManager status.Manager,
 	triggerPodSync func(pod *v1.Pod),
 	getActivePods func() []*v1.Pod,
@@ -178,8 +179,9 @@ func NewInMemoryManager(
 	recorder record.EventRecorderLogger,
 ) Manager {
 	return &manager{
-		allocated: state.NewStateMemory(nil),
+		allocated: state.NewStateMemory(logger, nil),
 
+		logger:        logger,
 		statusManager: statusManager,
 		admitHandlers: lifecycle.PodAdmitHandlers{},
 		sourcesReady:  sourcesReady,
@@ -212,10 +214,7 @@ func (m *manager) Run(ctx context.Context) {
 }
 
 func (m *manager) RetryPendingResizes(trigger string) {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
-	m.retryPendingResizes(logger, trigger)
+	m.retryPendingResizes(m.logger, trigger)
 }
 
 func (m *manager) retryPendingResizes(logger klog.Logger, trigger string) []*v1.Pod {
@@ -274,9 +273,6 @@ func (m *manager) retryPendingResizes(logger klog.Logger, trigger string) []*v1.
 }
 
 func (m *manager) PushPendingResize(uid types.UID) {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()
 
@@ -289,7 +285,7 @@ func (m *manager) PushPendingResize(uid types.UID) {
 
 	// Add the pod to the pending resizes list and sort by priority.
 	m.podsWithPendingResizes = append(m.podsWithPendingResizes, uid)
-	m.sortPendingResizes(logger)
+	m.sortPendingResizes(m.logger)
 }
 
 // sortPendingResizes sorts the list of pending resizes:
@@ -479,10 +475,7 @@ func updatePodFromAllocation(pod *v1.Pod, allocated state.PodResourceInfo) (*v1.
 
 // SetAllocatedResources checkpoints the resources allocated to a pod's containers
 func (m *manager) SetAllocatedResources(pod *v1.Pod) error {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
-	return m.allocated.SetPodResourceInfo(logger, pod.UID, allocationFromPod(pod))
+	return m.allocated.SetPodResourceInfo(m.logger, pod.UID, allocationFromPod(pod))
 }
 
 func allocationFromPod(pod *v1.Pod) state.PodResourceInfo {
@@ -509,9 +502,6 @@ func (m *manager) AddPodAdmitHandlers(handlers lifecycle.PodAdmitHandlers) {
 }
 
 func (m *manager) AddPod(activePods []*v1.Pod, pod *v1.Pod) (bool, string, string) {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
 	m.allocationMutex.Lock()
 	defer m.allocationMutex.Unlock()
 
@@ -523,13 +513,13 @@ func (m *manager) AddPod(activePods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 
 	// Check if we can admit the pod; if so, update the allocation.
 	allocatedPods := m.getAllocatedPods(activePods)
-	ok, reason, message := m.canAdmitPod(logger, allocatedPods, pod, lifecycle.AddOperation)
+	ok, reason, message := m.canAdmitPod(m.logger, allocatedPods, pod, lifecycle.AddOperation)
 
 	if ok && utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScaling) {
 		// Checkpoint the resource values at which the Pod has been admitted or resized.
 		if err := m.SetAllocatedResources(pod); err != nil {
 			// TODO(vinaykul,InPlacePodVerticalScaling): Can we recover from this in some way? Investigate
-			logger.Error(err, "SetPodAllocation failed", "pod", klog.KObj(pod))
+			m.logger.Error(err, "SetPodAllocation failed", "pod", klog.KObj(pod))
 		}
 	}
 
@@ -537,12 +527,9 @@ func (m *manager) AddPod(activePods []*v1.Pod, pod *v1.Pod) (bool, string, strin
 }
 
 func (m *manager) RemovePod(uid types.UID) {
-	// Use klog.TODO() because we currently do not have a proper logger to pass in.
-	// Replace this with an appropriate logger when refactoring this function to accept a logger parameter.
-	logger := klog.TODO()
 	if err := m.allocated.RemovePod(uid); err != nil {
 		// If the deletion fails, it will be retried by RemoveOrphanedPods, so we can safely ignore the error.
-		logger.V(3).Info("Failed to delete pod allocation", "podUID", uid, "err", err)
+		m.logger.V(3).Info("Failed to delete pod allocation", "podUID", uid, "err", err)
 	}
 }
 

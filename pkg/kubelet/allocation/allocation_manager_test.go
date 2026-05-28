@@ -2425,6 +2425,7 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 		containerManager = cm.NewFakeContainerManagerWithNodeConfig(*nodeConfig)
 	}
 	allocationManager := NewInMemoryManager(
+		logger,
 		statusManager,
 		func(pod *v1.Pod) {
 			/* For testing, just mark the pod as having a pod sync triggered in an annotation. */
