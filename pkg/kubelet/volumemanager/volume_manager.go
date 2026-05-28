@@ -30,6 +30,7 @@ import (
 	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -47,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/reconciler"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
+	"k8s.io/kubernetes/pkg/volume/emptydir"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -157,6 +159,14 @@ type VolumeManager interface {
 	// Marks the specified volume as having successfully been reported as "in
 	// use" in the nodes's volume status.
 	MarkVolumesAsReportedInUse(volumesReportedAsInUse []v1.UniqueVolumeName)
+
+	// ResizeEphemeralVolume directly triggers a resize of the specified volume.
+	// This is intended for volumes that support online resizing and require
+	// strict coordination with container runtime operations.
+	ResizeEphemeralVolume(pod *v1.Pod, volumeName string, newSize *resource.Quantity) error
+
+	// GetVolumeSize returns the current size of the specified volume.
+	GetVolumeSize(pod *v1.Pod, volumeName string) (*resource.Quantity, error)
 }
 
 // podStateProvider can determine if a pod is going to be terminated
@@ -644,4 +654,55 @@ func getExtraSupplementalGID(volumeGIDValue string, pod *v1.Pod) (int64, bool) {
 	}
 
 	return gid, true
+}
+
+// ResizeEphemeralVolume synchronously triggers a resize of the specified volume.
+// This returns an error if the volume is not supported for direct resizing.
+func (vm *volumeManager) ResizeEphemeralVolume(pod *v1.Pod, volumeName string, newSize *resource.Quantity) error {
+	resizablePlugin, volumeSpec, err := vm.volumePluginSupportsDirectResize(pod, volumeName)
+	if err != nil {
+		return err
+	}
+	return resizablePlugin.ResizeEphemeralVolume(volumeSpec, pod, newSize)
+}
+
+// GetVolumeSize returns the current size of the specified volume.
+// This returns an error if the volume is not supported for direct resizing.
+func (vm *volumeManager) GetVolumeSize(pod *v1.Pod, volumeName string) (*resource.Quantity, error) {
+	resizablePlugin, volumeSpec, err := vm.volumePluginSupportsDirectResize(pod, volumeName)
+	if err != nil {
+		return nil, err
+	}
+	return resizablePlugin.GetVolumeSize(volumeSpec, pod)
+}
+
+func (vm *volumeManager) volumePluginSupportsDirectResize(pod *v1.Pod, volumeName string) (volume.ResizableEphemeralVolumePlugin, *volume.Spec, error) {
+	vol := findVolumeInPodSpec(pod, volumeName)
+	if vol == nil {
+		return nil, nil, fmt.Errorf("volume %s not found in pod %s", volumeName, pod.Name)
+	}
+
+	// Only emptyDir volumes support resize through this mechanism.
+	if vol.EmptyDir != nil {
+		plugin, err := vm.volumePluginMgr.FindPluginByName(emptydir.EmptyDirPluginName)
+		if err != nil {
+			return nil, nil, fmt.Errorf("plugin %s not found: %w", emptydir.EmptyDirPluginName, err)
+		}
+
+		if resizablePlugin, ok := plugin.(volume.ResizableEphemeralVolumePlugin); ok {
+			volumeSpec := volume.NewSpecFromVolume(vol)
+			return resizablePlugin, volumeSpec, nil
+		}
+	}
+
+	return nil, nil, fmt.Errorf("volume %s does not support direct resizing", volumeName)
+}
+
+func findVolumeInPodSpec(pod *v1.Pod, volumeName string) *v1.Volume {
+	for _, v := range pod.Spec.Volumes {
+		if v.Name == volumeName {
+			return &v
+		}
+	}
+	return nil
 }
