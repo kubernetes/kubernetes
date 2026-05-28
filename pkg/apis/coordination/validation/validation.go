@@ -181,10 +181,91 @@ func ValidateCoordinatedLeaseStrategy(strategy coordination.CoordinatedLeaseStra
 	return allErrs
 }
 
+// ValidateEvictionRequest validates an EvictionRequest.
+func ValidateEvictionRequest(evictionRequest *coordination.EvictionRequest) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = validation.ValidateObjectMeta(&evictionRequest.ObjectMeta, true, validation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateEvictionRequestSpec(&evictionRequest.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidateEvictionRequestSpec validates an EvictionRequest Spec.
+func ValidateEvictionRequestSpec(evictionRequestSpec *coordination.EvictionRequestSpec, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	// .target
+	// validate.Union covered by DV
+
+	// .target.pod.name
+	// validate.RequiredValue covered by DV
+	// validate.LongName covered by DV
+
+	// .target.pod.uid
+	// validate.RequiredValue covered by DV
+	// validate.UUID covered by DV
+
+	// .requesterName
+	namePath := fldPath.Child("requesterName")
+	// validate.RequiredValue covered by DV
+	if len(evictionRequestSpec.RequesterName) != 0 {
+		allErrs = append(allErrs, utilvalidation.IsDomainPrefixedKey(namePath, evictionRequestSpec.RequesterName)...)
+	}
+
+	// .intent
+	// validate.RequiredValue covered by DV
+	// validate.Enum covered by DV
+
+	return allErrs
+}
+
+// ValidateEvictionRequestUpdate validates an EvictionRequest.
+func ValidateEvictionRequestUpdate(evictionRequest, oldEvictionRequest *coordination.EvictionRequest) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&evictionRequest.ObjectMeta, &oldEvictionRequest.ObjectMeta, field.NewPath("metadata"))
+
+	// .spec.target
+	// validate.Immutable covered by DV
+
+	// .spec.requesterName
+	// validate.Immutable covered by DV
+
+	// .spec.intent
+	// validate.RequiredValue covered by DV
+	// validate.Enum covered by DV
+	return allErrs
+}
+
+// ValidateEvictionRequestStatusUpdate validates an EvictionRequest Status update.
+func ValidateEvictionRequestStatusUpdate(evictionRequest, oldEvictionRequest *coordination.EvictionRequest) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&evictionRequest.ObjectMeta, &oldEvictionRequest.ObjectMeta, field.NewPath("metadata"))
+	allErrs = append(allErrs, ValidateEvictionRequestStatus(&evictionRequest.Status, &oldEvictionRequest.Status, field.NewPath("status"))...)
+	return allErrs
+}
+
+// ValidateEvictionRequestStatus validates an EvictionRequest Status.
+func ValidateEvictionRequestStatus(status, oldStatus *coordination.EvictionRequestStatus, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// observedGeneration
+	observedGenerationPath := fldPath.Child("observedGeneration")
+	// validate.Minimum covered by DV
+	shouldCheckObservedGen := ptr.Deref(status.ObservedGeneration, 0) >= 1 || (status.ObservedGeneration == nil && oldStatus.ObservedGeneration != nil) // the rest is handled by validate.Minimum
+	if shouldCheckObservedGen && ptr.Deref(status.ObservedGeneration, 0) < ptr.Deref(oldStatus.ObservedGeneration, 0) {
+		allErrs = append(allErrs, field.Invalid(observedGenerationPath, status.ObservedGeneration, "cannot decrement, "+content.MinError(ptr.Deref(oldStatus.ObservedGeneration, 1))))
+	}
+
+	// conditions
+	conditionsPath := fldPath.Child("conditions")
+	// validate.MaxItems covered by DV
+	// validate.Unique covered by DV
+	for i, condition := range status.Conditions {
+		allErrs = append(allErrs, validation2.ValidateCondition(condition, conditionsPath.Index(i))...)
+	}
+
+	return allErrs
+}
+
 // ValidateEviction validates an Eviction.
 func ValidateEviction(eviction *coordination.Eviction) field.ErrorList {
-	var allErrs field.ErrorList
-	allErrs = validation.ValidateObjectMeta(&eviction.ObjectMeta, true, validation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	allErrs := validation.ValidateObjectMeta(&eviction.ObjectMeta, true, validation.NameIsDNSSubdomain, field.NewPath("metadata"))
 
 	// .spec.target
 	// validate.Union covered by DV

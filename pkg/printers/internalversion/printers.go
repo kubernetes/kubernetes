@@ -773,6 +773,18 @@ func AddHandlers(h printers.PrintHandler) {
 	_ = h.TableHandler(podGroupColumnDefinitions, printPodGroup)
 	_ = h.TableHandler(podGroupColumnDefinitions, printPodGroupList)
 
+	evictionRequestColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Target", Type: "string", Description: coordinationv1alpha1.EvictionRequestSpec{}.SwaggerDoc()["target"]},
+		{Name: "Target Type", Type: "string", Description: coordinationv1alpha1.EvictionRequestSpec{}.SwaggerDoc()["target"]},
+		{Name: "Status", Type: "string", Description: coordinationv1alpha1.EvictionStatus{}.SwaggerDoc()["conditions"]},
+		{Name: "Requester", Type: "string", Description: coordinationv1alpha1.EvictionRequestSpec{}.SwaggerDoc()["requesterName"]},
+		{Name: "Intent", Type: "string", Description: coordinationv1alpha1.EvictionRequestSpec{}.SwaggerDoc()["intent"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	_ = h.TableHandler(evictionRequestColumnDefinitions, printEvictionRequest)
+	_ = h.TableHandler(evictionRequestColumnDefinitions, printEvictionRequestList)
+
 	evictionColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Target", Type: "string", Description: coordinationv1alpha1.EvictionSpec{}.SwaggerDoc()["target"]},
@@ -3543,6 +3555,43 @@ func printPodGroupList(list *scheduling.PodGroupList, options printers.GenerateO
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printPodGroup(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+func printEvictionRequest(obj *coordination.EvictionRequest, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	var wideCells []interface{}
+	row.Cells = append(row.Cells, obj.Name)
+
+	// resolve target
+	target := "<unset>"
+	targetType := "<unset>"
+	if obj.Spec.Target.Pod != nil {
+		target = obj.Spec.Target.Pod.Name
+		targetType = "Pod"
+	}
+	row.Cells = append(row.Cells, target, targetType)
+
+	// resolve status
+	evictionStatus := resolveEvictionStatusConditions(obj.Status.ObservedGeneration, obj.Status.Conditions)
+	row.Cells = append(row.Cells, evictionStatus)
+
+	// resolve requester, intent, age
+	row.Cells = append(row.Cells, obj.Spec.RequesterName, string(obj.Spec.Intent), translateTimestampSince(obj.CreationTimestamp))
+
+	row.Cells = append(row.Cells, wideCells...)
+	return []metav1.TableRow{row}, nil
+}
+func printEvictionRequestList(list *coordination.EvictionRequestList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printEvictionRequest(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

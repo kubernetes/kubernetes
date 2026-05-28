@@ -361,7 +361,221 @@ func TestValidateCoordinatedLeaseStrategy(t *testing.T) {
 	}
 }
 
-const valiUIDName = "bd23f542-ac79-4b44-a628-9735e18b8037"
+const validUID = "bd23f542-ac79-4b44-a628-9735e18b8037"
+
+func TestValidateEvictionRequest(t *testing.T) {
+	successCases := map[string]struct {
+		input *coordination.EvictionRequest
+	}{
+		"valid: pod target": {
+			input: mkValidEvictionRequest(),
+		},
+	}
+	for name, tc := range successCases {
+		t.Run(name, func(t *testing.T) {
+			errs := ValidateEvictionRequest(tc.input)
+			if len(errs) != 0 {
+				t.Errorf("Expected success for %q: %v", name, errs)
+			}
+		})
+	}
+
+	failureCases := map[string]struct {
+		input *coordination.EvictionRequest
+
+		errors []*field.Error
+	}{
+		"name is not valid": {
+			input: mkValidEvictionRequest(setERName("-invalid-name-test")),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("metadata", "name"), "", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"),
+			},
+		},
+		"missing namespace": {
+			input: mkValidEvictionRequest(setERNamespace("")),
+			errors: []*field.Error{
+				field.Required(field.NewPath("metadata", "namespace"), ""),
+			},
+		},
+		"invalid requester name": {
+			input: mkValidEvictionRequest(setRequesterName("foo")),
+			errors: field.ErrorList{
+				field.Invalid(field.NewPath("spec", "requesterName"), "", "must be a domain-prefixed key"),
+			},
+		},
+	}
+
+	for name, tc := range failureCases {
+		t.Run(name, func(t *testing.T) {
+			errs := ValidateEvictionRequest(tc.input)
+			if len(errs) == 0 {
+				t.Errorf("Expected failure")
+				return
+			}
+			if len(errs) != len(tc.errors) {
+				t.Errorf("Expected %d errors, got %d: %v", len(tc.errors), len(errs), errs)
+				return
+			}
+			matcher := field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring()
+			matcher.Test(t, tc.errors, errs)
+
+			for i, err := range errs {
+				expectedErr := tc.errors[i]
+				if err.CoveredByDeclarative != expectedErr.CoveredByDeclarative {
+					t.Errorf("Error %d: expected CoveredByDeclarative=%v, got %v for error: %v",
+						i, expectedErr.CoveredByDeclarative, err.CoveredByDeclarative, err)
+				}
+			}
+		})
+	}
+}
+
+func TestValidateEvictionRequestUpdate(t *testing.T) {
+	successCases := map[string]struct {
+		input    *coordination.EvictionRequest
+		oldInput *coordination.EvictionRequest
+	}{
+		"withdraw a requester intent": {
+			oldInput: mkValidEvictionRequest(),
+			input:    mkValidEvictionRequest(setRequesterIntent(coordination.EvictionRequestIntentWithdrawn)),
+		},
+	}
+	for name, tc := range successCases {
+		t.Run(name, func(t *testing.T) {
+			tc.oldInput.ResourceVersion = "0"
+			tc.input.ResourceVersion = "1"
+			errs := ValidateEvictionRequestUpdate(tc.input, tc.oldInput)
+			if len(errs) != 0 {
+				t.Errorf("Expected success for %q: %v", name, errs)
+				return
+			}
+		})
+	}
+}
+
+func TestValidateEvictionRequestStatusUpdate(t *testing.T) {
+	clock := testing2.NewFakePassiveClock(time.Now())
+
+	successCases := map[string]struct {
+		clock    utilsclock.PassiveClock
+		input    *coordination.EvictionRequestStatus
+		oldInput *coordination.EvictionRequestStatus
+	}{
+		// conditions
+		// this is different from Eviction
+		"Evicted condition can be reverted to false": {
+			oldInput: mkValidEvictionRequestStatus(1, addERCondition(clock, coordination.EvictionConditionEvicted, true)),
+			input:    mkValidEvictionRequestStatus(1, addERCondition(clock, coordination.EvictionConditionEvicted, false)),
+		},
+		// this is different from Eviction
+		"Failed condition can be reverted to false": {
+			oldInput: mkValidEvictionRequestStatus(1, addERCondition(clock, coordination.EvictionConditionFailed, true)),
+			input:    mkValidEvictionRequestStatus(1, addERCondition(clock, coordination.EvictionConditionFailed, false)),
+		},
+		// observedGeneration
+		"set initial generation": {
+			oldInput: &coordination.EvictionRequestStatus{},
+			input:    mkValidEvictionRequestStatus(0),
+		},
+		"update generation": {
+			oldInput: mkValidEvictionRequestStatus(0),
+			input:    mkValidEvictionRequestStatus(0, setERObservedGeneration(ptr.To[int64](5))),
+		},
+	}
+	for name, tc := range successCases {
+		t.Run(name, func(t *testing.T) {
+			if validate.SemanticDeepEqual(tc.oldInput, tc.input) {
+				t.Errorf("Expected oldInput and input to differ")
+			}
+			oldEvictionRequest := mkValidEvictionRequest()
+			oldEvictionRequest.ResourceVersion = "0"
+			oldEvictionRequest.Status = *tc.oldInput
+			evictionRequest := mkValidEvictionRequest()
+			evictionRequest.ResourceVersion = "1"
+			evictionRequest.Status = *tc.input
+			errs := ValidateEvictionRequestStatusUpdate(evictionRequest, oldEvictionRequest)
+			if len(errs) != 0 {
+				t.Errorf("Expected success for %q: %v", name, errs)
+			}
+		})
+	}
+
+	failureCases := map[string]struct {
+		input    *coordination.EvictionRequestStatus
+		oldInput *coordination.EvictionRequestStatus
+
+		errors []*field.Error
+	}{
+		// conditions
+		"add invalid condition": {
+			oldInput: mkValidEvictionRequestStatus(1),
+			input: mkValidEvictionRequestStatus(1, func(obj *coordination.EvictionRequestStatus) {
+				obj.Conditions = append(obj.Conditions, metav1.Condition{
+					Type:               "-bad-name",
+					Status:             "invalid",
+					ObservedGeneration: -1,
+					Reason:             "-Reason",
+				})
+			}),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "conditions").Index(0).Child("type"), "", "name part must consist of alphanumeric characters, '-', '_' or '.', and "),
+				field.NotSupported(field.NewPath("status", "conditions").Index(0).Child("status"), "", []string{"False", "True", "Unknown"}),
+				field.Invalid(field.NewPath("status", "conditions").Index(0).Child("observedGeneration"), "", "must be greater than or equal to zero"),
+				field.Required(field.NewPath("status", "conditions").Index(0).Child("lastTransitionTime"), ""),
+				field.Invalid(field.NewPath("status", "conditions").Index(0).Child("reason"), "", "a condition reason must start with alphabetic character, optionally followed by a string of alphanumeric characters or '_,:', and "),
+			},
+		},
+		// observedGeneration
+		"clear generation": {
+			oldInput: mkValidEvictionRequestStatus(0, setERObservedGeneration(ptr.To[int64](1))),
+			input:    mkValidEvictionRequestStatus(0, setERObservedGeneration(nil)),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "observedGeneration"), 0, "cannot decrement, must be greater than or equal to 1"),
+			},
+		},
+		"decrease generation": {
+			oldInput: mkValidEvictionRequestStatus(0, setERObservedGeneration(ptr.To[int64](2))),
+			input:    mkValidEvictionRequestStatus(0, setERObservedGeneration(ptr.To[int64](1))),
+			errors: []*field.Error{
+				field.Invalid(field.NewPath("status", "observedGeneration"), 1, "cannot decrement, must be greater than or equal to 2"),
+			},
+		},
+	}
+
+	for name, tc := range failureCases {
+		t.Run(name, func(t *testing.T) {
+			oldEvictionRequest := mkValidEvictionRequest()
+			oldEvictionRequest.ResourceVersion = "0"
+			oldEvictionRequest.Status = *tc.oldInput
+			evictionRequest := mkValidEvictionRequest()
+			evictionRequest.ResourceVersion = "1"
+			evictionRequest.Status = *tc.input
+			errs := ValidateEvictionRequestStatusUpdate(evictionRequest, oldEvictionRequest)
+			if len(errs) == 0 {
+				t.Errorf("Expected failure")
+				return
+			}
+			if len(errs) != len(tc.errors) {
+				errsFormated := "\n"
+				for _, err := range errs {
+					errsFormated += err.Error() + "\n"
+				}
+				t.Errorf("Expected %d errors, got %d: %v", len(tc.errors), len(errs), errsFormated)
+				return
+			}
+			matcher := field.ErrorMatcher{}.ByType().ByField().ByDetailSubstring()
+			matcher.Test(t, tc.errors, errs)
+
+			for i, err := range errs {
+				expectedErr := tc.errors[i]
+				if err.CoveredByDeclarative != expectedErr.CoveredByDeclarative {
+					t.Errorf("Error %d: expected CoveredByDeclarative=%v, got %v for error: %v",
+						i, expectedErr.CoveredByDeclarative, err.CoveredByDeclarative, err)
+				}
+			}
+		})
+	}
+}
 
 func TestValidateEviction(t *testing.T) {
 	successCases := map[string]struct {
@@ -386,7 +600,7 @@ func TestValidateEviction(t *testing.T) {
 		errors []*field.Error
 	}{
 		"name is not valid": {
-			input: mkValidEviction(setName("-invalid-name-test", "")),
+			input: mkValidEviction(setName("-invalid-name-test")),
 			errors: []*field.Error{
 				field.Invalid(field.NewPath("metadata", "name"), "", "a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters"),
 			},
@@ -1243,13 +1457,85 @@ func TestValidateEvictionStatusUpdate(t *testing.T) {
 	}
 }
 
+func mkValidEvictionRequest(tweaks ...func(obj *coordination.EvictionRequest)) *coordination.EvictionRequest {
+	obj := coordination.EvictionRequest{
+		ObjectMeta: metav1.ObjectMeta{Name: "bar", Namespace: "foo"},
+		Spec: coordination.EvictionRequestSpec{
+			Target: coordination.EvictionRequestTarget{
+				Pod: &coordination.EvictionRequestPodReference{
+					UID:  validUID,
+					Name: "foo.pod",
+				},
+			},
+			RequesterName: "foo.example.com/bar",
+			Intent:        coordination.EvictionRequestIntentEviction,
+		},
+	}
+	for _, tweak := range tweaks {
+		tweak(&obj)
+	}
+	return &obj
+}
+
+func setERName(name string) func(obj *coordination.EvictionRequest) {
+	return func(obj *coordination.EvictionRequest) {
+		obj.Name = name
+	}
+}
+func setERNamespace(namespace string) func(obj *coordination.EvictionRequest) {
+	return func(obj *coordination.EvictionRequest) {
+		obj.Namespace = namespace
+	}
+}
+
+func setRequesterName(requesterName string) func(obj *coordination.EvictionRequest) {
+	return func(obj *coordination.EvictionRequest) {
+		obj.Spec.RequesterName = requesterName
+	}
+}
+func setRequesterIntent(intent coordination.EvictionRequestIntent) func(obj *coordination.EvictionRequest) {
+	return func(obj *coordination.EvictionRequest) {
+		obj.Spec.Intent = intent
+	}
+}
+
+func mkValidEvictionRequestStatus(responders int, tweaks ...func(obj *coordination.EvictionRequestStatus)) *coordination.EvictionRequestStatus {
+	obj := coordination.EvictionRequestStatus{
+		ObservedGeneration: ptr.To[int64](1),
+	}
+	for _, tweak := range tweaks {
+		tweak(&obj)
+	}
+	return &obj
+}
+func addERCondition(clock utilsclock.PassiveClock, name coordination.EvictionConditionType, status bool) func(obj *coordination.EvictionRequestStatus) {
+	return func(obj *coordination.EvictionRequestStatus) {
+		newCond := metav1.Condition{
+			Type:               string(name),
+			Status:             metav1.ConditionFalse,
+			Reason:             string(name) + "Reason",
+			LastTransitionTime: metav1.Time{Time: clock.Now()},
+		}
+		if status {
+			newCond.Status = metav1.ConditionTrue
+		}
+		obj.Conditions = append(obj.Conditions, newCond)
+	}
+}
+
+func setERObservedGeneration(generation *int64) func(obj *coordination.EvictionRequestStatus) {
+	return func(obj *coordination.EvictionRequestStatus) {
+		obj.ObservedGeneration = generation
+	}
+}
+
 func mkValidEviction(tweaks ...func(obj *coordination.Eviction)) *coordination.Eviction {
 	obj := coordination.Eviction{
-		ObjectMeta: metav1.ObjectMeta{Name: valiUIDName, Namespace: "foo"},
+		ObjectMeta: metav1.ObjectMeta{Name: validUID, Namespace: "foo"},
 		Spec: coordination.EvictionSpec{
 			Target: coordination.EvictionTarget{
 				Pod: &coordination.EvictionPodReference{
-					UID:  valiUIDName,
+					UID:  validUID,
 					Name: "foo.pod",
 				},
 			},
@@ -1261,10 +1547,9 @@ func mkValidEviction(tweaks ...func(obj *coordination.Eviction)) *coordination.E
 	return &obj
 }
 
-func setName(name, generateName string) func(obj *coordination.Eviction) {
+func setName(name string) func(obj *coordination.Eviction) {
 	return func(obj *coordination.Eviction) {
 		obj.Name = name
-		obj.GenerateName = generateName
 	}
 }
 func setNamespace(namespace string) func(obj *coordination.Eviction) {

@@ -8626,6 +8626,221 @@ func TestPrintResourcePoolStatusRequest(t *testing.T) {
 	}
 }
 
+func TestPrintEvictionRequest(t *testing.T) {
+	now := time.Now().UTC().AddDate(0, 0, -3)
+	twoDaysAgo := now.AddDate(0, 0, -2)
+
+	eviction := coordination.EvictionRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "pod-1-pod1",
+			Namespace:         "ns1",
+			CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+		},
+		Spec: coordination.EvictionRequestSpec{
+			Target: coordination.EvictionRequestTarget{
+				Pod: &coordination.EvictionRequestPodReference{
+					Name: "pod1",
+					UID:  "3d7fdff1-3fe5-48b9-b106-1ee24b0277f6",
+				},
+			},
+			RequesterName: "drain.foo.com/bar",
+			Intent:        coordination.EvictionRequestIntentEviction,
+		},
+		Status: coordination.EvictionRequestStatus{
+			ObservedGeneration: ptr.To[int64](1),
+			Conditions:         []metav1.Condition{},
+		},
+	}
+
+	tests := []struct {
+		expected []metav1.TableRow
+	}{
+		{
+			expected: []metav1.TableRow{
+				// Columns: Name, Target, Target Type, Status, Requester, Intent, Age
+				{Cells: []interface{}{"pod-1-pod1", "pod1", "Pod", "Progressing", "drain.foo.com/bar", "Eviction", "5d"}},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		rows, err := printEvictionRequest(&eviction, printers.GenerateOptions{})
+		if err != nil {
+			t.Fatalf("Error generating table rows for EvictionRequest: %#v", err)
+		}
+		rows[0].Object.Object = nil
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("mismatch: %s", cmp.Diff(test.expected, rows))
+		}
+	}
+}
+
+func TestPrintEvictionRequestList(t *testing.T) {
+	now := time.Now().UTC().AddDate(0, 0, -3)
+	dayAgo := now.AddDate(0, 0, -1)
+	twoDaysAgo := now.AddDate(0, 0, -2)
+	evictionRequestList := coordination.EvictionRequestList{
+		Items: []coordination.EvictionRequest{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pod-1-pod1",
+					Namespace:         "ns1",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: coordination.EvictionRequestSpec{
+					Target: coordination.EvictionRequestTarget{
+						Pod: &coordination.EvictionRequestPodReference{
+							Name: "pod1",
+							UID:  "bc134542-aa19-4361-8fe2-cf18f78848c0",
+						},
+					},
+					RequesterName: "drain.foo.com/bar",
+					Intent:        coordination.EvictionRequestIntentEviction,
+				},
+				Status: coordination.EvictionRequestStatus{
+					ObservedGeneration: ptr.To[int64](1),
+					Conditions: []metav1.Condition{
+						{Type: string(coordination.EvictionConditionEvicted), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: dayAgo}, Reason: string(coordination.EvictionConditionReasonPodDeleted), Message: "Pod was successfully deleted."},
+					},
+				},
+			},
+
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pod-1-pod2",
+					Namespace:         "ns2",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: coordination.EvictionRequestSpec{
+					Target: coordination.EvictionRequestTarget{
+						Pod: &coordination.EvictionRequestPodReference{
+							Name: "pod2",
+							UID:  "5e153f5b-e420-41b4-9040-8f3b51cf2162",
+						},
+					},
+					RequesterName: "drain.foo.com/bar",
+					Intent:        coordination.EvictionRequestIntentEviction,
+				},
+				Status: coordination.EvictionRequestStatus{
+					ObservedGeneration: ptr.To[int64](1),
+					Conditions: []metav1.Condition{
+						{Type: string(coordination.EvictionConditionFailed), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: string(coordination.EvictionConditionReasonNoFurtherResponder), Message: "Canceled because there is no further responder."},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pod-1-pod3",
+					Namespace:         "ns3",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: coordination.EvictionRequestSpec{
+					Target: coordination.EvictionRequestTarget{
+						Pod: &coordination.EvictionRequestPodReference{
+							Name: "pod3",
+							UID:  "68018c4c-bcca-4465-964a-66d8a1626686",
+						},
+					},
+					RequesterName: "drain.foo.com/bar",
+					Intent:        coordination.EvictionRequestIntentWithdrawn,
+				},
+				Status: coordination.EvictionRequestStatus{
+					ObservedGeneration: ptr.To[int64](1),
+					Conditions: []metav1.Condition{
+						{Type: string(coordination.EvictionConditionFailed), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: string(coordination.EvictionConditionReasonCanceledDueToNoRequesters), Message: "Canceled due to no requesters."},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pod-1-pod4",
+					Namespace:         "ns4",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: coordination.EvictionRequestSpec{
+					Target: coordination.EvictionRequestTarget{
+						Pod: &coordination.EvictionRequestPodReference{
+							Name: "pod4",
+							UID:  "3d7fdff1-3fe5-48b9-b106-1ee24b0277f6",
+						},
+					},
+					RequesterName: "drain.foo.com/bar",
+					Intent:        coordination.EvictionRequestIntentEviction,
+				},
+				Status: coordination.EvictionRequestStatus{
+					ObservedGeneration: ptr.To[int64](1),
+					Conditions: []metav1.Condition{
+						{Type: string(coordination.EvictionConditionEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "EvictionInProgress", Message: "Pod is being evicted."},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pod-1-pod5",
+					Namespace:         "ns5",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: coordination.EvictionRequestSpec{
+					Target: coordination.EvictionRequestTarget{
+						Pod: &coordination.EvictionRequestPodReference{
+							Name: "pod5",
+							UID:  "9f4a1620-0e97-4246-b304-5969b2104377",
+						},
+					},
+					RequesterName: "drain.foo.com/bar",
+					Intent:        coordination.EvictionRequestIntentEviction,
+				},
+				Status: coordination.EvictionRequestStatus{
+					ObservedGeneration: ptr.To[int64](1),
+					Conditions: []metav1.Condition{
+						{Type: string(coordination.EvictionConditionEvicted), Status: metav1.ConditionFalse, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: "Canceled", Message: "Eviction failed due to cancelation."},
+						{Type: string(coordination.EvictionConditionFailed), Status: metav1.ConditionTrue, ObservedGeneration: 1, LastTransitionTime: metav1.Time{Time: now}, Reason: string(coordination.EvictionConditionReasonEvictionInvalid), Message: "Pod pod6 was not found."},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "pod-1-pod6",
+					Namespace:         "ns6",
+					CreationTimestamp: metav1.Time{Time: twoDaysAgo},
+				},
+				Spec: coordination.EvictionRequestSpec{
+					Target: coordination.EvictionRequestTarget{
+						Pod: &coordination.EvictionRequestPodReference{
+							Name: "pod6",
+							UID:  "e968f679-523b-4e63-9417-0cd9ae13a0b2",
+						},
+					},
+					RequesterName: "drain.foo.com/bar",
+					Intent:        coordination.EvictionRequestIntentEviction,
+				},
+			},
+		},
+	}
+
+	// Columns: Name, Target, Target Type, Status, Requester, Intent, Age
+	expected := []metav1.TableRow{
+		{Cells: []interface{}{"pod-1-pod1", "pod1", "Pod", "Evicted (PodDeleted)", "drain.foo.com/bar", "Eviction", "5d"}},
+		{Cells: []interface{}{"pod-1-pod2", "pod2", "Pod", "Failed (NoFurtherResponder)", "drain.foo.com/bar", "Eviction", "5d"}},
+		{Cells: []interface{}{"pod-1-pod3", "pod3", "Pod", "Failed (CanceledDueToNoRequesters)", "drain.foo.com/bar", "Withdrawn", "5d"}},
+		{Cells: []interface{}{"pod-1-pod4", "pod4", "Pod", "Progressing", "drain.foo.com/bar", "Eviction", "5d"}},
+		{Cells: []interface{}{"pod-1-pod5", "pod5", "Pod", "Failed (EvictionInvalid)", "drain.foo.com/bar", "Eviction", "5d"}},
+		{Cells: []interface{}{"pod-1-pod6", "pod6", "Pod", "Pending", "drain.foo.com/bar", "Eviction", "5d"}},
+	}
+
+	rows, err := printEvictionRequestList(&evictionRequestList, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error generating table rows for EvictionRequestList: %#v", err)
+	}
+	for i := range rows {
+		rows[i].Object.Object = nil
+	}
+
+	if !reflect.DeepEqual(expected, rows) {
+		t.Errorf("mismatch: %s", cmp.Diff(expected, rows))
+	}
+}
+
 func TestPrintEviction(t *testing.T) {
 	now := time.Now().UTC().AddDate(0, 0, -3)
 	daysLater := now.AddDate(0, 0, 5).Add(time.Minute)

@@ -150,7 +150,7 @@ func viewRules() []rbacv1.PolicyRule {
 		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(schedulingGroup).Resources("workloads", "podgroups", "podgroups/status").RuleOrDie())
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.EvictionRequestAPI) {
-		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(coordinationGroup).Resources("evictions").RuleOrDie())
+		rules = append(rules, rbacv1helpers.NewRule(Read...).Groups(coordinationGroup).Resources("evictionrequests", "evictions").RuleOrDie())
 	}
 	return rules
 }
@@ -197,7 +197,7 @@ func editRules() []rbacv1.PolicyRule {
 		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(schedulingGroup).Resources("workloads", "podgroups").RuleOrDie())
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.EvictionRequestAPI) {
-		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(coordinationGroup).Resources("evictions").RuleOrDie())
+		rules = append(rules, rbacv1helpers.NewRule(Write...).Groups(coordinationGroup).Resources("evictionrequests", "evictions").RuleOrDie())
 	}
 	return rules
 }

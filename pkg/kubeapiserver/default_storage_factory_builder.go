@@ -88,6 +88,7 @@ func NewStorageFactoryConfigEffectiveVersion(effectiveVersion basecompatibility.
 		resource.Resource("devicetaintrules").WithVersion("v1alpha3"),
 		resource.Resource("resourcepoolstatusrequests").WithVersion("v1alpha3"),
 		coordination.Resource("evictions").WithVersion("v1alpha1"),
+		coordination.Resource("evictionrequests").WithVersion("v1alpha1"),
 	}
 	return &StorageFactoryConfig{
 		Serializer:                legacyscheme.Codecs,

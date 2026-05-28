@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/coordination"
 	"k8s.io/kubernetes/pkg/features"
 	evictionstorage "k8s.io/kubernetes/pkg/registry/coordination/eviction/storage"
+	evictionrequeststorage "k8s.io/kubernetes/pkg/registry/coordination/evictionrequest/storage"
 	leasestorage "k8s.io/kubernetes/pkg/registry/coordination/lease/storage"
 	leasecandidatestorage "k8s.io/kubernetes/pkg/registry/coordination/leasecandidate/storage"
 	"k8s.io/utils/clock"
@@ -134,6 +135,18 @@ func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstora
 			storage[resource+"/status"] = evictionStatusStorage
 		} else {
 			klog.Warning("Eviction storage is disabled because the EvictionRequestAPI feature gate is disabled")
+		}
+	}
+	if resource := "evictionrequests"; apiResourceConfigSource.ResourceEnabled(coordinationv1alpha1.SchemeGroupVersion.WithResource(resource)) {
+		if utilfeature.DefaultFeatureGate.Enabled(features.EvictionRequestAPI) {
+			evictionRequestStorage, evictionRequestStatusStorage, err := evictionrequeststorage.NewREST(restOptionsGetter, p.Authorizer)
+			if err != nil {
+				return storage, err
+			}
+			storage[resource] = evictionRequestStorage
+			storage[resource+"/status"] = evictionRequestStatusStorage
+		} else {
+			klog.Warning("EvictionRequest storage is disabled because the EvictionRequestAPI feature gate is disabled")
 		}
 	}
 
