@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/kubernetes/pkg/kubelet/nodeinfocache"
 )
 
 func TestGetCachedNode(t *testing.T) {
@@ -111,9 +112,10 @@ func TestGetCachedNode(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			kl := Kubelet{
-				cachedNode: test.cachedNode,
-				nodeLister: newFakeNodeLister(test.nodeListerErr, test.informerNode),
-				kubeClient: &fake.Clientset{},
+				cachedNode:    test.cachedNode,
+				nodeLister:    newFakeNodeLister(test.nodeListerErr, test.informerNode),
+				kubeClient:    &fake.Clientset{},
+				nodeInfoCache: nodeinfocache.New(),
 			}
 			if test.expectedNode == nil {
 				var err error

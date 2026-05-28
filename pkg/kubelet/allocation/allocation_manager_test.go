@@ -1751,7 +1751,7 @@ func TestAllocationManagerAddPodWithPLR(t *testing.T) {
 				allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
 			}
 
-			ok, reason, message := allocationManager.AddPod(tc.currentActivePods, tc.podToAdd)
+			ok, reason, message := allocationManager.AddPod(tc.podToAdd)
 			require.Equal(t, tc.expectAdmit, ok)
 			require.Equal(t, tc.admissionFailureReason, reason)
 			require.Equal(t, tc.admissionFailureMessage, message)
@@ -2007,7 +2007,7 @@ func TestAllocationManagerAddPod(t *testing.T) {
 				allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{handler})
 			}
 
-			ok, reason, message := allocationManager.AddPod(tc.currentActivePods, tc.podToAdd)
+			ok, reason, message := allocationManager.AddPod(tc.podToAdd)
 			require.Equal(t, tc.expectAdmit, ok)
 			require.Equal(t, tc.admissionFailureReason, reason)
 			require.Equal(t, tc.admissionFailureMessage, message)
@@ -2433,7 +2433,6 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 			}
 			pod.Annotations["pod-sync-triggered"] = "true"
 		},
-		func() []*v1.Pod { return allocatedPods },
 		func(uid types.UID) (*v1.Pod, bool) {
 			for _, p := range allocatedPods {
 				if p.UID == uid {
@@ -2461,8 +2460,7 @@ func makeAllocationManager(t *testing.T, runtime *containertest.FakeRuntime, all
 			},
 		}, nil
 	}
-
-	predicateHandler := lifecycle.NewPredicateAdmitHandler(getNode, lifecycle.NewAdmissionFailureHandlerStub(), containerManager.UpdatePluginResources)
+	predicateHandler := lifecycle.NewPredicateAdmitHandler(getNode, lifecycle.NewAdmissionFailureHandlerStub(), containerManager.UpdatePluginResources, lifecycle.NewNodeInfoProviderStubWithPods(allocatedPods))
 	resizeHandler := NewPodResizesAdmitHandler(containerManager, runtime, allocationManager, logger)
 	allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{resizeHandler, predicateHandler})
 	return allocationManager
