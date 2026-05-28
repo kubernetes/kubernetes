@@ -897,6 +897,109 @@ func TestRunPlacementFeasiblePlugins(t *testing.T) {
 	}
 }
 
+func TestRunPlacementFeasiblePlugins_SuccessfulPlugins(t *testing.T) {
+	type placementFeasiblePluginRun struct {
+		useNewCycleState bool
+		expectedStatus   *fwk.Status
+		expectedCalled   []bool
+	}
+
+	tests := []struct {
+		name    string
+		plugins []*mockPlacementFeasiblePlugin
+		runs    []placementFeasiblePluginRun
+	}{
+		{
+			name: "Plugins successful on first run are skipped on second run with same cycle state",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: nil},
+				{name: "p2", status: nil},
+			},
+			runs: []placementFeasiblePluginRun{
+				{
+					expectedStatus: nil,
+					expectedCalled: []bool{true, true},
+				},
+				{
+					expectedStatus: nil,
+					expectedCalled: []bool{false, false},
+				},
+			},
+		},
+		{
+			name: "Plugins successful on first run are called on second run with new cycle state",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: nil},
+				{name: "p2", status: nil},
+			},
+			runs: []placementFeasiblePluginRun{
+				{
+					expectedStatus: nil,
+					expectedCalled: []bool{true, true},
+				},
+				{
+					useNewCycleState: true,
+					expectedStatus:   nil,
+					expectedCalled:   []bool{true, true},
+				},
+			},
+		},
+		{
+			name: "Plugins that fail on first run are called on second run with same cycle state",
+			plugins: []*mockPlacementFeasiblePlugin{
+				{name: "p1", status: fwk.NewStatus(fwk.Unschedulable, "unschedulable")},
+				{name: "p2", status: nil},
+			},
+			runs: []placementFeasiblePluginRun{
+				{
+					expectedStatus: fwk.NewStatus(fwk.Unschedulable, "unschedulable").WithPlugin("p1"),
+					expectedCalled: []bool{true, true},
+				},
+				{
+					expectedStatus: fwk.NewStatus(fwk.Unschedulable, "unschedulable").WithPlugin("p1"),
+					expectedCalled: []bool{true, false},
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, ctx := ktesting.NewTestContext(t)
+			f := &frameworkImpl{
+				placementFeasiblePlugins: make([]framework.PlacementFeasiblePlugin, len(tc.plugins)),
+			}
+			for i, p := range tc.plugins {
+				f.placementFeasiblePlugins[i] = p
+			}
+
+			var state fwk.PlacementCycleState = framework.NewCycleState()
+
+			for rIdx, run := range tc.runs {
+				if run.useNewCycleState {
+					state = framework.NewCycleState()
+				}
+
+				for _, p := range tc.plugins {
+					p.called = false
+				}
+
+				status := f.RunPlacementFeasiblePlugins(ctx, state, nil)
+
+				if diff := cmp.Diff(run.expectedStatus, status, statusCmpOpts...); diff != "" {
+					t.Errorf("Run %d: Unexpected status (-want, +got):\n%s", rIdx, diff)
+				}
+
+				for i, p := range tc.plugins {
+					if p.called != run.expectedCalled[i] {
+						t.Errorf("Run %d: Expected plugin %s called=%v, got %v", rIdx, p.name, run.expectedCalled[i], p.called)
+					}
+				}
+			}
+		})
+	}
+}
+
 func TestNewFrameworkMultiPointExpansion(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -3591,6 +3694,8 @@ func withMetricsRecorder(recorder *metrics.MetricAsyncRecorder) Option {
 
 func TestRecordingMetrics(t *testing.T) {
 	state.SetRecordPluginMetrics(true)
+	initialState := state.Clone()
+	state := initialState
 	tests := []struct {
 		name               string
 		action             func(ctx context.Context, f framework.Framework)
@@ -3773,6 +3878,7 @@ func TestRecordingMetrics(t *testing.T) {
 			ctx, cancel := context.WithCancel(ctx)
 			metrics.FrameworkExtensionPointDuration.Reset()
 			metrics.PluginExecutionDuration.Reset()
+			state = initialState.Clone()
 
 			plugin := &TestPlugin{name: testPlugin, inj: tt.inject}
 			r := make(Registry)
