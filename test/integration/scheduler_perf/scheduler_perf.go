@@ -799,6 +799,13 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
 					scheduler, informerFactory, schedulerDone, tCtx := setupTestCase(b, tc, featureGates, w, opts)
+					tCtx.TB().Cleanup(func() {
+						tCtx.Cancel("workload is done")
+						<-schedulerDone
+						// Reset metrics to prevent metrics generated in current workload gets
+						// carried over to the next workload.
+						legacyregistry.Reset()
+					})
 
 					err := w.isValid(tc.MetricsCollectorConfig)
 					if err != nil {
@@ -845,14 +852,6 @@ func RunBenchmarkPerfScheduling(b *testing.B, configFile string, topicName strin
 					if err = checkEmptyInFlightEvents(); err != nil {
 						tCtx.Errorf("%s: %s", w.Name, err)
 					}
-
-					tCtx.Cancel("workload is done")
-					// Wait for the scheduler to stop to avoid data races when resetting metrics.
-					<-schedulerDone
-
-					// Reset metrics to prevent metrics generated in current workload gets
-					// carried over to the next workload.
-					legacyregistry.Reset()
 
 					// Exactly one result is expected to contain the progress information.
 					for _, item := range results {
@@ -923,6 +922,13 @@ func RunIntegrationPerfScheduling(t *testing.T, configFile string, options ...Sc
 					}
 					featureGates := featureGatesMerge(tc.FeatureGates, w.FeatureGates)
 					scheduler, informerFactory, schedulerDone, tCtx := setupTestCase(t, tc, featureGates, w, opts)
+					tCtx.TB().Cleanup(func() {
+						tCtx.Cancel("workload is done")
+						<-schedulerDone
+						// Reset metrics to prevent metrics generated in current workload gets
+						// carried over to the next workload.
+						legacyregistry.Reset()
+					})
 					err := w.isValid(tc.MetricsCollectorConfig)
 					if err != nil {
 						t.Fatalf("workload %s is not valid: %v", w.Name, err)
@@ -937,14 +943,6 @@ func RunIntegrationPerfScheduling(t *testing.T, configFile string, options ...Sc
 					if err = checkEmptyInFlightEvents(); err != nil {
 						tCtx.Errorf("%s: %s", w.Name, err)
 					}
-
-					tCtx.Cancel("workload is done")
-					// Wait for the scheduler to stop to avoid data races when resetting metrics.
-					<-schedulerDone
-
-					// Reset metrics to prevent metrics generated in current workload gets
-					// carried over to the next workload.
-					legacyregistry.Reset()
 				})
 			}
 		})
