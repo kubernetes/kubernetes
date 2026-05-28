@@ -19,6 +19,7 @@ limitations under the License.
 package nftables
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"reflect"
@@ -4250,14 +4251,32 @@ func TestSyncProxyRulesRepeated(t *testing.T) {
 	assertNumOperations(t, nft, 0)
 }
 
+type transactionRecorder struct {
+	knftables.Interface
+	transactions []*knftables.Transaction
+}
+
+func (tr *transactionRecorder) Run(ctx context.Context, tx *knftables.Transaction) error {
+	tr.transactions = append(tr.transactions, tx)
+	return tr.Interface.Run(ctx, tx)
+}
+
 func TestSyncProxyRulesStartup(t *testing.T) {
 	nft, fp := NewFakeProxier(v1.IPv4Protocol)
+	recorder := &transactionRecorder{Interface: nft}
+	fp.nftables = recorder
+
 	fp.syncProxyRules()
-	// measure the amount of ops required for the initial sync
-	setupOps := nft.LastTransaction.NumOperations()
+	// measure the amount of ops required for the initial sync across all transactions
+	setupOps := 0
+	for _, tx := range recorder.transactions {
+		setupOps += tx.NumOperations()
+	}
 
 	// now create a new proxier and start from scratch
 	nft, fp = NewFakeProxier(v1.IPv4Protocol)
+	recorder = &transactionRecorder{Interface: nft}
+	fp.nftables = recorder
 
 	// put a part of desired state to nftables
 	err := nft.ParseDump(baseRules + dedent.Dedent(`
@@ -4366,12 +4385,20 @@ func TestSyncProxyRulesStartup(t *testing.T) {
 		add rule ip kube-proxy service-MHHHYRWA-ns2/svc2/tcp/p8080 meta l4proto tcp dnat ip addr . port to numgen random mod 1 map { 0 : 10.0.2.1 . 8080 }
 	`)
 	assertNFTablesTransactionEqual(t, getLine(), expected, nft.Dump())
-	assertNumOperations(t, nft,
-		setupOps, // nft setup
-		1,        // add new svc1 endpoint to hairpin-connections
-		2,        // add svc3 IP to the cluster-ips, and to the no-endpoint-services set
-		6,        // add+flush 2 service chains + 1 rule each
-	)
+
+	// Assert the total number of operations across all executed transactions.
+	// We sum across all Run() calls because the full-sync path now uses multiple
+	// chunked transactions (txInit, endpoint/service chain chunks, tx) and
+	// nft.Dump() only reflects the last one.
+	totalOps := 0
+	for _, tx := range recorder.transactions {
+		totalOps += tx.NumOperations()
+	}
+
+	expectedOps := setupOps + 1 + 2 + 6
+	if totalOps != expectedOps {
+		t.Errorf("Expected total of %d operations across transactions, got %d", expectedOps, totalOps)
+	}
 }
 
 func TestNoEndpointsMetric(t *testing.T) {

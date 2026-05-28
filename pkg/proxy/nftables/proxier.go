@@ -1133,18 +1133,178 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		}
 	}
 
-	// Now start the actual syncing transaction
-	tx := proxier.nftables.NewTransaction()
-	if doFullSync {
-		proxier.setupNFTables(tx)
-	}
-
 	// We need to use, eg, "ip daddr" for IPv4 but "ip6 daddr" for IPv6
 	ipX := "ip"
 	ipvX_addr := "ipv4_addr" //nolint:staticcheck // var name intentionally resembles value
 	if proxier.ipFamily == v1.IPv6Protocol {
 		ipX = "ip6"
 		ipvX_addr = "ipv6_addr"
+	}
+
+	// Now start the actual syncing transaction.
+	//
+	// On a full sync we split the work into multiple sequential transactions:
+	//   txInit:   initializes the table, base chains, and global sets/maps.
+	//   chunks:   creates endpoint chains/affinity sets and service chains in small batches.
+	//   tx:       populates rules into every chain and elements into every set/map.
+	//
+	// Submitting one giant transaction at scale (thousands of services) causes the
+	// kernel to hold a netlink lock for the entire duration, stalling traffic
+	// forwarding on a newly joined node.  Splitting into smaller chunked transactions
+	// keeps each individual kernel operation shorter.
+	//
+	// On an incremental (warm) sync doFullSync is false, so chainTx == tx and
+	// everything goes into a single transaction exactly as before.
+	tx := proxier.nftables.NewTransaction()
+	// chainTx is the transaction used for ensureChain calls in the rules loop.
+	// In the full-sync path it is intentionally nil: all ensureChain calls below
+	// pass doFullSync=true as skipCreation, so chainTx is never dereferenced.
+	var chainTx *knftables.Transaction
+	if !doFullSync {
+		chainTx = tx
+	} else {
+		// Initialize the table, base chains, and global sets/maps.
+		txInit := proxier.nftables.NewTransaction()
+		proxier.setupNFTables(txInit)
+		if err := proxier.nftables.Run(context.TODO(), txInit); err != nil {
+			proxier.logger.Error(err, "nftables table initialization failed")
+			metrics.NFTablesSyncFailuresTotal.WithLabelValues(string(proxier.ipFamily)).Inc()
+			clear(proxier.staleChains)
+			proxier.logFailure(txInit)
+			return err
+		}
+
+		// Collect all endpoint chains, affinity sets, and service chains that need to be created.
+		neededEndpointChains := sets.New[string]()
+		neededAffinitySets := make(map[string]time.Duration)
+		neededServiceChains := sets.New[string]()
+
+		for svcName, svc := range proxier.svcPortMap {
+			svcInfo, ok := svc.(*servicePortInfo)
+			if !ok {
+				continue
+			}
+
+			allEndpoints := proxier.endpointsMap[svcName]
+			clusterEndpoints, localEndpoints, allLocallyReachableEndpoints, _ := proxy.CategorizeEndpoints(allEndpoints, svcInfo, proxier.nodeName, proxier.topologyLabels)
+
+			serviceUsesAffinity := svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP
+
+			for _, ep := range allLocallyReachableEndpoints {
+				epInfo, ok := ep.(*endpointInfo)
+				if !ok {
+					continue
+				}
+				if serviceUsesAffinity {
+					neededEndpointChains.Insert(epInfo.chainName)
+					neededAffinitySets[epInfo.affinitySetName] = time.Duration(svcInfo.StickyMaxAgeSeconds()) * time.Second
+				}
+			}
+
+			if len(clusterEndpoints) > 0 && svcInfo.UsesClusterEndpoints() {
+				neededServiceChains.Insert(svcInfo.clusterPolicyChainName)
+			}
+			if len(localEndpoints) > 0 && svcInfo.UsesLocalEndpoints() {
+				neededServiceChains.Insert(svcInfo.localPolicyChainName)
+			}
+			if len(allEndpoints) > 0 && svcInfo.ExternallyAccessible() {
+				neededServiceChains.Insert(svcInfo.externalChainName)
+			}
+			if len(svcInfo.LoadBalancerVIPs()) > 0 && len(svcInfo.LoadBalancerSourceRanges()) > 0 {
+				neededServiceChains.Insert(svcInfo.firewallChainName)
+			}
+		}
+
+		// Batch create endpoint chains and affinity sets
+		currentTx := proxier.nftables.NewTransaction()
+		opsInCurrentTx := 0
+		const maxOpsPerTx = 1000
+
+		for _, chain := range neededEndpointChains.UnsortedList() {
+			if opsInCurrentTx >= maxOpsPerTx {
+				if err := proxier.nftables.Run(context.TODO(), currentTx); err != nil {
+					proxier.logger.Error(err, "failed to run chunked endpoint chains transaction")
+					metrics.NFTablesSyncFailuresTotal.WithLabelValues(string(proxier.ipFamily)).Inc()
+					clear(proxier.staleChains)
+					proxier.logFailure(currentTx)
+					return err
+				}
+				currentTx = proxier.nftables.NewTransaction()
+				opsInCurrentTx = 0
+			}
+			currentTx.Add(&knftables.Chain{
+				Name: chain,
+			})
+			currentTx.Flush(&knftables.Chain{
+				Name: chain,
+			})
+			opsInCurrentTx += 2
+		}
+
+		for name, timeout := range neededAffinitySets {
+			if opsInCurrentTx >= maxOpsPerTx {
+				if err := proxier.nftables.Run(context.TODO(), currentTx); err != nil {
+					proxier.logger.Error(err, "failed to run chunked affinity sets transaction")
+					metrics.NFTablesSyncFailuresTotal.WithLabelValues(string(proxier.ipFamily)).Inc()
+					clear(proxier.staleChains)
+					proxier.logFailure(currentTx)
+					return err
+				}
+				currentTx = proxier.nftables.NewTransaction()
+				opsInCurrentTx = 0
+			}
+			currentTx.Add(&knftables.Set{
+				Name:    name,
+				Type:    ipvX_addr,
+				Flags:   []knftables.SetFlag{knftables.DynamicFlag, knftables.TimeoutFlag},
+				Timeout: ptr.To(timeout),
+			})
+			opsInCurrentTx++
+		}
+
+		if opsInCurrentTx > 0 {
+			if err := proxier.nftables.Run(context.TODO(), currentTx); err != nil {
+				proxier.logger.Error(err, "failed to run chunked endpoint chains/affinity sets transaction")
+				metrics.NFTablesSyncFailuresTotal.WithLabelValues(string(proxier.ipFamily)).Inc()
+				clear(proxier.staleChains)
+				proxier.logFailure(currentTx)
+				return err
+			}
+		}
+
+		// Batch create service chains
+		currentTx = proxier.nftables.NewTransaction()
+		opsInCurrentTx = 0
+		for _, chain := range neededServiceChains.UnsortedList() {
+			if opsInCurrentTx >= maxOpsPerTx {
+				if err := proxier.nftables.Run(context.TODO(), currentTx); err != nil {
+					proxier.logger.Error(err, "failed to run chunked service chains transaction")
+					metrics.NFTablesSyncFailuresTotal.WithLabelValues(string(proxier.ipFamily)).Inc()
+					clear(proxier.staleChains)
+					proxier.logFailure(currentTx)
+					return err
+				}
+				currentTx = proxier.nftables.NewTransaction()
+				opsInCurrentTx = 0
+			}
+			currentTx.Add(&knftables.Chain{
+				Name: chain,
+			})
+			currentTx.Flush(&knftables.Chain{
+				Name: chain,
+			})
+			opsInCurrentTx += 2
+		}
+
+		if opsInCurrentTx > 0 {
+			if err := proxier.nftables.Run(context.TODO(), currentTx); err != nil {
+				proxier.logger.Error(err, "failed to run chunked service chains transaction")
+				metrics.NFTablesSyncFailuresTotal.WithLabelValues(string(proxier.ipFamily)).Inc()
+				clear(proxier.staleChains)
+				proxier.logFailure(currentTx)
+				return err
+			}
+		}
 	}
 
 	var err error
@@ -1216,7 +1376,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 			// If using affinity, note the endpoint chain and affinity set
 			// names, and ensure that the chain exists.
 			if serviceUsesAffinity {
-				ensureChain(epInfo.chainName, tx, activeChains, skipServiceUpdate)
+				ensureChain(epInfo.chainName, chainTx, activeChains, doFullSync || skipServiceUpdate)
 				activeAffinitySets.Insert(epInfo.affinitySetName)
 			}
 
@@ -1238,14 +1398,14 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		clusterPolicyChain := svcInfo.clusterPolicyChainName
 		usesClusterPolicyChain := len(clusterEndpoints) > 0 && svcInfo.UsesClusterEndpoints()
 		if usesClusterPolicyChain {
-			ensureChain(clusterPolicyChain, tx, activeChains, skipServiceUpdate)
+			ensureChain(clusterPolicyChain, chainTx, activeChains, doFullSync || skipServiceUpdate)
 		}
 
 		// localPolicyChain contains the endpoints used with "Local" traffic policy
 		localPolicyChain := svcInfo.localPolicyChainName
 		usesLocalPolicyChain := len(localEndpoints) > 0 && svcInfo.UsesLocalEndpoints()
 		if usesLocalPolicyChain {
-			ensureChain(localPolicyChain, tx, activeChains, skipServiceUpdate)
+			ensureChain(localPolicyChain, chainTx, activeChains, doFullSync || skipServiceUpdate)
 		}
 
 		// internalPolicyChain is the chain containing the endpoints for
@@ -1287,7 +1447,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		// are no externally-usable endpoints.
 		usesExternalTrafficChain := hasEndpoints && svcInfo.ExternallyAccessible()
 		if usesExternalTrafficChain {
-			ensureChain(externalTrafficChain, tx, activeChains, skipServiceUpdate)
+			ensureChain(externalTrafficChain, chainTx, activeChains, doFullSync || skipServiceUpdate)
 		}
 
 		var internalTrafficFilterVerdict, externalTrafficFilterVerdict string
@@ -1389,7 +1549,7 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		usesFWChain := len(svcInfo.LoadBalancerVIPs()) > 0 && len(svcInfo.LoadBalancerSourceRanges()) > 0
 		fwChain := svcInfo.firewallChainName
 		if usesFWChain {
-			ensureChain(fwChain, tx, activeChains, skipServiceUpdate)
+			ensureChain(fwChain, chainTx, activeChains, doFullSync || skipServiceUpdate)
 		}
 
 		// Capture load-balancer ingress.
@@ -1600,23 +1760,25 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 				// ServicePort (without regard to which service IP was
 				// used to reach the service). This may be changed in the
 				// future.
-				tx.Add(&knftables.Set{
-					Name: epInfo.affinitySetName,
-					Type: ipvX_addr,
-					Flags: []knftables.SetFlag{
-						// The nft docs say "dynamic" is only
-						// needed for sets containing stateful
-						// objects (eg counters), but (at least on
-						// RHEL8) if we create the set without
-						// "dynamic", it later gets mutated to
-						// have it, and then the next attempt to
-						// tx.Add() it here fails because it looks
-						// like we're trying to change the flags.
-						knftables.DynamicFlag,
-						knftables.TimeoutFlag,
-					},
-					Timeout: ptr.To(time.Duration(svcInfo.StickyMaxAgeSeconds()) * time.Second),
-				})
+				if !doFullSync {
+					tx.Add(&knftables.Set{
+						Name: epInfo.affinitySetName,
+						Type: ipvX_addr,
+						Flags: []knftables.SetFlag{
+							// The nft docs say "dynamic" is only
+							// needed for sets containing stateful
+							// objects (eg counters), but (at least on
+							// RHEL8) if we create the set without
+							// "dynamic", it later gets mutated to
+							// have it, and then the next attempt to
+							// tx.Add() it here fails because it looks
+							// like we're trying to change the flags.
+							knftables.DynamicFlag,
+							knftables.TimeoutFlag,
+						},
+						Timeout: ptr.To(time.Duration(svcInfo.StickyMaxAgeSeconds()) * time.Second),
+					})
+				}
 			}
 		}
 
@@ -1707,9 +1869,8 @@ func (proxier *Proxier) syncProxyRules() (retryError error) {
 		"numServices", len(proxier.svcPortMap),
 		"numEndpoints", totalEndpoints,
 	)
-
 	if klogV9 := klog.V(9); klogV9.Enabled() {
-		klogV9.InfoS("Running nftables transaction", "transaction", tx.String())
+		klogV9.InfoS("Running nftables rules transaction", "transaction", tx.String())
 	}
 
 	err = proxier.nftables.Run(context.TODO(), tx)
