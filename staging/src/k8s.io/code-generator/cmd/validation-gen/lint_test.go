@@ -20,6 +20,7 @@ import (
 	"errors"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/code-generator/cmd/validation-gen/validators"
 	"k8s.io/gengo/v2/codetags"
 	"k8s.io/gengo/v2/generator"
@@ -481,10 +482,17 @@ func TestHasAnyValidationTag(t *testing.T) {
 		},
 	}
 
+	chainTags := sets.New[string]()
+	for _, doc := range validator.Docs() {
+		if doc.PayloadsType == codetags.ValueTypeTag {
+			chainTags.Insert(doc.Tag)
+		}
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tags, _ := validator.ExtractTags(validators.Context{}, tt.comments)
-			if got := hasNonOpaqueValidationTag(tags); got != tt.want {
+			if got := hasNonOpaqueValidationTag(validator, chainTags, tags); got != tt.want {
 				t.Errorf("hasNonOpaqueValidationTag() = %v, want %v", got, tt.want)
 			}
 		})
@@ -545,6 +553,10 @@ func TestHasRequirednessTag(t *testing.T) {
 }
 
 func TestLintRequiredness(t *testing.T) {
+	sharedAlias := testAlias("MyAlias", testSlice(testStruct("Inner", []types.Member{
+		testField("Bar", testType("int"), "+k8s:minimum=0"),
+	})))
+
 	tests := []struct {
 		name       string
 		typeToLint *types.Type
@@ -873,6 +885,21 @@ func TestLintRequiredness(t *testing.T) {
 			wantError: "",
 		},
 		{
+			name: "alias field (to slice) with local validation tag and elements marked opaque on the type definition - reports error",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Widgets", testAlias("WidgetList",
+					testSlice(
+						testStruct("Inner", []types.Member{
+							testField("Bar", testType("int"), "+k8s:minimum=0"),
+						}),
+					),
+					"+k8s:maxItems=100",
+					"+k8s:eachVal=+k8s:opaqueType",
+				)),
+			}),
+			wantError: "field Widgets: field with validation must have +k8s:optional, +k8s:required or +k8s:forbidden",
+		},
+		{
 			name: "pointer field with transitive malformed tag on alias type definition - reports error as lint warning instead of crashing",
 			typeToLint: testStruct("T", []types.Member{
 				testField("Foo", testPtr(
@@ -880,6 +907,25 @@ func TestLintRequiredness(t *testing.T) {
 				)),
 			}),
 			wantError: "field Foo: invalid validation tags: tag \"k8s:minimum\": can only be used on integer types (pkg.MyString -> string)",
+		},
+		{
+			name: "pointer field with transitive malformed tag on struct type definition - reports error as lint warning instead of crashing",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", testPtr(
+					testStruct("MyStruct", []types.Member{
+						testField("Bar", testType("int")),
+					}, "+k8s:minimum=0"),
+				)),
+			}),
+			wantError: "field Foo: invalid validation tags: tag \"k8s:minimum\": can only be used on integer types (pkg.MyStruct)",
+		},
+		{
+			name: "same alias used with different opacity contexts caches correctly",
+			typeToLint: testStruct("T", []types.Member{
+				testField("Foo", sharedAlias, "+k8s:opaqueType"),
+				testField("Bar", sharedAlias),
+			}),
+			wantError: "field Bar: field with validation must have +k8s:optional, +k8s:required or +k8s:forbidden",
 		},
 	}
 
