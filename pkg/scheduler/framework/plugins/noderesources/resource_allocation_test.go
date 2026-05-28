@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	resourceapi "k8s.io/api/resource/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -844,15 +843,21 @@ func TestNodeMatchCaching(t *testing.T) {
 
 			// First call should be a cache miss
 			_, found1 := scorer.getCachedNodeMatch(testNode.Name, tc.nodeNameToMatch, tc.allNodesMatch, nodeSelectorStr)
-			assert.False(t, found1, "Cache should be empty initially")
+			if found1 {
+				t.Errorf("Cache should be empty initially")
+			}
 
 			// Simulate setting a cached result
 			scorer.setCachedNodeMatch(testNode.Name, tc.nodeNameToMatch, tc.allNodesMatch, nodeSelectorStr, tc.expectedMatch)
 
 			// Second call should be a cache hit
 			matches2, found2 := scorer.getCachedNodeMatch(testNode.Name, tc.nodeNameToMatch, tc.allNodesMatch, nodeSelectorStr)
-			assert.True(t, found2, "Result should be found in cache")
-			assert.Equal(t, tc.expectedMatch, matches2, "Cached result should match expected value")
+			if !found2 {
+				t.Errorf("Result should be found in cache")
+			}
+			if matches2 != tc.expectedMatch {
+				t.Errorf("Cached result should match expected value, got %v, want %v", matches2, tc.expectedMatch)
+			}
 		})
 	}
 }

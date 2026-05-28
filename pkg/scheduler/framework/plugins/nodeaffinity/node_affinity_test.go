@@ -22,7 +22,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -1361,11 +1360,17 @@ func Test_isSchedulableAfterNodeChange(t *testing.T) {
 
 			actualHint, err := p.(*NodeAffinity).isSchedulableAfterNodeChange(logger, tc.pod, tc.oldObj, tc.newObj)
 			if tc.expectedErr {
-				require.Error(t, err)
+				if err == nil {
+					t.Fatalf("expected error but got nil")
+				}
 				return
 			}
-			require.NoError(t, err)
-			require.Equal(t, tc.expectedHint, actualHint)
+			if err != nil {
+				t.Fatalf("unexpected error: %s", err)
+			}
+			if actualHint != tc.expectedHint {
+				t.Fatalf("expected hint %s, got %s", tc.expectedHint, actualHint)
+			}
 		})
 	}
 }
