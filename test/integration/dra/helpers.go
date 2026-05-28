@@ -151,8 +151,8 @@ func createClaim(tCtx ktesting.TContext, namespace string, suffix string, class 
 	return claim
 }
 
-// createPod create a pod in the namespace, referencing the given claim.
-func createPod(tCtx ktesting.TContext, namespace string, suffix string, pod *v1.Pod, claims ...*resourceapi.ResourceClaim) *v1.Pod {
+// createPod create a pod in the namespace, referencing the given claim or template.
+func createPod(tCtx ktesting.TContext, namespace string, suffix string, pod *v1.Pod, claims ...any) *v1.Pod {
 	return createPodInternal(tCtx, namespace, suffix, pod, nil, claims...)
 }
 
@@ -165,18 +165,28 @@ func createPodWithExtendedResource(tCtx ktesting.TContext, namespace, resourceNa
 
 // createPodInternal contains the common logic for createPod and createPodWithExtendedResource.
 // It shouldn't be called directly from tests.
-var createPodInternal = func(tCtx ktesting.TContext, namespace string, suffix string, pod *v1.Pod, resources map[v1.ResourceName]string, claims ...*resourceapi.ResourceClaim) *v1.Pod {
+var createPodInternal = func(tCtx ktesting.TContext, namespace string, suffix string, pod *v1.Pod, resources map[v1.ResourceName]string, claims ...any) *v1.Pod {
 	tCtx.Helper()
 	pod = pod.DeepCopy()
 	pod.Name += suffix
 	podName := pod.Name
 	pod.Namespace = namespace
 	var resourceClaims []v1.PodResourceClaim
-	for _, claim := range claims {
-		resourceClaims = append(resourceClaims, v1.PodResourceClaim{
-			Name:              claim.Name,
-			ResourceClaimName: &claim.Name,
-		})
+	for _, c := range claims {
+		switch claim := c.(type) {
+		case *resourceapi.ResourceClaim:
+			resourceClaims = append(resourceClaims, v1.PodResourceClaim{
+				Name:              claim.Name,
+				ResourceClaimName: ptr.To(claim.Name),
+			})
+		case *resourceapi.ResourceClaimTemplate:
+			resourceClaims = append(resourceClaims, v1.PodResourceClaim{
+				Name:                      claim.Name,
+				ResourceClaimTemplateName: ptr.To(claim.Name),
+			})
+		default:
+			tCtx.Fatalf("Unsupported claim type: %T", c)
+		}
 	}
 	for res, qty := range resources {
 		for i := range pod.Spec.Containers {

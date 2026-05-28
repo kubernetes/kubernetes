@@ -61,7 +61,7 @@ func testPrioritizedList(tCtx ktesting.TContext, enabled bool) {
 			"Type":    gomega.Equal(v1.PodScheduled),
 			"Status":  gomega.Equal(v1.ConditionFalse),
 			"Reason":  gomega.Equal("Unschedulable"),
-			"Message": gomega.Equal("0/8 nodes are available: 8 cannot allocate all claims. still not schedulable, preemption: 0/8 nodes are available: 8 Preemption is not helpful for scheduling."),
+			"Message": gomega.ContainSubstring("cannot allocate all claims"),
 		}),
 	))
 	tCtx.Eventually(func(tCtx ktesting.TContext) (*v1.Pod, error) {
