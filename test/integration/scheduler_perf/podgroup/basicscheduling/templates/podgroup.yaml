@@ -1,0 +1,7 @@
+apiVersion: scheduling.k8s.io/v1alpha3
+kind: PodGroup
+metadata:
+  name: basic-group-{{.Index}}
+spec:
+  schedulingPolicy:
+    basic: {}
