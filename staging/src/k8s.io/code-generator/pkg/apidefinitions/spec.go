@@ -99,6 +99,7 @@ var (
 			"k8s:validation-gen-nolint",
 			"k8s:validation-gen-scheme-registry",
 			"k8s:validation-gen-test-fixture",
+			"k8s:validation-gen-test-targets",
 		},
 	}
 	PrereleaseLifecycle = Spec{

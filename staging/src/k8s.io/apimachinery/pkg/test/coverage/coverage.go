@@ -78,7 +78,11 @@ func RecordObservedRules(gvk schema.GroupVersionKind, errs field.ErrorList) {
 	// "metadata.labels[my-key]"); declared paths use "[*]". Replace every
 	// "[...]" with "[*]" so the lookup in AssertDeclarativeCoverage matches.
 	for _, e := range errs {
-		path := indexKeyRe.ReplaceAllString(e.Field, "[*]")
+		path := e.Field
+		if path == "<nil>" {
+			path = ""
+		}
+		path = indexKeyRe.ReplaceAllString(path, "[*]")
 		observed.Insert(ruleKey{gvk: gvk, path: path, errorType: string(e.Type), origin: e.Origin})
 	}
 }

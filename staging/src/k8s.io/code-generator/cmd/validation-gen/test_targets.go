@@ -166,130 +166,117 @@ func loadAllowlist(path string) ([]allowlistEntry, error) {
 	return entries, nil
 }
 
-// perVersionTestGen emits one <prefix><version>_test.go for one (Group, Version, Kind):
-// an init() that registers the declared FieldRules with the runtime testing
-// package. Uses SnippetWriter so imports are namer-tracked.
-type perVersionTestGen struct {
+// coverageTestGen emits test files for validation-gen coverage.
+// It can emit rule registrations (init func), apiVersions variable, and TestMain.
+type coverageTestGen struct {
 	generator.GoGenerator
 	outputPackage string
 	imports       namer.ImportTracker
-	report        *report
-}
-
-func newPerVersionTestGen(outputPackage, filePrefix string, report *report) generator.Generator {
-	return &perVersionTestGen{
-		GoGenerator: generator.GoGenerator{
-			OutputFilename: filePrefix + report.Version + "_test.go",
-		},
-		outputPackage: outputPackage,
-		imports:       generator.NewImportTrackerForPackage(outputPackage),
-		report:        report,
-	}
-}
-
-func (g *perVersionTestGen) Namers(*generator.Context) namer.NameSystems {
-	return namer.NameSystems{"raw": namer.NewRawNamer(g.outputPackage, g.imports)}
-}
-
-func (g *perVersionTestGen) Imports(*generator.Context) []string { return g.imports.ImportLines() }
-
-func (g *perVersionTestGen) Filter(*generator.Context, *types.Type) bool { return false }
-
-func (g *perVersionTestGen) Init(c *generator.Context, w io.Writer) error {
-	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	args := generator.Args{
-		"schema":  mkSymbolArgs(c, schemaPkgSymbols),
-		"runtime": mkSymbolArgs(c, runtimeRegisterSymbols),
-		"group":   strconv.Quote(g.report.Group),
-		"version": strconv.Quote(g.report.Version),
-		"kind":    strconv.Quote(g.report.Kind),
-	}
-	sw.Do("func init() {\n", nil)
-	sw.Do("    $.runtime.RegisterDeclaredRules|raw$(\n", args)
-	sw.Do("        $.schema.GroupVersionKind|raw${Group: $.group$, Version: $.version$, Kind: $.kind$},\n", args)
-	sw.Do("        $.runtime.FieldRules|raw${\n", args)
-
-	paths := make([]string, 0, len(g.report.Rules))
-	for p := range g.report.Rules {
-		paths = append(paths, p)
-	}
-	slices.Sort(paths)
-	for _, path := range paths {
-		rules := slices.Clone(g.report.Rules[path])
-		slices.SortFunc(rules, func(a, b rule) int {
-			if c := cmp.Compare(a.ErrorType, b.ErrorType); c != 0 {
-				return c
-			}
-			return cmp.Compare(a.Origin, b.Origin)
-		})
-		sw.Do("            $.path$: {\n", generator.Args{"path": strconv.Quote(path)})
-		for _, r := range rules {
-			ruleArgs := generator.Args{"errorType": strconv.Quote(r.ErrorType)}
-			if r.Origin != "" {
-				ruleArgs["origin"] = strconv.Quote(r.Origin)
-				sw.Do("                {ErrorType: $.errorType$, Origin: $.origin$},\n", ruleArgs)
-			} else {
-				sw.Do("                {ErrorType: $.errorType$},\n", ruleArgs)
-			}
-		}
-		sw.Do("            },\n", nil)
-	}
-	sw.Do("        },\n    )\n}\n", nil)
-	return sw.Error()
-}
-
-// mainTestGen emits <prefix>main_test.go for one Kind: an apiVersions slice and a
-// TestMain that asserts coverage after the package's tests run.
-type mainTestGen struct {
-	generator.GoGenerator
-	outputPackage string
-	imports       namer.ImportTracker
+	reports       []*report
+	emitMain      bool
 	versions      []string
 }
 
-func newMainTestGen(outputPackage, filePrefix string, versions []string) generator.Generator {
-	return &mainTestGen{
+func newCoverageTestGen(outputPackage, filename string, reports []*report, emitMain bool, versions []string) generator.Generator {
+	return &coverageTestGen{
 		GoGenerator: generator.GoGenerator{
-			OutputFilename: filePrefix + "main_test.go",
+			OutputFilename: filename,
 		},
 		outputPackage: outputPackage,
 		imports:       generator.NewImportTrackerForPackage(outputPackage),
+		reports:       reports,
+		emitMain:      emitMain,
 		versions:      versions,
 	}
 }
 
-func (g *mainTestGen) Namers(*generator.Context) namer.NameSystems {
+func (g *coverageTestGen) Namers(*generator.Context) namer.NameSystems {
 	return namer.NameSystems{"raw": namer.NewRawNamer(g.outputPackage, g.imports)}
 }
 
-func (g *mainTestGen) Imports(*generator.Context) []string { return g.imports.ImportLines() }
+func (g *coverageTestGen) Imports(*generator.Context) []string { return g.imports.ImportLines() }
 
-func (g *mainTestGen) Filter(*generator.Context, *types.Type) bool { return false }
+func (g *coverageTestGen) Filter(*generator.Context, *types.Type) bool { return false }
 
-func (g *mainTestGen) Init(c *generator.Context, w io.Writer) error {
-	sw := generator.NewSnippetWriter(w, c, "$", "$")
+func emitRegisterDeclaredRules(sw *generator.SnippetWriter, c *generator.Context, reports []*report) {
+	for _, r := range reports {
+		args := generator.Args{
+			"schema":  mkSymbolArgs(c, schemaPkgSymbols),
+			"runtime": mkSymbolArgs(c, runtimeRegisterSymbols),
+			"group":   strconv.Quote(r.Group),
+			"version": strconv.Quote(r.Version),
+			"kind":    strconv.Quote(r.Kind),
+		}
+		sw.Do("func init() {\n", nil)
+		sw.Do("    $.runtime.RegisterDeclaredRules|raw$(\n", args)
+		sw.Do("        $.schema.GroupVersionKind|raw${Group: $.group$, Version: $.version$, Kind: $.kind$},\n", args)
+		sw.Do("        $.runtime.FieldRules|raw${\n", args)
+
+		paths := make([]string, 0, len(r.Rules))
+		for p := range r.Rules {
+			paths = append(paths, p)
+		}
+		slices.Sort(paths)
+		for _, path := range paths {
+			rules := slices.Clone(r.Rules[path])
+			slices.SortFunc(rules, func(a, b rule) int {
+				if c := cmp.Compare(a.ErrorType, b.ErrorType); c != 0 {
+					return c
+				}
+				return cmp.Compare(a.Origin, b.Origin)
+			})
+			sw.Do("            $.path$: {\n", generator.Args{"path": strconv.Quote(path)})
+			for _, r := range rules {
+				ruleArgs := generator.Args{"errorType": strconv.Quote(r.ErrorType)}
+				if r.Origin != "" {
+					ruleArgs["origin"] = strconv.Quote(r.Origin)
+					sw.Do("                {ErrorType: $.errorType$, Origin: $.origin$},\n", ruleArgs)
+				} else {
+					sw.Do("                {ErrorType: $.errorType$},\n", ruleArgs)
+				}
+			}
+			sw.Do("            },\n", nil)
+		}
+		sw.Do("        },\n    )\n}\n", nil)
+	}
+}
+
+func emitTestMain(sw *generator.SnippetWriter, c *generator.Context) {
 	args := generator.Args{
 		"testing": mkSymbolArgs(c, testingSymbols),
 		"fmt":     mkSymbolArgs(c, fmtPkgSymbols),
 		"os":      mkSymbolArgs(c, osPkgSymbols),
 		"runtime": mkSymbolArgs(c, runtimeAssertCovSymbols),
 	}
-	versions := slices.Clone(g.versions)
-	slices.Sort(versions)
-	sw.Do("var apiVersions = []string{", nil)
-	for i, v := range versions {
-		if i > 0 {
-			sw.Do(", ", nil)
-		}
-		sw.Do("$.v$", generator.Args{"v": strconv.Quote(v)})
-	}
-	sw.Do("}\n\n", nil)
 	sw.Do("func TestMain(m *$.testing.M|raw$) {\n", args)
 	sw.Do("    code := m.Run()\n", nil)
 	sw.Do("    if err := $.runtime.AssertDeclarativeCoverage|raw$(); err != nil {\n", args)
 	sw.Do("        $.fmt.Fprintln|raw$($.os.Stderr|raw$, err)\n", args)
 	sw.Do("        if code == 0 {\n            code = 1\n        }\n    }\n", nil)
 	sw.Do("    $.os.Exit|raw$(code)\n}\n", args)
+}
+
+func (g *coverageTestGen) Init(c *generator.Context, w io.Writer) error {
+	sw := generator.NewSnippetWriter(w, c, "$", "$")
+	if len(g.reports) > 0 {
+		emitRegisterDeclaredRules(sw, c, g.reports)
+	}
+
+	if g.emitMain {
+		if len(g.versions) > 0 {
+			versions := slices.Clone(g.versions)
+			slices.Sort(versions)
+			sw.Do("var apiVersions = []string{", nil)
+			for i, v := range versions {
+				if i > 0 {
+					sw.Do(", ", nil)
+				}
+				sw.Do("$.v$", generator.Args{"v": strconv.Quote(v)})
+			}
+			sw.Do("}\n\n", nil)
+		}
+		emitTestMain(sw, c)
+	}
 	return sw.Error()
 }
 
@@ -366,14 +353,13 @@ func testTargets(testOutputRoot, filePrefix string, groupKindReports map[schema.
 			GeneratorsFunc: func(*generator.Context) []generator.Generator {
 				gens := make([]generator.Generator, 0, len(reports)+1) // +1 for main_test.go
 				versions := make([]string, 0, len(reports))
-				for _, report := range reports {
-					gens = append(gens, newPerVersionTestGen(pkgDir, filePrefix, report))
-					versions = append(versions, report.Version)
+				for _, r := range reports {
+					gens = append(gens, newCoverageTestGen(pkgDir, filePrefix+r.Version+"_test.go", []*report{r}, false, nil))
+					versions = append(versions, r.Version)
 				}
-				gens = append(gens, newMainTestGen(pkgDir, filePrefix, versions))
+				gens = append(gens, newCoverageTestGen(pkgDir, filePrefix+"main_test.go", nil, true, versions))
 				return gens
-			},
-		})
+			}})
 	}
 	return out
 }

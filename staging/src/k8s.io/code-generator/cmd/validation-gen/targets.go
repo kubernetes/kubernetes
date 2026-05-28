@@ -47,6 +47,9 @@ const (
 	// name of a subresource that this type can validate declaratively, tag may be
 	// repeated to support multiple subresources.
 	supportsSubresourceTagName = "k8s:supportsSubresource"
+
+	// if set on a package, generates declarative coverage test targets even if it's not a versioned API package.
+	generateTestTargetsTagName = "k8s:validation-gen-test-targets"
 )
 
 var (
@@ -183,6 +186,15 @@ func testFixtureTag(pkg *types.Package) sets.Set[string] {
 		result.Insert(tag.Value)
 	}
 	return result
+}
+
+func generateTestTargetsTag(pkg *types.Package) bool {
+	tags, err := gengo.ExtractFunctionStyleCommentTags("+", []string{generateTestTargetsTagName}, pkg.Comments)
+	if err != nil {
+		klog.Fatalf("Failed to extract %s tags: %v", generateTestTargetsTagName, err)
+	}
+	_, found := tags[generateTestTargetsTagName]
+	return found
 }
 
 // NameSystems returns the name system used by the generators in this package.
@@ -413,6 +425,25 @@ func GetTargets(context *generator.Context, args *Args) []generator.Target {
 						}
 						filename := args.OutputFile[0:len(args.OutputFile)-3] + "_test.go"
 						generators = append(generators, FixtureTests(filename, testFixtureTags))
+					}
+					if generateTestTargetsTag(pkg) {
+						var reports []*report
+						for _, t := range rootTypes {
+							rules := collectRules(td.typeNodes[t])
+							if len(rules) == 0 {
+								continue
+							}
+							reports = append(reports, &report{
+								Group:   pkg.Path,
+								Version: pkg.Name,
+								Kind:    t.Name.Name,
+								Rules:   rules,
+							})
+						}
+						if len(reports) > 0 {
+							filename := args.OutputFile[0:len(args.OutputFile)-3] + "_coverage_test.go"
+							generators = append(generators, newCoverageTestGen(pkg.Path, filename, reports, true, nil))
+						}
 					}
 					return generators
 				},
