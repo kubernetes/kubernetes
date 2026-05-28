@@ -228,7 +228,7 @@ func (pl *TestPlugin) PreFilter(ctx context.Context, state fwk.CycleState, p *v1
 	return pl.inj.PreFilterResult, fwk.NewStatus(fwk.Code(pl.inj.PreFilterStatus), injectReason)
 }
 
-func (pl *TestPlugin) PlacementFeasible(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo) *fwk.Status {
+func (pl *TestPlugin) PlacementFeasible(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo) *fwk.Status {
 	return fwk.NewStatus(fwk.Code(pl.inj.PlacementFeasibleStatus), injectReason)
 }
 
@@ -278,7 +278,7 @@ func (pl *TestPlugin) GeneratePlacements(ctx context.Context, state fwk.PodGroup
 	return &fwk.GeneratePlacementsResult{Placements: pl.inj.GeneratePlacementsResult}, fwk.NewStatus(fwk.Code(pl.inj.GeneratePlacementsStatus), injectReason)
 }
 
-func (pl *TestPlugin) ScorePlacement(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
+func (pl *TestPlugin) ScorePlacement(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
 	return 0, fwk.NewStatus(fwk.Code(pl.inj.PlacementScoreStatus), injectReason)
 }
 
@@ -795,7 +795,7 @@ type mockPlacementFeasiblePlugin struct {
 
 func (p *mockPlacementFeasiblePlugin) Name() string { return p.name }
 
-func (p *mockPlacementFeasiblePlugin) PlacementFeasible(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo) *fwk.Status {
+func (p *mockPlacementFeasiblePlugin) PlacementFeasible(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo) *fwk.Status {
 	p.called = true
 	return p.status
 }
@@ -3666,7 +3666,7 @@ func TestRecordingMetrics(t *testing.T) {
 		{
 			name: "PlacementScore - Success",
 			action: func(ctx context.Context, f framework.Framework) {
-				f.RunPlacementScorePlugins(ctx, state, nil, []*fwk.PodGroupAssignments{{Placement: &fwk.Placement{}}})
+				f.RunPlacementScorePlugins(ctx, state, nil, []*fwk.PodGroupAssignments{{Placement: &fwk.Placement{}}}, []fwk.PlacementCycleState{state})
 			},
 			wantExtensionPoint: "PlacementScore",
 			wantStatus:         fwk.Success,
@@ -3750,7 +3750,7 @@ func TestRecordingMetrics(t *testing.T) {
 		{
 			name: "PlacementScore - Error",
 			action: func(ctx context.Context, f framework.Framework) {
-				f.RunPlacementScorePlugins(ctx, state, nil, []*fwk.PodGroupAssignments{{Placement: &fwk.Placement{}}})
+				f.RunPlacementScorePlugins(ctx, state, nil, []*fwk.PodGroupAssignments{{Placement: &fwk.Placement{}}}, []fwk.PlacementCycleState{state})
 			},
 			inject:             injectedResult{PlacementScoreStatus: int(fwk.Error)},
 			wantExtensionPoint: "PlacementScore",
@@ -4440,7 +4440,7 @@ func (pl *testPlacementScorePlugin) Name() string {
 	return pl.name
 }
 
-func (pl *testPlacementScorePlugin) ScorePlacement(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
+func (pl *testPlacementScorePlugin) ScorePlacement(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
 	r := pl.results[placement.Placement]
 	return r.score, r.status
 }
@@ -4682,11 +4682,13 @@ func TestRunPlacementScorePlugins(t *testing.T) {
 				t.Fatalf("Unexpected error during calling NewFramework, got %v", err)
 			}
 			assumedPlacements := make([]*fwk.PodGroupAssignments, len(placements))
+			placementStates := make([]fwk.PlacementCycleState, len(placements))
 			for i := range placements {
 				assumedPlacements[i] = &fwk.PodGroupAssignments{Placement: placements[i]}
+				placementStates[i] = framework.NewCycleState()
 			}
 
-			result, status := fw.RunPlacementScorePlugins(ctx, framework.NewCycleState(), nil, assumedPlacements)
+			result, status := fw.RunPlacementScorePlugins(ctx, framework.NewCycleState(), nil, assumedPlacements, placementStates)
 			if status.Code() != tt.wantStatusCode {
 				t.Errorf("got status code %s, want %s", status.Code(), tt.wantStatusCode)
 			}

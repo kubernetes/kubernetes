@@ -795,9 +795,10 @@ type PlacementScorePlugin interface {
 	// ScorePlacement calculates a score for a given Placement.
 	// This function is called only for Placements that have been deemed feasible for the sufficient number of pods in the PodGroup scheduling cycle.
 	// The PodGroupAssignments indicates the node assigned to each pod within this Placement.
+	// The state is scoped to the Placement being scored and can be used to access the owning PodGroup cycle state.
 	// The returned score is a int64 with higher scores generally indicating more preferable Placements.
 	// Plugins can implement various scoring strategies, such as bin packing to minimize resource fragmentation.
-	ScorePlacement(ctx context.Context, state PodGroupCycleState, podGroup PodGroupInfo, placement *PodGroupAssignments) (int64, *Status)
+	ScorePlacement(ctx context.Context, state PlacementCycleState, podGroup PodGroupInfo, placement *PodGroupAssignments) (int64, *Status)
 
 	// PlacementScoreExtensions returns a PlacementScoreExtensions interface if it implements one, or nil if does not.
 	PlacementScoreExtensions() PlacementScoreExtensions

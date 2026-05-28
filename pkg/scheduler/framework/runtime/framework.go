@@ -1482,12 +1482,20 @@ func (f *frameworkImpl) runScoreExtension(ctx context.Context, pl fwk.ScorePlugi
 // It also returns *Status, which is set to non-success if any of the plugins returns
 // a non-success status.
 //
+// placementStates holds the per-placement cycle state for each entry in podGroupAssignments
+// (1:1 by index): placementStates[i] is the state with which podGroupAssignments[i] was
+// processed, and is passed to ScorePlacement for that placement.
+//
 // This function mostly duplicates RunScorePlugins. Any changes to it should likely be reflected in both places.
-func (f *frameworkImpl) RunPlacementScorePlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo, podGroupAssignments []*fwk.PodGroupAssignments) (ps []fwk.PlacementPluginScores, status *fwk.Status) {
+func (f *frameworkImpl) RunPlacementScorePlugins(ctx context.Context, state fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo, podGroupAssignments []*fwk.PodGroupAssignments, placementStates []fwk.PlacementCycleState) (ps []fwk.PlacementPluginScores, status *fwk.Status) {
 	startTime := time.Now()
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PlacementScore, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
+
+	if len(podGroupAssignments) != len(placementStates) {
+		return nil, fwk.AsStatus(fmt.Errorf("expected one PlacementCycleState per PodGroupAssignments, got %d placement states for %d assignments", len(placementStates), len(podGroupAssignments)))
+	}
 
 	allPlacementPluginScores := make([]fwk.PlacementPluginScores, len(podGroupAssignments))
 	numPlugins := len(f.placementScorePlugins)
@@ -1520,7 +1528,7 @@ func (f *frameworkImpl) RunPlacementScorePlugins(ctx context.Context, state fwk.
 					logger := klog.LoggerWithName(logger, pl.Name())
 					ctx = klog.NewContext(ctx, logger)
 				}
-				s, status := f.runPlacementScorePlugin(ctx, pl, state, podGroupInfo, pga)
+				s, status := f.runPlacementScorePlugin(ctx, pl, placementStates[index], podGroupInfo, pga)
 				if !status.IsSuccess() {
 					err := fmt.Errorf("plugin %q failed with: %w", pl.Name(), status.AsError())
 					errCh.SendWithCancel(err, cancel)
@@ -1589,7 +1597,7 @@ func (f *frameworkImpl) RunPlacementScorePlugins(ctx context.Context, state fwk.
 	return allPlacementPluginScores, nil
 }
 
-func (f *frameworkImpl) runPlacementScorePlugin(ctx context.Context, pl fwk.PlacementScorePlugin, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
+func (f *frameworkImpl) runPlacementScorePlugin(ctx context.Context, pl fwk.PlacementScorePlugin, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.ScorePlacement(ctx, state, podGroup, placement)
 	}
@@ -2014,7 +2022,7 @@ func (f *frameworkImpl) runPermitPlugin(ctx context.Context, pl fwk.PermitPlugin
 // If any plugin returns invalid status, the result will be Error and the remaining plugins won't be invoked.
 // Otherwise, if at least 1 plugin returns UnschedulableAndUnresolvable, the remaining plugins won't be invoked and the result will be UnschdulableAndUnresolvable.
 // Otherwise, if at least 1 plugin returns Unschedulable, the remaining plugins will be invoked and the result will be Unschedulable.
-func (f *frameworkImpl) RunPlacementFeasiblePlugins(ctx context.Context, placementCycleState fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo) (status *fwk.Status) {
+func (f *frameworkImpl) RunPlacementFeasiblePlugins(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo) (status *fwk.Status) {
 	startTime := time.Now()
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(metrics.PlacementFeasible, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
@@ -2041,7 +2049,7 @@ func (f *frameworkImpl) RunPlacementFeasiblePlugins(ctx context.Context, placeme
 	return status
 }
 
-func (f *frameworkImpl) runPlacementFeasiblePlugin(ctx context.Context, pl framework.PlacementFeasiblePlugin, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo) *fwk.Status {
+func (f *frameworkImpl) runPlacementFeasiblePlugin(ctx context.Context, pl framework.PlacementFeasiblePlugin, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo) *fwk.Status {
 	if !state.ShouldRecordPluginMetrics() {
 		return pl.PlacementFeasible(ctx, state, podGroup)
 	}

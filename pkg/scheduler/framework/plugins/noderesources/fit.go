@@ -760,6 +760,6 @@ func (f *Fit) PlacementScoreExtensions() fwk.PlacementScoreExtensions {
 }
 
 // ScorePlacement scores capacity ratio on all nodes in the placement including all assigned pod group pods' resource requests.
-func (f *Fit) ScorePlacement(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
+func (f *Fit) ScorePlacement(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
 	return f.placementScorer.scorePlacement(ctx, podGroup, placement)
 }

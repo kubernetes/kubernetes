@@ -139,7 +139,7 @@ func (mp *fakePlacementFeasiblePlugin) Name() string {
 // - The outer slice represents distinct placements (e.g., when evaluating multiple topology placements).
 // - The inner slice represents the pod-by-pod evaluation within a single placement.
 // It uses placementCycleState to track how many pods have been evaluated in the current placement.
-func (mp *fakePlacementFeasiblePlugin) PlacementFeasible(ctx context.Context, placementCycleState fwk.PodGroupCycleState, podGroupInfo fwk.PodGroupInfo) *fwk.Status {
+func (mp *fakePlacementFeasiblePlugin) PlacementFeasible(ctx context.Context, placementCycleState fwk.PlacementCycleState, podGroupInfo fwk.PodGroupInfo) *fwk.Status {
 	// If no mock statuses are configured, always succeed.
 	if len(mp.placementFeasibleStatuses) == 0 {
 		return nil
@@ -1642,7 +1642,9 @@ func TestSubmitPodGroupAlgorithmResult(t *testing.T) {
 
 			for i := range tt.algorithmResult.podResults {
 				pod := podGroupInfo.QueuedPodInfos[i].Pod
-				podCtx := initPodSchedulingContext(ctx, pod, podGroupCycleState, runAllPostFilters)
+				placementCycleState := framework.NewCycleState()
+				placementCycleState.SetPodGroupSchedulingCycle(podGroupCycleState)
+				podCtx := initPodSchedulingContext(ctx, pod, placementCycleState, runAllPostFilters)
 				tt.algorithmResult.podResults[i].podCtx = podCtx
 			}
 
@@ -2091,7 +2093,7 @@ func (mp *fakePlacementPlugin) PlacementScoreExtensions() fwk.PlacementScoreExte
 	return nil
 }
 
-func (mp *fakePlacementPlugin) ScorePlacement(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
+func (mp *fakePlacementPlugin) ScorePlacement(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
 	return mp.scorePlacementsResult[placement.Name], mp.scorePlacementsStatus[placement.Name]
 }
 
@@ -2428,6 +2430,7 @@ func TestPodGroupSchedulingPlacementAlgorithm(t *testing.T) {
 					algorithmResult{},
 					ScheduleResult{},
 					fwk.Status{}),
+				cmpopts.IgnoreFields(podGroupAlgorithmResult{}, "placementCycleState"),
 				cmpopts.IgnoreFields(algorithmResult{}, "podCtx", "schedulingDuration"),
 				statusCmpOpt,
 			}
@@ -2590,6 +2593,182 @@ func TestPodGroupSchedulingPlacementAlgorithm_Scoring(t *testing.T) {
 				t.Fatalf("Unexpected algorithm result, expected placement %s with node %s, got node %s", tt.expectedPlacement, expectedHost, actualHost)
 			}
 		})
+	}
+}
+
+// placementStateTracker is a fake plugin that writes to PlacementCycleState during Filter
+// and reads from it during ScorePlacement, to verify the lifecycle of PlacementCycleState.
+type placementStateTracker struct {
+	name string
+	mu   sync.Mutex
+	// scoreReadValues records what value was read from PlacementCycleState
+	// during each ScorePlacement call, keyed by placement name.
+	scoreReadValues map[string]string
+	// generatePlacementsResult defines the placements to generate.
+	generatePlacementsResult map[string][]string
+}
+
+type placementStateData struct {
+	value string
+}
+
+func (d *placementStateData) Clone() fwk.StateData { return d }
+
+var placementStateKey fwk.StateKey = "placementStateTracker"
+
+var _ fwk.FilterPlugin = &placementStateTracker{}
+var _ fwk.PlacementGeneratePlugin = &placementStateTracker{}
+var _ fwk.PlacementScorePlugin = &placementStateTracker{}
+
+func (p *placementStateTracker) Name() string { return p.name }
+
+func (p *placementStateTracker) Filter(ctx context.Context, state fwk.CycleState, pod *v1.Pod, nodeInfo fwk.NodeInfo) *fwk.Status {
+	placementState := state.GetPlacementCycleState()
+	if placementState == nil {
+		return fwk.NewStatus(fwk.Error, "PlacementCycleState is nil during Filter")
+	}
+
+	// Write the node name as a marker so ScorePlacement can verify
+	// which placement's state it received.
+	placementState.Write(placementStateKey, &placementStateData{value: nodeInfo.Node().Name})
+	return nil
+}
+
+func (p *placementStateTracker) ScorePlacement(ctx context.Context, state fwk.PlacementCycleState, podGroup fwk.PodGroupInfo, placement *fwk.PodGroupAssignments) (int64, *fwk.Status) {
+	if state == nil {
+		return 0, fwk.NewStatus(fwk.Error, "PlacementCycleState is nil during ScorePlacement")
+	}
+
+	data, err := state.Read(placementStateKey)
+	if err != nil {
+		return 0, fwk.NewStatus(fwk.Error, fmt.Sprintf("failed to read PlacementCycleState for %s: %v", placement.Name, err))
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.scoreReadValues[placement.Name] = data.(*placementStateData).value
+	return 1, nil
+}
+
+func (p *placementStateTracker) PlacementScoreExtensions() fwk.PlacementScoreExtensions {
+	return nil
+}
+
+func (p *placementStateTracker) GeneratePlacements(ctx context.Context, state fwk.PodGroupCycleState, podGroup fwk.PodGroupInfo, parentPlacement *fwk.Placement) (*fwk.GeneratePlacementsResult, *fwk.Status) {
+	parentNodes := map[string]fwk.NodeInfo{}
+	for _, node := range parentPlacement.Nodes {
+		parentNodes[node.Node().Name] = node
+	}
+
+	resultPlacements := make([]*fwk.Placement, 0, len(p.generatePlacementsResult))
+	for placementName, nodeNames := range p.generatePlacementsResult {
+		placement := &fwk.Placement{Name: placementName}
+		for _, nodeName := range nodeNames {
+			placement.Nodes = append(placement.Nodes, parentNodes[nodeName])
+		}
+		resultPlacements = append(resultPlacements, placement)
+	}
+	return &fwk.GeneratePlacementsResult{Placements: resultPlacements}, nil
+}
+
+func TestPlacementCycleStateLifecycle(t *testing.T) {
+	featuregatetesting.SetFeatureGatesDuringTest(t, utilfeature.DefaultFeatureGate, featuregatetesting.FeatureOverrides{
+		features.TopologyAwareWorkloadScheduling: true,
+		features.GenericWorkload:                 true,
+		features.GangScheduling:                  true,
+	})
+
+	// A single scenario exercises both isolation and continuity:
+	// - Filter writes a node-name marker into PlacementCycleState during each placement's simulation.
+	// - ScorePlacement reads from the placement state after all simulations.
+	// Assertions verify:
+	//   1. Each placement's scorer reads only the value its own simulation wrote (isolation).
+	//   2. Data written during each placement's simulation remains readable during its scoring (continuity from simulation to scoring).
+
+	nodes := []*v1.Node{
+		st.MakeNode().Name("node1").Obj(),
+		st.MakeNode().Name("node2").Obj(),
+	}
+	podGroupPod := st.MakePod().Name("foo").UID("foo").PodGroupName("pg").Obj()
+
+	logger, ctx := ktesting.NewTestContext(t)
+
+	informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewClientset(), 0)
+	queue := internalqueue.NewSchedulingQueue(nil, informerFactory)
+
+	tracker := &placementStateTracker{
+		name:            "StateTracker",
+		scoreReadValues: make(map[string]string),
+		generatePlacementsResult: map[string][]string{
+			"placementA": {nodes[0].Name},
+			"placementB": {nodes[1].Name},
+		},
+	}
+
+	registry := []tf.RegisterPluginFunc{
+		tf.RegisterPlacementGeneratePlugin(tracker.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+			return tracker, nil
+		}),
+		tf.RegisterPlacementScorePlugin(tracker.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+			return tracker, nil
+		}, 1),
+		tf.RegisterFilterPlugin(tracker.Name(), func(_ context.Context, _ runtime.Object, _ fwk.Handle) (fwk.Plugin, error) {
+			return tracker, nil
+		}),
+	}
+
+	snapshot := internalcache.NewEmptySnapshot()
+	schedFwk, err := tf.NewFramework(ctx,
+		append(registry,
+			tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+			tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+		),
+		"test-scheduler",
+		frameworkruntime.WithInformerFactory(informerFactory),
+		frameworkruntime.WithSnapshotSharedLister(snapshot),
+		frameworkruntime.WithPodNominator(queue),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create framework: %v", err)
+	}
+
+	cache := internalcache.New(ctx, nil, true)
+	for _, node := range nodes {
+		cache.AddNode(logger, node)
+	}
+
+	sched := &Scheduler{
+		Cache:            cache,
+		nodeInfoSnapshot: snapshot,
+		SchedulingQueue:  queue,
+		Profiles:         profile.Map{"test-scheduler": schedFwk},
+	}
+	sched.SchedulePod = sched.schedulePod
+
+	if err := sched.Cache.UpdateSnapshot(logger, sched.nodeInfoSnapshot); err != nil {
+		t.Fatalf("Failed to update snapshot: %v", err)
+	}
+
+	pgInfo := &framework.QueuedPodGroupInfo{
+		QueuedPodInfos: []*framework.QueuedPodInfo{
+			{PodInfo: &framework.PodInfo{Pod: podGroupPod}},
+		},
+		PodGroupInfo: &framework.PodGroupInfo{
+			UnscheduledPods: []*v1.Pod{podGroupPod},
+		},
+	}
+
+	result := sched.podGroupSchedulingPlacementAlgorithm(ctx, schedFwk, framework.NewCycleState(), pgInfo, runAllPostFilters)
+	if !result.status.IsSuccess() {
+		t.Fatalf("Expected success, got: %v", result.status)
+	}
+
+	// Each placement's scorer must read only what its own simulation wrote
+	// (placementA simulated on node1, placementB on node2). This proves both:
+	//   - Continuity: data written during a placement's simulation is readable during its scoring.
+	//   - Isolation: a placement's scorer does not see another placement's writes.
+	expectedScoreReadValues := map[string]string{"placementA": "node1", "placementB": "node2"}
+	if diff := cmp.Diff(expectedScoreReadValues, tracker.scoreReadValues); diff != "" {
+		t.Errorf("Unexpected scoreReadValues (-want,+got)\n%s", diff)
 	}
 }
 
