@@ -245,31 +245,12 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 		// to create a real containerManagerImpl and inject our mock CPU sets into it,
 		// so we are not able to test the disabled quota (-1). Only quota enabled tests were added.
 		{
-			name: "No exclusive CPUs, DisableCPUQuotaWithExclusiveCPUs feature gate enabled",
+			name: "No exclusive CPUs, cpu quota disabled",
 			containerResources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
 				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
 			},
 			cpuSets: map[string]cpuset.CPUSet{},
-			enableFeatures: map[featuregate.Feature]bool{
-				features.DisableCPUQuotaWithExclusiveCPUs: true,
-			},
-			expected: &runtimeapi.LinuxContainerResources{
-				CpuPeriod: 100000,
-				CpuQuota:  100000,
-				CpuShares: 1024,
-			},
-		},
-		{
-			name: "Exclusive CPUs, DisableCPUQuotaWithExclusiveCPUs feature gate disabled",
-			containerResources: v1.ResourceRequirements{
-				Requests: v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
-				Limits:   v1.ResourceList{v1.ResourceCPU: resource.MustParse("1")},
-			},
-			cpuSets: map[string]cpuset.CPUSet{"12345678/foo": cpuset.New(1)},
-			enableFeatures: map[featuregate.Feature]bool{
-				features.DisableCPUQuotaWithExclusiveCPUs: false,
-			},
 			expected: &runtimeapi.LinuxContainerResources{
 				CpuPeriod: 100000,
 				CpuQuota:  100000,
@@ -288,9 +269,8 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 			},
 			cpuSets: map[string]cpuset.CPUSet{},
 			enableFeatures: map[featuregate.Feature]bool{
-				features.PodLevelResources:                true,
-				features.PodLevelResourceManagers:         true,
-				features.DisableCPUQuotaWithExclusiveCPUs: true,
+				features.PodLevelResources:        true,
+				features.PodLevelResourceManagers: true,
 			},
 			expected: &runtimeapi.LinuxContainerResources{
 				CpuPeriod: 100000,
@@ -310,9 +290,8 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 			},
 			cpuSets: map[string]cpuset.CPUSet{},
 			enableFeatures: map[featuregate.Feature]bool{
-				features.PodLevelResources:                true,
-				features.PodLevelResourceManagers:         true,
-				features.DisableCPUQuotaWithExclusiveCPUs: true,
+				features.PodLevelResources:        true,
+				features.PodLevelResourceManagers: true,
 			},
 			expected: &runtimeapi.LinuxContainerResources{
 				CpuPeriod: 100000,
@@ -332,9 +311,8 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 			},
 			cpuSets: map[string]cpuset.CPUSet{},
 			enableFeatures: map[featuregate.Feature]bool{
-				features.PodLevelResources:                true,
-				features.PodLevelResourceManagers:         false,
-				features.DisableCPUQuotaWithExclusiveCPUs: true,
+				features.PodLevelResources:        true,
+				features.PodLevelResourceManagers: false,
 			},
 			expected: &runtimeapi.LinuxContainerResources{
 				CpuPeriod:          100000,
@@ -352,9 +330,8 @@ func TestGenerateLinuxContainerConfigResources(t *testing.T) {
 			containerResources: v1.ResourceRequirements{},
 			cpuSets:            map[string]cpuset.CPUSet{},
 			enableFeatures: map[featuregate.Feature]bool{
-				features.PodLevelResources:                true,
-				features.PodLevelResourceManagers:         false,
-				features.DisableCPUQuotaWithExclusiveCPUs: true,
+				features.PodLevelResources:        true,
+				features.PodLevelResourceManagers: false,
 			},
 			expected: &runtimeapi.LinuxContainerResources{
 				CpuPeriod: 100000,

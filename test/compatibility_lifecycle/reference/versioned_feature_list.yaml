@@ -427,6 +427,10 @@
     lockToDefault: false
     preRelease: Deprecated
     version: "1.36"
+  - default: true
+    lockToDefault: true
+    preRelease: Deprecated
+    version: "1.37"
 - name: DisableNodeKubeProxyVersion
   versionedSpecs:
   - default: false
