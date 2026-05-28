@@ -109,6 +109,15 @@ func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.Response
 		ctx:             ctx,
 	}
 
+	var memoryAllocator runtime.MemoryAllocator
+	if encoderWithAllocator, supportsAllocator := encoder.(runtime.EncoderWithAllocator); supportsAllocator {
+		memoryAllocator = runtime.AllocatorPool.Get().(*runtime.Allocator)
+		encoder = runtime.NewEncoderWithAllocator(encoderWithAllocator, memoryAllocator)
+	}
+	if memoryAllocator != nil {
+		defer runtime.AllocatorPool.Put(memoryAllocator)
+	}
+
 	err := encoder.Encode(object, w)
 	if err == nil {
 		err = w.Close()
