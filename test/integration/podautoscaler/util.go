@@ -132,6 +132,12 @@ func withHPAMinMaxReplicas(minReplicas, maxReplicas int32) createHPAOption {
 	}
 }
 
+func withHPABehavior(behavior *autoscalingv2.HorizontalPodAutoscalerBehavior) createHPAOption {
+	return func(hpa *autoscalingv2.HorizontalPodAutoscaler) {
+		hpa.Spec.Behavior = behavior
+	}
+}
+
 // newHPA builds an HPA targeting the given deployment with a single metric.
 // It applies opts but does not create the object, so callers can also use it to
 // build HPAs whose creation is expected to be rejected.
@@ -230,7 +236,9 @@ func createDeployment(t *testing.T, cs *clientset.Clientset, namespace string, r
 	return d
 }
 
-func atLeastReplicas(minReplicas int32) func(*appsv1.Deployment) error {
+type deploymentCondition func(*appsv1.Deployment) error
+
+func atLeastReplicas(minReplicas int32) deploymentCondition {
 	return func(d *appsv1.Deployment) error {
 		r := ptr.Deref(d.Spec.Replicas, 0)
 		if r < minReplicas {
@@ -240,7 +248,7 @@ func atLeastReplicas(minReplicas int32) func(*appsv1.Deployment) error {
 	}
 }
 
-func equalReplicas(replicas int32) func(*appsv1.Deployment) error {
+func equalReplicas(replicas int32) deploymentCondition {
 	return func(d *appsv1.Deployment) error {
 		r := ptr.Deref(d.Spec.Replicas, math.MaxInt32)
 		if r != replicas {
@@ -250,9 +258,19 @@ func equalReplicas(replicas int32) func(*appsv1.Deployment) error {
 	}
 }
 
+func noMoreThanReplicas(maxReplicas int32) deploymentCondition {
+	return func(d *appsv1.Deployment) error {
+		r := ptr.Deref(d.Spec.Replicas, 0)
+		if r > maxReplicas {
+			return fmt.Errorf("got %d replicas, want at most %d", r, maxReplicas)
+		}
+		return nil
+	}
+}
+
 // waitForDeploymentCondition waits until a deployment matches a given condition cond.
 func waitForDeploymentCondition(ctx context.Context, cs *clientset.Clientset, d *appsv1.Deployment,
-	cond func(*appsv1.Deployment) error) error {
+	cond deploymentCondition) error {
 
 	// Updates shouldn't take more than 1 HPA resync period. Bump to a few more
 	// to cover corner cases (e.g. slow API server).
