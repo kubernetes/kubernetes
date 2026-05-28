@@ -40,7 +40,7 @@ const (
 	defaultAggregateMaxEvents         = 10
 	defaultAggregateIntervalInSeconds = 600
 
-	// by default, allow a source to send 25 events about an object
+	// by default, allow a source to send 25 events about an object+reason
 	// but control the refill rate to 1 new event every 5 minutes
 	// this helps control the long-tail of events for things that are always
 	// unhealthy
@@ -66,7 +66,7 @@ func getEventKey(event *v1.Event) string {
 		"")
 }
 
-// getSpamKey builds unique event key based on source, involvedObject
+// getSpamKey builds unique event key based on source, involvedObject, reason
 func getSpamKey(event *v1.Event) string {
 	return strings.Join([]string{
 		event.Source.Component,
@@ -77,6 +77,7 @@ func getSpamKey(event *v1.Event) string {
 		string(event.InvolvedObject.UID),
 		event.InvolvedObject.APIVersion,
 		event.Type,
+		event.Reason,
 	},
 		"")
 }
@@ -430,7 +431,7 @@ type EventCorrelateResult struct {
 //     the same reason.
 //   - Events are incrementally counted if the exact same event is encountered multiple
 //     times.
-//   - A source may burst 25 events about an object, but has a refill rate budget
+//   - A source may burst 25 events about an object+reason, but has a refill rate budget
 //     per object of 1 event every 5 minutes to control long-tail of spam.
 func NewEventCorrelator(clock clock.PassiveClock) *EventCorrelator {
 	cacheSize := maxLruCacheEntries
