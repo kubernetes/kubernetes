@@ -2216,6 +2216,13 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		}
 		return false, nil, err
 	}
+	// Volumes are finished mounting. If this is a startup sync, we need ot make sure we checkpoint the
+	// emptyDir volume limits for any memory-backed volumes.
+	if utilfeature.DefaultFeatureGate.Enabled(features.InPlacePodVerticalScalingMemoryBackedVolumes) {
+		if err := kl.containerRuntime.CheckpointEmptyDirSizeLimitsIfNotSet(logger, pod); err != nil {
+			logger.Error(err, "Unable to checkpoint empty dir size limits for pod", "pod", klog.KObj(pod))
+		}
+	}
 
 	// Fetch the pull secrets for the pod
 	pullSecrets := kl.getPullSecretsForPod(logger, pod)
