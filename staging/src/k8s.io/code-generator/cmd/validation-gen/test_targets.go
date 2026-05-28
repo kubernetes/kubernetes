@@ -379,7 +379,7 @@ func collectRules(node *typeNode) fieldRules {
 	}
 
 	var walkNode func(*typeNode, string, bool, bool)
-	var walkChild func(*childNode, string)
+	var walkChild func(*childNode, string, bool, bool)
 	walkNode = func(n *typeNode, path string, skipElem, skipKey bool) {
 		if n == nil || seen[n] {
 			return
@@ -391,31 +391,46 @@ func collectRules(node *typeNode) fieldRules {
 		if n.valueType == nil {
 			return
 		}
+
+		if n.typeValidations.OpaqueType {
+			return
+		}
+
+		skipElem = skipElem || n.typeValidations.OpaqueValType
+		skipKey = skipKey || n.typeValidations.OpaqueKeyType
+
 		record(joinPath(path, "[*]"), n.typeValIterations.Functions)
 		record(path, n.typeKeyIterations.Functions) // keys validate at parent path
 
 		for _, fld := range n.fields {
-			walkChild(fld, joinPath(path, fld.jsonName))
+			walkChild(fld, joinPath(path, fld.jsonName), false, false)
 		}
 		if n.elem != nil && !skipElem {
-			walkChild(n.elem, joinPath(path, "[*]"))
+			walkChild(n.elem, joinPath(path, "[*]"), false, false)
 		}
 		if n.key != nil && !skipKey {
-			walkChild(n.key, path)
+			walkChild(n.key, path, false, false)
 		}
 		if n.underlying != nil {
-			walkChild(n.underlying, path)
+			walkChild(n.underlying, path, skipElem, skipKey)
 		}
 	}
-	walkChild = func(c *childNode, path string) {
+	walkChild = func(c *childNode, path string, skipElem, skipKey bool) {
 		if c == nil {
 			return
 		}
 		record(path, c.fieldValidations.Functions)
 		record(joinPath(path, "[*]"), c.fieldValIterations.Functions)
 		record(path, c.fieldKeyIterations.Functions)
-		walkNode(c.node, path, c.fieldValidations.OpaqueValType, c.fieldValidations.OpaqueKeyType)
 
+		if c.fieldValidations.OpaqueType {
+			return
+		}
+
+		skipElem = skipElem || c.fieldValidations.OpaqueValType
+		skipKey = skipKey || c.fieldValidations.OpaqueKeyType
+
+		walkNode(c.node, path, skipElem, skipKey)
 	}
 	walkNode(node, "", false, false)
 	return rules

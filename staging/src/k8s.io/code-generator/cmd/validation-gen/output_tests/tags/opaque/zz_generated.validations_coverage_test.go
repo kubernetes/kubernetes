@@ -32,28 +32,6 @@ import (
 
 func init() {
 	coverage.RegisterDeclaredRules(
-		schema.GroupVersionKind{Group: "k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque", Version: "opaque", Kind: "OpaqueFieldsStruct"},
-		coverage.FieldRules{
-			"typedefOpaqueMapField": {
-				{ErrorType: "FieldValueInvalid", Origin: "validateFalse"},
-			},
-			"typedefOpaqueMapField[*]": {
-				{ErrorType: "FieldValueInvalid", Origin: "validateFalse"},
-			},
-			"typedefOpaqueMapField[*].stringField": {
-				{ErrorType: "FieldValueInvalid", Origin: "validateFalse"},
-			},
-			"typedefOpaqueSliceField[*]": {
-				{ErrorType: "FieldValueInvalid", Origin: "validateFalse"},
-			},
-			"typedefOpaqueSliceField[*].stringField": {
-				{ErrorType: "FieldValueInvalid", Origin: "validateFalse"},
-			},
-		},
-	)
-}
-func init() {
-	coverage.RegisterDeclaredRules(
 		schema.GroupVersionKind{Group: "k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque", Version: "opaque", Kind: "OtherString"},
 		coverage.FieldRules{
 			"": {
@@ -152,64 +130,6 @@ func init() {
 				{ErrorType: "FieldValueRequired"},
 			},
 			"structPtrField.stringField": {
-				{ErrorType: "FieldValueInvalid", Origin: "validateFalse"},
-			},
-		},
-	)
-}
-func init() {
-	coverage.RegisterDeclaredRules(
-		schema.GroupVersionKind{Group: "k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque", Version: "opaque", Kind: "TypedefMapOther"},
-		coverage.FieldRules{
-			"": {
-				{ErrorType: "FieldValueInvalid", Origin: "validateFalse"},
-			},
-			"[*]": {
-				{ErrorType: "FieldValueInvalid", Origin: "validateFalse"},
-			},
-			"[*].stringField": {
-				{ErrorType: "FieldValueInvalid", Origin: "validateFalse"},
-			},
-		},
-	)
-}
-func init() {
-	coverage.RegisterDeclaredRules(
-		schema.GroupVersionKind{Group: "k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque", Version: "opaque", Kind: "TypedefOpaqueMap"},
-		coverage.FieldRules{
-			"": {
-				{ErrorType: "FieldValueInvalid", Origin: "validateFalse"},
-			},
-			"[*]": {
-				{ErrorType: "FieldValueInvalid", Origin: "validateFalse"},
-			},
-			"[*].stringField": {
-				{ErrorType: "FieldValueInvalid", Origin: "validateFalse"},
-			},
-		},
-	)
-}
-func init() {
-	coverage.RegisterDeclaredRules(
-		schema.GroupVersionKind{Group: "k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque", Version: "opaque", Kind: "TypedefOpaqueSlice"},
-		coverage.FieldRules{
-			"[*]": {
-				{ErrorType: "FieldValueInvalid", Origin: "validateFalse"},
-			},
-			"[*].stringField": {
-				{ErrorType: "FieldValueInvalid", Origin: "validateFalse"},
-			},
-		},
-	)
-}
-func init() {
-	coverage.RegisterDeclaredRules(
-		schema.GroupVersionKind{Group: "k8s.io/code-generator/cmd/validation-gen/output_tests/tags/opaque", Version: "opaque", Kind: "TypedefSliceOther"},
-		coverage.FieldRules{
-			"[*]": {
-				{ErrorType: "FieldValueInvalid", Origin: "validateFalse"},
-			},
-			"[*].stringField": {
 				{ErrorType: "FieldValueInvalid", Origin: "validateFalse"},
 			},
 		},
