@@ -250,11 +250,12 @@ func (s *EtcdOptions) ApplyWithStorageFactoryTo(factory serverstorage.StorageFac
 }
 
 type monitorCache struct {
-	mu       sync.RWMutex
-	closed   bool
-	monitors []metrics.Monitor
-	factory  serverstorage.StorageFactory
-	stopCh   <-chan struct{}
+	mu          sync.RWMutex
+	initialized bool
+	closed      bool
+	monitors    []metrics.Monitor
+	factory     serverstorage.StorageFactory
+	stopCh      <-chan struct{}
 }
 
 var createMonitor = storagefactory.CreateMonitor
@@ -277,7 +278,7 @@ func (c *monitorCache) get() ([]metrics.Monitor, error) {
 		c.mu.RUnlock()
 		return nil, fmt.Errorf("monitor cache is closed")
 	}
-	if c.monitors != nil {
+	if c.initialized {
 		result := c.monitors
 		c.mu.RUnlock()
 		return result, nil
@@ -295,7 +296,7 @@ func (c *monitorCache) initialize() ([]metrics.Monitor, error) {
 	if c.closed {
 		return nil, fmt.Errorf("monitor cache is closed")
 	}
-	if c.monitors != nil {
+	if c.initialized {
 		return c.monitors, nil
 	}
 
@@ -311,6 +312,7 @@ func (c *monitorCache) initialize() ([]metrics.Monitor, error) {
 		monitors = append(monitors, m)
 	}
 	c.monitors = monitors
+	c.initialized = true
 
 	go func() {
 		<-c.stopCh

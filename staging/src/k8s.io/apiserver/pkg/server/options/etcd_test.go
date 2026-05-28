@@ -559,6 +559,23 @@ func TestMonitorCache(t *testing.T) {
 			},
 		},
 		{
+			name: "marks initialized after first get",
+			test: func(t *testing.T) {
+				cache := newTestCache(t)
+				setCreateMonitor(t, func(cfg storagebackend.Config) (metrics.Monitor, error) {
+					return &fakeMonitor{}, nil
+				})
+
+				if _, err := cache.get(); err != nil {
+					t.Fatalf("get() returned error: %v", err)
+				}
+
+				if !cache.initialized {
+					t.Fatal("expected cache to be marked initialized after first get()")
+				}
+			},
+		},
+		{
 			name: "concurrent get calls all return the first initialized monitors",
 			test: func(t *testing.T) {
 				cache := newTestCache(t)
