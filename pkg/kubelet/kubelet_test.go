@@ -1367,6 +1367,7 @@ func TestPurgingObsoleteStatusMapEntries(t *testing.T) {
 }
 
 func TestValidateContainerLogStatus(t *testing.T) {
+	logger, _ := ktesting.NewTestContext(t)
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
@@ -1495,7 +1496,7 @@ func TestValidateContainerLogStatus(t *testing.T) {
 		// Access the log of the most recent container
 		previous := false
 		podStatus := &v1.PodStatus{ContainerStatuses: tc.statuses}
-		_, err := kubelet.validateContainerLogStatus("podName", podStatus, containerName, previous)
+		_, err := kubelet.validateContainerLogStatus(logger, "podName", podStatus, containerName, previous)
 		if !tc.success {
 			assert.Errorf(t, err, "[case %d] error", i)
 		} else {
@@ -1503,14 +1504,14 @@ func TestValidateContainerLogStatus(t *testing.T) {
 		}
 		// Access the log of the previous, terminated container
 		previous = true
-		_, err = kubelet.validateContainerLogStatus("podName", podStatus, containerName, previous)
+		_, err = kubelet.validateContainerLogStatus(logger, "podName", podStatus, containerName, previous)
 		if !tc.pSuccess {
 			assert.Errorf(t, err, "[case %d] error", i)
 		} else {
 			assert.NoErrorf(t, err, "[case %d] error", i)
 		}
 		// Access the log of a container that's not in the pod
-		_, err = kubelet.validateContainerLogStatus("podName", podStatus, "blah", false)
+		_, err = kubelet.validateContainerLogStatus(logger, "podName", podStatus, "blah", false)
 		assert.Errorf(t, err, "[case %d] invalid container name should cause an error", i)
 	}
 }
