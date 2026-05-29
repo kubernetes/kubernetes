@@ -31,6 +31,38 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// pluralizeName converts a Kind name to its plural form using English pluralization rules.
+// Examples: Pod -> pods, Policy -> policies, Class -> classes
+func pluralizeName(kindName string) string {
+	singularName := strings.ToLower(kindName)
+
+	// Apply English pluralization rules based on suffix
+	switch {
+	case strings.HasSuffix(singularName, "z"):
+		// Double 'z' before adding 'es' (quiz -> quizzes)
+		return singularName + "zes"
+	case strings.HasSuffix(singularName, "s"), strings.HasSuffix(singularName, "x"),
+		strings.HasSuffix(singularName, "ch"), strings.HasSuffix(singularName, "sh"):
+		return singularName + "es"
+	case strings.HasSuffix(singularName, "y") && len(singularName) > 1 &&
+		!isVowel(rune(singularName[len(singularName)-2])):
+		// If 'y' is preceded by consonant, replace 'y' with 'ies'
+		return singularName[:len(singularName)-1] + "ies"
+	default:
+		return singularName + "s"
+	}
+}
+
+// isVowel returns true if the rune is an English vowel.
+func isVowel(r rune) bool {
+	switch r {
+	case 'a', 'e', 'i', 'o', 'u':
+		return true
+	default:
+		return false
+	}
+}
+
 // informerGenerator produces a file of listers for a given GroupVersion and
 // type.
 type informerGenerator struct {
@@ -103,7 +135,7 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 		"namespaceAll":                             c.Universe.Type(metav1NamespaceAll),
 		"namespaced":                               !tags.NonNamespaced,
 		"newLister":                                c.Universe.Function(types.Name{Package: listerPackage, Name: "New" + t.Name.Name + "Lister"}),
-		"resourceName":                             strings.ToLower(t.Name.Name) + "s",
+		"resourceName":                             pluralizeName(t.Name.Name),
 		"runtimeObject":                            c.Universe.Type(runtimeObject),
 		"schemaGroupVersionResource":               c.Universe.Type(schemaGroupVersionResource),
 		"timeDuration":                             c.Universe.Type(timeDuration),
