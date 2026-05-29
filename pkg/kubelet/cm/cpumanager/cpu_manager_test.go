@@ -48,10 +48,24 @@ import (
 	"k8s.io/utils/cpuset"
 )
 
+type mockStateStats struct {
+	SetCPUSet            int
+	SetDefaultCPUSet     int
+	SetCPUAssignments    int
+	SetPodCPUSet         int
+	SetPodCPUAssignments int
+	Delete               int
+	ClearState           int
+	HoldStore            int
+	Store                int
+}
+
 type mockState struct {
 	assignments    state.ContainerCPUAssignments
 	podAssignments state.PodCPUAssignments
 	defaultCPUSet  cpuset.CPUSet
+	hold           int
+	callStats      [2]mockStateStats
 }
 
 func (s *mockState) GetCPUSet(podUID string, containerName string) (cpuset.CPUSet, bool) {
@@ -76,6 +90,7 @@ func (s *mockState) GetPodCPUSet(podUID string) (cpuset.CPUSet, bool) {
 }
 
 func (s *mockState) SetCPUSet(podUID string, containerName string, cset cpuset.CPUSet) {
+	s.callStats[s.hold].SetCPUSet++
 	if _, exists := s.assignments[podUID]; !exists {
 		s.assignments[podUID] = make(map[string]cpuset.CPUSet)
 	}
@@ -83,6 +98,7 @@ func (s *mockState) SetCPUSet(podUID string, containerName string, cset cpuset.C
 }
 
 func (s *mockState) SetPodCPUSet(podUID string, cset cpuset.CPUSet) {
+	s.callStats[s.hold].SetPodCPUSet++
 	if s.podAssignments == nil {
 		s.podAssignments = make(state.PodCPUAssignments)
 	}
@@ -93,10 +109,12 @@ func (s *mockState) SetPodCPUSet(podUID string, cset cpuset.CPUSet) {
 }
 
 func (s *mockState) SetDefaultCPUSet(cset cpuset.CPUSet) {
+	s.callStats[s.hold].SetDefaultCPUSet++
 	s.defaultCPUSet = cset
 }
 
 func (s *mockState) Delete(podUID string, containerName string) {
+	s.callStats[s.hold].Delete++
 	delete(s.assignments[podUID], containerName)
 	if len(s.assignments[podUID]) == 0 {
 		delete(s.assignments, podUID)
@@ -104,6 +122,7 @@ func (s *mockState) Delete(podUID string, containerName string) {
 }
 
 func (s *mockState) ClearState() {
+	s.callStats[s.hold].ClearState++
 	s.defaultCPUSet = cpuset.New()
 	s.assignments = make(state.ContainerCPUAssignments)
 	s.podAssignments = make(state.PodCPUAssignments)
@@ -114,10 +133,12 @@ func (s *mockState) DeletePod(podUID string) {
 }
 
 func (s *mockState) SetCPUAssignments(a state.ContainerCPUAssignments) {
+	s.callStats[s.hold].SetCPUAssignments++
 	s.assignments = a.Clone()
 }
 
 func (s *mockState) SetPodCPUAssignments(a state.PodCPUAssignments) {
+	s.callStats[s.hold].SetPodCPUAssignments++
 	s.podAssignments = a.Clone()
 }
 
@@ -129,9 +150,15 @@ func (s *mockState) GetPodCPUAssignments() state.PodCPUAssignments {
 	return s.podAssignments.Clone()
 }
 
-func (s *mockState) HoldStore() {}
+func (s *mockState) HoldStore() {
+	s.callStats[s.hold].HoldStore++
+	s.hold = 1
+}
 
-func (s *mockState) Store() {}
+func (s *mockState) Store() {
+	s.callStats[s.hold].Store++
+	s.hold = 0
+}
 
 type mockPolicy struct {
 	err error
