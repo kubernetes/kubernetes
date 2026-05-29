@@ -206,6 +206,7 @@ type execInContainer struct {
 	// run executes a command in a container. Combined stdout and stderr output is always returned. An
 	// error is returned if one occurred.
 	run       func() ([]byte, error)
+	logger    klog.Logger
 	writer    io.Writer
 	pod       *v1.Pod
 	container v1.Container
@@ -214,6 +215,7 @@ type execInContainer struct {
 func (pb *prober) newExecInContainer(ctx context.Context, pod *v1.Pod, container v1.Container, containerID kubecontainer.ContainerID, cmd []string, timeout time.Duration) exec.Cmd {
 	return &execInContainer{
 		run:       func() ([]byte, error) { return pb.runner.RunInContainer(ctx, containerID, cmd, timeout) },
+		logger:    klog.FromContext(ctx),
 		pod:       pod,
 		container: container,
 	}
@@ -260,9 +262,7 @@ func (eic *execInContainer) Start() error {
 	if eic.writer != nil {
 		// only record the write error, do not cover the command run error
 		if p, err := eic.writer.Write(data); err != nil {
-			// Use klog.TODO() because we currently do not have a proper context/logger to pass in.
-			// Replace this with an appropriate context/logger when refactoring this function to accept a context parameter.
-			klog.TODO().Error(err, "Unable to write all bytes from execInContainer", "expectedBytes", len(data), "actualBytes", p, "pod", klog.KObj(eic.pod), "containerName", eic.container.Name)
+			eic.logger.Error(err, "Unable to write all bytes from execInContainer", "expectedBytes", len(data), "actualBytes", p, "pod", klog.KObj(eic.pod), "containerName", eic.container.Name)
 		}
 	}
 	return err
