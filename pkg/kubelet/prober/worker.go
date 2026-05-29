@@ -252,7 +252,12 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 			w.resultsManager.Remove(w.containerID)
 		}
 
-		w.containerID = kubecontainer.ParseContainerID(logger, c.ContainerID)
+		containerID, err := kubecontainer.ParseContainerID(c.ContainerID)
+		if err != nil {
+			logger.Error(err, "Failed to update probe worker container ID; waiting for the next status update")
+			return true // Wait for the next status update.
+		}
+		w.containerID = containerID
 
 		if !utilfeature.DefaultFeatureGate.Enabled(features.ChangeContainerStatusOnKubeletRestart) {
 			// On kubelet restart, we don't want to immediately set the probe result to Failure,

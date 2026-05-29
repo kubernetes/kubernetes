@@ -1380,7 +1380,8 @@ func TestValidateContainerLogStatus(t *testing.T) {
 		{
 			statuses: []v1.ContainerStatus{
 				{
-					Name: containerName,
+					Name:        containerName,
+					ContainerID: "docker://fakeid",
 					State: v1.ContainerState{
 						Running: &v1.ContainerStateRunning{},
 					},
@@ -1395,7 +1396,8 @@ func TestValidateContainerLogStatus(t *testing.T) {
 		{
 			statuses: []v1.ContainerStatus{
 				{
-					Name: containerName,
+					Name:        containerName,
+					ContainerID: "docker://fakeid",
 					State: v1.ContainerState{
 						Running: &v1.ContainerStateRunning{},
 					},

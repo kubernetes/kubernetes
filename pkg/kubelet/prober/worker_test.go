@@ -1080,7 +1080,7 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 					podStatus.InitContainerStatuses[0].State.Running.StartedAt = metav1.Time{Time: m.start.Add(5 * time.Minute)}
 				}
 				m.statusManager.SetPodStatus(logger, w.pod, podStatus)
-				containerID = kubecontainer.ParseContainerID(logger, podStatus.InitContainerStatuses[0].ContainerID)
+				containerID = mustParseContainerID(t, podStatus.InitContainerStatuses[0].ContainerID)
 			} else {
 				podStatus := getTestRunningStatus()
 				podStatus.ContainerStatuses[0].ContainerID = "test://container-id"
@@ -1091,7 +1091,7 @@ func TestChangeContainerStatusOnKubeletRestart(t *testing.T) {
 				}
 				w = newTestWorker(m, tc.probeType, v1.Probe{InitialDelaySeconds: 1000})
 				m.statusManager.SetPodStatus(logger, w.pod, podStatus)
-				containerID = kubecontainer.ParseContainerID(logger, podStatus.ContainerStatuses[0].ContainerID)
+				containerID = mustParseContainerID(t, podStatus.ContainerStatuses[0].ContainerID)
 			}
 
 			w.doProbe(ctx)
