@@ -1117,7 +1117,7 @@ func doPodResizeOOMKilledTest(f *framework.Framework) {
 			ginkgo.By("Creating pod with low memory limit to trigger OOMKill")
 			newPod := podClient.Create(ctx, testPod)
 
-			ginkgo.By("Waiting for container to be OOMKilled")
+			ginkgo.By("Waiting for container to enter CrashLoopBackOff after OOMKill (RestartCount >= 2)")
 			framework.ExpectNoError(
 				framework.Gomega().
 					Eventually(ctx, framework.RetryNotFound(
@@ -1128,26 +1128,27 @@ func doPodResizeOOMKilledTest(f *framework.Framework) {
 							if cs.Name != containerName {
 								continue
 							}
-							// accept either currently terminated which caught it right after OOM
-							// or already restarted with OOM recorded in lastTerminationState.
-							if cs.State.Terminated != nil && cs.State.Terminated.Reason == "OOMKilled" {
-								return nil, nil
+							if cs.LastTerminationState.Terminated == nil ||
+								cs.LastTerminationState.Terminated.Reason != "OOMKilled" {
+								return func() string { return "waiting for OOMKilled in lastTerminationState" }, nil
 							}
-							if cs.LastTerminationState.Terminated != nil && cs.LastTerminationState.Terminated.Reason == "OOMKilled" {
-								return nil, nil
+							if cs.RestartCount < 2 {
+								return func() string {
+									return fmt.Sprintf("waiting for RestartCount >= 2 to ensure backoff window (currently %d)", cs.RestartCount)
+								}, nil
 							}
 						}
-						return func() string { return "waiting for OOMKilled state" }, nil
+						return nil, nil
 					})),
 			)
 
-			// fetch the pod at OOMKilled time so we can build the resize patch.
+			// fetch the pod now that it is in backoff so we can build the resize patch.
 			oomPod, err := f.ClientSet.CoreV1().Pods(newPod.Namespace).Get(ctx, newPod.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "failed to get pod after OOMKill")
 			oomCS := e2epod.FindContainerStatusInPod(oomPod, containerName)
 			gomega.Expect(oomCS).NotTo(gomega.BeNil(), "container status not found for %q after OOMKill", containerName)
 			restartCountAtResize := oomCS.RestartCount
-			framework.Logf("Pod %s is OOMKilled (restarts=%d), applying resize to %s",
+			framework.Logf("Pod %s is in CrashLoopBackOff after OOMKill (restarts=%d), applying resize to %s",
 				oomPod.Name, restartCountAtResize, resizedMemLimit)
 
 			// build the resize patch: increase memory limit from initialMemLimit to resizedMemLimit.
@@ -1181,7 +1182,6 @@ func doPodResizeOOMKilledTest(f *framework.Framework) {
 			expectedContainers := []podresize.ResizableContainerInfo{resizedContainerInfo}
 			resizedPod := podresize.WaitForPodResizeActuation(ctx, f, podClient, patchedPod, expectedContainers)
 
-			// Verify that dd successfully allocated 200M after the resize.
 			ginkgo.By("Verifying dd allocated 200M successfully after resize (container exits cleanly, not OOMKilled)")
 			framework.ExpectNoError(
 				framework.Gomega().
@@ -1193,16 +1193,22 @@ func doPodResizeOOMKilledTest(f *framework.Framework) {
 							if cs.Name != containerName {
 								continue
 							}
+							if cs.RestartCount < restartCountAtResize+2 {
+								return func() string {
+									return fmt.Sprintf("waiting for RestartCount >= %d to confirm post-resize cycle (currently %d)",
+										restartCountAtResize+2, cs.RestartCount)
+								}, nil
+							}
 							lt := cs.LastTerminationState.Terminated
 							if lt == nil {
-								return func() string { return "waiting for container to complete a post-resize cycle" }, nil
+								return func() string { return "waiting for post-resize LastTerminationState" }, nil
 							}
 							if lt.ExitCode != 0 {
-								if lt.Reason == "OOMKilled" && cs.RestartCount > restartCountAtResize {
+								if lt.Reason == "OOMKilled" {
 									return nil, gomega.StopTrying("container was OOMKilled after resize; pod-level cgroup was not updated")
 								}
 								return func() string {
-									return fmt.Sprintf("waiting for clean exit after resize-restart (last exit code=%d reason=%q)", lt.ExitCode, lt.Reason)
+									return fmt.Sprintf("waiting for clean exit after resize (last exit code=%d reason=%q)", lt.ExitCode, lt.Reason)
 								}, nil
 							}
 							return nil, nil
