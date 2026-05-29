@@ -63,6 +63,10 @@ type IsEligiblePodFunc func(nodeInfo fwk.NodeInfo, victim fwk.PodInfo, preemptor
 // as affinity between pods that are eligible to preempt each other isn't recommended.
 type MoreImportantPodFunc func(pod1, pod2 *v1.Pod) bool
 
+type podGroupEvaluator interface {
+	Preempt(ctx context.Context, pg *schedulingapi.PodGroup, pods []*v1.Pod, podGroupSchedulingFunc framework.PodGroupSchedulingFunc) (*framework.PodGroupPostFilterResult, *fwk.Status)
+}
+
 // DefaultPreemption is a PostFilter plugin implements the preemption logic.
 type DefaultPreemption struct {
 	fh   fwk.Handle
@@ -72,7 +76,7 @@ type DefaultPreemption struct {
 	Executor          *preemption.Executor
 	Evaluator         *preemption.Evaluator
 	pgLister          v1alpha3.PodGroupLister
-	podGroupEvaluator *preemption.PodGroupEvaluator
+	podGroupEvaluator podGroupEvaluator
 
 	// IsEligiblePod returns whether a victim pod is allowed to be preempted by a preemptor pod.
 	// This filtering is in addition to the internal requirement that the victim pod have lower
@@ -439,8 +443,11 @@ func filterPodsWithPDBViolation(podInfos []fwk.PodInfo, pdbs []*policy.PodDisrup
 }
 
 // PodGroupPostFilter runs a default preemption for the pod group.
-func (pl *DefaultPreemption) PodGroupPostFilter(ctx context.Context, pg *schedulingapi.PodGroup, pods []*v1.Pod, pgSchedulingFunc framework.PodGroupSchedulingFunc) (*framework.PodGroupPostFilterResult, *fwk.Status) {
-	res, status := pl.podGroupEvaluator.Preempt(ctx, pg, pods, pgSchedulingFunc)
+func (pl *DefaultPreemption) PodGroupPostFilter(ctx context.Context, pg *schedulingapi.PodGroup, pods []*v1.Pod, pgSchedulingFunc framework.PodGroupSchedulingFunc) (res *framework.PodGroupPostFilterResult, status *fwk.Status) {
+	defer func() {
+		metrics.WorkloadPreemptionAttempts.WithLabelValues(status.Code().String()).Inc()
+	}()
+	res, status = pl.podGroupEvaluator.Preempt(ctx, pg, pods, pgSchedulingFunc)
 	msg := status.Message()
 	if len(msg) > 0 {
 		return res, fwk.NewStatus(status.Code(), "pod group preemption: "+msg)
