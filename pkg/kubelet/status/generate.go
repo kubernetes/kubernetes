@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -267,8 +268,8 @@ func GeneratePodInitializedCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, co
 	}
 }
 
-func GeneratePodReadyToStartContainersCondition(pod *v1.Pod, oldPodStatus *v1.PodStatus, podStatus *kubecontainer.PodStatus) v1.PodCondition {
-	newSandboxNeeded, _, _ := runtimeutil.PodSandboxChanged(pod, podStatus)
+func GeneratePodReadyToStartContainersCondition(logger klog.Logger, pod *v1.Pod, oldPodStatus *v1.PodStatus, podStatus *kubecontainer.PodStatus) v1.PodCondition {
+	newSandboxNeeded, _, _ := runtimeutil.PodSandboxChanged(logger, pod, podStatus)
 	// if a new sandbox does not need to be created for a pod, it indicates that
 	// a sandbox for the pod with networking configured already exists.
 	// Otherwise, the kubelet needs to invoke the container runtime to create a
