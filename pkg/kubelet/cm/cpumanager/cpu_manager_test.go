@@ -129,6 +129,10 @@ func (s *mockState) GetPodCPUAssignments() state.PodCPUAssignments {
 	return s.podAssignments.Clone()
 }
 
+func (s *mockState) HoldStore() {}
+
+func (s *mockState) Store() {}
+
 type mockPolicy struct {
 	err error
 }

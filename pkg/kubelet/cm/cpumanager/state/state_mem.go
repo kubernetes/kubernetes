@@ -182,3 +182,9 @@ func (s *stateMemory) ClearState() {
 	}
 	s.logger.V(2).Info("Cleared state")
 }
+
+// HoldStore does nothing as stateMemory don't store data
+func (s *stateMemory) HoldStore() {}
+
+// Store does nothing as stateMemory don't store data
+func (s *stateMemory) Store() {}

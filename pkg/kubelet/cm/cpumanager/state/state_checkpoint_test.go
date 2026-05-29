@@ -741,6 +741,610 @@ func TestCheckpointStateClear(t *testing.T) {
 	}
 }
 
+func TestCheckpointStateHoldStore(t *testing.T) {
+	podUID := "pod"
+	initialState := &stateMemory{
+		defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+		assignments: map[string]map[string]cpuset.CPUSet{
+			podUID: {
+				"c1": cpuset.New(0, 1),
+				"c2": cpuset.New(2, 3, 4, 5),
+				"c3": cpuset.New(),
+			},
+		},
+	}
+	testCases := []struct {
+		description         string
+		fgRequirements      FeatureGateCombination
+		scenario            func(State)
+		expectedCachedState *stateMemory
+		expectedStoredState *stateMemory
+	}{
+		{
+			"Hold store and assign CPUs to container",
+			nil,
+			func(s State) {
+				s.HoldStore()
+				s.SetCPUSet(podUID, "c1", cpuset.New(6, 7))
+			},
+			&stateMemory{
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+				assignments: map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(6, 7),
+						"c2": cpuset.New(2, 3, 4, 5),
+						"c3": cpuset.New(),
+					},
+				},
+			},
+			initialState,
+		},
+		{
+			"Hold store and set default CPU set",
+			nil,
+			func(s State) {
+				s.HoldStore()
+				s.SetDefaultCPUSet(cpuset.New(0, 1, 2, 3, 4, 5, 6, 9, 10))
+			},
+			&stateMemory{
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 9, 10),
+				assignments: map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(0, 1),
+						"c2": cpuset.New(2, 3, 4, 5),
+						"c3": cpuset.New(),
+					},
+				},
+			},
+			initialState,
+		},
+		{
+			"Hold store and set CPU assignments",
+			nil,
+			func(s State) {
+				s.HoldStore()
+				s.SetCPUAssignments(map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(),
+						"c2": cpuset.New(2, 3),
+						"c4": cpuset.New(0, 1),
+					},
+				})
+			},
+			&stateMemory{
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+				assignments: map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(),
+						"c2": cpuset.New(2, 3),
+						"c4": cpuset.New(0, 1),
+					},
+				},
+			},
+			initialState,
+		},
+		{
+			"Hold store and delete CPU assignment to container",
+			nil,
+			func(s State) {
+				s.HoldStore()
+				s.Delete(podUID, "c2")
+			},
+			&stateMemory{
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+				assignments: map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(0, 1),
+						"c3": cpuset.New(),
+					},
+				},
+			},
+			initialState,
+		},
+		{
+			"Hold store and cleare the state",
+			nil,
+			func(s State) {
+				s.HoldStore()
+				s.ClearState()
+			},
+			&stateMemory{},
+			initialState,
+		},
+		{
+			"Hold store and set pod-level CPU set",
+			FeatureGateCombination{features.PodLevelResourceManagers: true},
+			func(s State) {
+				s.HoldStore()
+				s.SetPodCPUSet(podUID, cpuset.New(0, 1, 2, 3, 4, 5, 6, 7))
+			},
+			&stateMemory{
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+				assignments: map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(0, 1),
+						"c2": cpuset.New(2, 3, 4, 5),
+						"c3": cpuset.New(),
+					},
+				},
+				podAssignments: PodCPUAssignments{
+					podUID: PodEntry{cpuset.New(0, 1, 2, 3, 4, 5, 6, 7)},
+				},
+			},
+			initialState,
+		},
+		{
+			"Hold store and set pod-level CPU assignments",
+			FeatureGateCombination{features.PodLevelResourceManagers: true},
+			func(s State) {
+				s.HoldStore()
+				s.SetPodCPUAssignments(PodCPUAssignments{
+					podUID: PodEntry{cpuset.New(0, 1, 2, 3, 4, 5, 6)},
+				})
+			},
+			&stateMemory{
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+				assignments: map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(0, 1),
+						"c2": cpuset.New(2, 3, 4, 5),
+						"c3": cpuset.New(),
+					},
+				},
+				podAssignments: PodCPUAssignments{
+					podUID: PodEntry{cpuset.New(0, 1, 2, 3, 4, 5, 6)},
+				},
+			},
+			initialState,
+		},
+		{
+			"Hold store and delete pod-level CPU for pod",
+			FeatureGateCombination{features.PodLevelResourceManagers: true},
+			func(s State) {
+				s.SetPodCPUAssignments(PodCPUAssignments{
+					podUID: PodEntry{cpuset.New(0, 1, 2, 3, 4, 5, 6)},
+				})
+
+				s.HoldStore()
+				s.DeletePod(podUID)
+			},
+			&stateMemory{
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+				assignments: map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(0, 1),
+						"c2": cpuset.New(2, 3, 4, 5),
+						"c3": cpuset.New(),
+					},
+				},
+			},
+			&stateMemory{
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+				assignments: map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(0, 1),
+						"c2": cpuset.New(2, 3, 4, 5),
+						"c3": cpuset.New(),
+					},
+				},
+				podAssignments: PodCPUAssignments{
+					podUID: PodEntry{cpuset.New(0, 1, 2, 3, 4, 5, 6)},
+				},
+			},
+		},
+		{
+			"Store container CPU set after hold is disabled",
+			nil,
+			func(s State) {
+				s.HoldStore()
+				defer s.Store()
+				s.SetCPUSet(podUID, "c1", cpuset.New(6, 7))
+			},
+			&stateMemory{
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+				assignments: map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(6, 7),
+						"c2": cpuset.New(2, 3, 4, 5),
+						"c3": cpuset.New(),
+					},
+				},
+			},
+			&stateMemory{
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+				assignments: map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(6, 7),
+						"c2": cpuset.New(2, 3, 4, 5),
+						"c3": cpuset.New(),
+					},
+				},
+			},
+		},
+		{
+			"Store default CPU set after hold is disabled",
+			nil,
+			func(s State) {
+				s.HoldStore()
+				defer s.Store()
+				s.SetDefaultCPUSet(cpuset.New(0, 1, 2, 3, 4, 5, 6, 9, 10))
+			},
+			&stateMemory{
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 9, 10),
+				assignments: map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(0, 1),
+						"c2": cpuset.New(2, 3, 4, 5),
+						"c3": cpuset.New(),
+					},
+				},
+			},
+			&stateMemory{
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 9, 10),
+				assignments: map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(0, 1),
+						"c2": cpuset.New(2, 3, 4, 5),
+						"c3": cpuset.New(),
+					},
+				},
+			},
+		},
+		{
+			"Store CPU assignments after hold is disabled",
+			nil,
+			func(s State) {
+				s.HoldStore()
+				defer s.Store()
+				s.SetCPUAssignments(map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(),
+						"c2": cpuset.New(2, 3),
+						"c4": cpuset.New(0, 1),
+					},
+				})
+			},
+			&stateMemory{
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+				assignments: map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(),
+						"c2": cpuset.New(2, 3),
+						"c4": cpuset.New(0, 1),
+					},
+				},
+			},
+			&stateMemory{
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+				assignments: map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(),
+						"c2": cpuset.New(2, 3),
+						"c4": cpuset.New(0, 1),
+					},
+				},
+			},
+		},
+		{
+			"Store deletion of CPU assignments after hold is disabled",
+			nil,
+			func(s State) {
+				s.HoldStore()
+				defer s.Store()
+				s.Delete(podUID, "c2")
+			},
+			&stateMemory{
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+				assignments: map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(0, 1),
+						"c3": cpuset.New(),
+					},
+				},
+			},
+			&stateMemory{
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+				assignments: map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(0, 1),
+						"c3": cpuset.New(),
+					},
+				},
+			},
+		},
+		{
+			"Store clearing the state after hold is disabled",
+			nil,
+			func(s State) {
+				s.HoldStore()
+				defer s.Store()
+				s.ClearState()
+			},
+			&stateMemory{},
+			&stateMemory{},
+		},
+		{
+			"Store pod-level CPU setting after hold is disabled",
+			FeatureGateCombination{features.PodLevelResourceManagers: true},
+			func(s State) {
+				s.HoldStore()
+				defer s.Store()
+				s.SetPodCPUSet(podUID, cpuset.New(0, 1, 2, 3, 4, 5, 6, 7))
+			},
+			&stateMemory{
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+				assignments: map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(0, 1),
+						"c2": cpuset.New(2, 3, 4, 5),
+						"c3": cpuset.New(),
+					},
+				},
+				podAssignments: PodCPUAssignments{
+					podUID: PodEntry{cpuset.New(0, 1, 2, 3, 4, 5, 6, 7)},
+				},
+			},
+			&stateMemory{
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+				assignments: map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(0, 1),
+						"c2": cpuset.New(2, 3, 4, 5),
+						"c3": cpuset.New(),
+					},
+				},
+				podAssignments: PodCPUAssignments{
+					podUID: PodEntry{cpuset.New(0, 1, 2, 3, 4, 5, 6, 7)},
+				},
+			},
+		},
+		{
+			"Store pod-level CPU assignments after hold is disabled",
+			FeatureGateCombination{features.PodLevelResourceManagers: true},
+			func(s State) {
+				s.HoldStore()
+				defer s.Store()
+				s.SetPodCPUAssignments(PodCPUAssignments{
+					podUID: PodEntry{cpuset.New(0, 1, 2, 3, 4, 5, 6)},
+				})
+			},
+			&stateMemory{
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+				assignments: map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(0, 1),
+						"c2": cpuset.New(2, 3, 4, 5),
+						"c3": cpuset.New(),
+					},
+				},
+				podAssignments: PodCPUAssignments{
+					podUID: PodEntry{cpuset.New(0, 1, 2, 3, 4, 5, 6)},
+				},
+			},
+			&stateMemory{
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+				assignments: map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(0, 1),
+						"c2": cpuset.New(2, 3, 4, 5),
+						"c3": cpuset.New(),
+					},
+				},
+				podAssignments: PodCPUAssignments{
+					podUID: PodEntry{cpuset.New(0, 1, 2, 3, 4, 5, 6)},
+				},
+			},
+		},
+		{
+			"Store pod-level CPU assignments without deleted after hold is disabled",
+			FeatureGateCombination{features.PodLevelResourceManagers: true},
+			func(s State) {
+				s.SetPodCPUAssignments(PodCPUAssignments{
+					podUID: PodEntry{cpuset.New(0, 1, 2, 3, 4, 5, 6)},
+				})
+
+				s.HoldStore()
+				defer s.Store()
+				s.DeletePod(podUID)
+			},
+			&stateMemory{
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+				assignments: map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(0, 1),
+						"c2": cpuset.New(2, 3, 4, 5),
+						"c3": cpuset.New(),
+					},
+				},
+			},
+			&stateMemory{
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+				assignments: map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(0, 1),
+						"c2": cpuset.New(2, 3, 4, 5),
+						"c3": cpuset.New(),
+					},
+				},
+			},
+		},
+		{
+			"Continue regular storing after hold is disabled",
+			nil,
+			func(s State) {
+				s.HoldStore()
+				s.SetCPUSet(podUID, "c1", cpuset.New(6, 7))
+				s.Store()
+
+				s.SetCPUSet(podUID, "c2", cpuset.New(8))
+			},
+			&stateMemory{
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+				assignments: map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(6, 7),
+						"c2": cpuset.New(8),
+						"c3": cpuset.New(),
+					},
+				},
+			},
+			&stateMemory{
+				defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+				assignments: map[string]map[string]cpuset.CPUSet{
+					podUID: {
+						"c1": cpuset.New(6, 7),
+						"c2": cpuset.New(8),
+						"c3": cpuset.New(),
+					},
+				},
+			},
+		},
+	}
+
+	// create temp dir
+	testingDir, err := os.MkdirTemp("", "cpumanager_state_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(testingDir)
+
+	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
+	if err != nil {
+		t.Fatalf("could not create testing checkpoint manager: %v", err)
+	}
+
+	// list of all features verified in this test
+	featureGateList := []featuregate.Feature{
+		features.PodLevelResourceManagers,
+	}
+	// iterate over all possible enabled/disabled feature combinations
+	for _, fgComb := range allFeatureGateCombinations(featureGateList) {
+		// run all testcases for current feature combination
+		t.Run(describe(fgComb), func(t *testing.T) {
+			for _, key := range slices.Sorted(maps.Keys(fgComb)) {
+				featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, key, fgComb[key])
+			}
+
+			for _, tc := range testCases {
+				// verify feature gate requirements for testcase
+				skip := false
+				for fg, requiredState := range tc.fgRequirements {
+					state, exist := fgComb[fg]
+					if !exist || requiredState != state {
+						skip = true
+					}
+				}
+				if skip {
+					continue
+				}
+				t.Run(tc.description, func(t *testing.T) {
+					// ensure there is no previous checkpoint
+					cpm.RemoveCheckpoint(testingCheckpoint)
+
+					logger, _ := ktesting.NewTestContext(t)
+					cs1, err := NewCheckpointState(logger, testingDir, testingCheckpoint, "none", nil)
+					if err != nil {
+						t.Fatalf("could not create testing checkpointState instance: %v", err)
+					}
+
+					// set initial values
+					cs1.SetDefaultCPUSet(initialState.defaultCPUSet)
+					cs1.SetCPUAssignments(initialState.assignments)
+
+					// execute test case scenario
+					tc.scenario(cs1)
+
+					// verify cached state
+					AssertStateEqual(t, cs1, tc.expectedCachedState)
+
+					// restore checkpoint with previously stored values
+					cs2, err := NewCheckpointState(logger, testingDir, testingCheckpoint, "none", nil)
+					if err != nil {
+						t.Fatalf("could not create testing checkpointState instance: %v", err)
+					}
+
+					AssertStateEqual(t, cs2, tc.expectedStoredState)
+				})
+			}
+		})
+	}
+}
+
+func TestCheckpointStateHoldStoreWithNoChanges(t *testing.T) {
+	podUID := "pod"
+	initialState := &stateMemory{
+		defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8),
+		assignments: map[string]map[string]cpuset.CPUSet{
+			podUID: {
+				"c1": cpuset.New(0, 1),
+				"c2": cpuset.New(2, 3, 4, 5),
+				"c3": cpuset.New(),
+			},
+		},
+	}
+	modifiedState := &stateMemory{
+		defaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6),
+		assignments: map[string]map[string]cpuset.CPUSet{
+			"pod": {
+				"c1": cpuset.New(0, 6),
+				"c2": cpuset.New(),
+				"c3": cpuset.New(3, 5),
+			},
+		},
+	}
+
+	// create temp dir
+	testingDir, err := os.MkdirTemp("", "cpumanager_state_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(testingDir)
+
+	cpm, err := checkpointmanager.NewCheckpointManager(testingDir)
+	if err != nil {
+		t.Fatalf("could not create testing checkpoint manager: %v", err)
+	}
+
+	// ensure there is no previous checkpoint
+	cpm.RemoveCheckpoint(testingCheckpoint)
+
+	logger, _ := ktesting.NewTestContext(t)
+	cs1, err := NewCheckpointState(logger, testingDir, testingCheckpoint, "none", nil)
+	if err != nil {
+		t.Fatalf("could not create testing checkpointState instance: %v", err)
+	}
+
+	// set initial values
+	cs1.SetDefaultCPUSet(initialState.defaultCPUSet)
+	cs1.SetCPUAssignments(initialState.assignments)
+
+	// create secondary checkpoint poining to same location
+	cs2, err := NewCheckpointState(logger, testingDir, testingCheckpoint, "none", nil)
+	if err != nil {
+		t.Fatalf("could not create testing checkpointState instance: %v", err)
+	}
+
+	// initiate hold in primary checkpoint
+	cs1.HoldStore()
+
+	// overwrite checkpoint file
+	cs2.SetDefaultCPUSet(modifiedState.defaultCPUSet)
+	cs2.SetCPUAssignments(modifiedState.assignments)
+
+	// release hold on primary checkpoint
+	cs1.Store()
+
+	// verify the primary checkpoint cache is unchanged and contains initial values
+	AssertStateEqual(t, cs1, initialState)
+
+	// verify the stored values with tertiary checkpoint
+	cs3, err := NewCheckpointState(logger, testingDir, testingCheckpoint, "none", nil)
+	if err != nil {
+		t.Fatalf("could not create testing checkpointState instance: %v", err)
+	}
+	AssertStateEqual(t, cs3, modifiedState)
+}
+
 func AssertStateEqual(t *testing.T, sf State, sm State) {
 	cpusetSf := sf.GetDefaultCPUSet()
 	cpusetSm := sm.GetDefaultCPUSet()
@@ -757,7 +1361,7 @@ func AssertStateEqual(t *testing.T, sf State, sm State) {
 	podcpuassignmentSf := sf.GetPodCPUAssignments()
 	podcpuassignmentSm := sm.GetPodCPUAssignments()
 	if !reflect.DeepEqual(podcpuassignmentSf, podcpuassignmentSm) {
-		t.Errorf("State CPU assignments mismatch. Have %s, want %s", podcpuassignmentSf, podcpuassignmentSm)
+		t.Errorf("State Pod CPU assignments mismatch. Have %s, want %s", podcpuassignmentSf, podcpuassignmentSm)
 	}
 }
 
