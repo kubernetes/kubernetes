@@ -964,14 +964,12 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 		var err error
 		// At upsizing, limits should expand prior to requests in order to keep "requests <= limits".
 		if newPodCgLimValue > currPodCgLimValue {
-			// TODO: Pass logger from context once contextual logging migration is complete
-			if err = setPodCgroupConfig(klog.TODO(), rName, true); err != nil {
+			if err = setPodCgroupConfig(logger, rName, true); err != nil {
 				return err
 			}
 		}
 		if newPodCgReqValue > currPodCgReqValue {
-			// TODO: Pass logger from context once contextual logging migration is complete
-			if err = setPodCgroupConfig(klog.TODO(), rName, false); err != nil {
+			if err = setPodCgroupConfig(logger, rName, false); err != nil {
 				return err
 			}
 		}
@@ -984,14 +982,12 @@ func (m *kubeGenericRuntimeManager) doPodResizeAction(ctx context.Context, pod *
 
 		// At downsizing, requests should shrink prior to limits in order to keep "requests <= limits".
 		if newPodCgReqValue < currPodCgReqValue {
-			// TODO: Pass logger from context once contextual logging migration is complete
-			if err = setPodCgroupConfig(klog.TODO(), rName, false); err != nil {
+			if err = setPodCgroupConfig(logger, rName, false); err != nil {
 				return err
 			}
 		}
 		if newPodCgLimValue < currPodCgLimValue {
-			// TODO(#127825): Pass logger from context once contextual logging migration is complete
-			if err = setPodCgroupConfig(klog.TODO(), rName, true); err != nil {
+			if err = setPodCgroupConfig(logger, rName, true); err != nil {
 				return err
 			}
 		}

@@ -50,7 +50,6 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	apitest "k8s.io/cri-api/pkg/apis/testing"
 	crierror "k8s.io/cri-api/pkg/errors"
-	"k8s.io/klog/v2"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/features"
@@ -4615,8 +4614,7 @@ func TestDoPodResizeAction(t *testing.T) {
 				CPUQuota:  ptr.To(cm.MilliCPUToQuota(podCPULimit, cm.QuotaPeriod)),
 			}, nil).Maybe()
 			if tc.expectPodCgroupUpdates > 0 {
-				// TODO: Update to use proper logger once contextual logging migration is complete
-				call := mockPCM.EXPECT().SetPodCgroupConfig(klog.TODO(), mock.Anything, mock.Anything)
+				call := mockPCM.EXPECT().SetPodCgroupConfig(mock.Anything, mock.Anything, mock.Anything)
 				if tc.injectPodUpdateCgroupsError != nil {
 					call.Return(tc.injectPodUpdateCgroupsError).Times(1)
 				} else {
