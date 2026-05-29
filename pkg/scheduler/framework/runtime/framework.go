@@ -494,7 +494,7 @@ func NewFramework(ctx context.Context, r Registry, profile *config.KubeScheduler
 			if p, ok := gs.(framework.PlacementFeasiblePlugin); ok {
 				f.placementFeasiblePlugins = append(f.placementFeasiblePlugins, p)
 			} else {
-				logger.V(2).Info("GenericWorkload is enabled, but GangScheduling plugin does not fulfill PlacementFeasiblePlugin interface.")
+				return nil, fmt.Errorf("GenericWorkload is enabled, but GangScheduling plugin does not fulfill PlacementFeasiblePlugin interface")
 			}
 		}
 	}
