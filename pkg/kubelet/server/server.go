@@ -999,9 +999,7 @@ func getPortForwardRequestParams(req *restful.Request) portForwardRequestParams 
 type responder struct{}
 
 func (r *responder) Error(w http.ResponseWriter, req *http.Request, err error) {
-	// Use context.TODO() because we currently do not have a proper context to pass in.
-	// Replace this with an appropriate context when refactoring this function to accept a context parameter.
-	logger := klog.FromContext(context.TODO())
+	logger := klog.FromContext(req.Context())
 	logger.Error(err, "Error while proxying request")
 	http.Error(w, err.Error(), http.StatusInternalServerError)
 }
