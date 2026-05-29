@@ -6468,6 +6468,67 @@
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
+- name: preemption_evaluation_duration
+  subsystem: scheduler
+  help: Duration in seconds for determining the final victims in preemption
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - preemptor
+  - result
+  buckets:
+  - 0.001
+  - 0.002
+  - 0.004
+  - 0.008
+  - 0.016
+  - 0.032
+  - 0.064
+  - 0.128
+  - 0.256
+  - 0.512
+  - 1.024
+  - 2.048
+  - 4.096
+  - 8.192
+  - 16.384
+  - 32.768
+  - 65.536
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: preemption_execution_duration
+  subsystem: scheduler
+  help: Duration in seconds for preempting the final victims in preemption
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - preemptor
+  - result
+  buckets:
+  - 0.01
+  - 0.02
+  - 0.04
+  - 0.08
+  - 0.16
+  - 0.32
+  - 0.64
+  - 1.28
+  - 2.56
+  - 5.12
+  - 10.24
+  - 20.48
+  - 40.96
+  - 81.92
+  - 163.84
+  - 327.68
+  - 655.36
+  - 1310.72
+  - 2621.44
+  - 5242.88
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
 - name: preemption_goroutines_duration_seconds
   subsystem: scheduler
   help: Duration in seconds for running goroutines for the preemption.
@@ -6506,6 +6567,38 @@
   stabilityLevel: ALPHA
   labels:
   - result
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: preemption_pdb_violations_total
+  subsystem: scheduler
+  help: Total number of pod disruption budget violations caused by preemption
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - preemptor
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: preemption_workload_disruptions
+  subsystem: scheduler
+  help: Number of pod preemption victims that disrupted a workload
+  type: Histogram
+  stabilityLevel: ALPHA
+  labels:
+  - preemptor
+  buckets:
+  - 1
+  - 2
+  - 4
+  - 8
+  - 16
+  - 32
+  - 64
+  - 128
+  - 256
+  - 512
+  - 1024
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
@@ -6606,6 +6699,37 @@
   stabilityLevel: ALPHA
   labels:
   - operation
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: workload_preemption_attempts_total
+  subsystem: scheduler
+  help: Total preemption attempts initiated by workload (including pod groups) in
+    the cluster till now
+  type: Counter
+  stabilityLevel: ALPHA
+  labels:
+  - result
+  componentEndpoints:
+  - component: kube-scheduler
+    endpoint: /metrics
+- name: workload_preemption_victims
+  subsystem: scheduler
+  help: Number of pod preemption victims caused by workload preemption
+  type: Histogram
+  stabilityLevel: ALPHA
+  buckets:
+  - 1
+  - 2
+  - 4
+  - 8
+  - 16
+  - 32
+  - 64
+  - 128
+  - 256
+  - 512
+  - 1024
   componentEndpoints:
   - component: kube-scheduler
     endpoint: /metrics
@@ -8536,7 +8660,8 @@
     endpoint: /metrics
 - name: preemption_victims
   subsystem: scheduler
-  help: Number of selected preemption victims
+  help: Number of selected preemption victims for preemption initiated by a single
+    pod
   type: Histogram
   stabilityLevel: STABLE
   buckets:

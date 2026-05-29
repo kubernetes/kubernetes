@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1"
@@ -31,6 +32,7 @@ import (
 	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/names"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 
 	"k8s.io/klog/v2"
@@ -58,6 +60,29 @@ func NewPodGroupEvaluator(fh fwk.Handle, executor *Executor) *PodGroupEvaluator 
 	}
 }
 
+// evaluate determines the victims for preemption, without actuation.
+func (ev *PodGroupEvaluator) evaluate(ctx context.Context, preemptor *podGroupPreemptor, podGroupSchedulingFunc framework.PodGroupSchedulingFunc) (res *selectVictimsResult, status *fwk.Status) {
+	startTime := time.Now()
+	defer func() {
+		metrics.PreemptionEvaluationDuration.WithLabelValues("podgroup", status.Code().String()).Observe(metrics.SinceInSeconds(startTime))
+	}()
+
+	// In case of workload-aware preemption, the domain is whole cluster.
+	// We do not make a snapshot of node info. Those nodes will be shared
+	// with the PodGroup scheduling algorithm passed as podGroupSchedulingFunc.
+	allNodes, err := ev.Handle.SnapshotSharedLister().NodeInfos().List()
+	if err != nil {
+		return nil, fwk.AsStatus(fmt.Errorf("failed to list node infos: %w", err))
+	}
+	domain := newDomainForWorkloadPreemption(allNodes, ev.podGroupLister, "cluster-domain")
+	pdbs, err := getPodDisruptionBudgets(ev.pdbLister)
+	if err != nil {
+		return nil, fwk.AsStatus(fmt.Errorf("failed to get pod disruption budgets: %w", err))
+	}
+
+	return ev.selectVictimsOnDomain(ctx, preemptor, domain, pdbs, podGroupSchedulingFunc)
+}
+
 // Preempt implements the preemption logic where the preemptor is a pod group
 // and the domain is the whole cluster. It preempts pod from the cluster
 // in order to make enough room for the pod group to be scheduled.
@@ -69,21 +94,8 @@ func NewPodGroupEvaluator(fh fwk.Handle, executor *Executor) *PodGroupEvaluator 
 // The caller is expected to backup the NodeInfo before calling this function
 // And rollback the state to the backup after function is finished.
 func (ev *PodGroupEvaluator) Preempt(ctx context.Context, pg *schedulingapi.PodGroup, pods []*v1.Pod, podGroupSchedulingFunc framework.PodGroupSchedulingFunc) (*framework.PodGroupPostFilterResult, *fwk.Status) {
-	// In case of workload-aware preemption, the domain is whole cluster.
-	// We do not make a snapshot of node info. Those nodes will be shared
-	// with the PodGroup scheduling algorithm passed as podGroupSchedulingFunc.
-	allNodes, err := ev.Handle.SnapshotSharedLister().NodeInfos().List()
-	if err != nil {
-		return nil, fwk.AsStatus(fmt.Errorf("failed to list node infos: %w", err))
-	}
-	domain := newDomainForWorkloadPreemption(allNodes, ev.podGroupLister, "cluster-domain")
 	preemptor := newPodGroupPreemptor(pg, pods)
-	pdbs, err := getPodDisruptionBudgets(ev.pdbLister)
-	if err != nil {
-		return nil, fwk.AsStatus(fmt.Errorf("failed to get pod disruption budgets: %w", err))
-	}
-
-	res, status := ev.selectVictimsOnDomain(ctx, preemptor, domain, pdbs, podGroupSchedulingFunc)
+	res, status := ev.evaluate(ctx, preemptor, podGroupSchedulingFunc)
 	if !status.IsSuccess() {
 		return nil, status
 	}
@@ -254,7 +266,8 @@ func (ev *PodGroupEvaluator) selectVictimsOnDomain(
 	}
 
 	v := &extenderv1.Victims{
-		Pods: podsToPreempt,
+		Pods:             podsToPreempt,
+		NumPDBViolations: int64(numViolatingVictim),
 	}
 	n := make(map[*v1.Pod]*fwk.NominatingInfo)
 	for _, p := range podGroupAssignments.ProposedAssignments {

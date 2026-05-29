@@ -220,7 +220,7 @@ func (e *Executor) prepareCandidateAsync(c Candidate, preemptor ExecutorPreempto
 		return
 	}
 
-	metrics.PreemptionVictims.Observe(float64(len(c.Victims().Pods)))
+	observeVictims(preemptor, c.Victims())
 
 	errCh := parallelize.NewResultChannel[error]()
 	preemptPod := func(index int) {
@@ -238,8 +238,15 @@ func (e *Executor) prepareCandidateAsync(c Candidate, preemptor ExecutorPreempto
 		logger := klog.FromContext(ctx)
 		startTime := time.Now()
 		result := metrics.GoroutineResultSuccess
-		defer metrics.PreemptionGoroutinesDuration.WithLabelValues(result).Observe(metrics.SinceInSeconds(startTime))
-		defer metrics.PreemptionGoroutinesExecutionTotal.WithLabelValues(result).Inc()
+		defer func() {
+			metrics.PreemptionExecutionDuration.WithLabelValues(preemptor.Type(), result).Observe(metrics.SinceInSeconds(startTime))
+		}()
+		defer func() {
+			metrics.PreemptionGoroutinesDuration.WithLabelValues(result).Observe(metrics.SinceInSeconds(startTime))
+		}()
+		defer func() {
+			metrics.PreemptionGoroutinesExecutionTotal.WithLabelValues(result).Inc()
+		}()
 		defer func() {
 			if result == metrics.GoroutineResultError {
 				// When API call isn't successful, the preemptor's Pods may get stuck in the unschedulable pod pool in the worst case.
@@ -309,7 +316,12 @@ func (e *Executor) prepareCandidateAsync(c Candidate, preemptor ExecutorPreempto
 // - Reject the victim pods if they are in waitingPod map
 // - Clear the low-priority pods' nominatedNodeName status if needed
 func (e *Executor) prepareCandidate(ctx context.Context, c Candidate, preemptor ExecutorPreemptor, pluginName string) *fwk.Status {
-	metrics.PreemptionVictims.Observe(float64(len(c.Victims().Pods)))
+	observeVictims(preemptor, c.Victims())
+	startTime := time.Now()
+	metricsResult := metrics.GoroutineResultSuccess
+	defer func() {
+		metrics.PreemptionExecutionDuration.WithLabelValues(preemptor.Type(), metricsResult).Observe(metrics.SinceInSeconds(startTime))
+	}()
 
 	fh := e.fh
 	cs := e.fh.ClientSet()
@@ -330,6 +342,7 @@ func (e *Executor) prepareCandidate(ctx context.Context, c Candidate, preemptor 
 		}
 	}, pluginName)
 	if err := errCh.Receive(); err != nil {
+		metricsResult = metrics.GoroutineResultError
 		return fwk.AsStatus(err)
 	}
 
@@ -344,6 +357,28 @@ func (e *Executor) prepareCandidate(ctx context.Context, c Candidate, preemptor 
 	}
 
 	return nil
+}
+
+func observeVictims(preemptor ExecutorPreemptor, victims *extenderv1.Victims) {
+	if preemptor.Type() == "podgroup" {
+		metrics.WorkloadPreemptionVictims.Observe(float64(len(victims.Pods)))
+	} else {
+		metrics.PreemptionVictims.Observe(float64(len(victims.Pods)))
+	}
+
+	var workloadDisruptions int
+	for _, victim := range victims.Pods {
+		if victim.Spec.SchedulingGroup != nil {
+			workloadDisruptions++
+		}
+	}
+	if workloadDisruptions > 0 {
+		metrics.PreemptionWorkloadDisruptions.WithLabelValues(preemptor.Type()).Observe(float64(workloadDisruptions))
+	}
+
+	if victims.NumPDBViolations > 0 {
+		metrics.PreemptionPDBViolations.WithLabelValues(preemptor.Type()).Add(float64(victims.NumPDBViolations))
+	}
 }
 
 // IsPodRunningPreemption returns true if the pod is currently triggering preemption asynchronously.

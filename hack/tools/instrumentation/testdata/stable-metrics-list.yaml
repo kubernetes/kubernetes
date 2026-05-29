@@ -1110,7 +1110,8 @@
   stabilityLevel: STABLE
 - name: preemption_victims
   subsystem: scheduler
-  help: Number of selected preemption victims
+  help: Number of selected preemption victims for preemption initiated by a single
+    pod
   type: Histogram
   stabilityLevel: STABLE
   buckets:
