@@ -255,6 +255,7 @@ type svmTest struct {
 	server                      *kubeapiservertesting.TestServer
 	apiextensionsclient         *apiextensionsclientset.Clientset
 	filePathForEncryptionConfig string
+	allowChaosNotFoundEvents    bool
 }
 
 func svmSetup(ctx context.Context, t *testing.T) *svmTest {
@@ -320,6 +321,9 @@ func svmSetup(ctx context.Context, t *testing.T) *svmTest {
 			if event.User != "system:serviceaccount:kube-system:storage-version-migrator-controller" {
 				return false
 			}
+			if svmTest.isExpectedSVMControllerAuditEvent(event) {
+				return false
+			}
 			if !validCodes.Has(event.Code) {
 				t.Errorf("svm controller had invalid response code for event: %#v", event)
 				return true
@@ -338,6 +342,17 @@ func svmSetup(ctx context.Context, t *testing.T) *svmTest {
 	})
 
 	return svmTest
+}
+
+func (svm *svmTest) isExpectedSVMControllerAuditEvent(event utils.AuditEvent) bool {
+	if !svm.allowChaosNotFoundEvents {
+		return false
+	}
+	return event.Code == http.StatusNotFound &&
+		event.Verb == "patch" &&
+		event.Namespace == defaultNamespace &&
+		event.Resource == crdName+"s" &&
+		strings.Contains(event.RequestURI, "/chaos-cr-")
 }
 
 func createKubeConfigFileForRestConfig(t *testing.T, restConfig *rest.Config) string {

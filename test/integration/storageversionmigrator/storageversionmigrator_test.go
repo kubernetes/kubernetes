@@ -310,6 +310,9 @@ func TestStorageVersionMigrationDuringChaos(t *testing.T) {
 	ctx := ktesting.Init(t)
 
 	svmTest := svmSetup(ctx, t)
+	// The chaos workload deletes these objects concurrently with migration, so the
+	// controller can legitimately observe them during list and get 404 on patch.
+	svmTest.allowChaosNotFoundEvents = true
 
 	svmTest.createChaos(ctx, t)
 
