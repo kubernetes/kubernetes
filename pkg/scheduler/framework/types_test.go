@@ -94,7 +94,7 @@ var (
 
 func TestPodGroupMemberPodsOrderingFunc(t *testing.T) {
 	timestamp := time.Now()
-	timestampNewer := time.Now()
+	timestampNewer := timestamp.Add(time.Second)
 
 	// Desired order: pod3 > pod5 > (pod1 = pod4) > pod2.
 	pInfo1 := &QueuedPodInfo{
