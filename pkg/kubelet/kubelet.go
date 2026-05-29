@@ -674,7 +674,7 @@ func NewMainKubelet(ctx context.Context,
 		klet.configMapManager = configMapManager
 	}
 
-	machineInfo, err := klet.cadvisor.MachineInfo()
+	machineInfo, err := klet.cadvisor.MachineInfo(logger)
 	if err != nil {
 		return nil, err
 	}

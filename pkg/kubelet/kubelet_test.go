@@ -299,7 +299,7 @@ func newTestKubeletWithImageList(
 	kubelet.daemonEndpoints = &v1.NodeDaemonEndpoints{}
 
 	kubelet.cadvisor = &cadvisortest.Fake{}
-	machineInfo, _ := kubelet.cadvisor.MachineInfo()
+	machineInfo, _ := kubelet.cadvisor.MachineInfo(logger)
 	kubelet.setCachedMachineInfo(machineInfo)
 	kubelet.tracer = noopoteltrace.NewTracerProvider().Tracer("")
 
@@ -3300,7 +3300,7 @@ func createRemoteRuntimeService(ctx context.Context, endpoint string, t *testing
 }
 
 func TestNewMainKubeletStandAlone(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	tempDir, err := os.MkdirTemp("", "logs")
 	require.NoError(t, err)
 	containerLogsDir := ContainerLogsDir
@@ -3352,7 +3352,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 	var prober volume.DynamicPluginProber
 	tp := noopoteltrace.NewTracerProvider()
 	cadvisor := cadvisortest.NewMockInterface(t)
-	cadvisor.EXPECT().MachineInfo().Return(&cadvisorapi.MachineInfo{}, nil).Maybe()
+	cadvisor.EXPECT().MachineInfo(logger).Return(&cadvisorapi.MachineInfo{}, nil).Maybe()
 	cadvisor.EXPECT().ImagesFsInfo(tCtx).Return(cadvisorapiv2.FsInfo{
 		Usage:     400,
 		Capacity:  1000,
@@ -3461,7 +3461,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 }
 
 func TestNewMainKubeletWithCertAndCAReloadingEnabled(t *testing.T) {
-	tCtx := ktesting.Init(t)
+	logger, tCtx := ktesting.NewTestContext(t)
 	tempDir, err := os.MkdirTemp("", "logs")
 	require.NoError(t, err)
 	containerLogsDir := ContainerLogsDir
@@ -3513,7 +3513,7 @@ func TestNewMainKubeletWithCertAndCAReloadingEnabled(t *testing.T) {
 	var prober volume.DynamicPluginProber
 	tp := noopoteltrace.NewTracerProvider()
 	cadvisor := cadvisortest.NewMockInterface(t)
-	cadvisor.EXPECT().MachineInfo().Return(&cadvisorapi.MachineInfo{}, nil).Maybe()
+	cadvisor.EXPECT().MachineInfo(logger).Return(&cadvisorapi.MachineInfo{}, nil).Maybe()
 	cadvisor.EXPECT().ImagesFsInfo(tCtx).Return(cadvisorapiv2.FsInfo{
 		Usage:     400,
 		Capacity:  1000,
