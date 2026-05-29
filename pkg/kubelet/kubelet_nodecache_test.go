@@ -17,7 +17,6 @@ limitations under the License.
 package kubelet
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"testing"
@@ -26,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/kubernetes/test/utils/ktesting"
 )
 
 func TestGetCachedNode(t *testing.T) {
@@ -110,6 +110,7 @@ func TestGetCachedNode(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			tCtx := ktesting.Init(t)
 			kl := Kubelet{
 				cachedNode: test.cachedNode,
 				nodeLister: newFakeNodeLister(test.nodeListerErr, test.informerNode),
@@ -117,13 +118,13 @@ func TestGetCachedNode(t *testing.T) {
 			}
 			if test.expectedNode == nil {
 				var err error
-				test.expectedNode, err = kl.initialNode(context.TODO())
+				test.expectedNode, err = kl.initialNode(tCtx)
 				if err != nil {
 					test.expectedErr = true
 				}
 			}
 
-			actualNode, err := kl.GetCachedNode(context.Background(), true)
+			actualNode, err := kl.GetCachedNode(tCtx, true)
 
 			if (err != nil) != test.expectedErr {
 				t.Errorf("GetCachedNode() unexpected error status: %v, expected error: %v", err, test.expectedErr)
