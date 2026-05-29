@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	componentmetrics "k8s.io/component-base/metrics"
 	"k8s.io/klog/v2/ktesting"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	fwk "k8s.io/kube-scheduler/framework"
@@ -940,4 +941,113 @@ func TestGetVictimsOnNode(t *testing.T) {
 			}
 		})
 	}
+}
+
+type evaluationDurationMetricState struct {
+	count uint64
+}
+
+func captureEvaluationDurationMetric(g componentmetrics.Gatherer, preemptorType string, status string) evaluationDurationMetricState {
+	state := evaluationDurationMetricState{}
+	if count, _, err := getHistogramFromGatherer(g, "scheduler_preemption_evaluation_duration_seconds", map[string]string{"preemptor": preemptorType, "result": status}); err == nil {
+		state.count = count
+	}
+	return state
+}
+
+func TestPreemptionEvaluationDurationMetric(t *testing.T) {
+	nodeName := "node1"
+	victim := st.MakePod().Name("victim").UID("victim").Node(nodeName).Priority(midPriority).Obj()
+	preemptor := st.MakePod().Name("preemptor").UID("preemptor").Priority(highPriority).Obj()
+	node := st.MakeNode().Name(nodeName).Obj()
+
+	tests := []struct {
+		name           string
+		podEligible    bool
+		expectedStatus string
+	}{
+		{
+			name:           "eligible preemptor, success",
+			podEligible:    true,
+			expectedStatus: "Success",
+		},
+		{
+			name:           "ineligible preemptor, unschedulable",
+			podEligible:    false,
+			expectedStatus: "Unschedulable",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testRegistry := componentmetrics.NewKubeRegistry()
+			testRegistry.MustRegister(metrics.PreemptionEvaluationDuration)
+
+			_, ctx := ktesting.NewTestContext(t)
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			cs := clientsetfake.NewClientset(node, victim, preemptor)
+			informerFactory := informers.NewSharedInformerFactory(cs, 0)
+
+			snapshot := internalcache.NewSnapshot([]*v1.Pod{victim}, []*v1.Node{node})
+			fh, err := tf.NewFramework(
+				ctx,
+				[]tf.RegisterPluginFunc{
+					tf.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+					tf.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+				},
+				"",
+				frameworkruntime.WithClientSet(cs),
+				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithWaitingPods(frameworkruntime.NewWaitingPodsMap()),
+				frameworkruntime.WithPodsInPreBind(frameworkruntime.NewPodsInPreBindMap()),
+				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithMutableSnapshotLister(snapshot),
+				frameworkruntime.WithPodNominator(internalqueue.NewSchedulingQueue(nil, informerFactory)),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
+
+			fakePostPlugin := &FakePostFilterPlugin{numViolatingVictim: 0}
+			customInterface := &customEvaluationInterface{
+				Interface:   fakePostPlugin,
+				podEligible: tt.podEligible,
+			}
+
+			pe := NewEvaluator("FakePostFilter", fh, customInterface, NewExecutor(fh, feature.Features{}))
+
+			state := framework.NewCycleState()
+			m := framework.NewNodeToStatus(
+				map[string]*fwk.Status{nodeName: fwk.NewStatus(fwk.Unschedulable)},
+				fwk.NewStatus(fwk.UnschedulableAndUnresolvable),
+			)
+
+			stateBefore := captureEvaluationDurationMetric(testRegistry, "pod", tt.expectedStatus)
+
+			pe.evaluate(ctx, state, preemptor, m)
+
+			stateAfter := captureEvaluationDurationMetric(testRegistry, "pod", tt.expectedStatus)
+
+			diff := stateAfter.count - stateBefore.count
+			if diff != 1 {
+				t.Errorf("Expected %s count delta to be 1, got %d", tt.expectedStatus, diff)
+			}
+		})
+	}
+}
+
+type customEvaluationInterface struct {
+	Interface
+	podEligible bool
+}
+
+func (c *customEvaluationInterface) PodEligibleToPreemptOthers(_ context.Context, pod *v1.Pod, nominatedNodeStatus *fwk.Status) (bool, string) {
+	if c.podEligible {
+		return true, ""
+	}
+	return false, "not eligible"
 }
