@@ -252,7 +252,7 @@ func BuildContainerID(typ, ID string) ContainerID {
 func ParseContainerID(containerID string) (ContainerID, error) {
 	var id ContainerID
 	if err := id.ParseString(containerID); err != nil {
-		return ContainerID{}, err
+		return ContainerID{}, fmt.Errorf("failed to parse container ID %q: %w", containerID, err)
 	}
 	return id, nil
 }

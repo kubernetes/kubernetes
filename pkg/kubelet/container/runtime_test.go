@@ -17,6 +17,7 @@ limitations under the License.
 package container
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -68,6 +69,7 @@ func TestParseContainerID(t *testing.T) {
 			result, err := ParseContainerID(tt.input)
 			if tt.wantErr {
 				require.Error(t, err)
+				require.ErrorContains(t, err, fmt.Sprintf("failed to parse container ID %q", tt.input))
 			} else {
 				require.NoError(t, err)
 			}

@@ -1601,7 +1601,7 @@ func (kl *Kubelet) validateContainerLogStatus(logger klog.Logger, podName string
 
 	containerID, err = kubecontainer.ParseContainerID(cID)
 	if err != nil {
-		logger.Error(err, "Parsing container ID failed", "containerID", cID)
+		logger.Error(err, "Failed to validate container log status")
 		return kubecontainer.ContainerID{}, err
 	}
 	return containerID, nil

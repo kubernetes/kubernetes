@@ -272,26 +272,19 @@ func (m *manager) CleanupPods(desiredPods map[types.UID]sets.Empty) {
 	}
 }
 
-func parseContainerID(logger klog.Logger, containerID string) (kubecontainer.ContainerID, bool) {
+func (m *manager) getStartupResult(logger klog.Logger, containerID string) (results.Result, bool) {
 	parsedContainerID, err := kubecontainer.ParseContainerID(containerID)
 	if err != nil {
-		logger.Error(err, "Parsing container ID failed", "containerID", containerID)
-		return kubecontainer.ContainerID{}, false
-	}
-	return parsedContainerID, true
-}
-
-func (m *manager) getStartupResult(logger klog.Logger, containerID string) (results.Result, bool) {
-	parsedContainerID, ok := parseContainerID(logger, containerID)
-	if !ok {
+		logger.Error(err, "Failed to get startup probe result; treating it as missing")
 		return results.Unknown, false
 	}
 	return m.startupManager.Get(parsedContainerID)
 }
 
 func (m *manager) getReadinessResult(logger klog.Logger, containerID string) (results.Result, bool) {
-	parsedContainerID, ok := parseContainerID(logger, containerID)
-	if !ok {
+	parsedContainerID, err := kubecontainer.ParseContainerID(containerID)
+	if err != nil {
+		logger.Error(err, "Failed to get readiness probe result; treating it as missing")
 		return results.Unknown, false
 	}
 	return m.readinessManager.Get(parsedContainerID)

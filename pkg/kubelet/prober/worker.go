@@ -254,7 +254,7 @@ func (w *worker) doProbe(ctx context.Context) (keepGoing bool) {
 
 		containerID, err := kubecontainer.ParseContainerID(c.ContainerID)
 		if err != nil {
-			logger.Error(err, "Parsing container ID failed", "containerID", c.ContainerID)
+			logger.Error(err, "Failed to update probe worker container ID; waiting for the next status update")
 			return true // Wait for the next status update.
 		}
 		w.containerID = containerID
