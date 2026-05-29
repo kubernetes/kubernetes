@@ -666,7 +666,7 @@ func TestPodGroupCycle_PodGroupPostFilter(t *testing.T) {
 	}
 }
 
-func TestPodGroupSchedulingAlgorithm(t *testing.T) {
+func TestPodGroupSchedulingDefaultAlgorithm(t *testing.T) {
 	testNode := st.MakeNode().Name("node1").UID("node1").Obj()
 
 	p1 := st.MakePod().Name("p1").UID("p1").PodGroupName("pg").SchedulerName("test-scheduler").Obj()
@@ -1058,7 +1058,7 @@ func TestPodGroupSchedulingAlgorithm(t *testing.T) {
 					t.Fatalf("Failed to update snapshot: %v", err)
 				}
 
-				result := sched.podGroupSchedulingAlgorithm(ctx, schedFwk, framework.NewCycleState(), podGroupInfo, runAllPostFilters)
+				result := sched.podGroupSchedulingDefaultAlgorithm(ctx, schedFwk, framework.NewCycleState(), podGroupInfo, runAllPostFilters)
 
 				if result.status.Code() != tt.expectedGroupStatusCode {
 					t.Errorf("Expected group status code: %v, got: %v", tt.expectedGroupStatusCode, result.status.Code())

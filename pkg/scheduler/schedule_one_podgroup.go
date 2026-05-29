@@ -340,7 +340,7 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 
 		if !podResult.status.IsSuccess() && !podResult.status.IsRejected() {
 			// When the algorithm returns error or unexpected status, stop evaluating the rest of the pods.
-			result.status = fwk.AsStatus(fmt.Errorf("failed to schedule other pod from a pod group: %w", podResult.status.AsError()))
+			result.status = fwk.NewStatus(podResult.status.Code()).WithError(fmt.Errorf("failed to schedule other pod from a pod group: %w", podResult.status.AsError()))
 			break
 		}
 
@@ -350,7 +350,7 @@ func (sched *Scheduler) podGroupSchedulingDefaultAlgorithm(ctx context.Context, 
 
 		if placementFeasibleStatus.IsError() {
 			// When the algorithm returns error or unexpected status, stop evaluating the rest of the pods.
-			result.status = fwk.AsStatus(fmt.Errorf("failed to evaluate placement feasibility: %w", placementFeasibleStatus.AsError()))
+			result.status = fwk.NewStatus(placementFeasibleStatus.Code()).WithError(fmt.Errorf("failed to evaluate placement feasibility: %w", placementFeasibleStatus.AsError()))
 			break
 		}
 
