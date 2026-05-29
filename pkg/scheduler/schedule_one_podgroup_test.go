@@ -409,30 +409,34 @@ func TestCompletePodGroupAlgorithmResult_SetsPod(t *testing.T) {
 	podGroupState := framework.NewCycleState()
 	groupStatus := fwk.NewStatus(fwk.Unschedulable, "pod group unschedulable")
 
-	result := completePodGroupAlgorithmResult(ctx, podGroupInfo, podGroupState, runAllPostFilters, podGroupAlgorithmResult{
+	podGroupResult := podGroupAlgorithmResult{
 		status: groupStatus,
 		podResults: []algorithmResult{{
 			pod:    p1,
 			status: fwk.NewStatus(fwk.Unschedulable, "p1 unschedulable"),
 		}},
-	})
+	}
+	numInResult := len(podGroupResult.podResults)
+
+	result := completePodGroupAlgorithmResult(ctx, podGroupInfo, podGroupState, runAllPostFilters, podGroupResult)
 
 	if len(result.podResults) != 3 {
 		t.Fatalf("expected 3 pod results, got %d", len(result.podResults))
 	}
-	if result.podResults[0].pod != p1 {
-		t.Errorf("expected pod result 0 to reference p1, got %v", result.podResults[0].pod)
-	}
-	for i, wantPod := range []*v1.Pod{p2, p3} {
-		got := result.podResults[i+1]
+	wantPods := []*v1.Pod{p1, p2, p3}
+	for i, wantPod := range wantPods {
+		got := result.podResults[i]
 		if got.pod != wantPod {
-			t.Errorf("expected pod result %d to reference %q, got %v", i+1, wantPod.Name, got.pod)
+			t.Errorf("expected pod result %d to reference %q, got %v", i, wantPod.Name, got.pod)
+		}
+		if i < numInResult {
+			continue
 		}
 		if got.podCtx == nil {
-			t.Errorf("expected pod result %d to have podCtx set", i+1)
+			t.Errorf("expected pod result %d to have podCtx set", i)
 		}
 		if got.status.Code() != groupStatus.Code() {
-			t.Errorf("expected pod result %d status code %v, got %v", i+1, groupStatus.Code(), got.status.Code())
+			t.Errorf("expected pod result %d status code %v, got %v", i, groupStatus.Code(), got.status.Code())
 		}
 	}
 }
