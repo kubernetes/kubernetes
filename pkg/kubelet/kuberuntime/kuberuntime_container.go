@@ -724,9 +724,9 @@ func (m *kubeGenericRuntimeManager) toKubeContainerStatus(ctx context.Context, p
 	var cStatusStopSignal *v1.Signal
 	if utilfeature.DefaultFeatureGate.Enabled(features.ContainerStopSignals) {
 		signal := status.GetStopSignal().String()
-		// Here Signal_RUNTIME_DEFAULT means that the runtime is not returning any StopSignal
+		// Here Signal_SIGNAL_RUNTIME_DEFAULT means that the runtime is not returning any StopSignal
 		// This happens only when the container runtime version doesn't support StopSignal yet
-		if signal != "" && signal != "RUNTIME_DEFAULT" {
+		if signal != "" && signal != runtimeapi.Signal_SIGNAL_RUNTIME_DEFAULT.String() {
 			cStatusStopSignal = runtimeSignalToString(status.GetStopSignal())
 		}
 	}
