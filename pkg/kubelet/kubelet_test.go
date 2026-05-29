@@ -160,18 +160,19 @@ type TestKubelet struct {
 	fakeKubeClient       *fake.Clientset
 	fakeMirrorClient     *podtest.FakeMirrorClient
 	fakeClock            *testingclock.FakeClock
-	pluginManagerStopCh  chan struct{}
 	mounter              mount.Interface
+	pluginManagerStopCh  chan struct{}
 	volumePlugin         *volumetest.FakeVolumePlugin
 }
 
 func (tk *TestKubelet) Cleanup() {
 	if tk.kubelet != nil {
+		// Signal the plugin manager to shutdown. This prevents reconciliation during cleanup.
 		if tk.pluginManagerStopCh != nil {
 			close(tk.pluginManagerStopCh)
-			tk.pluginManagerStopCh = nil
-			// Allow the plugin manager goroutines to observe stopCh before TempDir cleanup.
-			time.Sleep(20 * time.Millisecond)
+			// Wait for the plugin manager to fully stop before removing rootDirectory, so its goroutines no longer access the filesystem.
+			// Stopped() returns immediately if Run() was never started.
+			<-tk.kubelet.pluginManager.Stopped()
 		}
 		os.RemoveAll(tk.kubelet.rootDirectory)
 		tk.kubelet = nil
@@ -457,11 +458,13 @@ func newTestKubeletWithImageList(
 		kubelet.recorder,
 		volumetest.NewBlockVolumePathHandler())
 
+	pluginManagerStopCh := make(chan struct{})
+	kubelet.pluginManagerStopCh = pluginManagerStopCh
 	kubelet.pluginManager = pluginmanager.NewPluginManager(
 		kubelet.getPluginsRegistrationDir(), /* sockDir */
 		kubelet.recorder,
 	)
-	pluginManagerStopCh := make(chan struct{})
+	pluginManagerStopCh = make(chan struct{})
 	kubelet.pluginManagerStopCh = pluginManagerStopCh
 	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
 
@@ -472,17 +475,7 @@ func newTestKubeletWithImageList(
 	kubelet.AddPodSyncLoopHandler(activeDeadlineHandler)
 	kubelet.AddPodSyncHandler(activeDeadlineHandler)
 	kubelet.kubeletConfiguration.LocalStorageCapacityIsolation = localStorageCapacityIsolation
-	return &TestKubelet{
-		kubelet:              kubelet,
-		fakeRuntime:          fakeRuntime,
-		fakeContainerManager: fakeContainerManager,
-		fakeKubeClient:       fakeKubeClient,
-		fakeMirrorClient:     fakeMirrorClient,
-		fakeClock:            fakeClock,
-		pluginManagerStopCh:  pluginManagerStopCh,
-		mounter:              nil,
-		volumePlugin:         plug,
-	}
+	return &TestKubelet{kubelet, fakeRuntime, fakeContainerManager, fakeKubeClient, fakeMirrorClient, fakeClock, nil, pluginManagerStopCh, plug}
 }
 
 func newTestPods(count int) []*v1.Pod {

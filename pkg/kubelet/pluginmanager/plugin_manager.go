@@ -18,6 +18,7 @@ package pluginmanager
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -42,6 +43,9 @@ type PluginManager interface {
 	// the desired state of world cache in order to be used during plugin
 	// registration/deregistration
 	AddHandler(pluginType string, pluginHandler cache.PluginHandler)
+
+	// Stopped returns a closed channel once Run() has fully exited.
+	Stopped() <-chan struct{}
 }
 
 const (
@@ -76,7 +80,11 @@ func NewPluginManager(
 		reconciler:          reconciler,
 		desiredStateOfWorld: dsw,
 		actualStateOfWorld:  asw,
+		stopped:             make(chan struct{}),
 	}
+	// Close "stopped" channel immediately so Stopped() returns a closed channel
+	// if Run() is never called.
+	close(pm.stopped)
 	return pm
 }
 
@@ -102,30 +110,69 @@ type pluginManager struct {
 	// The data structure is populated by the desired state of the world
 	// populator (plugin watcher).
 	desiredStateOfWorld cache.DesiredStateOfWorld
+
+	// stopped is closed when Run() has fully exited.
+	// It's created closed and is reopened when Run() is called.
+	stopped chan struct{}
+
+	// stoppedMu protects access to stopped channel.
+	stoppedMu sync.RWMutex
+
+	// runOnce ensures Run() logic executes only once.
+	runOnce sync.Once
 }
 
 var _ PluginManager = &pluginManager{}
 
 func (pm *pluginManager) Run(ctx context.Context, sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
-	defer runtime.HandleCrashWithContext(ctx)
+	pm.runOnce.Do(func() {
+		// Reopen the channel since it was created closed.
+		pm.stoppedMu.Lock()
+		pm.stopped = make(chan struct{})
+		pm.stoppedMu.Unlock()
 
-	logger := klog.FromContext(ctx)
+		defer close(pm.stopped)
+		defer runtime.HandleCrashWithContext(ctx)
 
-	if err := pm.desiredStateOfWorldPopulator.Start(ctx, stopCh); err != nil {
-		logger.Error(err, "The desired_state_of_world populator (plugin watcher) starts failed!")
-		return
-	}
+		// Check if a shutdown was requested before manager initialization.
+		// This prevents the filesystem/watcher setup from immediate Kubelet
+		// shutdowns either production or in the test scope.
+		select {
+		case <-stopCh:
+			return
+		default:
+		}
 
-	logger.V(2).Info("The desired_state_of_world populator (plugin watcher) starts")
+		logger := klog.FromContext(ctx)
 
-	logger.Info("Starting Kubelet Plugin Manager")
-	go pm.reconciler.Run(stopCh)
+		if err := pm.desiredStateOfWorldPopulator.Start(ctx, stopCh); err != nil {
+			logger.Error(err, "The desired_state_of_world populator (plugin watcher) starts failed!")
+			return
+		}
 
-	metrics.Register(pm.actualStateOfWorld, pm.desiredStateOfWorld)
-	<-stopCh
-	logger.Info("Shutting down Kubelet Plugin Manager")
+		logger.V(2).Info("The desired_state_of_world populator (plugin watcher) starts")
+
+		logger.Info("Starting Kubelet Plugin Manager")
+		go pm.reconciler.Run(stopCh)
+
+		metrics.Register(pm.actualStateOfWorld, pm.desiredStateOfWorld)
+		<-stopCh
+		logger.Info("Shutting down Kubelet Plugin Manager")
+
+		// Wait for both reconciler and plugin watcher to stop
+		<-pm.reconciler.Stopped()
+		<-pm.desiredStateOfWorldPopulator.Stopped()
+	})
 }
 
 func (pm *pluginManager) AddHandler(pluginType string, handler cache.PluginHandler) {
 	pm.reconciler.AddHandler(pluginType, handler)
+}
+
+// Stopped returns a channel that is closed once Run() has fully exited.
+// If Run() was never called, the returned channel is already closed.
+func (pm *pluginManager) Stopped() <-chan struct{} {
+	pm.stoppedMu.RLock()
+	defer pm.stoppedMu.RUnlock()
+	return pm.stopped
 }

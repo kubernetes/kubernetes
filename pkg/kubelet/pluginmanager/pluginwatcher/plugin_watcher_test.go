@@ -260,6 +260,99 @@ func TestPluginRegistrationAtKubeletStart(t *testing.T) {
 	}
 }
 
+// TestWatcherStoppedOnInitError verifies that Stopped() doesn't block when init fails
+func TestWatcherStoppedOnInitError(t *testing.T) {
+	tCtx := ktesting.Init(t)
+
+	// Create a temporary directory and a file within it.
+	dummyFile := filepath.Join(t.TempDir(), "dummy")
+	err := os.WriteFile(dummyFile, []byte(""), 0644)
+	require.NoError(t, err)
+
+	// Attempt to access the subpath within the path of the file.
+	socketDir := filepath.Join(dummyFile, "test-dir")
+	dsw := cache.NewDesiredStateOfWorld()
+
+	w := NewWatcher(socketDir, dsw)
+	err = w.Start(tCtx, wait.NeverStop)
+
+	// Start should return an error as the directory doesn't exist
+	require.Error(t, err)
+
+	// Stopped() should not block as the channel is closed
+	select {
+	case <-w.Stopped():
+		// Success - channel is closed
+	case <-time.After(1 * time.Second):
+		t.Fatal("Stopped() blocked after Start() failed - stopped channel was not closed")
+	}
+}
+
+// TestWatcherMultipleStartCalls to confirm that the plugin is initialized exactly once
+func TestWatcherMultipleStartCalls(t *testing.T) {
+	socketDir := t.TempDir()
+
+	tCtx := ktesting.Init(t)
+	dsw := cache.NewDesiredStateOfWorld()
+
+	w := NewWatcher(socketDir, dsw)
+
+	stopCh := make(chan struct{})
+
+	// First Start() should succeed
+	err := w.Start(tCtx, stopCh)
+	require.NoError(t, err)
+
+	// Second Start should be no-op (sync.Once guard)
+	err = w.Start(tCtx, stopCh)
+	require.NoError(t, err)
+
+	close(stopCh)
+
+	// Verify Stopped() channel closes properly
+	select {
+	case <-w.Stopped():
+		// Success - watcher stopped cleanly
+	case <-time.After(2 * time.Second):
+		t.Fatal("Watcher did not stop within timeout")
+	}
+}
+
+// TestWatcherDoesNotRecreateDirectoryAfterStop verifies that the watcher does not recreate
+// the plugin directory after it has been stopped and the directory has been removed.
+func TestWatcherDoesNotRecreateDirectoryAfterStop(t *testing.T) {
+	socketDir := t.TempDir()
+
+	dsw := cache.NewDesiredStateOfWorld()
+	stopCh := make(chan struct{})
+
+	w := newWatcher(t, socketDir, dsw, stopCh)
+
+	// Verify directory exists after start
+	_, err := os.Stat(socketDir)
+	require.NoError(t, err, "Plugin directory should exist after watcher starts")
+
+	// Stop the watcher by closing stopCh
+	close(stopCh)
+
+	// Remove directory immediately after signaling stop to confirm
+	// that it's not re-created by the pluginWatcher during its teardown.
+	err = os.RemoveAll(socketDir)
+	require.NoError(t, err, "Should be able to remove plugin directory")
+
+	// Wait for watcher to fully stop
+	select {
+	case <-w.Stopped():
+		// Watcher has stopped
+	case <-time.After(2 * time.Second):
+		t.Fatal("Watcher did not stop within timeout")
+	}
+
+	// Verify socket directory does not exist. Watcher should not recreate it after a successful stop.
+	_, err = os.Stat(socketDir)
+	require.True(t, os.IsNotExist(err), "Plugin directory should not be recreated after watcher stops and directory is removed")
+}
+
 func newWatcher(t *testing.T, socketDir string, desiredStateOfWorldCache cache.DesiredStateOfWorld, stopCh <-chan struct{}) *Watcher {
 	tCtx := ktesting.Init(t)
 	w := NewWatcher(socketDir, desiredStateOfWorldCache)

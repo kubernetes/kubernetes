@@ -1041,6 +1041,8 @@ func NewMainKubelet(ctx context.Context,
 		kubeDeps.Recorder,
 	)
 
+	klet.pluginManagerStopCh = wait.NeverStop
+
 	// If the experimentalMounterPathFlag is set, we do not want to
 	// check node capabilities since the mount path is not the default
 	if len(experimentalMounterPath) != 0 {
@@ -1841,11 +1843,7 @@ func (kl *Kubelet) initializeRuntimeDependentModules(ctx context.Context) {
 
 	// Start the plugin manager
 	logger.V(4).Info("Starting plugin manager")
-	pluginManagerStopCh := kl.pluginManagerStopCh
-	if pluginManagerStopCh == nil {
-		pluginManagerStopCh = wait.NeverStop
-	}
-	go kl.pluginManager.Run(ctx, kl.sourcesReady, pluginManagerStopCh)
+	go kl.pluginManager.Run(ctx, kl.sourcesReady, kl.pluginManagerStopCh)
 
 	err = kl.shutdownManager.Start(ctx)
 	if err != nil {
