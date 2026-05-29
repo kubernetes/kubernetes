@@ -224,6 +224,9 @@ type ValidationExtractor interface {
 
 	// Stability returns the stability level for a given tag.
 	Stability(tag string) (TagStabilityLevel, error)
+
+	// IsKnownTag returns true if the tag is a registered validation tag.
+	IsKnownTag(tag string) bool
 }
 
 // Stability returns the stability level for a given tag.
@@ -243,6 +246,17 @@ func (reg *registry) Stability(tag string) (TagStabilityLevel, error) {
 // GetStability returns the stability level for a given tag from the global registry.
 func GetStability(tag string) (TagStabilityLevel, error) {
 	return globalRegistry.Stability(tag)
+}
+
+// IsKnownTag returns true if the tag has been registered as a validation tag.
+func (reg *registry) IsKnownTag(tag string) bool {
+	_, err := reg.Stability(tag)
+	return err == nil
+}
+
+// IsKnownTag returns true if the given tag is a registered validation tag.
+func IsKnownTag(tag string) bool {
+	return globalRegistry.IsKnownTag(tag)
 }
 
 // InitGlobalValidator must be called exactly once by the main application to
