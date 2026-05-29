@@ -72,7 +72,7 @@ type PriorityClass struct {
 	// +optional
 	Description string
 
-	// preemptionPolicy it the Policy for preempting pods/podgroups with lower priority.
+	// preemptionPolicy it the Policy for preempting pods with lower priority.
 	// One of Never, PreemptLowerPriority.
 	// Defaults to PreemptLowerPriority if unset.
 	// +optional
@@ -245,7 +245,7 @@ type PodGroupTemplate struct {
 	// +optional
 	Priority *int32
 
-	// PreemptionPolicy is the Policy for preempting pods with lower priority.
+	// PreemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
 	// One of Never, PreemptLowerPriority.
 	// Defaults to PreemptLowerPriority if unset.
 	// This field is available only when the WorkloadAwarePreemption feature gate

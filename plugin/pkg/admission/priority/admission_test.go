@@ -789,6 +789,12 @@ func TestAdmitPodGroup(t *testing.T) {
 		return pg
 	}
 
+	podGroupWithPreemptionPolicy := func(priorityClassName string, policy *api.PreemptionPolicy) *scheduling.PodGroup {
+		pg := podGroup(priorityClassName)
+		pg.Spec.PreemptionPolicy = policy
+		return pg
+	}
+
 	attributes := func(podGroup *scheduling.PodGroup, operation admission.Operation) admission.Attributes {
 		var oldPodGroup runtime.Object
 		var options runtime.Object = &metav1.CreateOptions{}
@@ -820,6 +826,7 @@ func TestAdmitPodGroup(t *testing.T) {
 		expectedPriority              int32
 		enableWorkloadAwarePreemption bool
 		expectError                   bool
+		expectedPreemptionPolicy      *api.PreemptionPolicy
 	}{
 		{
 			name:                          "pod group with empty priorityClassName, accepted and set to global default",
@@ -886,6 +893,34 @@ func TestAdmitPodGroup(t *testing.T) {
 			operation:                     admission.Update,
 			enableWorkloadAwarePreemption: true,
 		},
+		{
+			name:                          "pod group with nil preemption policy",
+			priorityClasses:               []*scheduling.PriorityClass{preemptionPolicyClass},
+			preparePodGroup:               podGroupWithPreemptionPolicy(preemptionPolicyClass.Name, nil),
+			operation:                     admission.Create,
+			expectedPriorityClass:         "nopreemptionpolicy",
+			expectedPriority:              preemptionPolicyClass.Value,
+			enableWorkloadAwarePreemption: true,
+			expectedPreemptionPolicy:      &preemptLowerPriority,
+		},
+		{
+			name:                          "pod group with preemption policy that matches preemption policy resolved from priority class",
+			priorityClasses:               []*scheduling.PriorityClass{preemptionPolicyClass},
+			preparePodGroup:               podGroupWithPreemptionPolicy(preemptionPolicyClass.Name, &preemptLowerPriority),
+			operation:                     admission.Create,
+			expectedPriorityClass:         "nopreemptionpolicy",
+			expectedPriority:              preemptionPolicyClass.Value,
+			enableWorkloadAwarePreemption: true,
+			expectedPreemptionPolicy:      &preemptLowerPriority,
+		},
+		{
+			name:                          "pod group with preemption policy that doesn't match preemption policy resolved from priority class",
+			priorityClasses:               []*scheduling.PriorityClass{preemptionPolicyClass},
+			preparePodGroup:               podGroupWithPreemptionPolicy(preemptionPolicyClass.Name, &preemptNever),
+			operation:                     admission.Create,
+			enableWorkloadAwarePreemption: true,
+			expectError:                   true,
+		},
 	}
 
 	for _, tt := range testCases {
@@ -913,6 +948,11 @@ func TestAdmitPodGroup(t *testing.T) {
 				}
 				if *tt.preparePodGroup.Spec.Priority != tt.expectedPriority {
 					t.Errorf("PodGroup Admit(), Priority = %v, want = %v", *tt.preparePodGroup.Spec.Priority, tt.expectedPriority)
+				}
+				if tt.expectedPreemptionPolicy != nil {
+					if tt.preparePodGroup.Spec.PreemptionPolicy == nil || *tt.preparePodGroup.Spec.PreemptionPolicy != *tt.expectedPreemptionPolicy {
+						t.Errorf("PodGroup Admit(), PreemptionPolicy = %v, want = %v", tt.preparePodGroup.Spec.PreemptionPolicy, tt.expectedPreemptionPolicy)
+					}
 				}
 			}
 			if tt.operation != admission.Create {

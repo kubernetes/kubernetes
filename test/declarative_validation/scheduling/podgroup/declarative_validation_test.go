@@ -762,7 +762,7 @@ func mkValidPodGroup(tweaks ...func(pg *scheduling.PodGroup)) scheduling.PodGrou
 	return obj
 }
 
-// mkValidWAPPodGroup produces a PodGroup which passes validation with PreemptionPolicy set to PreemptLowerPriority.
+// mkValidWAPPodGroup produces a PodGroup which passes validation with PreemptionPolicy and DisruptionMode set to defaults.
 func mkValidWAPPodGroup(tweaks ...func(pg *scheduling.PodGroup)) scheduling.PodGroup {
 	tweaksWithDefaults := []func(pg *scheduling.PodGroup){setPreemptionPolicy(core.PreemptLowerPriority), setDisruptionModeSingle()}
 	tweaksWithDefaults = append(tweaksWithDefaults, tweaks...)

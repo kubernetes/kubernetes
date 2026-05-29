@@ -203,7 +203,7 @@ type PodGroupTemplate struct {
 	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:maximum=1000000000 # HighestUserDefinablePriority
 	Priority *int32 `json:"priority,omitempty" protobuf:"varint,7,opt,name=priority"`
 
-	// PreemptionPolicy is the Policy for preempting pods with lower priority.
+	// PreemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
 	// One of Never, PreemptLowerPriority.
 	// Defaults to PreemptLowerPriority if unset.
 	// This field is available only when the WorkloadAwarePreemption feature gate
@@ -485,7 +485,7 @@ type PodGroupSpec struct {
 	// +k8s:ifEnabled("WorkloadAwarePreemption")=+k8s:maximum=1000000000 # HighestUserDefinablePriority
 	Priority *int32 `json:"priority,omitempty" protobuf:"varint,7,opt,name=priority"`
 
-	// PreemptionPolicy is the Policy for preempting pods with lower priority.
+	// PreemptionPolicy is the Policy for preempting pods/podgroups with lower priority.
 	// One of Never, PreemptLowerPriority.
 	// Defaults to PreemptLowerPriority if unset.
 	// This field is immutable.
