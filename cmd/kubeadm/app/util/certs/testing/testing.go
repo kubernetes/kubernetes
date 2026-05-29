@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package certs
+// Package testing contains utilities for managing the kubeadm certificates in tests.
+package testing
 
 import (
 	"crypto"
@@ -29,6 +30,7 @@ import (
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 )
 
@@ -56,6 +58,20 @@ func SetupIntermediateCertificateAuthority(t *testing.T, parentCert *x509.Certif
 	}
 
 	return caCert, caKey
+}
+
+// SetupPkiDirWithCertificateAuthority is a utility function for kubeadm testing that creates a
+// CertificateAuthority cert/key pair into /pki subfolder of a given temporary directory.
+// The function returns the path of the created pki.
+func SetupPkiDirWithCertificateAuthority(t *testing.T, tmpdir string) string {
+	caCert, caKey := SetupCertificateAuthority(t)
+
+	certDir := filepath.Join(tmpdir, "pki")
+	if err := pkiutil.WriteCertAndKey(certDir, kubeadmconstants.CACertAndKeyBaseName, caCert, caKey); err != nil {
+		t.Fatalf("failure while saving CA certificate and key: %v", err)
+	}
+
+	return certDir
 }
 
 // AssertCertificateIsSignedByCa is a utility function for kubeadm testing that asserts if a given certificate is signed

@@ -36,9 +36,9 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	filesutil "k8s.io/kubernetes/cmd/kubeadm/app/util/files/testing"
 	pkiutiltesting "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil/testing"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
-	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
 const (
@@ -214,10 +214,10 @@ func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 			}
 
 			// Assert expected files are there
-			testutil.AssertFilesCount(t, manifestPath, len(test.components))
+			filesutil.AssertFilesCount(t, manifestPath, len(test.components))
 
 			for _, fileName := range test.components {
-				testutil.AssertFileExists(t, manifestPath, fileName+".yaml")
+				filesutil.AssertFileExists(t, manifestPath, fileName+".yaml")
 			}
 		})
 	}

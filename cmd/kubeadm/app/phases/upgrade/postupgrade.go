@@ -38,6 +38,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
+	filesutil "k8s.io/kubernetes/cmd/kubeadm/app/util/files"
 )
 
 // UnupgradedControlPlaneInstances returns a list of control plane instances that have not yet been upgraded.
@@ -109,7 +110,7 @@ func WriteKubeletConfigFiles(cfg *kubeadmapi.InitConfiguration, kubeletDir strin
 
 	if !dryRun {
 		_, _ = fmt.Fprintf(out, "[upgrade] Backing up kubelet config file to %s\n", dest)
-		err := kubeadmutil.CopyFile(src, dest)
+		err := filesutil.CopyFile(src, dest)
 		if err != nil {
 			return errors.Wrap(err, "error backing up the kubelet config file")
 		}
@@ -182,7 +183,7 @@ func RemoveKubeletArgsFromFile(kubeletDir string, kubeConfigDir string, unwanted
 	dest := filepath.Join(backupDir, kubeadmconstants.KubeletEnvFileName)
 
 	_, _ = fmt.Fprintf(out, "[upgrade] Backing up kubelet env file to %s\n", dest)
-	err = kubeadmutil.CopyFile(src, dest)
+	err = filesutil.CopyFile(src, dest)
 	if err != nil {
 		return errors.Wrap(err, "error backing up the kubelet env file")
 	}

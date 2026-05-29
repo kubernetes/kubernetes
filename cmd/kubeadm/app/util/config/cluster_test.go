@@ -33,6 +33,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	clientset "k8s.io/client-go/kubernetes"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 
@@ -41,9 +42,26 @@ import (
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta4"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/errors"
-	testresources "k8s.io/kubernetes/cmd/kubeadm/test/resources"
+	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
+
+// fakeConfigMap is a helper for seeding a fake kube client with a ConfigMap in kube-system
+type fakeConfigMap struct {
+	Name string
+	Data map[string]string
+}
+
+func (c *fakeConfigMap) Create(client clientset.Interface) error {
+	return apiclient.CreateOrUpdate(client.CoreV1().ConfigMaps(metav1.NamespaceSystem), &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      c.Name,
+			Namespace: metav1.NamespaceSystem,
+		},
+		Data: c.Data,
+	})
+}
 
 var k8sVersionString = kubeadmconstants.MinimumControlPlaneVersion.String()
 var nodeName = "mynode"
@@ -280,7 +298,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 	var tests = []struct {
 		name             string
 		nodeName         string
-		staticPod        *testresources.FakeStaticPod
+		staticPod        *staticpodutil.FakeStaticPod
 		expectedEndpoint *kubeadmapi.APIEndpoint
 		expectedErr      bool
 	}{
@@ -292,7 +310,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 		{
 			name:     "valid ipv4 endpoint in pod annotation",
 			nodeName: nodeName,
-			staticPod: &testresources.FakeStaticPod{
+			staticPod: &staticpodutil.FakeStaticPod{
 				Component: kubeadmconstants.KubeAPIServer,
 				Annotations: map[string]string{
 					kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:1234",
@@ -303,7 +321,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 		{
 			name:     "invalid ipv4 endpoint in pod annotation",
 			nodeName: nodeName,
-			staticPod: &testresources.FakeStaticPod{
+			staticPod: &staticpodutil.FakeStaticPod{
 				Component: kubeadmconstants.KubeAPIServer,
 				Annotations: map[string]string{
 					kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3::1234",
@@ -314,7 +332,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 		{
 			name:     "invalid negative port with ipv4 address in pod annotation",
 			nodeName: nodeName,
-			staticPod: &testresources.FakeStaticPod{
+			staticPod: &staticpodutil.FakeStaticPod{
 				Component: kubeadmconstants.KubeAPIServer,
 				Annotations: map[string]string{
 					kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:-1234",
@@ -325,7 +343,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 		{
 			name:     "invalid high port with ipv4 address in pod annotation",
 			nodeName: nodeName,
-			staticPod: &testresources.FakeStaticPod{
+			staticPod: &staticpodutil.FakeStaticPod{
 				Component: kubeadmconstants.KubeAPIServer,
 				Annotations: map[string]string{
 					kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:65536",
@@ -336,7 +354,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 		{
 			name:     "valid ipv6 endpoint in pod annotation",
 			nodeName: nodeName,
-			staticPod: &testresources.FakeStaticPod{
+			staticPod: &staticpodutil.FakeStaticPod{
 				Component: kubeadmconstants.KubeAPIServer,
 				Annotations: map[string]string{
 					kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "[::1]:1234",
@@ -347,7 +365,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 		{
 			name:     "invalid ipv6 endpoint in pod annotation",
 			nodeName: nodeName,
-			staticPod: &testresources.FakeStaticPod{
+			staticPod: &staticpodutil.FakeStaticPod{
 				Component: kubeadmconstants.KubeAPIServer,
 				Annotations: map[string]string{
 					kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "[::1:1234",
@@ -358,7 +376,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 		{
 			name:     "invalid negative port with ipv6 address in pod annotation",
 			nodeName: nodeName,
-			staticPod: &testresources.FakeStaticPod{
+			staticPod: &staticpodutil.FakeStaticPod{
 				Component: kubeadmconstants.KubeAPIServer,
 				Annotations: map[string]string{
 					kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "[::1]:-1234",
@@ -369,7 +387,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 		{
 			name:     "invalid high port with ipv6 address in pod annotation",
 			nodeName: nodeName,
-			staticPod: &testresources.FakeStaticPod{
+			staticPod: &staticpodutil.FakeStaticPod{
 				Component: kubeadmconstants.KubeAPIServer,
 				Annotations: map[string]string{
 					kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "[::1]:65536",
@@ -422,8 +440,8 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 		name                string
 		fileContents        []byte
 		node                *v1.Node
-		staticPods          []testresources.FakeStaticPod
-		configMaps          []testresources.FakeConfigMap
+		staticPods          []staticpodutil.FakeStaticPod
+		configMaps          []fakeConfigMap
 		getNodeRegistration bool
 		getAPIEndpoint      bool
 		expectedError       bool
@@ -434,7 +452,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 		},
 		{
 			name: "invalid - No ClusterConfiguration in kubeadm-config ConfigMap",
-			configMaps: []testresources.FakeConfigMap{
+			configMaps: []fakeConfigMap{
 				{
 					Name: kubeadmconstants.KubeadmConfigConfigMap, // ClusterConfiguration from kubeadm-config.
 					Data: map[string]string{},
@@ -444,7 +462,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 		},
 		{
 			name: "valid v1beta4 - new control plane == false", // InitConfiguration composed with data from different places, with also node specific information
-			staticPods: []testresources.FakeStaticPod{
+			staticPods: []staticpodutil.FakeStaticPod{
 				{
 					NodeName:  nodeName,
 					Component: kubeadmconstants.KubeAPIServer,
@@ -453,7 +471,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 					},
 				},
 			},
-			configMaps: []testresources.FakeConfigMap{
+			configMaps: []fakeConfigMap{
 				{
 					Name: kubeadmconstants.KubeadmConfigConfigMap, // ClusterConfiguration from kubeadm-config.
 					Data: map[string]string{
@@ -487,7 +505,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 		},
 		{
 			name: "valid v1beta3 - new control plane == true", // InitConfiguration composed with data from different places, without node specific information
-			staticPods: []testresources.FakeStaticPod{
+			staticPods: []staticpodutil.FakeStaticPod{
 				{
 					NodeName:  nodeName,
 					Component: kubeadmconstants.KubeAPIServer,
@@ -496,7 +514,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 					},
 				},
 			},
-			configMaps: []testresources.FakeConfigMap{
+			configMaps: []fakeConfigMap{
 				{
 					Name: kubeadmconstants.KubeadmConfigConfigMap, // ClusterConfiguration from kubeadm-config.
 					Data: map[string]string{
@@ -609,7 +627,7 @@ func TestGetAPIEndpointFromPodAnnotation(t *testing.T) {
 	var tests = []struct {
 		name             string
 		nodeName         string
-		pods             []testresources.FakeStaticPod
+		pods             []staticpodutil.FakeStaticPod
 		clientSetup      func(*clientsetfake.Clientset)
 		expectedEndpoint kubeadmapi.APIEndpoint
 		expectedErr      bool
@@ -617,7 +635,7 @@ func TestGetAPIEndpointFromPodAnnotation(t *testing.T) {
 		{
 			name:     "exactly one pod with annotation",
 			nodeName: nodeName,
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					Component:   kubeadmconstants.KubeAPIServer,
 					Annotations: map[string]string{kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:1234"},
@@ -633,7 +651,7 @@ func TestGetAPIEndpointFromPodAnnotation(t *testing.T) {
 		{
 			name:     "exactly one pod with annotation; all requests fail",
 			nodeName: nodeName,
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					Component:   kubeadmconstants.KubeAPIServer,
 					Annotations: map[string]string{kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:1234"},
@@ -683,7 +701,7 @@ func TestGetRawAPIEndpointFromPodAnnotationWithoutRetry(t *testing.T) {
 	var tests = []struct {
 		name             string
 		nodeName         string
-		pods             []testresources.FakeStaticPod
+		pods             []staticpodutil.FakeStaticPod
 		clientSetup      func(*clientsetfake.Clientset)
 		expectedEndpoint string
 		expectedErr      bool
@@ -696,7 +714,7 @@ func TestGetRawAPIEndpointFromPodAnnotationWithoutRetry(t *testing.T) {
 		{
 			name:     "exactly one pod with annotation",
 			nodeName: nodeName,
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					Component:   kubeadmconstants.KubeAPIServer,
 					Annotations: map[string]string{kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:1234"},
@@ -707,7 +725,7 @@ func TestGetRawAPIEndpointFromPodAnnotationWithoutRetry(t *testing.T) {
 		{
 			name:     "two pods: one with annotation, one missing annotation",
 			nodeName: nodeName,
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					Component:   kubeadmconstants.KubeAPIServer,
 					Annotations: map[string]string{kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:1234"},
@@ -721,7 +739,7 @@ func TestGetRawAPIEndpointFromPodAnnotationWithoutRetry(t *testing.T) {
 		{
 			name:     "two pods: different annotations",
 			nodeName: nodeName,
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					Component:   kubeadmconstants.KubeAPIServer,
 					Annotations: map[string]string{kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:1234"},
@@ -736,7 +754,7 @@ func TestGetRawAPIEndpointFromPodAnnotationWithoutRetry(t *testing.T) {
 		{
 			name:     "two pods: both missing annotation",
 			nodeName: nodeName,
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					Component: kubeadmconstants.KubeAPIServer,
 				},
@@ -749,7 +767,7 @@ func TestGetRawAPIEndpointFromPodAnnotationWithoutRetry(t *testing.T) {
 		{
 			name:     "exactly one pod with annotation; request fails",
 			nodeName: nodeName,
-			pods: []testresources.FakeStaticPod{
+			pods: []staticpodutil.FakeStaticPod{
 				{
 					Component:   kubeadmconstants.KubeAPIServer,
 					Annotations: map[string]string{kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:1234"},
