@@ -629,6 +629,65 @@ var _ = SIGDescribe("MemoryQoS", framework.WithSerial(), func() {
 			// since cgroup v2 memory protection is hierarchical (parent=0 wins).
 		})
 
+		ginkgo.It("should clear stale memory.high when MemoryQoS is disabled and container is resized", func(ctx context.Context) {
+			configureMemoryQoSWithPolicy(ctx, 0.9, kubeletconfig.TieredReservationMemoryReservationPolicy)
+
+			pod := memqosMakePod("memqos-resize-rollback", f.Namespace.Name,
+				v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("128Mi"),
+					v1.ResourceCPU:    resource.MustParse("50m"),
+				},
+				v1.ResourceList{
+					v1.ResourceMemory: resource.MustParse("256Mi"),
+					v1.ResourceCPU:    resource.MustParse("100m"),
+				},
+			)
+			pod.Spec.Containers[0].ResizePolicy = []v1.ContainerResizePolicy{
+				{ResourceName: v1.ResourceMemory, RestartPolicy: v1.NotRequired},
+				{ResourceName: v1.ResourceCPU, RestartPolicy: v1.NotRequired},
+			}
+			pod = e2epod.NewPodClient(f).CreateSync(ctx, pod)
+
+			podCgroupPath := memqosGetPodCgroupPath(pod, cgroupDriver)
+			containerCgroupPath := memqosGetContainerCgroupPath(podCgroupPath, pod.Status.ContainerStatuses[0].ContainerID, cgroupDriver)
+
+			memHigh, err := memqosReadCgroupFile(containerCgroupPath, cgroupMemoryHigh)
+			framework.ExpectNoError(err)
+			framework.Logf("memory.high with MemoryQoS enabled: %s", memHigh)
+			gomega.Expect(memHigh).NotTo(gomega.Equal("max"),
+				"memory.high should be a computed value when MemoryQoS is enabled")
+
+			ginkgo.By("Disabling MemoryQoS feature gate")
+			newCfg := oldCfg.DeepCopy()
+			if newCfg.FeatureGates == nil {
+				newCfg.FeatureGates = make(map[string]bool)
+			}
+			newCfg.FeatureGates["MemoryQoS"] = false
+			newCfg.MemoryReservationPolicy = kubeletconfig.NoneMemoryReservationPolicy
+			updateKubeletConfig(ctx, f, newCfg, true)
+
+			memHighStale, err := memqosReadCgroupFile(containerCgroupPath, cgroupMemoryHigh)
+			framework.ExpectNoError(err)
+			framework.Logf("memory.high after disabling MemoryQoS (stale): %s", memHighStale)
+			gomega.Expect(memHighStale).NotTo(gomega.Equal("max"),
+				"memory.high should still be stale before resize")
+
+			ginkgo.By("Resizing the container to trigger updateContainerResources")
+			pod, err = f.ClientSet.CoreV1().Pods(pod.Namespace).Get(ctx, pod.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+
+			pod.Spec.Containers[0].Resources.Requests[v1.ResourceMemory] = resource.MustParse("160Mi")
+			pod.Spec.Containers[0].Resources.Limits[v1.ResourceMemory] = resource.MustParse("320Mi")
+			_, err = f.ClientSet.CoreV1().Pods(pod.Namespace).UpdateResize(ctx, pod.Name, pod, metav1.UpdateOptions{})
+			framework.ExpectNoError(err)
+
+			gomega.Eventually(ctx, func() string {
+				val, _ := memqosReadCgroupFile(containerCgroupPath, cgroupMemoryHigh)
+				return val
+			}).WithTimeout(2*time.Minute).WithPolling(5*time.Second).Should(gomega.Equal("max"),
+				"memory.high should be 'max' after resize with MemoryQoS disabled")
+		})
+
 		ginkgo.It("should not clobber other cgroup values when clearing stale memory protection at startup", func(ctx context.Context) {
 			configureMemoryQoSWithPolicy(ctx, 0.9, kubeletconfig.TieredReservationMemoryReservationPolicy)
 

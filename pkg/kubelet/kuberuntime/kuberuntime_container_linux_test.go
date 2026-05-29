@@ -698,6 +698,51 @@ func TestGenerateContainerConfigMemoryQoSPolicyNone(t *testing.T) {
 	assert.NotEmpty(t, linuxConfig.GetResources().GetUnified()["memory.high"])
 }
 
+func TestMemoryHighClearedWhenMemoryQoSDisabled(t *testing.T) {
+	tCtx := ktesting.Init(t)
+	_, _, m, err := createTestRuntimeManager(tCtx)
+	require.NoError(t, err)
+	m.memoryReservationPolicy = kubeletconfiginternal.TieredReservationMemoryReservationPolicy
+
+	setCgroupVersionDuringTest(cgroupV2)
+	t.Cleanup(func() {
+		setCgroupVersionDuringTest(cgroupV1)
+	})
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "bar",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "foo",
+					Image: "busybox",
+					Resources: v1.ResourceRequirements{
+						Requests: v1.ResourceList{v1.ResourceMemory: resource.MustParse("128Mi")},
+						Limits:   v1.ResourceList{v1.ResourceMemory: resource.MustParse("256Mi")},
+					},
+				},
+			},
+		},
+	}
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryQoS, true)
+	enabledResources := m.generateContainerResources(tCtx, pod, &pod.Spec.Containers[0])
+	require.NotNil(t, enabledResources)
+	memoryHigh := enabledResources.GetLinux().GetUnified()["memory.high"]
+	assert.NotEmpty(t, memoryHigh, "memory.high should be set when MemoryQoS is enabled")
+	assert.NotEqual(t, "max", memoryHigh, "memory.high should not be 'max' when MemoryQoS is enabled")
+
+	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MemoryQoS, false)
+	disabledResources := m.generateContainerResources(tCtx, pod, &pod.Spec.Containers[0])
+	require.NotNil(t, disabledResources)
+	assert.Equal(t, "max", disabledResources.GetLinux().GetUnified()["memory.high"],
+		"memory.high should be 'max' when MemoryQoS is disabled on cgroup v2")
+}
+
 func TestGetHugepageLimitsFromResources(t *testing.T) {
 	tCtx := ktesting.Init(t)
 	var baseHugepage []*runtimeapi.HugepageLimit
@@ -1201,7 +1246,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			false,
-			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 524288000, OomScoreAdj: -997, Unified: map[string]string{"memory.oom.group": "1"}},
+			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 524288000, OomScoreAdj: -997, Unified: map[string]string{"memory.oom.group": "1", "memory.high": "max"}},
 			cgroupV2,
 		},
 		{
@@ -1209,7 +1254,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("500m"), v1.ResourceMemory: resource.MustParse("750Mi")},
 			v1.ResourceList{v1.ResourceCPU: resource.MustParse("250m"), v1.ResourceMemory: resource.MustParse("500Mi")},
 			false,
-			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 786432000, OomScoreAdj: 970, Unified: map[string]string{"memory.oom.group": "1"}},
+			&runtimeapi.LinuxContainerResources{CpuShares: 256, MemoryLimitInBytes: 786432000, OomScoreAdj: 970, Unified: map[string]string{"memory.oom.group": "1", "memory.high": "max"}},
 			cgroupV2,
 		},
 		{
@@ -1217,7 +1262,7 @@ func TestGenerateLinuxContainerResources(t *testing.T) {
 			nil,
 			nil,
 			false,
-			&runtimeapi.LinuxContainerResources{CpuShares: 2, OomScoreAdj: 1000, Unified: map[string]string{"memory.oom.group": "1"}},
+			&runtimeapi.LinuxContainerResources{CpuShares: 2, OomScoreAdj: 1000, Unified: map[string]string{"memory.oom.group": "1", "memory.high": "max"}},
 			cgroupV2,
 		},
 	} {
