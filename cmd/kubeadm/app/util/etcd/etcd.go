@@ -32,7 +32,6 @@ import (
 	"go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	"go.etcd.io/etcd/client/pkg/v3/transport"
 	clientv3 "go.etcd.io/etcd/client/v3"
-	"google.golang.org/grpc"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -132,10 +131,7 @@ func New(endpoints []string, ca, cert, key string) (*Client, error) {
 		return clientv3.New(clientv3.Config{
 			Endpoints:   endpoints,
 			DialTimeout: etcdTimeout,
-			DialOptions: []grpc.DialOption{
-				grpc.WithBlock(), // block until the underlying connection is up
-			},
-			TLS: tlsConfig,
+			TLS:         tlsConfig,
 		})
 	}
 
